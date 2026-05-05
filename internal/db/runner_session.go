@@ -11,16 +11,16 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // RunnerSessions encapsulates the logic to access sessions from the database
 type RunnerSessions interface {
 	GetRunnerSessionByID(ctx context.Context, id string) (*models.RunnerSession, error)
-	GetRunnerSessionByTRN(ctx context.Context, trn string) (*models.RunnerSession, error)
+	GetRunnerSessionByTRN(ctx context.Context, trnValue string) (*models.RunnerSession, error)
 	GetRunnerSessions(ctx context.Context, input *GetRunnerSessionsInput) (*RunnerSessionsResult, error)
 	CreateRunnerSession(ctx context.Context, session *models.RunnerSession) (*models.RunnerSession, error)
 	UpdateRunnerSession(ctx context.Context, session *models.RunnerSession) (*models.RunnerSession, error)
@@ -100,16 +100,16 @@ func (a *sessions) GetRunnerSessionByID(ctx context.Context, id string) (*models
 	return a.getRunnerSession(ctx, goqu.Ex{"runner_sessions.id": id})
 }
 
-func (a *sessions) GetRunnerSessionByTRN(ctx context.Context, trn string) (*models.RunnerSession, error) {
+func (a *sessions) GetRunnerSessionByTRN(ctx context.Context, trnValue string) (*models.RunnerSession, error) {
 	ctx, span := tracer.Start(ctx, "db.GetRunnerSessionByTRN")
 	defer span.End()
 
-	path, err := types.RunnerSessionModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeRunnerSession.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 
 	ex := goqu.Ex{}
 	switch {
@@ -379,9 +379,9 @@ func scanRunnerSession(row scanner) (*models.RunnerSession, error) {
 
 	// Namespace path won't exist for shared runners
 	if namespacePath != nil {
-		session.Metadata.TRN = types.RunnerSessionModelType.BuildTRN(*namespacePath, runnerName, session.GetGlobalID())
+		session.Metadata.TRN = trn.TypeRunnerSession.Build(*namespacePath, runnerName, session.GetGlobalID())
 	} else {
-		session.Metadata.TRN = types.RunnerSessionModelType.BuildTRN(runnerName, session.GetGlobalID())
+		session.Metadata.TRN = trn.TypeRunnerSession.Build(runnerName, session.GetGlobalID())
 	}
 
 	return session, nil

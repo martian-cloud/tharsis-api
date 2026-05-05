@@ -20,12 +20,12 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/registry/addrs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TokenGetterFunc is a function that retrieves a token for a given hostname.
@@ -214,7 +214,7 @@ func (m *federatedTharsisRegistrySource) GetAttestations(ctx context.Context, se
 	}
 	attestations, err := m.federatedRegistryClient.GetModuleAttestations(ctx, &GetModuleAttestationsInput{
 		FederatedRegistry: m.federatedRegistry,
-		ModuleVersionID:   moduleVersion.Metadata.ID,
+		ModuleVersionID:   moduleVersion.Metadata.Id,
 		ModuleDigest:      moduleDigest,
 	})
 	if err != nil {
@@ -240,7 +240,7 @@ func (m *federatedTharsisRegistrySource) ResolveDigest(ctx context.Context, vers
 		return nil, err
 	}
 
-	moduleDigest, err := hex.DecodeString(moduleVersion.SHASum)
+	moduleDigest, err := hex.DecodeString(moduleVersion.ShaSum)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode federated registry module digest")
 	}
@@ -518,7 +518,7 @@ func (m *moduleResolver) ParseModuleRegistrySource(ctx context.Context, moduleSo
 
 // GetModuleByAddress retrieves a module by its namespace, name, and system.
 func GetModuleByAddress(ctx context.Context, dbClient *db.Client, namespace string, name string, system string) (*models.TerraformModule, error) {
-	rootGroup, err := dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespace))
+	rootGroup, err := dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(namespace))
 	if err != nil {
 		return nil, err
 	}

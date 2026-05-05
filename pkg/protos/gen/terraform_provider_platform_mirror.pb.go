@@ -235,6 +235,99 @@ func (x *DeleteTerraformProviderPlatformMirrorRequest) GetId() string {
 	return ""
 }
 
+// GetProviderPlatformPackageDownloadURLRequest is the input for getting a provider platform package download URL.
+type GetProviderPlatformPackageDownloadURLRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	GroupPath         string                 `protobuf:"bytes,1,opt,name=group_path,json=groupPath,proto3" json:"group_path,omitempty"`
+	Type              string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	RegistryNamespace string                 `protobuf:"bytes,3,opt,name=registry_namespace,json=registryNamespace,proto3" json:"registry_namespace,omitempty"`
+	RegistryHostname  string                 `protobuf:"bytes,4,opt,name=registry_hostname,json=registryHostname,proto3" json:"registry_hostname,omitempty"`
+	SemanticVersion   string                 `protobuf:"bytes,5,opt,name=semantic_version,json=semanticVersion,proto3" json:"semantic_version,omitempty"`
+	Os                string                 `protobuf:"bytes,6,opt,name=os,proto3" json:"os,omitempty"`
+	Arch              string                 `protobuf:"bytes,7,opt,name=arch,proto3" json:"arch,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *GetProviderPlatformPackageDownloadURLRequest) Reset() {
+	*x = GetProviderPlatformPackageDownloadURLRequest{}
+	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProviderPlatformPackageDownloadURLRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProviderPlatformPackageDownloadURLRequest) ProtoMessage() {}
+
+func (x *GetProviderPlatformPackageDownloadURLRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProviderPlatformPackageDownloadURLRequest.ProtoReflect.Descriptor instead.
+func (*GetProviderPlatformPackageDownloadURLRequest) Descriptor() ([]byte, []int) {
+	return file_terraform_provider_platform_mirror_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetProviderPlatformPackageDownloadURLRequest) GetGroupPath() string {
+	if x != nil {
+		return x.GroupPath
+	}
+	return ""
+}
+
+func (x *GetProviderPlatformPackageDownloadURLRequest) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *GetProviderPlatformPackageDownloadURLRequest) GetRegistryNamespace() string {
+	if x != nil {
+		return x.RegistryNamespace
+	}
+	return ""
+}
+
+func (x *GetProviderPlatformPackageDownloadURLRequest) GetRegistryHostname() string {
+	if x != nil {
+		return x.RegistryHostname
+	}
+	return ""
+}
+
+func (x *GetProviderPlatformPackageDownloadURLRequest) GetSemanticVersion() string {
+	if x != nil {
+		return x.SemanticVersion
+	}
+	return ""
+}
+
+func (x *GetProviderPlatformPackageDownloadURLRequest) GetOs() string {
+	if x != nil {
+		return x.Os
+	}
+	return ""
+}
+
+func (x *GetProviderPlatformPackageDownloadURLRequest) GetArch() string {
+	if x != nil {
+		return x.Arch
+	}
+	return ""
+}
+
 // TerraformProviderPlatformMirror represents a mirrored provider platform.
 type TerraformProviderPlatformMirror struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
@@ -248,7 +341,7 @@ type TerraformProviderPlatformMirror struct {
 
 func (x *TerraformProviderPlatformMirror) Reset() {
 	*x = TerraformProviderPlatformMirror{}
-	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[3]
+	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -260,7 +353,7 @@ func (x *TerraformProviderPlatformMirror) String() string {
 func (*TerraformProviderPlatformMirror) ProtoMessage() {}
 
 func (x *TerraformProviderPlatformMirror) ProtoReflect() protoreflect.Message {
-	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[3]
+	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -273,7 +366,7 @@ func (x *TerraformProviderPlatformMirror) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerraformProviderPlatformMirror.ProtoReflect.Descriptor instead.
 func (*TerraformProviderPlatformMirror) Descriptor() ([]byte, []int) {
-	return file_terraform_provider_platform_mirror_proto_rawDescGZIP(), []int{3}
+	return file_terraform_provider_platform_mirror_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *TerraformProviderPlatformMirror) GetMetadata() *ResourceMetadata {
@@ -315,7 +408,7 @@ type GetTerraformProviderPlatformMirrorsResponse struct {
 
 func (x *GetTerraformProviderPlatformMirrorsResponse) Reset() {
 	*x = GetTerraformProviderPlatformMirrorsResponse{}
-	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[4]
+	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -327,7 +420,7 @@ func (x *GetTerraformProviderPlatformMirrorsResponse) String() string {
 func (*GetTerraformProviderPlatformMirrorsResponse) ProtoMessage() {}
 
 func (x *GetTerraformProviderPlatformMirrorsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[4]
+	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -340,7 +433,7 @@ func (x *GetTerraformProviderPlatformMirrorsResponse) ProtoReflect() protoreflec
 
 // Deprecated: Use GetTerraformProviderPlatformMirrorsResponse.ProtoReflect.Descriptor instead.
 func (*GetTerraformProviderPlatformMirrorsResponse) Descriptor() ([]byte, []int) {
-	return file_terraform_provider_platform_mirror_proto_rawDescGZIP(), []int{4}
+	return file_terraform_provider_platform_mirror_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetTerraformProviderPlatformMirrorsResponse) GetPageInfo() *PageInfo {
@@ -353,6 +446,59 @@ func (x *GetTerraformProviderPlatformMirrorsResponse) GetPageInfo() *PageInfo {
 func (x *GetTerraformProviderPlatformMirrorsResponse) GetPlatformMirrors() []*TerraformProviderPlatformMirror {
 	if x != nil {
 		return x.PlatformMirrors
+	}
+	return nil
+}
+
+// GetProviderPlatformPackageDownloadURLResponse is the response containing the download URL and hashes.
+type GetProviderPlatformPackageDownloadURLResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Hashes        []string               `protobuf:"bytes,2,rep,name=hashes,proto3" json:"hashes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProviderPlatformPackageDownloadURLResponse) Reset() {
+	*x = GetProviderPlatformPackageDownloadURLResponse{}
+	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProviderPlatformPackageDownloadURLResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProviderPlatformPackageDownloadURLResponse) ProtoMessage() {}
+
+func (x *GetProviderPlatformPackageDownloadURLResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_terraform_provider_platform_mirror_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProviderPlatformPackageDownloadURLResponse.ProtoReflect.Descriptor instead.
+func (*GetProviderPlatformPackageDownloadURLResponse) Descriptor() ([]byte, []int) {
+	return file_terraform_provider_platform_mirror_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetProviderPlatformPackageDownloadURLResponse) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *GetProviderPlatformPackageDownloadURLResponse) GetHashes() []string {
+	if x != nil {
+		return x.Hashes
 	}
 	return nil
 }
@@ -375,7 +521,16 @@ const file_terraform_provider_platform_mirror_proto_rawDesc = "" +
 	"\x03_osB\x0f\n" +
 	"\r_architecture\">\n" +
 	",DeleteTerraformProviderPlatformMirrorRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xd2\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x8c\x02\n" +
+	",GetProviderPlatformPackageDownloadURLRequest\x12\x1d\n" +
+	"\n" +
+	"group_path\x18\x01 \x01(\tR\tgroupPath\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12-\n" +
+	"\x12registry_namespace\x18\x03 \x01(\tR\x11registryNamespace\x12+\n" +
+	"\x11registry_hostname\x18\x04 \x01(\tR\x10registryHostname\x12)\n" +
+	"\x10semantic_version\x18\x05 \x01(\tR\x0fsemanticVersion\x12\x0e\n" +
+	"\x02os\x18\x06 \x01(\tR\x02os\x12\x12\n" +
+	"\x04arch\x18\a \x01(\tR\x04arch\"\xd2\x01\n" +
 	"\x1fTerraformProviderPlatformMirror\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x0e\n" +
 	"\x02os\x18\x02 \x01(\tR\x02os\x12\"\n" +
@@ -383,7 +538,10 @@ const file_terraform_provider_platform_mirror_proto_rawDesc = "" +
 	"\x11version_mirror_id\x18\x04 \x01(\tR\x0fversionMirrorId\"\x83\x02\n" +
 	"+GetTerraformProviderPlatformMirrorsResponse\x12J\n" +
 	"\tpage_info\x18\x01 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo\x12\x87\x01\n" +
-	"\x10platform_mirrors\x18\x02 \x03(\v2\\.martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirrorR\x0fplatformMirrors*W\n" +
+	"\x10platform_mirrors\x18\x02 \x03(\v2\\.martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirrorR\x0fplatformMirrors\"Y\n" +
+	"-GetProviderPlatformPackageDownloadURLResponse\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12\x16\n" +
+	"\x06hashes\x18\x02 \x03(\tR\x06hashes*W\n" +
 	",TerraformProviderPlatformMirrorSortableField\x12\x12\n" +
 	"\x0eCREATED_AT_ASC\x10\x00\x12\x13\n" +
 	"\x0fCREATED_AT_DESC\x10\x01BIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
@@ -401,29 +559,31 @@ func file_terraform_provider_platform_mirror_proto_rawDescGZIP() []byte {
 }
 
 var file_terraform_provider_platform_mirror_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_terraform_provider_platform_mirror_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_terraform_provider_platform_mirror_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_terraform_provider_platform_mirror_proto_goTypes = []any{
 	(TerraformProviderPlatformMirrorSortableField)(0),     // 0: martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirrorSortableField
 	(*GetTerraformProviderPlatformMirrorByIDRequest)(nil), // 1: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorByIDRequest
 	(*GetTerraformProviderPlatformMirrorsRequest)(nil),    // 2: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsRequest
 	(*DeleteTerraformProviderPlatformMirrorRequest)(nil),  // 3: martiancloud.tharsis.api.terraform_provider_platform_mirror.DeleteTerraformProviderPlatformMirrorRequest
-	(*TerraformProviderPlatformMirror)(nil),               // 4: martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror
-	(*GetTerraformProviderPlatformMirrorsResponse)(nil),   // 5: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse
-	(*PaginationOptions)(nil),                             // 6: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),                              // 7: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                                      // 8: martiancloud.tharsis.api.pagination.PageInfo
+	(*GetProviderPlatformPackageDownloadURLRequest)(nil),  // 4: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetProviderPlatformPackageDownloadURLRequest
+	(*TerraformProviderPlatformMirror)(nil),               // 5: martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror
+	(*GetTerraformProviderPlatformMirrorsResponse)(nil),   // 6: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse
+	(*GetProviderPlatformPackageDownloadURLResponse)(nil), // 7: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetProviderPlatformPackageDownloadURLResponse
+	(*PaginationOptions)(nil),                             // 8: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),                              // 9: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*PageInfo)(nil),                                      // 10: martiancloud.tharsis.api.pagination.PageInfo
 }
 var file_terraform_provider_platform_mirror_proto_depIdxs = []int32{
-	6, // 0: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
-	0, // 1: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsRequest.sort:type_name -> martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirrorSortableField
-	7, // 2: martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	8, // 3: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	4, // 4: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse.platform_mirrors:type_name -> martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	8,  // 0: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	0,  // 1: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsRequest.sort:type_name -> martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirrorSortableField
+	9,  // 2: martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	10, // 3: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	5,  // 4: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse.platform_mirrors:type_name -> martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror
+	5,  // [5:5] is the sub-list for method output_type
+	5,  // [5:5] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_terraform_provider_platform_mirror_proto_init() }
@@ -440,7 +600,7 @@ func file_terraform_provider_platform_mirror_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terraform_provider_platform_mirror_proto_rawDesc), len(file_terraform_provider_platform_mirror_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

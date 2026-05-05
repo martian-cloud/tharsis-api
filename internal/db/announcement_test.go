@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // getValue implements the sortableField interface for AnnouncementSortableField
@@ -116,7 +116,7 @@ func TestGetAnnouncementByTRN(t *testing.T) {
 		},
 		{
 			name: "resource with TRN not found",
-			trn:  types.AnnouncementModelType.BuildTRN(nonExistentID),
+			trn:  trn.TypeAnnouncement.Build(nonExistentID),
 		},
 		{
 			name:            "get resource with invalid TRN will return an error",

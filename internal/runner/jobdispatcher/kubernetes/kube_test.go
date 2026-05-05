@@ -63,9 +63,9 @@ func TestJobDispatcher_DispatchJob(t *testing.T) {
 		{
 			name: "failed to create job",
 			j: &JobDispatcher{
-				logger: nil,
-				image:  "hello-world",
-				apiURL: "http://localhost",
+				logger:      nil,
+				image:       "hello-world",
+				apiEndpoint: "http://localhost",
 				client: func() client {
 					client := &mockClient{}
 
@@ -88,9 +88,9 @@ func TestJobDispatcher_DispatchJob(t *testing.T) {
 		{
 			name: "create job succeeds",
 			j: &JobDispatcher{
-				logger: nil,
-				image:  "hello-world",
-				apiURL: "http://localhost",
+				logger:      nil,
+				image:       "hello-world",
+				apiEndpoint: "http://localhost",
 				client: func() client {
 					client := &mockClient{}
 
@@ -117,9 +117,9 @@ func TestJobDispatcher_DispatchJob(t *testing.T) {
 		{
 			name: "create job with node selector succeeds",
 			j: &JobDispatcher{
-				logger: nil,
-				image:  "hello-world",
-				apiURL: "http://localhost",
+				logger:      nil,
+				image:       "hello-world",
+				apiEndpoint: "http://localhost",
 				nodeSelector: map[string]string{
 					"kubernetes.io/arch": "amd64",
 					"node-type":          "worker",
@@ -192,7 +192,7 @@ func Test_New(t *testing.T) {
 		{
 			name: "Missing required field",
 			pluginData: map[string]string{
-				"api_url": "https://api.example.com",
+				"endpoint": "https://api.example.com",
 				// Missing other required fields
 			},
 			discoveryHost:       "discovery.example.com",
@@ -204,7 +204,7 @@ func Test_New(t *testing.T) {
 			name: "Unsupported auth type",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -221,7 +221,7 @@ func Test_New(t *testing.T) {
 			name: "EKS IAM auth type missing required fields",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -238,7 +238,7 @@ func Test_New(t *testing.T) {
 			name: "KubeConfig auth type with valid config",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":          "https://api.example.com",
+					"endpoint":         "https://api.example.com",
 					"image":            "test-image:latest",
 					"memory_request":   "128Mi",
 					"memory_limit":     "256Mi",
@@ -255,7 +255,7 @@ func Test_New(t *testing.T) {
 			name: "KubeConfig auth type with invalid path",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":          "https://api.example.com",
+					"endpoint":         "https://api.example.com",
 					"image":            "test-image:latest",
 					"memory_request":   "128Mi",
 					"memory_limit":     "256Mi",
@@ -273,7 +273,7 @@ func Test_New(t *testing.T) {
 			name: "X509Cert auth type missing required fields",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -290,7 +290,7 @@ func Test_New(t *testing.T) {
 			name: "X509Cert auth type with invalid cert data",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -310,7 +310,7 @@ func Test_New(t *testing.T) {
 			name: "X509Cert auth type with valid data",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -329,7 +329,7 @@ func Test_New(t *testing.T) {
 			name: "RunnerIDToken auth type missing required fields",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -346,7 +346,7 @@ func Test_New(t *testing.T) {
 			name: "RunnerIDToken auth type with valid data",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -363,7 +363,7 @@ func Test_New(t *testing.T) {
 			name: "InCluster auth type",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -379,7 +379,7 @@ func Test_New(t *testing.T) {
 			name: "With security context settings",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":                          "https://api.example.com",
+					"endpoint":                         "https://api.example.com",
 					"image":                            "test-image:latest",
 					"memory_request":                   "128Mi",
 					"memory_limit":                     "256Mi",
@@ -398,7 +398,7 @@ func Test_New(t *testing.T) {
 			name: "With invalid security context settings",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":                      "https://api.example.com",
+					"endpoint":                     "https://api.example.com",
 					"image":                        "test-image:latest",
 					"memory_request":               "128Mi",
 					"memory_limit":                 "256Mi",
@@ -416,7 +416,7 @@ func Test_New(t *testing.T) {
 			name: "With extra discovery hosts",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":                       "https://api.example.com",
+					"endpoint":                      "https://api.example.com",
 					"image":                         "test-image:latest",
 					"memory_request":                "128Mi",
 					"memory_limit":                  "256Mi",
@@ -433,7 +433,7 @@ func Test_New(t *testing.T) {
 			name: "With valid node selector",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -450,7 +450,7 @@ func Test_New(t *testing.T) {
 			name: "With empty node selector",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -467,7 +467,7 @@ func Test_New(t *testing.T) {
 			name: "With invalid node selector format - missing value",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -485,7 +485,7 @@ func Test_New(t *testing.T) {
 			name: "With invalid node selector format - empty key",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -503,7 +503,7 @@ func Test_New(t *testing.T) {
 			name: "With invalid node selector format - empty value",
 			pluginData: func() map[string]string {
 				data := map[string]string{
-					"api_url":        "https://api.example.com",
+					"endpoint":       "https://api.example.com",
 					"image":          "test-image:latest",
 					"memory_request": "128Mi",
 					"memory_limit":   "256Mi",
@@ -535,7 +535,7 @@ func Test_New(t *testing.T) {
 				assert.NotNil(t, dispatcher)
 
 				// Verify basic properties of the dispatcher
-				assert.Equal(t, tt.pluginData["api_url"], dispatcher.apiURL)
+				assert.Equal(t, tt.pluginData["endpoint"], dispatcher.apiEndpoint)
 				assert.Equal(t, tt.pluginData["image"], dispatcher.image)
 
 				// Check if discovery hosts are properly set

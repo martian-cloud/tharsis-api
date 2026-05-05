@@ -16,6 +16,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 const (
@@ -247,7 +248,7 @@ func TestGetSCIMUsers(t *testing.T) {
 				}
 				mockUsers.On("GetUserBySCIMExternalID", mock.Anything, *test.input.SCIMExternalID).Return(externalIDUser, nil)
 			} else if test.input.Username != nil && *test.input.Username != "" {
-				mockUsers.On("GetUserByTRN", mock.Anything, types.UserModelType.BuildTRN(*test.input.Username)).Return(test.mockUser, nil)
+				mockUsers.On("GetUserByTRN", mock.Anything, trn.TypeUser.Build(*test.input.Username)).Return(test.mockUser, nil)
 				if test.mockUser != nil && test.mockUser.SCIMExternalID != "" {
 					mockUsers.On("GetUserByExternalID", mock.Anything, issuerURL, test.mockUser.SCIMExternalID).Return(test.mockLinked, nil)
 				}
@@ -727,7 +728,7 @@ func TestCreateSCIMGroup(t *testing.T) {
 
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateTeamPermission).Return(nil)
 
-			mockTeams.On("GetTeamByTRN", mock.Anything, types.TeamModelType.BuildTRN(test.input.Name)).Return(test.existingSCIMGroup, nil)
+			mockTeams.On("GetTeamByTRN", mock.Anything, trn.TypeTeam.Build(test.input.Name)).Return(test.existingSCIMGroup, nil)
 			mockTeams.On("UpdateTeam", mock.Anything, test.existingSCIMGroup).Return(test.returnedSCIMGroup, nil)
 			mockTeams.On("CreateTeam", mock.Anything, sampleSCIMGroup).Return(test.returnedSCIMGroup, nil)
 

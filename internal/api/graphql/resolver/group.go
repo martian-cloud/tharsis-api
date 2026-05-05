@@ -23,6 +23,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
@@ -522,7 +523,7 @@ func (r GroupResolver) FederatedRegistries(ctx context.Context,
 
 // DEPRECATED: should use node query instead since it supports both TRN and GID
 func groupQuery(ctx context.Context, args *GroupQueryArgs) (*GroupResolver, error) {
-	group, err := getServiceCatalog(ctx).GroupService.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(args.FullPath))
+	group, err := getServiceCatalog(ctx).GroupService.GetGroupByTRN(ctx, trn.TypeGroup.Build(args.FullPath))
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -556,7 +557,7 @@ func groupsQuery(ctx context.Context, args *GroupConnectionQueryArgs) (*GroupCon
 		}
 		input.ParentGroupID = &parentID
 	} else if (args.ParentPath != nil) && (*args.ParentPath != "") {
-		parent, err := getServiceCatalog(ctx).GroupService.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(*args.ParentPath))
+		parent, err := getServiceCatalog(ctx).GroupService.GetGroupByTRN(ctx, trn.TypeGroup.Build(*args.ParentPath))
 		if err != nil {
 			return nil, err
 		}
@@ -692,7 +693,7 @@ func createGroupMutation(ctx context.Context, input *CreateGroupInput) (*GroupMu
 	if input.ParentID != nil {
 		valueToResolve = input.ParentID
 	} else if input.ParentPath != nil {
-		valueToResolve = ptr.String(types.GroupModelType.BuildTRN(*input.ParentPath))
+		valueToResolve = ptr.String(trn.TypeGroup.Build(*input.ParentPath))
 	}
 
 	serviceCatalog := getServiceCatalog(ctx)

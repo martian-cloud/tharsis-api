@@ -292,6 +292,7 @@ func handleStateVersionMutationProblem(e error, clientMutationID *string) (*Stat
 	return &StateVersionMutationPayloadResolver{StateVersionMutationPayload: payload}, nil
 }
 
+// Deprecated: Use the gRPC API instead.
 func createStateVersionMutation(ctx context.Context, input *CreateStateVersionInput) (*StateVersionMutationPayloadResolver, error) {
 	serviceCatalog := getServiceCatalog(ctx)
 

@@ -13,10 +13,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestGetUserByID(t *testing.T) {
@@ -90,7 +90,7 @@ func TestGetUserByTRN(t *testing.T) {
 	sampleUser := &models.User{
 		Metadata: models.ResourceMetadata{
 			ID:  "user-id-1",
-			TRN: types.UserModelType.BuildTRN("user-1"),
+			TRN: trn.TypeUser.Build("user-1"),
 		},
 		Username: "user-1",
 		Email:    "user@test.com",
@@ -279,7 +279,7 @@ func TestGetNotificationPreference(t *testing.T) {
 				if !strings.Contains(*test.input.NamespacePath, "/") {
 					response = &models.Group{}
 				}
-				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(*test.input.NamespacePath)).Return(response, nil).Maybe()
+				mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(*test.input.NamespacePath)).Return(response, nil).Maybe()
 			}
 
 			if test.expectPreference != nil {
@@ -534,7 +534,7 @@ func TestSetNotificationPreference(t *testing.T) {
 				if !strings.Contains(*test.input.NamespacePath, "/") {
 					response = &models.Group{}
 				}
-				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(*test.input.NamespacePath)).Return(response, nil).Maybe()
+				mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(*test.input.NamespacePath)).Return(response, nil).Maybe()
 			}
 
 			existingPreferences := []models.NotificationPreference{}
@@ -1842,9 +1842,9 @@ func TestCreateNamespaceFavorite(t *testing.T) {
 
 			if !tc.expectError {
 				if tc.input.NamespaceType == namespace.TypeGroup {
-					mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(tc.input.NamespacePath)).Return(tc.mockGroup, nil)
+					mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(tc.input.NamespacePath)).Return(tc.mockGroup, nil)
 				} else if tc.input.NamespaceType == namespace.TypeWorkspace {
-					mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, types.WorkspaceModelType.BuildTRN(tc.input.NamespacePath)).Return(&models.Workspace{
+					mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, trn.TypeWorkspace.Build(tc.input.NamespacePath)).Return(&models.Workspace{
 						Metadata: models.ResourceMetadata{ID: "workspace-id"},
 						FullPath: tc.input.NamespacePath,
 					}, nil)
@@ -2056,12 +2056,12 @@ func TestDeleteNamespaceFavorite(t *testing.T) {
 			mockWorkspaces := db.NewMockWorkspaces(t)
 			if tc.input != nil && tc.expectErrorCode != errors.EForbidden && tc.expectErrorCode != errors.EUnauthorized {
 				if tc.input.NamespaceType == namespace.TypeGroup {
-					mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(tc.input.NamespacePath)).Return(&models.Group{
+					mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(tc.input.NamespacePath)).Return(&models.Group{
 						Metadata: models.ResourceMetadata{ID: "group-id"},
 						FullPath: tc.input.NamespacePath,
 					}, nil)
 				} else if tc.input.NamespaceType == namespace.TypeWorkspace {
-					mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, types.WorkspaceModelType.BuildTRN(tc.input.NamespacePath)).Return(&models.Workspace{
+					mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, trn.TypeWorkspace.Build(tc.input.NamespacePath)).Return(&models.Workspace{
 						Metadata: models.ResourceMetadata{ID: "workspace-id"},
 						FullPath: tc.input.NamespacePath,
 					}, nil)

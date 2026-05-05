@@ -2,7 +2,6 @@ package interceptors
 
 import (
 	"context"
-	goerrors "errors"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -61,15 +60,15 @@ func buildStatusError(err error) error {
 	var grpcMsg string
 
 	switch {
-	case errors.ErrorCode(err) == errors.EInternal:
-		grpcCode = codes.Internal
-		grpcMsg = errors.InternalErrorMessage
-	case goerrors.Is(err, context.DeadlineExceeded):
+	case errors.IsDeadlineExceededError(err):
 		grpcCode = codes.DeadlineExceeded
 		grpcMsg = err.Error()
 	case errors.IsContextCanceledError(err):
 		grpcCode = codes.Canceled
 		grpcMsg = err.Error()
+	case errors.ErrorCode(err) == errors.EInternal:
+		grpcCode = codes.Internal
+		grpcMsg = errors.InternalErrorMessage
 	default:
 		grpcCode = errorToStatusCode[errors.ErrorCode(err)]
 		grpcMsg = errors.ErrorMessage(err)
@@ -83,10 +82,11 @@ func handleError(ctx context.Context, err error, logger logger.Logger) error {
 	switch errors.ErrorCode(err) {
 	case errors.EInternal:
 		// Don't log context deadline expired and context cancelled errors.
-		if !(goerrors.Is(err, context.DeadlineExceeded) || errors.IsContextCanceledError(err)) {
+		if !errors.IsDeadlineExceededError(err) && !errors.IsContextCanceledError(err) {
 			logger.WithContextFields(ctx).Errorf("Unexpected gRPC error occurred: %s", err.Error())
 		}
 	}
+
 	// Convert error to gRPC equivalent.
 	return buildStatusError(err)
 }

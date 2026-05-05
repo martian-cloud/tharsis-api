@@ -12,16 +12,16 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestEnforceRules(t *testing.T) {
 	managedIdentity := models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "123",
-			TRN: types.ManagedIdentityModelType.BuildTRN("test-group/test-managed-identity"),
+			TRN: trn.TypeManagedIdentity.Build("test-group/test-managed-identity"),
 		},
 	}
 

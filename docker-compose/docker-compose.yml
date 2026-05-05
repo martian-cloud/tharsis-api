@@ -34,7 +34,7 @@ services:
       - THARSIS_API_URL=http://localhost:6560
       - THARSIS_INTERNAL_RUNNERS_0_NAME=default-shared-runner
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_TYPE=docker
-      - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_API_URL=http://localhost:6560
+      - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_ENDPOINT=http://localhost:6560
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_HOST=unix:///var/run/docker.sock
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_EXTRA_HOSTS=localhost:host-gateway
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_IMAGE=registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/job-executor:latest

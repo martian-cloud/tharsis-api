@@ -7,7 +7,6 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -239,7 +238,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "valid with OIDC trust policy",
 			serviceAccount: ServiceAccount{
-				Metadata:          ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata:          ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:              "valid-sa",
 				OIDCTrustPolicies: validTrustPolicy,
 			},
@@ -247,7 +246,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "valid with client credentials",
 			serviceAccount: ServiceAccount{
-				Metadata:              ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata:              ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:                  "valid-sa",
 				ClientSecretHash:      ptr.String("hash"),
 				ClientSecretExpiresAt: ptr.Time(time.Now().Add(24 * time.Hour)),
@@ -256,7 +255,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "valid with both auth methods",
 			serviceAccount: ServiceAccount{
-				Metadata:              ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata:              ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:                  "valid-sa",
 				OIDCTrustPolicies:     validTrustPolicy,
 				ClientSecretHash:      ptr.String("hash"),
@@ -266,7 +265,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "valid with multiple trust policies",
 			serviceAccount: ServiceAccount{
-				Metadata: ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata: ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:     "valid-sa",
 				OIDCTrustPolicies: []OIDCTrustPolicy{
 					{Issuer: "https://example1.com", BoundClaimsType: BoundClaimsTypeString, BoundClaims: map[string]string{"sub": "test1"}},
@@ -277,7 +276,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "valid with glob bound claims type",
 			serviceAccount: ServiceAccount{
-				Metadata: ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata: ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:     "valid-sa",
 				OIDCTrustPolicies: []OIDCTrustPolicy{{
 					Issuer:          "https://example.com",
@@ -289,7 +288,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - no auth method",
 			serviceAccount: ServiceAccount{
-				Metadata: ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata: ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:     "valid-sa",
 			},
 			expectErrorCode: errors.EInvalid,
@@ -297,7 +296,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - empty trust policies and no client credentials",
 			serviceAccount: ServiceAccount{
-				Metadata:          ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata:          ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:              "valid-sa",
 				OIDCTrustPolicies: []OIDCTrustPolicy{},
 			},
@@ -306,7 +305,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - client secret hash without expiration",
 			serviceAccount: ServiceAccount{
-				Metadata:          ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata:          ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:              "valid-sa",
 				ClientSecretHash:  ptr.String("hash"),
 				OIDCTrustPolicies: validTrustPolicy,
@@ -316,7 +315,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - client secret expiration without hash",
 			serviceAccount: ServiceAccount{
-				Metadata:              ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata:              ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:                  "valid-sa",
 				ClientSecretExpiresAt: ptr.Time(time.Now().Add(24 * time.Hour)),
 				OIDCTrustPolicies:     validTrustPolicy,
@@ -326,7 +325,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - trust policy without issuer",
 			serviceAccount: ServiceAccount{
-				Metadata: ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata: ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:     "valid-sa",
 				OIDCTrustPolicies: []OIDCTrustPolicy{{
 					BoundClaimsType: BoundClaimsTypeString,
@@ -338,7 +337,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - trust policy with invalid issuer URL",
 			serviceAccount: ServiceAccount{
-				Metadata: ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata: ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:     "valid-sa",
 				OIDCTrustPolicies: []OIDCTrustPolicy{{
 					Issuer:          "not-a-url",
@@ -351,7 +350,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - trust policy without bound claims type",
 			serviceAccount: ServiceAccount{
-				Metadata: ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata: ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:     "valid-sa",
 				OIDCTrustPolicies: []OIDCTrustPolicy{{
 					Issuer:      "https://example.com",
@@ -363,7 +362,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - trust policy without bound claims",
 			serviceAccount: ServiceAccount{
-				Metadata: ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata: ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:     "valid-sa",
 				OIDCTrustPolicies: []OIDCTrustPolicy{{
 					Issuer:          "https://example.com",
@@ -376,7 +375,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - trust policy with nil bound claims",
 			serviceAccount: ServiceAccount{
-				Metadata: ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata: ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:     "valid-sa",
 				OIDCTrustPolicies: []OIDCTrustPolicy{{
 					Issuer:          "https://example.com",
@@ -389,7 +388,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - glob claim with only wildcard",
 			serviceAccount: ServiceAccount{
-				Metadata: ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata: ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:     "valid-sa",
 				OIDCTrustPolicies: []OIDCTrustPolicy{{
 					Issuer:          "https://example.com",
@@ -402,7 +401,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - exceeds max trust policies",
 			serviceAccount: ServiceAccount{
-				Metadata: ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata: ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:     "valid-sa",
 				OIDCTrustPolicies: func() []OIDCTrustPolicy {
 					policies := make([]OIDCTrustPolicy, 11)
@@ -421,7 +420,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - empty name",
 			serviceAccount: ServiceAccount{
-				Metadata:          ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata:          ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:              "",
 				OIDCTrustPolicies: validTrustPolicy,
 			},
@@ -430,7 +429,7 @@ func TestServiceAccount_Validate(t *testing.T) {
 		{
 			name: "invalid - name with invalid characters",
 			serviceAccount: ServiceAccount{
-				Metadata:          ResourceMetadata{TRN: types.TRNPrefix + "service_account:group/sa-name"},
+				Metadata:          ResourceMetadata{TRN: "trn:" + "service_account:group/sa-name"},
 				Name:              "invalid name!",
 				OIDCTrustPolicies: validTrustPolicy,
 			},
@@ -460,17 +459,17 @@ func TestServiceAccount_GetGroupPath(t *testing.T) {
 	}{
 		{
 			name:     "single level group",
-			trn:      types.TRNPrefix + "service_account:group/sa-name",
+			trn:      "trn:" + "service_account:group/sa-name",
 			expected: "group",
 		},
 		{
 			name:     "nested group",
-			trn:      types.TRNPrefix + "service_account:parent/child/sa-name",
+			trn:      "trn:" + "service_account:parent/child/sa-name",
 			expected: "parent/child",
 		},
 		{
 			name:     "deeply nested group",
-			trn:      types.TRNPrefix + "service_account:a/b/c/d/sa-name",
+			trn:      "trn:" + "service_account:a/b/c/d/sa-name",
 			expected: "a/b/c/d",
 		},
 	}
@@ -491,12 +490,12 @@ func TestServiceAccount_GetResourcePath(t *testing.T) {
 	}{
 		{
 			name:     "single level group",
-			trn:      types.TRNPrefix + "service_account:group/sa-name",
+			trn:      "trn:" + "service_account:group/sa-name",
 			expected: "group/sa-name",
 		},
 		{
 			name:     "nested group",
-			trn:      types.TRNPrefix + "service_account:parent/child/sa-name",
+			trn:      "trn:" + "service_account:parent/child/sa-name",
 			expected: "parent/child/sa-name",
 		},
 	}

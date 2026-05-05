@@ -25,6 +25,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // ErrSessionAlreadyExists is returned when trying to create a session while one already exists
@@ -337,7 +338,7 @@ func (u *userSessionManager) CreateSession(ctx context.Context, input *CreateSes
 			usernameToSearch = parts[0]
 		}
 
-		u, err := u.dbClient.Users.GetUserByTRN(ctx, types.UserModelType.BuildTRN(usernameToSearch))
+		u, err := u.dbClient.Users.GetUserByTRN(ctx, trn.TypeUser.Build(usernameToSearch))
 		if err != nil {
 			return nil, err
 		}

@@ -14,6 +14,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/variable"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // NamespaceVariableVersionQueryArgs are used to query a variable version
@@ -283,7 +284,7 @@ func (r *VariableMutationPayloadResolver) Namespace(ctx context.Context) (*Names
 
 	serviceCatalog := getServiceCatalog(ctx)
 
-	group, err := serviceCatalog.GroupService.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(*r.NamespacePath))
+	group, err := serviceCatalog.GroupService.GetGroupByTRN(ctx, trn.TypeGroup.Build(*r.NamespacePath))
 	if err != nil && errors.ErrorCode(err) != errors.ENotFound {
 		return nil, err
 	}
@@ -291,7 +292,7 @@ func (r *VariableMutationPayloadResolver) Namespace(ctx context.Context) (*Names
 		return &NamespaceResolver{result: &GroupResolver{group: group}}, nil
 	}
 
-	ws, err := serviceCatalog.WorkspaceService.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(*r.NamespacePath))
+	ws, err := serviceCatalog.WorkspaceService.GetWorkspaceByTRN(ctx, trn.TypeWorkspace.Build(*r.NamespacePath))
 	if err != nil {
 		return nil, err
 	}

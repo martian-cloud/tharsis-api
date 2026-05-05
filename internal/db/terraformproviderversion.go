@@ -12,16 +12,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TerraformProviderVersions encapsulates the logic to access terraform provider versions from the database
 type TerraformProviderVersions interface {
 	GetProviderVersionByID(ctx context.Context, id string) (*models.TerraformProviderVersion, error)
-	GetProviderVersionByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersion, error)
+	GetProviderVersionByTRN(ctx context.Context, trnValue string) (*models.TerraformProviderVersion, error)
 	GetProviderVersions(ctx context.Context, input *GetProviderVersionsInput) (*ProviderVersionsResult, error)
 	CreateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error)
 	UpdateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error)
@@ -108,16 +108,16 @@ func (t *terraformProviderVersions) GetProviderVersionByID(ctx context.Context, 
 	return t.getProviderVersion(ctx, goqu.Ex{"terraform_provider_versions.id": id})
 }
 
-func (t *terraformProviderVersions) GetProviderVersionByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersion, error) {
+func (t *terraformProviderVersions) GetProviderVersionByTRN(ctx context.Context, trnValue string) (*models.TerraformProviderVersion, error) {
 	ctx, span := tracer.Start(ctx, "db.GetProviderVersionByTRN")
 	defer span.End()
 
-	path, err := types.TerraformProviderVersionModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeTerraformProviderVersion.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 
 	if len(parts) < 3 {
 		return nil, errors.New("a Terraform Provider version TRN must have group path, provider name and semver separated by a forward slash",
@@ -452,7 +452,7 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 		providerVersion.GPGKeyID = &val
 	}
 
-	providerVersion.Metadata.TRN = types.TerraformProviderVersionModelType.BuildTRN(
+	providerVersion.Metadata.TRN = trn.TypeTerraformProviderVersion.Build(
 		groupPath,
 		providerName,
 		providerVersion.SemanticVersion,

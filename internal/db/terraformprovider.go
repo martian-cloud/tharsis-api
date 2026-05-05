@@ -10,16 +10,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TerraformProviders encapsulates the logic to access terraform providers from the database
 type TerraformProviders interface {
 	GetProviderByID(ctx context.Context, id string) (*models.TerraformProvider, error)
-	GetProviderByTRN(ctx context.Context, trn string) (*models.TerraformProvider, error)
+	GetProviderByTRN(ctx context.Context, trnValue string) (*models.TerraformProvider, error)
 	GetProviders(ctx context.Context, input *GetProvidersInput) (*ProvidersResult, error)
 	CreateProvider(ctx context.Context, provider *models.TerraformProvider) (*models.TerraformProvider, error)
 	UpdateProvider(ctx context.Context, provider *models.TerraformProvider) (*models.TerraformProvider, error)
@@ -101,25 +101,23 @@ func (t *terraformProviders) GetProviderByID(ctx context.Context, id string) (*m
 	return t.getProvider(ctx, goqu.Ex{"terraform_providers.id": id})
 }
 
-func (t *terraformProviders) GetProviderByTRN(ctx context.Context, trn string) (*models.TerraformProvider, error) {
+func (t *terraformProviders) GetProviderByTRN(ctx context.Context, trnValue string) (*models.TerraformProvider, error) {
 	ctx, span := tracer.Start(ctx, "db.GetProviderByTRN")
 	defer span.End()
 
-	path, err := types.TerraformProviderModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeTerraformProvider.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	index := strings.LastIndex(path, "/")
-
-	if index == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a Terraform provider TRN must have group path and provider name separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
 		)
 	}
 
-	return t.getProvider(ctx, goqu.Ex{"terraform_providers.name": path[index+1:], "namespaces.path": path[:index]})
+	return t.getProvider(ctx, goqu.Ex{"terraform_providers.name": parsed.BaseName(), "namespaces.path": parsed.ParentPath()})
 }
 
 func (t *terraformProviders) GetProviders(ctx context.Context, input *GetProvidersInput) (*ProvidersResult, error) {
@@ -442,7 +440,7 @@ func scanTerraformProvider(row scanner) (*models.TerraformProvider, error) {
 		return nil, err
 	}
 
-	provider.Metadata.TRN = types.TerraformProviderModelType.BuildTRN(groupPath, provider.Name)
+	provider.Metadata.TRN = trn.TypeTerraformProvider.Build(groupPath, provider.Name)
 
 	return provider, nil
 }

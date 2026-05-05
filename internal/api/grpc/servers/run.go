@@ -15,6 +15,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -209,6 +210,23 @@ func (s *RunServer) CancelRun(ctx context.Context, req *pb.CancelRunRequest) (*p
 	return toPBRun(canceledRun), nil
 }
 
+// CreateDestroyRunForWorkspace creates a destroy run using the workspace's current state.
+func (s *RunServer) CreateDestroyRunForWorkspace(ctx context.Context, req *pb.CreateDestroyRunForWorkspaceRequest) (*pb.Run, error) {
+	workspaceID, err := s.serviceCatalog.FetchModelID(ctx, req.WorkspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	createdRun, err := s.serviceCatalog.RunService.CreateDestroyRunForWorkspace(ctx, &run.CreateDestroyRunForWorkspaceInput{
+		WorkspaceID: workspaceID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBRun(createdRun), nil
+}
+
 // GetRunVariables returns variables for a Run.
 func (s *RunServer) GetRunVariables(ctx context.Context, req *pb.GetRunVariablesRequest) (*pb.GetRunVariablesResponse, error) {
 	runID, err := s.serviceCatalog.FetchModelID(ctx, req.Id)
@@ -356,6 +374,23 @@ func (s *RunServer) GetLatestJobForApply(ctx context.Context, req *pb.GetLatestJ
 	return toPBJob(job), nil
 }
 
+// SetVariablesIncludedInTFConfig updates which variables are included in the Terraform config.
+func (s *RunServer) SetVariablesIncludedInTFConfig(ctx context.Context, req *pb.SetVariablesIncludedInTFConfigRequest) (*emptypb.Empty, error) {
+	runID, err := s.serviceCatalog.FetchModelID(ctx, req.RunId)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = s.serviceCatalog.RunService.SetVariablesIncludedInTFConfig(ctx, &run.SetVariablesIncludedInTFConfigInput{
+		RunID:        runID,
+		VariableKeys: req.VariableKeys,
+	}); err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
 // SubscribeToRunEvents subscribes to run events.
 func (s *RunServer) SubscribeToRunEvents(req *pb.SubscribeToRunEventsRequest, stream pb.Runs_SubscribeToRunEventsServer) error {
 	var workspaceID, runID, ancestorGroupID *string
@@ -451,6 +486,11 @@ func toPBPlan(p *models.Plan) *pb.Plan {
 		Status:       string(p.Status),
 		HasChanges:   p.HasChanges,
 		ErrorMessage: p.ErrorMessage,
+		Summary: &pb.PlanSummary{
+			ResourceAdditions:    p.Summary.ResourceAdditions,
+			ResourceChanges:      p.Summary.ResourceChanges,
+			ResourceDestructions: p.Summary.ResourceDestructions,
+		},
 	}
 }
 

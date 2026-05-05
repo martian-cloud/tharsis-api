@@ -105,6 +105,7 @@ func handleApplyMutationProblem(e error, clientMutationID *string) (*ApplyMutati
 	return &ApplyMutationPayloadResolver{ApplyMutationPayload: payload}, nil
 }
 
+// Deprecated: Use the gRPC API instead.
 func updateApplyMutation(ctx context.Context, input *UpdateApplyInput) (*ApplyMutationPayloadResolver, error) {
 	serviceCatalog := getServiceCatalog(ctx)
 

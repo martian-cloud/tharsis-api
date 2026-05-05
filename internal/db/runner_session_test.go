@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestGetRunnerSessionByID(t *testing.T) {
@@ -126,15 +126,15 @@ func TestGetRunnerSessionByTRN(t *testing.T) {
 		},
 		{
 			name: "shared runner session with TRN not found",
-			trn:  types.RunnerSessionModelType.BuildTRN(sharedRunner.Name, nonExistentGlobalID),
+			trn:  trn.TypeRunnerSession.Build(sharedRunner.Name, nonExistentGlobalID),
 		},
 		{
 			name: "group runner session with TRN not found",
-			trn:  types.RunnerSessionModelType.BuildTRN(group.FullPath, groupRunner.Name, nonExistentGlobalID),
+			trn:  trn.TypeRunnerSession.Build(group.FullPath, groupRunner.Name, nonExistentGlobalID),
 		},
 		{
 			name:            "runner session TRN cannot have less than two parts",
-			trn:             types.RunnerSessionModelType.BuildTRN(nonExistentGlobalID),
+			trn:             trn.TypeRunnerSession.Build(nonExistentGlobalID),
 			expectErrorCode: errors.EInvalid,
 		},
 		{
@@ -158,9 +158,9 @@ func TestGetRunnerSessionByTRN(t *testing.T) {
 			if test.expectSession {
 				require.NotNil(t, actualSession)
 				if test.trn == sharedRunnerSession.Metadata.TRN {
-					assert.Equal(t, types.RunnerSessionModelType.BuildTRN(sharedRunner.Name, sharedRunnerSession.GetGlobalID()), actualSession.Metadata.TRN)
+					assert.Equal(t, trn.TypeRunnerSession.Build(sharedRunner.Name, sharedRunnerSession.GetGlobalID()), actualSession.Metadata.TRN)
 				} else {
-					assert.Equal(t, types.RunnerSessionModelType.BuildTRN(group.FullPath, groupRunner.Name, groupRunnerSession.GetGlobalID()), actualSession.Metadata.TRN)
+					assert.Equal(t, trn.TypeRunnerSession.Build(group.FullPath, groupRunner.Name, groupRunnerSession.GetGlobalID()), actualSession.Metadata.TRN)
 				}
 			} else {
 				assert.Nil(t, actualSession)

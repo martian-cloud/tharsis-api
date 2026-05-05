@@ -9,6 +9,7 @@ package gen
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -432,6 +433,51 @@ func (x *CancelRunRequest) GetForce() bool {
 	return false
 }
 
+// CreateDestroyRunForWorkspaceRequest is the input for creating a destroy run for a workspace.
+type CreateDestroyRunForWorkspaceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateDestroyRunForWorkspaceRequest) Reset() {
+	*x = CreateDestroyRunForWorkspaceRequest{}
+	mi := &file_run_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateDestroyRunForWorkspaceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateDestroyRunForWorkspaceRequest) ProtoMessage() {}
+
+func (x *CreateDestroyRunForWorkspaceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateDestroyRunForWorkspaceRequest.ProtoReflect.Descriptor instead.
+func (*CreateDestroyRunForWorkspaceRequest) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CreateDestroyRunForWorkspaceRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
 // GetRunVariablesRequest is the input for getting run variables.
 type GetRunVariablesRequest struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
@@ -443,7 +489,7 @@ type GetRunVariablesRequest struct {
 
 func (x *GetRunVariablesRequest) Reset() {
 	*x = GetRunVariablesRequest{}
-	mi := &file_run_proto_msgTypes[5]
+	mi := &file_run_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -455,7 +501,7 @@ func (x *GetRunVariablesRequest) String() string {
 func (*GetRunVariablesRequest) ProtoMessage() {}
 
 func (x *GetRunVariablesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[5]
+	mi := &file_run_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -468,7 +514,7 @@ func (x *GetRunVariablesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRunVariablesRequest.ProtoReflect.Descriptor instead.
 func (*GetRunVariablesRequest) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{5}
+	return file_run_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetRunVariablesRequest) GetId() string {
@@ -497,7 +543,7 @@ type SubscribeToRunEventsRequest struct {
 
 func (x *SubscribeToRunEventsRequest) Reset() {
 	*x = SubscribeToRunEventsRequest{}
-	mi := &file_run_proto_msgTypes[6]
+	mi := &file_run_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -509,7 +555,7 @@ func (x *SubscribeToRunEventsRequest) String() string {
 func (*SubscribeToRunEventsRequest) ProtoMessage() {}
 
 func (x *SubscribeToRunEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[6]
+	mi := &file_run_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -522,7 +568,7 @@ func (x *SubscribeToRunEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeToRunEventsRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeToRunEventsRequest) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{6}
+	return file_run_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SubscribeToRunEventsRequest) GetWorkspaceId() string {
@@ -558,7 +604,7 @@ type RunVariableInput struct {
 
 func (x *RunVariableInput) Reset() {
 	*x = RunVariableInput{}
-	mi := &file_run_proto_msgTypes[7]
+	mi := &file_run_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -570,7 +616,7 @@ func (x *RunVariableInput) String() string {
 func (*RunVariableInput) ProtoMessage() {}
 
 func (x *RunVariableInput) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[7]
+	mi := &file_run_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -583,7 +629,7 @@ func (x *RunVariableInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunVariableInput.ProtoReflect.Descriptor instead.
 func (*RunVariableInput) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{7}
+	return file_run_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RunVariableInput) GetCategory() string {
@@ -605,6 +651,59 @@ func (x *RunVariableInput) GetValue() string {
 		return *x.Value
 	}
 	return ""
+}
+
+// SetVariablesIncludedInTFConfigRequest is the input for setting variables included in the Terraform config.
+type SetVariablesIncludedInTFConfigRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	VariableKeys  []string               `protobuf:"bytes,2,rep,name=variable_keys,json=variableKeys,proto3" json:"variable_keys,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetVariablesIncludedInTFConfigRequest) Reset() {
+	*x = SetVariablesIncludedInTFConfigRequest{}
+	mi := &file_run_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetVariablesIncludedInTFConfigRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetVariablesIncludedInTFConfigRequest) ProtoMessage() {}
+
+func (x *SetVariablesIncludedInTFConfigRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetVariablesIncludedInTFConfigRequest.ProtoReflect.Descriptor instead.
+func (*SetVariablesIncludedInTFConfigRequest) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SetVariablesIncludedInTFConfigRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *SetVariablesIncludedInTFConfigRequest) GetVariableKeys() []string {
+	if x != nil {
+		return x.VariableKeys
+	}
+	return nil
 }
 
 // Run represents a Terraform plan/apply operation.
@@ -636,7 +735,7 @@ type Run struct {
 
 func (x *Run) Reset() {
 	*x = Run{}
-	mi := &file_run_proto_msgTypes[8]
+	mi := &file_run_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -648,7 +747,7 @@ func (x *Run) String() string {
 func (*Run) ProtoMessage() {}
 
 func (x *Run) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[8]
+	mi := &file_run_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -661,7 +760,7 @@ func (x *Run) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Run.ProtoReflect.Descriptor instead.
 func (*Run) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{8}
+	return file_run_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Run) GetMetadata() *ResourceMetadata {
@@ -820,7 +919,7 @@ type RunVariable struct {
 
 func (x *RunVariable) Reset() {
 	*x = RunVariable{}
-	mi := &file_run_proto_msgTypes[9]
+	mi := &file_run_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -832,7 +931,7 @@ func (x *RunVariable) String() string {
 func (*RunVariable) ProtoMessage() {}
 
 func (x *RunVariable) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[9]
+	mi := &file_run_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -845,7 +944,7 @@ func (x *RunVariable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunVariable.ProtoReflect.Descriptor instead.
 func (*RunVariable) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{9}
+	return file_run_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RunVariable) GetNamespacePath() string {
@@ -908,7 +1007,7 @@ type RunEvent struct {
 
 func (x *RunEvent) Reset() {
 	*x = RunEvent{}
-	mi := &file_run_proto_msgTypes[10]
+	mi := &file_run_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -920,7 +1019,7 @@ func (x *RunEvent) String() string {
 func (*RunEvent) ProtoMessage() {}
 
 func (x *RunEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[10]
+	mi := &file_run_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -933,7 +1032,7 @@ func (x *RunEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunEvent.ProtoReflect.Descriptor instead.
 func (*RunEvent) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{10}
+	return file_run_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RunEvent) GetAction() string {
@@ -961,7 +1060,7 @@ type GetRunsResponse struct {
 
 func (x *GetRunsResponse) Reset() {
 	*x = GetRunsResponse{}
-	mi := &file_run_proto_msgTypes[11]
+	mi := &file_run_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -973,7 +1072,7 @@ func (x *GetRunsResponse) String() string {
 func (*GetRunsResponse) ProtoMessage() {}
 
 func (x *GetRunsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[11]
+	mi := &file_run_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -986,7 +1085,7 @@ func (x *GetRunsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRunsResponse.ProtoReflect.Descriptor instead.
 func (*GetRunsResponse) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{11}
+	return file_run_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetRunsResponse) GetRuns() []*Run {
@@ -1013,7 +1112,7 @@ type GetRunVariablesResponse struct {
 
 func (x *GetRunVariablesResponse) Reset() {
 	*x = GetRunVariablesResponse{}
-	mi := &file_run_proto_msgTypes[12]
+	mi := &file_run_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1025,7 +1124,7 @@ func (x *GetRunVariablesResponse) String() string {
 func (*GetRunVariablesResponse) ProtoMessage() {}
 
 func (x *GetRunVariablesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[12]
+	mi := &file_run_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1038,7 +1137,7 @@ func (x *GetRunVariablesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRunVariablesResponse.ProtoReflect.Descriptor instead.
 func (*GetRunVariablesResponse) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{12}
+	return file_run_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetRunVariablesResponse) GetVariables() []*RunVariable {
@@ -1053,7 +1152,7 @@ var File_run_proto protoreflect.FileDescriptor
 const file_run_proto_rawDesc = "" +
 	"\n" +
 	"\trun.proto\x12\x1cmartiancloud.tharsis.api.run\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\n" +
-	"plan.proto\x1a\vapply.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"#\n" +
+	"plan.proto\x1a\vapply.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"#\n" +
 	"\x11GetRunByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x98\x03\n" +
 	"\x0eGetRunsRequest\x12j\n" +
@@ -1093,7 +1192,9 @@ const file_run_proto_rawDesc = "" +
 	"\x10CancelRunRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\x05force\x18\x02 \x01(\bH\x00R\x05force\x88\x01\x01B\b\n" +
-	"\x06_force\"b\n" +
+	"\x06_force\"H\n" +
+	"#CreateDestroyRunForWorkspaceRequest\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"b\n" +
 	"\x16GetRunVariablesRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x128\n" +
 	"\x18include_sensitive_values\x18\x02 \x01(\bR\x16includeSensitiveValues\"\xc4\x01\n" +
@@ -1108,7 +1209,10 @@ const file_run_proto_rawDesc = "" +
 	"\bcategory\x18\x01 \x01(\tR\bcategory\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x19\n" +
 	"\x05value\x18\x03 \x01(\tH\x00R\x05value\x88\x01\x01B\b\n" +
-	"\x06_value\"\xd6\a\n" +
+	"\x06_value\"c\n" +
+	"%SetVariablesIncludedInTFConfigRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12#\n" +
+	"\rvariable_keys\x18\x02 \x03(\tR\fvariableKeys\"\xd6\a\n" +
 	"\x03Run\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x19\n" +
 	"\bapply_id\x18\x02 \x01(\tR\aapplyId\x12=\n" +
@@ -1164,7 +1268,7 @@ const file_run_proto_rawDesc = "" +
 	"\x0eCREATED_AT_ASC\x10\x00\x12\x13\n" +
 	"\x0fCREATED_AT_DESC\x10\x01\x12\x12\n" +
 	"\x0eUPDATED_AT_ASC\x10\x02\x12\x13\n" +
-	"\x0fUPDATED_AT_DESC\x10\x032\x8d\t\n" +
+	"\x0fUPDATED_AT_DESC\x10\x032\x93\v\n" +
 	"\x04Runs\x12`\n" +
 	"\n" +
 	"GetRunByID\x12/.martiancloud.tharsis.api.run.GetRunByIDRequest\x1a!.martiancloud.tharsis.api.run.Run\x12f\n" +
@@ -1177,8 +1281,10 @@ const file_run_proto_rawDesc = "" +
 	"\fGetApplyByID\x123.martiancloud.tharsis.api.apply.GetApplyByIDRequest\x1a%.martiancloud.tharsis.api.apply.Apply\x12c\n" +
 	"\n" +
 	"UpdatePlan\x120.martiancloud.tharsis.api.plan.UpdatePlanRequest\x1a#.martiancloud.tharsis.api.plan.Plan\x12h\n" +
-	"\vUpdateApply\x122.martiancloud.tharsis.api.apply.UpdateApplyRequest\x1a%.martiancloud.tharsis.api.apply.Apply\x12{\n" +
-	"\x14SubscribeToRunEvents\x129.martiancloud.tharsis.api.run.SubscribeToRunEventsRequest\x1a&.martiancloud.tharsis.api.run.RunEvent0\x01BIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
+	"\vUpdateApply\x122.martiancloud.tharsis.api.apply.UpdateApplyRequest\x1a%.martiancloud.tharsis.api.apply.Apply\x12}\n" +
+	"\x1eSetVariablesIncludedInTFConfig\x12C.martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest\x1a\x16.google.protobuf.Empty\x12{\n" +
+	"\x14SubscribeToRunEvents\x129.martiancloud.tharsis.api.run.SubscribeToRunEventsRequest\x1a&.martiancloud.tharsis.api.run.RunEvent0\x01\x12\x84\x01\n" +
+	"\x1cCreateDestroyRunForWorkspace\x12A.martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest\x1a!.martiancloud.tharsis.api.run.RunBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var (
 	file_run_proto_rawDescOnce sync.Once
@@ -1193,67 +1299,74 @@ func file_run_proto_rawDescGZIP() []byte {
 }
 
 var file_run_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_run_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_run_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_run_proto_goTypes = []any{
-	(RunSortableField)(0),               // 0: martiancloud.tharsis.api.run.RunSortableField
-	(*GetRunByIDRequest)(nil),           // 1: martiancloud.tharsis.api.run.GetRunByIDRequest
-	(*GetRunsRequest)(nil),              // 2: martiancloud.tharsis.api.run.GetRunsRequest
-	(*CreateRunRequest)(nil),            // 3: martiancloud.tharsis.api.run.CreateRunRequest
-	(*ApplyRunRequest)(nil),             // 4: martiancloud.tharsis.api.run.ApplyRunRequest
-	(*CancelRunRequest)(nil),            // 5: martiancloud.tharsis.api.run.CancelRunRequest
-	(*GetRunVariablesRequest)(nil),      // 6: martiancloud.tharsis.api.run.GetRunVariablesRequest
-	(*SubscribeToRunEventsRequest)(nil), // 7: martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
-	(*RunVariableInput)(nil),            // 8: martiancloud.tharsis.api.run.RunVariableInput
-	(*Run)(nil),                         // 9: martiancloud.tharsis.api.run.Run
-	(*RunVariable)(nil),                 // 10: martiancloud.tharsis.api.run.RunVariable
-	(*RunEvent)(nil),                    // 11: martiancloud.tharsis.api.run.RunEvent
-	(*GetRunsResponse)(nil),             // 12: martiancloud.tharsis.api.run.GetRunsResponse
-	(*GetRunVariablesResponse)(nil),     // 13: martiancloud.tharsis.api.run.GetRunVariablesResponse
-	(*PaginationOptions)(nil),           // 14: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),            // 15: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*timestamppb.Timestamp)(nil),       // 16: google.protobuf.Timestamp
-	(*PageInfo)(nil),                    // 17: martiancloud.tharsis.api.pagination.PageInfo
-	(*GetPlanByIDRequest)(nil),          // 18: martiancloud.tharsis.api.plan.GetPlanByIDRequest
-	(*GetApplyByIDRequest)(nil),         // 19: martiancloud.tharsis.api.apply.GetApplyByIDRequest
-	(*UpdatePlanRequest)(nil),           // 20: martiancloud.tharsis.api.plan.UpdatePlanRequest
-	(*UpdateApplyRequest)(nil),          // 21: martiancloud.tharsis.api.apply.UpdateApplyRequest
-	(*Plan)(nil),                        // 22: martiancloud.tharsis.api.plan.Plan
-	(*Apply)(nil),                       // 23: martiancloud.tharsis.api.apply.Apply
+	(RunSortableField)(0),                         // 0: martiancloud.tharsis.api.run.RunSortableField
+	(*GetRunByIDRequest)(nil),                     // 1: martiancloud.tharsis.api.run.GetRunByIDRequest
+	(*GetRunsRequest)(nil),                        // 2: martiancloud.tharsis.api.run.GetRunsRequest
+	(*CreateRunRequest)(nil),                      // 3: martiancloud.tharsis.api.run.CreateRunRequest
+	(*ApplyRunRequest)(nil),                       // 4: martiancloud.tharsis.api.run.ApplyRunRequest
+	(*CancelRunRequest)(nil),                      // 5: martiancloud.tharsis.api.run.CancelRunRequest
+	(*CreateDestroyRunForWorkspaceRequest)(nil),   // 6: martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
+	(*GetRunVariablesRequest)(nil),                // 7: martiancloud.tharsis.api.run.GetRunVariablesRequest
+	(*SubscribeToRunEventsRequest)(nil),           // 8: martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
+	(*RunVariableInput)(nil),                      // 9: martiancloud.tharsis.api.run.RunVariableInput
+	(*SetVariablesIncludedInTFConfigRequest)(nil), // 10: martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
+	(*Run)(nil),                     // 11: martiancloud.tharsis.api.run.Run
+	(*RunVariable)(nil),             // 12: martiancloud.tharsis.api.run.RunVariable
+	(*RunEvent)(nil),                // 13: martiancloud.tharsis.api.run.RunEvent
+	(*GetRunsResponse)(nil),         // 14: martiancloud.tharsis.api.run.GetRunsResponse
+	(*GetRunVariablesResponse)(nil), // 15: martiancloud.tharsis.api.run.GetRunVariablesResponse
+	(*PaginationOptions)(nil),       // 16: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),        // 17: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*timestamppb.Timestamp)(nil),   // 18: google.protobuf.Timestamp
+	(*PageInfo)(nil),                // 19: martiancloud.tharsis.api.pagination.PageInfo
+	(*GetPlanByIDRequest)(nil),      // 20: martiancloud.tharsis.api.plan.GetPlanByIDRequest
+	(*GetApplyByIDRequest)(nil),     // 21: martiancloud.tharsis.api.apply.GetApplyByIDRequest
+	(*UpdatePlanRequest)(nil),       // 22: martiancloud.tharsis.api.plan.UpdatePlanRequest
+	(*UpdateApplyRequest)(nil),      // 23: martiancloud.tharsis.api.apply.UpdateApplyRequest
+	(*Plan)(nil),                    // 24: martiancloud.tharsis.api.plan.Plan
+	(*Apply)(nil),                   // 25: martiancloud.tharsis.api.apply.Apply
+	(*emptypb.Empty)(nil),           // 26: google.protobuf.Empty
 }
 var file_run_proto_depIdxs = []int32{
-	14, // 0: martiancloud.tharsis.api.run.GetRunsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	16, // 0: martiancloud.tharsis.api.run.GetRunsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.run.GetRunsRequest.sort:type_name -> martiancloud.tharsis.api.run.RunSortableField
-	8,  // 2: martiancloud.tharsis.api.run.CreateRunRequest.variables:type_name -> martiancloud.tharsis.api.run.RunVariableInput
-	15, // 3: martiancloud.tharsis.api.run.Run.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	16, // 4: martiancloud.tharsis.api.run.Run.force_cancel_available_at:type_name -> google.protobuf.Timestamp
-	9,  // 5: martiancloud.tharsis.api.run.RunEvent.run:type_name -> martiancloud.tharsis.api.run.Run
-	9,  // 6: martiancloud.tharsis.api.run.GetRunsResponse.runs:type_name -> martiancloud.tharsis.api.run.Run
-	17, // 7: martiancloud.tharsis.api.run.GetRunsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	10, // 8: martiancloud.tharsis.api.run.GetRunVariablesResponse.variables:type_name -> martiancloud.tharsis.api.run.RunVariable
+	9,  // 2: martiancloud.tharsis.api.run.CreateRunRequest.variables:type_name -> martiancloud.tharsis.api.run.RunVariableInput
+	17, // 3: martiancloud.tharsis.api.run.Run.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	18, // 4: martiancloud.tharsis.api.run.Run.force_cancel_available_at:type_name -> google.protobuf.Timestamp
+	11, // 5: martiancloud.tharsis.api.run.RunEvent.run:type_name -> martiancloud.tharsis.api.run.Run
+	11, // 6: martiancloud.tharsis.api.run.GetRunsResponse.runs:type_name -> martiancloud.tharsis.api.run.Run
+	19, // 7: martiancloud.tharsis.api.run.GetRunsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	12, // 8: martiancloud.tharsis.api.run.GetRunVariablesResponse.variables:type_name -> martiancloud.tharsis.api.run.RunVariable
 	1,  // 9: martiancloud.tharsis.api.run.Runs.GetRunByID:input_type -> martiancloud.tharsis.api.run.GetRunByIDRequest
 	2,  // 10: martiancloud.tharsis.api.run.Runs.GetRuns:input_type -> martiancloud.tharsis.api.run.GetRunsRequest
 	3,  // 11: martiancloud.tharsis.api.run.Runs.CreateRun:input_type -> martiancloud.tharsis.api.run.CreateRunRequest
 	4,  // 12: martiancloud.tharsis.api.run.Runs.ApplyRun:input_type -> martiancloud.tharsis.api.run.ApplyRunRequest
 	5,  // 13: martiancloud.tharsis.api.run.Runs.CancelRun:input_type -> martiancloud.tharsis.api.run.CancelRunRequest
-	6,  // 14: martiancloud.tharsis.api.run.Runs.GetRunVariables:input_type -> martiancloud.tharsis.api.run.GetRunVariablesRequest
-	18, // 15: martiancloud.tharsis.api.run.Runs.GetPlanByID:input_type -> martiancloud.tharsis.api.plan.GetPlanByIDRequest
-	19, // 16: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
-	20, // 17: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
-	21, // 18: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
-	7,  // 19: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
-	9,  // 20: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
-	12, // 21: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
-	9,  // 22: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
-	9,  // 23: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
-	9,  // 24: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
-	13, // 25: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
-	22, // 26: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
-	23, // 27: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
-	22, // 28: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
-	23, // 29: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
-	11, // 30: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
-	20, // [20:31] is the sub-list for method output_type
-	9,  // [9:20] is the sub-list for method input_type
+	7,  // 14: martiancloud.tharsis.api.run.Runs.GetRunVariables:input_type -> martiancloud.tharsis.api.run.GetRunVariablesRequest
+	20, // 15: martiancloud.tharsis.api.run.Runs.GetPlanByID:input_type -> martiancloud.tharsis.api.plan.GetPlanByIDRequest
+	21, // 16: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
+	22, // 17: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
+	23, // 18: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
+	10, // 19: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:input_type -> martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
+	8,  // 20: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
+	6,  // 21: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:input_type -> martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
+	11, // 22: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
+	14, // 23: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
+	11, // 24: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
+	11, // 25: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
+	11, // 26: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
+	15, // 27: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
+	24, // 28: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
+	25, // 29: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
+	24, // 30: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
+	25, // 31: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
+	26, // 32: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:output_type -> google.protobuf.Empty
+	13, // 33: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
+	11, // 34: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:output_type -> martiancloud.tharsis.api.run.Run
+	22, // [22:35] is the sub-list for method output_type
+	9,  // [9:22] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
@@ -1271,17 +1384,17 @@ func file_run_proto_init() {
 	file_run_proto_msgTypes[1].OneofWrappers = []any{}
 	file_run_proto_msgTypes[2].OneofWrappers = []any{}
 	file_run_proto_msgTypes[4].OneofWrappers = []any{}
-	file_run_proto_msgTypes[6].OneofWrappers = []any{}
 	file_run_proto_msgTypes[7].OneofWrappers = []any{}
 	file_run_proto_msgTypes[8].OneofWrappers = []any{}
-	file_run_proto_msgTypes[9].OneofWrappers = []any{}
+	file_run_proto_msgTypes[10].OneofWrappers = []any{}
+	file_run_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_run_proto_rawDesc), len(file_run_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

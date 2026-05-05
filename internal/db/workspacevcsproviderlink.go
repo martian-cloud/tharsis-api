@@ -7,22 +7,21 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // WorkspaceVCSProviderLinks encapsulates the logic to access workspace vcs provider links from the database.
 type WorkspaceVCSProviderLinks interface {
 	GetLinksByProviderID(ctx context.Context, providerID string) ([]models.WorkspaceVCSProviderLink, error)
 	GetLinkByID(ctx context.Context, id string) (*models.WorkspaceVCSProviderLink, error)
-	GetLinkByTRN(ctx context.Context, trn string) (*models.WorkspaceVCSProviderLink, error)
+	GetLinkByTRN(ctx context.Context, trnValue string) (*models.WorkspaceVCSProviderLink, error)
 	GetLinkByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceVCSProviderLink, error)
 	CreateLink(ctx context.Context, link *models.WorkspaceVCSProviderLink) (*models.WorkspaceVCSProviderLink, error)
 	UpdateLink(ctx context.Context, link *models.WorkspaceVCSProviderLink) (*models.WorkspaceVCSProviderLink, error)
@@ -102,18 +101,17 @@ func (wpl *workspaceVCSProviderLinks) GetLinkByID(ctx context.Context, id string
 	return wpl.getLink(ctx, goqu.Ex{"workspace_vcs_provider_links.id": id})
 }
 
-func (wpl *workspaceVCSProviderLinks) GetLinkByTRN(ctx context.Context, trn string) (*models.WorkspaceVCSProviderLink, error) {
+func (wpl *workspaceVCSProviderLinks) GetLinkByTRN(ctx context.Context, trnValue string) (*models.WorkspaceVCSProviderLink, error) {
 	ctx, span := tracer.Start(ctx, "db.GetLinkByTRN")
 	defer span.End()
 
-	path, err := types.WorkspaceVCSProviderLinkModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeWorkspaceVCSProviderLink.Parse(trnValue)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to parse TRN")
 		return nil, err
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a workspace vcs provider link TRN must have the workspace path, and link GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -121,8 +119,8 @@ func (wpl *workspaceVCSProviderLinks) GetLinkByTRN(ctx context.Context, trn stri
 	}
 
 	return wpl.getLink(ctx, goqu.Ex{
-		"workspace_vcs_provider_links.id": gid.FromGlobalID(path[lastSlashIndex+1:]),
-		"namespaces.path":                 path[:lastSlashIndex],
+		"workspace_vcs_provider_links.id": gid.FromGlobalID(parsed.BaseName()),
+		"namespaces.path":                 parsed.ParentPath(),
 	})
 }
 
@@ -372,7 +370,7 @@ func scanLink(row scanner) (*models.WorkspaceVCSProviderLink, error) {
 		wpl.WebhookID = webhookID.String
 	}
 
-	wpl.Metadata.TRN = types.WorkspaceVCSProviderLinkModelType.BuildTRN(workspacePath, wpl.GetGlobalID())
+	wpl.Metadata.TRN = trn.TypeWorkspaceVCSProviderLink.Build(workspacePath, wpl.GetGlobalID())
 
 	return wpl, nil
 }

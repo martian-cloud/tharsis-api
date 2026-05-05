@@ -12,13 +12,14 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
 )
 
 // StateVersionOutputs encapsulates the logic to access state version outputs from the database
 type StateVersionOutputs interface {
 	GetStateVersionOutputByID(ctx context.Context, id string) (*models.StateVersionOutput, error)
-	GetStateVersionOutputByTRN(ctx context.Context, trn string) (*models.StateVersionOutput, error)
+	GetStateVersionOutputByTRN(ctx context.Context, trnValue string) (*models.StateVersionOutput, error)
 	CreateStateVersionOutput(ctx context.Context, stateVersionOutput *models.StateVersionOutput) (*models.StateVersionOutput, error)
 	GetStateVersionOutputs(ctx context.Context, stateVersionID string) ([]models.StateVersionOutput, error)
 }
@@ -129,17 +130,17 @@ func (s *stateVersionOutputs) GetStateVersionOutputByID(ctx context.Context, id 
 	return s.getStateVersionOutput(ctx, goqu.Ex{"state_version_outputs.id": id})
 }
 
-func (s *stateVersionOutputs) GetStateVersionOutputByTRN(ctx context.Context, trn string) (*models.StateVersionOutput, error) {
+func (s *stateVersionOutputs) GetStateVersionOutputByTRN(ctx context.Context, trnValue string) (*models.StateVersionOutput, error) {
 	ctx, span := tracer.Start(ctx, "db.GetStateVersionOutputByTRN")
-	span.SetAttributes(attribute.String("trn", trn))
+	span.SetAttributes(attribute.String("trn", trnValue))
 	defer span.End()
 
-	path, err := types.StateVersionOutputModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeStateVersionOutput.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 	if len(parts) < 3 {
 		return nil, errors.New("a state version outputs TRN must have the workspace path, state version GID and output name separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
@@ -222,7 +223,7 @@ func scanStateVersionOutput(row scanner) (*models.StateVersionOutput, error) {
 		return nil, err
 	}
 
-	stateVersionOutput.Metadata.TRN = types.StateVersionOutputModelType.BuildTRN(
+	stateVersionOutput.Metadata.TRN = trn.TypeStateVersionOutput.Build(
 		workspacePath,
 		gid.ToGlobalID(types.StateVersionModelType, stateVersionID),
 		stateVersionOutput.Name,

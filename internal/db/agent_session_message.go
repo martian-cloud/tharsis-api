@@ -16,6 +16,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // AgentSessionMessages encapsulates the logic to access agent session messages from the database
@@ -243,7 +244,7 @@ func scanAgentSessionMessage(row scanner) (*models.AgentSessionMessage, error) {
 		return nil, err
 	}
 
-	msg.Metadata.TRN = types.AgentSessionMessageModelType.BuildTRN(
+	msg.Metadata.TRN = trn.TypeAgentSessionMessage.Build(
 		gid.ToGlobalID(types.AgentSessionModelType, msg.SessionID),
 		gid.ToGlobalID(types.AgentSessionRunModelType, msg.RunID),
 		msg.GetGlobalID(),

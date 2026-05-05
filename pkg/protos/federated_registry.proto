@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.federated_registry;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+// FederatedRegistries implements functionality related to federated registries.
+service FederatedRegistries {
+  // CreateFederatedRegistryTokens creates federated registry tokens for a job.
+  rpc CreateFederatedRegistryTokens(CreateFederatedRegistryTokensRequest) returns (CreateFederatedRegistryTokensResponse);
+}
+
+// CreateFederatedRegistryTokensRequest is the input for creating federated registry tokens.
+message CreateFederatedRegistryTokensRequest {
+  string job_id = 1;
+}
+
+// FederatedRegistryToken represents a token for accessing a federated registry.
+message FederatedRegistryToken {
+  string token    = 1;
+  string hostname = 2;
+}
+
+// CreateFederatedRegistryTokensResponse is the response containing federated registry tokens.
+message CreateFederatedRegistryTokensResponse {
+  repeated FederatedRegistryToken tokens = 1;
+}

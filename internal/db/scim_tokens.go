@@ -10,9 +10,9 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // SCIMTokens encapsulates the logic to access SCIM tokens from the database
@@ -199,7 +199,7 @@ func scanSCIMToken(row scanner) (*models.SCIMToken, error) {
 		return nil, err
 	}
 
-	token.Metadata.TRN = types.SCIMTokenModelType.BuildTRN(token.GetGlobalID())
+	token.Metadata.TRN = trn.TypeSCIMToken.Build(token.GetGlobalID())
 
 	return token, nil
 }

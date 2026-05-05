@@ -35,6 +35,7 @@ testdata/objectstore/*
 # Tharsis Api specific
 apiserver
 job
+runner
 !internal/**
 !cmd/*
 internal/**/.env*

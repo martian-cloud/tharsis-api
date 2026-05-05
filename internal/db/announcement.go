@@ -12,15 +12,15 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Announcements encapsulates the logic to access announcements from the database
 type Announcements interface {
 	GetAnnouncementByID(ctx context.Context, id string) (*models.Announcement, error)
-	GetAnnouncementByTRN(ctx context.Context, trn string) (*models.Announcement, error)
+	GetAnnouncementByTRN(ctx context.Context, trnValue string) (*models.Announcement, error)
 	GetAnnouncements(ctx context.Context, input *GetAnnouncementsInput) (*AnnouncementsResult, error)
 	CreateAnnouncement(ctx context.Context, announcement *models.Announcement) (*models.Announcement, error)
 	UpdateAnnouncement(ctx context.Context, announcement *models.Announcement) (*models.Announcement, error)
@@ -95,16 +95,16 @@ func (a *announcements) GetAnnouncementByID(ctx context.Context, id string) (*mo
 	return a.getAnnouncement(ctx, goqu.Ex{"announcements.id": id})
 }
 
-func (a *announcements) GetAnnouncementByTRN(ctx context.Context, trn string) (*models.Announcement, error) {
+func (a *announcements) GetAnnouncementByTRN(ctx context.Context, trnValue string) (*models.Announcement, error) {
 	ctx, span := tracer.Start(ctx, "db.GetAnnouncementByTRN")
 	defer span.End()
 
-	path, err := types.AnnouncementModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeAnnouncement.Parse(trnValue)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	return a.getAnnouncement(ctx, goqu.Ex{"announcements.id": gid.FromGlobalID(path)})
+	return a.getAnnouncement(ctx, goqu.Ex{"announcements.id": gid.FromGlobalID(parsed.Path())})
 }
 
 func (a *announcements) GetAnnouncements(ctx context.Context, input *GetAnnouncementsInput) (*AnnouncementsResult, error) {
@@ -340,7 +340,7 @@ func scanAnnouncement(row scanner) (*models.Announcement, error) {
 		return nil, err
 	}
 
-	announcement.Metadata.TRN = types.AnnouncementModelType.BuildTRN(announcement.GetGlobalID())
+	announcement.Metadata.TRN = trn.TypeAnnouncement.Build(announcement.GetGlobalID())
 
 	return announcement, nil
 }

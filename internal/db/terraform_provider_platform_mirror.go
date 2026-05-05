@@ -10,16 +10,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TerraformProviderPlatformMirrors encapsulates the logic to access TerraformProviderPlatform from the DB.
 type TerraformProviderPlatformMirrors interface {
 	GetPlatformMirrorByID(ctx context.Context, id string) (*models.TerraformProviderPlatformMirror, error)
-	GetPlatformMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatformMirror, error)
+	GetPlatformMirrorByTRN(ctx context.Context, trnValue string) (*models.TerraformProviderPlatformMirror, error)
 	GetPlatformMirrors(ctx context.Context, input *GetProviderPlatformMirrorsInput) (*ProviderPlatformMirrorsResult, error)
 	CreatePlatformMirror(ctx context.Context, platformMirror *models.TerraformProviderPlatformMirror) (*models.TerraformProviderPlatformMirror, error)
 	DeletePlatformMirror(ctx context.Context, platformMirror *models.TerraformProviderPlatformMirror) error
@@ -99,16 +99,16 @@ func (t *terraformProviderPlatformMirrors) GetPlatformMirrorByID(ctx context.Con
 	return t.getPlatformMirror(ctx, goqu.Ex{"terraform_provider_platform_mirrors.id": id})
 }
 
-func (t *terraformProviderPlatformMirrors) GetPlatformMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatformMirror, error) {
+func (t *terraformProviderPlatformMirrors) GetPlatformMirrorByTRN(ctx context.Context, trnValue string) (*models.TerraformProviderPlatformMirror, error) {
 	ctx, span := tracer.Start(ctx, "db.GetPlatformMirrorByTRN")
 	defer span.End()
 
-	path, err := types.TerraformProviderPlatformMirrorModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeTerraformProviderPlatformMirror.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 
 	if len(parts) < 7 {
 		return nil, errors.New("a Terraform provider platform mirror must have group path, hostname, namespace, type, semantic version, os, and arch separated by a forward slash",
@@ -354,7 +354,7 @@ func scanPlatformMirror(row scanner) (*models.TerraformProviderPlatformMirror, e
 		return nil, err
 	}
 
-	platformMirror.Metadata.TRN = types.TerraformProviderPlatformMirrorModelType.BuildTRN(
+	platformMirror.Metadata.TRN = trn.TypeTerraformProviderPlatformMirror.Build(
 		namespacePath,
 		registryHostname,
 		registryNamespace,

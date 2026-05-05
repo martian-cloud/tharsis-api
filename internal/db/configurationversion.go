@@ -12,10 +12,10 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // ConfigurationVersionSortableField represents the fields that a list of configuration versions can be sorted by
@@ -72,7 +72,7 @@ type ConfigurationVersions interface {
 	// GetConfigurationVersionByID returns a configuration version by ID
 	GetConfigurationVersionByID(ctx context.Context, id string) (*models.ConfigurationVersion, error)
 	// GetConfigurationVersionByTRN returns a configuration version by TRN
-	GetConfigurationVersionByTRN(ctx context.Context, trn string) (*models.ConfigurationVersion, error)
+	GetConfigurationVersionByTRN(ctx context.Context, trnValue string) (*models.ConfigurationVersion, error)
 	// CreateConfigurationVersion creates a new configuration version
 	CreateConfigurationVersion(ctx context.Context, configurationVersion models.ConfigurationVersion) (*models.ConfigurationVersion, error)
 	// UpdateConfigurationVersion updates a configuration version in the database
@@ -184,17 +184,16 @@ func (c *configurationVersions) GetConfigurationVersionByID(ctx context.Context,
 	return c.getConfigurationVersion(ctx, goqu.Ex{"configuration_versions.id": id})
 }
 
-func (c *configurationVersions) GetConfigurationVersionByTRN(ctx context.Context, trn string) (*models.ConfigurationVersion, error) {
+func (c *configurationVersions) GetConfigurationVersionByTRN(ctx context.Context, trnValue string) (*models.ConfigurationVersion, error) {
 	ctx, span := tracer.Start(ctx, "db.GetConfigurationVersionByTRN")
 	defer span.End()
 
-	path, err := types.ConfigurationVersionModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeConfigurationVersion.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a configuration version TRN must have the workspace path and version GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -202,8 +201,8 @@ func (c *configurationVersions) GetConfigurationVersionByTRN(ctx context.Context
 	}
 
 	return c.getConfigurationVersion(ctx, goqu.Ex{
-		"configuration_versions.id": gid.FromGlobalID(path[lastSlashIndex+1:]),
-		"namespaces.path":           path[:lastSlashIndex],
+		"configuration_versions.id": gid.FromGlobalID(parsed.BaseName()),
+		"namespaces.path":           parsed.ParentPath(),
 	})
 }
 
@@ -355,7 +354,7 @@ func scanConfigurationVersion(row scanner) (*models.ConfigurationVersion, error)
 		return nil, err
 	}
 
-	configurationVersion.Metadata.TRN = types.ConfigurationVersionModelType.BuildTRN(workspacePath, configurationVersion.GetGlobalID())
+	configurationVersion.Metadata.TRN = trn.TypeConfigurationVersion.Build(workspacePath, configurationVersion.GetGlobalID())
 
 	return configurationVersion, nil
 }

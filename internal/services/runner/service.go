@@ -65,8 +65,8 @@ type CreateRunnerInput struct {
 
 // CreateRunnerSessionInput is the input for creating a new runner session.
 type CreateRunnerSessionInput struct {
-	RunnerPath string
-	Internal   bool
+	RunnerID string
+	Internal bool
 }
 
 // SubscribeToRunnerSessionErrorLogInput includes options for setting up a log event subscription
@@ -461,7 +461,7 @@ func (s *service) AcceptRunnerSessionHeartbeat(ctx context.Context, sessionID st
 
 func (s *service) CreateRunnerSession(ctx context.Context, input *CreateRunnerSessionInput) (*models.RunnerSession, error) {
 	ctx, span := tracer.Start(ctx, "svc.CreateRunnerSession")
-	span.SetAttributes(attribute.String("runnerPath", input.RunnerPath))
+	span.SetAttributes(attribute.String("runnerID", input.RunnerID))
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -469,16 +469,7 @@ func (s *service) CreateRunnerSession(ctx context.Context, input *CreateRunnerSe
 		return nil, err
 	}
 
-	runner, err := s.dbClient.Runners.GetRunnerByTRN(ctx, types.RunnerModelType.BuildTRN(input.RunnerPath))
-	if err != nil {
-		return nil, err
-	}
-
-	if runner == nil {
-		return nil, errors.New("runner not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
-	}
-
-	err = caller.RequirePermission(ctx, models.CreateRunnerSessionPermission, auth.WithRunnerID(runner.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.CreateRunnerSessionPermission, auth.WithRunnerID(input.RunnerID))
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +487,7 @@ func (s *service) CreateRunnerSession(ctx context.Context, input *CreateRunnerSe
 
 	// Execute create first to ensure that no other runner sessions can be created while the transaction is in progress
 	session, err := s.dbClient.RunnerSessions.CreateRunnerSession(txContext, &models.RunnerSession{
-		RunnerID:             runner.Metadata.ID,
+		RunnerID:             input.RunnerID,
 		LastContactTimestamp: time.Now().UTC(),
 		Internal:             input.Internal,
 	})
@@ -515,7 +506,7 @@ func (s *service) CreateRunnerSession(ctx context.Context, input *CreateRunnerSe
 	// Check how many sessions are currently active for the runner.
 	activeSessionsResponse, err := s.dbClient.RunnerSessions.GetRunnerSessions(txContext, &db.GetRunnerSessionsInput{
 		Filter: &db.RunnerSessionFilter{
-			RunnerID: &runner.Metadata.ID,
+			RunnerID: &input.RunnerID,
 		},
 		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(0),
@@ -536,7 +527,7 @@ func (s *service) CreateRunnerSession(ctx context.Context, input *CreateRunnerSe
 		oldestSessionResponse, err := s.dbClient.RunnerSessions.GetRunnerSessions(txContext, &db.GetRunnerSessionsInput{
 			Sort: &sortBy,
 			Filter: &db.RunnerSessionFilter{
-				RunnerID: &runner.Metadata.ID,
+				RunnerID: &input.RunnerID,
 			},
 			PaginationOptions: &pagination.Options{
 				First: ptr.Int32(1),

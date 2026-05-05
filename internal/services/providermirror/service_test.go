@@ -24,6 +24,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 const (
@@ -310,7 +311,7 @@ func TestGetProviderVersionMirrorByTRN(t *testing.T) {
 	sampleMirror := &models.TerraformProviderVersionMirror{
 		Metadata: models.ResourceMetadata{
 			ID:  "mirror-1",
-			TRN: types.TerraformProviderVersionMirrorModelType.BuildTRN("group-1/mirror-1"),
+			TRN: trn.TypeTerraformProviderVersionMirror.Build("group-1/mirror-1"),
 		},
 		GroupID:           "group-1",
 		RegistryHostname:  "registry.terraform.io",
@@ -1028,7 +1029,7 @@ func TestGetProviderPlatformMirrorByTRN(t *testing.T) {
 	sampleMirror := &models.TerraformProviderPlatformMirror{
 		Metadata: models.ResourceMetadata{
 			ID:  "mirror-1",
-			TRN: types.TerraformProviderPlatformMirrorModelType.BuildTRN("group-1/mirror-1"),
+			TRN: trn.TypeTerraformProviderPlatformMirror.Build("group-1/mirror-1"),
 		},
 		VersionMirrorID: "version-1",
 		OS:              "linux",
@@ -1557,7 +1558,7 @@ func TestGetAvailableProviderVersions(t *testing.T) {
 			mockGroups := db.NewMockGroups(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
-			mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(namespace)).Return(test.group, nil)
+			mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(namespace)).Return(test.group, nil)
 
 			if test.group != nil {
 				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)
@@ -1728,7 +1729,7 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 			mockPlatformMirrors := db.NewMockTerraformProviderPlatformMirrors(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
-			mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(namespace)).Return(test.group, nil)
+			mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(namespace)).Return(test.group, nil)
 
 			if test.group != nil {
 				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)

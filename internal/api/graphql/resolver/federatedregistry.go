@@ -351,6 +351,7 @@ func handleCreateFederatedRegistryTokensMutationProblem(e error,
 	return &FederatedRegistryTokensMutationPayloadResolver{FederatedRegistryTokensMutationPayload: payload}, nil
 }
 
+// Deprecated: Use the gRPC API instead.
 func createFederatedRegistryTokensMutation(ctx context.Context,
 	input *CreateFederatedRegistryTokensInput,
 ) (*FederatedRegistryTokensMutationPayloadResolver, error) {

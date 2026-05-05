@@ -24,6 +24,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 const (
@@ -645,8 +646,8 @@ func (s *service) CreateOIDCToken(ctx context.Context, input *CreateOIDCTokenInp
 
 	if serviceAccountID == "" {
 		validationErrors = append(validationErrors, "service account ID is empty")
-	} else if types.IsTRN(serviceAccountID) {
-		_, resourcePathErr := types.ServiceAccountModelType.ResourcePathFromTRN(serviceAccountID)
+	} else if trn.IsTRN(serviceAccountID) {
+		_, resourcePathErr := trn.TypeServiceAccount.Parse(serviceAccountID)
 		if resourcePathErr != nil {
 			validationErrors = append(validationErrors, fmt.Sprintf("service account path is not valid - %s", resourcePathErr.Error()))
 		}
@@ -692,7 +693,7 @@ func (s *service) CreateOIDCToken(ctx context.Context, input *CreateOIDCTokenInp
 
 	// Get service account based on the ID type (TRN or GID)
 	var serviceAccount *models.ServiceAccount
-	if types.IsTRN(input.ServiceAccountPublicID) {
+	if trn.IsTRN(input.ServiceAccountPublicID) {
 		serviceAccount, err = s.dbClient.ServiceAccounts.GetServiceAccountByTRN(ctx, input.ServiceAccountPublicID)
 	} else {
 		serviceAccount, err = s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, gid.FromGlobalID(input.ServiceAccountPublicID))
@@ -751,7 +752,7 @@ func (s *service) CreateClientCredentialsToken(ctx context.Context, input *Creat
 
 	var serviceAccount *models.ServiceAccount
 	var err error
-	if types.IsTRN(input.ClientID) {
+	if trn.IsTRN(input.ClientID) {
 		serviceAccount, err = s.dbClient.ServiceAccounts.GetServiceAccountByTRN(ctx, input.ClientID)
 	} else {
 		serviceAccount, err = s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, gid.FromGlobalID(input.ClientID))

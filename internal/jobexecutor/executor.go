@@ -12,7 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 )
 
 const (
@@ -133,28 +133,28 @@ func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, 
 	}
 
 	// Get Run
-	run, err := j.client.GetRun(ctx, job.RunID)
+	run, err := j.client.GetRun(ctx, job.RunId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get run %v", err)
 	}
 
 	// Get workspace
-	ws, err := j.client.GetWorkspace(ctx, job.WorkspaceID)
+	ws, err := j.client.GetWorkspace(ctx, job.WorkspaceId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace %v", err)
 	}
 
-	cancellableCtx := j.createCancellableContext(ctx, jobLogger, run.Metadata.ID, job.MaxJobDuration)
+	cancellableCtx := j.createCancellableContext(ctx, jobLogger, run.Metadata.Id, job.MaxJobDuration)
 
 	var handler JobHandler
 
 	switch job.Type {
-	case types.JobPlanType:
+	case pb.JobType_plan.String():
 		handler, err = NewPlanHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, job, j.logger, jobLogger, j.client)
 		if err != nil {
 			return nil, err
 		}
-	case types.JobApplyType:
+	case pb.JobType_apply.String():
 		handler, err = NewApplyHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, job, j.logger, jobLogger, j.client)
 		if err != nil {
 			return nil, err
@@ -212,7 +212,7 @@ func (j *JobExecutor) createCancellableContext(ctx context.Context, jobLogger jo
 
 			// If the cancellation was forced, this should kill the main process and force the run to terminate.
 			if run.ForceCanceled {
-				jobLogger.Errorf("Force canceled run ID %s", run.Metadata.ID)
+				jobLogger.Errorf("Force canceled run ID %s", run.Metadata.Id)
 				os.Exit(1)
 			}
 

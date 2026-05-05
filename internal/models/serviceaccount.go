@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
@@ -14,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 var _ Model = (*ServiceAccount)(nil)
@@ -152,13 +152,12 @@ func (s *ServiceAccount) Validate() error {
 
 // GetResourcePath returns the ServiceAccount resource's path
 func (s *ServiceAccount) GetResourcePath() string {
-	return strings.Split(s.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+	return trn.MustParseAny(s.Metadata.TRN).Path()
 }
 
 // GetGroupPath returns the group path
 func (s *ServiceAccount) GetGroupPath() string {
-	resourcePath := s.GetResourcePath()
-	return resourcePath[:strings.LastIndex(resourcePath, "/")]
+	return trn.MustParseAny(s.Metadata.TRN).ParentPath()
 }
 
 // GenerateClientSecret generates and sets a cryptographically secure client secret.

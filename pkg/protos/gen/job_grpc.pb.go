@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,9 +20,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	Jobs_GetJobByID_FullMethodName                      = "/martiancloud.tharsis.api.job.Jobs/GetJobByID"
 	Jobs_GetJobLogs_FullMethodName                      = "/martiancloud.tharsis.api.job.Jobs/GetJobLogs"
 	Jobs_GetLatestJobForPlan_FullMethodName             = "/martiancloud.tharsis.api.job.Jobs/GetLatestJobForPlan"
 	Jobs_GetLatestJobForApply_FullMethodName            = "/martiancloud.tharsis.api.job.Jobs/GetLatestJobForApply"
+	Jobs_SaveJobLogs_FullMethodName                     = "/martiancloud.tharsis.api.job.Jobs/SaveJobLogs"
+	Jobs_ClaimJob_FullMethodName                        = "/martiancloud.tharsis.api.job.Jobs/ClaimJob"
 	Jobs_SubscribeToJobLogStream_FullMethodName         = "/martiancloud.tharsis.api.job.Jobs/SubscribeToJobLogStream"
 	Jobs_SubscribeToJobEvents_FullMethodName            = "/martiancloud.tharsis.api.job.Jobs/SubscribeToJobEvents"
 	Jobs_SubscribeToJobCancellationEvent_FullMethodName = "/martiancloud.tharsis.api.job.Jobs/SubscribeToJobCancellationEvent"
@@ -33,12 +37,18 @@ const (
 //
 // Jobs implements all functionality related to Tharsis Jobs.
 type JobsClient interface {
+	// GetJobByID retrieves a job by its ID.
+	GetJobByID(ctx context.Context, in *GetJobByIDRequest, opts ...grpc.CallOption) (*Job, error)
 	// GetJobLogs retrieves job logs.
 	GetJobLogs(ctx context.Context, in *GetJobLogsRequest, opts ...grpc.CallOption) (*GetJobLogsResponse, error)
 	// GetLatestJobForPlan retrieves the latest job for a plan ID.
 	GetLatestJobForPlan(ctx context.Context, in *GetLatestJobForPlanRequest, opts ...grpc.CallOption) (*Job, error)
 	// GetLatestJobForApply retrieves the latest job for an apply ID.
 	GetLatestJobForApply(ctx context.Context, in *GetLatestJobForApplyRequest, opts ...grpc.CallOption) (*Job, error)
+	// SaveJobLogs saves job logs.
+	SaveJobLogs(ctx context.Context, in *SaveJobLogsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ClaimJob claims the next available job for a runner.
+	ClaimJob(ctx context.Context, in *ClaimJobRequest, opts ...grpc.CallOption) (*ClaimJobResponse, error)
 	// SubscribeToJobLogStream subscribes to job log stream events.
 	SubscribeToJobLogStream(ctx context.Context, in *SubscribeToJobLogStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[JobLogStreamEvent], error)
 	// SubscribeToJobEvents subscribes to job events.
@@ -53,6 +63,16 @@ type jobsClient struct {
 
 func NewJobsClient(cc grpc.ClientConnInterface) JobsClient {
 	return &jobsClient{cc}
+}
+
+func (c *jobsClient) GetJobByID(ctx context.Context, in *GetJobByIDRequest, opts ...grpc.CallOption) (*Job, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Job)
+	err := c.cc.Invoke(ctx, Jobs_GetJobByID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *jobsClient) GetJobLogs(ctx context.Context, in *GetJobLogsRequest, opts ...grpc.CallOption) (*GetJobLogsResponse, error) {
@@ -79,6 +99,26 @@ func (c *jobsClient) GetLatestJobForApply(ctx context.Context, in *GetLatestJobF
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Job)
 	err := c.cc.Invoke(ctx, Jobs_GetLatestJobForApply_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobsClient) SaveJobLogs(ctx context.Context, in *SaveJobLogsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Jobs_SaveJobLogs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobsClient) ClaimJob(ctx context.Context, in *ClaimJobRequest, opts ...grpc.CallOption) (*ClaimJobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ClaimJobResponse)
+	err := c.cc.Invoke(ctx, Jobs_ClaimJob_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -148,12 +188,18 @@ type Jobs_SubscribeToJobCancellationEventClient = grpc.ServerStreamingClient[Job
 //
 // Jobs implements all functionality related to Tharsis Jobs.
 type JobsServer interface {
+	// GetJobByID retrieves a job by its ID.
+	GetJobByID(context.Context, *GetJobByIDRequest) (*Job, error)
 	// GetJobLogs retrieves job logs.
 	GetJobLogs(context.Context, *GetJobLogsRequest) (*GetJobLogsResponse, error)
 	// GetLatestJobForPlan retrieves the latest job for a plan ID.
 	GetLatestJobForPlan(context.Context, *GetLatestJobForPlanRequest) (*Job, error)
 	// GetLatestJobForApply retrieves the latest job for an apply ID.
 	GetLatestJobForApply(context.Context, *GetLatestJobForApplyRequest) (*Job, error)
+	// SaveJobLogs saves job logs.
+	SaveJobLogs(context.Context, *SaveJobLogsRequest) (*emptypb.Empty, error)
+	// ClaimJob claims the next available job for a runner.
+	ClaimJob(context.Context, *ClaimJobRequest) (*ClaimJobResponse, error)
 	// SubscribeToJobLogStream subscribes to job log stream events.
 	SubscribeToJobLogStream(*SubscribeToJobLogStreamRequest, grpc.ServerStreamingServer[JobLogStreamEvent]) error
 	// SubscribeToJobEvents subscribes to job events.
@@ -170,6 +216,9 @@ type JobsServer interface {
 // pointer dereference when methods are called.
 type UnimplementedJobsServer struct{}
 
+func (UnimplementedJobsServer) GetJobByID(context.Context, *GetJobByIDRequest) (*Job, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetJobByID not implemented")
+}
 func (UnimplementedJobsServer) GetJobLogs(context.Context, *GetJobLogsRequest) (*GetJobLogsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetJobLogs not implemented")
 }
@@ -178,6 +227,12 @@ func (UnimplementedJobsServer) GetLatestJobForPlan(context.Context, *GetLatestJo
 }
 func (UnimplementedJobsServer) GetLatestJobForApply(context.Context, *GetLatestJobForApplyRequest) (*Job, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLatestJobForApply not implemented")
+}
+func (UnimplementedJobsServer) SaveJobLogs(context.Context, *SaveJobLogsRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SaveJobLogs not implemented")
+}
+func (UnimplementedJobsServer) ClaimJob(context.Context, *ClaimJobRequest) (*ClaimJobResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ClaimJob not implemented")
 }
 func (UnimplementedJobsServer) SubscribeToJobLogStream(*SubscribeToJobLogStreamRequest, grpc.ServerStreamingServer[JobLogStreamEvent]) error {
 	return status.Error(codes.Unimplemented, "method SubscribeToJobLogStream not implemented")
@@ -207,6 +262,24 @@ func RegisterJobsServer(s grpc.ServiceRegistrar, srv JobsServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Jobs_ServiceDesc, srv)
+}
+
+func _Jobs_GetJobByID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetJobByIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobsServer).GetJobByID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Jobs_GetJobByID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobsServer).GetJobByID(ctx, req.(*GetJobByIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Jobs_GetJobLogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -263,6 +336,42 @@ func _Jobs_GetLatestJobForApply_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Jobs_SaveJobLogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveJobLogsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobsServer).SaveJobLogs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Jobs_SaveJobLogs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobsServer).SaveJobLogs(ctx, req.(*SaveJobLogsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Jobs_ClaimJob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClaimJobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobsServer).ClaimJob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Jobs_ClaimJob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobsServer).ClaimJob(ctx, req.(*ClaimJobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Jobs_SubscribeToJobLogStream_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(SubscribeToJobLogStreamRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -304,6 +413,10 @@ var Jobs_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*JobsServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "GetJobByID",
+			Handler:    _Jobs_GetJobByID_Handler,
+		},
+		{
 			MethodName: "GetJobLogs",
 			Handler:    _Jobs_GetJobLogs_Handler,
 		},
@@ -314,6 +427,14 @@ var Jobs_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLatestJobForApply",
 			Handler:    _Jobs_GetLatestJobForApply_Handler,
+		},
+		{
+			MethodName: "SaveJobLogs",
+			Handler:    _Jobs_SaveJobLogs_Handler,
+		},
+		{
+			MethodName: "ClaimJob",
+			Handler:    _Jobs_ClaimJob_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

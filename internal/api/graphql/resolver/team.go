@@ -9,10 +9,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 /* Team Query Resolvers */
@@ -173,7 +173,7 @@ func (r *TeamResolver) Members(ctx context.Context, args *ConnectionQueryArgs) (
 
 // DEPRECATED: use node query instead with a TRN
 func teamQuery(ctx context.Context, args *TeamQueryArgs) (*TeamResolver, error) {
-	team, err := getServiceCatalog(ctx).TeamService.GetTeamByTRN(ctx, types.TeamModelType.BuildTRN(args.Name))
+	team, err := getServiceCatalog(ctx).TeamService.GetTeamByTRN(ctx, trn.TypeTeam.Build(args.Name))
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -282,7 +282,7 @@ func updateTeamMutation(ctx context.Context, input *UpdateTeamInput) (*TeamMutat
 	case input.ID != nil:
 		teamValueToResolve = *input.ID
 	case input.Name != nil:
-		teamValueToResolve = types.TeamModelType.BuildTRN(*input.Name)
+		teamValueToResolve = trn.TypeTeam.Build(*input.Name)
 	default:
 		return nil, errors.New("either team id or name must be specified", errors.WithErrorCode(errors.EInvalid))
 	}
@@ -326,7 +326,7 @@ func deleteTeamMutation(ctx context.Context, input *DeleteTeamInput) (*TeamMutat
 	case input.ID != nil:
 		teamValueToResolve = *input.ID
 	case input.Name != nil:
-		teamValueToResolve = types.TeamModelType.BuildTRN(*input.Name)
+		teamValueToResolve = trn.TypeTeam.Build(*input.Name)
 	default:
 		return nil, errors.New("either team id or name must be specified", errors.WithErrorCode(errors.EInvalid))
 	}

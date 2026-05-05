@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 )
 
 // Authenticator supports Kubernetes OIDC authentication
@@ -26,8 +26,8 @@ func (a *Authenticator) Close(context.Context) error {
 // Authenticate configures the environment with Kubernetes authentication information
 func (a *Authenticator) Authenticate(
 	ctx context.Context,
-	managedIdentities []types.ManagedIdentity,
-	credsRetriever func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error),
+	managedIdentities []*pb.ManagedIdentity,
+	credsRetriever func(ctx context.Context, managedIdentity *pb.ManagedIdentity) ([]byte, error),
 ) (*managedidentity.AuthenticateResponse, error) {
 	if len(managedIdentities) != 1 {
 		return nil, fmt.Errorf("expected exactly one kubernetes managed identity, got %d", len(managedIdentities))
@@ -35,7 +35,7 @@ func (a *Authenticator) Authenticate(
 
 	managedIdentity := managedIdentities[0]
 	// Get JWT token from credentials retriever (service layer)
-	token, err := credsRetriever(ctx, &managedIdentity)
+	token, err := credsRetriever(ctx, managedIdentity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve managed identity token: %w", err)
 	}

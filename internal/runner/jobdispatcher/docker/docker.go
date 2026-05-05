@@ -21,10 +21,11 @@ import (
 	"github.com/dustin/go-humanize"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
-var pluginDataRequiredFields = []string{"host", "image", "api_url"}
+var pluginDataRequiredFields = []string{"host", "image", "endpoint"}
 
 type client interface {
 	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
@@ -40,7 +41,7 @@ type JobDispatcher struct {
 	bindPath               string
 	registryUsername       string
 	registryPassword       string
-	apiURL                 string
+	apiEndpoint            string
 	discoveryProtocolHosts []string
 	extraHosts             []string
 	localImage             bool
@@ -49,6 +50,10 @@ type JobDispatcher struct {
 
 // New creates a JobDispatcher
 func New(pluginData map[string]string, discoveryProtocolHost string, logger logger.Logger) (*JobDispatcher, error) {
+	if err := types.MigrateDeprecatedPluginDataFields(pluginData, logger); err != nil {
+		return nil, err
+	}
+
 	for _, field := range pluginDataRequiredFields {
 		if _, ok := pluginData[field]; !ok {
 			return nil, fmt.Errorf("docker job dispatcher requires plugin data '%s' field", field)
@@ -101,7 +106,7 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 	return &JobDispatcher{
 		image:                  pluginData["image"],
 		bindPath:               pluginData["bind_path"],
-		apiURL:                 pluginData["api_url"],
+		apiEndpoint:            pluginData["endpoint"],
 		discoveryProtocolHosts: discoveryProtocolHosts,
 		registryUsername:       pluginData["registry_username"],
 		registryPassword:       pluginData["registry_password"],
@@ -148,7 +153,7 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 	resp, err := j.client.ContainerCreate(ctx, &container.Config{
 		Image: j.image,
 		Env: []string{
-			fmt.Sprintf("API_URL=%s", j.apiURL),
+			fmt.Sprintf("ENDPOINT=%s", j.apiEndpoint),
 			fmt.Sprintf("JOB_ID=%s", jobID),
 			fmt.Sprintf("JOB_TOKEN=%s", token),
 			fmt.Sprintf("DISCOVERY_PROTOCOL_HOSTS=%s", strings.Join(j.discoveryProtocolHosts, ",")),

@@ -12,13 +12,13 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // GetVariableVersionsInput is the input for querying a list of variable versions
@@ -901,12 +901,12 @@ func (s *service) getTargetTypeID(ctx context.Context,
 ) (models.ActivityEventTargetType, string, error) {
 	var targetType models.ActivityEventTargetType
 	targetID := ""
-	group, gErr := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespacePath))
+	group, gErr := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(namespacePath))
 	if (gErr == nil) && (group != nil) {
 		targetType = models.TargetGroup
 		targetID = group.Metadata.ID
 	} else {
-		workspace, wErr := s.dbClient.Workspaces.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(namespacePath))
+		workspace, wErr := s.dbClient.Workspaces.GetWorkspaceByTRN(ctx, trn.TypeWorkspace.Build(namespacePath))
 		if (wErr == nil) && (workspace != nil) {
 			targetType = models.TargetWorkspace
 			targetID = workspace.Metadata.ID

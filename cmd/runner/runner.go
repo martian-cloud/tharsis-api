@@ -2,17 +2,18 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/client"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Version is passed in via ldflags at build time
@@ -35,22 +36,43 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	apiURL := os.Getenv("THARSIS_API_URL")
-	if apiURL == "" {
-		logger.Errorf("THARSIS_API_URL environment variable is required")
+	apiEndpoint := os.Getenv("THARSIS_ENDPOINT")
+	if apiEndpoint == "" {
+		apiEndpoint = os.Getenv("THARSIS_API_URL")
+		if apiEndpoint != "" {
+			logger.Warnf("THARSIS_API_URL is deprecated, use THARSIS_ENDPOINT instead")
+		}
+	}
+
+	if apiEndpoint == "" {
+		logger.Errorf("THARSIS_ENDPOINT environment variable is required")
 		return
 	}
 
-	runnerPath := os.Getenv("THARSIS_RUNNER_PATH")
-	if runnerPath == "" {
-		logger.Errorf("THARSIS_RUNNER_PATH environment variable is required")
-		return
+	runnerID := os.Getenv("THARSIS_RUNNER_ID")
+	if runnerID == "" {
+		// Fall back to deprecated env var and convert path to TRN.
+		runnerPath := os.Getenv("THARSIS_RUNNER_PATH")
+		if runnerPath == "" {
+			logger.Errorf("THARSIS_RUNNER_ID environment variable is required")
+			return
+		}
+
+		logger.Warnf("THARSIS_RUNNER_PATH is deprecated, use THARSIS_RUNNER_ID instead")
+		runnerID = trn.TypeRunner.Build(runnerPath)
 	}
 
-	serviceAccountPath := os.Getenv("THARSIS_SERVICE_ACCOUNT_PATH")
-	if serviceAccountPath == "" {
-		logger.Errorf("THARSIS_SERVICE_ACCOUNT_PATH environment variable is required")
-		return
+	serviceAccountID := os.Getenv("THARSIS_SERVICE_ACCOUNT_ID")
+	if serviceAccountID == "" {
+		// Fall back to deprecated env var and convert path to TRN.
+		serviceAccountPath := os.Getenv("THARSIS_SERVICE_ACCOUNT_PATH")
+		if serviceAccountPath == "" {
+			logger.Errorf("THARSIS_SERVICE_ACCOUNT_ID environment variable is required")
+			return
+		}
+
+		logger.Warnf("THARSIS_SERVICE_ACCOUNT_PATH is deprecated, use THARSIS_SERVICE_ACCOUNT_ID instead")
+		serviceAccountID = trn.TypeServiceAccount.Build(serviceAccountPath)
 	}
 
 	dispatcherType := os.Getenv("THARSIS_JOB_DISPATCHER_TYPE")
@@ -71,30 +93,75 @@ func main() {
 		pluginData[k] = v
 	}
 
-	baseURL, err := url.Parse(apiURL)
+	baseURL, err := url.Parse(apiEndpoint)
 	if err != nil {
-		logger.Errorf("failed to parse THARSIS_API_URL %s: %v", apiURL, err)
+		logger.Errorf("failed to parse THARSIS_ENDPOINT %s: %v", apiEndpoint, err)
 		return
 	}
 
-	tokenProvider, err := createTokenProvider(baseURL.String(), serviceAccountPath, credHelperPath, strings.Split(os.Getenv("THARSIS_CREDENTIAL_HELPER_CMD_ARGS"), " "))
+	var tlsSkipVerify bool
+	if v := os.Getenv("TLS_SKIP_VERIFY"); v != "" {
+		tlsSkipVerify, err = strconv.ParseBool(v)
+		if err != nil {
+			logger.Errorf("Invalid TLS_SKIP_VERIFY value: %v", err)
+			return
+		}
+	}
+
+	userAgent := client.BuildUserAgent("tharsis-runner", Version)
+	slogger := logger.Slog()
+
+	tokenResolver, err := NewTokenResolver(ctx, &TokenResolverInput{
+		BaseURL:              baseURL,
+		ServiceAccountID:     serviceAccountID,
+		CredentialHelperPath: credHelperPath,
+		CredentialHelperArgs: strings.Split(os.Getenv("THARSIS_CREDENTIAL_HELPER_CMD_ARGS"), " "),
+		Logger:               slogger,
+		UserAgent:            userAgent,
+		TLSSkipVerify:        tlsSkipVerify,
+	})
 	if err != nil {
-		logger.Errorf("failed to create token provider: %v", err)
+		logger.Errorf("failed to create token resolver: %v", err)
 		return
 	}
 
-	client, err := NewClient(baseURL.String(), tokenProvider)
+	defer func() {
+		if cErr := tokenResolver.Close(); cErr != nil {
+			logger.Errorf("failed to close token resolver: %v", cErr)
+		}
+	}()
+
+	client, err := NewClient(ctx, &ClientConfig{
+		APIEndpoint:   baseURL.String(),
+		TokenResolver: tokenResolver,
+		UserAgent:     userAgent,
+		TLSSkipVerify: tlsSkipVerify,
+		Logger:        slogger,
+	})
 	if err != nil {
 		logger.Errorf("failed to create runner client %v", err)
 		return
 	}
 
-	runner, err := runner.NewRunner(ctx, runnerPath, logger, Version, client, &runner.JobDispatcherSettings{
+	defer func() {
+		if cErr := client.Close(); cErr != nil {
+			logger.Errorf("failed to close runner client: %v", cErr)
+		}
+	}()
+
+	// Resolve the runner TRN/ID to the canonical ID used by the API.
+	resolvedRunnerID, err := client.GetRunnerID(ctx, runnerID)
+	if err != nil {
+		logger.Errorf("failed to resolve runner ID: %v", err)
+		return
+	}
+
+	runner, err := runner.NewRunner(ctx, resolvedRunnerID, logger, Version, client, &runner.JobDispatcherSettings{
 		DispatcherType:       dispatcherType,
 		ServiceDiscoveryHost: os.Getenv("THARSIS_SERVICE_DISCOVERY_HOST"),
 		PluginData:           pluginData,
-		TokenGetterFunc: func(_ context.Context) (string, error) {
-			return tokenProvider.GetToken()
+		TokenGetterFunc: func(ctx context.Context) (string, error) {
+			return tokenResolver.Token(ctx)
 		},
 	})
 	if err != nil {
@@ -119,21 +186,6 @@ func main() {
 	runner.Start(ctx)
 
 	logger.Info("Runner has gracefully shutdown")
-}
-
-func createTokenProvider(apiURL string, serviceAccountPath string, credentialHelperPath string, credentialHelperArgs []string) (auth.TokenProvider, error) {
-	// Setup service account token provider
-	tokenProvider, err := auth.NewServiceAccountTokenProvider(apiURL, serviceAccountPath, func() (string, error) {
-		token, chErr := invokeCredentialHelper(credentialHelperPath, credentialHelperArgs)
-		if chErr != nil {
-			return "", fmt.Errorf("failed to invoke credential helper: %v", chErr)
-		}
-		return token, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return tokenProvider, nil
 }
 
 func loadDispatcherData(envPrefix string) map[string]string {

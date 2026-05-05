@@ -44,7 +44,7 @@ lint: ## run linting on Go and UI code
 		exit 1; \
 	fi
 	@echo "Linting UI code..."
-	@cd frontend && npm ci >/dev/null && npm run lint
+	@cd frontend && npm run lint
 
 .PHONY: vet
 vet: ## run golint on all Go package

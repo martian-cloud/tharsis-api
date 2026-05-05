@@ -74,9 +74,9 @@ func (_m *MockJobs) GetJobByID(ctx context.Context, id string) (*models.Job, err
 	return r0, r1
 }
 
-// GetJobByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockJobs) GetJobByTRN(ctx context.Context, trn string) (*models.Job, error) {
-	ret := _m.Called(ctx, trn)
+// GetJobByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockJobs) GetJobByTRN(ctx context.Context, trnValue string) (*models.Job, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetJobByTRN")
@@ -85,10 +85,10 @@ func (_m *MockJobs) GetJobByTRN(ctx context.Context, trn string) (*models.Job, e
 	var r0 *models.Job
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Job, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Job); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Job)
@@ -96,7 +96,7 @@ func (_m *MockJobs) GetJobByTRN(ctx context.Context, trn string) (*models.Job, e
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

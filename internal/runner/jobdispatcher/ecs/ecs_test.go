@@ -15,7 +15,7 @@ import (
 
 func TestNew(t *testing.T) {
 	pluginData := map[string]string{
-		"api_url":         "testUrl",
+		"endpoint":        "testUrl",
 		"region":          "testRegion",
 		"task_definition": "testTaskDef",
 		"cluster":         "testCluster",
@@ -27,7 +27,7 @@ func TestNew(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 
-	assert.Equal(t, "testUrl", dispatcher.apiURL)
+	assert.Equal(t, "testUrl", dispatcher.apiEndpoint)
 	assert.Equal(t, "testTaskDef", dispatcher.taskDefinition)
 	assert.Equal(t, "testCluster", dispatcher.cluster)
 	assert.Equal(t, []string{"test1", "test2"}, dispatcher.subnets)
@@ -36,7 +36,7 @@ func TestNew(t *testing.T) {
 
 func TestNewInvalidLaunchType(t *testing.T) {
 	pluginData := map[string]string{
-		"api_url":         "testUrl",
+		"endpoint":        "testUrl",
 		"region":          "testRegion",
 		"task_definition": "testTaskDef",
 		"cluster":         "testCluster",
@@ -133,7 +133,7 @@ func TestDispatchJob(t *testing.T) {
 							Environment: []types.KeyValuePair{
 								{Name: ptr.String("JOB_ID"), Value: &test.jobID},
 								{Name: ptr.String("JOB_TOKEN"), Value: &token},
-								{Name: ptr.String("API_URL"), Value: &apiURL},
+								{Name: ptr.String("ENDPOINT"), Value: &apiURL},
 								{Name: ptr.String("DISCOVERY_PROTOCOL_HOSTS"), Value: &discoveryProtocolHost},
 							},
 						},
@@ -147,7 +147,7 @@ func TestDispatchJob(t *testing.T) {
 				cluster:                cluster,
 				launchType:             launchType,
 				subnets:                subnets,
-				apiURL:                 apiURL,
+				apiEndpoint:            apiURL,
 				discoveryProtocolHosts: []string{discoveryProtocolHost},
 				client:                 &client,
 			}

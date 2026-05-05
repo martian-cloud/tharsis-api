@@ -14,10 +14,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -269,7 +269,7 @@ func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMUsersInput) ([
 			users = append(users, *user)
 		}
 	} else if input.Username != nil && *input.Username != "" {
-		user, err := s.dbClient.Users.GetUserByTRN(ctx, types.UserModelType.BuildTRN(*input.Username))
+		user, err := s.dbClient.Users.GetUserByTRN(ctx, trn.TypeUser.Build(*input.Username))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get a SCIM user by username", errors.WithSpan(span))
 		}
@@ -621,7 +621,7 @@ func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInp
 	}
 
 	// Check if team with same name exists.
-	existingTeam, err := s.dbClient.Teams.GetTeamByTRN(ctx, types.TeamModelType.BuildTRN(input.Name))
+	existingTeam, err := s.dbClient.Teams.GetTeamByTRN(ctx, trn.TypeTeam.Build(input.Name))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get team by TRN")
 		return nil, err

@@ -11,17 +11,17 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestGetNamespaceMembershipByTRN(t *testing.T) {
 	sampleMembership := &models.NamespaceMembership{
 		Metadata: models.ResourceMetadata{
 			ID:  "membership-1",
-			TRN: types.NamespaceMembershipModelType.BuildTRN("group-1/membership-1"),
+			TRN: trn.TypeNamespaceMembership.Build("group-1/membership-1"),
 		},
 		Namespace: models.MembershipNamespace{
 			Path:    "group-1",
@@ -123,7 +123,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				ServiceAccount: &models.ServiceAccount{
 					Metadata: models.ResourceMetadata{
 						ID:  "serviceAccount1",
-						TRN: types.ServiceAccountModelType.BuildTRN("ns1/ns11/serviceAccount"),
+						TRN: trn.TypeServiceAccount.Build("ns1/ns11/serviceAccount"),
 					},
 				},
 			},
@@ -145,7 +145,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				ServiceAccount: &models.ServiceAccount{
 					Metadata: models.ResourceMetadata{
 						ID:  "serviceAccount1",
-						TRN: types.ServiceAccountModelType.BuildTRN("ns1/serviceAccount"),
+						TRN: trn.TypeServiceAccount.Build("ns1/serviceAccount"),
 					},
 				},
 			},
@@ -197,7 +197,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				ServiceAccount: &models.ServiceAccount{
 					Metadata: models.ResourceMetadata{
 						ID:  "serviceAccount1",
-						TRN: types.ServiceAccountModelType.BuildTRN("ns2/serviceAccount"),
+						TRN: trn.TypeServiceAccount.Build("ns2/serviceAccount"),
 					},
 				},
 			},
@@ -212,7 +212,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				ServiceAccount: &models.ServiceAccount{
 					Metadata: models.ResourceMetadata{
 						ID:  "serviceAccount1",
-						TRN: types.ServiceAccountModelType.BuildTRN("ns1/ns11/serviceAccount"),
+						TRN: trn.TypeServiceAccount.Build("ns1/ns11/serviceAccount"),
 					},
 				},
 			},

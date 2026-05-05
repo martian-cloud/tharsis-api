@@ -23,6 +23,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestGetModuleByID(t *testing.T) {
@@ -111,7 +112,7 @@ func TestGetModuleByID(t *testing.T) {
 func TestGetModuleByTRN(t *testing.T) {
 	groupID := "group-1"
 	moduleID := "module-1"
-	moduleTRN := types.TerraformModuleModelType.BuildTRN("group/test-module/aws")
+	moduleTRN := trn.TypeTerraformModule.Build("group/test-module/aws")
 
 	type testCase struct {
 		module          *models.TerraformModule
@@ -283,7 +284,7 @@ func TestGetModuleByAddress(t *testing.T) {
 
 			mockGroups := db.NewMockGroups(t)
 
-			mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(namespace)).Return(test.rootGroup, nil)
+			mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(namespace)).Return(test.rootGroup, nil)
 
 			mockModules := db.NewMockTerraformModules(t)
 
@@ -346,7 +347,7 @@ func TestGetModulesByIDs(t *testing.T) {
 			expectModule: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  moduleID,
-					TRN: types.TerraformModuleModelType.BuildTRN("some-group/test-module"),
+					TRN: trn.TypeTerraformModule.Build("some-group/test-module"),
 				},
 				GroupID: groupID,
 				Name:    "test-module",
@@ -358,7 +359,7 @@ func TestGetModulesByIDs(t *testing.T) {
 			expectModule: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  moduleID,
-					TRN: types.TerraformModuleModelType.BuildTRN("some-group/test-module"),
+					TRN: trn.TypeTerraformModule.Build("some-group/test-module"),
 				},
 				GroupID: groupID,
 				Name:    "test-module",
@@ -370,7 +371,7 @@ func TestGetModulesByIDs(t *testing.T) {
 			expectModule: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  moduleID,
-					TRN: types.TerraformModuleModelType.BuildTRN("some-group/test-module"),
+					TRN: trn.TypeTerraformModule.Build("some-group/test-module"),
 				},
 				GroupID: groupID,
 				Name:    "test-module",
@@ -741,7 +742,7 @@ func TestCreateModule(t *testing.T) {
 			}
 
 			if test.group != nil && test.group.ParentID != "" {
-				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(test.group.GetRootGroupPath())).Return(&models.Group{
+				mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(test.group.GetRootGroupPath())).Return(&models.Group{
 					Metadata: models.ResourceMetadata{ID: "root-group"},
 				}, nil)
 			}
@@ -817,7 +818,7 @@ func TestUpdateModule(t *testing.T) {
 			input: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  "module123",
-					TRN: types.TerraformModuleModelType.BuildTRN("group123/test-module/aws"),
+					TRN: trn.TypeTerraformModule.Build("group123/test-module/aws"),
 				},
 				Name:    "test-module",
 				System:  "aws",
@@ -829,7 +830,7 @@ func TestUpdateModule(t *testing.T) {
 			input: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  "module123",
-					TRN: types.TerraformModuleModelType.BuildTRN("group123/test-module/aws"),
+					TRN: trn.TypeTerraformModule.Build("group123/test-module/aws"),
 				},
 				Name:    "test-module",
 				System:  "aws",
@@ -910,7 +911,7 @@ func TestDeleteModule(t *testing.T) {
 			input: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  "module123",
-					TRN: types.TerraformModuleModelType.BuildTRN("group123/test-module/aws"),
+					TRN: trn.TypeTerraformModule.Build("group123/test-module/aws"),
 				},
 				Name:    "test-module",
 				System:  "aws",
@@ -922,7 +923,7 @@ func TestDeleteModule(t *testing.T) {
 			input: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  "module123",
-					TRN: types.TerraformModuleModelType.BuildTRN("group123/test-module/aws"),
+					TRN: trn.TypeTerraformModule.Build("group123/test-module/aws"),
 				},
 				Name:    "test-module",
 				System:  "aws",
@@ -1093,7 +1094,7 @@ func TestGetModuleVersionByTRN(t *testing.T) {
 	sampleVersion := &models.TerraformModuleVersion{
 		Metadata: models.ResourceMetadata{
 			ID:  "version-1",
-			TRN: types.TerraformModuleVersionModelType.BuildTRN("group-1/module-1/version-1"),
+			TRN: trn.TypeTerraformModuleVersion.Build("group-1/module-1/version-1"),
 		},
 		ModuleID: "module-1",
 	}
@@ -1324,7 +1325,7 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 			expectModule: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  moduleID,
-					TRN: types.TerraformModuleModelType.BuildTRN("some-group/test-module"),
+					TRN: trn.TypeTerraformModule.Build("some-group/test-module"),
 				},
 				GroupID: groupID,
 				Name:    "test-module",
@@ -1341,7 +1342,7 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 			expectModule: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  moduleID,
-					TRN: types.TerraformModuleModelType.BuildTRN("some-group/test-module"),
+					TRN: trn.TypeTerraformModule.Build("some-group/test-module"),
 				},
 				GroupID: groupID,
 				Name:    "test-module",
@@ -1358,7 +1359,7 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 			expectModule: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  moduleID,
-					TRN: types.TerraformModuleModelType.BuildTRN("some-group/test-module"),
+					TRN: trn.TypeTerraformModule.Build("some-group/test-module"),
 				},
 				GroupID: groupID,
 				Name:    "test-module",
@@ -1653,7 +1654,7 @@ func TestCreateModuleVersion(t *testing.T) {
 			mockModules.On("GetModuleByID", mock.Anything, moduleID).Return(&models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  moduleID,
-					TRN: types.TerraformModuleModelType.BuildTRN("testgroup/testmodule"),
+					TRN: trn.TypeTerraformModule.Build("testgroup/testmodule"),
 				},
 				GroupID: groupID,
 			}, nil)
@@ -1917,7 +1918,7 @@ func TestDeleteModuleVersion(t *testing.T) {
 			mockModules.On("GetModuleByID", mock.Anything, moduleID).Return(&models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  moduleID,
-					TRN: types.TerraformModuleModelType.BuildTRN("group123/module123"),
+					TRN: trn.TypeTerraformModule.Build("group123/module123"),
 				},
 				GroupID: groupID,
 			}, nil)
@@ -2498,7 +2499,7 @@ func TestCreateModuleAttestation(t *testing.T) {
 			mockModules.On("GetModuleByID", mock.Anything, moduleID).Return(&models.TerraformModule{
 				Metadata: models.ResourceMetadata{
 					ID:  moduleID,
-					TRN: types.TerraformModuleModelType.BuildTRN("testgroup/testmodule"),
+					TRN: trn.TypeTerraformModule.Build("testgroup/testmodule"),
 				},
 				GroupID: groupID,
 			}, nil)
@@ -2685,7 +2686,7 @@ func TestGetModuleAttestationByTRN(t *testing.T) {
 	sampleAttestation := &models.TerraformModuleAttestation{
 		Metadata: models.ResourceMetadata{
 			ID:  "attestation-1",
-			TRN: types.TerraformModuleAttestationModelType.BuildTRN("group-1/module-1/attestation-1"),
+			TRN: trn.TypeTerraformModuleAttestation.Build("group-1/module-1/attestation-1"),
 		},
 		ModuleID: "module-1",
 	}

@@ -11,10 +11,10 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -22,7 +22,7 @@ import (
 type Teams interface {
 	GetTeamBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.Team, error)
 	GetTeamByID(ctx context.Context, id string) (*models.Team, error)
-	GetTeamByTRN(ctx context.Context, trn string) (*models.Team, error)
+	GetTeamByTRN(ctx context.Context, trnValue string) (*models.Team, error)
 	GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResult, error)
 	CreateTeam(ctx context.Context, team *models.Team) (*models.Team, error)
 	UpdateTeam(ctx context.Context, team *models.Team) (*models.Team, error)
@@ -109,17 +109,17 @@ func (t *teams) GetTeamByID(ctx context.Context, id string) (*models.Team, error
 	return t.getTeam(ctx, goqu.Ex{"teams.id": id})
 }
 
-func (t *teams) GetTeamByTRN(ctx context.Context, trn string) (*models.Team, error) {
+func (t *teams) GetTeamByTRN(ctx context.Context, trnValue string) (*models.Team, error) {
 	ctx, span := tracer.Start(ctx, "db.GetTeamByTRN")
-	span.SetAttributes(attribute.String("trn", trn))
+	span.SetAttributes(attribute.String("trn", trnValue))
 	defer span.End()
 
-	path, err := types.TeamModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeTeam.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	return t.getTeam(ctx, goqu.Ex{"teams.name": path})
+	return t.getTeam(ctx, goqu.Ex{"teams.name": parsed.Path()})
 }
 
 func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResult, error) {
@@ -372,7 +372,7 @@ func scanTeam(row scanner) (*models.Team, error) {
 		team.SCIMExternalID = scimExternalID.String
 	}
 
-	team.Metadata.TRN = types.TeamModelType.BuildTRN(team.Name)
+	team.Metadata.TRN = trn.TypeTeam.Build(team.Name)
 
 	return team, nil
 }

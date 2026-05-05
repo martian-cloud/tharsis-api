@@ -12,16 +12,16 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Roles encapsulates the logic to access Tharsis roles from the database.
 type Roles interface {
 	GetRoleByName(ctx context.Context, name string) (*models.Role, error)
-	GetRoleByTRN(ctx context.Context, trn string) (*models.Role, error)
+	GetRoleByTRN(ctx context.Context, trnValue string) (*models.Role, error)
 	GetRoleByID(ctx context.Context, id string) (*models.Role, error)
 	GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResult, error)
 	CreateRole(ctx context.Context, role *models.Role) (*models.Role, error)
@@ -107,17 +107,16 @@ func (r *roles) GetRoleByName(ctx context.Context, name string) (*models.Role, e
 	return r.getRole(ctx, goqu.Ex{"roles.name": name})
 }
 
-func (r *roles) GetRoleByTRN(ctx context.Context, trn string) (*models.Role, error) {
+func (r *roles) GetRoleByTRN(ctx context.Context, trnValue string) (*models.Role, error) {
 	ctx, span := tracer.Start(ctx, "db.GetRoleByTRN")
 	defer span.End()
 
-	path, err := types.RoleModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeRole.Parse(trnValue)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to parse TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse role TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	return r.getRole(ctx, goqu.Ex{"roles.name": path})
+	return r.getRole(ctx, goqu.Ex{"roles.name": parsed.Path()})
 }
 
 func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResult, error) {
@@ -373,7 +372,7 @@ func scanRole(row scanner) (*models.Role, error) {
 	}
 
 	r.SetPermissions(perms)
-	r.Metadata.TRN = types.RoleModelType.BuildTRN(r.Name)
+	r.Metadata.TRN = trn.TypeRole.Build(r.Name)
 
 	return r, nil
 }

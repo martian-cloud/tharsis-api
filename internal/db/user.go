@@ -13,10 +13,10 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Users encapsulates the logic to access users from the database
@@ -26,7 +26,7 @@ type Users interface {
 	LinkUserWithExternalID(ctx context.Context, issuer string, externalID string, userID string) error
 	UnlinkUserExternalID(ctx context.Context, issuer string, externalID string) error
 	GetUserByID(ctx context.Context, id string) (*models.User, error)
-	GetUserByTRN(ctx context.Context, trn string) (*models.User, error)
+	GetUserByTRN(ctx context.Context, trnValue string) (*models.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 	GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResult, error)
 	UpdateUser(ctx context.Context, user *models.User) (*models.User, error)
@@ -104,17 +104,17 @@ func (u *users) GetUserByID(ctx context.Context, id string) (*models.User, error
 	return u.getUser(ctx, goqu.Ex{"users.id": id})
 }
 
-func (u *users) GetUserByTRN(ctx context.Context, trn string) (*models.User, error) {
+func (u *users) GetUserByTRN(ctx context.Context, trnValue string) (*models.User, error) {
 	ctx, span := tracer.Start(ctx, "db.GetUserByTRN")
-	span.SetAttributes(attribute.String("trn", trn))
+	span.SetAttributes(attribute.String("trn", trnValue))
 	defer span.End()
 
-	path, err := types.UserModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeUser.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	return u.getUser(ctx, goqu.Ex{"users.username": path})
+	return u.getUser(ctx, goqu.Ex{"users.username": parsed.Path()})
 }
 
 func (u *users) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
@@ -510,7 +510,7 @@ func scanUser(row scanner) (*models.User, error) {
 		user.SCIMExternalID = scimExternalID.String
 	}
 
-	user.Metadata.TRN = types.UserModelType.BuildTRN(user.Username)
+	user.Metadata.TRN = trn.TypeUser.Build(user.Username)
 
 	return user, nil
 }

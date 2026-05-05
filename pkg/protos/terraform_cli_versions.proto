@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.terraform_cli;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+// TerraformCLIVersions implements functionality related to Terraform CLI versions.
+service TerraformCLIVersions {
+  // CreateTerraformCLIDownloadURL creates a download URL for a Terraform CLI binary.
+  rpc CreateTerraformCLIDownloadURL(CreateTerraformCLIDownloadURLRequest)
+      returns (CreateTerraformCLIDownloadURLResponse);
+}
+
+// CreateTerraformCLIDownloadURLRequest is the input for creating a Terraform CLI download URL.
+message CreateTerraformCLIDownloadURLRequest {
+  string version      = 1;
+  string os           = 2;
+  string architecture = 3;
+}
+
+// CreateTerraformCLIDownloadURLResponse is the response containing the download URL.
+message CreateTerraformCLIDownloadURLResponse {
+  string url = 1;
+}

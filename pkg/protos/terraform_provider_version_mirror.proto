@@ -60,3 +60,16 @@ message GetTerraformProviderVersionMirrorsResponse {
   pagination.PageInfo                     page_info       = 1;
   repeated TerraformProviderVersionMirror version_mirrors = 2;
 }
+
+// GetAvailableProviderVersionsRequest is the input for getting available provider versions.
+message GetAvailableProviderVersionsRequest {
+  string group_path         = 1;
+  string type               = 2;
+  string registry_namespace = 3;
+  string registry_hostname  = 4;
+}
+
+// GetAvailableProviderVersionsResponse is the response containing available provider versions.
+message GetAvailableProviderVersionsResponse {
+  repeated string versions = 1;
+}

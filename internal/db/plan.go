@@ -11,10 +11,10 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Plans encapsulates the logic to access plans from the database
@@ -22,7 +22,7 @@ type Plans interface {
 	// GetPlanByID returns a plan by ID
 	GetPlanByID(ctx context.Context, id string) (*models.Plan, error)
 	// GetPlanByTRN returns a plan by TRN
-	GetPlanByTRN(ctx context.Context, trn string) (*models.Plan, error)
+	GetPlanByTRN(ctx context.Context, trnValue string) (*models.Plan, error)
 	// GetPlans returns a list of plans
 	GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResult, error)
 	// CreatePlan will create a new plan
@@ -112,17 +112,16 @@ func (p *plans) GetPlanByID(ctx context.Context, id string) (*models.Plan, error
 	return p.getPlan(ctx, goqu.Ex{"plans.id": id})
 }
 
-func (p *plans) GetPlanByTRN(ctx context.Context, trn string) (*models.Plan, error) {
+func (p *plans) GetPlanByTRN(ctx context.Context, trnValue string) (*models.Plan, error) {
 	ctx, span := tracer.Start(ctx, "db.GetPlanByTRN")
 	defer span.End()
 
-	path, err := types.PlanModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypePlan.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a plan TRN must have the workspace path and plan GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -130,8 +129,8 @@ func (p *plans) GetPlanByTRN(ctx context.Context, trn string) (*models.Plan, err
 	}
 
 	return p.getPlan(ctx, goqu.Ex{
-		"plans.id":        gid.FromGlobalID(path[lastSlashIndex+1:]),
-		"namespaces.path": path[:lastSlashIndex],
+		"plans.id":        gid.FromGlobalID(parsed.BaseName()),
+		"namespaces.path": parsed.ParentPath(),
 	})
 }
 
@@ -382,7 +381,7 @@ func scanPlan(row scanner) (*models.Plan, error) {
 		return nil, err
 	}
 
-	plan.Metadata.TRN = types.PlanModelType.BuildTRN(workspacePath, plan.GetGlobalID())
+	plan.Metadata.TRN = trn.TypePlan.Build(workspacePath, plan.GetGlobalID())
 
 	return plan, nil
 }

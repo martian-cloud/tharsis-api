@@ -17,16 +17,16 @@ import (
 
 func TestNew(t *testing.T) {
 	pluginData := map[string]string{
-		"api_url": "testUrl",
-		"host":    "http://localhost",
-		"image":   "testImage",
+		"endpoint": "testUrl",
+		"host":     "http://localhost",
+		"image":    "testImage",
 	}
 	dispatcher, err := New(pluginData, "http://localhost", logger.New())
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 
-	assert.Equal(t, "testUrl", dispatcher.apiURL)
+	assert.Equal(t, "testUrl", dispatcher.apiEndpoint)
 	assert.Equal(t, "testImage", dispatcher.image)
 	assert.False(t, dispatcher.localImage)
 	assert.NotNil(t, dispatcher.client)
@@ -125,7 +125,7 @@ func TestDispatchJob(t *testing.T) {
 			client.On("ContainerCreate", ctx, &dockercontainer.Config{
 				Image: image,
 				Env: []string{
-					fmt.Sprintf("API_URL=%s", apiURL),
+					fmt.Sprintf("ENDPOINT=%s", apiURL),
 					fmt.Sprintf("JOB_ID=%s", test.jobID),
 					fmt.Sprintf("JOB_TOKEN=%s", token),
 					fmt.Sprintf("DISCOVERY_PROTOCOL_HOSTS=%s", discoveryProtocolHost),
@@ -142,7 +142,7 @@ func TestDispatchJob(t *testing.T) {
 				localImage:             test.localImage,
 				registryUsername:       test.username,
 				registryPassword:       test.password,
-				apiURL:                 apiURL,
+				apiEndpoint:            apiURL,
 				discoveryProtocolHosts: []string{discoveryProtocolHost},
 				client:                 &client,
 			}

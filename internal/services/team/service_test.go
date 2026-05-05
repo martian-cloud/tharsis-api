@@ -12,10 +12,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestGetTeamByID(t *testing.T) {
@@ -78,7 +78,7 @@ func TestGetTeamByTRN(t *testing.T) {
 	sampleTeam := &models.Team{
 		Metadata: models.ResourceMetadata{
 			ID:  "team-id-1",
-			TRN: types.TeamModelType.BuildTRN("my-team/team-1"),
+			TRN: trn.TypeTeam.Build("my-team/team-1"),
 		},
 		Name:        "team-1",
 		Description: "Test team",
@@ -565,10 +565,10 @@ func TestGetTeamMember(t *testing.T) {
 			mockUsers := db.NewMockUsers(t)
 			mockTeamMembers := db.NewMockTeamMembers(t)
 
-			mockUsers.On("GetUserByTRN", mock.Anything, types.UserModelType.BuildTRN(sampleUser.Username)).Return(test.existingUser, nil)
+			mockUsers.On("GetUserByTRN", mock.Anything, trn.TypeUser.Build(sampleUser.Username)).Return(test.existingUser, nil)
 
 			if test.existingUser != nil {
-				mockTeams.On("GetTeamByTRN", mock.Anything, types.TeamModelType.BuildTRN(sampleTeam.Name)).Return(test.existingTeam, nil)
+				mockTeams.On("GetTeamByTRN", mock.Anything, trn.TypeTeam.Build(sampleTeam.Name)).Return(test.existingTeam, nil)
 			}
 
 			if test.existingTeam != nil && test.existingUser != nil {
@@ -719,10 +719,10 @@ func TestAddUserToTeam(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			mockTeams.On("GetTeamByTRN", mock.Anything, types.TeamModelType.BuildTRN(sampleTeam.Name)).Return(test.existingTeam, nil)
+			mockTeams.On("GetTeamByTRN", mock.Anything, trn.TypeTeam.Build(sampleTeam.Name)).Return(test.existingTeam, nil)
 
 			if test.existingTeam != nil {
-				mockUsers.On("GetUserByTRN", mock.Anything, types.UserModelType.BuildTRN(sampleUser.Username)).Return(test.existingUser, nil)
+				mockUsers.On("GetUserByTRN", mock.Anything, trn.TypeUser.Build(sampleUser.Username)).Return(test.existingUser, nil)
 			}
 
 			if test.existingTeam != nil && test.existingUser != nil {
@@ -859,10 +859,10 @@ func TestUpdateTeamMember(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			mockTeams.On("GetTeamByTRN", mock.Anything, types.TeamModelType.BuildTRN(sampleTeam.Name)).Return(test.existingTeam, nil)
+			mockTeams.On("GetTeamByTRN", mock.Anything, trn.TypeTeam.Build(sampleTeam.Name)).Return(test.existingTeam, nil)
 
 			if test.existingTeam != nil {
-				mockUsers.On("GetUserByTRN", mock.Anything, types.UserModelType.BuildTRN(sampleUser.Username)).Return(test.existingUser, nil)
+				mockUsers.On("GetUserByTRN", mock.Anything, trn.TypeUser.Build(sampleUser.Username)).Return(test.existingUser, nil)
 			}
 
 			if test.existingTeam != nil && test.existingUser != nil {

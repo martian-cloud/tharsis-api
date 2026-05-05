@@ -16,15 +16,15 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Workspaces encapsulates the logic to access workspaces from the database
 type Workspaces interface {
-	GetWorkspaceByTRN(ctx context.Context, trn string) (*models.Workspace, error)
+	GetWorkspaceByTRN(ctx context.Context, trnValue string) (*models.Workspace, error)
 	GetWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error)
 	GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) (*WorkspacesResult, error)
 	UpdateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error)
@@ -131,17 +131,17 @@ func NewWorkspaces(dbClient *Client) Workspaces {
 	return &workspaces{dbClient: dbClient}
 }
 
-func (w *workspaces) GetWorkspaceByTRN(ctx context.Context, trn string) (*models.Workspace, error) {
+func (w *workspaces) GetWorkspaceByTRN(ctx context.Context, trnValue string) (*models.Workspace, error) {
 	ctx, span := tracer.Start(ctx, "db.GetWorkspaceByTRN")
-	span.SetAttributes(attribute.String("trn", trn))
+	span.SetAttributes(attribute.String("trn", trnValue))
 	defer span.End()
 
-	path, err := types.WorkspaceModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeWorkspace.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	return w.getWorkspace(ctx, goqu.Ex{"namespaces.path": path})
+	return w.getWorkspace(ctx, goqu.Ex{"namespaces.path": parsed.Path()})
 }
 
 func (w *workspaces) GetWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error) {
@@ -479,7 +479,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 	}
 
 	createdWorkspace.FullPath = fullPath
-	createdWorkspace.Metadata.TRN = types.WorkspaceModelType.BuildTRN(fullPath)
+	createdWorkspace.Metadata.TRN = trn.TypeWorkspace.Build(fullPath)
 
 	return createdWorkspace, nil
 }
@@ -840,7 +840,7 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 	}
 
 	if withFullPath {
-		ws.Metadata.TRN = types.WorkspaceModelType.BuildTRN(ws.FullPath)
+		ws.Metadata.TRN = trn.TypeWorkspace.Build(ws.FullPath)
 	}
 
 	return ws, nil

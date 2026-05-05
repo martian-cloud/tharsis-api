@@ -15,12 +15,13 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // AgentSessionRuns encapsulates the logic to access agent session runs from the database
 type AgentSessionRuns interface {
 	GetAgentSessionRunByID(ctx context.Context, id string) (*models.AgentSessionRun, error)
-	GetAgentSessionRunByTRN(ctx context.Context, trn string) (*models.AgentSessionRun, error)
+	GetAgentSessionRunByTRN(ctx context.Context, trnValue string) (*models.AgentSessionRun, error)
 	GetAgentSessionRuns(ctx context.Context, input *GetAgentSessionRunsInput) (*AgentSessionRunsResult, error)
 	CreateAgentSessionRun(ctx context.Context, run *models.AgentSessionRun) (*models.AgentSessionRun, error)
 	UpdateAgentSessionRun(ctx context.Context, run *models.AgentSessionRun) (*models.AgentSessionRun, error)
@@ -110,18 +111,17 @@ func (a *agentSessionRuns) GetAgentSessionRunByID(ctx context.Context, id string
 	return run, nil
 }
 
-func (a *agentSessionRuns) GetAgentSessionRunByTRN(ctx context.Context, trn string) (*models.AgentSessionRun, error) {
+func (a *agentSessionRuns) GetAgentSessionRunByTRN(ctx context.Context, trnValue string) (*models.AgentSessionRun, error) {
 	ctx, span := tracer.Start(ctx, "db.GetAgentSessionRunByTRN")
 	defer span.End()
 
-	path, err := types.AgentSessionRunModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeAgentSessionRun.Parse(trnValue)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// TRN path is sessionID/runID — extract the run ID
-	parts := strings.Split(path, "/")
-	return a.GetAgentSessionRunByID(ctx, gid.FromGlobalID(parts[len(parts)-1]))
+	return a.GetAgentSessionRunByID(ctx, gid.FromGlobalID(parsed.BaseName()))
 }
 
 func (a *agentSessionRuns) GetAgentSessionRuns(ctx context.Context, input *GetAgentSessionRunsInput) (*AgentSessionRunsResult, error) {
@@ -292,7 +292,7 @@ func scanAgentSessionRun(row scanner) (*models.AgentSessionRun, error) {
 		return nil, err
 	}
 
-	run.Metadata.TRN = types.AgentSessionRunModelType.BuildTRN(gid.ToGlobalID(types.AgentSessionModelType, run.SessionID), run.GetGlobalID())
+	run.Metadata.TRN = trn.TypeAgentSessionRun.Build(gid.ToGlobalID(types.AgentSessionModelType, run.SessionID), run.GetGlobalID())
 
 	return run, nil
 }

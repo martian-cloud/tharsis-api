@@ -33,7 +33,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 )
 
 const (
@@ -82,14 +82,14 @@ type terraformWorkspace struct {
 	cancellableCtx    context.Context
 	client            jobclient.Client
 	jobCfg            *JobConfig
-	workspace         *types.Workspace
-	run               *types.Run
-	job               *types.Job
+	workspace         *pb.Workspace
+	run               *pb.Run
+	job               *pb.Job
 	jobLogger         joblogger.Logger
 	managedIdentities *managedIdentities
 	fullEnv           map[string]string
 	workspaceDir      string
-	variables         []types.RunVariable
+	variables         []*pb.RunVariable
 	pathsToRemove     []string
 	credentialHelper  *credentialHelper
 	capabilities      *capabilities
@@ -100,14 +100,14 @@ func newTerraformWorkspace(
 	cancellableCtx context.Context,
 	jobCfg *JobConfig,
 	workspaceDir string,
-	workspace *types.Workspace,
-	run *types.Run,
-	job *types.Job,
+	workspace *pb.Workspace,
+	run *pb.Run,
+	job *pb.Job,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
 ) (*terraformWorkspace, error) {
 	managedIdentities := newManagedIdentities(
-		workspace.Metadata.ID,
+		workspace.Metadata.Id,
 		jobLogger,
 		client,
 		jobCfg,
@@ -159,7 +159,7 @@ func (t *terraformWorkspace) close(ctx context.Context) error {
 // init prepares for and does "terraform init".
 func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error) {
 	// Get run variables
-	variables, err := t.client.GetRunVariables(ctx, t.run.Metadata.ID)
+	variables, err := t.client.GetRunVariables(ctx, t.run.Metadata.Id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get run variables %v", err)
 	}
@@ -167,7 +167,7 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 
 	// Add run variables to environment
 	for _, v := range variables {
-		if v.Category == types.EnvironmentVariableCategory {
+		if v.Category == pb.VariableCategory_environment.String() {
 			t.fullEnv[v.Key] = *v.Value
 		}
 	}
@@ -190,8 +190,8 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 
 	// Handle a possible configuration version.  Configuration version and module
 	// source are mutually exclusive, so downloading to workspaceDir is okay.
-	if t.run.ConfigurationVersionID != nil {
-		t.jobLogger.Infof("Downloading configuration version %s", *t.run.ConfigurationVersionID)
+	if t.run.ConfigurationVersionId != nil {
+		t.jobLogger.Infof("Downloading configuration version %s", *t.run.ConfigurationVersionId)
 
 		if err = t.downloadConfigurationVersion(ctx); err != nil {
 			return nil, err
@@ -199,9 +199,7 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 	}
 
 	// If the above set any tokens for a federated registry remote host, potentially replace the tokens.
-	federatedRegistryTokens, err := t.client.CreateFederatedRegistryTokens(ctx, &types.CreateFederatedRegistryTokensInput{
-		JobID: t.jobCfg.JobID,
-	})
+	federatedRegistryTokens, err := t.client.CreateFederatedRegistryTokens(ctx, t.job.Metadata.Id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create federated registry tokens: %v", err)
 	}
@@ -325,10 +323,10 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 			proxy, pErr := newProviderMirrorProxy(
 				t.cancellableCtx, // Use cancellable context so async caching can be manually cancelled
 				t.client,
-				t.workspace.Metadata.ID,
+				t.workspace.Metadata.Id,
 				t.jobLogger,
 				registryTokens,
-				time.Duration(t.workspace.MaxJobDuration)*time.Minute,
+				time.Duration(t.job.MaxJobDuration)*time.Minute,
 			)
 			if pErr != nil {
 				return nil, fmt.Errorf("failed to create provider mirror proxy: %v", pErr)
@@ -432,7 +430,7 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 
 	// If a current workspace state exists, download it to workspaceDir.
 	// This must happen after the first init or remote module source download refuses to try.
-	if t.workspace.CurrentStateVersion != nil {
+	if t.workspace.CurrentStateVersionId != "" {
 		if err = t.downloadCurrentStateVersion(ctx); err != nil {
 			return nil, err
 		}
@@ -516,7 +514,7 @@ func (t *terraformWorkspace) downloadConfigurationVersion(ctx context.Context) e
 	}
 	defer os.RemoveAll(tmpDownloadDir)
 
-	cvFilePath := fmt.Sprintf("%s/%s.tar.gz", tmpDownloadDir, *t.run.ConfigurationVersionID)
+	cvFilePath := fmt.Sprintf("%s/%s.tar.gz", tmpDownloadDir, *t.run.ConfigurationVersionId)
 
 	cvFile, err := os.Create(cvFilePath)
 	if err != nil {
@@ -527,7 +525,7 @@ func (t *terraformWorkspace) downloadConfigurationVersion(ctx context.Context) e
 
 	defer cvFile.Close()
 
-	cv, err := t.client.GetConfigurationVersion(ctx, *t.run.ConfigurationVersionID)
+	cv, err := t.client.GetConfigurationVersion(ctx, *t.run.ConfigurationVersionId)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to query configuration version from database: %v",
@@ -535,7 +533,7 @@ func (t *terraformWorkspace) downloadConfigurationVersion(ctx context.Context) e
 		)
 	}
 
-	if err := t.client.DownloadConfigurationVersion(ctx, cv, cvFile); err != nil {
+	if err := t.client.DownloadConfigurationVersion(ctx, cv.Metadata.Id, cvFile); err != nil {
 		return err
 	}
 
@@ -548,8 +546,6 @@ func (t *terraformWorkspace) downloadConfigurationVersion(ctx context.Context) e
 }
 
 func (t *terraformWorkspace) downloadCurrentStateVersion(ctx context.Context) error {
-	stateVersion := t.workspace.CurrentStateVersion
-
 	stateFile, err := os.Create(filepath.Join(t.workspaceDir, "terraform.tfstate"))
 	if err != nil {
 		return fmt.Errorf(
@@ -560,7 +556,7 @@ func (t *terraformWorkspace) downloadCurrentStateVersion(ctx context.Context) er
 
 	defer stateFile.Close()
 
-	return t.client.DownloadStateVersion(ctx, stateVersion, stateFile)
+	return t.client.DownloadStateVersion(ctx, t.workspace.CurrentStateVersionId, stateFile)
 }
 
 // setBuiltInEnvVars will add Tharsis built in environment variables for the job.
@@ -642,8 +638,8 @@ func (t *terraformWorkspace) writeCACert(certDER []byte) (string, error) {
 
 func (t *terraformWorkspace) createVarsFile() (string, []string, error) {
 	// Get all variables in the module
-	hclVariables := []types.RunVariable{}
-	stringVariables := []types.RunVariable{}
+	hclVariables := []*pb.RunVariable{}
+	stringVariables := []*pb.RunVariable{}
 	variablesIncludedInTFConfig := []string{}
 
 	// Parse terraform config
@@ -653,13 +649,13 @@ func (t *terraformWorkspace) createVarsFile() (string, []string, error) {
 	}
 
 	// Create map of variables for faster lookup
-	inputVarMap := map[string]*types.RunVariable{}
+	inputVarMap := map[string]*pb.RunVariable{}
 	for _, v := range t.variables {
-		inputVarMap[v.Key] = &v
+		inputVarMap[v.Key] = v
 	}
 
 	for _, v := range t.variables {
-		if v.Category != types.TerraformVariableCategory {
+		if v.Category != pb.VariableCategory_terraform.String() {
 			continue
 		}
 
@@ -703,19 +699,19 @@ func (t *terraformWorkspace) createVarsFile() (string, []string, error) {
 		// Only inject the write-only variable value if it's defined in the tf config and not explicitly passed
 		// as an input variable
 		if !includedInInputVars && includedInConfig {
-			if v.VersionID != nil {
+			if v.VersionId != nil {
 				// Since this is a versioned input variable, we need to inject a variable for the hashed version if it's defined
 				// in the config but not included in the input variables
 				hasher := fnv.New64a()
-				hasher.Write([]byte(*v.VersionID))
+				hasher.Write([]byte(*v.VersionId))
 
 				// Write-only attribute needs to be an integer so we will use the numerical hashed value
 				hashedStr := strconv.FormatUint(hasher.Sum64()%math.MaxInt32, 10)
 
-				hclVariables = append(hclVariables, types.RunVariable{
+				hclVariables = append(hclVariables, &pb.RunVariable{
 					Key:      variableVersionKey,
 					Value:    &hashedStr,
-					Category: types.TerraformVariableCategory,
+					Category: pb.VariableCategory_terraform.String(),
 				})
 			} else {
 				t.jobLogger.Warningf(
@@ -745,7 +741,7 @@ func (t *terraformWorkspace) createVarsFile() (string, []string, error) {
 		rootBody.SetAttributeValue(v.Key, cty.StringVal(*v.Value))
 	}
 
-	filePath := fmt.Sprintf("%s/run-%s.tfvars", t.workspaceDir, t.run.Metadata.ID)
+	filePath := fmt.Sprintf("%s/run-%s.tfvars", t.workspaceDir, t.run.Metadata.Id)
 	tfVarsFile, err := os.Create(filePath)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to create temporary file for tfvars %v", err)

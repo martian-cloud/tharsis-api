@@ -63,7 +63,7 @@ type GetJobsInput struct {
 
 // ClaimJobResponse is returned when a runner claims a Job
 type ClaimJobResponse struct {
-	JobID string
+	Job   *models.Job
 	Token string
 }
 
@@ -604,7 +604,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobRespo
 				"workspaceID", job.WorkspaceID,
 				"jobID", job.Metadata.ID,
 			)
-			return &ClaimJobResponse{JobID: job.Metadata.ID, Token: string(token)}, nil
+			return &ClaimJobResponse{Job: job, Token: string(token)}, nil
 		}
 	}
 }

@@ -8,10 +8,10 @@ import (
 	"github.com/hashicorp/jsonapi"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // clientCredentialsTokenResponse is the token response per RFC 6749 Section 5.1
@@ -64,7 +64,7 @@ func (c *serviceAccountController) Login(w http.ResponseWriter, r *http.Request)
 	}
 
 	resp, err := c.saService.CreateOIDCToken(r.Context(), &serviceaccount.CreateOIDCTokenInput{
-		ServiceAccountPublicID: types.ServiceAccountModelType.BuildTRN(*req.ServiceAccountPath),
+		ServiceAccountPublicID: trn.TypeServiceAccount.Build(*req.ServiceAccountPath),
 		Token:                  []byte(*req.Token),
 	})
 	if err != nil {

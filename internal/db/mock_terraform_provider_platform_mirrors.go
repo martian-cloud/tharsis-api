@@ -92,9 +92,9 @@ func (_m *MockTerraformProviderPlatformMirrors) GetPlatformMirrorByID(ctx contex
 	return r0, r1
 }
 
-// GetPlatformMirrorByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockTerraformProviderPlatformMirrors) GetPlatformMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatformMirror, error) {
-	ret := _m.Called(ctx, trn)
+// GetPlatformMirrorByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockTerraformProviderPlatformMirrors) GetPlatformMirrorByTRN(ctx context.Context, trnValue string) (*models.TerraformProviderPlatformMirror, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPlatformMirrorByTRN")
@@ -103,10 +103,10 @@ func (_m *MockTerraformProviderPlatformMirrors) GetPlatformMirrorByTRN(ctx conte
 	var r0 *models.TerraformProviderPlatformMirror
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.TerraformProviderPlatformMirror, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.TerraformProviderPlatformMirror); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.TerraformProviderPlatformMirror)
@@ -114,7 +114,7 @@ func (_m *MockTerraformProviderPlatformMirrors) GetPlatformMirrorByTRN(ctx conte
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

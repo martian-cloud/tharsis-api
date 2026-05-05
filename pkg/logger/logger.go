@@ -35,6 +35,8 @@ type Logger interface {
 	Debugf(format string, args ...interface{})
 	// Infof uses fmt.Sprintf to construct and log a message at INFO level
 	Infof(format string, args ...interface{})
+	// Warnf uses fmt.Sprintf to construct and log a message at WARN level
+	Warnf(format string, args ...interface{})
 	// Errorf uses fmt.Sprintf to construct and log a message at ERROR level
 	Errorf(format string, args ...interface{})
 

@@ -2,48 +2,54 @@
 package registry
 
 //go:generate go tool mockery --name FederatedRegistryClient --inpackage --case underscore
-//go:generate go tool mockery --name sdkClient --inpackage --case underscore
+//go:generate go tool mockery --name remoteClient --inpackage --case underscore
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/client"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/client/token"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
-	sdk "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg"
-	sdkauth "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/config"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 const (
 	maxAttestationPages = 10
 )
 
-type sdkClient interface {
-	GetModuleVersion(ctx context.Context, input *types.GetTerraformModuleVersionInput) (*types.TerraformModuleVersion, error)
-	GetModuleAttestations(ctx context.Context, input *types.GetTerraformModuleAttestationsInput) (*types.GetTerraformModuleAttestationsOutput, error)
+// remoteClient wraps the gRPC calls needed to communicate with a remote Tharsis instance.
+type remoteClient interface {
+	GetTerraformModuleVersionByID(ctx context.Context, req *pb.GetTerraformModuleVersionByIDRequest) (*pb.TerraformModuleVersion, error)
+	GetTerraformModuleAttestations(ctx context.Context, req *pb.GetTerraformModuleAttestationsRequest) (*pb.GetTerraformModuleAttestationsResponse, error)
+	Close() error
 }
 
-type sdkClientImpl struct {
-	client *sdk.Client
+// grpcRemoteClient implements remoteClient using a GRPCClient.
+type grpcRemoteClient struct {
+	client *client.GRPCClient
 }
 
-func (c *sdkClientImpl) GetModuleVersion(ctx context.Context, input *types.GetTerraformModuleVersionInput) (*types.TerraformModuleVersion, error) {
-	return c.client.TerraformModuleVersion.GetModuleVersion(ctx, input)
+func (c *grpcRemoteClient) GetTerraformModuleVersionByID(ctx context.Context, req *pb.GetTerraformModuleVersionByIDRequest) (*pb.TerraformModuleVersion, error) {
+	return c.client.TerraformModulesClient.GetTerraformModuleVersionByID(ctx, req)
 }
 
-func (c *sdkClientImpl) GetModuleAttestations(ctx context.Context, input *types.GetTerraformModuleAttestationsInput) (*types.GetTerraformModuleAttestationsOutput, error) {
-	return c.client.TerraformModuleAttestation.GetModuleAttestations(ctx, input)
+func (c *grpcRemoteClient) GetTerraformModuleAttestations(ctx context.Context, req *pb.GetTerraformModuleAttestationsRequest) (*pb.GetTerraformModuleAttestationsResponse, error) {
+	return c.client.TerraformModulesClient.GetTerraformModuleAttestations(ctx, req)
+}
+
+func (c *grpcRemoteClient) Close() error {
+	return c.client.Close()
 }
 
 // GetModuleVersionInput is the input for getting a module version.
@@ -62,88 +68,83 @@ type GetModuleAttestationsInput struct {
 	ModuleDigest      string
 }
 
-// FederatedRegistryClient communicates via HTTP with the federated registry.
+// FederatedRegistryClient communicates via gRPC with the federated registry.
 type FederatedRegistryClient interface {
-	GetModuleVersion(ctx context.Context, input *GetModuleVersionInput) (*types.TerraformModuleVersion, error)
-	GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) ([]*types.TerraformModuleAttestation, error)
+	GetModuleVersion(ctx context.Context, input *GetModuleVersionInput) (*pb.TerraformModuleVersion, error)
+	GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) ([]*pb.TerraformModuleAttestation, error)
 }
 
 type federatedRegistryClient struct {
-	httpClient       *http.Client
-	identityProvider auth.SigningKeyManager
-	sdkClientBuilder func(cfg *config.Config) (sdkClient, error)
-	endpointResolver func(httpClient *http.Client, host string) (*url.URL, error)
+	httpClient          *http.Client
+	identityProvider    auth.SigningKeyManager
+	logger              logger.Logger
+	version             string
+	remoteClientBuilder func(ctx context.Context, cfg *client.GRPCClientConfig) (remoteClient, error)
+	endpointResolver    func(httpClient *http.Client, host string) (*url.URL, error)
 }
 
 // NewFederatedRegistryClient returns a new FederatedRegistryClient registry.
-func NewFederatedRegistryClient(identityProvider auth.SigningKeyManager) FederatedRegistryClient {
+func NewFederatedRegistryClient(logger logger.Logger, identityProvider auth.SigningKeyManager, version string) FederatedRegistryClient {
 	return &federatedRegistryClient{
-		httpClient:       tharsishttp.NewHTTPClient(),
-		identityProvider: identityProvider,
-		sdkClientBuilder: sdkClientBuilder,
-		endpointResolver: module.GetModuleRegistryEndpointForHost,
+		httpClient:          tharsishttp.NewHTTPClient(),
+		identityProvider:    identityProvider,
+		remoteClientBuilder: remoteClientBuilder,
+		endpointResolver:    module.GetModuleRegistryEndpointForHost,
+		version:             version,
+		logger:              logger,
 	}
 }
 
 // GetModuleVersion fetches the module version object from the federated registry server.
-func (r *federatedRegistryClient) GetModuleVersion(ctx context.Context, input *GetModuleVersionInput) (*types.TerraformModuleVersion, error) {
-	client, err := r.initializeTharsisClient(ctx, input.FederatedRegistry)
+func (r *federatedRegistryClient) GetModuleVersion(ctx context.Context, input *GetModuleVersionInput) (*pb.TerraformModuleVersion, error) {
+	rc, err := r.initializeRemoteClient(ctx, input.FederatedRegistry)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Tharsis client")
+		return nil, errors.Wrap(err, "failed to create gRPC client")
 	}
+	defer rc.Close()
 
-	response, err := client.GetModuleVersion(ctx, &types.GetTerraformModuleVersionInput{
-		ModulePath: ptr.String(fmt.Sprintf("%s/%s/%s", input.ModuleNamespace, input.ModuleName, input.ModuleSystem)),
-		Version:    &input.ModuleVersion,
+	return rc.GetTerraformModuleVersionByID(ctx, &pb.GetTerraformModuleVersionByIDRequest{
+		Id: trn.TypeTerraformModuleVersion.Build(input.ModuleNamespace, input.ModuleName, input.ModuleSystem, input.ModuleVersion),
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
 }
 
-// GetAttestations returns the attestations as SDK types.
-func (r *federatedRegistryClient) GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) ([]*types.TerraformModuleAttestation, error) {
-	client, err := r.initializeTharsisClient(ctx, input.FederatedRegistry)
+// GetModuleAttestations returns the attestations from the federated registry.
+func (r *federatedRegistryClient) GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) ([]*pb.TerraformModuleAttestation, error) {
+	rc, err := r.initializeRemoteClient(ctx, input.FederatedRegistry)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Tharsis client")
+		return nil, errors.Wrap(err, "failed to create gRPC client")
 	}
+	defer rc.Close()
 
-	response := []*types.TerraformModuleAttestation{}
+	response := []*pb.TerraformModuleAttestation{}
 
 	count := 0
-
 	var cursor *string
 	for {
-		toSort := types.TerraformModuleAttestationSortableFieldCreatedAtDesc
-		toLimit := int32(100)
-		page, err := client.GetModuleAttestations(ctx,
-			&types.GetTerraformModuleAttestationsInput{
-				Filter: &types.TerraformModuleAttestationFilter{
-					TerraformModuleVersionID: &input.ModuleVersionID,
-					Digest:                   &input.ModuleDigest,
-				},
-				Sort: &toSort,
-				PaginationOptions: &types.PaginationOptions{
-					Limit:  &toLimit,
-					Cursor: cursor,
-				},
-			})
+		limit := int32(100)
+		sort := pb.TerraformModuleAttestationSortableField_CREATED_AT_DESC
+		req := &pb.GetTerraformModuleAttestationsRequest{
+			ModuleId: input.ModuleVersionID,
+			Digest:   &input.ModuleDigest,
+			Sort:     &sort,
+			PaginationOptions: &pb.PaginationOptions{
+				First: &limit,
+				After: cursor,
+			},
+		}
+
+		page, err := rc.GetTerraformModuleAttestations(ctx, req)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, attestation := range page.ModuleAttestations {
-			attestation := attestation
-			response = append(response, &attestation)
-		}
+		response = append(response, page.Attestations...)
 
 		if !page.PageInfo.HasNextPage {
 			break
 		}
 
-		cursor = &page.PageInfo.Cursor
+		cursor = page.PageInfo.EndCursor
 
 		count++
 		if count > maxAttestationPages {
@@ -154,9 +155,9 @@ func (r *federatedRegistryClient) GetModuleAttestations(ctx context.Context, inp
 	return response, nil
 }
 
-// initializeClient opens the Tharsis SDK client for business.
-func (r *federatedRegistryClient) initializeTharsisClient(ctx context.Context, federatedRegistry *models.FederatedRegistry) (sdkClient, error) {
-	token, err := NewFederatedRegistryToken(ctx, &FederatedRegistryTokenInput{
+// initializeRemoteClient creates a remote client for the federated registry.
+func (r *federatedRegistryClient) initializeRemoteClient(ctx context.Context, federatedRegistry *models.FederatedRegistry) (remoteClient, error) {
+	federatedToken, err := NewFederatedRegistryToken(ctx, &FederatedRegistryTokenInput{
 		FederatedRegistry: federatedRegistry,
 		IdentityProvider:  r.identityProvider,
 	})
@@ -164,22 +165,24 @@ func (r *federatedRegistryClient) initializeTharsisClient(ctx context.Context, f
 		return nil, err
 	}
 
-	staticTokenProvider, err := sdkauth.NewStaticTokenProvider(token)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create static token provider for the remote API: %v")
-	}
-
-	realAPIBaseURL, err := r.resolveAPIEndpoint(federatedRegistry.Hostname)
+	apiEndpoint, err := r.resolveAPIEndpoint(federatedRegistry.Hostname)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get module api endpoint for service discovery host %s", federatedRegistry.Hostname)
 	}
 
-	cfg, err := config.Load(config.WithEndpoint(realAPIBaseURL), config.WithTokenProvider(staticTokenProvider), config.WithHTTPClient(r.httpClient))
+	tokenResolver, err := token.NewStatic(func() (string, error) {
+		return federatedToken, nil
+	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load the config for the remote SDK: %v")
+		return nil, err
 	}
 
-	return r.sdkClientBuilder(cfg)
+	return r.remoteClientBuilder(ctx, &client.GRPCClientConfig{
+		HTTPEndpoint:  apiEndpoint,
+		TokenResolver: tokenResolver,
+		UserAgent:     client.BuildUserAgent("tharsis-federated-registry", r.version),
+		Logger:        r.logger.Slog(),
+	})
 }
 
 // resolveAPIEndpoint fetches the service discovery document from the server and returns the module API URL as a string.
@@ -196,14 +199,14 @@ func (r *federatedRegistryClient) resolveAPIEndpoint(host string) (string, error
 	return moduleRegistryURL.String(), nil
 }
 
-func sdkClientBuilder(cfg *config.Config) (sdkClient, error) {
-	client, err := sdk.NewClient(cfg)
+func remoteClientBuilder(ctx context.Context, cfg *client.GRPCClientConfig) (remoteClient, error) {
+	grpcClient, err := client.NewGRPCClient(ctx, cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create the remote SDK client: %v")
+		return nil, errors.Wrap(err, "failed to create remote grpc client")
 	}
 
-	return &sdkClientImpl{
-		client: client,
+	return &grpcRemoteClient{
+		client: grpcClient,
 	}, nil
 }
 

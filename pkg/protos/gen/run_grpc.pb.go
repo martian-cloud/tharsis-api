@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,17 +20,19 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Runs_GetRunByID_FullMethodName           = "/martiancloud.tharsis.api.run.Runs/GetRunByID"
-	Runs_GetRuns_FullMethodName              = "/martiancloud.tharsis.api.run.Runs/GetRuns"
-	Runs_CreateRun_FullMethodName            = "/martiancloud.tharsis.api.run.Runs/CreateRun"
-	Runs_ApplyRun_FullMethodName             = "/martiancloud.tharsis.api.run.Runs/ApplyRun"
-	Runs_CancelRun_FullMethodName            = "/martiancloud.tharsis.api.run.Runs/CancelRun"
-	Runs_GetRunVariables_FullMethodName      = "/martiancloud.tharsis.api.run.Runs/GetRunVariables"
-	Runs_GetPlanByID_FullMethodName          = "/martiancloud.tharsis.api.run.Runs/GetPlanByID"
-	Runs_GetApplyByID_FullMethodName         = "/martiancloud.tharsis.api.run.Runs/GetApplyByID"
-	Runs_UpdatePlan_FullMethodName           = "/martiancloud.tharsis.api.run.Runs/UpdatePlan"
-	Runs_UpdateApply_FullMethodName          = "/martiancloud.tharsis.api.run.Runs/UpdateApply"
-	Runs_SubscribeToRunEvents_FullMethodName = "/martiancloud.tharsis.api.run.Runs/SubscribeToRunEvents"
+	Runs_GetRunByID_FullMethodName                     = "/martiancloud.tharsis.api.run.Runs/GetRunByID"
+	Runs_GetRuns_FullMethodName                        = "/martiancloud.tharsis.api.run.Runs/GetRuns"
+	Runs_CreateRun_FullMethodName                      = "/martiancloud.tharsis.api.run.Runs/CreateRun"
+	Runs_ApplyRun_FullMethodName                       = "/martiancloud.tharsis.api.run.Runs/ApplyRun"
+	Runs_CancelRun_FullMethodName                      = "/martiancloud.tharsis.api.run.Runs/CancelRun"
+	Runs_GetRunVariables_FullMethodName                = "/martiancloud.tharsis.api.run.Runs/GetRunVariables"
+	Runs_GetPlanByID_FullMethodName                    = "/martiancloud.tharsis.api.run.Runs/GetPlanByID"
+	Runs_GetApplyByID_FullMethodName                   = "/martiancloud.tharsis.api.run.Runs/GetApplyByID"
+	Runs_UpdatePlan_FullMethodName                     = "/martiancloud.tharsis.api.run.Runs/UpdatePlan"
+	Runs_UpdateApply_FullMethodName                    = "/martiancloud.tharsis.api.run.Runs/UpdateApply"
+	Runs_SetVariablesIncludedInTFConfig_FullMethodName = "/martiancloud.tharsis.api.run.Runs/SetVariablesIncludedInTFConfig"
+	Runs_SubscribeToRunEvents_FullMethodName           = "/martiancloud.tharsis.api.run.Runs/SubscribeToRunEvents"
+	Runs_CreateDestroyRunForWorkspace_FullMethodName   = "/martiancloud.tharsis.api.run.Runs/CreateDestroyRunForWorkspace"
 )
 
 // RunsClient is the client API for Runs service.
@@ -58,8 +61,12 @@ type RunsClient interface {
 	UpdatePlan(ctx context.Context, in *UpdatePlanRequest, opts ...grpc.CallOption) (*Plan, error)
 	// UpdateApply updates an Apply.
 	UpdateApply(ctx context.Context, in *UpdateApplyRequest, opts ...grpc.CallOption) (*Apply, error)
+	// SetVariablesIncludedInTFConfig updates which variables are included in the Terraform config.
+	SetVariablesIncludedInTFConfig(ctx context.Context, in *SetVariablesIncludedInTFConfigRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// SubscribeToRunEvents subscribes to run events.
 	SubscribeToRunEvents(ctx context.Context, in *SubscribeToRunEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunEvent], error)
+	// CreateDestroyRunForWorkspace creates a destroy run using the workspace's current state.
+	CreateDestroyRunForWorkspace(ctx context.Context, in *CreateDestroyRunForWorkspaceRequest, opts ...grpc.CallOption) (*Run, error)
 }
 
 type runsClient struct {
@@ -170,6 +177,16 @@ func (c *runsClient) UpdateApply(ctx context.Context, in *UpdateApplyRequest, op
 	return out, nil
 }
 
+func (c *runsClient) SetVariablesIncludedInTFConfig(ctx context.Context, in *SetVariablesIncludedInTFConfigRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Runs_SetVariablesIncludedInTFConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *runsClient) SubscribeToRunEvents(ctx context.Context, in *SubscribeToRunEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Runs_ServiceDesc.Streams[0], Runs_SubscribeToRunEvents_FullMethodName, cOpts...)
@@ -188,6 +205,16 @@ func (c *runsClient) SubscribeToRunEvents(ctx context.Context, in *SubscribeToRu
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Runs_SubscribeToRunEventsClient = grpc.ServerStreamingClient[RunEvent]
+
+func (c *runsClient) CreateDestroyRunForWorkspace(ctx context.Context, in *CreateDestroyRunForWorkspaceRequest, opts ...grpc.CallOption) (*Run, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Run)
+	err := c.cc.Invoke(ctx, Runs_CreateDestroyRunForWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 // RunsServer is the server API for Runs service.
 // All implementations must embed UnimplementedRunsServer
@@ -215,8 +242,12 @@ type RunsServer interface {
 	UpdatePlan(context.Context, *UpdatePlanRequest) (*Plan, error)
 	// UpdateApply updates an Apply.
 	UpdateApply(context.Context, *UpdateApplyRequest) (*Apply, error)
+	// SetVariablesIncludedInTFConfig updates which variables are included in the Terraform config.
+	SetVariablesIncludedInTFConfig(context.Context, *SetVariablesIncludedInTFConfigRequest) (*emptypb.Empty, error)
 	// SubscribeToRunEvents subscribes to run events.
 	SubscribeToRunEvents(*SubscribeToRunEventsRequest, grpc.ServerStreamingServer[RunEvent]) error
+	// CreateDestroyRunForWorkspace creates a destroy run using the workspace's current state.
+	CreateDestroyRunForWorkspace(context.Context, *CreateDestroyRunForWorkspaceRequest) (*Run, error)
 	mustEmbedUnimplementedRunsServer()
 }
 
@@ -257,8 +288,14 @@ func (UnimplementedRunsServer) UpdatePlan(context.Context, *UpdatePlanRequest) (
 func (UnimplementedRunsServer) UpdateApply(context.Context, *UpdateApplyRequest) (*Apply, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateApply not implemented")
 }
+func (UnimplementedRunsServer) SetVariablesIncludedInTFConfig(context.Context, *SetVariablesIncludedInTFConfigRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetVariablesIncludedInTFConfig not implemented")
+}
 func (UnimplementedRunsServer) SubscribeToRunEvents(*SubscribeToRunEventsRequest, grpc.ServerStreamingServer[RunEvent]) error {
 	return status.Error(codes.Unimplemented, "method SubscribeToRunEvents not implemented")
+}
+func (UnimplementedRunsServer) CreateDestroyRunForWorkspace(context.Context, *CreateDestroyRunForWorkspaceRequest) (*Run, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateDestroyRunForWorkspace not implemented")
 }
 func (UnimplementedRunsServer) mustEmbedUnimplementedRunsServer() {}
 func (UnimplementedRunsServer) testEmbeddedByValue()              {}
@@ -461,6 +498,24 @@ func _Runs_UpdateApply_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Runs_SetVariablesIncludedInTFConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetVariablesIncludedInTFConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunsServer).SetVariablesIncludedInTFConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Runs_SetVariablesIncludedInTFConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunsServer).SetVariablesIncludedInTFConfig(ctx, req.(*SetVariablesIncludedInTFConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Runs_SubscribeToRunEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(SubscribeToRunEventsRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -471,6 +526,24 @@ func _Runs_SubscribeToRunEvents_Handler(srv interface{}, stream grpc.ServerStrea
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Runs_SubscribeToRunEventsServer = grpc.ServerStreamingServer[RunEvent]
+
+func _Runs_CreateDestroyRunForWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateDestroyRunForWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunsServer).CreateDestroyRunForWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Runs_CreateDestroyRunForWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunsServer).CreateDestroyRunForWorkspace(ctx, req.(*CreateDestroyRunForWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 // Runs_ServiceDesc is the grpc.ServiceDesc for Runs service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -518,6 +591,14 @@ var Runs_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateApply",
 			Handler:    _Runs_UpdateApply_Handler,
+		},
+		{
+			MethodName: "SetVariablesIncludedInTFConfig",
+			Handler:    _Runs_SetVariablesIncludedInTFConfig_Handler,
+		},
+		{
+			MethodName: "CreateDestroyRunForWorkspace",
+			Handler:    _Runs_CreateDestroyRunForWorkspace_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

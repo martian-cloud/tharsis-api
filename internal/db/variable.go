@@ -10,17 +10,17 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Variables encapsulates the logic to access variables from the database
 type Variables interface {
 	GetVariables(ctx context.Context, input *GetVariablesInput) (*VariableResult, error)
 	GetVariableByID(ctx context.Context, id string) (*models.Variable, error)
-	GetVariableByTRN(ctx context.Context, trn string) (*models.Variable, error)
+	GetVariableByTRN(ctx context.Context, trnValue string) (*models.Variable, error)
 	CreateVariable(ctx context.Context, input *models.Variable) (*models.Variable, error)
 	CreateVariables(ctx context.Context, namespacePath string, variables []*models.Variable) error
 	UpdateVariable(ctx context.Context, variable *models.Variable) (*models.Variable, error)
@@ -102,16 +102,16 @@ func (m *variables) GetVariableByID(ctx context.Context, id string) (*models.Var
 	return m.getVariable(ctx, goqu.Ex{"namespace_variables.id": id})
 }
 
-func (m *variables) GetVariableByTRN(ctx context.Context, trn string) (*models.Variable, error) {
+func (m *variables) GetVariableByTRN(ctx context.Context, trnValue string) (*models.Variable, error) {
 	_, span := tracer.Start(ctx, "db.GetVariableByTRN")
 	defer span.End()
 
-	path, err := types.VariableModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeVariable.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 
 	if len(parts) < 3 {
 		return nil, errors.New("a variable TRN must have namespace path, variable category, and key separated by a forward slash",
@@ -694,7 +694,7 @@ func scanVariable(row scanner) (*models.Variable, error) {
 		return nil, err
 	}
 
-	variable.Metadata.TRN = types.VariableModelType.BuildTRN(variable.NamespacePath, string(variable.Category), variable.Key)
+	variable.Metadata.TRN = trn.TypeVariable.Build(variable.NamespacePath, string(variable.Category), variable.Key)
 
 	return variable, nil
 }

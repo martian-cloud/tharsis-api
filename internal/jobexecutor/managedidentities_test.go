@@ -9,12 +9,12 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 )
 
 func TestInitialize(t *testing.T) {
 	const workspaceID = "workspaceID"
-	const managedIdentityType = types.ManagedIdentityTharsisFederated
+	var managedIdentityType = pb.ManagedIdentityType_tharsis_federated.String()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -53,11 +53,11 @@ func TestInitialize(t *testing.T) {
 	assert.Equal(t, authenticateResponse.HostCredentialFileMapping, response.HostCredentialFileMapping)
 }
 
-func buildArrayOfManagedIdentities(managedIdentityType types.ManagedIdentityType) []types.ManagedIdentity {
-	identities := []types.ManagedIdentity{
+func buildArrayOfManagedIdentities(managedIdentityType string) []*pb.ManagedIdentity {
+	identities := []*pb.ManagedIdentity{
 		{
-			Metadata: types.ResourceMetadata{
-				ID: "managedIdentity-1",
+			Metadata: &pb.ResourceMetadata{
+				Id: "managedIdentity-1",
 			},
 			Type: managedIdentityType,
 		},
@@ -65,9 +65,9 @@ func buildArrayOfManagedIdentities(managedIdentityType types.ManagedIdentityType
 	return identities
 }
 
-func buildFactoryMap(authenticator managedidentity.Authenticator) map[types.ManagedIdentityType]authenticatorFactoryFunc {
-	return map[types.ManagedIdentityType]authenticatorFactoryFunc{
-		types.ManagedIdentityTharsisFederated: func() (managedidentity.Authenticator, error) {
+func buildFactoryMap(authenticator managedidentity.Authenticator) map[string]authenticatorFactoryFunc {
+	return map[string]authenticatorFactoryFunc{
+		pb.ManagedIdentityType_tharsis_federated.String(): func() (managedidentity.Authenticator, error) {
 			return authenticator, nil
 		},
 	}

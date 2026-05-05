@@ -13,10 +13,10 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // StateVersionSortableField represents the fields that a list of state versions can be sorted by
@@ -74,7 +74,7 @@ type StateVersions interface {
 	// GetStateVersionByID returns a stateVersion by ID
 	GetStateVersionByID(ctx context.Context, id string) (*models.StateVersion, error)
 	// GetStateVersionByTRN returns a state version by TRN
-	GetStateVersionByTRN(ctx context.Context, trn string) (*models.StateVersion, error)
+	GetStateVersionByTRN(ctx context.Context, trnValue string) (*models.StateVersion, error)
 	// CreateStateVersion will create a new stateVersion
 	CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion) (*models.StateVersion, error)
 }
@@ -179,17 +179,16 @@ func (s *stateVersions) GetStateVersionByID(ctx context.Context, id string) (*mo
 	return s.getStateVersion(ctx, goqu.Ex{"state_versions.id": id})
 }
 
-func (s *stateVersions) GetStateVersionByTRN(ctx context.Context, trn string) (*models.StateVersion, error) {
+func (s *stateVersions) GetStateVersionByTRN(ctx context.Context, trnValue string) (*models.StateVersion, error) {
 	ctx, span := tracer.Start(ctx, "db.GetStateVersionByTRN")
 	defer span.End()
 
-	path, err := types.StateVersionModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeStateVersion.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a state version TRN must have the workspace path and GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -197,8 +196,8 @@ func (s *stateVersions) GetStateVersionByTRN(ctx context.Context, trn string) (*
 	}
 
 	return s.getStateVersion(ctx, goqu.Ex{
-		"state_versions.id": gid.FromGlobalID(path[lastSlashIndex+1:]),
-		"namespaces.path":   path[:lastSlashIndex],
+		"state_versions.id": gid.FromGlobalID(parsed.BaseName()),
+		"namespaces.path":   parsed.ParentPath(),
 	})
 }
 
@@ -303,7 +302,7 @@ func scanStateVersion(row scanner) (*models.StateVersion, error) {
 		return nil, err
 	}
 
-	stateVersion.Metadata.TRN = types.StateVersionModelType.BuildTRN(workspacePath, stateVersion.GetGlobalID())
+	stateVersion.Metadata.TRN = trn.TypeStateVersion.Build(workspacePath, stateVersion.GetGlobalID())
 
 	return stateVersion, nil
 }

@@ -24,6 +24,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestGetRunnerByID(t *testing.T) {
@@ -114,7 +115,7 @@ func TestGetRunnerByTRN(t *testing.T) {
 	sampleRunner := &models.Runner{
 		Metadata: models.ResourceMetadata{
 			ID:  "runner-id-1",
-			TRN: types.RunnerModelType.BuildTRN("my-group/runner-1"),
+			TRN: trn.TypeRunner.Build("my-group/runner-1"),
 		},
 		Name:    "runner-1",
 		GroupID: ptr.String("group-1"),
@@ -148,7 +149,7 @@ func TestGetRunnerByTRN(t *testing.T) {
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-id-1",
-					TRN: types.RunnerModelType.BuildTRN("runner-1"),
+					TRN: trn.TypeRunner.Build("runner-1"),
 				},
 				Name: "runner-1",
 				Type: models.SharedRunnerType,
@@ -205,7 +206,7 @@ func TestGetRunnersByIDs(t *testing.T) {
 			expectRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  runnerID,
-					TRN: types.RunModelType.BuildTRN("test-runner"),
+					TRN: trn.TypeRun.Build("test-runner"),
 				},
 				Name: "test-runner",
 				Type: models.SharedRunnerType,
@@ -216,7 +217,7 @@ func TestGetRunnersByIDs(t *testing.T) {
 			expectRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  runnerID,
-					TRN: types.RunModelType.BuildTRN("some-group/test-runner"),
+					TRN: trn.TypeRun.Build("some-group/test-runner"),
 				},
 				GroupID: &groupID,
 				Name:    "test-runner",
@@ -228,7 +229,7 @@ func TestGetRunnersByIDs(t *testing.T) {
 			expectRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  runnerID,
-					TRN: types.RunModelType.BuildTRN("some-group/test-runner"),
+					TRN: trn.TypeRun.Build("some-group/test-runner"),
 				},
 				GroupID: &groupID,
 				Name:    "test-runner",
@@ -475,7 +476,7 @@ func TestCreateRunner(t *testing.T) {
 			expectCreatedRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group-1/test-runner"),
+					TRN: trn.TypeRun.Build("group-1/test-runner"),
 				},
 				Type:            models.GroupRunnerType,
 				Name:            "test-runner",
@@ -506,7 +507,7 @@ func TestCreateRunner(t *testing.T) {
 			expectCreatedRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group-1/test-runner"),
+					TRN: trn.TypeRun.Build("group-1/test-runner"),
 				},
 				Type:      models.GroupRunnerType,
 				Name:      "test-runner",
@@ -581,10 +582,10 @@ func TestCreateRunner(t *testing.T) {
 							TotalCount: test.injectRunnersPerGroup,
 						},
 					}
-				}, nil)
+				}, nil).Maybe()
 
 				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
-					Return(&models.ResourceLimit{Value: test.limit}, nil)
+					Return(&models.ResourceLimit{Value: test.limit}, nil).Maybe()
 			}
 
 			testLogger, _ := logger.NewForTest()
@@ -621,7 +622,7 @@ func TestUpdateRunner(t *testing.T) {
 			input: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group123/test-runner"),
+					TRN: trn.TypeRun.Build("group123/test-runner"),
 				},
 				Type:            models.GroupRunnerType,
 				Name:            "test-runner",
@@ -636,7 +637,7 @@ func TestUpdateRunner(t *testing.T) {
 			input: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group123/test-runner"),
+					TRN: trn.TypeRun.Build("group123/test-runner"),
 				},
 				Type:            models.GroupRunnerType,
 				Name:            "test-runner",
@@ -681,7 +682,7 @@ func TestUpdateRunner(t *testing.T) {
 			mockActivityEvents := activityevent.NewMockService(t)
 
 			if test.authError == nil {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil).Maybe()
 			}
 
 			testLogger, _ := logger.NewForTest()
@@ -718,7 +719,7 @@ func TestDeleteRunner(t *testing.T) {
 			input: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group123/test-runner"),
+					TRN: trn.TypeRun.Build("group123/test-runner"),
 				},
 				Type:     models.GroupRunnerType,
 				Name:     "test-runner",
@@ -731,7 +732,7 @@ func TestDeleteRunner(t *testing.T) {
 			input: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group123/test-runner"),
+					TRN: trn.TypeRun.Build("group123/test-runner"),
 				},
 				Type:     models.GroupRunnerType,
 				Name:     "test-runner",
@@ -774,7 +775,7 @@ func TestDeleteRunner(t *testing.T) {
 			mockActivityEvents := activityevent.NewMockService(t)
 
 			if test.authError == nil {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil).Maybe()
 			}
 
 			testLogger, _ := logger.NewForTest()
@@ -812,7 +813,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group123/runner-1"),
+					TRN: trn.TypeRun.Build("group123/runner-1"),
 				},
 				GroupID: &groupID,
 				Type:    models.GroupRunnerType,
@@ -820,7 +821,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			serviceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "sa-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("group123/sa-1"),
+					TRN: trn.TypeServiceAccount.Build("group123/sa-1"),
 				},
 				GroupID: groupID,
 			},
@@ -830,14 +831,14 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("runner-1"),
+					TRN: trn.TypeRun.Build("runner-1"),
 				},
 				Type: models.SharedRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "sa-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("sa-1"),
+					TRN: trn.TypeServiceAccount.Build("sa-1"),
 				},
 			},
 			isAdmin:       true,
@@ -848,14 +849,14 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("runner-1"),
+					TRN: trn.TypeRun.Build("runner-1"),
 				},
 				Type: models.SharedRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "sa-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("group123/sa-1"),
+					TRN: trn.TypeServiceAccount.Build("group123/sa-1"),
 				},
 				GroupID: groupID,
 			},
@@ -866,7 +867,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group123/runner-1"),
+					TRN: trn.TypeRun.Build("group123/runner-1"),
 				},
 				GroupID: &groupID,
 				Type:    models.GroupRunnerType,
@@ -874,7 +875,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			serviceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "sa-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("global/sa-1"),
+					TRN: trn.TypeServiceAccount.Build("global/sa-1"),
 				},
 			},
 			expectErrCode: errors.EInvalid,
@@ -884,7 +885,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group123/runner-1"),
+					TRN: trn.TypeRun.Build("group123/runner-1"),
 				},
 				GroupID: &groupID,
 				Type:    models.GroupRunnerType,
@@ -892,7 +893,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			serviceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "sa-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("group456/sa-1"),
+					TRN: trn.TypeServiceAccount.Build("group456/sa-1"),
 				},
 				GroupID: "group456",
 			},
@@ -907,7 +908,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group123/runner-1"),
+					TRN: trn.TypeRun.Build("group123/runner-1"),
 				},
 				GroupID: &groupID,
 				Type:    models.GroupRunnerType,
@@ -919,14 +920,14 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("runner-1"),
+					TRN: trn.TypeRun.Build("runner-1"),
 				},
 				Type: models.SharedRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "sa-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("global/sa-1"),
+					TRN: trn.TypeServiceAccount.Build("global/sa-1"),
 				},
 			},
 			expectErrCode: errors.EInvalid, // unlike in Phobos, where this is forbidden
@@ -936,7 +937,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("group123/runner-1"),
+					TRN: trn.TypeRun.Build("group123/runner-1"),
 				},
 				GroupID: &groupID,
 				Type:    models.GroupRunnerType,
@@ -944,7 +945,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			serviceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "sa-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("group123/sa-1"),
+					TRN: trn.TypeServiceAccount.Build("group123/sa-1"),
 				},
 				GroupID: groupID,
 			},
@@ -956,14 +957,14 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  "runner-1",
-					TRN: types.RunModelType.BuildTRN("runner-1"),
+					TRN: trn.TypeRun.Build("runner-1"),
 				},
 				Type: models.SharedRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "sa-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("global/sa-1"),
+					TRN: trn.TypeServiceAccount.Build("global/sa-1"),
 				},
 			},
 			expectErrCode: errors.EInvalid, // unlike in Phobos, where this is forbidden
@@ -1113,7 +1114,6 @@ func TestUnassignServiceAccountFromRunner(t *testing.T) {
 
 func TestCreateRunnerSession(t *testing.T) {
 	runnerID := "runner-1"
-	runnerPath := "runner123"
 	runnerSessionID := "runner-session-123"
 
 	// Test cases
@@ -1129,17 +1129,17 @@ func TestCreateRunnerSession(t *testing.T) {
 		{
 			name: "create runner session",
 			input: &CreateRunnerSessionInput{
-				RunnerPath: runnerPath,
+				RunnerID: runnerID,
 			},
 			createdRunnerSession: &models.RunnerSession{
 				Metadata: models.ResourceMetadata{ID: runnerSessionID},
-				RunnerID: runnerPath,
+				RunnerID: runnerID,
 			},
 		},
 		{
 			name: "subject does not have permissions to create a runner",
 			input: &CreateRunnerSessionInput{
-				RunnerPath: runnerPath,
+				RunnerID: runnerID,
 			},
 			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
@@ -1147,22 +1147,22 @@ func TestCreateRunnerSession(t *testing.T) {
 		{
 			name: "oldest session should be deleted when limit is reached",
 			input: &CreateRunnerSessionInput{
-				RunnerPath: runnerPath,
+				RunnerID: runnerID,
 			},
 			createdRunnerSession: &models.RunnerSession{
 				Metadata: models.ResourceMetadata{ID: runnerSessionID},
-				RunnerID: runnerPath,
+				RunnerID: runnerID,
 			},
 			limitError: errors.New("mocked limit violation", errors.WithErrorCode(errors.EInvalid)),
 		},
 		{
 			name: "create session should fail because limit is reached and all sessions are currently active",
 			input: &CreateRunnerSessionInput{
-				RunnerPath: runnerPath,
+				RunnerID: runnerID,
 			},
 			createdRunnerSession: &models.RunnerSession{
 				Metadata: models.ResourceMetadata{ID: runnerSessionID},
-				RunnerID: runnerPath,
+				RunnerID: runnerID,
 			},
 			allExistingSessionsActive: true,
 			limitError:                errors.New("mocked limit violation", errors.WithErrorCode(errors.EInvalid)),
@@ -1186,13 +1186,6 @@ func TestCreateRunnerSession(t *testing.T) {
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-
-			mockRunners.On("GetRunnerByTRN", mock.Anything, types.RunnerModelType.BuildTRN(runnerPath)).Return(&models.Runner{
-				Metadata: models.ResourceMetadata{
-					ID:  runnerID,
-					TRN: types.RunModelType.BuildTRN(runnerPath),
-				},
-			}, nil)
 
 			mockRunnerSessions.On("GetRunnerSessions", mock.Anything, &db.GetRunnerSessionsInput{
 				Filter: &db.RunnerSessionFilter{
@@ -1240,7 +1233,7 @@ func TestCreateRunnerSession(t *testing.T) {
 				}).Return(&db.RunnerSessionsResult{
 					PageInfo:       &pagination.PageInfo{},
 					RunnerSessions: []models.RunnerSession{existingSession},
-				}, nil)
+				}, nil).Maybe()
 
 				if !test.allExistingSessionsActive {
 					mockRunnerSessions.On("DeleteRunnerSession", mock.Anything, &existingSession).Return(nil)
@@ -1488,7 +1481,7 @@ func TestGetRunnerSessionByTRN(t *testing.T) {
 	sampleRunnerSession := &models.RunnerSession{
 		Metadata: models.ResourceMetadata{
 			ID:  "session-id-1",
-			TRN: types.RunnerSessionModelType.BuildTRN("my-group/session-1"),
+			TRN: trn.TypeRunnerSession.Build("my-group/session-1"),
 		},
 		RunnerID: "runner-1",
 	}
@@ -1551,7 +1544,7 @@ func TestGetRunnerSessionByTRN(t *testing.T) {
 					},
 					GroupID: ptr.String("group-1"),
 					Type:    test.runnerType,
-				}, nil)
+				}, nil).Maybe()
 
 				if test.runnerType == models.GroupRunnerType {
 					mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).Return(test.authError)
@@ -1960,7 +1953,7 @@ func TestGetLogStreamsByRunnerSessionIDs(t *testing.T) {
 					},
 				}).Return(&db.RunnerSessionsResult{
 					RunnerSessions: runnerSessions,
-				}, nil)
+				}, nil).Maybe()
 
 				mockRunners.On("GetRunners", mock.Anything, &db.GetRunnersInput{
 					Filter: &db.RunnerFilter{
@@ -1968,7 +1961,7 @@ func TestGetLogStreamsByRunnerSessionIDs(t *testing.T) {
 					},
 				}).Return(&db.RunnersResult{
 					Runners: []models.Runner{*test.runner},
-				}, nil)
+				}, nil).Maybe()
 
 				for idx, sessionID := range test.sessionIDs {
 					sessionIDCopy := sessionID

@@ -32,6 +32,17 @@ message DeleteTerraformProviderPlatformMirrorRequest {
   string id = 1;
 }
 
+// GetProviderPlatformPackageDownloadURLRequest is the input for getting a provider platform package download URL.
+message GetProviderPlatformPackageDownloadURLRequest {
+  string group_path         = 1;
+  string type               = 2;
+  string registry_namespace = 3;
+  string registry_hostname  = 4;
+  string semantic_version   = 5;
+  string os                 = 6;
+  string arch               = 7;
+}
+
 // TerraformProviderPlatformMirror represents a mirrored provider platform.
 message TerraformProviderPlatformMirror {
   metadata.ResourceMetadata metadata          = 1;
@@ -44,4 +55,10 @@ message TerraformProviderPlatformMirror {
 message GetTerraformProviderPlatformMirrorsResponse {
   pagination.PageInfo                      page_info        = 1;
   repeated TerraformProviderPlatformMirror platform_mirrors = 2;
+}
+
+// GetProviderPlatformPackageDownloadURLResponse is the response containing the download URL and hashes.
+message GetProviderPlatformPackageDownloadURLResponse {
+  string          url    = 1;
+  repeated string hashes = 2;
 }

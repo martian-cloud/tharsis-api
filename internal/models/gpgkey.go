@@ -2,10 +2,10 @@ package models
 
 import (
 	"fmt"
-	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 var _ Model = (*GPGKey)(nil)
@@ -63,11 +63,10 @@ func (g *GPGKey) GetHexGPGKeyID() string {
 
 // GetResourcePath returns the path to the GPG Key resource
 func (g *GPGKey) GetResourcePath() string {
-	return strings.Split(g.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+	return trn.MustParseAny(g.Metadata.TRN).Path()
 }
 
 // GetGroupPath returns the group path
 func (g *GPGKey) GetGroupPath() string {
-	resourcePath := g.GetResourcePath()
-	return resourcePath[:strings.LastIndex(resourcePath, "/")]
+	return trn.MustParseAny(g.Metadata.TRN).ParentPath()
 }

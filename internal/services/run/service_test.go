@@ -35,6 +35,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 type mockDBClient struct {
@@ -155,7 +156,7 @@ func TestRunByTRN(t *testing.T) {
 	sampleRun := &models.Run{
 		Metadata: models.ResourceMetadata{
 			ID:  "run-id-1",
-			TRN: types.RunModelType.BuildTRN("run-gid-1"),
+			TRN: trn.TypeRun.Build("run-gid-1"),
 		},
 		WorkspaceID: "workspace-1",
 		Status:      models.RunPlanned,
@@ -365,7 +366,7 @@ func TestGetPlanByTRN(t *testing.T) {
 	samplePlan := &models.Plan{
 		Metadata: models.ResourceMetadata{
 			ID:  "plan-id-1",
-			TRN: types.PlanModelType.BuildTRN("plan-gid-1"),
+			TRN: trn.TypePlan.Build("plan-gid-1"),
 		},
 		WorkspaceID: "workspace-1",
 	}
@@ -516,7 +517,7 @@ func TestGetApplyByTRN(t *testing.T) {
 	sampleApply := &models.Apply{
 		Metadata: models.ResourceMetadata{
 			ID:  "apply-id-1",
-			TRN: types.ApplyModelType.BuildTRN("apply-gid-1"),
+			TRN: trn.TypeApply.Build("apply-gid-1"),
 		},
 		WorkspaceID: "workspace-1",
 	}

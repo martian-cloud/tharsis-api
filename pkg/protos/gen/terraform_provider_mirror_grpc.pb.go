@@ -27,6 +27,8 @@ const (
 	TerraformProviderMirrors_GetTerraformProviderPlatformMirrorByID_FullMethodName = "/martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors/GetTerraformProviderPlatformMirrorByID"
 	TerraformProviderMirrors_GetTerraformProviderPlatformMirrors_FullMethodName    = "/martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors/GetTerraformProviderPlatformMirrors"
 	TerraformProviderMirrors_DeleteTerraformProviderPlatformMirror_FullMethodName  = "/martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors/DeleteTerraformProviderPlatformMirror"
+	TerraformProviderMirrors_GetAvailableProviderVersions_FullMethodName           = "/martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors/GetAvailableProviderVersions"
+	TerraformProviderMirrors_GetProviderPlatformPackageDownloadURL_FullMethodName  = "/martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors/GetProviderPlatformPackageDownloadURL"
 )
 
 // TerraformProviderMirrorsClient is the client API for TerraformProviderMirrors service.
@@ -49,6 +51,10 @@ type TerraformProviderMirrorsClient interface {
 	GetTerraformProviderPlatformMirrors(ctx context.Context, in *GetTerraformProviderPlatformMirrorsRequest, opts ...grpc.CallOption) (*GetTerraformProviderPlatformMirrorsResponse, error)
 	// DeleteTerraformProviderPlatformMirror deletes a platform mirror.
 	DeleteTerraformProviderPlatformMirror(ctx context.Context, in *DeleteTerraformProviderPlatformMirrorRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetAvailableProviderVersions returns all cached versions for a provider.
+	GetAvailableProviderVersions(ctx context.Context, in *GetAvailableProviderVersionsRequest, opts ...grpc.CallOption) (*GetAvailableProviderVersionsResponse, error)
+	// GetProviderPlatformPackageDownloadURL returns the download URL and hashes for a provider platform package.
+	GetProviderPlatformPackageDownloadURL(ctx context.Context, in *GetProviderPlatformPackageDownloadURLRequest, opts ...grpc.CallOption) (*GetProviderPlatformPackageDownloadURLResponse, error)
 }
 
 type terraformProviderMirrorsClient struct {
@@ -129,6 +135,26 @@ func (c *terraformProviderMirrorsClient) DeleteTerraformProviderPlatformMirror(c
 	return out, nil
 }
 
+func (c *terraformProviderMirrorsClient) GetAvailableProviderVersions(ctx context.Context, in *GetAvailableProviderVersionsRequest, opts ...grpc.CallOption) (*GetAvailableProviderVersionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAvailableProviderVersionsResponse)
+	err := c.cc.Invoke(ctx, TerraformProviderMirrors_GetAvailableProviderVersions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *terraformProviderMirrorsClient) GetProviderPlatformPackageDownloadURL(ctx context.Context, in *GetProviderPlatformPackageDownloadURLRequest, opts ...grpc.CallOption) (*GetProviderPlatformPackageDownloadURLResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetProviderPlatformPackageDownloadURLResponse)
+	err := c.cc.Invoke(ctx, TerraformProviderMirrors_GetProviderPlatformPackageDownloadURL_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TerraformProviderMirrorsServer is the server API for TerraformProviderMirrors service.
 // All implementations must embed UnimplementedTerraformProviderMirrorsServer
 // for forward compatibility.
@@ -149,6 +175,10 @@ type TerraformProviderMirrorsServer interface {
 	GetTerraformProviderPlatformMirrors(context.Context, *GetTerraformProviderPlatformMirrorsRequest) (*GetTerraformProviderPlatformMirrorsResponse, error)
 	// DeleteTerraformProviderPlatformMirror deletes a platform mirror.
 	DeleteTerraformProviderPlatformMirror(context.Context, *DeleteTerraformProviderPlatformMirrorRequest) (*emptypb.Empty, error)
+	// GetAvailableProviderVersions returns all cached versions for a provider.
+	GetAvailableProviderVersions(context.Context, *GetAvailableProviderVersionsRequest) (*GetAvailableProviderVersionsResponse, error)
+	// GetProviderPlatformPackageDownloadURL returns the download URL and hashes for a provider platform package.
+	GetProviderPlatformPackageDownloadURL(context.Context, *GetProviderPlatformPackageDownloadURLRequest) (*GetProviderPlatformPackageDownloadURLResponse, error)
 	mustEmbedUnimplementedTerraformProviderMirrorsServer()
 }
 
@@ -179,6 +209,12 @@ func (UnimplementedTerraformProviderMirrorsServer) GetTerraformProviderPlatformM
 }
 func (UnimplementedTerraformProviderMirrorsServer) DeleteTerraformProviderPlatformMirror(context.Context, *DeleteTerraformProviderPlatformMirrorRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteTerraformProviderPlatformMirror not implemented")
+}
+func (UnimplementedTerraformProviderMirrorsServer) GetAvailableProviderVersions(context.Context, *GetAvailableProviderVersionsRequest) (*GetAvailableProviderVersionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAvailableProviderVersions not implemented")
+}
+func (UnimplementedTerraformProviderMirrorsServer) GetProviderPlatformPackageDownloadURL(context.Context, *GetProviderPlatformPackageDownloadURLRequest) (*GetProviderPlatformPackageDownloadURLResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetProviderPlatformPackageDownloadURL not implemented")
 }
 func (UnimplementedTerraformProviderMirrorsServer) mustEmbedUnimplementedTerraformProviderMirrorsServer() {
 }
@@ -328,6 +364,42 @@ func _TerraformProviderMirrors_DeleteTerraformProviderPlatformMirror_Handler(srv
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TerraformProviderMirrors_GetAvailableProviderVersions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAvailableProviderVersionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TerraformProviderMirrorsServer).GetAvailableProviderVersions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TerraformProviderMirrors_GetAvailableProviderVersions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TerraformProviderMirrorsServer).GetAvailableProviderVersions(ctx, req.(*GetAvailableProviderVersionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TerraformProviderMirrors_GetProviderPlatformPackageDownloadURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProviderPlatformPackageDownloadURLRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TerraformProviderMirrorsServer).GetProviderPlatformPackageDownloadURL(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TerraformProviderMirrors_GetProviderPlatformPackageDownloadURL_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TerraformProviderMirrorsServer).GetProviderPlatformPackageDownloadURL(ctx, req.(*GetProviderPlatformPackageDownloadURLRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TerraformProviderMirrors_ServiceDesc is the grpc.ServiceDesc for TerraformProviderMirrors service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -362,6 +434,14 @@ var TerraformProviderMirrors_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteTerraformProviderPlatformMirror",
 			Handler:    _TerraformProviderMirrors_DeleteTerraformProviderPlatformMirror_Handler,
+		},
+		{
+			MethodName: "GetAvailableProviderVersions",
+			Handler:    _TerraformProviderMirrors_GetAvailableProviderVersions_Handler,
+		},
+		{
+			MethodName: "GetProviderPlatformPackageDownloadURL",
+			Handler:    _TerraformProviderMirrors_GetProviderPlatformPackageDownloadURL_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

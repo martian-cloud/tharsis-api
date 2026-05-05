@@ -11,12 +11,13 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestVCSWorkspaceLinkCaller_GetSubject(t *testing.T) {
 	caller := VCSWorkspaceLinkCaller{Provider: &models.VCSProvider{
 		Metadata: models.ResourceMetadata{
-			TRN: types.VCSProviderModelType.BuildTRN("rs1"),
+			TRN: trn.TypeVCSProvider.Build("rs1"),
 		},
 	}}
 	assert.Equal(t, "rs1", caller.GetSubject())
@@ -51,7 +52,7 @@ func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {
 	caller := VCSWorkspaceLinkCaller{
 		Provider: &models.VCSProvider{
 			Metadata: models.ResourceMetadata{
-				TRN: types.VCSProviderModelType.BuildTRN("group1/vcs-provider"),
+				TRN: trn.TypeVCSProvider.Build("group1/vcs-provider"),
 			},
 		},
 		Link: &models.WorkspaceVCSProviderLink{
@@ -142,7 +143,7 @@ func TestVCSWorkspaceLinkCaller_RequireInheritedPermissions(t *testing.T) {
 	caller := VCSWorkspaceLinkCaller{
 		Provider: &models.VCSProvider{
 			Metadata: models.ResourceMetadata{
-				TRN: types.VCSProviderModelType.BuildTRN("group1/vcs-provider"),
+				TRN: trn.TypeVCSProvider.Build("group1/vcs-provider"),
 			},
 		},
 	}
@@ -154,7 +155,7 @@ func TestVCSWorkspaceLinkCaller_RequireRole(t *testing.T) {
 	caller := VCSWorkspaceLinkCaller{
 		Provider: &models.VCSProvider{
 			Metadata: models.ResourceMetadata{
-				TRN: types.VCSProviderModelType.BuildTRN("group-1/test-provider"),
+				TRN: trn.TypeVCSProvider.Build("group-1/test-provider"),
 			},
 		},
 	}

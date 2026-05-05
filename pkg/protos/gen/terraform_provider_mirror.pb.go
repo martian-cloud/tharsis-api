@@ -25,7 +25,7 @@ var File_terraform_provider_mirror_proto protoreflect.FileDescriptor
 
 const file_terraform_provider_mirror_proto_rawDesc = "" +
 	"\n" +
-	"\x1fterraform_provider_mirror.proto\x122martiancloud.tharsis.api.terraform_provider_mirror\x1a\x1bgoogle/protobuf/empty.proto\x1a'terraform_provider_version_mirror.proto\x1a(terraform_provider_platform_mirror.proto2\xb5\f\n" +
+	"\x1fterraform_provider_mirror.proto\x122martiancloud.tharsis.api.terraform_provider_mirror\x1a\x1bgoogle/protobuf/empty.proto\x1a'terraform_provider_version_mirror.proto\x1a(terraform_provider_platform_mirror.proto2\x9a\x10\n" +
 	"\x18TerraformProviderMirrors\x12\xed\x01\n" +
 	"%GetTerraformProviderVersionMirrorByID\x12h.martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorByIDRequest\x1aZ.martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror\x12\xf3\x01\n" +
 	"\"GetTerraformProviderVersionMirrors\x12e.martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsRequest\x1af.martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse\x12\xeb\x01\n" +
@@ -33,7 +33,9 @@ const file_terraform_provider_mirror_proto_rawDesc = "" +
 	"$DeleteTerraformProviderVersionMirror\x12g.martiancloud.tharsis.api.terraform_provider_version_mirror.DeleteTerraformProviderVersionMirrorRequest\x1a\x16.google.protobuf.Empty\x12\xf2\x01\n" +
 	"&GetTerraformProviderPlatformMirrorByID\x12j.martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorByIDRequest\x1a\\.martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror\x12\xf8\x01\n" +
 	"#GetTerraformProviderPlatformMirrors\x12g.martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsRequest\x1ah.martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse\x12\xaa\x01\n" +
-	"%DeleteTerraformProviderPlatformMirror\x12i.martiancloud.tharsis.api.terraform_provider_platform_mirror.DeleteTerraformProviderPlatformMirrorRequest\x1a\x16.google.protobuf.EmptyBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
+	"%DeleteTerraformProviderPlatformMirror\x12i.martiancloud.tharsis.api.terraform_provider_platform_mirror.DeleteTerraformProviderPlatformMirrorRequest\x1a\x16.google.protobuf.Empty\x12\xe1\x01\n" +
+	"\x1cGetAvailableProviderVersions\x12_.martiancloud.tharsis.api.terraform_provider_version_mirror.GetAvailableProviderVersionsRequest\x1a`.martiancloud.tharsis.api.terraform_provider_version_mirror.GetAvailableProviderVersionsResponse\x12\xfe\x01\n" +
+	"%GetProviderPlatformPackageDownloadURL\x12i.martiancloud.tharsis.api.terraform_provider_platform_mirror.GetProviderPlatformPackageDownloadURLRequest\x1aj.martiancloud.tharsis.api.terraform_provider_platform_mirror.GetProviderPlatformPackageDownloadURLResponseBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var file_terraform_provider_mirror_proto_goTypes = []any{
 	(*GetTerraformProviderVersionMirrorByIDRequest)(nil),  // 0: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorByIDRequest
@@ -43,11 +45,15 @@ var file_terraform_provider_mirror_proto_goTypes = []any{
 	(*GetTerraformProviderPlatformMirrorByIDRequest)(nil), // 4: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorByIDRequest
 	(*GetTerraformProviderPlatformMirrorsRequest)(nil),    // 5: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsRequest
 	(*DeleteTerraformProviderPlatformMirrorRequest)(nil),  // 6: martiancloud.tharsis.api.terraform_provider_platform_mirror.DeleteTerraformProviderPlatformMirrorRequest
-	(*TerraformProviderVersionMirror)(nil),                // 7: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror
-	(*GetTerraformProviderVersionMirrorsResponse)(nil),    // 8: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse
-	(*emptypb.Empty)(nil),                                 // 9: google.protobuf.Empty
-	(*TerraformProviderPlatformMirror)(nil),               // 10: martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror
-	(*GetTerraformProviderPlatformMirrorsResponse)(nil),   // 11: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse
+	(*GetAvailableProviderVersionsRequest)(nil),           // 7: martiancloud.tharsis.api.terraform_provider_version_mirror.GetAvailableProviderVersionsRequest
+	(*GetProviderPlatformPackageDownloadURLRequest)(nil),  // 8: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetProviderPlatformPackageDownloadURLRequest
+	(*TerraformProviderVersionMirror)(nil),                // 9: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror
+	(*GetTerraformProviderVersionMirrorsResponse)(nil),    // 10: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse
+	(*emptypb.Empty)(nil),                                 // 11: google.protobuf.Empty
+	(*TerraformProviderPlatformMirror)(nil),               // 12: martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror
+	(*GetTerraformProviderPlatformMirrorsResponse)(nil),   // 13: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse
+	(*GetAvailableProviderVersionsResponse)(nil),          // 14: martiancloud.tharsis.api.terraform_provider_version_mirror.GetAvailableProviderVersionsResponse
+	(*GetProviderPlatformPackageDownloadURLResponse)(nil), // 15: martiancloud.tharsis.api.terraform_provider_platform_mirror.GetProviderPlatformPackageDownloadURLResponse
 }
 var file_terraform_provider_mirror_proto_depIdxs = []int32{
 	0,  // 0: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderVersionMirrorByID:input_type -> martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorByIDRequest
@@ -57,15 +63,19 @@ var file_terraform_provider_mirror_proto_depIdxs = []int32{
 	4,  // 4: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderPlatformMirrorByID:input_type -> martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorByIDRequest
 	5,  // 5: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderPlatformMirrors:input_type -> martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsRequest
 	6,  // 6: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.DeleteTerraformProviderPlatformMirror:input_type -> martiancloud.tharsis.api.terraform_provider_platform_mirror.DeleteTerraformProviderPlatformMirrorRequest
-	7,  // 7: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderVersionMirrorByID:output_type -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror
-	8,  // 8: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderVersionMirrors:output_type -> martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse
-	7,  // 9: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.CreateTerraformProviderVersionMirror:output_type -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror
-	9,  // 10: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.DeleteTerraformProviderVersionMirror:output_type -> google.protobuf.Empty
-	10, // 11: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderPlatformMirrorByID:output_type -> martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror
-	11, // 12: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderPlatformMirrors:output_type -> martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse
-	9,  // 13: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.DeleteTerraformProviderPlatformMirror:output_type -> google.protobuf.Empty
-	7,  // [7:14] is the sub-list for method output_type
-	0,  // [0:7] is the sub-list for method input_type
+	7,  // 7: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetAvailableProviderVersions:input_type -> martiancloud.tharsis.api.terraform_provider_version_mirror.GetAvailableProviderVersionsRequest
+	8,  // 8: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetProviderPlatformPackageDownloadURL:input_type -> martiancloud.tharsis.api.terraform_provider_platform_mirror.GetProviderPlatformPackageDownloadURLRequest
+	9,  // 9: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderVersionMirrorByID:output_type -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror
+	10, // 10: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderVersionMirrors:output_type -> martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse
+	9,  // 11: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.CreateTerraformProviderVersionMirror:output_type -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror
+	11, // 12: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.DeleteTerraformProviderVersionMirror:output_type -> google.protobuf.Empty
+	12, // 13: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderPlatformMirrorByID:output_type -> martiancloud.tharsis.api.terraform_provider_platform_mirror.TerraformProviderPlatformMirror
+	13, // 14: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetTerraformProviderPlatformMirrors:output_type -> martiancloud.tharsis.api.terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse
+	11, // 15: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.DeleteTerraformProviderPlatformMirror:output_type -> google.protobuf.Empty
+	14, // 16: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetAvailableProviderVersions:output_type -> martiancloud.tharsis.api.terraform_provider_version_mirror.GetAvailableProviderVersionsResponse
+	15, // 17: martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors.GetProviderPlatformPackageDownloadURL:output_type -> martiancloud.tharsis.api.terraform_provider_platform_mirror.GetProviderPlatformPackageDownloadURLResponse
+	9,  // [9:18] is the sub-list for method output_type
+	0,  // [0:9] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name

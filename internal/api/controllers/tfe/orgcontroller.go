@@ -11,10 +11,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // EntitlementSettings represents the entitlements for a particular user
@@ -69,7 +69,7 @@ func (c *orgController) GetRunQueue(w http.ResponseWriter, r *http.Request) {
 
 	groupPath := convertOrgToGroupPath(org)
 
-	group, err := c.groupService.GetGroupByTRN(r.Context(), types.GroupModelType.BuildTRN(groupPath))
+	group, err := c.groupService.GetGroupByTRN(r.Context(), trn.TypeGroup.Build(groupPath))
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return

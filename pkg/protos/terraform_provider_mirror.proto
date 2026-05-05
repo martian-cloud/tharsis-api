@@ -24,4 +24,8 @@ service TerraformProviderMirrors {
   rpc GetTerraformProviderPlatformMirrors(terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsRequest) returns (terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse);
   // DeleteTerraformProviderPlatformMirror deletes a platform mirror.
   rpc DeleteTerraformProviderPlatformMirror(terraform_provider_platform_mirror.DeleteTerraformProviderPlatformMirrorRequest) returns (google.protobuf.Empty);
+  // GetAvailableProviderVersions returns all cached versions for a provider.
+  rpc GetAvailableProviderVersions(terraform_provider_version_mirror.GetAvailableProviderVersionsRequest) returns (terraform_provider_version_mirror.GetAvailableProviderVersionsResponse);
+  // GetProviderPlatformPackageDownloadURL returns the download URL and hashes for a provider platform package.
+  rpc GetProviderPlatformPackageDownloadURL(terraform_provider_platform_mirror.GetProviderPlatformPackageDownloadURLRequest) returns (terraform_provider_platform_mirror.GetProviderPlatformPackageDownloadURLResponse);
 }

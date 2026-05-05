@@ -23,9 +23,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/ansi"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
-	tharsis "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Provider Mirror Proxy
@@ -249,7 +250,7 @@ func (p *mirrorProxy) handleVersions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fallback to cached versions if upstream fails
-	versions, err := p.client.GetAvailableProviderVersions(r.Context(), &types.GetAvailableProviderVersionsInput{
+	versions, err := p.client.GetAvailableProviderVersions(r.Context(), &pb.GetAvailableProviderVersionsRequest{
 		GroupPath:         rootGroupPath,
 		RegistryHostname:  hostname,
 		RegistryNamespace: namespace,
@@ -296,23 +297,23 @@ func (p *mirrorProxy) handlePackages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Try to get cached package directly - returns not found or forbidden if not cached/accessible
-	packageInfo, err := p.client.GetProviderPlatformPackageDownloadURL(r.Context(), &types.GetProviderPlatformPackageDownloadURLInput{
+	packageInfo, err := p.client.GetProviderPlatformPackageDownloadURL(r.Context(), &pb.GetProviderPlatformPackageDownloadURLRequest{
 		GroupPath:         rootGroupPath,
 		RegistryHostname:  hostname,
 		RegistryNamespace: namespace,
 		Type:              providerType,
-		Version:           version,
-		OS:                os,
+		SemanticVersion:   version,
+		Os:                os,
 		Arch:              arch,
 	})
-	if err != nil && !tharsis.IsNotFoundError(err) && httpStatusFromError(err) != http.StatusForbidden {
+	if err != nil && status.Code(err) != codes.NotFound && httpStatusFromError(err) != http.StatusForbidden {
 		http.Error(w, err.Error(), httpStatusFromError(err))
 		return
 	}
 
 	if packageInfo != nil {
 		p.log.printf("- Used cached %s v%s", prov, version)
-		p.writePackageResponse(w, os, arch, packageInfo.URL, packageInfo.Hashes)
+		p.writePackageResponse(w, os, arch, packageInfo.Url, packageInfo.Hashes)
 		return
 	}
 
@@ -370,7 +371,7 @@ func (p *mirrorProxy) cacheProviderPackage(ctx context.Context, prov *provider.P
 		token = &t
 	}
 
-	versionMirror, err := p.client.CreateProviderVersionMirror(ctx, &types.CreateTerraformProviderVersionMirrorInput{
+	versionMirror, err := p.client.CreateProviderVersionMirror(ctx, &pb.CreateTerraformProviderVersionMirrorRequest{
 		GroupPath:         groupPath,
 		Type:              prov.Type,
 		RegistryNamespace: prov.Namespace,
@@ -379,7 +380,7 @@ func (p *mirrorProxy) cacheProviderPackage(ctx context.Context, prov *provider.P
 		RegistryToken:     token,
 	})
 	if err != nil {
-		if tharsis.IsConflictError(err) {
+		if status.Code(err) == codes.AlreadyExists {
 			// Another job already created it, nothing to do
 			return nil
 		}
@@ -396,12 +397,12 @@ func (p *mirrorProxy) cacheProviderPackage(ctx context.Context, prov *provider.P
 		return fmt.Errorf("empty response from upstream")
 	}
 
-	if err := p.client.UploadProviderPlatformPackageToMirror(ctx, &types.UploadProviderPlatformPackageToMirrorInput{
-		Reader:          body,
-		VersionMirrorID: versionMirror.Metadata.ID,
-		OS:              os,
-		Arch:            arch,
-	}); err != nil && !tharsis.IsConflictError(err) {
+	if err := p.client.UploadProviderPlatformPackageToMirror(ctx,
+		versionMirror.Metadata.Id,
+		os,
+		arch,
+		body,
+	); err != nil && status.Code(err) != codes.AlreadyExists {
 		return fmt.Errorf("failed to upload: %w", err)
 	}
 
@@ -483,26 +484,22 @@ func generateTLSConfig(validity time.Duration) (*tls.Config, []byte, error) {
 
 // httpStatusFromError returns an appropriate HTTP status code for the given error.
 func httpStatusFromError(err error) int {
-	var tErr *types.Error
-	if errors.As(err, &tErr) {
-		switch tErr.Code {
-		case types.ErrNotFound:
-			return http.StatusNotFound
-		case types.ErrForbidden:
-			return http.StatusForbidden
-		case types.ErrUnauthorized:
-			return http.StatusUnauthorized
-		case types.ErrBadRequest:
-			return http.StatusBadRequest
-		case types.ErrConflict, types.ErrOptimisticLock:
-			return http.StatusConflict
-		case types.ErrTooManyRequests:
-			return http.StatusTooManyRequests
-		case types.ErrTooLarge:
-			return http.StatusRequestEntityTooLarge
-		case types.ErrServiceUnavailable:
-			return http.StatusServiceUnavailable
-		}
+	switch status.Code(err) {
+	case codes.NotFound:
+		return http.StatusNotFound
+	case codes.PermissionDenied:
+		return http.StatusForbidden
+	case codes.Unauthenticated:
+		return http.StatusUnauthorized
+	case codes.InvalidArgument:
+		return http.StatusBadRequest
+	case codes.AlreadyExists, codes.Aborted:
+		return http.StatusConflict
+	case codes.ResourceExhausted:
+		return http.StatusTooManyRequests
+	case codes.Unavailable:
+		return http.StatusServiceUnavailable
+	default:
+		return http.StatusInternalServerError
 	}
-	return http.StatusInternalServerError
 }

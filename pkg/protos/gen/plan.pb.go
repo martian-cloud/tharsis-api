@@ -202,6 +202,67 @@ func (x *UpdatePlanRequest) GetErrorMessage() string {
 	return ""
 }
 
+// PlanSummary contains a summary of the types of changes a plan includes.
+type PlanSummary struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	ResourceAdditions    int32                  `protobuf:"varint,1,opt,name=resource_additions,json=resourceAdditions,proto3" json:"resource_additions,omitempty"`
+	ResourceChanges      int32                  `protobuf:"varint,2,opt,name=resource_changes,json=resourceChanges,proto3" json:"resource_changes,omitempty"`
+	ResourceDestructions int32                  `protobuf:"varint,3,opt,name=resource_destructions,json=resourceDestructions,proto3" json:"resource_destructions,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *PlanSummary) Reset() {
+	*x = PlanSummary{}
+	mi := &file_plan_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PlanSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlanSummary) ProtoMessage() {}
+
+func (x *PlanSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_plan_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlanSummary.ProtoReflect.Descriptor instead.
+func (*PlanSummary) Descriptor() ([]byte, []int) {
+	return file_plan_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PlanSummary) GetResourceAdditions() int32 {
+	if x != nil {
+		return x.ResourceAdditions
+	}
+	return 0
+}
+
+func (x *PlanSummary) GetResourceChanges() int32 {
+	if x != nil {
+		return x.ResourceChanges
+	}
+	return 0
+}
+
+func (x *PlanSummary) GetResourceDestructions() int32 {
+	if x != nil {
+		return x.ResourceDestructions
+	}
+	return 0
+}
+
 // Plan represents a Terraform plan.
 type Plan struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -209,13 +270,14 @@ type Plan struct {
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	ErrorMessage  *string                `protobuf:"bytes,3,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
 	HasChanges    bool                   `protobuf:"varint,4,opt,name=has_changes,json=hasChanges,proto3" json:"has_changes,omitempty"`
+	Summary       *PlanSummary           `protobuf:"bytes,5,opt,name=summary,proto3" json:"summary,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Plan) Reset() {
 	*x = Plan{}
-	mi := &file_plan_proto_msgTypes[2]
+	mi := &file_plan_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -227,7 +289,7 @@ func (x *Plan) String() string {
 func (*Plan) ProtoMessage() {}
 
 func (x *Plan) ProtoReflect() protoreflect.Message {
-	mi := &file_plan_proto_msgTypes[2]
+	mi := &file_plan_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -240,7 +302,7 @@ func (x *Plan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Plan.ProtoReflect.Descriptor instead.
 func (*Plan) Descriptor() ([]byte, []int) {
-	return file_plan_proto_rawDescGZIP(), []int{2}
+	return file_plan_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Plan) GetMetadata() *ResourceMetadata {
@@ -271,6 +333,13 @@ func (x *Plan) GetHasChanges() bool {
 	return false
 }
 
+func (x *Plan) GetSummary() *PlanSummary {
+	if x != nil {
+		return x.Summary
+	}
+	return nil
+}
+
 var File_plan_proto protoreflect.FileDescriptor
 
 const file_plan_proto_rawDesc = "" +
@@ -288,13 +357,18 @@ const file_plan_proto_rawDesc = "" +
 	"\rerror_message\x18\x05 \x01(\tH\x01R\ferrorMessage\x88\x01\x01B\n" +
 	"\n" +
 	"\b_versionB\x10\n" +
-	"\x0e_error_message\"\xcc\x01\n" +
+	"\x0e_error_message\"\x9c\x01\n" +
+	"\vPlanSummary\x12-\n" +
+	"\x12resource_additions\x18\x01 \x01(\x05R\x11resourceAdditions\x12)\n" +
+	"\x10resource_changes\x18\x02 \x01(\x05R\x0fresourceChanges\x123\n" +
+	"\x15resource_destructions\x18\x03 \x01(\x05R\x14resourceDestructions\"\x92\x02\n" +
 	"\x04Plan\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12(\n" +
 	"\rerror_message\x18\x03 \x01(\tH\x00R\ferrorMessage\x88\x01\x01\x12\x1f\n" +
 	"\vhas_changes\x18\x04 \x01(\bR\n" +
-	"hasChangesB\x10\n" +
+	"hasChanges\x12D\n" +
+	"\asummary\x18\x05 \x01(\v2*.martiancloud.tharsis.api.plan.PlanSummaryR\asummaryB\x10\n" +
 	"\x0e_error_message*[\n" +
 	"\n" +
 	"PlanStatus\x12\f\n" +
@@ -319,22 +393,24 @@ func file_plan_proto_rawDescGZIP() []byte {
 }
 
 var file_plan_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plan_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_plan_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_plan_proto_goTypes = []any{
 	(PlanStatus)(0),            // 0: martiancloud.tharsis.api.plan.PlanStatus
 	(*GetPlanByIDRequest)(nil), // 1: martiancloud.tharsis.api.plan.GetPlanByIDRequest
 	(*UpdatePlanRequest)(nil),  // 2: martiancloud.tharsis.api.plan.UpdatePlanRequest
-	(*Plan)(nil),               // 3: martiancloud.tharsis.api.plan.Plan
-	(*ResourceMetadata)(nil),   // 4: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*PlanSummary)(nil),        // 3: martiancloud.tharsis.api.plan.PlanSummary
+	(*Plan)(nil),               // 4: martiancloud.tharsis.api.plan.Plan
+	(*ResourceMetadata)(nil),   // 5: martiancloud.tharsis.api.metadata.ResourceMetadata
 }
 var file_plan_proto_depIdxs = []int32{
 	0, // 0: martiancloud.tharsis.api.plan.UpdatePlanRequest.status:type_name -> martiancloud.tharsis.api.plan.PlanStatus
-	4, // 1: martiancloud.tharsis.api.plan.Plan.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	5, // 1: martiancloud.tharsis.api.plan.Plan.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	3, // 2: martiancloud.tharsis.api.plan.Plan.summary:type_name -> martiancloud.tharsis.api.plan.PlanSummary
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_plan_proto_init() }
@@ -344,14 +420,14 @@ func file_plan_proto_init() {
 	}
 	file_metadata_proto_init()
 	file_plan_proto_msgTypes[1].OneofWrappers = []any{}
-	file_plan_proto_msgTypes[2].OneofWrappers = []any{}
+	file_plan_proto_msgTypes[3].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plan_proto_rawDesc), len(file_plan_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -14,6 +14,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestCreateNamespaceFavorite(t *testing.T) {
@@ -429,7 +430,7 @@ func TestGetNamespaceFavoriteByTRN(t *testing.T) {
 				if createdFavorite.Metadata.TRN != "" {
 					return createdFavorite.Metadata.TRN
 				}
-				return types.NamespaceFavoriteModelType.BuildTRN(group.FullPath, gid.ToGlobalID(types.UserModelType, user.Metadata.ID))
+				return trn.TypeNamespaceFavorite.Build(group.FullPath, gid.ToGlobalID(types.UserModelType, user.Metadata.ID))
 			}(),
 		},
 		{
@@ -439,17 +440,17 @@ func TestGetNamespaceFavoriteByTRN(t *testing.T) {
 		},
 		{
 			name:            "return error for TRN without namespace path",
-			trn:             types.NamespaceFavoriteModelType.BuildTRN("TkZfYmY0ZTJjNjUtYjc4YS00ODZjLWI4MjAtNzQ4YTkyNjI1MDE3"),
+			trn:             trn.TypeNamespaceFavorite.Build("TkZfYmY0ZTJjNjUtYjc4YS00ODZjLWI4MjAtNzQ4YTkyNjI1MDE3"),
 			expectErrorCode: errors.EInvalid,
 		},
 		{
 			name:      "return nil when favorite not found",
-			trn:       types.NamespaceFavoriteModelType.BuildTRN(group.FullPath, "TkZfYmY0ZTJjNjUtYjc4YS00ODZjLWI4MjAtNzQ4YTkyNjI1MDE3"),
+			trn:       trn.TypeNamespaceFavorite.Build(group.FullPath, "TkZfYmY0ZTJjNjUtYjc4YS00ODZjLWI4MjAtNzQ4YTkyNjI1MDE3"),
 			expectNil: true,
 		},
 		{
 			name:      "return nil when TRN namespace path does not match",
-			trn:       types.NamespaceFavoriteModelType.BuildTRN("wrong/path", gid.ToGlobalID(types.UserModelType, user.Metadata.ID)),
+			trn:       trn.TypeNamespaceFavorite.Build("wrong/path", gid.ToGlobalID(types.UserModelType, user.Metadata.ID)),
 			expectNil: true,
 		},
 	}

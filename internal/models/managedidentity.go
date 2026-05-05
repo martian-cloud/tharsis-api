@@ -1,12 +1,11 @@
 package models
 
 import (
-	"strings"
-
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 var (
@@ -162,13 +161,12 @@ func (m *ManagedIdentity) Validate() error {
 
 // GetResourcePath returns the resource path
 func (m *ManagedIdentity) GetResourcePath() string {
-	return strings.Split(m.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+	return trn.MustParseAny(m.Metadata.TRN).Path()
 }
 
 // GetGroupPath returns the group path
 func (m *ManagedIdentity) GetGroupPath() string {
-	resourcePath := m.GetResourcePath()
-	return resourcePath[:strings.LastIndex(resourcePath, "/")]
+	return trn.MustParseAny(m.Metadata.TRN).ParentPath()
 }
 
 // IsAlias returns true is managed identity is an alias.

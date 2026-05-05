@@ -38,7 +38,7 @@ const (
 )
 
 var (
-	pluginDataRequiredFields              = []string{"api_url", "auth_type", "image", "memory_request", "memory_limit"}
+	pluginDataRequiredFields              = []string{"endpoint", "auth_type", "image", "memory_request", "memory_limit"}
 	requireEKSIAMAuthFields               = []string{"region", "eks_cluster"}
 	requireKubeConfigAuthFields           = []string{"kube_config_path"}
 	requireX509CertAuthFields             = []string{"kube_server", "client_cert", "client_key"}
@@ -76,7 +76,7 @@ type JobDispatcher struct {
 	logger                 logger.Logger
 	client                 client
 	image                  string
-	apiURL                 string
+	apiEndpoint            string
 	discoveryProtocolHosts []string
 	memoryRequest          resource.Quantity
 	memoryLimit            resource.Quantity
@@ -91,6 +91,10 @@ type JobDispatcher struct {
 
 // New creates a JobDispatcher
 func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHost string, tokenGetter types.TokenGetterFunc, logger logger.Logger) (*JobDispatcher, error) {
+	if err := types.MigrateDeprecatedPluginDataFields(pluginData, logger); err != nil {
+		return nil, err
+	}
+
 	for _, field := range pluginDataRequiredFields {
 		if _, ok := pluginData[field]; !ok {
 			return nil, fmt.Errorf("kubernetes job dispatcher requires plugin data '%s' field", field)
@@ -270,7 +274,7 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 	return &JobDispatcher{
 		logger:                 logger,
 		image:                  pluginData["image"],
-		apiURL:                 pluginData["api_url"],
+		apiEndpoint:            pluginData["endpoint"],
 		discoveryProtocolHosts: discoveryProtocolHosts,
 		memoryRequest:          memoryRequest,
 		memoryLimit:            memoryLimit,
@@ -346,8 +350,8 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 									Value: token,
 								},
 								{
-									Name:  "API_URL",
-									Value: j.apiURL,
+									Name:  "ENDPOINT",
+									Value: j.apiEndpoint,
 								},
 								{
 									Name:  "DISCOVERY_PROTOCOL_HOSTS",

@@ -7,9 +7,9 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
@@ -244,7 +244,7 @@ func (r *NamespaceMembershipMutationPayloadResolver) Namespace(ctx context.Conte
 
 	serviceCatalog := getServiceCatalog(ctx)
 
-	group, err := serviceCatalog.GroupService.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(r.NamespaceMembership.Namespace.Path))
+	group, err := serviceCatalog.GroupService.GetGroupByTRN(ctx, trn.TypeGroup.Build(r.NamespaceMembership.Namespace.Path))
 	if err != nil && errors.ErrorCode(err) != errors.ENotFound {
 		return nil, err
 	}
@@ -252,7 +252,7 @@ func (r *NamespaceMembershipMutationPayloadResolver) Namespace(ctx context.Conte
 		return &NamespaceResolver{result: &GroupResolver{group: group}}, nil
 	}
 
-	ws, err := serviceCatalog.WorkspaceService.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(r.NamespaceMembership.Namespace.Path))
+	ws, err := serviceCatalog.WorkspaceService.GetWorkspaceByTRN(ctx, trn.TypeWorkspace.Build(r.NamespaceMembership.Namespace.Path))
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +309,7 @@ func createNamespaceMembershipMutation(ctx context.Context,
 ) (*NamespaceMembershipMutationPayloadResolver, error) {
 	serviceCatalog := getServiceCatalog(ctx)
 
-	role, err := serviceCatalog.RoleService.GetRoleByTRN(ctx, types.RoleModelType.BuildTRN(input.Role))
+	role, err := serviceCatalog.RoleService.GetRoleByTRN(ctx, trn.TypeRole.Build(input.Role))
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +320,7 @@ func createNamespaceMembershipMutation(ctx context.Context,
 	}
 
 	if input.Username != nil {
-		user, uErr := serviceCatalog.UserService.GetUserByTRN(ctx, types.UserModelType.BuildTRN(*input.Username))
+		user, uErr := serviceCatalog.UserService.GetUserByTRN(ctx, trn.TypeUser.Build(*input.Username))
 		if uErr != nil {
 			return nil, uErr
 		}
@@ -342,7 +342,7 @@ func createNamespaceMembershipMutation(ctx context.Context,
 	}
 
 	if input.TeamName != nil {
-		team, tErr := serviceCatalog.TeamService.GetTeamByTRN(ctx, types.TeamModelType.BuildTRN(*input.TeamName))
+		team, tErr := serviceCatalog.TeamService.GetTeamByTRN(ctx, trn.TypeTeam.Build(*input.TeamName))
 		if tErr != nil {
 			return nil, tErr
 		}
@@ -387,7 +387,7 @@ func updateNamespaceMembershipMutation(ctx context.Context,
 		namespaceMembership.Metadata.Version = v
 	}
 
-	role, err := serviceCatalog.RoleService.GetRoleByTRN(ctx, types.RoleModelType.BuildTRN(input.Role))
+	role, err := serviceCatalog.RoleService.GetRoleByTRN(ctx, trn.TypeRole.Build(input.Role))
 	if err != nil {
 		return nil, err
 	}

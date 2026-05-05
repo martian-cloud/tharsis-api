@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func (sf VariableVersionSortableField) getValue() string {
@@ -117,11 +117,11 @@ func TestGetVariableVersionByTRN(t *testing.T) {
 		},
 		{
 			name: "resource with TRN not found",
-			trn:  types.VariableVersionModelType.BuildTRN(group.FullPath, variableVersion.Key, nonExistentGlobalID),
+			trn:  trn.TypeVariableVersion.Build(group.FullPath, variableVersion.Key, nonExistentGlobalID),
 		},
 		{
 			name:            "variable version trn must not have less than three parts",
-			trn:             types.VariableVersionModelType.BuildTRN(variableVersion.Key, nonExistentGlobalID),
+			trn:             trn.TypeVariableVersion.Build(variableVersion.Key, nonExistentGlobalID),
 			expectErrorCode: errors.EInvalid,
 		},
 		{
@@ -145,7 +145,7 @@ func TestGetVariableVersionByTRN(t *testing.T) {
 			if test.expectVariableVersion {
 				require.NotNil(t, actualVariableVersion)
 				assert.Equal(t,
-					types.VariableVersionModelType.BuildTRN(group.FullPath, variableVersion.Key, variableVersion.GetGlobalID()),
+					trn.TypeVariableVersion.Build(group.FullPath, variableVersion.Key, variableVersion.GetGlobalID()),
 					actualVariableVersion.Metadata.TRN,
 				)
 			} else {

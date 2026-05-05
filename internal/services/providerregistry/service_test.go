@@ -19,6 +19,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestGetProviderByID(t *testing.T) {
@@ -105,7 +106,7 @@ func TestGetProviderByID(t *testing.T) {
 }
 
 func TestGetProviderByTRN(t *testing.T) {
-	providerTRN := types.TerraformProviderModelType.BuildTRN("group/provider")
+	providerTRN := trn.TypeTerraformProvider.Build("group/provider")
 	providerID := "provider-1"
 	groupID := "group-1"
 
@@ -290,7 +291,7 @@ func TestGetProviderVersionByTRN(t *testing.T) {
 	sampleVersion := &models.TerraformProviderVersion{
 		Metadata: models.ResourceMetadata{
 			ID:  "version-1",
-			TRN: types.TerraformProviderVersionModelType.BuildTRN("group/provider/0.1.0"),
+			TRN: trn.TypeTerraformProviderVersion.Build("group/provider/0.1.0"),
 		},
 		ProviderID: "provider-1",
 	}
@@ -479,7 +480,7 @@ func TestGetProviderPlatformByTRN(t *testing.T) {
 	samplePlatform := &models.TerraformProviderPlatform{
 		Metadata: models.ResourceMetadata{
 			ID:  "platform-1",
-			TRN: types.TerraformProviderPlatformModelType.BuildTRN("group/provider/0.1.0/terraform/aws"),
+			TRN: trn.TypeTerraformProviderPlatform.Build("group/provider/0.1.0/terraform/aws"),
 		},
 		ProviderVersionID: "version-1",
 	}
@@ -698,7 +699,7 @@ func TestCreateProvider(t *testing.T) {
 			}
 
 			if test.group != nil && test.group.ParentID != "" {
-				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(test.group.GetRootGroupPath())).Return(&models.Group{
+				mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(test.group.GetRootGroupPath())).Return(&models.Group{
 					Metadata: models.ResourceMetadata{ID: "root-group"},
 				}, nil)
 			}
@@ -951,7 +952,7 @@ func TestCreateProviderVersion(t *testing.T) {
 			mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(&models.TerraformProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  providerID,
-					TRN: types.TerraformProviderModelType.BuildTRN("testgroup/testprovider"),
+					TRN: trn.TypeTerraformProvider.Build("testgroup/testprovider"),
 				},
 				GroupID: groupID,
 			}, nil)
@@ -1191,7 +1192,7 @@ func TestDeleteProviderVersion(t *testing.T) {
 			mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(&models.TerraformProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  providerID,
-					TRN: types.TerraformProviderModelType.BuildTRN("testgroup/testprovider"),
+					TRN: trn.TypeTerraformProvider.Build("testgroup/testprovider"),
 				},
 				GroupID: groupID,
 			}, nil)
@@ -1328,7 +1329,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 			mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(&models.TerraformProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  providerID,
-					TRN: types.TerraformProviderModelType.BuildTRN("testgroup/testprovider"),
+					TRN: trn.TypeTerraformProvider.Build("testgroup/testprovider"),
 				},
 				GroupID: groupID,
 			}, nil)

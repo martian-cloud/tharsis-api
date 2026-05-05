@@ -472,6 +472,120 @@ func (x *GetTerraformProviderVersionMirrorsResponse) GetVersionMirrors() []*Terr
 	return nil
 }
 
+// GetAvailableProviderVersionsRequest is the input for getting available provider versions.
+type GetAvailableProviderVersionsRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	GroupPath         string                 `protobuf:"bytes,1,opt,name=group_path,json=groupPath,proto3" json:"group_path,omitempty"`
+	Type              string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	RegistryNamespace string                 `protobuf:"bytes,3,opt,name=registry_namespace,json=registryNamespace,proto3" json:"registry_namespace,omitempty"`
+	RegistryHostname  string                 `protobuf:"bytes,4,opt,name=registry_hostname,json=registryHostname,proto3" json:"registry_hostname,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *GetAvailableProviderVersionsRequest) Reset() {
+	*x = GetAvailableProviderVersionsRequest{}
+	mi := &file_terraform_provider_version_mirror_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAvailableProviderVersionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAvailableProviderVersionsRequest) ProtoMessage() {}
+
+func (x *GetAvailableProviderVersionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_terraform_provider_version_mirror_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAvailableProviderVersionsRequest.ProtoReflect.Descriptor instead.
+func (*GetAvailableProviderVersionsRequest) Descriptor() ([]byte, []int) {
+	return file_terraform_provider_version_mirror_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetAvailableProviderVersionsRequest) GetGroupPath() string {
+	if x != nil {
+		return x.GroupPath
+	}
+	return ""
+}
+
+func (x *GetAvailableProviderVersionsRequest) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *GetAvailableProviderVersionsRequest) GetRegistryNamespace() string {
+	if x != nil {
+		return x.RegistryNamespace
+	}
+	return ""
+}
+
+func (x *GetAvailableProviderVersionsRequest) GetRegistryHostname() string {
+	if x != nil {
+		return x.RegistryHostname
+	}
+	return ""
+}
+
+// GetAvailableProviderVersionsResponse is the response containing available provider versions.
+type GetAvailableProviderVersionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Versions      []string               `protobuf:"bytes,1,rep,name=versions,proto3" json:"versions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAvailableProviderVersionsResponse) Reset() {
+	*x = GetAvailableProviderVersionsResponse{}
+	mi := &file_terraform_provider_version_mirror_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAvailableProviderVersionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAvailableProviderVersionsResponse) ProtoMessage() {}
+
+func (x *GetAvailableProviderVersionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_terraform_provider_version_mirror_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAvailableProviderVersionsResponse.ProtoReflect.Descriptor instead.
+func (*GetAvailableProviderVersionsResponse) Descriptor() ([]byte, []int) {
+	return file_terraform_provider_version_mirror_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetAvailableProviderVersionsResponse) GetVersions() []string {
+	if x != nil {
+		return x.Versions
+	}
+	return nil
+}
+
 var File_terraform_provider_version_mirror_proto protoreflect.FileDescriptor
 
 const file_terraform_provider_version_mirror_proto_rawDesc = "" +
@@ -512,7 +626,15 @@ const file_terraform_provider_version_mirror_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfe\x01\n" +
 	"*GetTerraformProviderVersionMirrorsResponse\x12J\n" +
 	"\tpage_info\x18\x01 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo\x12\x83\x01\n" +
-	"\x0fversion_mirrors\x18\x02 \x03(\v2Z.martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirrorR\x0eversionMirrors*s\n" +
+	"\x0fversion_mirrors\x18\x02 \x03(\v2Z.martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirrorR\x0eversionMirrors\"\xb4\x01\n" +
+	"#GetAvailableProviderVersionsRequest\x12\x1d\n" +
+	"\n" +
+	"group_path\x18\x01 \x01(\tR\tgroupPath\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12-\n" +
+	"\x12registry_namespace\x18\x03 \x01(\tR\x11registryNamespace\x12+\n" +
+	"\x11registry_hostname\x18\x04 \x01(\tR\x10registryHostname\"B\n" +
+	"$GetAvailableProviderVersionsResponse\x12\x1a\n" +
+	"\bversions\x18\x01 \x03(\tR\bversions*s\n" +
 	"+TerraformProviderVersionMirrorSortableField\x12\x12\n" +
 	"\x0eCREATED_AT_ASC\x10\x00\x12\x13\n" +
 	"\x0fCREATED_AT_DESC\x10\x01\x12\f\n" +
@@ -532,7 +654,7 @@ func file_terraform_provider_version_mirror_proto_rawDescGZIP() []byte {
 }
 
 var file_terraform_provider_version_mirror_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_terraform_provider_version_mirror_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_terraform_provider_version_mirror_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_terraform_provider_version_mirror_proto_goTypes = []any{
 	(TerraformProviderVersionMirrorSortableField)(0),     // 0: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirrorSortableField
 	(*GetTerraformProviderVersionMirrorByIDRequest)(nil), // 1: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorByIDRequest
@@ -541,17 +663,19 @@ var file_terraform_provider_version_mirror_proto_goTypes = []any{
 	(*DeleteTerraformProviderVersionMirrorRequest)(nil),  // 4: martiancloud.tharsis.api.terraform_provider_version_mirror.DeleteTerraformProviderVersionMirrorRequest
 	(*TerraformProviderVersionMirror)(nil),               // 5: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror
 	(*GetTerraformProviderVersionMirrorsResponse)(nil),   // 6: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse
-	nil,                       // 7: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.DigestsEntry
-	(*PaginationOptions)(nil), // 8: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),  // 9: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),          // 10: martiancloud.tharsis.api.pagination.PageInfo
+	(*GetAvailableProviderVersionsRequest)(nil),          // 7: martiancloud.tharsis.api.terraform_provider_version_mirror.GetAvailableProviderVersionsRequest
+	(*GetAvailableProviderVersionsResponse)(nil),         // 8: martiancloud.tharsis.api.terraform_provider_version_mirror.GetAvailableProviderVersionsResponse
+	nil,                       // 9: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.DigestsEntry
+	(*PaginationOptions)(nil), // 10: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),  // 11: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*PageInfo)(nil),          // 12: martiancloud.tharsis.api.pagination.PageInfo
 }
 var file_terraform_provider_version_mirror_proto_depIdxs = []int32{
-	8,  // 0: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	10, // 0: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsRequest.sort:type_name -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirrorSortableField
-	9,  // 2: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	7,  // 3: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.digests:type_name -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.DigestsEntry
-	10, // 4: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	11, // 2: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	9,  // 3: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.digests:type_name -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.DigestsEntry
+	12, // 4: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
 	5,  // 5: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse.version_mirrors:type_name -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror
 	6,  // [6:6] is the sub-list for method output_type
 	6,  // [6:6] is the sub-list for method input_type
@@ -575,7 +699,7 @@ func file_terraform_provider_version_mirror_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terraform_provider_version_mirror_proto_rawDesc), len(file_terraform_provider_version_mirror_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

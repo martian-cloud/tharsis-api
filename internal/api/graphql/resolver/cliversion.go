@@ -51,6 +51,7 @@ type CreateTerraformCLIDownloadURLInput struct {
 	Architecture     string
 }
 
+// Deprecated: Use the gRPC API instead.
 func createTerraformCLIDownloadURLMutation(ctx context.Context,
 	input *CreateTerraformCLIDownloadURLInput,
 ) (*TerraformCLIMutationPayload, error) {

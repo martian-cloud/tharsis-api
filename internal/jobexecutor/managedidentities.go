@@ -11,7 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity/azurefederated"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity/kubernetesfederated"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity/tharsisfederated"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 )
 
 type authenticatorFactoryFunc func() (managedidentity.Authenticator, error)
@@ -19,7 +19,7 @@ type authenticatorFactoryFunc func() (managedidentity.Authenticator, error)
 type managedIdentities struct {
 	client         jobclient.Client
 	jobLogger      joblogger.Logger
-	factoryMap     map[types.ManagedIdentityType]authenticatorFactoryFunc
+	factoryMap     map[string]authenticatorFactoryFunc
 	workspaceID    string
 	authenticators []managedidentity.Authenticator
 }
@@ -40,17 +40,17 @@ func newManagedIdentities(
 		jobLogger:      jobLogger,
 		client:         client,
 		authenticators: []managedidentity.Authenticator{},
-		factoryMap: map[types.ManagedIdentityType]authenticatorFactoryFunc{
-			types.ManagedIdentityAWSFederated: func() (managedidentity.Authenticator, error) {
+		factoryMap: map[string]authenticatorFactoryFunc{
+			pb.ManagedIdentityType_aws_federated.String(): func() (managedidentity.Authenticator, error) {
 				return awsfederated.New()
 			},
-			types.ManagedIdentityAzureFederated: func() (managedidentity.Authenticator, error) {
+			pb.ManagedIdentityType_azure_federated.String(): func() (managedidentity.Authenticator, error) {
 				return azurefederated.New()
 			},
-			types.ManagedIdentityTharsisFederated: func() (managedidentity.Authenticator, error) {
+			pb.ManagedIdentityType_tharsis_federated.String(): func() (managedidentity.Authenticator, error) {
 				return tharsisfederated.New(client, jobLogger, jobCfg.APIEndpoint, jobCfg.DiscoveryProtocolHosts)
 			},
-			types.ManagedIdentityKubernetesFederated: func() (managedidentity.Authenticator, error) {
+			pb.ManagedIdentityType_kubernetes_federated.String(): func() (managedidentity.Authenticator, error) {
 				return kubernetesfederated.New()
 			},
 		},
@@ -77,7 +77,7 @@ func (l *managedIdentities) initialize(ctx context.Context) (*managedIdentityIni
 		return nil, fmt.Errorf("failed to get assigned managed identities for workspace %v", err)
 	}
 
-	identitiesMap := map[types.ManagedIdentityType][]types.ManagedIdentity{}
+	identitiesMap := map[string][]*pb.ManagedIdentity{}
 	for _, identity := range identities {
 		identitiesMap[identity.Type] = append(identitiesMap[identity.Type], identity)
 	}
@@ -95,9 +95,9 @@ func (l *managedIdentities) initialize(ctx context.Context) (*managedIdentityIni
 
 		l.authenticators = append(l.authenticators, authenticator)
 
-		credsRetriever := func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error) {
-			l.jobLogger.Infof("Loading credentials for %s managed identity: %s", managedIdentity.Type, managedIdentity.ResourcePath)
-			return l.client.CreateManagedIdentityCredentials(ctx, managedIdentity.Metadata.ID)
+		credsRetriever := func(ctx context.Context, managedIdentity *pb.ManagedIdentity) ([]byte, error) {
+			l.jobLogger.Infof("Loading credentials for managed identity: %s", managedIdentity.Metadata.Trn)
+			return l.client.CreateManagedIdentityCredentials(ctx, managedIdentity.Metadata.Id)
 		}
 
 		authResponse, err := authenticator.Authenticate(ctx, identities, credsRetriever)

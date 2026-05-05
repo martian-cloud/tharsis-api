@@ -1,11 +1,10 @@
 package models
 
 import (
-	"strings"
-
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 var _ Model = (*Runner)(nil)
@@ -102,7 +101,7 @@ func (r *Runner) Validate() error {
 
 // GetResourcePath returns the resource path
 func (r *Runner) GetResourcePath() string {
-	return strings.Split(r.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+	return trn.MustParseAny(r.Metadata.TRN).Path()
 }
 
 // GetGroupPath returns the group path
@@ -111,8 +110,7 @@ func (r *Runner) GetGroupPath() string {
 		return ""
 	}
 
-	resourcePath := r.GetResourcePath()
-	return resourcePath[:strings.LastIndex(resourcePath, "/")]
+	return trn.MustParseAny(r.Metadata.TRN).ParentPath()
 }
 
 // verifyValidRunnerTags checks for duplicate tags, too-long tags, and too many tags.

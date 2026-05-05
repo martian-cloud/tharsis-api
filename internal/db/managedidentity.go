@@ -13,17 +13,17 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
 )
 
 // ManagedIdentities encapsulates the logic to access managed identities from the database
 type ManagedIdentities interface {
 	GetManagedIdentityByID(ctx context.Context, id string) (*models.ManagedIdentity, error)
-	GetManagedIdentityByTRN(ctx context.Context, trn string) (*models.ManagedIdentity, error)
+	GetManagedIdentityByTRN(ctx context.Context, trnValue string) (*models.ManagedIdentity, error)
 	GetManagedIdentitiesForWorkspace(ctx context.Context, workspaceID string) ([]models.ManagedIdentity, error)
 	AddManagedIdentityToWorkspace(ctx context.Context, managedIdentityID string, workspaceID string) error
 	RemoveManagedIdentityFromWorkspace(ctx context.Context, managedIdentityID string, workspaceID string) error
@@ -33,7 +33,7 @@ type ManagedIdentities interface {
 	DeleteManagedIdentity(ctx context.Context, managedIdentity *models.ManagedIdentity) error
 	GetManagedIdentityAccessRules(ctx context.Context, input *GetManagedIdentityAccessRulesInput) (*ManagedIdentityAccessRulesResult, error)
 	GetManagedIdentityAccessRuleByID(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error)
-	GetManagedIdentityAccessRuleByTRN(ctx context.Context, trn string) (*models.ManagedIdentityAccessRule, error)
+	GetManagedIdentityAccessRuleByTRN(ctx context.Context, trnValue string) (*models.ManagedIdentityAccessRule, error)
 	CreateManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error)
 	UpdateManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error)
 	DeleteManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) error
@@ -284,16 +284,16 @@ func (m *managedIdentities) GetManagedIdentityAccessRuleByID(ctx context.Context
 	return m.getManagedIdentityAccessRule(ctx, goqu.Ex{"managed_identity_rules.id": ruleID})
 }
 
-func (m *managedIdentities) GetManagedIdentityAccessRuleByTRN(ctx context.Context, trn string) (*models.ManagedIdentityAccessRule, error) {
+func (m *managedIdentities) GetManagedIdentityAccessRuleByTRN(ctx context.Context, trnValue string) (*models.ManagedIdentityAccessRule, error) {
 	ctx, span := tracer.Start(ctx, "db.GetManagedIdentityAccessRuleByTRN")
 	defer span.End()
 
-	path, err := types.ManagedIdentityAccessRuleModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeManagedIdentityAccessRule.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 	if len(parts) < 3 {
 		return nil, errors.New("a managed identity access rule TRN must have the group path, managed identity name, and rule GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
@@ -786,19 +786,17 @@ func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id strin
 }
 
 // GetManagedIdentityByTRN returns a managedIdentity by TRN
-func (m *managedIdentities) GetManagedIdentityByTRN(ctx context.Context, trn string) (*models.ManagedIdentity, error) {
+func (m *managedIdentities) GetManagedIdentityByTRN(ctx context.Context, trnValue string) (*models.ManagedIdentity, error) {
 	ctx, span := tracer.Start(ctx, "db.GetManagedIdentityByTRN")
-	span.SetAttributes(attribute.String("trn", trn))
+	span.SetAttributes(attribute.String("trn", trnValue))
 	defer span.End()
 
-	path, err := types.ManagedIdentityModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeManagedIdentity.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a managed identity TRN must have a group path and identity name separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -806,8 +804,8 @@ func (m *managedIdentities) GetManagedIdentityByTRN(ctx context.Context, trn str
 	}
 
 	return m.getManagedIdentity(ctx, goqu.Ex{
-		"t1.name":         path[lastSlashIndex+1:],
-		"namespaces.path": path[:lastSlashIndex],
+		"t1.name":         parsed.BaseName(),
+		"namespaces.path": parsed.ParentPath(),
 	})
 }
 
@@ -1369,7 +1367,7 @@ func scanManagedIdentity(row scanner, withAliasFields bool) (*models.ManagedIden
 		managedIdentity.Data = []byte(aliasSourceData.String)
 	}
 
-	managedIdentity.Metadata.TRN = types.ManagedIdentityModelType.BuildTRN(namespacePath, managedIdentity.Name)
+	managedIdentity.Metadata.TRN = trn.TypeManagedIdentity.Build(namespacePath, managedIdentity.Name)
 
 	return managedIdentity, nil
 }
@@ -1397,7 +1395,7 @@ func scanManagedIdentityRule(row scanner) (*models.ManagedIdentityAccessRule, er
 		return nil, err
 	}
 
-	rule.Metadata.TRN = types.ManagedIdentityAccessRuleModelType.BuildTRN(groupPath, managedIdentityName, rule.GetGlobalID())
+	rule.Metadata.TRN = trn.TypeManagedIdentityAccessRule.Build(groupPath, managedIdentityName, rule.GetGlobalID())
 
 	return rule, nil
 }

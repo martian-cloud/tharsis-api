@@ -35,7 +35,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	mcptools "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/mcp/tools"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
@@ -76,6 +75,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	mcpserver "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/mcp"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // APIServer represents an instance of a server
@@ -200,7 +200,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	limits := limits.NewLimitChecker(dbClient)
 	notificationManager := namespace.NewNotificationManager(dbClient, inheritedSettingsResolver)
-	federatedRegistryClient := registry.NewFederatedRegistryClient(signingKeyManager)
+	federatedRegistryClient := registry.NewFederatedRegistryClient(logger, signingKeyManager, apiVersion)
 
 	runStateManager := state.NewRunStateManager(dbClient, logger)
 	eventhandlers.NewErroredRunEmailHandler(logger, dbClient, runStateManager, emailClient, notificationManager, taskManager).RegisterHandlers()
@@ -364,7 +364,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		}
 
 		if runnerModel == nil {
-			runnerModel, err = dbClient.Runners.GetRunnerByTRN(ctx, types.RunnerModelType.BuildTRN(r.Name))
+			runnerModel, err = dbClient.Runners.GetRunnerByTRN(ctx, trn.TypeRunner.Build(r.Name))
 			if err != nil {
 				return nil, fmt.Errorf("failed to get internal runner %q: %v", r.Name, err)
 			}
@@ -372,7 +372,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 		logger.Infof("starting internal runner %q with job dispatcher type %q", r.Name, r.JobDispatcherType)
 
-		runner, err := rnr.NewRunner(ctx, r.Name, logger, apiVersion, runnerClient, &rnr.JobDispatcherSettings{
+		runner, err := rnr.NewRunner(ctx, runnerModel.Metadata.ID, logger, apiVersion, runnerClient, &rnr.JobDispatcherSettings{
 			DispatcherType:       r.JobDispatcherType,
 			ServiceDiscoveryHost: cfg.ServiceDiscoveryHost,
 			PluginData:           r.JobDispatcherData,

@@ -18,7 +18,7 @@ enum RunnerSessionSortableField {
 
 // CreateRunnerSessionRequest is the input for creating a runner session.
 message CreateRunnerSessionRequest {
-  string runner_path = 1;
+  string runner_id = 1;
 }
 
 // GetRunnerSessionsRequest is the input for getting runner sessions.

@@ -231,11 +231,14 @@ func (s *RunnerServer) UnassignServiceAccountFromRunner(ctx context.Context, req
 
 // CreateRunnerSession creates a new runner session.
 func (s *RunnerServer) CreateRunnerSession(ctx context.Context, req *pb.CreateRunnerSessionRequest) (*pb.RunnerSession, error) {
-	input := &runner.CreateRunnerSessionInput{
-		RunnerPath: req.RunnerPath,
+	runnerID, err := s.serviceCatalog.FetchModelID(ctx, req.RunnerId)
+	if err != nil {
+		return nil, err
 	}
 
-	session, err := s.serviceCatalog.RunnerService.CreateRunnerSession(ctx, input)
+	session, err := s.serviceCatalog.RunnerService.CreateRunnerSession(ctx, &runner.CreateRunnerSessionInput{
+		RunnerID: runnerID,
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -10,9 +10,9 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // AgentCreditQuotas encapsulates the logic to access agent credit quotas from the database
@@ -149,7 +149,7 @@ func scanAgentCreditQuota(row scanner) (*models.AgentCreditQuota, error) {
 		return nil, err
 	}
 
-	quota.Metadata.TRN = types.AgentCreditQuotaModelType.BuildTRN(quota.Metadata.ID)
+	quota.Metadata.TRN = trn.TypeAgentCreditQuota.Build(quota.Metadata.ID)
 
 	return quota, nil
 }

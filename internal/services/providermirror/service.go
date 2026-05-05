@@ -24,6 +24,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 const (
@@ -311,7 +312,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 		return nil, err
 	}
 
-	group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(input.GroupPath))
+	group, err := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(input.GroupPath))
 	if err != nil {
 		tracing.RecordError(span, err, "group not found")
 		return nil, err
@@ -988,7 +989,7 @@ func (s *service) GetInstallationPackage(ctx context.Context, input *GetInstalla
 	}
 
 	// Build TRN for version mirror lookup.
-	versionTRN := types.TerraformProviderVersionMirrorModelType.BuildTRN(
+	versionTRN := trn.TypeTerraformProviderVersionMirror.Build(
 		input.GroupPath, input.RegistryHostname, input.RegistryNamespace, input.Type, input.SemanticVersion,
 	)
 
@@ -1002,7 +1003,7 @@ func (s *service) GetInstallationPackage(ctx context.Context, input *GetInstalla
 	}
 
 	// Build TRN for platform mirror lookup.
-	platformTRN := types.TerraformProviderPlatformMirrorModelType.BuildTRN(
+	platformTRN := trn.TypeTerraformProviderPlatformMirror.Build(
 		input.GroupPath, input.RegistryHostname, input.RegistryNamespace, input.Type, input.SemanticVersion, input.OS, input.Arch,
 	)
 
@@ -1096,7 +1097,7 @@ func (s *service) getPlatformMirrorByID(ctx context.Context, id string) (*models
 }
 
 func (s *service) getGroupByFullPath(ctx context.Context, path string) (*models.Group, error) {
-	group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(path))
+	group, err := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(path))
 	if err != nil {
 		return nil, err
 	}

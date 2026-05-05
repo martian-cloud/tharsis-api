@@ -6,6 +6,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 var _ Model = (*TerraformModule)(nil)
@@ -65,16 +66,16 @@ func (t *TerraformModule) Validate() error {
 
 // GetResourcePath returns the resource path for the terraform module
 func (t *TerraformModule) GetResourcePath() string {
-	return strings.Split(t.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+	return trn.MustParseAny(t.Metadata.TRN).Path()
 }
 
 // GetRegistryNamespace returns the module registry namespace for the terraform module
 func (t *TerraformModule) GetRegistryNamespace() string {
-	return strings.Split(t.GetResourcePath(), "/")[0]
+	return trn.MustParseAny(t.Metadata.TRN).PathParts()[0]
 }
 
 // GetGroupPath returns the group path
 func (t *TerraformModule) GetGroupPath() string {
-	pathParts := strings.Split(t.GetResourcePath(), "/")
-	return strings.Join(pathParts[:len(pathParts)-2], "/")
+	parts := trn.MustParseAny(t.Metadata.TRN).PathParts()
+	return strings.Join(parts[:len(parts)-2], "/")
 }

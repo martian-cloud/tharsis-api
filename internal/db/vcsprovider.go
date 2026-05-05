@@ -12,16 +12,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // VCSProviders encapsulates the logic to access VCS providers from the database.
 type VCSProviders interface {
 	GetProviderByID(ctx context.Context, id string) (*models.VCSProvider, error)
-	GetProviderByTRN(ctx context.Context, trn string) (*models.VCSProvider, error)
+	GetProviderByTRN(ctx context.Context, trnValue string) (*models.VCSProvider, error)
 	GetProviderByOAuthState(ctx context.Context, state string) (*models.VCSProvider, error)
 	GetProviders(ctx context.Context, input *GetVCSProvidersInput) (*VCSProvidersResult, error)
 	CreateProvider(ctx context.Context, provider *models.VCSProvider) (*models.VCSProvider, error)
@@ -130,18 +130,16 @@ func (vp *vcsProviders) GetProviderByID(ctx context.Context, id string) (*models
 	return vp.getProvider(ctx, goqu.Ex{"vcs_providers.id": id})
 }
 
-func (vp *vcsProviders) GetProviderByTRN(ctx context.Context, trn string) (*models.VCSProvider, error) {
+func (vp *vcsProviders) GetProviderByTRN(ctx context.Context, trnValue string) (*models.VCSProvider, error) {
 	ctx, span := tracer.Start(ctx, "db.GetProviderByTRN")
 	defer span.End()
 
-	path, err := types.VCSProviderModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeVCSProvider.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a VCS provider TRN must have a group path and vcs provider name separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -149,8 +147,8 @@ func (vp *vcsProviders) GetProviderByTRN(ctx context.Context, trn string) (*mode
 	}
 
 	return vp.getProvider(ctx, goqu.Ex{
-		"namespaces.path":    path[:lastSlashIndex],
-		"vcs_providers.name": path[lastSlashIndex+1:],
+		"namespaces.path":    parsed.ParentPath(),
+		"vcs_providers.name": parsed.BaseName(),
 	})
 }
 
@@ -513,7 +511,7 @@ func scanVCSProvider(row scanner) (*models.VCSProvider, error) {
 	}
 	vp.URL = *parsedURL
 
-	vp.Metadata.TRN = types.VCSProviderModelType.BuildTRN(namespacePath, vp.Name)
+	vp.Metadata.TRN = trn.TypeVCSProvider.Build(namespacePath, vp.Name)
 
 	return vp, nil
 }

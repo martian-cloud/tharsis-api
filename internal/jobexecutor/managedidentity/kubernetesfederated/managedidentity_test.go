@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/kubernetesfederated"
 	"testing"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/kubernetesfederated"
+
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 )
 
 func TestAuthenticate(t *testing.T) {
@@ -26,9 +27,9 @@ func TestAuthenticate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	identity := types.ManagedIdentity{
-		Metadata: types.ResourceMetadata{
-			ID: "managedIdentity-1",
+	identity := &pb.ManagedIdentity{
+		Metadata: &pb.ResourceMetadata{
+			Id: "managedIdentity-1",
 		},
 		Data: base64.StdEncoding.EncodeToString(dataBuffer),
 	}
@@ -36,8 +37,8 @@ func TestAuthenticate(t *testing.T) {
 
 	response, err := authenticator.Authenticate(
 		ctx,
-		[]types.ManagedIdentity{identity},
-		func(_ context.Context, _ *types.ManagedIdentity) ([]byte, error) {
+		[]*pb.ManagedIdentity{identity},
+		func(_ context.Context, _ *pb.ManagedIdentity) ([]byte, error) {
 			return token, nil
 		},
 	)

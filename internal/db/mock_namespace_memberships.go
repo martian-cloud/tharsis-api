@@ -92,9 +92,9 @@ func (_m *MockNamespaceMemberships) GetNamespaceMembershipByID(ctx context.Conte
 	return r0, r1
 }
 
-// GetNamespaceMembershipByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockNamespaceMemberships) GetNamespaceMembershipByTRN(ctx context.Context, trn string) (*models.NamespaceMembership, error) {
-	ret := _m.Called(ctx, trn)
+// GetNamespaceMembershipByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockNamespaceMemberships) GetNamespaceMembershipByTRN(ctx context.Context, trnValue string) (*models.NamespaceMembership, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetNamespaceMembershipByTRN")
@@ -103,10 +103,10 @@ func (_m *MockNamespaceMemberships) GetNamespaceMembershipByTRN(ctx context.Cont
 	var r0 *models.NamespaceMembership
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.NamespaceMembership, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.NamespaceMembership); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.NamespaceMembership)
@@ -114,7 +114,7 @@ func (_m *MockNamespaceMemberships) GetNamespaceMembershipByTRN(ctx context.Cont
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

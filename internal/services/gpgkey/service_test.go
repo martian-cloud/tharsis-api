@@ -17,6 +17,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 type mockDBClient struct {
@@ -254,7 +255,7 @@ func TestGPGKeyByTRN(t *testing.T) {
 	sampleGPGKey := &models.GPGKey{
 		Metadata: models.ResourceMetadata{
 			ID:  "gpg-key-id-1",
-			TRN: types.GPGKeyModelType.BuildTRN("my-group/123341"),
+			TRN: trn.TypeGPGKey.Build("my-group/123341"),
 		},
 		GroupID: "group-1",
 	}
