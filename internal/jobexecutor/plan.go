@@ -9,7 +9,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -18,7 +18,7 @@ type PlanHandler struct {
 	client             jobclient.Client
 	cancellableCtx     context.Context
 	terraformWorkspace *terraformWorkspace
-	run                *types.Run
+	run                *pb.Run
 	logger             logger.Logger
 	jobLogger          joblogger.Logger
 	workspaceDir       string
@@ -29,9 +29,9 @@ func NewPlanHandler(
 	cancellableCtx context.Context,
 	jobCfg *JobConfig,
 	workspaceDir string,
-	workspace *types.Workspace,
-	run *types.Run,
-	job *types.Job,
+	workspace *pb.Workspace,
+	run *pb.Run,
+	job *pb.Job,
 	logger logger.Logger,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
@@ -60,21 +60,23 @@ func (p *PlanHandler) Cleanup(ctx context.Context) error {
 
 // OnError is called if the job returns an error while executing
 func (p *PlanHandler) OnError(ctx context.Context, planErr error) {
-	plan := p.run.Plan
+	input := &jobclient.UpdatePlanInput{
+		ID: p.run.PlanId,
+	}
 
 	if p.cancellableCtx.Err() != nil {
 		p.jobLogger.Errorf("Plan canceled while in progress %s", failureIcon)
-		plan.Status = types.PlanCanceled
+		input.Status = pb.PlanStatus_CANCELED
 	} else {
 		p.jobLogger.Errorf("Error occurred while executing plan %s", failureIcon)
-		plan.Status = types.PlanErrored
-		plan.ErrorMessage = parseTfExecError(planErr)
+		input.Status = pb.PlanStatus_ERRORED
+		input.ErrorMessage = parseTfExecError(planErr)
 	}
 
 	// Flush all logs before updating apply state
 	p.jobLogger.Flush()
 
-	_, err := p.client.UpdatePlan(ctx, plan)
+	_, err := p.client.UpdatePlan(ctx, input)
 	if err != nil {
 		p.logger.Errorf("failed to update plan in database %v", err)
 	}
@@ -83,10 +85,10 @@ func (p *PlanHandler) OnError(ctx context.Context, planErr error) {
 // Execute will execute the job
 func (p *PlanHandler) Execute(ctx context.Context) error {
 	// Get plan resource and update status to running
-	plan := p.run.Plan
-
-	plan.Status = types.PlanRunning
-	plan, err := p.client.UpdatePlan(ctx, plan)
+	plan, err := p.client.UpdatePlan(ctx, &jobclient.UpdatePlanInput{
+		ID:     p.run.PlanId,
+		Status: pb.PlanStatus_RUNNING,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to update plan %v", err)
 	}
@@ -109,12 +111,12 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 
 	if len(variablesIncludedInTFConfig) > 0 {
 		// Update run variables with latest usage.
-		if err = p.client.SetVariablesIncludedInTFConfig(ctx, p.run.Metadata.ID, variablesIncludedInTFConfig); err != nil {
+		if err = p.client.SetVariablesIncludedInTFConfig(ctx, p.run.Metadata.Id, variablesIncludedInTFConfig); err != nil {
 			return fmt.Errorf("failed to set variables included in tfconfig: %v", err)
 		}
 	}
 
-	planOutputPath := fmt.Sprintf("%s/%s", tmpDir, plan.Metadata.ID)
+	planOutputPath := fmt.Sprintf("%s/%s", tmpDir, plan.Metadata.Id)
 
 	// To avoid compiler type problems, must build up a slice of PlanOptions before calling Plan
 	planOptions := []tfexec.PlanOption{
@@ -171,14 +173,14 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 
 		defer planReader.Close()
 
-		if err = p.client.UploadPlanCache(ctx, plan, planReader); err != nil {
+		if err = p.client.UploadPlanCache(ctx, plan.Metadata.Id, planReader); err != nil {
 			return fmt.Errorf("failed to upload plan binary%v", err)
 		}
 		return nil
 	})
 
 	eg.Go(func() error {
-		if err = p.client.UploadPlanData(ctx, plan, planJSON, providerSchemasJSON); err != nil {
+		if err = p.client.UploadPlanData(ctx, plan.Metadata.Id, planJSON, providerSchemasJSON); err != nil {
 			// Log error and continue
 			p.jobLogger.Errorf("failed to upload plan json output %v", err)
 		}
@@ -192,11 +194,11 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 
 	// Update plan and run status
 	if p.cancellableCtx.Err() != nil {
-		plan.Status = types.PlanCanceled
+		plan.Status = pb.PlanStatus_CANCELED.String()
 		p.jobLogger.Write([]byte("\n"))
 		p.jobLogger.Infof("Plan was canceled %s", failureIcon)
 	} else {
-		plan.Status = types.PlanFinished
+		plan.Status = pb.PlanStatus_FINISHED.String()
 		p.jobLogger.Write([]byte("\n"))
 		p.jobLogger.Infof("Plan complete! %s", successIcon)
 	}
@@ -204,8 +206,11 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 	// Flush all logs before updating plan
 	p.jobLogger.Flush()
 
-	plan.HasChanges = hasChanges
-	_, err = p.client.UpdatePlan(ctx, plan)
+	_, err = p.client.UpdatePlan(ctx, &jobclient.UpdatePlanInput{
+		ID:         plan.Metadata.Id,
+		Status:     pb.PlanStatus(pb.PlanStatus_value[plan.Status]),
+		HasChanges: hasChanges,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to update plan %v", err)
 	}

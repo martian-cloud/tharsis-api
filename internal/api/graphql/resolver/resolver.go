@@ -72,7 +72,7 @@ func toModelID(ctx context.Context, path *string, globalID *string, modelType ty
 	case path != nil && globalID != nil:
 		return "", errors.New(fmt.Sprintf("cannot specify both id and path for %s", modelType.Name()), errors.WithErrorCode(errors.EInvalid))
 	case path != nil:
-		valueToResolve = modelType.BuildTRN(*path)
+		valueToResolve = modelType.TRNType().Build(*path)
 	case globalID != nil:
 		valueToResolve = *globalID
 	default:

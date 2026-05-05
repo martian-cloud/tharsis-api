@@ -92,9 +92,9 @@ func (_m *MockAnnouncements) GetAnnouncementByID(ctx context.Context, id string)
 	return r0, r1
 }
 
-// GetAnnouncementByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockAnnouncements) GetAnnouncementByTRN(ctx context.Context, trn string) (*models.Announcement, error) {
-	ret := _m.Called(ctx, trn)
+// GetAnnouncementByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockAnnouncements) GetAnnouncementByTRN(ctx context.Context, trnValue string) (*models.Announcement, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAnnouncementByTRN")
@@ -103,10 +103,10 @@ func (_m *MockAnnouncements) GetAnnouncementByTRN(ctx context.Context, trn strin
 	var r0 *models.Announcement
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Announcement, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Announcement); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Announcement)
@@ -114,7 +114,7 @@ func (_m *MockAnnouncements) GetAnnouncementByTRN(ctx context.Context, trn strin
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

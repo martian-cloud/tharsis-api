@@ -5,15 +5,22 @@ package martiancloud.tharsis.api.job;
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
 import "metadata.proto";
+import "google/protobuf/empty.proto";
 
 // Jobs implements all functionality related to Tharsis Jobs.
 service Jobs {
+  // GetJobByID retrieves a job by its ID.
+  rpc GetJobByID(GetJobByIDRequest) returns (Job);
   // GetJobLogs retrieves job logs.
   rpc GetJobLogs(GetJobLogsRequest) returns (GetJobLogsResponse);
   // GetLatestJobForPlan retrieves the latest job for a plan ID.
   rpc GetLatestJobForPlan(GetLatestJobForPlanRequest) returns (Job);
   // GetLatestJobForApply retrieves the latest job for an apply ID.
   rpc GetLatestJobForApply(GetLatestJobForApplyRequest) returns (Job);
+  // SaveJobLogs saves job logs.
+  rpc SaveJobLogs(SaveJobLogsRequest) returns (google.protobuf.Empty);
+  // ClaimJob claims the next available job for a runner.
+  rpc ClaimJob(ClaimJobRequest) returns (ClaimJobResponse);
   // SubscribeToJobLogStream subscribes to job log stream events.
   rpc SubscribeToJobLogStream(SubscribeToJobLogStreamRequest) returns (stream JobLogStreamEvent);
   // SubscribeToJobEvents subscribes to job events.
@@ -26,6 +33,11 @@ service Jobs {
 enum JobType {
   plan  = 0;
   apply = 1;
+}
+
+// GetJobByIDRequest is the input for getting a job by ID.
+message GetJobByIDRequest {
+  string id = 1;
 }
 
 // GetJobLogsRequest is the input for getting job logs.
@@ -62,6 +74,18 @@ message SubscribeToJobCancellationEventRequest {
   string job_id = 1;
 }
 
+// ClaimJobRequest is the input for claiming a job.
+message ClaimJobRequest {
+  string runner_id = 1;
+}
+
+// SaveJobLogsRequest is the input for saving job logs.
+message SaveJobLogsRequest {
+  string job_id       = 1;
+  int32  start_offset = 2;
+  string logs         = 3;
+}
+
 // Job represents a Terraform job.
 message Job {
   metadata.ResourceMetadata metadata         = 1;
@@ -71,6 +95,7 @@ message Job {
   string                    status           = 5;
   int32                     max_job_duration = 6;
   map<string, string>       properties       = 7;
+  bool                      cancel_requested = 8;
 }
 
 // JobLogStreamEventData contains the log data.
@@ -100,4 +125,10 @@ message JobCancellationEvent {
 // GetJobLogsResponse is the response for getting job logs.
 message GetJobLogsResponse {
   string logs = 1;
+}
+
+// ClaimJobResponse is the response for claiming a job.
+message ClaimJobResponse {
+  Job    job   = 1;
+  string token = 2;
 }

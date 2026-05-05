@@ -11,7 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 )
 
 // ApplyHandler handles an apply job
@@ -19,7 +19,7 @@ type ApplyHandler struct {
 	client             jobclient.Client
 	cancellableCtx     context.Context
 	terraformWorkspace *terraformWorkspace
-	run                *types.Run
+	run                *pb.Run
 	logger             logger.Logger
 	jobLogger          joblogger.Logger
 	workspaceDir       string
@@ -30,9 +30,9 @@ func NewApplyHandler(
 	cancellableCtx context.Context,
 	jobCfg *JobConfig,
 	workspaceDir string,
-	workspace *types.Workspace,
-	run *types.Run,
-	job *types.Job,
+	workspace *pb.Workspace,
+	run *pb.Run,
+	job *pb.Job,
 	logger logger.Logger,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
@@ -61,21 +61,23 @@ func (a *ApplyHandler) Cleanup(ctx context.Context) error {
 
 // OnError is called if the job returns an error while executing
 func (a *ApplyHandler) OnError(ctx context.Context, applyErr error) {
-	apply := a.run.Apply
+	input := &jobclient.UpdateApplyInput{
+		ID: a.run.ApplyId,
+	}
 
 	if a.cancellableCtx.Err() != nil {
 		a.jobLogger.Errorf("Apply canceled while in progress %s", failureIcon)
-		apply.Status = types.ApplyCanceled
+		input.Status = pb.ApplyStatus_CANCELED
 	} else {
 		a.jobLogger.Errorf("Error occurred while executing apply %s", failureIcon)
-		apply.Status = types.ApplyErrored
-		apply.ErrorMessage = parseTfExecError(applyErr)
+		input.Status = pb.ApplyStatus_ERRORED
+		input.ErrorMessage = parseTfExecError(applyErr)
 	}
 
 	// Flush all logs before updating apply state
 	a.jobLogger.Flush()
 
-	_, err := a.client.UpdateApply(ctx, apply)
+	_, err := a.client.UpdateApply(ctx, input)
 	if err != nil {
 		a.logger.Errorf("failed to update apply in database %v", err)
 	}
@@ -83,13 +85,14 @@ func (a *ApplyHandler) OnError(ctx context.Context, applyErr error) {
 
 // Execute will execute the job
 func (a *ApplyHandler) Execute(ctx context.Context) error {
-	apply := a.run.Apply
-	if a.run.Apply == nil {
+	if a.run.ApplyId == "" {
 		return errors.New("cannot run apply stage because Apply is undefined")
 	}
 
-	apply.Status = types.ApplyRunning
-	apply, err := a.client.UpdateApply(ctx, apply)
+	apply, err := a.client.UpdateApply(ctx, &jobclient.UpdateApplyInput{
+		ID:     a.run.ApplyId,
+		Status: pb.ApplyStatus_RUNNING,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to update apply %v", err)
 	}
@@ -150,11 +153,11 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 		return fmt.Errorf("failed to find state file %v", err)
 	} else if stateFileStats.Size() > 0 {
 		// Create new state version
-		sv, csvErr := a.client.CreateStateVersion(ctx, a.run.Metadata.ID, stateFile)
+		sv, csvErr := a.client.CreateStateVersion(ctx, a.run.Metadata.Id, stateFile)
 		if csvErr != nil {
 			return fmt.Errorf("failed to create new state version %v", csvErr)
 		}
-		a.jobLogger.Infof("Created new state version %s", sv.Metadata.ID)
+		a.jobLogger.Infof("Created new state version %s", sv.Metadata.Id)
 	} else {
 		a.jobLogger.Infof("No state version was created because state file is empty")
 	}
@@ -162,18 +165,21 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 	// Update apply and run status
 	if a.cancellableCtx.Err() != nil || isCancellationError(cmdErr) {
 		a.jobLogger.Infof("Terraform apply command gracefully exited due to job cancellation")
-		apply.Status = types.ApplyCanceled
+		apply.Status = pb.ApplyStatus_CANCELED.String()
 	} else if cmdErr != nil {
 		a.OnError(ctx, cmdErr)
 		return nil
 	} else {
-		apply.Status = types.ApplyFinished
+		apply.Status = pb.ApplyStatus_FINISHED.String()
 	}
 
 	// Flush all logs before updating apply state
 	a.jobLogger.Flush()
 
-	_, err = a.client.UpdateApply(ctx, apply)
+	_, err = a.client.UpdateApply(ctx, &jobclient.UpdateApplyInput{
+		ID:     apply.Metadata.Id,
+		Status: pb.ApplyStatus(pb.ApplyStatus_value[apply.Status]),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to update apply %v", err)
 	}
@@ -191,7 +197,7 @@ func (a *ApplyHandler) downloadPlanCache(ctx context.Context, downloadPath strin
 
 	return a.client.DownloadPlanCache(
 		ctx,
-		a.run.Plan.Metadata.ID,
+		a.run.PlanId,
 		cacheFile,
 	)
 }

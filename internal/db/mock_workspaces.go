@@ -92,9 +92,9 @@ func (_m *MockWorkspaces) GetWorkspaceByID(ctx context.Context, id string) (*mod
 	return r0, r1
 }
 
-// GetWorkspaceByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockWorkspaces) GetWorkspaceByTRN(ctx context.Context, trn string) (*models.Workspace, error) {
-	ret := _m.Called(ctx, trn)
+// GetWorkspaceByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockWorkspaces) GetWorkspaceByTRN(ctx context.Context, trnValue string) (*models.Workspace, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetWorkspaceByTRN")
@@ -103,10 +103,10 @@ func (_m *MockWorkspaces) GetWorkspaceByTRN(ctx context.Context, trn string) (*m
 	var r0 *models.Workspace
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Workspace, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Workspace); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Workspace)
@@ -114,7 +114,7 @@ func (_m *MockWorkspaces) GetWorkspaceByTRN(ctx context.Context, trn string) (*m
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

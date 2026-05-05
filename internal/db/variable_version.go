@@ -11,16 +11,16 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // VariableVersions encapsulates the logic to access variableVersions from the database
 type VariableVersions interface {
 	GetVariableVersions(ctx context.Context, input *GetVariableVersionsInput) (*VariableVersionResult, error)
 	GetVariableVersionByID(ctx context.Context, id string) (*models.VariableVersion, error)
-	GetVariableVersionByTRN(ctx context.Context, trn string) (*models.VariableVersion, error)
+	GetVariableVersionByTRN(ctx context.Context, trnValue string) (*models.VariableVersion, error)
 }
 
 // VariableVersionSortableField represents the fields that a variable can be sorted by
@@ -88,16 +88,16 @@ func (m *variableVersions) GetVariableVersionByID(ctx context.Context, id string
 	return m.getVariableVersion(ctx, goqu.Ex{"namespace_variable_versions.id": id})
 }
 
-func (m *variableVersions) GetVariableVersionByTRN(ctx context.Context, trn string) (*models.VariableVersion, error) {
+func (m *variableVersions) GetVariableVersionByTRN(ctx context.Context, trnValue string) (*models.VariableVersion, error) {
 	ctx, span := tracer.Start(ctx, "db.GetVariableVersionByTRN")
 	defer span.End()
 
-	path, err := types.VariableVersionModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeVariableVersion.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 	if len(parts) < 3 {
 		return nil, errors.New("a variable version TRN must have the namespace path, variable key and version GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
@@ -246,7 +246,7 @@ func scanVariableVersion(row scanner) (*models.VariableVersion, error) {
 		return nil, err
 	}
 
-	variableVersion.Metadata.TRN = types.VariableVersionModelType.BuildTRN(namespacePath, variableVersion.Key, variableVersion.GetGlobalID())
+	variableVersion.Metadata.TRN = trn.TypeVariableVersion.Build(namespacePath, variableVersion.Key, variableVersion.GetGlobalID())
 
 	return variableVersion, nil
 }

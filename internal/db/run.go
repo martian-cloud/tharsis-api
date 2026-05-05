@@ -15,16 +15,16 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Runs encapsulates the logic to access runs from the database
 type Runs interface {
 	GetRunByID(ctx context.Context, id string) (*models.Run, error)
-	GetRunByTRN(ctx context.Context, trn string) (*models.Run, error)
+	GetRunByTRN(ctx context.Context, trnValue string) (*models.Run, error)
 	GetRunByPlanID(ctx context.Context, planID string) (*models.Run, error)
 	GetRunByApplyID(ctx context.Context, applyID string) (*models.Run, error)
 	CreateRun(ctx context.Context, run *models.Run) (*models.Run, error)
@@ -133,17 +133,16 @@ func (r *runs) GetRunByID(ctx context.Context, id string) (*models.Run, error) {
 	return r.getRun(ctx, goqu.Ex{"runs.id": id})
 }
 
-func (r *runs) GetRunByTRN(ctx context.Context, trn string) (*models.Run, error) {
+func (r *runs) GetRunByTRN(ctx context.Context, trnValue string) (*models.Run, error) {
 	ctx, span := tracer.Start(ctx, "db.GetRunByTRN")
 	defer span.End()
 
-	path, err := types.RunModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeRun.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a run TRN must have the workspace path and run GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -151,8 +150,8 @@ func (r *runs) GetRunByTRN(ctx context.Context, trn string) (*models.Run, error)
 	}
 
 	return r.getRun(ctx, goqu.Ex{
-		"runs.id":         gid.FromGlobalID(path[lastSlashIndex+1:]),
-		"namespaces.path": path[:lastSlashIndex],
+		"runs.id":         gid.FromGlobalID(parsed.BaseName()),
+		"namespaces.path": parsed.ParentPath(),
 	})
 }
 
@@ -529,7 +528,7 @@ func scanRun(row scanner) (*models.Run, error) {
 		run.ApplyID = applyID.String
 	}
 
-	run.Metadata.TRN = types.RunModelType.BuildTRN(workspacePath, run.GetGlobalID())
+	run.Metadata.TRN = trn.TypeRun.Build(workspacePath, run.GetGlobalID())
 
 	return run, nil
 }

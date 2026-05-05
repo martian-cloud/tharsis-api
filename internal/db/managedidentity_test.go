@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -158,11 +158,11 @@ func TestGetManagedIdentityByTRN(t *testing.T) {
 		},
 		{
 			name: "resource with TRN not found",
-			trn:  types.ManagedIdentityModelType.BuildTRN(group.FullPath, "unknown"),
+			trn:  trn.TypeManagedIdentity.Build(group.FullPath, "unknown"),
 		},
 		{
 			name:            "managed identity trn must have two parts",
-			trn:             types.ManagedIdentityModelType.BuildTRN("unknown"),
+			trn:             trn.TypeManagedIdentity.Build("unknown"),
 			expectErrorCode: errors.EInvalid,
 		},
 		{
@@ -185,7 +185,7 @@ func TestGetManagedIdentityByTRN(t *testing.T) {
 
 			if test.expectManagedIdentity {
 				require.NotNil(t, actualManagedIdentity)
-				assert.Equal(t, types.ManagedIdentityModelType.BuildTRN(group.FullPath, managedIdentity.Name), actualManagedIdentity.Metadata.TRN)
+				assert.Equal(t, trn.TypeManagedIdentity.Build(group.FullPath, managedIdentity.Name), actualManagedIdentity.Metadata.TRN)
 			} else {
 				assert.Nil(t, actualManagedIdentity)
 			}
@@ -588,7 +588,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
-					TRN:               types.ManagedIdentityModelType.BuildTRN(group1.FullPath + "/positive-create-managed-identity-nearly-empty"),
+					TRN:               trn.TypeManagedIdentity.Build(group1.FullPath + "/positive-create-managed-identity-nearly-empty"),
 				},
 				Name:    "positive-create-managed-identity-nearly-empty",
 				GroupID: group1.Metadata.ID,
@@ -612,7 +612,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
-					TRN:               types.ManagedIdentityModelType.BuildTRN(group1.FullPath + "/positive-create-managed-identity-full"),
+					TRN:               trn.TypeManagedIdentity.Build(group1.FullPath + "/positive-create-managed-identity-full"),
 				},
 				Type:        models.ManagedIdentityAWSFederated,
 				Name:        "positive-create-managed-identity-full",
@@ -635,7 +635,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
-					TRN:               types.ManagedIdentityModelType.BuildTRN(aliasGroup.FullPath + "/positive-create-managed-identity-alias"),
+					TRN:               trn.TypeManagedIdentity.Build(aliasGroup.FullPath + "/positive-create-managed-identity-alias"),
 				},
 				Type:          aliasSourceIdentity.Type,
 				Name:          "positive-create-managed-identity-alias",
@@ -770,7 +770,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 					Version:              managedIdentity1.Metadata.Version + 1,
 					CreationTimestamp:    managedIdentity1.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
-					TRN:                  types.ManagedIdentityModelType.BuildTRN(otherGroup.FullPath + "/" + managedIdentity1.Name),
+					TRN:                  trn.TypeManagedIdentity.Build(otherGroup.FullPath + "/" + managedIdentity1.Name),
 				},
 				Name:        "1-managed-identity-0",
 				Description: "updated description",
@@ -1841,11 +1841,11 @@ func TestGetManagedIdentityAccessRuleByTRN(t *testing.T) {
 		},
 		{
 			name: "resource with TRN not found",
-			trn:  types.ManagedIdentityAccessRuleModelType.BuildTRN(group.FullPath, managedIdentity.Name, nonExistentGlobalID),
+			trn:  trn.TypeManagedIdentityAccessRule.Build(group.FullPath, managedIdentity.Name, nonExistentGlobalID),
 		},
 		{
 			name:            "managed identity rule TRN cannot have less than three parts",
-			trn:             types.ManagedIdentityAccessRuleModelType.BuildTRN(nonExistentGlobalID),
+			trn:             trn.TypeManagedIdentityAccessRule.Build(nonExistentGlobalID),
 			expectErrorCode: errors.EInvalid,
 		},
 		{
@@ -1869,7 +1869,7 @@ func TestGetManagedIdentityAccessRuleByTRN(t *testing.T) {
 			if test.expectAccessRule {
 				require.NotNil(t, actualAccessRule)
 				assert.Equal(t,
-					types.ManagedIdentityAccessRuleModelType.BuildTRN(group.FullPath, managedIdentity.Name, accessRule.GetGlobalID()),
+					trn.TypeManagedIdentityAccessRule.Build(group.FullPath, managedIdentity.Name, accessRule.GetGlobalID()),
 					actualAccessRule.Metadata.TRN,
 				)
 			} else {

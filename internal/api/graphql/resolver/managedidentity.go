@@ -14,6 +14,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
@@ -388,7 +389,7 @@ func managedIdentityQuery(ctx context.Context, args *ManagedIdentityQueryArgs) (
 	case args.ID != nil:
 		valueToResolve = *args.ID
 	case args.Path != nil:
-		valueToResolve = types.ManagedIdentityModelType.BuildTRN(*args.Path)
+		valueToResolve = trn.TypeManagedIdentity.Build(*args.Path)
 	default:
 		return nil, errors.New("must specify either id or path", errors.WithErrorCode(errors.EInvalid))
 	}
@@ -1153,6 +1154,7 @@ func unassignManagedIdentityMutation(ctx context.Context, input *AssignManagedId
 	return &AssignManagedIdentityMutationPayloadResolver{AssignManagedIdentityMutationPayload: payload}, nil
 }
 
+// Deprecated: Use the gRPC API instead.
 func createManagedIdentityCredentialsMutation(ctx context.Context,
 	input *CreateManagedIdentityCredentialsInput,
 ) (*ManagedIdentityCredentialsMutationPayloadResolver, error) {
@@ -1218,7 +1220,7 @@ func getManagedIdentityAllowedUserIDs(ctx context.Context, usernames []string) (
 	response := []string{}
 
 	for _, username := range usernames {
-		user, err := userService.GetUserByTRN(ctx, types.UserModelType.BuildTRN(username))
+		user, err := userService.GetUserByTRN(ctx, trn.TypeUser.Build(username))
 		if err != nil {
 			return nil, err
 		}
@@ -1234,7 +1236,7 @@ func getManagedIdentityAllowedServiceAccountIDs(ctx context.Context, serviceAcco
 	response := []string{}
 
 	for _, path := range serviceAccountPaths {
-		sa, err := saService.GetServiceAccountByTRN(ctx, types.ServiceAccountModelType.BuildTRN(path))
+		sa, err := saService.GetServiceAccountByTRN(ctx, trn.TypeServiceAccount.Build(path))
 		if err != nil {
 			return nil, err
 		}
@@ -1250,7 +1252,7 @@ func getManagedIdentityAllowedTeamIDs(ctx context.Context, teamNames []string) (
 	response := []string{}
 
 	for _, teamName := range teamNames {
-		team, err := teamService.GetTeamByTRN(ctx, types.TeamModelType.BuildTRN(teamName))
+		team, err := teamService.GetTeamByTRN(ctx, trn.TypeTeam.Build(teamName))
 		if err != nil {
 			return nil, err
 		}

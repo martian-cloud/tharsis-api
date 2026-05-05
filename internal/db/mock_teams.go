@@ -122,9 +122,9 @@ func (_m *MockTeams) GetTeamBySCIMExternalID(ctx context.Context, scimExternalID
 	return r0, r1
 }
 
-// GetTeamByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockTeams) GetTeamByTRN(ctx context.Context, trn string) (*models.Team, error) {
-	ret := _m.Called(ctx, trn)
+// GetTeamByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockTeams) GetTeamByTRN(ctx context.Context, trnValue string) (*models.Team, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTeamByTRN")
@@ -133,10 +133,10 @@ func (_m *MockTeams) GetTeamByTRN(ctx context.Context, trn string) (*models.Team
 	var r0 *models.Team
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Team, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Team); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Team)
@@ -144,7 +144,7 @@ func (_m *MockTeams) GetTeamByTRN(ctx context.Context, trn string) (*models.Team
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

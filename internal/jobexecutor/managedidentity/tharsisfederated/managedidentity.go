@@ -15,12 +15,13 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/tharsisfederated"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 const (
 	serviceAccountTokenFilename       = "service-account-token"
-	tharsisServiceAccountPathEnvName  = "THARSIS_SERVICE_ACCOUNT_PATH"
+	tharsisServiceAccountIDEnvName    = "THARSIS_SERVICE_ACCOUNT_ID"
 	tharsisServiceAccountTokenEnvName = "THARSIS_SERVICE_ACCOUNT_TOKEN"
 	tokenFilePermissions              = os.FileMode(0640)
 )
@@ -71,8 +72,8 @@ func (a *Authenticator) Close(_ context.Context) error {
 // Authenticate configures the environment with the identity information used by the Tharsis terraform provider
 func (a *Authenticator) Authenticate(
 	ctx context.Context,
-	managedIdentities []types.ManagedIdentity,
-	credsRetriever func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error),
+	managedIdentities []*pb.ManagedIdentity,
+	credsRetriever func(ctx context.Context, managedIdentity *pb.ManagedIdentity) ([]byte, error),
 ) (*managedidentity.AuthenticateResponse, error) {
 	if len(managedIdentities) != 1 {
 		return nil, fmt.Errorf("expected exactly one tharsis federated managed identity, got %d", len(managedIdentities))
@@ -85,7 +86,7 @@ func (a *Authenticator) Authenticate(
 		return nil, err
 	}
 
-	creds, err := credsRetriever(ctx, &managedIdentity)
+	creds, err := credsRetriever(ctx, managedIdentity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve credentials %v", err)
 	}
@@ -94,7 +95,8 @@ func (a *Authenticator) Authenticate(
 
 	response := managedidentity.AuthenticateResponse{
 		Env: map[string]string{
-			tharsisServiceAccountPathEnvName:  federatedData.ServiceAccountPath,
+			tharsisServiceAccountIDEnvName:    trn.TypeServiceAccount.Build(federatedData.ServiceAccountPath),
+			"THARSIS_SERVICE_ACCOUNT_PATH":    federatedData.ServiceAccountPath, // Deprecated: for backwards compatibility with older CLI/provider versions.
 			tharsisServiceAccountTokenEnvName: convertedCreds,
 		},
 		HostCredentialFileMapping: map[string]string{},

@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
@@ -602,7 +603,7 @@ func serviceAccountCreateTokenMutation(ctx context.Context,
 	case input.ServiceAccountPath != nil && input.ServiceAccountID != nil:
 		return nil, errors.New("cannot specify both serviceAccountID and serviceAccountPath", errors.WithErrorCode(errors.EInvalid))
 	case input.ServiceAccountPath != nil:
-		serviceAccountValue = types.ServiceAccountModelType.BuildTRN(*input.ServiceAccountPath)
+		serviceAccountValue = trn.TypeServiceAccount.Build(*input.ServiceAccountPath)
 	case input.ServiceAccountID != nil:
 		serviceAccountValue = *input.ServiceAccountID
 	default:

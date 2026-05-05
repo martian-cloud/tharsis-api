@@ -20,6 +20,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestGetManagedIdentities(t *testing.T) {
@@ -191,7 +192,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:    "a-managed-identity-to-delete",
 		GroupID: "some-group-id",
@@ -318,7 +319,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 	sampleManagedIdentity := models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:    "a-managed-identity",
 		GroupID: "some-group-id",
@@ -388,7 +389,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 	awsManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:    "a-managed-identity",
 		GroupID: "some-group-id",
@@ -464,7 +465,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			existingManagedIdentity: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "some-managed-identity-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+					TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 				},
 				Name:    "a-managed-identity",
 				GroupID: "some-group-id",
@@ -475,7 +476,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 				{
 					Metadata: models.ResourceMetadata{
 						ID:  "some-managed-identity-id-1",
-						TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+						TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 					},
 					Name:    "a-managed-identity",
 					GroupID: "some-group-id",
@@ -600,7 +601,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:    "a-managed-identity",
 		GroupID: "some-group-id",
@@ -706,7 +707,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:    "a-managed-identity",
 		GroupID: "some-group-id",
@@ -779,7 +780,7 @@ func TestGetManagedIdentityByTRN(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "managed-identity-id-1",
-			TRN: types.ManagedIdentityModelType.BuildTRN("managed-identity-gid-1"),
+			TRN: trn.TypeManagedIdentity.Build("managed-identity-gid-1"),
 		},
 		GroupID: "group-1",
 	}
@@ -853,7 +854,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:        "a-managed-identity",
 		Description: "this is a managed identity being created",
@@ -923,7 +924,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			expectCreatedAlias: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID: "some-new-alias-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN(
+					TRN: trn.TypeManagedIdentity.Build(
 						sampleAliasGroup.FullPath + "/some-managed-identity-alias",
 					),
 				},
@@ -1057,7 +1058,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			expectCreatedAlias: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID: "some-new-alias-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN(
+					TRN: trn.TypeManagedIdentity.Build(
 						sampleAliasGroup.FullPath + "/some-managed-identity-alias",
 					),
 				},
@@ -1095,7 +1096,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			expectCreatedAlias: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID: "some-new-alias-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN(
+					TRN: trn.TypeManagedIdentity.Build(
 						sampleAliasGroup.FullPath + "/some-managed-identity-alias",
 					),
 				},
@@ -1227,7 +1228,7 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 	sampleManagedIdentityAlias := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-alias-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:          "a-managed-identity-alias-to-delete",
 		GroupID:       "some-group-id",
@@ -1373,7 +1374,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:        "a-managed-identity",
 		Description: "this is a managed identity being created",
@@ -1386,7 +1387,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 	sampleServiceAccount := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-service-account-id",
-			TRN: types.ServiceAccountModelType.BuildTRN("some/resource/service-account"),
+			TRN: trn.TypeServiceAccount.Build("some/resource/service-account"),
 		},
 	}
 
@@ -1519,7 +1520,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			existingServiceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "outside-scope-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("outside/scope/service-account"),
+					TRN: trn.TypeServiceAccount.Build("outside/scope/service-account"),
 				},
 			},
 			expectErrorCode:  errors.EInvalid,
@@ -1700,7 +1701,7 @@ func TestGetManagedIdentitiesByIDs(t *testing.T) {
 	sampleManagedIdentity := models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some-group/some-identity"),
+			TRN: trn.TypeManagedIdentity.Build("some-group/some-identity"),
 		},
 		GroupID: "some-group-id",
 	}
@@ -1785,7 +1786,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:        "a-managed-identity",
 		Description: "old-description",
@@ -1824,7 +1825,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			expectManagedIdentity: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "some-managed-identity-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+					TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 				},
 				Name:        "a-managed-identity",
 				Description: "This is an updated description",
@@ -1961,7 +1962,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:        "a-managed-identity",
 		Description: "old-description",
@@ -2076,7 +2077,7 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 			{
 				Metadata: models.ResourceMetadata{
 					ID:  "some-managed-identity-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("some-group/some-identity"),
+					TRN: trn.TypeManagedIdentity.Build("some-group/some-identity"),
 				},
 				GroupID: "some-group-id",
 			},
@@ -2257,7 +2258,7 @@ func TestGetManagedIdentityAccessRuleByTRN(t *testing.T) {
 	sampleAccessRule := &models.ManagedIdentityAccessRule{
 		Metadata: models.ResourceMetadata{
 			ID:  "access-rule-id-1",
-			TRN: types.ManagedIdentityAccessRuleModelType.BuildTRN("access-rule-gid-1"),
+			TRN: trn.TypeManagedIdentityAccessRule.Build("access-rule-gid-1"),
 		},
 		ManagedIdentityID: "managed-identity-id-1",
 		Type:              models.ManagedIdentityAccessRuleEligiblePrincipals,
@@ -2340,7 +2341,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		GroupID: "some-group-id",
 		Type:    models.ManagedIdentityAWSFederated,
@@ -2361,7 +2362,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 	sampleServiceAccount := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:  "service-account-id-1",
-			TRN: types.ServiceAccountModelType.BuildTRN("some/resource/service-account"),
+			TRN: trn.TypeServiceAccount.Build("some/resource/service-account"),
 		},
 	}
 
@@ -2413,7 +2414,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			existingServiceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "service-account-id-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("out/of/scope/service-account"),
+					TRN: trn.TypeServiceAccount.Build("out/of/scope/service-account"),
 				},
 			},
 			expectErrorCode: errors.EInvalid,
@@ -2531,7 +2532,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		GroupID: "some-group-id",
 		Type:    models.ManagedIdentityAWSFederated,
@@ -2552,7 +2553,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 	sampleServiceAccount := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:  "service-account-id-1",
-			TRN: types.ServiceAccountModelType.BuildTRN("some/resource/service-account"),
+			TRN: trn.TypeServiceAccount.Build("some/resource/service-account"),
 		},
 	}
 
@@ -2594,7 +2595,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 			existingServiceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
 					ID:  "service-account-id-1",
-					TRN: types.ServiceAccountModelType.BuildTRN("out/of/scope/service-account"),
+					TRN: trn.TypeServiceAccount.Build("out/of/scope/service-account"),
 				},
 			},
 			expectErrorCode: errors.EInvalid,
@@ -2674,7 +2675,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		GroupID: "some-group-id",
 		Type:    models.ManagedIdentityAWSFederated,
@@ -2792,7 +2793,7 @@ func TestCreateCredentials(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		GroupID: "some-group-id",
 		Type:    models.ManagedIdentityAWSFederated,
@@ -2910,7 +2911,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID:  "some-managed-identity-id",
-			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
+			TRN: trn.TypeManagedIdentity.Build("some/resource/path"),
 		},
 		Name:        "a-managed-identity",
 		Description: "some-description",
@@ -2946,7 +2947,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "mover-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
+					TRN: trn.TypeManagedIdentity.Build("old-group-path/mover-name"),
 				},
 				GroupID: "old-group-id",
 			},
@@ -2961,7 +2962,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			injectMoved: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "moved-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("target-group-id/moved-id"),
+					TRN: trn.TypeManagedIdentity.Build("target-group-id/moved-id"),
 				},
 			},
 			// For the positive test case, GetManagedIdentities is hit when checking the resource limit and for aliases.
@@ -2982,14 +2983,14 @@ func TestMoveManagedIdentity(t *testing.T) {
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "mover-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
+					TRN: trn.TypeManagedIdentity.Build("old-group-path/mover-name"),
 				},
 				GroupID: "old-group-id",
 			},
 			injectMoved: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "moved-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("target-group-id/moved-id"),
+					TRN: trn.TypeManagedIdentity.Build("target-group-id/moved-id"),
 				},
 			},
 			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
@@ -3007,7 +3008,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "mover-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
+					TRN: trn.TypeManagedIdentity.Build("old-group-path/mover-name"),
 				},
 				GroupID: "old-group-id",
 			},
@@ -3025,14 +3026,14 @@ func TestMoveManagedIdentity(t *testing.T) {
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "mover-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/pat"),
+					TRN: trn.TypeManagedIdentity.Build("some/resource/pat"),
 				},
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
 			},
 			injectMoved: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "moved-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("target-group-id/moved-id"),
+					TRN: trn.TypeManagedIdentity.Build("target-group-id/moved-id"),
 				},
 			},
 			expectErrorCode: errors.EInvalid,
@@ -3065,7 +3066,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "mover-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
+					TRN: trn.TypeManagedIdentity.Build("old-group-path/mover-name"),
 				},
 				GroupID: "old-group-id",
 			},
@@ -3075,7 +3076,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 					{
 						Metadata: models.ResourceMetadata{
 							ID:  "alias in a descendant group",
-							TRN: types.ManagedIdentityModelType.BuildTRN("target-parent-path/target-group-name/descendant-name/alias-name"),
+							TRN: trn.TypeManagedIdentity.Build("target-parent-path/target-group-name/descendant-name/alias-name"),
 						},
 						AliasSourceID: ptr.String("mover-id"),
 						GroupID:       "alias-group-id",
@@ -3097,7 +3098,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "mover-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
+					TRN: trn.TypeManagedIdentity.Build("old-group-path/mover-name"),
 				},
 				GroupID: "old-group-id",
 			},
@@ -3107,7 +3108,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 					{
 						Metadata: models.ResourceMetadata{
 							ID:  "alias in an ancestor group",
-							TRN: types.ManagedIdentityModelType.BuildTRN("ancestor-path/alias-name"),
+							TRN: trn.TypeManagedIdentity.Build("ancestor-path/alias-name"),
 						},
 						AliasSourceID: ptr.String("mover-id"),
 						GroupID:       "alias-group-id",
@@ -3129,7 +3130,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:  "mover-id",
-					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
+					TRN: trn.TypeManagedIdentity.Build("old-group-path/mover-name"),
 				},
 				GroupID: "old-group-id",
 			},

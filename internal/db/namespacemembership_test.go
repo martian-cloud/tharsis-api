@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -1328,11 +1328,11 @@ func TestGetNamespaceMembershipByTRN(t *testing.T) {
 		},
 		{
 			name: "resource with TRN not found",
-			trn:  types.NamespaceMembershipModelType.BuildTRN(group.FullPath, nonExistentGlobalID),
+			trn:  trn.TypeNamespaceMembership.Build(group.FullPath, nonExistentGlobalID),
 		},
 		{
 			name:            "namespace membership TRN must not have less than two parts",
-			trn:             types.NamespaceMembershipModelType.BuildTRN(nonExistentGlobalID),
+			trn:             trn.TypeNamespaceMembership.Build(nonExistentGlobalID),
 			expectErrorCode: errors.EInvalid,
 		},
 		{
@@ -1353,7 +1353,7 @@ func TestGetNamespaceMembershipByTRN(t *testing.T) {
 
 			if test.expectNamespaceMembership {
 				require.NotNil(t, actualNamespaceMembership)
-				assert.Equal(t, types.NamespaceMembershipModelType.BuildTRN(group.FullPath, namespaceMembership.GetGlobalID()), actualNamespaceMembership.Metadata.TRN)
+				assert.Equal(t, trn.TypeNamespaceMembership.Build(group.FullPath, namespaceMembership.GetGlobalID()), actualNamespaceMembership.Metadata.TRN)
 			} else {
 				assert.Nil(t, actualNamespaceMembership)
 			}

@@ -110,9 +110,9 @@ func (_m *MockVariables) GetVariableByID(ctx context.Context, id string) (*model
 	return r0, r1
 }
 
-// GetVariableByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockVariables) GetVariableByTRN(ctx context.Context, trn string) (*models.Variable, error) {
-	ret := _m.Called(ctx, trn)
+// GetVariableByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockVariables) GetVariableByTRN(ctx context.Context, trnValue string) (*models.Variable, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetVariableByTRN")
@@ -121,10 +121,10 @@ func (_m *MockVariables) GetVariableByTRN(ctx context.Context, trn string) (*mod
 	var r0 *models.Variable
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Variable, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Variable); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Variable)
@@ -132,7 +132,7 @@ func (_m *MockVariables) GetVariableByTRN(ctx context.Context, trn string) (*mod
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

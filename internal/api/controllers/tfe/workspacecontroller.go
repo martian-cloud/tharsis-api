@@ -25,6 +25,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 type workspaceController struct {
@@ -93,7 +94,7 @@ func (c *workspaceController) GetWorkspace(w http.ResponseWriter, r *http.Reques
 
 	path := fmt.Sprintf("%s/%s", convertOrgToGroupPath(org), workspaceName)
 
-	workspace, err := c.workspaceService.GetWorkspaceByTRN(r.Context(), types.WorkspaceModelType.BuildTRN(path))
+	workspace, err := c.workspaceService.GetWorkspaceByTRN(r.Context(), trn.TypeWorkspace.Build(path))
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
@@ -161,7 +162,7 @@ func (c *workspaceController) CreateWorkspace(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get group
-	group, err := c.groupService.GetGroupByTRN(r.Context(), types.GroupModelType.BuildTRN(convertOrgToGroupPath(org)))
+	group, err := c.groupService.GetGroupByTRN(r.Context(), trn.TypeGroup.Build(convertOrgToGroupPath(org)))
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return

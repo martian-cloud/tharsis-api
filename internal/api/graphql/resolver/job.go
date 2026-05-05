@@ -8,13 +8,13 @@ import (
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // JobEdgeResolver resolves job edges
@@ -396,7 +396,7 @@ func jobsQuery(ctx context.Context, args *JobConnectionQueryArgs) (*JobConnectio
 		}
 		input.WorkspaceID = &workspaceID
 	case args.WorkspacePath != nil:
-		workspace, err := serviceCatalog.WorkspaceService.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(*args.WorkspacePath))
+		workspace, err := serviceCatalog.WorkspaceService.GetWorkspaceByTRN(ctx, trn.TypeWorkspace.Build(*args.WorkspacePath))
 		if err != nil {
 			return nil, err
 		}
@@ -618,6 +618,7 @@ func handleSaveJobLogsMutationProblem(e error, clientMutationID *string) (*SaveJ
 	return &SaveJobLogsPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}, nil
 }
 
+// Deprecated: Use the gRPC API instead.
 func claimJobMutation(ctx context.Context, input *ClaimJobInput) (*ClaimJobMutationPayload, error) {
 	runnerID, err := toModelID(ctx, input.RunnerPath, input.RunnerID, types.RunnerModelType)
 	if err != nil {
@@ -631,13 +632,14 @@ func claimJobMutation(ctx context.Context, input *ClaimJobInput) (*ClaimJobMutat
 
 	payload := ClaimJobMutationPayload{
 		ClientMutationID: input.ClientMutationID,
-		JobID:            ptr.String(gid.ToGlobalID(types.JobModelType, resp.JobID)),
+		JobID:            new(resp.Job.GetGlobalID()),
 		Token:            &resp.Token,
 		Problems:         []Problem{},
 	}
 	return &payload, nil
 }
 
+// Deprecated: Use the gRPC API instead.
 func saveJobLogsMutation(ctx context.Context, input *SaveJobLogsInput) (*SaveJobLogsPayload, error) {
 	serviceCatalog := getServiceCatalog(ctx)
 	logs := []byte(input.Logs)

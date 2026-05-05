@@ -1,10 +1,9 @@
 package models
 
 import (
-	"strings"
-
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 var _ Model = (*TerraformProvider)(nil)
@@ -58,16 +57,15 @@ func (t *TerraformProvider) Validate() error {
 
 // GetResourcePath returns the resource path for the terraform provider
 func (t *TerraformProvider) GetResourcePath() string {
-	return strings.Split(t.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+	return trn.MustParseAny(t.Metadata.TRN).Path()
 }
 
 // GetRegistryNamespace returns the provider registry namespace for the terraform provider
 func (t *TerraformProvider) GetRegistryNamespace() string {
-	return strings.Split(t.GetResourcePath(), "/")[0]
+	return trn.MustParseAny(t.Metadata.TRN).PathParts()[0]
 }
 
 // GetGroupPath returns the group path
 func (t *TerraformProvider) GetGroupPath() string {
-	resourcePath := t.GetResourcePath()
-	return resourcePath[:strings.LastIndex(resourcePath, "/")]
+	return trn.MustParseAny(t.Metadata.TRN).ParentPath()
 }

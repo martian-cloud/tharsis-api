@@ -14,16 +14,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TerraformModuleAttestations encapsulates the logic to access terraform module attestationsfrom the database
 type TerraformModuleAttestations interface {
 	GetModuleAttestationByID(ctx context.Context, id string) (*models.TerraformModuleAttestation, error)
-	GetModuleAttestationByTRN(ctx context.Context, trn string) (*models.TerraformModuleAttestation, error)
+	GetModuleAttestationByTRN(ctx context.Context, trnValue string) (*models.TerraformModuleAttestation, error)
 	GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) (*ModuleAttestationsResult, error)
 	CreateModuleAttestation(ctx context.Context, moduleAttestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error)
 	UpdateModuleAttestation(ctx context.Context, moduleAttestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error)
@@ -102,16 +102,16 @@ func (t *terraformModuleAttestations) GetModuleAttestationByID(ctx context.Conte
 	return t.getModuleAttestation(ctx, goqu.Ex{"terraform_module_attestations.id": id})
 }
 
-func (t *terraformModuleAttestations) GetModuleAttestationByTRN(ctx context.Context, trn string) (*models.TerraformModuleAttestation, error) {
+func (t *terraformModuleAttestations) GetModuleAttestationByTRN(ctx context.Context, trnValue string) (*models.TerraformModuleAttestation, error) {
 	ctx, span := tracer.Start(ctx, "db.GetModuleAttestationByTRN")
 	defer span.End()
 
-	path, err := types.TerraformModuleAttestationModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeTerraformModuleAttestation.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 
 	if len(parts) < 4 {
 		return nil, errors.New("a Terraform module attestation must have group path, module name, system, and shasum separated by a forward slash",
@@ -437,7 +437,7 @@ func scanTerraformModuleAttestation(row scanner) (*models.TerraformModuleAttesta
 		moduleAttestation.Description = description.String
 	}
 
-	moduleAttestation.Metadata.TRN = types.TerraformModuleAttestationModelType.BuildTRN(
+	moduleAttestation.Metadata.TRN = trn.TypeTerraformModuleAttestation.Build(
 		groupPath,
 		moduleName,
 		moduleSystem,

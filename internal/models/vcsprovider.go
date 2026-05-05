@@ -2,12 +2,12 @@ package models
 
 import (
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 var _ Model = (*VCSProvider)(nil)
@@ -82,11 +82,10 @@ func (v *VCSProvider) Validate() error {
 
 // GetResourcePath returns the resource path
 func (v *VCSProvider) GetResourcePath() string {
-	return strings.Split(v.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+	return trn.MustParseAny(v.Metadata.TRN).Path()
 }
 
 // GetGroupPath returns the group path
 func (v *VCSProvider) GetGroupPath() string {
-	resourcePath := v.GetResourcePath()
-	return resourcePath[:strings.LastIndex(resourcePath, "/")]
+	return trn.MustParseAny(v.Metadata.TRN).ParentPath()
 }

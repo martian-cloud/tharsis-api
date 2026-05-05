@@ -17,7 +17,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/tharsisfederated"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 const refreshTokenEarlyDuration = 5 * time.Second
@@ -131,9 +132,9 @@ func TestAuthenticate(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			const serviceAccountPath = "service/account/path"
+			const serviceAccountID = "service/account/path"
 
-			identities := setupManagedIdentities(t, serviceAccountPath, test.additionalManagedIdentityID, test.managedIdentityData, test.useServiceAccountForTerraformCLI)
+			identities := setupManagedIdentities(t, serviceAccountID, test.additionalManagedIdentityID, test.managedIdentityData, test.useServiceAccountForTerraformCLI)
 
 			creds := []byte("tokendata")
 
@@ -141,7 +142,7 @@ func TestAuthenticate(t *testing.T) {
 				stubCreateServiceAccountToken(
 					ctx,
 					client,
-					serviceAccountPath,
+					serviceAccountID,
 					creds,
 					test.expiresIn,
 					token,
@@ -151,7 +152,7 @@ func TestAuthenticate(t *testing.T) {
 			response, err := authenticator.Authenticate(
 				ctx,
 				identities,
-				func(_ context.Context, _ *types.ManagedIdentity) ([]byte, error) {
+				func(_ context.Context, _ *pb.ManagedIdentity) ([]byte, error) {
 					return creds, nil
 				})
 
@@ -161,7 +162,8 @@ func TestAuthenticate(t *testing.T) {
 			}
 
 			expectedEnv := map[string]string{
-				"THARSIS_SERVICE_ACCOUNT_PATH":  serviceAccountPath,
+				"THARSIS_SERVICE_ACCOUNT_ID":    trn.TypeServiceAccount.Build(serviceAccountID),
+				"THARSIS_SERVICE_ACCOUNT_PATH":  serviceAccountID,
 				"THARSIS_SERVICE_ACCOUNT_TOKEN": string(creds),
 			}
 			assert.Equal(t, expectedEnv, response.Env)
@@ -258,40 +260,40 @@ func buildAuthenticator(
 
 func setupManagedIdentities(
 	t *testing.T,
-	serviceAccountPath string,
+	serviceAccountID string,
 	additionalManagedIdentityID string,
 	managedIdentityData string,
 	useServiceAccountForTerraformCLI bool,
-) []types.ManagedIdentity {
-	identities := []types.ManagedIdentity{}
+) []*pb.ManagedIdentity {
+	identities := []*pb.ManagedIdentity{}
 
-	firstIdentity := buildManagedIdentity(t, serviceAccountPath, "managedIdentity-1", managedIdentityData, useServiceAccountForTerraformCLI)
-	identities = append(identities, *firstIdentity)
+	firstIdentity := buildManagedIdentity(t, serviceAccountID, "managedIdentity-1", managedIdentityData, useServiceAccountForTerraformCLI)
+	identities = append(identities, firstIdentity)
 
 	if additionalManagedIdentityID != "" {
-		secondIdentity := buildManagedIdentity(t, serviceAccountPath, additionalManagedIdentityID, "", useServiceAccountForTerraformCLI)
-		identities = append(identities, *secondIdentity)
+		secondIdentity := buildManagedIdentity(t, serviceAccountID, additionalManagedIdentityID, "", useServiceAccountForTerraformCLI)
+		identities = append(identities, secondIdentity)
 	}
 
 	return identities
 }
 
-func buildManagedIdentity(t *testing.T, serviceAccountPath string, id string, managedIdentityData string, useServiceAccountForTerraformCLI bool) *types.ManagedIdentity {
+func buildManagedIdentity(t *testing.T, serviceAccountID string, id string, managedIdentityData string, useServiceAccountForTerraformCLI bool) *pb.ManagedIdentity {
 	if managedIdentityData == "" {
-		managedIdentityData = buildManagedIdentityData(t, serviceAccountPath, useServiceAccountForTerraformCLI)
+		managedIdentityData = buildManagedIdentityData(t, serviceAccountID, useServiceAccountForTerraformCLI)
 	}
 
-	return &types.ManagedIdentity{
-		Metadata: types.ResourceMetadata{
-			ID: id,
+	return &pb.ManagedIdentity{
+		Metadata: &pb.ResourceMetadata{
+			Id: id,
 		},
 		Data: managedIdentityData,
 	}
 }
 
-func buildManagedIdentityData(t *testing.T, serviceAccountPath string, useServiceAccountForTerraformCLI bool) string {
+func buildManagedIdentityData(t *testing.T, serviceAccountID string, useServiceAccountForTerraformCLI bool) string {
 	data := &tharsisfederated.Data{
-		ServiceAccountPath:               serviceAccountPath,
+		ServiceAccountPath:               serviceAccountID,
 		UseServiceAccountForTerraformCLI: useServiceAccountForTerraformCLI,
 	}
 
@@ -306,7 +308,7 @@ func buildManagedIdentityData(t *testing.T, serviceAccountPath string, useServic
 func stubCreateServiceAccountToken(
 	ctx context.Context,
 	client *jobclient.MockClient,
-	serviceAccountPath string,
+	serviceAccountID string,
 	creds []byte,
 	expiresIn *time.Duration,
 	createdToken string,
@@ -321,7 +323,7 @@ func stubCreateServiceAccountToken(
 	}
 
 	client.
-		On("CreateServiceAccountToken", ctx, serviceAccountPath, string(creds)).
+		On("CreateServiceAccountToken", ctx, serviceAccountID, string(creds)).
 		Return(createdToken, expiresIn, err).
 		Once()
 }

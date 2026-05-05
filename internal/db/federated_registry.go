@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 //go:generate go tool mockery --name FederatedRegistries --inpackage --case underscore
@@ -20,7 +21,7 @@ import (
 // FederatedRegistries encapsulates the logic to access federatedRegistries from the database
 type FederatedRegistries interface {
 	GetFederatedRegistryByID(ctx context.Context, id string) (*models.FederatedRegistry, error)
-	GetFederatedRegistryByTRN(ctx context.Context, trn string) (*models.FederatedRegistry, error)
+	GetFederatedRegistryByTRN(ctx context.Context, trnValue string) (*models.FederatedRegistry, error)
 	GetFederatedRegistries(ctx context.Context, input *GetFederatedRegistriesInput) (*FederatedRegistriesResult, error)
 	CreateFederatedRegistry(ctx context.Context, federatedRegistry *models.FederatedRegistry) (*models.FederatedRegistry, error)
 	UpdateFederatedRegistry(ctx context.Context, federatedRegistry *models.FederatedRegistry) (*models.FederatedRegistry, error)
@@ -96,25 +97,24 @@ func (p *federatedRegistries) GetFederatedRegistryByID(ctx context.Context,
 	return p.getFederatedRegistry(ctx, goqu.Ex{"federated_registries.id": id})
 }
 
-func (p *federatedRegistries) GetFederatedRegistryByTRN(ctx context.Context, trn string) (*models.FederatedRegistry, error) {
+func (p *federatedRegistries) GetFederatedRegistryByTRN(ctx context.Context, trnValue string) (*models.FederatedRegistry, error) {
 	ctx, span := tracer.Start(ctx, "db.GetFederatedRegistryByTRN")
 	defer span.End()
 
-	path, err := types.FederatedRegistryModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeFederatedRegistry.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a federated registry trn must have the group path and registry hostname separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span),
 		)
 	}
 
 	return p.getFederatedRegistry(ctx, goqu.Ex{
-		"federated_registries.hostname": path[lastSlashIndex+1:],
-		"namespaces.path":               path[:lastSlashIndex],
+		"federated_registries.hostname": parsed.BaseName(),
+		"namespaces.path":               parsed.ParentPath(),
 	})
 }
 
@@ -395,7 +395,7 @@ func scanFederatedRegistry(row scanner) (*models.FederatedRegistry, error) {
 		return nil, err
 	}
 
-	federatedRegistry.Metadata.TRN = types.FederatedRegistryModelType.BuildTRN(groupPath, federatedRegistry.Hostname)
+	federatedRegistry.Metadata.TRN = trn.TypeFederatedRegistry.Build(groupPath, federatedRegistry.Hostname)
 
 	return federatedRegistry, nil
 }

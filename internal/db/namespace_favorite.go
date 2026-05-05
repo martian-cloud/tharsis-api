@@ -15,12 +15,13 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // NamespaceFavorites encapsulates the logic to access namespace favorites from the database
 type NamespaceFavorites interface {
 	GetNamespaceFavoriteByID(ctx context.Context, id string) (*models.NamespaceFavorite, error)
-	GetNamespaceFavoriteByTRN(ctx context.Context, trn string) (*models.NamespaceFavorite, error)
+	GetNamespaceFavoriteByTRN(ctx context.Context, trnValue string) (*models.NamespaceFavorite, error)
 	GetNamespaceFavorites(ctx context.Context, input *GetNamespaceFavoritesInput) (*NamespaceFavoritesResult, error)
 	CreateNamespaceFavorite(ctx context.Context, favorite *models.NamespaceFavorite) (*models.NamespaceFavorite, error)
 	DeleteNamespaceFavorite(ctx context.Context, favorite *models.NamespaceFavorite) error
@@ -109,21 +110,21 @@ func (f *namespaceFavorites) GetNamespaceFavoriteByID(ctx context.Context, id st
 	return &result.NamespaceFavorites[0], nil
 }
 
-func (f *namespaceFavorites) GetNamespaceFavoriteByTRN(ctx context.Context, trn string) (*models.NamespaceFavorite, error) {
+func (f *namespaceFavorites) GetNamespaceFavoriteByTRN(ctx context.Context, trnValue string) (*models.NamespaceFavorite, error) {
 	ctx, span := tracer.Start(ctx, "db.GetNamespaceFavoriteByTRN")
 	defer span.End()
 
-	resourcePath, err := types.NamespaceFavoriteModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeNamespaceFavorite.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
-	lastSlashIndex := strings.LastIndex(resourcePath, "/")
-	if lastSlashIndex == -1 {
+
+	if !parsed.HasParent() {
 		return nil, errors.New("invalid TRN format: missing namespace path", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	namespacePath := resourcePath[:lastSlashIndex]
-	gidStr := resourcePath[lastSlashIndex+1:]
+	namespacePath := parsed.ParentPath()
+	gidStr := parsed.BaseName()
 	parsedGID, err := gid.ParseGlobalID(gidStr)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse GID", errors.WithSpan(span))
@@ -352,7 +353,7 @@ func scanNamespaceFavorite(row scanner) (*models.NamespaceFavorite, error) {
 		return nil, err
 	}
 
-	favorite.Metadata.TRN = types.NamespaceFavoriteModelType.BuildTRN(namespacePath, gid.ToGlobalID(types.UserModelType, favorite.UserID))
+	favorite.Metadata.TRN = trn.TypeNamespaceFavorite.Build(namespacePath, gid.ToGlobalID(types.UserModelType, favorite.UserID))
 
 	return favorite, nil
 }

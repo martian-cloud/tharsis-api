@@ -9,7 +9,9 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // JobServer embeds the UnimplementedJobsServer.
@@ -23,6 +25,21 @@ func NewJobServer(serviceCatalog *services.Catalog) *JobServer {
 	return &JobServer{
 		serviceCatalog: serviceCatalog,
 	}
+}
+
+// GetJobByID retrieves a job by its ID.
+func (s *JobServer) GetJobByID(ctx context.Context, req *pb.GetJobByIDRequest) (*pb.Job, error) {
+	model, err := s.serviceCatalog.FetchModel(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	job, ok := model.(*models.Job)
+	if !ok {
+		return nil, errors.New("job with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	return toPBJob(job), nil
 }
 
 // GetJobLogs retrieves job logs.
@@ -70,6 +87,38 @@ func (s *JobServer) GetLatestJobForApply(ctx context.Context, req *pb.GetLatestJ
 	}
 
 	return toPBJob(job), nil
+}
+
+// SaveJobLogs saves job logs.
+func (s *JobServer) SaveJobLogs(ctx context.Context, req *pb.SaveJobLogsRequest) (*emptypb.Empty, error) {
+	jobID, err := s.serviceCatalog.FetchModelID(ctx, req.JobId)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.serviceCatalog.JobService.WriteLogs(ctx, jobID, int(req.StartOffset), []byte(req.Logs)); err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
+// ClaimJob claims the next available job for a runner.
+func (s *JobServer) ClaimJob(ctx context.Context, req *pb.ClaimJobRequest) (*pb.ClaimJobResponse, error) {
+	runnerID, err := s.serviceCatalog.FetchModelID(ctx, req.RunnerId)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.serviceCatalog.JobService.ClaimJob(ctx, runnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.ClaimJobResponse{
+		Job:   toPBJob(resp.Job),
+		Token: resp.Token,
+	}, nil
 }
 
 // SubscribeToJobLogStream subscribes to job log stream events.
@@ -190,12 +239,13 @@ func (s *JobServer) SubscribeToJobCancellationEvent(req *pb.SubscribeToJobCancel
 // toPBJob converts from Job model to ProtoBuf model.
 func toPBJob(j *models.Job) *pb.Job {
 	return &pb.Job{
-		Metadata:       toPBMetadata(&j.Metadata, types.JobModelType),
-		WorkspaceId:    gid.ToGlobalID(types.WorkspaceModelType, j.WorkspaceID),
-		RunId:          gid.ToGlobalID(types.RunModelType, j.RunID),
-		Type:           string(j.Type),
-		Status:         string(j.Status),
-		MaxJobDuration: j.MaxJobDuration,
-		Properties:     j.Properties,
+		Metadata:        toPBMetadata(&j.Metadata, types.JobModelType),
+		WorkspaceId:     gid.ToGlobalID(types.WorkspaceModelType, j.WorkspaceID),
+		RunId:           gid.ToGlobalID(types.RunModelType, j.RunID),
+		Type:            string(j.Type),
+		Status:          string(j.Status),
+		MaxJobDuration:  j.MaxJobDuration,
+		Properties:      j.Properties,
+		CancelRequested: j.CancelRequested,
 	}
 }

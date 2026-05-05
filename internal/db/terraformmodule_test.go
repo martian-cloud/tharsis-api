@@ -5,8 +5,9 @@ package db
 import (
 	"context"
 	"fmt"
-	"github.com/aws/smithy-go/ptr"
 	"testing"
+
+	"github.com/aws/smithy-go/ptr"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

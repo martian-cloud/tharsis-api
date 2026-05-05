@@ -11,15 +11,15 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // AsymSigningKeys encapsulates the logic to access asymmetric signing keys from the database
 type AsymSigningKeys interface {
 	GetAsymSigningKeyByID(ctx context.Context, id string) (*models.AsymSigningKey, error)
-	GetAsymSigningKeyByTRN(ctx context.Context, trn string) (*models.AsymSigningKey, error)
+	GetAsymSigningKeyByTRN(ctx context.Context, trnValue string) (*models.AsymSigningKey, error)
 	GetAsymSigningKeys(ctx context.Context, input *GetAsymSigningKeysInput) (*AsymSigningKeysResult, error)
 	CreateAsymSigningKey(ctx context.Context, asymSigningKey *models.AsymSigningKey) (*models.AsymSigningKey, error)
 	UpdateAsymSigningKey(ctx context.Context, asymSigningKey *models.AsymSigningKey) (*models.AsymSigningKey, error)
@@ -90,16 +90,16 @@ func (a *asymSigningKeys) GetAsymSigningKeyByID(ctx context.Context, id string) 
 	return a.getAsymSigningKey(ctx, goqu.Ex{"asym_signing_keys.id": id})
 }
 
-func (a *asymSigningKeys) GetAsymSigningKeyByTRN(ctx context.Context, trn string) (*models.AsymSigningKey, error) {
+func (a *asymSigningKeys) GetAsymSigningKeyByTRN(ctx context.Context, trnValue string) (*models.AsymSigningKey, error) {
 	ctx, span := tracer.Start(ctx, "db.GetAsymSigningKeyByTRN")
 	defer span.End()
 
-	path, err := types.AsymSigningKeyModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeAsymSigningKey.Parse(trnValue)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	return a.getAsymSigningKey(ctx, goqu.Ex{"asym_signing_keys.id": gid.FromGlobalID(path)})
+	return a.getAsymSigningKey(ctx, goqu.Ex{"asym_signing_keys.id": gid.FromGlobalID(parsed.Path())})
 }
 
 func (a *asymSigningKeys) GetAsymSigningKeys(ctx context.Context, input *GetAsymSigningKeysInput) (*AsymSigningKeysResult, error) {
@@ -326,7 +326,7 @@ func scanAsymSigningKey(row scanner) (*models.AsymSigningKey, error) {
 		return nil, err
 	}
 
-	asymSigningKey.Metadata.TRN = types.AsymSigningKeyModelType.BuildTRN(asymSigningKey.GetGlobalID())
+	asymSigningKey.Metadata.TRN = trn.TypeAsymSigningKey.Build(asymSigningKey.GetGlobalID())
 
 	return asymSigningKey, nil
 }

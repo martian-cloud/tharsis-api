@@ -18,8 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
-	sdkTypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestMirrorProxy_url(t *testing.T) {
@@ -205,8 +207,8 @@ func TestMirrorProxy_handleVersions(t *testing.T) {
 
 		prov := &provider.Provider{Hostname: "registry.terraform.io", Namespace: "hashicorp", Type: "null"}
 		mockResolver.On("ListVersions", mock.Anything, prov).Return(nil, assert.AnError)
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
-		mockClient.On("GetAvailableProviderVersions", mock.Anything, &sdkTypes.GetAvailableProviderVersionsInput{
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("GetAvailableProviderVersions", mock.Anything, &pb.GetAvailableProviderVersionsRequest{
 			GroupPath:         "test-group",
 			RegistryHostname:  "registry.terraform.io",
 			RegistryNamespace: "hashicorp",
@@ -236,9 +238,9 @@ func TestMirrorProxy_handlePackages(t *testing.T) {
 		mockClient := jobclient.NewMockClient(t)
 		mockLogger := joblogger.NewMockLogger(t)
 
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
 		mockClient.On("GetProviderPlatformPackageDownloadURL", mock.Anything, mock.Anything).
-			Return(&sdkTypes.ProviderPlatformPackageInfo{URL: "https://mirror/pkg.zip", Hashes: []string{"zh:abc123"}}, nil)
+			Return(&pb.GetProviderPlatformPackageDownloadURLResponse{Url: "https://mirror/pkg.zip", Hashes: []string{"zh:abc123"}}, nil)
 
 		proxy := &mirrorProxy{client: mockClient, log: &batchedLog{logger: mockLogger}, workspaceID: "test-workspace-id"}
 		w := httptest.NewRecorder()
@@ -254,9 +256,9 @@ func TestMirrorProxy_handlePackages(t *testing.T) {
 		mockLogger := joblogger.NewMockLogger(t)
 
 		// Forbidden - workspace migrated to different group
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
 		mockClient.On("GetProviderPlatformPackageDownloadURL", mock.Anything, mock.Anything).
-			Return(nil, &sdkTypes.Error{Code: sdkTypes.ErrForbidden})
+			Return(nil, status.Error(codes.PermissionDenied, "forbidden"))
 
 		prov := &provider.Provider{Hostname: "registry.terraform.io", Namespace: "hashicorp", Type: "null"}
 		mockResolver.On("GetPackageInfo", mock.Anything, prov, version, testOS, testArch).
@@ -270,10 +272,10 @@ func TestMirrorProxy_handlePackages(t *testing.T) {
 			Return(provider.Checksums{filename: []byte("checksum123456789012345678901234")}, nil)
 
 		mockClient.On("CreateProviderVersionMirror", mock.Anything, mock.Anything).
-			Return(&sdkTypes.TerraformProviderVersionMirror{Metadata: sdkTypes.ResourceMetadata{ID: "mirror-id"}}, nil).Maybe()
+			Return(&pb.TerraformProviderVersionMirror{Metadata: &pb.ResourceMetadata{Id: "mirror-id"}}, nil).Maybe()
 		mockResolver.On("DownloadPackage", mock.Anything, mock.Anything).
 			Return(io.NopCloser(bytes.NewReader([]byte("data"))), int64(4), nil).Maybe()
-		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything).Return(nil).Maybe()
+		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		mockLogger.On("Errorf", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 		proxy := &mirrorProxy{
@@ -298,9 +300,9 @@ func TestMirrorProxy_handlePackages(t *testing.T) {
 		mockLogger := joblogger.NewMockLogger(t)
 
 		// Not cached - returns not found
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
 		mockClient.On("GetProviderPlatformPackageDownloadURL", mock.Anything, mock.Anything).
-			Return(nil, &sdkTypes.Error{Code: sdkTypes.ErrNotFound})
+			Return(nil, status.Error(codes.NotFound, "not found"))
 
 		prov := &provider.Provider{Hostname: "registry.terraform.io", Namespace: "hashicorp", Type: "null"}
 		mockResolver.On("GetPackageInfo", mock.Anything, prov, version, testOS, testArch).
@@ -315,10 +317,10 @@ func TestMirrorProxy_handlePackages(t *testing.T) {
 
 		// Async caching mocks
 		mockClient.On("CreateProviderVersionMirror", mock.Anything, mock.Anything).
-			Return(&sdkTypes.TerraformProviderVersionMirror{Metadata: sdkTypes.ResourceMetadata{ID: "mirror-id"}}, nil).Maybe()
+			Return(&pb.TerraformProviderVersionMirror{Metadata: &pb.ResourceMetadata{Id: "mirror-id"}}, nil).Maybe()
 		mockResolver.On("DownloadPackage", mock.Anything, mock.Anything).
 			Return(io.NopCloser(bytes.NewReader([]byte("data"))), int64(4), nil).Maybe()
-		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything).Return(nil).Maybe()
+		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		mockLogger.On("Infof", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		mockLogger.On("Errorf", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
@@ -345,9 +347,9 @@ func TestMirrorProxy_handlePackages(t *testing.T) {
 		mockLogger := joblogger.NewMockLogger(t)
 
 		// Not cached
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
 		mockClient.On("GetProviderPlatformPackageDownloadURL", mock.Anything, mock.Anything).
-			Return(nil, &sdkTypes.Error{Code: sdkTypes.ErrNotFound})
+			Return(nil, status.Error(codes.NotFound, "not found"))
 
 		prov := &provider.Provider{Hostname: "registry.terraform.io", Namespace: "hashicorp", Type: "null"}
 		mockResolver.On("GetPackageInfo", mock.Anything, prov, version, testOS, testArch).
@@ -397,25 +399,25 @@ func TestMirrorProxy_handlePackages(t *testing.T) {
 		groupPath := "test-group"
 
 		// Not cached
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
 		mockClient.On("GetProviderPlatformPackageDownloadURL", mock.Anything, mock.Anything).
-			Return(nil, &sdkTypes.Error{Code: sdkTypes.ErrNotFound})
+			Return(nil, status.Error(codes.NotFound, "not found"))
 
 		mockResolver.On("GetPackageInfo", mock.Anything, prov, version, testOS, testArch).Return(packageInfo, nil)
 		mockResolver.On("GetChecksums", mock.Anything, packageInfo).
 			Return(provider.Checksums{filename: []byte("checksum123456789012345678901234")}, nil)
 
 		// Async caching
-		mockClient.On("CreateProviderVersionMirror", mock.Anything, &sdkTypes.CreateTerraformProviderVersionMirrorInput{
+		mockClient.On("CreateProviderVersionMirror", mock.Anything, &pb.CreateTerraformProviderVersionMirrorRequest{
 			GroupPath:         groupPath,
 			Type:              "null",
 			RegistryHostname:  "registry.terraform.io",
 			RegistryNamespace: "hashicorp",
 			SemanticVersion:   version,
-		}).Return(&sdkTypes.TerraformProviderVersionMirror{Metadata: sdkTypes.ResourceMetadata{ID: "mirror-id"}}, nil).Maybe()
+		}).Return(&pb.TerraformProviderVersionMirror{Metadata: &pb.ResourceMetadata{Id: "mirror-id"}}, nil).Maybe()
 		mockResolver.On("DownloadPackage", mock.Anything, downloadURL).
 			Return(io.NopCloser(bytes.NewReader([]byte("data"))), int64(4), nil).Maybe()
-		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything).Return(nil).Maybe()
+		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		mockLogger.On("Infof", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 		proxy := &mirrorProxy{
@@ -451,26 +453,26 @@ func TestMirrorProxy_handlePackages(t *testing.T) {
 		}
 
 		// Not cached
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
 		mockClient.On("GetProviderPlatformPackageDownloadURL", mock.Anything, mock.Anything).
-			Return(nil, &sdkTypes.Error{Code: sdkTypes.ErrNotFound})
+			Return(nil, status.Error(codes.NotFound, "not found"))
 
 		mockResolver.On("GetPackageInfo", mock.Anything, prov, version, testOS, testArch).Return(packageInfo, nil)
 		mockResolver.On("GetChecksums", mock.Anything, packageInfo).
 			Return(provider.Checksums{filename: checksum}, nil)
 
 		// Async caching mocks
-		mockClient.On("CreateProviderVersionMirror", mock.Anything, &sdkTypes.CreateTerraformProviderVersionMirrorInput{
+		mockClient.On("CreateProviderVersionMirror", mock.Anything, &pb.CreateTerraformProviderVersionMirrorRequest{
 			GroupPath:         groupPath,
 			Type:              "null",
 			RegistryHostname:  "registry.terraform.io",
 			RegistryNamespace: "hashicorp",
 			SemanticVersion:   version,
-		}).Return(&sdkTypes.TerraformProviderVersionMirror{Metadata: sdkTypes.ResourceMetadata{ID: "mirror-id"}}, nil).Maybe()
+		}).Return(&pb.TerraformProviderVersionMirror{Metadata: &pb.ResourceMetadata{Id: "mirror-id"}}, nil).Maybe()
 		mockResolver.On("DownloadPackage", mock.Anything, downloadURL).
 			Return(io.NopCloser(bytes.NewReader([]byte("data"))), int64(4), nil).Maybe()
 		// UploadProviderPlatformPackageToMirror has Reader field that can't be matched exactly
-		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything).Return(nil).Maybe()
+		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		mockLogger.On("Infof", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 		proxy := &mirrorProxy{
@@ -503,9 +505,9 @@ func TestMirrorProxy_handlePackages(t *testing.T) {
 		token := "secret-token"
 
 		// Not cached
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
 		mockClient.On("GetProviderPlatformPackageDownloadURL", mock.Anything, mock.Anything).
-			Return(nil, &sdkTypes.Error{Code: sdkTypes.ErrNotFound})
+			Return(nil, status.Error(codes.NotFound, "not found"))
 
 		mockResolver.On("GetPackageInfo", mock.Anything, prov, version, testOS, testArch, mock.AnythingOfType("provider.RequestOption")).
 			Return(packageInfo, nil)
@@ -513,18 +515,18 @@ func TestMirrorProxy_handlePackages(t *testing.T) {
 			Return(provider.Checksums{filename: []byte("checksum123456789012345678901234")}, nil)
 
 		// Async caching mocks
-		mockClient.On("CreateProviderVersionMirror", mock.Anything, &sdkTypes.CreateTerraformProviderVersionMirrorInput{
+		mockClient.On("CreateProviderVersionMirror", mock.Anything, &pb.CreateTerraformProviderVersionMirrorRequest{
 			GroupPath:         groupPath,
 			Type:              "custom",
 			RegistryHostname:  "tharsis.example.com",
 			RegistryNamespace: "myorg",
 			SemanticVersion:   version,
 			RegistryToken:     &token,
-		}).Return(&sdkTypes.TerraformProviderVersionMirror{Metadata: sdkTypes.ResourceMetadata{ID: "mirror-id"}}, nil).Maybe()
+		}).Return(&pb.TerraformProviderVersionMirror{Metadata: &pb.ResourceMetadata{Id: "mirror-id"}}, nil).Maybe()
 		mockResolver.On("DownloadPackage", mock.Anything, downloadURL).
 			Return(io.NopCloser(bytes.NewReader([]byte("data"))), int64(4), nil).Maybe()
 		// UploadProviderPlatformPackageToMirror has Reader field that can't be matched exactly
-		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything).Return(nil).Maybe()
+		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		mockLogger.On("Infof", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 		proxy := &mirrorProxy{
@@ -563,18 +565,18 @@ func TestMirrorProxy_cacheProviderPackage(t *testing.T) {
 		mockClient := jobclient.NewMockClient(t)
 		mockResolver := provider.NewMockRegistryProtocol(t)
 
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
-		mockClient.On("CreateProviderVersionMirror", mock.Anything, &sdkTypes.CreateTerraformProviderVersionMirrorInput{
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("CreateProviderVersionMirror", mock.Anything, &pb.CreateTerraformProviderVersionMirrorRequest{
 			GroupPath:         "test-group",
 			Type:              "null",
 			RegistryHostname:  "registry.terraform.io",
 			RegistryNamespace: "hashicorp",
 			SemanticVersion:   version,
-		}).Return(&sdkTypes.TerraformProviderVersionMirror{Metadata: sdkTypes.ResourceMetadata{ID: "mirror-id"}}, nil)
+		}).Return(&pb.TerraformProviderVersionMirror{Metadata: &pb.ResourceMetadata{Id: "mirror-id"}}, nil)
 		mockResolver.On("DownloadPackage", mock.Anything, downloadURL).
 			Return(io.NopCloser(bytes.NewReader([]byte("data"))), int64(4), nil)
 		// UploadProviderPlatformPackageToMirror has Reader field that can't be matched exactly
-		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything).Return(nil)
+		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		proxy := &mirrorProxy{client: mockClient, registryClient: mockResolver, workspaceID: "test-workspace-id"}
 		err := proxy.cacheProviderPackage(t.Context(), prov, version, testOS, testArch, downloadURL)
@@ -586,19 +588,19 @@ func TestMirrorProxy_cacheProviderPackage(t *testing.T) {
 		mockClient := jobclient.NewMockClient(t)
 		mockResolver := provider.NewMockRegistryProtocol(t)
 
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
-		mockClient.On("CreateProviderVersionMirror", mock.Anything, &sdkTypes.CreateTerraformProviderVersionMirrorInput{
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("CreateProviderVersionMirror", mock.Anything, &pb.CreateTerraformProviderVersionMirrorRequest{
 			GroupPath:         "test-group",
 			Type:              "null",
 			RegistryHostname:  "registry.terraform.io",
 			RegistryNamespace: "hashicorp",
 			SemanticVersion:   version,
-		}).Return(&sdkTypes.TerraformProviderVersionMirror{Metadata: sdkTypes.ResourceMetadata{ID: "mirror-id"}}, nil)
+		}).Return(&pb.TerraformProviderVersionMirror{Metadata: &pb.ResourceMetadata{Id: "mirror-id"}}, nil)
 		mockResolver.On("DownloadPackage", mock.Anything, downloadURL).
 			Return(io.NopCloser(bytes.NewReader([]byte("data"))), int64(4), nil)
 		// UploadProviderPlatformPackageToMirror has Reader field that can't be matched exactly
-		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything).
-			Return(&sdkTypes.Error{Code: sdkTypes.ErrConflict})
+		mockClient.On("UploadProviderPlatformPackageToMirror", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(status.Error(codes.AlreadyExists, "conflict"))
 
 		proxy := &mirrorProxy{client: mockClient, registryClient: mockResolver, workspaceID: "test-workspace-id"}
 		err := proxy.cacheProviderPackage(t.Context(), prov, version, testOS, testArch, downloadURL)
@@ -609,14 +611,14 @@ func TestMirrorProxy_cacheProviderPackage(t *testing.T) {
 	t.Run("conflict on version mirror creation returns early", func(t *testing.T) {
 		mockClient := jobclient.NewMockClient(t)
 
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
-		mockClient.On("CreateProviderVersionMirror", mock.Anything, &sdkTypes.CreateTerraformProviderVersionMirrorInput{
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("CreateProviderVersionMirror", mock.Anything, &pb.CreateTerraformProviderVersionMirrorRequest{
 			GroupPath:         "test-group",
 			Type:              "null",
 			RegistryHostname:  "registry.terraform.io",
 			RegistryNamespace: "hashicorp",
 			SemanticVersion:   version,
-		}).Return(nil, &sdkTypes.Error{Code: sdkTypes.ErrConflict})
+		}).Return(nil, status.Error(codes.AlreadyExists, "conflict"))
 
 		proxy := &mirrorProxy{client: mockClient, workspaceID: "test-workspace-id"}
 		err := proxy.cacheProviderPackage(t.Context(), prov, version, testOS, testArch, downloadURL)
@@ -628,9 +630,9 @@ func TestMirrorProxy_cacheProviderPackage(t *testing.T) {
 		mockClient := jobclient.NewMockClient(t)
 		mockResolver := provider.NewMockRegistryProtocol(t)
 
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
 		mockClient.On("CreateProviderVersionMirror", mock.Anything, mock.Anything).
-			Return(&sdkTypes.TerraformProviderVersionMirror{Metadata: sdkTypes.ResourceMetadata{ID: "mirror-id"}}, nil)
+			Return(&pb.TerraformProviderVersionMirror{Metadata: &pb.ResourceMetadata{Id: "mirror-id"}}, nil)
 		mockResolver.On("DownloadPackage", mock.Anything, downloadURL).
 			Return(io.NopCloser(bytes.NewReader(nil)), int64(0), nil)
 
@@ -645,14 +647,14 @@ func TestMirrorProxy_cacheProviderPackage(t *testing.T) {
 		mockClient := jobclient.NewMockClient(t)
 		mockResolver := provider.NewMockRegistryProtocol(t)
 
-		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&sdkTypes.Workspace{FullPath: "test-group/workspace"}, nil)
-		mockClient.On("CreateProviderVersionMirror", mock.Anything, &sdkTypes.CreateTerraformProviderVersionMirrorInput{
+		mockClient.On("GetWorkspace", mock.Anything, "test-workspace-id").Return(&pb.Workspace{FullPath: "test-group/workspace"}, nil)
+		mockClient.On("CreateProviderVersionMirror", mock.Anything, &pb.CreateTerraformProviderVersionMirrorRequest{
 			GroupPath:         "test-group",
 			Type:              "null",
 			RegistryHostname:  "registry.terraform.io",
 			RegistryNamespace: "hashicorp",
 			SemanticVersion:   version,
-		}).Return(&sdkTypes.TerraformProviderVersionMirror{Metadata: sdkTypes.ResourceMetadata{ID: "mirror-id"}}, nil)
+		}).Return(&pb.TerraformProviderVersionMirror{Metadata: &pb.ResourceMetadata{Id: "mirror-id"}}, nil)
 		mockResolver.On("DownloadPackage", mock.Anything, downloadURL).
 			Return(nil, int64(0), context.Canceled)
 

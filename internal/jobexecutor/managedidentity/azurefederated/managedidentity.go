@@ -11,7 +11,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/azurefederated"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 )
 
 // Authenticator supports Azure OIDC Federation
@@ -40,8 +40,8 @@ func (a *Authenticator) Close(_ context.Context) error {
 // Authenticate configures the environment with the identity information used by the Azure terraform provider
 func (a *Authenticator) Authenticate(
 	ctx context.Context,
-	managedIdentities []types.ManagedIdentity,
-	credsRetriever func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error),
+	managedIdentities []*pb.ManagedIdentity,
+	credsRetriever func(ctx context.Context, managedIdentity *pb.ManagedIdentity) ([]byte, error),
 ) (*managedidentity.AuthenticateResponse, error) {
 	if len(managedIdentities) != 1 {
 		return nil, fmt.Errorf("expected exactly one azure federated managed identity, got %d", len(managedIdentities))
@@ -59,12 +59,12 @@ func (a *Authenticator) Authenticate(
 		return nil, fmt.Errorf("failed to unmarshal managed identity payload %v", err)
 	}
 
-	creds, err := credsRetriever(ctx, &managedIdentity)
+	creds, err := credsRetriever(ctx, managedIdentity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve managed identity token %v", err)
 	}
 
-	filePath := filepath.Join(a.dir, fmt.Sprintf("%s-token", managedIdentity.Metadata.ID))
+	filePath := filepath.Join(a.dir, fmt.Sprintf("%s-token", managedIdentity.Metadata.Id))
 	if err := os.WriteFile(filePath, creds, 0o600); err != nil {
 		return nil, fmt.Errorf("failed to write managed identity token to disk %v", err)
 	}

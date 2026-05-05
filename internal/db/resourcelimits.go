@@ -8,8 +8,8 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // ResourceLimits encapsulates the logic to access resource-limits from the database
@@ -159,7 +159,7 @@ func scanResourceLimit(row scanner) (*models.ResourceLimit, error) {
 		return nil, err
 	}
 
-	resourceLimit.Metadata.TRN = types.ResourceLimitModelType.BuildTRN(resourceLimit.Name)
+	resourceLimit.Metadata.TRN = trn.TypeResourceLimit.Build(resourceLimit.Name)
 
 	return resourceLimit, nil
 }

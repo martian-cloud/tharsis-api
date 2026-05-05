@@ -8,10 +8,10 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 
 	"github.com/aws/smithy-go/ptr"
 	graphql "github.com/graph-gophers/graphql-go"
@@ -826,13 +826,13 @@ func getActivityEventsInputFromQueryArgs(ctx context.Context,
 	if args.UserID != nil {
 		userIDToResolve = args.UserID
 	} else if args.Username != nil {
-		userIDToResolve = ptr.String(types.UserModelType.BuildTRN(*args.Username))
+		userIDToResolve = ptr.String(trn.TypeUser.Build(*args.Username))
 	}
 
 	if args.ServiceAccountID != nil {
 		serviceAccountIDToResolve = args.ServiceAccountID
 	} else if args.ServiceAccountPath != nil {
-		serviceAccountIDToResolve = ptr.String(types.ServiceAccountModelType.BuildTRN(*args.ServiceAccountPath))
+		serviceAccountIDToResolve = ptr.String(trn.TypeServiceAccount.Build(*args.ServiceAccountPath))
 	}
 
 	// Resolve the user's ID to pass in as a filter

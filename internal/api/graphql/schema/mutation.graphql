@@ -9,7 +9,9 @@ type Mutation {
   lockWorkspace(input: LockWorkspaceInput!): LockWorkspacePayload!
   unlockWorkspace(input: UnlockWorkspaceInput!): UnlockWorkspacePayload!
   destroyWorkspace(input: DestroyWorkspaceInput!): DestroyWorkspacePayload!
-  reconcileWorkspace(input: ReconcileWorkspaceInput!): ReconcileWorkspacePayload!
+  reconcileWorkspace(
+    input: ReconcileWorkspaceInput!
+  ): ReconcileWorkspacePayload!
   assessWorkspace(input: AssessWorkspaceInput!): AssessWorkspacePayload!
   createGroup(input: CreateGroupInput!): CreateGroupPayload!
   updateGroup(input: UpdateGroupInput!): UpdateGroupPayload!
@@ -42,6 +44,7 @@ type Mutation {
   createManagedIdentityCredentials(
     input: CreateManagedIdentityCredentialsInput!
   ): CreateManagedIdentityCredentialsPayload!
+    @deprecated(reason: "Use the gRPC API instead.")
   createManagedIdentityAlias(
     input: CreateManagedIdentityAliasInput!
   ): CreateManagedIdentityAliasPayload!
@@ -79,16 +82,19 @@ type Mutation {
   applyRun(input: ApplyRunInput!): RunMutationPayload!
   cancelRun(input: CancelRunInput!): RunMutationPayload!
   updatePlan(input: UpdatePlanInput!): UpdatePlanPayload!
+    @deprecated(reason: "Use the gRPC API instead.")
   updateApply(input: UpdateApplyInput!): UpdateApplyPayload!
+    @deprecated(reason: "Use the gRPC API instead.")
   setVariablesIncludedInTFConfig(
     input: SetVariablesIncludedInTFConfigInput!
   ): SetVariablesIncludedInTFConfigPayload!
+    @deprecated(reason: "Use the gRPC API instead.")
   createConfigurationVersion(
     input: CreateConfigurationVersionInput!
   ): ConfigurationVersionMutationPayload!
   createStateVersion(
     input: CreateStateVersionInput!
-  ): CreateStateVersionPayload!
+  ): CreateStateVersionPayload! @deprecated(reason: "Use the gRPC API instead.")
   createNamespaceVariable(
     input: CreateNamespaceVariableInput!
   ): NamespaceVariableMutationPayload!
@@ -102,6 +108,7 @@ type Mutation {
     input: SetNamespaceVariablesInput!
   ): NamespaceVariableMutationPayload!
   saveJobLogs(input: SaveJobLogsInput!): SaveJobLogsPayload!
+    @deprecated(reason: "Use the gRPC API instead.")
   createTeam(input: CreateTeamInput): CreateTeamPayload!
   updateTeam(input: UpdateTeamInput): UpdateTeamPayload!
   deleteTeam(input: DeleteTeamInput): DeleteTeamPayload!
@@ -158,6 +165,7 @@ type Mutation {
   createTerraformCLIDownloadURL(
     input: CreateTerraformCLIDownloadURLInput!
   ): TerraformCLIMutationPayload!
+    @deprecated(reason: "Use the gRPC API instead.")
   createSCIMToken(input: CreateSCIMTokenInput!): CreateSCIMTokenPayload!
   createVCSProvider(input: CreateVCSProviderInput!): CreateVCSProviderPayload!
   updateVCSProvider(input: UpdateVCSProviderInput!): UpdateVCSProviderPayload!
@@ -179,6 +187,7 @@ type Mutation {
   updateRole(input: UpdateRoleInput!): UpdateRolePayload!
   deleteRole(input: DeleteRoleInput!): DeleteRolePayload!
   claimJob(input: ClaimJobInput!): ClaimJobPayload!
+    @deprecated(reason: "Use the gRPC API instead.")
   createRunner(input: CreateRunnerInput!): CreateRunnerPayload!
   updateRunner(input: UpdateRunnerInput!): UpdateRunnerPayload!
   deleteRunner(input: DeleteRunnerInput!): DeleteRunnerPayload!
@@ -235,6 +244,7 @@ type Mutation {
   createFederatedRegistryTokens(
     input: CreateFederatedRegistryTokensInput!
   ): CreateFederatedRegistryTokensPayload!
+    @deprecated(reason: "Use the gRPC API instead.")
   createAnnouncement(
     input: CreateAnnouncementInput!
   ): CreateAnnouncementPayload!
@@ -253,10 +263,6 @@ type Mutation {
   createAgentSession(
     input: CreateAgentSessionInput!
   ): CreateAgentSessionPayload!
-  createAgentRun(
-    input: CreateAgentRunInput!
-  ): CreateAgentRunPayload!
-  cancelAgentRun(
-    input: CancelAgentRunInput!
-  ): CancelAgentRunPayload!
+  createAgentRun(input: CreateAgentRunInput!): CreateAgentRunPayload!
+  cancelAgentRun(input: CancelAgentRunInput!): CancelAgentRunPayload!
 }

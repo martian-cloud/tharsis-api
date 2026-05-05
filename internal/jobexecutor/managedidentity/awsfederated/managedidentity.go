@@ -11,7 +11,8 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/awsfederated"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 const (
@@ -49,8 +50,8 @@ func (a *Authenticator) Close(context.Context) error {
 // Authenticate configures the environment with the identity information used by the AWS terraform provider
 func (a *Authenticator) Authenticate(
 	ctx context.Context,
-	managedIdentities []types.ManagedIdentity,
-	credsRetriever func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error),
+	managedIdentities []*pb.ManagedIdentity,
+	credsRetriever func(ctx context.Context, managedIdentity *pb.ManagedIdentity) ([]byte, error),
 ) (*managedidentity.AuthenticateResponse, error) {
 	envs := map[string]string{}
 
@@ -74,12 +75,12 @@ func (a *Authenticator) Authenticate(
 			return nil, fmt.Errorf("failed to unmarshal managed identity payload %v", err)
 		}
 
-		creds, err := credsRetriever(ctx, &managedIdentity)
+		creds, err := credsRetriever(ctx, managedIdentity)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve managed identity token %v", err)
 		}
 
-		tokenFilepath := filepath.Join(a.dir, fmt.Sprintf("%s-token", managedIdentity.Metadata.ID))
+		tokenFilepath := filepath.Join(a.dir, fmt.Sprintf("%s-token", managedIdentity.Metadata.Id))
 		if err = os.WriteFile(tokenFilepath, creds, 0o600); err != nil {
 			return nil, fmt.Errorf("failed to write managed identity token to disk %v", err)
 		}
@@ -91,7 +92,7 @@ func (a *Authenticator) Authenticate(
 		}
 
 		// Use the managed identity resource path as the profile name
-		if _, err = fmt.Fprintf(configFile, awsProfileTemplate, managedIdentity.ResourcePath, federatedData.Role, tokenFilepath); err != nil {
+		if _, err = fmt.Fprintf(configFile, awsProfileTemplate, trn.MustParseAny(managedIdentity.Metadata.Trn).Path(), federatedData.Role, tokenFilepath); err != nil {
 			return nil, fmt.Errorf("failed to write AWS profile %v", err)
 		}
 	}

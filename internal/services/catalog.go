@@ -34,6 +34,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/version"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // modelFetcherFunc defines a function type that retrieves a model by its identifier
@@ -70,17 +71,21 @@ type Catalog struct {
 	VersionService                   version.Service
 	WorkspaceService                 workspace.Service
 	gidFetchers                      map[string]modelFetcherFunc
-	trnFetchers                      map[string]modelFetcherFunc
+	trnFetchers                      map[trn.Type]modelFetcherFunc
 }
 
 // FetchModel retrieves a resource model by its Global ID (GID) or Tharsis Resource Name (TRN)
 // It automatically detects the identifier type and uses the appropriate fetcher
 func (c *Catalog) FetchModel(ctx context.Context, value string) (models.Model, error) {
-	if types.IsTRN(value) {
-		modelName := types.GetModelNameFromTRN(value)
-		fetchByTRN, ok := c.getModelFetcherByModelName(modelName)
+	if trn.IsTRN(value) {
+		parsed, err := trn.ParseAny(value)
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid TRN format", errors.WithErrorCode(errors.EInvalid))
+		}
+
+		fetchByTRN, ok := c.getModelFetcherByTRNType(parsed.Type())
 		if !ok {
-			return nil, errors.New("unsupported resource type: TRN with model type '%s' cannot be resolved", modelName)
+			return nil, errors.New("unsupported resource type: TRN with model type '%s' cannot be resolved", parsed.Type())
 		}
 
 		return fetchByTRN(ctx, value)
@@ -104,11 +109,15 @@ func (c *Catalog) FetchModel(ctx context.Context, value string) (models.Model, e
 // Returns the raw ID without fetching the entire model when possible
 func (c *Catalog) FetchModelID(ctx context.Context, value string) (string, error) {
 	// If the value is a TRN, fetch it using the appropriate method
-	if types.IsTRN(value) {
-		modelName := types.GetModelNameFromTRN(value)
-		fetchByTRN, ok := c.getModelFetcherByModelName(modelName)
+	if trn.IsTRN(value) {
+		parsed, err := trn.ParseAny(value)
+		if err != nil {
+			return "", errors.Wrap(err, "invalid TRN format", errors.WithErrorCode(errors.EInvalid))
+		}
+
+		fetchByTRN, ok := c.getModelFetcherByTRNType(parsed.Type())
 		if !ok {
-			return "", errors.New("unsupported resource type: TRN with model type '%s' has no registered handler", modelName)
+			return "", errors.New("unsupported resource type: TRN with model type '%s' has no registered handler", parsed.Type())
 		}
 
 		model, err := fetchByTRN(ctx, value)
@@ -515,17 +524,17 @@ func (c *Catalog) addModelFetchers(modelType types.ModelType, fetchByGID, fetchB
 	}
 
 	if c.trnFetchers == nil {
-		c.trnFetchers = make(map[string]modelFetcherFunc)
+		c.trnFetchers = make(map[trn.Type]modelFetcherFunc)
 	}
 
 	c.gidFetchers[modelType.GIDCode()] = fetchByGID
-	c.trnFetchers[modelType.Name()] = fetchByTRN
+	c.trnFetchers[modelType.TRNType()] = fetchByTRN
 }
 
-// getModelFetcherByModelName retrieves the TRN-based fetcher function for a given model name
-// Returns the fetcher function and a boolean indicating if the model type is supported
-func (c *Catalog) getModelFetcherByModelName(modelName string) (modelFetcherFunc, bool) {
-	fetcher, ok := c.trnFetchers[modelName]
+// getModelFetcherByTRNType retrieves the TRN-based fetcher function for a given TRN type.
+// Returns the fetcher function and a boolean indicating if the model type is supported.
+func (c *Catalog) getModelFetcherByTRNType(trnType trn.Type) (modelFetcherFunc, bool) {
+	fetcher, ok := c.trnFetchers[trnType]
 	return fetcher, ok
 }
 

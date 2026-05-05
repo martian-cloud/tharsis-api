@@ -19,6 +19,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestClaimJob(t *testing.T) {
@@ -48,7 +49,7 @@ func TestClaimJob(t *testing.T) {
 			existingRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  runnerID,
-					TRN: types.RunnerModelType.BuildTRN("shared-runner"),
+					TRN: trn.TypeRunner.Build("shared-runner"),
 				},
 				Type: models.SharedRunnerType,
 				Name: "shared-runner",
@@ -59,7 +60,7 @@ func TestClaimJob(t *testing.T) {
 			existingRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  runnerID,
-					TRN: types.RunnerModelType.BuildTRN("group-1/group-runner"),
+					TRN: trn.TypeRunner.Build("group-1/group-runner"),
 				},
 				Type:    models.GroupRunnerType,
 				Name:    "group-runner",
@@ -76,7 +77,7 @@ func TestClaimJob(t *testing.T) {
 			existingRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{
 					ID:  runnerID,
-					TRN: types.RunnerModelType.BuildTRN("shared-runner"),
+					TRN: trn.TypeRunner.Build("shared-runner"),
 				},
 				Type: models.SharedRunnerType,
 				Name: "shared-runner",
@@ -169,7 +170,7 @@ func TestClaimJob(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			assert.Equal(t, &ClaimJobResponse{JobID: jobID, Token: token}, actualResponse)
+			assert.Equal(t, &ClaimJobResponse{Job: &sampleQueuedJob, Token: token}, actualResponse)
 		})
 	}
 }
@@ -212,7 +213,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 			},
 			runners: []models.Runner{
 				{Metadata: models.ResourceMetadata{
-					TRN: types.RunnerModelType.BuildTRN("a/runner1"),
+					TRN: trn.TypeRunner.Build("a/runner1"),
 				}},
 			},
 			workspaceMap: map[string]models.Workspace{
@@ -258,7 +259,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 			name: "group runner should get next job because it's in the same group as the workspace",
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
-					TRN: types.RunnerModelType.BuildTRN("group1/runner1"),
+					TRN: trn.TypeRunner.Build("group1/runner1"),
 				},
 				Type: models.GroupRunnerType,
 			},
@@ -278,7 +279,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 			name: "group runner should get next job because there are no runners in a child group with higher precedence",
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
-					TRN: types.RunnerModelType.BuildTRN("group1/runner1"),
+					TRN: trn.TypeRunner.Build("group1/runner1"),
 				},
 				Type: models.GroupRunnerType,
 			},
@@ -288,7 +289,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 			runners: []models.Runner{
 				{
 					Metadata: models.ResourceMetadata{
-						TRN: types.RunnerModelType.BuildTRN("group1/group2/runner1"),
+						TRN: trn.TypeRunner.Build("group1/group2/runner1"),
 					},
 					Type: models.GroupRunnerType,
 				},
@@ -305,7 +306,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 			name: "group runner can get next job even if there is a child group that has a runner",
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
-					TRN: types.RunnerModelType.BuildTRN("group1/runner1"),
+					TRN: trn.TypeRunner.Build("group1/runner1"),
 				},
 				Type: models.GroupRunnerType,
 			},
@@ -315,13 +316,13 @@ func TestGetNextAvailableJob(t *testing.T) {
 			runners: []models.Runner{
 				{
 					Metadata: models.ResourceMetadata{
-						TRN: types.RunnerModelType.BuildTRN("group1/runner1"),
+						TRN: trn.TypeRunner.Build("group1/runner1"),
 					},
 					Type: models.GroupRunnerType,
 				},
 				{
 					Metadata: models.ResourceMetadata{
-						TRN: types.RunnerModelType.BuildTRN("group1/group2/runner1"),
+						TRN: trn.TypeRunner.Build("group1/group2/runner1"),
 					},
 					Type: models.GroupRunnerType,
 				},
@@ -338,7 +339,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 			name: "group runner should not get next job because the workspace is in a different group hierarchy",
 			runner: &models.Runner{
 				Metadata: models.ResourceMetadata{
-					TRN: types.RunnerModelType.BuildTRN("group1/group2/runner1"),
+					TRN: trn.TypeRunner.Build("group1/group2/runner1"),
 				},
 				Type: models.GroupRunnerType,
 			},
@@ -772,7 +773,7 @@ func TestGetJobByTRN(t *testing.T) {
 	sampleJob := &models.Job{
 		Metadata: models.ResourceMetadata{
 			ID:  "job-id-1",
-			TRN: types.JobModelType.BuildTRN("job-gid-1"),
+			TRN: trn.TypeJob.Build("job-gid-1"),
 		},
 		WorkspaceID: "workspace-1",
 	}

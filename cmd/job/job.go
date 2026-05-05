@@ -6,12 +6,14 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/client"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -36,12 +38,18 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	apiURL := os.Getenv("API_URL")
+	apiEndpoint := os.Getenv("ENDPOINT")
+	if apiEndpoint == "" {
+		apiEndpoint = os.Getenv("API_URL")
+		if apiEndpoint != "" {
+			logger.Warnf("API_URL is deprecated, use ENDPOINT instead")
+		}
+	}
 	jobID := os.Getenv("JOB_ID")
 	token := os.Getenv("JOB_TOKEN")
 
-	if apiURL == "" || jobID == "" || token == "" {
-		logger.Errorf("API_URL, JOB_ID, and JOB_TOKEN environment variables are required")
+	if apiEndpoint == "" || jobID == "" || token == "" {
+		logger.Errorf("ENDPOINT, JOB_ID, and JOB_TOKEN environment variables are required")
 		return
 	}
 
@@ -53,7 +61,24 @@ func main() {
 		}
 	}
 
-	client, err := jobclient.NewClient(apiURL, token)
+	var tlsSkipVerify bool
+	if v := os.Getenv("TLS_SKIP_VERIFY"); v != "" {
+		value, err := strconv.ParseBool(v)
+		if err != nil {
+			logger.Errorf("Invalid TLS_SKIP_VERIFY value: %v", err)
+			return
+		}
+
+		tlsSkipVerify = value
+	}
+
+	client, err := jobclient.NewClient(ctx, &jobclient.ClientConfig{
+		APIEndpoint:   apiEndpoint,
+		Token:         token,
+		UserAgent:     client.BuildUserAgent("tharsis-job-executor", Version),
+		TLSSkipVerify: tlsSkipVerify,
+		Logger:        logger.Slog(),
+	})
 	if err != nil {
 		logger.Errorf("Failed to create client %v", err)
 		return
@@ -82,7 +107,7 @@ func main() {
 	// Create job config
 	cfg := jobexecutor.JobConfig{
 		JobID:                  jobID,
-		APIEndpoint:            apiURL,
+		APIEndpoint:            apiEndpoint,
 		JobToken:               token,
 		DiscoveryProtocolHosts: discoveryProtocolHosts,
 	}

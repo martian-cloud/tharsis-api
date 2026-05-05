@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // getValue implements the sortableField interface for AgentSessionRunSortableField
@@ -324,7 +324,7 @@ func TestAgentSessionRuns_GetAgentSessionRunByTRN(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:      "get run by TRN",
-			trn:       types.AgentSessionRunModelType.BuildTRN(session.GetGlobalID(), created.GetGlobalID()),
+			trn:       trn.TypeAgentSessionRun.Build(session.GetGlobalID(), created.GetGlobalID()),
 			expectRun: true,
 		},
 		{

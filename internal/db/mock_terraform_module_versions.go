@@ -92,9 +92,9 @@ func (_m *MockTerraformModuleVersions) GetModuleVersionByID(ctx context.Context,
 	return r0, r1
 }
 
-// GetModuleVersionByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockTerraformModuleVersions) GetModuleVersionByTRN(ctx context.Context, trn string) (*models.TerraformModuleVersion, error) {
-	ret := _m.Called(ctx, trn)
+// GetModuleVersionByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockTerraformModuleVersions) GetModuleVersionByTRN(ctx context.Context, trnValue string) (*models.TerraformModuleVersion, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetModuleVersionByTRN")
@@ -103,10 +103,10 @@ func (_m *MockTerraformModuleVersions) GetModuleVersionByTRN(ctx context.Context
 	var r0 *models.TerraformModuleVersion
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.TerraformModuleVersion, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.TerraformModuleVersion); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.TerraformModuleVersion)
@@ -114,7 +114,7 @@ func (_m *MockTerraformModuleVersions) GetModuleVersionByTRN(ctx context.Context
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -13,17 +13,17 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
 )
 
 // ServiceAccounts encapsulates the logic to access service accounts from the database
 type ServiceAccounts interface {
 	GetServiceAccountByID(ctx context.Context, id string) (*models.ServiceAccount, error)
-	GetServiceAccountByTRN(ctx context.Context, trn string) (*models.ServiceAccount, error)
+	GetServiceAccountByTRN(ctx context.Context, trnValue string) (*models.ServiceAccount, error)
 	CreateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error)
 	UpdateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error)
 	GetServiceAccounts(ctx context.Context, input *GetServiceAccountsInput) (*ServiceAccountsResult, error)
@@ -128,15 +128,17 @@ func (s *serviceAccounts) GetServiceAccountByID(ctx context.Context, id string) 
 	return s.getServiceAccount(ctx, goqu.Ex{"service_accounts.id": id})
 }
 
-func (s *serviceAccounts) GetServiceAccountByTRN(ctx context.Context, trn string) (*models.ServiceAccount, error) {
+func (s *serviceAccounts) GetServiceAccountByTRN(ctx context.Context, trnValue string) (*models.ServiceAccount, error) {
 	ctx, span := tracer.Start(ctx, "db.GetServiceAccountByTRN")
-	span.SetAttributes(attribute.String("trn", trn))
+	span.SetAttributes(attribute.String("trn", trnValue))
 	defer span.End()
 
-	path, err := types.ServiceAccountModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeServiceAccount.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
+
+	path := parsed.Path()
 
 	lastSlashIndex := strings.LastIndex(path, "/")
 
@@ -149,8 +151,8 @@ func (s *serviceAccounts) GetServiceAccountByTRN(ctx context.Context, trn string
 	}
 
 	return s.getServiceAccount(ctx, goqu.Ex{
-		"namespaces.path":       path[:lastSlashIndex],
-		"service_accounts.name": path[lastSlashIndex+1:],
+		"namespaces.path":       parsed.ParentPath(),
+		"service_accounts.name": parsed.BaseName(),
 	})
 }
 
@@ -603,7 +605,7 @@ func scanServiceAccount(row scanner) (*models.ServiceAccount, error) {
 		})
 	}
 
-	serviceAccount.Metadata.TRN = types.ServiceAccountModelType.BuildTRN(groupPath, serviceAccount.Name)
+	serviceAccount.Metadata.TRN = trn.TypeServiceAccount.Build(groupPath, serviceAccount.Name)
 
 	return serviceAccount, nil
 }

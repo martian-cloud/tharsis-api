@@ -21,12 +21,12 @@ const (
 
 // CreateRunnerSessionInput is the input for creating a runner session
 type CreateRunnerSessionInput struct {
-	RunnerPath string
+	RunnerID string
 }
 
 // ClaimJobInput is the input for claiming the next available job
 type ClaimJobInput struct {
-	RunnerPath string
+	RunnerID string
 }
 
 // ClaimJobResponse is the response when claiming a job
@@ -115,37 +115,32 @@ func NewInternalClient(runnerService runner.Service, jobService job.Service) Cli
 }
 
 func (a *internalClient) CreateRunnerSessionError(ctx context.Context, sessionID string, err error) error {
-	return a.runnerService.CreateRunnerSessionError(ctx, gid.FromGlobalID(sessionID), err.Error())
+	return a.runnerService.CreateRunnerSessionError(ctx, sessionID, err.Error())
 }
 
 func (a *internalClient) CreateRunnerSession(ctx context.Context, input *CreateRunnerSessionInput) (string, error) {
 	session, err := a.runnerService.CreateRunnerSession(ctx, &runner.CreateRunnerSessionInput{
-		RunnerPath: input.RunnerPath,
-		Internal:   true,
+		RunnerID: input.RunnerID,
+		Internal: true,
 	})
 	if err != nil {
 		return "", err
 	}
-	return session.GetGlobalID(), nil
+	return session.Metadata.ID, nil
 }
 
 func (a *internalClient) SendRunnerSessionHeartbeat(ctx context.Context, sessionID string) error {
-	return a.runnerService.AcceptRunnerSessionHeartbeat(ctx, gid.FromGlobalID(sessionID))
+	return a.runnerService.AcceptRunnerSessionHeartbeat(ctx, sessionID)
 }
 
 func (a *internalClient) ClaimJob(ctx context.Context, input *ClaimJobInput) (*ClaimJobResponse, error) {
-	runner, err := a.runnerService.GetRunnerByTRN(ctx, types.RunnerModelType.BuildTRN(input.RunnerPath))
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := a.jobService.ClaimJob(ctx, runner.Metadata.ID)
+	resp, err := a.jobService.ClaimJob(ctx, input.RunnerID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ClaimJobResponse{
-		JobID: gid.ToGlobalID(types.JobModelType, resp.JobID),
+		JobID: resp.Job.GetGlobalID(),
 		Token: resp.Token,
 	}, nil
 }

@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func (sf WorkspaceAssessmentSortableField) getValue() string {
@@ -123,11 +123,11 @@ func TestGetWorkspaceAssessmentByTRN(t *testing.T) {
 		},
 		{
 			name: "resource with TRN not found",
-			trn:  types.WorkspaceAssessmentModelType.BuildTRN(workspace.FullPath, nonExistentGlobalID),
+			trn:  trn.TypeWorkspaceAssessment.Build(workspace.FullPath, nonExistentGlobalID),
 		},
 		{
 			name:            "assessment TRN cannot have less than two parts",
-			trn:             types.WorkspaceAssessmentModelType.BuildTRN(nonExistentGlobalID),
+			trn:             trn.TypeWorkspaceAssessment.Build(nonExistentGlobalID),
 			expectErrorCode: errors.EInvalid,
 		},
 		{
@@ -150,7 +150,7 @@ func TestGetWorkspaceAssessmentByTRN(t *testing.T) {
 
 			if test.expectWorkspaceAssessment {
 				require.NotNil(t, actualWorkspaceAssessment)
-				assert.Equal(t, types.WorkspaceAssessmentModelType.BuildTRN(workspace.FullPath, workspaceAssessment.GetGlobalID()), actualWorkspaceAssessment.Metadata.TRN)
+				assert.Equal(t, trn.TypeWorkspaceAssessment.Build(workspace.FullPath, workspaceAssessment.GetGlobalID()), actualWorkspaceAssessment.Metadata.TRN)
 			} else {
 				assert.Nil(t, actualWorkspaceAssessment)
 			}

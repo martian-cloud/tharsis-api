@@ -13,16 +13,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TerraformModuleVersions encapsulates the logic to access terraform module versions from the database
 type TerraformModuleVersions interface {
 	GetModuleVersionByID(ctx context.Context, id string) (*models.TerraformModuleVersion, error)
-	GetModuleVersionByTRN(ctx context.Context, trn string) (*models.TerraformModuleVersion, error)
+	GetModuleVersionByTRN(ctx context.Context, trnValue string) (*models.TerraformModuleVersion, error)
 	GetModuleVersions(ctx context.Context, input *GetModuleVersionsInput) (*ModuleVersionsResult, error)
 	CreateModuleVersion(ctx context.Context, moduleVersion *models.TerraformModuleVersion) (*models.TerraformModuleVersion, error)
 	UpdateModuleVersion(ctx context.Context, moduleVersion *models.TerraformModuleVersion) (*models.TerraformModuleVersion, error)
@@ -118,16 +118,16 @@ func (t *terraformModuleVersions) GetModuleVersionByID(ctx context.Context, id s
 	return t.getModuleVersion(ctx, goqu.Ex{"terraform_module_versions.id": id})
 }
 
-func (t *terraformModuleVersions) GetModuleVersionByTRN(ctx context.Context, trn string) (*models.TerraformModuleVersion, error) {
+func (t *terraformModuleVersions) GetModuleVersionByTRN(ctx context.Context, trnValue string) (*models.TerraformModuleVersion, error) {
 	ctx, span := tracer.Start(ctx, "db.GetModuleVersionByTRN")
 	defer span.End()
 
-	path, err := types.TerraformModuleVersionModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeTerraformModuleVersion.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 
 	if len(parts) < 4 {
 		return nil, errors.New("a Terraform module version TRN must have group path, module name, system, and semver separated by a forward slash",
@@ -523,7 +523,7 @@ func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, er
 		moduleVersion.UploadStartedTimestamp = &uploadStartedAt.Time
 	}
 
-	moduleVersion.Metadata.TRN = types.TerraformModuleVersionModelType.BuildTRN(
+	moduleVersion.Metadata.TRN = trn.TypeTerraformModuleVersion.Build(
 		groupPath,
 		moduleName,
 		moduleSystem,

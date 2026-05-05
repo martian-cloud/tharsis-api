@@ -8,10 +8,10 @@ import (
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 /* TerraformProviderVersionMirror Query Resolvers */
@@ -211,7 +211,7 @@ func (r *TerraformProviderVersionMirrorResolver) PlatformMirrors(ctx context.Con
 
 // Deprecated: use node query instead
 func terraformProviderVersionMirrorQuery(ctx context.Context, args *TerraformProviderVersionMirrorQueryArgs) (*TerraformProviderVersionMirrorResolver, error) {
-	trn := types.TerraformProviderVersionMirrorModelType.BuildTRN(args.GroupPath, args.RegistryHostname, args.RegistryNamespace, args.Type, args.Version)
+	trn := trn.TypeTerraformProviderVersionMirror.Build(args.GroupPath, args.RegistryHostname, args.RegistryNamespace, args.Type, args.Version)
 	versionMirror, err := getServiceCatalog(ctx).TerraformProviderMirrorService.GetProviderVersionMirrorByTRN(ctx, trn)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {

@@ -7,12 +7,12 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -681,7 +681,7 @@ func (s *service) RemoveUserFromTeam(ctx context.Context, input *RemoveUserFromT
 }
 
 func (s *service) getTeamByName(ctx context.Context, span trace.Span, name string) (*models.Team, error) {
-	team, err := s.dbClient.Teams.GetTeamByTRN(ctx, types.TeamModelType.BuildTRN(name))
+	team, err := s.dbClient.Teams.GetTeamByTRN(ctx, trn.TypeTeam.Build(name))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get team by TRN")
 		return nil, err
@@ -696,7 +696,7 @@ func (s *service) getTeamByName(ctx context.Context, span trace.Span, name strin
 }
 
 func (s *service) getUserByUsername(ctx context.Context, span trace.Span, username string) (*models.User, error) {
-	user, err := s.dbClient.Users.GetUserByTRN(ctx, types.UserModelType.BuildTRN(username))
+	user, err := s.dbClient.Users.GetUserByTRN(ctx, trn.TypeUser.Build(username))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to user by TRN")
 		return nil, err

@@ -9,6 +9,7 @@ import "pagination.proto";
 import "plan.proto";
 import "apply.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
 // Runs implements all functionality related to a Tharsis Run.
 service Runs {
@@ -32,8 +33,12 @@ service Runs {
   rpc UpdatePlan(plan.UpdatePlanRequest) returns (plan.Plan);
   // UpdateApply updates an Apply.
   rpc UpdateApply(apply.UpdateApplyRequest) returns (apply.Apply);
+  // SetVariablesIncludedInTFConfig updates which variables are included in the Terraform config.
+  rpc SetVariablesIncludedInTFConfig(SetVariablesIncludedInTFConfigRequest) returns (google.protobuf.Empty);
   // SubscribeToRunEvents subscribes to run events.
   rpc SubscribeToRunEvents(SubscribeToRunEventsRequest) returns (stream RunEvent);
+  // CreateDestroyRunForWorkspace creates a destroy run using the workspace's current state.
+  rpc CreateDestroyRunForWorkspace(CreateDestroyRunForWorkspaceRequest) returns (Run);
 }
 
 // RunSortableField defines enums that allow sorting a paginated list of Runs.
@@ -75,7 +80,7 @@ message CreateRunRequest {
   // module versions are eligible to be selected as "latest". Defaults to
   // false. Has no effect when module_version is an exact match. Requires
   // module_source to be set.
-  optional bool             include_module_prereleases = 12;
+  optional bool include_module_prereleases = 12;
 }
 
 // ApplyRunRequest is the input for applying a Run.
@@ -87,6 +92,11 @@ message ApplyRunRequest {
 message CancelRunRequest {
   string        id    = 1;
   optional bool force = 2;
+}
+
+// CreateDestroyRunForWorkspaceRequest is the input for creating a destroy run for a workspace.
+message CreateDestroyRunForWorkspaceRequest {
+  string workspace_id = 1;
 }
 
 // GetRunVariablesRequest is the input for getting run variables.
@@ -108,6 +118,13 @@ message RunVariableInput {
   string          key      = 2;
   optional string value    = 3;
 }
+
+// SetVariablesIncludedInTFConfigRequest is the input for setting variables included in the Terraform config.
+message SetVariablesIncludedInTFConfigRequest {
+  string          run_id        = 1;
+  repeated string variable_keys = 2;
+}
+
 
 // Run represents a Terraform plan/apply operation.
 message Run {
@@ -160,3 +177,4 @@ message GetRunsResponse {
 message GetRunVariablesResponse {
   repeated RunVariable variables = 1;
 }
+

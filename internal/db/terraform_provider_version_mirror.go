@@ -11,16 +11,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TerraformProviderVersionMirrors encapsulates the logic to access Terraform provider version mirrors from the DB
 type TerraformProviderVersionMirrors interface {
 	GetVersionMirrorByID(ctx context.Context, id string) (*models.TerraformProviderVersionMirror, error)
-	GetVersionMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersionMirror, error)
+	GetVersionMirrorByTRN(ctx context.Context, trnValue string) (*models.TerraformProviderVersionMirror, error)
 	GetVersionMirrors(ctx context.Context, input *GetProviderVersionMirrorsInput) (*ProviderVersionMirrorsResult, error)
 	CreateVersionMirror(ctx context.Context, versionMirror *models.TerraformProviderVersionMirror) (*models.TerraformProviderVersionMirror, error)
 	DeleteVersionMirror(ctx context.Context, versionMirror *models.TerraformProviderVersionMirror) error
@@ -114,16 +114,16 @@ func (t *terraformProviderVersionMirrors) GetVersionMirrorByID(ctx context.Conte
 	return t.getVersionMirror(ctx, goqu.Ex{"terraform_provider_version_mirrors.id": id})
 }
 
-func (t *terraformProviderVersionMirrors) GetVersionMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersionMirror, error) {
+func (t *terraformProviderVersionMirrors) GetVersionMirrorByTRN(ctx context.Context, trnValue string) (*models.TerraformProviderVersionMirror, error) {
 	ctx, span := tracer.Start(ctx, "db.GetVersionMirrorByTRN")
 	defer span.End()
 
-	path, err := types.TerraformProviderVersionMirrorModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeTerraformProviderVersionMirror.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 
 	if len(parts) < 5 {
 		return nil, errors.New("a Terraform provider version TRN must have group path, registry hostname, registry namespace, type and semantic version separated by a forward slash",
@@ -393,7 +393,7 @@ func scanVersionMirror(row scanner) (*models.TerraformProviderVersionMirror, err
 		return nil, err
 	}
 
-	versionMirror.Metadata.TRN = types.TerraformProviderVersionMirrorModelType.BuildTRN(
+	versionMirror.Metadata.TRN = trn.TypeTerraformProviderVersionMirror.Build(
 		namespacePath,
 		versionMirror.RegistryHostname,
 		versionMirror.RegistryNamespace,

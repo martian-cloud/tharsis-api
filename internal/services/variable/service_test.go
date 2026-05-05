@@ -13,12 +13,12 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestGetVariableByID(t *testing.T) {
@@ -96,7 +96,7 @@ func TestGetVariableByID(t *testing.T) {
 
 func TestGetVariableByTRN(t *testing.T) {
 	variableID := "var-1"
-	variableTRN := types.VariableModelType.BuildTRN("variable-gid-1")
+	variableTRN := trn.TypeVariable.Build("variable-gid-1")
 
 	sampleVariable := &models.Variable{
 		Metadata: models.ResourceMetadata{
@@ -292,7 +292,7 @@ func TestGetVariableVersionByID(t *testing.T) {
 func TestGetVariableVersionByTRN(t *testing.T) {
 	variableID := "var-1"
 	variableVersionID := "var-version-1"
-	variableVersionTRN := types.VariableVersionModelType.BuildTRN("variable-version-gid-1")
+	variableVersionTRN := trn.TypeVariableVersion.Build("variable-version-gid-1")
 	secretValue := "test-secret-value"
 
 	type testCase struct {
@@ -688,7 +688,7 @@ func TestSetVariables(t *testing.T) {
 					mockVariables.On("DeleteVariable", mock.Anything, v).Return(nil)
 				}
 
-				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(test.input.NamespacePath)).Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}}, nil)
+				mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(test.input.NamespacePath)).Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}}, nil)
 
 				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
@@ -1173,7 +1173,7 @@ func TestDeleteVariable(t *testing.T) {
 
 			if test.expectErrCode == "" {
 				mockVariables.On("DeleteVariable", mock.Anything, test.existingVariable).Return(nil)
-				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(test.existingVariable.NamespacePath)).Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}}, nil)
+				mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(test.existingVariable.NamespacePath)).Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}}, nil)
 			}
 
 			dbClient := db.Client{

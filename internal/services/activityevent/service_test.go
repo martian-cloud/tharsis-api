@@ -13,8 +13,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 type mockDBClient struct {
@@ -173,7 +173,7 @@ func TestCreateActivityEvent(t *testing.T) {
 	positiveCallerServiceAccount := models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:  "test-caller-service-account-id-1",
-			TRN: types.ServiceAccountModelType.BuildTRN("service-account-name-1"),
+			TRN: trn.TypeServiceAccount.Build("service-account-name-1"),
 		},
 		Name:        "service-account-name-1",
 		Description: "This is test service account 1.",
@@ -182,7 +182,7 @@ func TestCreateActivityEvent(t *testing.T) {
 	invalidCallerServiceAccount := models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID: "test-caller-invalid-service-account-id",
-			TRN: types.ServiceAccountModelType.BuildTRN(
+			TRN: trn.TypeServiceAccount.Build(
 				"invalid-service-account-name-1"),
 		},
 		Name:        "invalid",

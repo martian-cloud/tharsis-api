@@ -17,6 +17,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
@@ -512,7 +513,7 @@ func (r *WorkspaceResolver) ProviderMirrorEnabled(ctx context.Context) (*namespa
 
 // DEPRECATED: use node query instead
 func workspaceQuery(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceResolver, error) {
-	ws, err := getServiceCatalog(ctx).WorkspaceService.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(args.FullPath))
+	ws, err := getServiceCatalog(ctx).WorkspaceService.GetWorkspaceByTRN(ctx, trn.TypeWorkspace.Build(args.FullPath))
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -541,7 +542,7 @@ func workspacesQuery(ctx context.Context, args *WorkspaceConnectionQueryArgs) (*
 	if args.GroupID != nil {
 		groupValueToResolve = args.GroupID
 	} else if args.GroupPath != nil {
-		groupValueToResolve = ptr.String(types.GroupModelType.BuildTRN(*args.GroupPath))
+		groupValueToResolve = ptr.String(trn.TypeGroup.Build(*args.GroupPath))
 	}
 
 	if groupValueToResolve != nil {

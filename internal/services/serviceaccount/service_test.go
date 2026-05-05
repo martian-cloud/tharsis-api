@@ -29,6 +29,7 @@ import (
 	terrs "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 type keyPair struct {
@@ -74,7 +75,7 @@ func TestGetServiceAccountByID(t *testing.T) {
 	sampleServiceAccount := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:  "service-account-id-1",
-			TRN: types.ServiceAccountModelType.BuildTRN("my-group/service-account-1"),
+			TRN: trn.TypeServiceAccount.Build("my-group/service-account-1"),
 		},
 		Name:        "service-account-1",
 		GroupID:     "group-1",
@@ -136,7 +137,7 @@ func TestGetServiceAccountByTRN(t *testing.T) {
 	sampleServiceAccount := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:  "service-account-id-1",
-			TRN: types.ServiceAccountModelType.BuildTRN("my-group/service-account-1"),
+			TRN: trn.TypeServiceAccount.Build("my-group/service-account-1"),
 		},
 		Name:        "service-account-1",
 		GroupID:     "group-1",
@@ -200,7 +201,7 @@ func TestDeleteServiceAccount(t *testing.T) {
 	resourcePath := "group-name/test-sa"
 
 	existingSA := &models.ServiceAccount{
-		Metadata: models.ResourceMetadata{ID: serviceAccountID, TRN: types.ServiceAccountModelType.BuildTRN(resourcePath), Version: 1},
+		Metadata: models.ResourceMetadata{ID: serviceAccountID, TRN: trn.TypeServiceAccount.Build(resourcePath), Version: 1},
 		Name:     "test-sa",
 		GroupID:  groupID,
 	}
@@ -314,7 +315,7 @@ func TestGetServiceAccountsByIDs(t *testing.T) {
 	resourcePath := "group-name/test-sa"
 
 	sa := models.ServiceAccount{
-		Metadata: models.ResourceMetadata{ID: saID, TRN: types.ServiceAccountModelType.BuildTRN(resourcePath)},
+		Metadata: models.ResourceMetadata{ID: saID, TRN: trn.TypeServiceAccount.Build(resourcePath)},
 		Name:     "test-sa",
 		GroupID:  groupID,
 	}
@@ -387,7 +388,7 @@ func TestCreateServiceAccount(t *testing.T) {
 	createdSA := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:  groupID,
-			TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
+			TRN: trn.TypeServiceAccount.Build(resourcePath),
 		},
 		Name:              serviceAccountName,
 		Description:       serviceAccountDescription,
@@ -538,7 +539,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 	existingSA := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:      serviceAccountID,
-			TRN:     types.ServiceAccountModelType.BuildTRN(resourcePath),
+			TRN:     trn.TypeServiceAccount.Build(resourcePath),
 			Version: 1,
 		},
 		Name:        "test-sa",
@@ -785,7 +786,7 @@ func TestCreateOIDCToken(t *testing.T) {
 	keyID := validKeyPair.pub.KeyID()
 	serviceAccountID := "d4a94ff5-154e-4758-8039-55e2147fa154"
 	serviceAccountGID := gid.ToGlobalID(types.ServiceAccountModelType, serviceAccountID)
-	serviceAccountTRN := types.ServiceAccountModelType.BuildTRN("groupA/serviceAccount1")
+	serviceAccountTRN := trn.TypeServiceAccount.Build("groupA/serviceAccount1")
 	issuer := "https://test.tharsis"
 	sub := "testSubject1"
 
@@ -1110,7 +1111,7 @@ func TestCreateOIDCToken(t *testing.T) {
 func TestCreateClientCredentialsToken(t *testing.T) {
 	serviceAccountID := "12345678-1234-1234-1234-123456789012"
 	serviceAccountGID := gid.ToGlobalID(types.ServiceAccountModelType, serviceAccountID)
-	serviceAccountTRN := types.ServiceAccountModelType.BuildTRN("group-123/test-sa")
+	serviceAccountTRN := trn.TypeServiceAccount.Build("group-123/test-sa")
 	clientSecret := "test-secret"
 	resourcePath := "group-123/test-sa"
 
@@ -1118,7 +1119,7 @@ func TestCreateClientCredentialsToken(t *testing.T) {
 	saWithClientCreds := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:  serviceAccountID,
-			TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
+			TRN: trn.TypeServiceAccount.Build(resourcePath),
 		},
 		Name:    "test-sa",
 		GroupID: "group-123",
@@ -1129,7 +1130,7 @@ func TestCreateClientCredentialsToken(t *testing.T) {
 	saWithoutClientCreds := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:  serviceAccountID,
-			TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
+			TRN: trn.TypeServiceAccount.Build(resourcePath),
 		},
 		Name:    "test-sa-no-client-creds",
 		GroupID: "group-123",
@@ -1257,7 +1258,7 @@ func TestResetClientCredentials(t *testing.T) {
 	saWithClientCreds := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:      serviceAccountID,
-			TRN:     types.ServiceAccountModelType.BuildTRN(resourcePath),
+			TRN:     trn.TypeServiceAccount.Build(resourcePath),
 			Version: 1,
 		},
 		Name:             "test-sa",
@@ -1268,7 +1269,7 @@ func TestResetClientCredentials(t *testing.T) {
 	saWithoutClientCreds := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID:  serviceAccountID,
-			TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
+			TRN: trn.TypeServiceAccount.Build(resourcePath),
 		},
 		Name:    "test-sa-no-client-creds",
 		GroupID: groupID,

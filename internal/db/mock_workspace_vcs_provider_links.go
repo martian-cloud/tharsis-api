@@ -92,9 +92,9 @@ func (_m *MockWorkspaceVCSProviderLinks) GetLinkByID(ctx context.Context, id str
 	return r0, r1
 }
 
-// GetLinkByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockWorkspaceVCSProviderLinks) GetLinkByTRN(ctx context.Context, trn string) (*models.WorkspaceVCSProviderLink, error) {
-	ret := _m.Called(ctx, trn)
+// GetLinkByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockWorkspaceVCSProviderLinks) GetLinkByTRN(ctx context.Context, trnValue string) (*models.WorkspaceVCSProviderLink, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetLinkByTRN")
@@ -103,10 +103,10 @@ func (_m *MockWorkspaceVCSProviderLinks) GetLinkByTRN(ctx context.Context, trn s
 	var r0 *models.WorkspaceVCSProviderLink
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.WorkspaceVCSProviderLink, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.WorkspaceVCSProviderLink); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.WorkspaceVCSProviderLink)
@@ -114,7 +114,7 @@ func (_m *MockWorkspaceVCSProviderLinks) GetLinkByTRN(ctx context.Context, trn s
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

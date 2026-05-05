@@ -21,6 +21,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestNewUserSessionManager(t *testing.T) {
@@ -269,7 +270,7 @@ func TestUserSessionManager_CreateSession(t *testing.T) {
 				}
 				err := user.SetPassword(password)
 				require.NoError(t, err)
-				mockUsers.On("GetUserByTRN", mock.Anything, types.UserModelType.BuildTRN(username)).Return(user, nil)
+				mockUsers.On("GetUserByTRN", mock.Anything, trn.TypeUser.Build(username)).Return(user, nil)
 
 				mockTx.On("BeginTx", mock.Anything).Return(context.Background(), nil)
 				mockTx.On("CommitTx", mock.Anything).Return(nil)

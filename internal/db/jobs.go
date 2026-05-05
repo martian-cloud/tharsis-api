@@ -15,16 +15,16 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Jobs encapsulates the logic to access jobs from the database
 type Jobs interface {
 	GetJobByID(ctx context.Context, id string) (*models.Job, error)
-	GetJobByTRN(ctx context.Context, trn string) (*models.Job, error)
+	GetJobByTRN(ctx context.Context, trnValue string) (*models.Job, error)
 	GetLatestJobByType(ctx context.Context, runID string, jobType models.JobType) (*models.Job, error)
 	GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, error)
 	UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error)
@@ -115,17 +115,16 @@ func (j *jobs) GetJobByID(ctx context.Context, id string) (*models.Job, error) {
 	return j.getJob(ctx, goqu.Ex{"jobs.id": id})
 }
 
-func (j *jobs) GetJobByTRN(ctx context.Context, trn string) (*models.Job, error) {
+func (j *jobs) GetJobByTRN(ctx context.Context, trnValue string) (*models.Job, error) {
 	ctx, span := tracer.Start(ctx, "db.GetJobByTRN")
 	defer span.End()
 
-	path, err := types.JobModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeJob.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a job TRN must have the workspace path and job GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -133,8 +132,8 @@ func (j *jobs) GetJobByTRN(ctx context.Context, trn string) (*models.Job, error)
 	}
 
 	return j.getJob(ctx, goqu.Ex{
-		"jobs.id":         gid.FromGlobalID(path[lastSlashIndex+1:]),
-		"namespaces.path": path[:lastSlashIndex],
+		"jobs.id":         gid.FromGlobalID(parsed.BaseName()),
+		"namespaces.path": parsed.ParentPath(),
 	})
 }
 
@@ -520,7 +519,7 @@ func scanJob(row scanner) (*models.Job, error) {
 		job.Timestamps.FinishedTimestamp = &finishedAt.Time
 	}
 
-	job.Metadata.TRN = types.JobModelType.BuildTRN(workspacePath, job.GetGlobalID())
+	job.Metadata.TRN = trn.TypeJob.Build(workspacePath, job.GetGlobalID())
 
 	return job, nil
 }

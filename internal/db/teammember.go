@@ -11,10 +11,10 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TeamMembers encapsulates the logic to access team members from the database
@@ -392,7 +392,7 @@ func scanTeamMember(row scanner) (*models.TeamMember, error) {
 		return nil, err
 	}
 
-	teamMember.Metadata.TRN = types.TeamMemberModelType.BuildTRN(teamName, userName)
+	teamMember.Metadata.TRN = trn.TypeTeamMember.Build(teamName, userName)
 
 	return teamMember, nil
 }

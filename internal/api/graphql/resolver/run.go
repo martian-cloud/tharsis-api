@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
@@ -425,7 +426,7 @@ func runsQuery(ctx context.Context, args *RunConnectionQueryArgs) (*RunConnectio
 
 	var workspaceFilterValueToResolver *string
 	if args.WorkspacePath != nil {
-		workspaceFilterValueToResolver = ptr.String(types.WorkspaceModelType.BuildTRN(*args.WorkspacePath))
+		workspaceFilterValueToResolver = ptr.String(trn.TypeWorkspace.Build(*args.WorkspacePath))
 	} else if args.WorkspaceID != nil {
 		workspaceFilterValueToResolver = args.WorkspaceID
 	}
@@ -658,6 +659,7 @@ func cancelRunMutation(ctx context.Context, input *CancelRunInput) (*RunMutation
 	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
 }
 
+// Deprecated: Use the gRPC API instead.
 func setVariablesIncludedInTFConfigMutation(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) (*RunMutationPayloadResolver, error) {
 	serviceCatalog := getServiceCatalog(ctx)
 
@@ -721,7 +723,7 @@ func (r RootResolver) workspaceRunEventsSubscription(ctx context.Context, input 
 	if input.WorkspaceID != nil {
 		workspaceValueToResolve = input.WorkspaceID
 	} else if input.WorkspacePath != nil {
-		workspaceValueToResolve = ptr.String(types.WorkspaceModelType.BuildTRN(*input.WorkspacePath))
+		workspaceValueToResolve = ptr.String(trn.TypeWorkspace.Build(*input.WorkspacePath))
 	}
 
 	if workspaceValueToResolve != nil {

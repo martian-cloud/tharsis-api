@@ -32,6 +32,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // CreateModuleInput is the input for creating a terraform module
@@ -850,7 +851,7 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 	if group.ParentID == "" {
 		rootGroupID = input.GroupID
 	} else {
-		rootGroup, gErr := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(group.GetRootGroupPath()))
+		rootGroup, gErr := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(group.GetRootGroupPath()))
 		if gErr != nil {
 			tracing.RecordError(span, gErr, "failed to get group by full path")
 			return nil, gErr

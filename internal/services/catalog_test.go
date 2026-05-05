@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestFetchModel(t *testing.T) {
@@ -27,7 +28,7 @@ func TestFetchModel(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:        "fetch by TRN",
-			searchValue: types.RunModelType.BuildTRN(sampleRunGID),
+			searchValue: trn.TypeRun.Build(sampleRunGID),
 		},
 		{
 			name:        "fetch by GID",
@@ -50,7 +51,7 @@ func TestFetchModel(t *testing.T) {
 			// We use just one service for testing since logic for all others is the same
 			mockRunService := run.NewMockService(t)
 
-			if types.GetModelNameFromTRN(test.searchValue) == types.RunModelType.Name() {
+			if trn.IsTRN(test.searchValue) && trn.MustParseAny(test.searchValue).Type().String() == types.RunModelType.Name() {
 				mockRunService.On("GetRunByTRN", mock.Anything, test.searchValue).Return(&models.Run{}, nil)
 			} else {
 				mockRunService.On("GetRunByID", mock.Anything, gid.FromGlobalID(test.searchValue)).Return(&models.Run{}, nil).Maybe()
@@ -94,7 +95,7 @@ func TestFetchModelID(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:        "fetch by TRN",
-			searchValue: types.RunModelType.BuildTRN(sampleRunGID),
+			searchValue: trn.TypeRun.Build(sampleRunGID),
 		},
 		{
 			name:        "fetch by GID",
@@ -111,7 +112,7 @@ func TestFetchModelID(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockRunService := run.NewMockService(t)
 
-			if types.GetModelNameFromTRN(test.searchValue) == types.RunModelType.Name() {
+			if trn.IsTRN(test.searchValue) && trn.MustParseAny(test.searchValue).Type().String() == types.RunModelType.Name() {
 				mockRunService.On("GetRunByTRN", mock.Anything, test.searchValue).Return(sampleRun, nil)
 			} else {
 				mockRunService.On("GetRunByID", mock.Anything, gid.FromGlobalID(test.searchValue)).Return(sampleRun, nil).Maybe()
@@ -170,7 +171,7 @@ func Test_addFetchers(t *testing.T) {
 	require.NotEmpty(t, catalog.trnFetchers)
 }
 
-func Test_getModelFetcherByModelName(t *testing.T) {
+func Test_getModelFetcherByTRNType(t *testing.T) {
 	mockRunService := run.NewMockService(t)
 
 	catalog := &Catalog{}
@@ -185,7 +186,7 @@ func Test_getModelFetcherByModelName(t *testing.T) {
 	)
 
 	// By ResourceType
-	actualFetchMethods, ok := catalog.getModelFetcherByModelName(types.RunModelType.Name())
+	actualFetchMethods, ok := catalog.getModelFetcherByTRNType(types.RunModelType.TRNType())
 	require.True(t, ok)
 	require.NotNil(t, actualFetchMethods)
 }

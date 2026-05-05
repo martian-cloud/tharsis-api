@@ -12,7 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/awsfederated"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestAuthenticate(t *testing.T) {
@@ -35,25 +36,26 @@ func TestAuthenticate(t *testing.T) {
 			authenticator, _ := New()
 			defer authenticator.Close(ctx)
 
-			identities := make([]types.ManagedIdentity, tc.identitiesCount)
+			identities := make([]*pb.ManagedIdentity, tc.identitiesCount)
 			for i := 0; i < tc.identitiesCount; i++ {
 				dataBuffer, err := json.Marshal(&awsfederated.Data{Role: fmt.Sprintf("testrole-%d", i)})
 				require.NoError(t, err)
 
-				identities[i] = types.ManagedIdentity{
-					Metadata: types.ResourceMetadata{
-						ID: fmt.Sprintf("identity-%d", i),
+				identities[i] = &pb.ManagedIdentity{
+					Metadata: &pb.ResourceMetadata{
+						Id:  fmt.Sprintf("identity-%d", i),
+						Trn: fmt.Sprintf("trn:managed_identity:test-group/managedIdentity-%d", i),
 					},
-					Name:         fmt.Sprintf("managedIdentity-%d", i),
-					ResourcePath: fmt.Sprintf("test-group/managedIdentity-%d", i),
-					Data:         base64.StdEncoding.EncodeToString(dataBuffer),
+					Name: fmt.Sprintf("managedIdentity-%d", i),
+
+					Data: base64.StdEncoding.EncodeToString(dataBuffer),
 				}
 			}
 
 			response, err := authenticator.Authenticate(
 				ctx,
 				identities,
-				func(_ context.Context, _ *types.ManagedIdentity) ([]byte, error) {
+				func(_ context.Context, _ *pb.ManagedIdentity) ([]byte, error) {
 					return token, nil
 				},
 			)
@@ -87,10 +89,10 @@ func TestAuthenticate(t *testing.T) {
 
 			for i := 0; i < tc.identitiesCount; i++ {
 				role := fmt.Sprintf("testrole-%d", i)
-				nameOfFile := fmt.Sprintf("%s-token", identities[i].Metadata.ID)
+				nameOfFile := fmt.Sprintf("%s-token", identities[i].Metadata.Id)
 				tokenFilepath := filepath.Join(authenticator.dir, nameOfFile)
 
-				profile := fmt.Sprintf(awsProfileTemplate, identities[i].ResourcePath, role, tokenFilepath)
+				profile := fmt.Sprintf(awsProfileTemplate, trn.MustParseAny(identities[i].Metadata.Trn).Path(), role, tokenFilepath)
 				assert.Contains(t, string(configFile), profile)
 			}
 		})

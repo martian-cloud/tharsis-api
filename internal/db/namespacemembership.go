@@ -13,10 +13,10 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // CreateNamespaceMembershipInput is the input for creating a new namespace membership
@@ -32,7 +32,7 @@ type CreateNamespaceMembershipInput struct {
 type NamespaceMemberships interface {
 	GetNamespaceMemberships(ctx context.Context, input *GetNamespaceMembershipsInput) (*NamespaceMembershipResult, error)
 	GetNamespaceMembershipByID(ctx context.Context, id string) (*models.NamespaceMembership, error)
-	GetNamespaceMembershipByTRN(ctx context.Context, trn string) (*models.NamespaceMembership, error)
+	GetNamespaceMembershipByTRN(ctx context.Context, trnValue string) (*models.NamespaceMembership, error)
 	CreateNamespaceMembership(ctx context.Context, input *CreateNamespaceMembershipInput) (*models.NamespaceMembership, error)
 	UpdateNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) (*models.NamespaceMembership, error)
 	DeleteNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) error
@@ -115,17 +115,16 @@ func (m *namespaceMemberships) GetNamespaceMembershipByID(ctx context.Context, i
 	return m.getNamespaceMembership(ctx, goqu.Ex{"namespace_memberships.id": id})
 }
 
-func (m *namespaceMemberships) GetNamespaceMembershipByTRN(ctx context.Context, trn string) (*models.NamespaceMembership, error) {
+func (m *namespaceMemberships) GetNamespaceMembershipByTRN(ctx context.Context, trnValue string) (*models.NamespaceMembership, error) {
 	ctx, span := tracer.Start(ctx, "db.GetNamespaceMembershipByTRN")
 	defer span.End()
 
-	path, err := types.NamespaceMembershipModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeNamespaceMembership.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.Wrap(err, "a namespace membership TRN must have namespace path and membership GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -133,8 +132,8 @@ func (m *namespaceMemberships) GetNamespaceMembershipByTRN(ctx context.Context, 
 	}
 
 	return m.getNamespaceMembership(ctx, goqu.Ex{
-		"namespace_memberships.id": gid.FromGlobalID(path[lastSlashIndex+1:]),
-		"namespaces.path":          path[:lastSlashIndex],
+		"namespace_memberships.id": gid.FromGlobalID(parsed.BaseName()),
+		"namespaces.path":          parsed.ParentPath(),
 	})
 }
 
@@ -523,7 +522,7 @@ func scanNamespaceMembership(row scanner) (*models.NamespaceMembership, error) {
 		namespaceMembership.TeamID = &teamID.String
 	}
 
-	namespaceMembership.Metadata.TRN = types.NamespaceMembershipModelType.BuildTRN(namespaceMembership.Namespace.Path, namespaceMembership.GetGlobalID())
+	namespaceMembership.Metadata.TRN = trn.TypeNamespaceMembership.Build(namespaceMembership.Namespace.Path, namespaceMembership.GetGlobalID())
 
 	return namespaceMembership, nil
 }

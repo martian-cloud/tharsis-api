@@ -10,10 +10,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/role"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // RolesConnectionQueryArgs are used to query a role connection
@@ -168,7 +168,7 @@ func availableRolePermissionsQuery(ctx context.Context) ([]string, error) {
 
 // DEPRECATED: use node query instead with a TRN
 func roleQuery(ctx context.Context, args *RoleQueryArgs) (*RoleResolver, error) {
-	role, err := getServiceCatalog(ctx).RoleService.GetRoleByTRN(ctx, types.RoleModelType.BuildTRN(args.Name))
+	role, err := getServiceCatalog(ctx).RoleService.GetRoleByTRN(ctx, trn.TypeRole.Build(args.Name))
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil

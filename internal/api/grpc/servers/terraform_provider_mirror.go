@@ -228,6 +228,47 @@ func (s *TerraformProviderMirrorServer) DeleteTerraformProviderPlatformMirror(ct
 	return &emptypb.Empty{}, nil
 }
 
+// GetAvailableProviderVersions returns all cached versions for a provider.
+func (s *TerraformProviderMirrorServer) GetAvailableProviderVersions(ctx context.Context, req *pb.GetAvailableProviderVersionsRequest) (*pb.GetAvailableProviderVersionsResponse, error) {
+	versions, err := s.serviceCatalog.TerraformProviderMirrorService.GetAvailableProviderVersions(ctx, &providermirror.GetAvailableProviderVersionsInput{
+		GroupPath:         req.GroupPath,
+		Type:              req.Type,
+		RegistryNamespace: req.RegistryNamespace,
+		RegistryHostname:  req.RegistryHostname,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	versionList := make([]string, 0, len(versions))
+	for v := range versions {
+		versionList = append(versionList, v)
+	}
+
+	return &pb.GetAvailableProviderVersionsResponse{Versions: versionList}, nil
+}
+
+// GetProviderPlatformPackageDownloadURL returns the download URL and hashes for a provider platform package.
+func (s *TerraformProviderMirrorServer) GetProviderPlatformPackageDownloadURL(ctx context.Context, req *pb.GetProviderPlatformPackageDownloadURLRequest) (*pb.GetProviderPlatformPackageDownloadURLResponse, error) {
+	pkg, err := s.serviceCatalog.TerraformProviderMirrorService.GetInstallationPackage(ctx, &providermirror.GetInstallationPackageInput{
+		GroupPath:         req.GroupPath,
+		Type:              req.Type,
+		RegistryNamespace: req.RegistryNamespace,
+		RegistryHostname:  req.RegistryHostname,
+		SemanticVersion:   req.SemanticVersion,
+		OS:                req.Os,
+		Arch:              req.Arch,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.GetProviderPlatformPackageDownloadURLResponse{
+		Url:    pkg.URL,
+		Hashes: pkg.Hashes,
+	}, nil
+}
+
 func toPBTerraformProviderVersionMirror(m *models.TerraformProviderVersionMirror) *pb.TerraformProviderVersionMirror {
 	digests := make(map[string]string, len(m.Digests))
 	for k, v := range m.Digests {

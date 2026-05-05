@@ -92,9 +92,9 @@ func (_m *MockAgentSessions) GetAgentSessionByID(ctx context.Context, id string)
 	return r0, r1
 }
 
-// GetAgentSessionByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockAgentSessions) GetAgentSessionByTRN(ctx context.Context, trn string) (*models.AgentSession, error) {
-	ret := _m.Called(ctx, trn)
+// GetAgentSessionByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockAgentSessions) GetAgentSessionByTRN(ctx context.Context, trnValue string) (*models.AgentSession, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAgentSessionByTRN")
@@ -103,10 +103,10 @@ func (_m *MockAgentSessions) GetAgentSessionByTRN(ctx context.Context, trn strin
 	var r0 *models.AgentSession
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.AgentSession, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.AgentSession); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.AgentSession)
@@ -114,7 +114,7 @@ func (_m *MockAgentSessions) GetAgentSessionByTRN(ctx context.Context, trn strin
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

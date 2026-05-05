@@ -21,7 +21,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	mtypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	types "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
@@ -29,6 +28,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 const (
@@ -121,7 +121,7 @@ func TestGetVCSProviderByTRN(t *testing.T) {
 	sampleProvider := &models.VCSProvider{
 		Metadata: models.ResourceMetadata{
 			ID:  "provider-1",
-			TRN: mtypes.VCSProviderModelType.BuildTRN("provider-gid-1"),
+			TRN: trn.TypeVCSProvider.Build("provider-gid-1"),
 		},
 		Name:               "test-provider",
 		OAuthClientID:      "client-id",
@@ -284,7 +284,7 @@ func TestGetVCSProvidersByIDs(t *testing.T) {
 	sampleProvider := models.VCSProvider{
 		Metadata: models.ResourceMetadata{
 			ID:  resourceUUID,
-			TRN: mtypes.VCSProviderModelType.BuildTRN("some-group/expected-name"),
+			TRN: trn.TypeVCSProvider.Build("some-group/expected-name"),
 		},
 		Name: "expected-name",
 	}
@@ -356,7 +356,7 @@ func TestGetVCSEventByID(t *testing.T) {
 	sampleEvent := &models.VCSEvent{
 		Metadata: models.ResourceMetadata{
 			ID:  "event-1",
-			TRN: mtypes.VCSEventModelType.BuildTRN("event-gid-1"),
+			TRN: trn.TypeVCSEvent.Build("event-gid-1"),
 		},
 		WorkspaceID: "workspace-1",
 	}
@@ -427,7 +427,7 @@ func TestGetVCSEventByTRN(t *testing.T) {
 	sampleEvent := &models.VCSEvent{
 		Metadata: models.ResourceMetadata{
 			ID:  "event-1",
-			TRN: mtypes.VCSEventModelType.BuildTRN("event-gid-1"),
+			TRN: trn.TypeVCSEvent.Build("event-gid-1"),
 		},
 		WorkspaceID: "workspace-1",
 	}
@@ -552,7 +552,7 @@ func TestCreateVCSProvider(t *testing.T) {
 			expectedProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  resourceUUID,
-					TRN: mtypes.VCSProviderModelType.BuildTRN("a/resource/path"),
+					TRN: trn.TypeVCSProvider.Build("a/resource/path"),
 				},
 				Name:               "a-sample-gitlab-provider",
 				Description:        "",
@@ -608,7 +608,7 @@ func TestCreateVCSProvider(t *testing.T) {
 			expectedProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  resourceUUID,
-					TRN: mtypes.VCSProviderModelType.BuildTRN("a/resource/path"),
+					TRN: trn.TypeVCSProvider.Build("a/resource/path"),
 				},
 				Name:               "a-sample-github-provider",
 				Description:        "",
@@ -693,7 +693,7 @@ func TestCreateVCSProvider(t *testing.T) {
 			expectedProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  resourceUUID,
-					TRN: mtypes.VCSProviderModelType.BuildTRN("a/resource/path"),
+					TRN: trn.TypeVCSProvider.Build("a/resource/path"),
 				},
 				Name:               "a-sample-gitlab-provider",
 				Description:        "",
@@ -814,7 +814,7 @@ func TestUpdateVCSProvider(t *testing.T) {
 				&models.VCSProvider{
 					Metadata: models.ResourceMetadata{
 						ID:  resourceUUID,
-						TRN: mtypes.VCSProviderModelType.BuildTRN("a/resource/path"),
+						TRN: trn.TypeVCSProvider.Build("a/resource/path"),
 					},
 					Name:               "a-sample-github-provider",
 					Description:        "this-is-the-new-description",
@@ -893,7 +893,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID:      resourceUUID,
 			Version: 1,
-			TRN:     mtypes.VCSProviderModelType.BuildTRN(groupPath + "/some-provider"),
+			TRN:     trn.TypeVCSProvider.Build(groupPath + "/some-provider"),
 		},
 		URL:                sampleProviderURL,
 		OAuthClientID:      "a-sample-client-id",
@@ -910,7 +910,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID:      resourceUUID,
 			Version: 1,
-			TRN:     mtypes.VCSProviderModelType.BuildTRN(groupPath + "/some-provider"),
+			TRN:     trn.TypeVCSProvider.Build(groupPath + "/some-provider"),
 		},
 		URL:                sampleProviderURL,
 		OAuthClientID:      "a-sample-client-id",
@@ -1217,7 +1217,7 @@ func TestGetWorkspaceVCSProviderLinkByTRN(t *testing.T) {
 	sampleLink := &models.WorkspaceVCSProviderLink{
 		Metadata: models.ResourceMetadata{
 			ID:  "link-1",
-			TRN: mtypes.WorkspaceVCSProviderLinkModelType.BuildTRN("link-gid-1"),
+			TRN: trn.TypeWorkspaceVCSProviderLink.Build("link-gid-1"),
 		},
 		WorkspaceID:     "workspace-1",
 		ProviderID:      "provider-1",
@@ -1345,7 +1345,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  "provider-id",
-					TRN: mtypes.VCSEventModelType.BuildTRN("full/path/to/provider"),
+					TRN: trn.TypeVCSEvent.Build("full/path/to/provider"),
 				},
 				URL:                sampleProviderURL,
 				OAuthClientID:      "a-sample-client-id",
@@ -1423,7 +1423,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  "provider-id",
-					TRN: mtypes.VCSEventModelType.BuildTRN("full/path/to/provider"),
+					TRN: trn.TypeVCSEvent.Build("full/path/to/provider"),
 				},
 				URL:                sampleProviderURL,
 				OAuthClientID:      "a-sample-client-id",
@@ -1472,7 +1472,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  "provider-id",
-					TRN: mtypes.VCSProviderModelType.BuildTRN("some/resource/path"), // Different from workspace.
+					TRN: trn.TypeVCSProvider.Build("some/resource/path"), // Different from workspace.
 				},
 			},
 			expectedErrorCode: errors.EInvalid,
@@ -1486,7 +1486,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  "provider-id",
-					TRN: mtypes.VCSEventModelType.BuildTRN("path/provider"),
+					TRN: trn.TypeVCSEvent.Build("path/provider"),
 				},
 			},
 			expectedErrorCode: errors.EInvalid,
@@ -1501,7 +1501,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  "provider-id",
-					TRN: mtypes.VCSEventModelType.BuildTRN("path/provider"),
+					TRN: trn.TypeVCSEvent.Build("path/provider"),
 				},
 			},
 			expectedErrorCode: errors.EInvalid,
@@ -1516,7 +1516,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  "provider-id",
-					TRN: mtypes.VCSEventModelType.BuildTRN("path/provider"),
+					TRN: trn.TypeVCSEvent.Build("path/provider"),
 				},
 			},
 			expectedErrorCode: errors.EInvalid,
@@ -1532,7 +1532,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  "provider-id",
-					TRN: mtypes.VCSEventModelType.BuildTRN("path/provider"),
+					TRN: trn.TypeVCSEvent.Build("path/provider"),
 				},
 			},
 			expectedErrorCode: errors.EInvalid,

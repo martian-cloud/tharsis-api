@@ -12,10 +12,10 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -24,7 +24,7 @@ type Applies interface {
 	// GetApplyByID returns a apply by ID
 	GetApplyByID(ctx context.Context, id string) (*models.Apply, error)
 	// GetApplyByTRN returns a apply by TRN
-	GetApplyByTRN(ctx context.Context, trn string) (*models.Apply, error)
+	GetApplyByTRN(ctx context.Context, trnValue string) (*models.Apply, error)
 	// GetApplies returns a list of applies
 	GetApplies(ctx context.Context, input *GetAppliesInput) (*AppliesResult, error)
 	// CreateApply will create a new apply
@@ -98,18 +98,17 @@ func (a *applies) GetApplyByID(ctx context.Context, id string) (*models.Apply, e
 	return a.getApply(ctx, goqu.Ex{"applies.id": id})
 }
 
-func (a *applies) GetApplyByTRN(ctx context.Context, trn string) (*models.Apply, error) {
+func (a *applies) GetApplyByTRN(ctx context.Context, trnValue string) (*models.Apply, error) {
 	ctx, span := tracer.Start(ctx, "db.GetApplyByTRN")
-	span.SetAttributes(attribute.String("trn", trn))
+	span.SetAttributes(attribute.String("trn", trnValue))
 	defer span.End()
 
-	path, err := types.ApplyModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeApply.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a apply TRN must have the workspace path and apply GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -117,8 +116,8 @@ func (a *applies) GetApplyByTRN(ctx context.Context, trn string) (*models.Apply,
 	}
 
 	return a.getApply(ctx, goqu.Ex{
-		"applies.id":      gid.FromGlobalID(path[lastSlashIndex+1:]),
-		"namespaces.path": path[:lastSlashIndex],
+		"applies.id":      gid.FromGlobalID(parsed.BaseName()),
+		"namespaces.path": parsed.ParentPath(),
 	})
 }
 
@@ -347,7 +346,7 @@ func scanApply(row scanner) (*models.Apply, error) {
 		apply.TriggeredBy = triggeredBy.String
 	}
 
-	apply.Metadata.TRN = types.ApplyModelType.BuildTRN(workspacePath, apply.GetGlobalID())
+	apply.Metadata.TRN = trn.TypeApply.Build(workspacePath, apply.GetGlobalID())
 
 	return apply, nil
 }

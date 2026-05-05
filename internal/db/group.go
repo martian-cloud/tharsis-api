@@ -15,10 +15,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // Groups encapsulates the logic to access groups from the database
@@ -26,7 +26,7 @@ type Groups interface {
 	// GetGroupByID returns a group by ID
 	GetGroupByID(ctx context.Context, id string) (*models.Group, error)
 	// GetGroupByTRN returns a group by trn
-	GetGroupByTRN(ctx context.Context, trn string) (*models.Group, error)
+	GetGroupByTRN(ctx context.Context, trnValue string) (*models.Group, error)
 	// DeleteGroup deletes a group
 	DeleteGroup(ctx context.Context, group *models.Group) error
 	// GetGroups returns a list of groups
@@ -129,17 +129,17 @@ func (g *groups) GetGroupByID(ctx context.Context, id string) (*models.Group, er
 	return g.getGroup(ctx, goqu.Ex{"groups.id": id})
 }
 
-func (g *groups) GetGroupByTRN(ctx context.Context, trn string) (*models.Group, error) {
+func (g *groups) GetGroupByTRN(ctx context.Context, trnValue string) (*models.Group, error) {
 	ctx, span := tracer.Start(ctx, "db.GetGroupByTRN")
-	span.SetAttributes(attribute.String("trn", trn))
+	span.SetAttributes(attribute.String("trn", trnValue))
 	defer span.End()
 
-	path, err := types.GroupModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeGroup.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	return g.getGroup(ctx, goqu.Ex{"namespaces.path": path})
+	return g.getGroup(ctx, goqu.Ex{"namespaces.path": parsed.Path()})
 }
 
 func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsResult, error) {
@@ -362,7 +362,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 	}
 
 	createdGroup.FullPath = fullPath
-	createdGroup.Metadata.TRN = types.GroupModelType.BuildTRN(fullPath)
+	createdGroup.Metadata.TRN = trn.TypeGroup.Build(fullPath)
 
 	return createdGroup, nil
 }
@@ -956,7 +956,7 @@ func scanGroup(row scanner, withFullPath bool) (*models.Group, error) {
 	}
 
 	if withFullPath {
-		group.Metadata.TRN = types.GroupModelType.BuildTRN(group.FullPath)
+		group.Metadata.TRN = trn.TypeGroup.Build(group.FullPath)
 	}
 
 	return group, nil

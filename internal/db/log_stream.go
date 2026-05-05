@@ -11,9 +11,9 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // LogStreamSortableField represents the fields that a log stream can be sorted by
@@ -312,7 +312,7 @@ func scanLogStream(row scanner) (*models.LogStream, error) {
 		return nil, err
 	}
 
-	logStream.Metadata.TRN = types.LogStreamModelType.BuildTRN(logStream.GetGlobalID())
+	logStream.Metadata.TRN = trn.TypeLogStream.Build(logStream.GetGlobalID())
 
 	return logStream, nil
 }

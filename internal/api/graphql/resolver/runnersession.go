@@ -8,6 +8,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
@@ -231,7 +232,7 @@ func handleCreateRunnerSessionMutationProblem(e error,
 func createRunnerSessionMutation(ctx context.Context,
 	input *CreateRunnerSessionInput) (*CreateRunnerSessionMutationPayloadResolver, error) {
 	createdRunnerSession, err := getServiceCatalog(ctx).RunnerService.CreateRunnerSession(ctx, &runner.CreateRunnerSessionInput{
-		RunnerPath: input.RunnerPath,
+		RunnerID: trn.TypeRunner.Build(input.RunnerPath),
 	})
 	if err != nil {
 		return nil, err

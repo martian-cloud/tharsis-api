@@ -12,11 +12,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/smithy-go/ptr"
+	dispatchertypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
-var pluginDataRequiredFields = []string{"api_url", "region", "task_definition", "cluster", "subnets", "launch_type"}
+var pluginDataRequiredFields = []string{"endpoint", "region", "task_definition", "cluster", "subnets", "launch_type"}
 
 type client interface {
 	RunTask(ctx context.Context, params *ecs.RunTaskInput, optFns ...func(*ecs.Options)) (*ecs.RunTaskOutput, error)
@@ -29,13 +30,17 @@ type JobDispatcher struct {
 	taskDefinition         string
 	cluster                string
 	launchType             types.LaunchType
-	apiURL                 string
+	apiEndpoint            string
 	discoveryProtocolHosts []string
 	subnets                []string
 }
 
 // New creates a JobDispatcher
 func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHost string, logger logger.Logger) (*JobDispatcher, error) {
+	if err := dispatchertypes.MigrateDeprecatedPluginDataFields(pluginData, logger); err != nil {
+		return nil, err
+	}
+
 	for _, field := range pluginDataRequiredFields {
 		if _, ok := pluginData[field]; !ok {
 			return nil, fmt.Errorf("ECS job dispatcher requires plugin data '%s' field", field)
@@ -77,7 +82,7 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		cluster:                pluginData["cluster"],
 		launchType:             launchType,
 		subnets:                strings.Split(pluginData["subnets"], ","),
-		apiURL:                 pluginData["api_url"],
+		apiEndpoint:            pluginData["endpoint"],
 		discoveryProtocolHosts: discoveryProtocolHosts,
 		client:                 client,
 	}, nil
@@ -102,7 +107,7 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 					Environment: []types.KeyValuePair{
 						{Name: ptr.String("JOB_ID"), Value: &jobID},
 						{Name: ptr.String("JOB_TOKEN"), Value: &token},
-						{Name: ptr.String("API_URL"), Value: &j.apiURL},
+						{Name: ptr.String("ENDPOINT"), Value: &j.apiEndpoint},
 						{Name: ptr.String("DISCOVERY_PROTOCOL_HOSTS"), Value: ptr.String(strings.Join(j.discoveryProtocolHosts, ","))},
 					},
 				},

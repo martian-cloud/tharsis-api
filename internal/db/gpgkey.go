@@ -10,17 +10,17 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
 )
 
 // GPGKeys encapsulates the logic to access gpg keys from the database
 type GPGKeys interface {
 	GetGPGKeyByID(ctx context.Context, id string) (*models.GPGKey, error)
-	GetGPGKeyByTRN(ctx context.Context, trn string) (*models.GPGKey, error)
+	GetGPGKeyByTRN(ctx context.Context, trnValue string) (*models.GPGKey, error)
 	GetGPGKeys(ctx context.Context, input *GetGPGKeysInput) (*GPGKeysResult, error)
 	CreateGPGKey(ctx context.Context, gpgKey *models.GPGKey) (*models.GPGKey, error)
 	DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
@@ -108,19 +108,17 @@ func (t *terraformGPGKeys) GetGPGKeyByID(ctx context.Context, id string) (*model
 	return t.getGPGKey(ctx, goqu.Ex{"gpg_keys.id": id})
 }
 
-func (t *terraformGPGKeys) GetGPGKeyByTRN(ctx context.Context, trn string) (*models.GPGKey, error) {
+func (t *terraformGPGKeys) GetGPGKeyByTRN(ctx context.Context, trnValue string) (*models.GPGKey, error) {
 	ctx, span := tracer.Start(ctx, "db.GetGPGKeyByTRN")
-	span.SetAttributes(attribute.String("trn", trn))
+	span.SetAttributes(attribute.String("trn", trnValue))
 	defer span.End()
 
-	path, err := types.GPGKeyModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeGPGKey.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a GPG key TRN must have the group path and key fingerprint separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -128,8 +126,8 @@ func (t *terraformGPGKeys) GetGPGKeyByTRN(ctx context.Context, trn string) (*mod
 	}
 
 	return t.getGPGKey(ctx, goqu.Ex{
-		"gpg_keys.fingerprint": path[lastSlashIndex+1:],
-		"namespaces.path":      path[:lastSlashIndex],
+		"gpg_keys.fingerprint": parsed.BaseName(),
+		"namespaces.path":      parsed.ParentPath(),
 	})
 }
 
@@ -369,7 +367,7 @@ func scanGPGKey(row scanner) (*models.GPGKey, error) {
 
 	// Cast int64 to uint64 for the model
 	gpgKey.GPGKeyID = uint64(gpgKeyID)
-	gpgKey.Metadata.TRN = types.GPGKeyModelType.BuildTRN(groupPath, gpgKey.Fingerprint)
+	gpgKey.Metadata.TRN = trn.TypeGPGKey.Build(groupPath, gpgKey.Fingerprint)
 
 	return gpgKey, nil
 }

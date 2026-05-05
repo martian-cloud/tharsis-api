@@ -19,6 +19,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 type mockDBClient struct {
@@ -308,7 +309,7 @@ func TestFederatedRegistryByTRN(t *testing.T) {
 	sampleFederatedRegistry := &models.FederatedRegistry{
 		Metadata: models.ResourceMetadata{
 			ID:  "federated-registry-id-1",
-			TRN: types.FederatedRegistryModelType.BuildTRN("my-group/123341"),
+			TRN: trn.TypeFederatedRegistry.Build("my-group/123341"),
 		},
 		GroupID:   "group-1",
 		Audience:  "test-audience",

@@ -8,12 +8,12 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -194,7 +194,7 @@ func (s *service) SetNotificationPreference(ctx context.Context, input *SetNotif
 		namespacePath := *input.NamespacePath
 		permission := models.ViewWorkspacePermission
 		// Check if this namespace is a group, if it's not a group we can assume it's a workspace
-		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespacePath))
+		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(namespacePath))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get group by TRN", errors.WithSpan(span))
 		}
@@ -287,7 +287,7 @@ func (s *service) GetNotificationPreference(ctx context.Context, input *GetNotif
 		namespacePath := *input.NamespacePath
 		permission := models.ViewWorkspacePermission
 		// Check if this namespace is a group, if it's not a group we can assume it's a workspace
-		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespacePath))
+		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(namespacePath))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get group by TRN", errors.WithSpan(span))
 		}
@@ -850,7 +850,7 @@ func (s *service) CreateNamespaceFavorite(ctx context.Context, input *CreateName
 		if err := userCaller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(namespacePath)); err != nil {
 			return nil, err
 		}
-		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespacePath))
+		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(namespacePath))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get group", errors.WithSpan(span))
 		}
@@ -862,7 +862,7 @@ func (s *service) CreateNamespaceFavorite(ctx context.Context, input *CreateName
 		if err := userCaller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(namespacePath)); err != nil {
 			return nil, err
 		}
-		workspace, err := s.dbClient.Workspaces.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(namespacePath))
+		workspace, err := s.dbClient.Workspaces.GetWorkspaceByTRN(ctx, trn.TypeWorkspace.Build(namespacePath))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get workspace", errors.WithSpan(span))
 		}
@@ -931,7 +931,7 @@ func (s *service) DeleteNamespaceFavorite(ctx context.Context, input *DeleteName
 		if err := userCaller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(namespacePath)); err != nil {
 			return err
 		}
-		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespacePath))
+		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(namespacePath))
 		if err != nil {
 			return errors.Wrap(err, "failed to get group", errors.WithSpan(span))
 		}
@@ -942,7 +942,7 @@ func (s *service) DeleteNamespaceFavorite(ctx context.Context, input *DeleteName
 		if err := userCaller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(namespacePath)); err != nil {
 			return err
 		}
-		workspace, err := s.dbClient.Workspaces.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(namespacePath))
+		workspace, err := s.dbClient.Workspaces.GetWorkspaceByTRN(ctx, trn.TypeWorkspace.Build(namespacePath))
 		if err != nil {
 			return errors.Wrap(err, "failed to get workspace", errors.WithSpan(span))
 		}

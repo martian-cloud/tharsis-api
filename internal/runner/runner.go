@@ -45,14 +45,13 @@ type Runner struct {
 	jobDispatcher jobdispatcher.JobDispatcher
 	logger        logger.Logger
 	client        Client
-	runnerPath    string
+	runnerID      string
 }
 
 // NewRunner creates a new Runner
-// In Tharsis, this takes a runner path, not a runner ID.
 func NewRunner(
 	ctx context.Context,
-	runnerPath string,
+	runnerID string,
 	logger logger.Logger,
 	version string,
 	client Client,
@@ -63,18 +62,17 @@ func NewRunner(
 		return nil, fmt.Errorf("failed to create job dispatcher %v", err)
 	}
 
-	return &Runner{runnerPath: runnerPath, jobDispatcher: dispatcher, logger: logger, client: client}, nil
+	return &Runner{runnerID: runnerID, jobDispatcher: dispatcher, logger: logger, client: client}, nil
 }
 
 // Start will start the runner so it can begin picking up jobs
 func (r *Runner) Start(ctx context.Context) {
-
 	defer r.logger.Info("Runner session has ended")
 
 	r.logger.Info("Creating new runner session")
 
 	sessionID, err := r.client.CreateRunnerSession(ctx, &CreateRunnerSessionInput{
-		RunnerPath: r.runnerPath,
+		RunnerID: r.runnerID,
 	})
 	if err != nil {
 		r.logger.Errorf("Failed to create runner session %v", err)
@@ -88,7 +86,7 @@ func (r *Runner) Start(ctx context.Context) {
 		r.logger.Info("Waiting for next available run")
 
 		resp, err := r.client.ClaimJob(ctx, &ClaimJobInput{
-			RunnerPath: r.runnerPath,
+			RunnerID: r.runnerID,
 		})
 		claimJobCount.Inc()
 

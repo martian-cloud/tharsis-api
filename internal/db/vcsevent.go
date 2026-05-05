@@ -11,16 +11,16 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // VCSEvents encapsulates the logic for accessing vcs events form the database.
 type VCSEvents interface {
 	GetEventByID(ctx context.Context, id string) (*models.VCSEvent, error)
-	GetEventByTRN(ctx context.Context, trn string) (*models.VCSEvent, error)
+	GetEventByTRN(ctx context.Context, trnValue string) (*models.VCSEvent, error)
 	GetEvents(ctx context.Context, input *GetVCSEventsInput) (*VCSEventsResult, error)
 	CreateEvent(ctx context.Context, event *models.VCSEvent) (*models.VCSEvent, error)
 	UpdateEvent(ctx context.Context, event *models.VCSEvent) (*models.VCSEvent, error)
@@ -105,17 +105,16 @@ func (ve *vcsEvents) GetEventByID(ctx context.Context, id string) (*models.VCSEv
 	return ve.getEvent(ctx, goqu.Ex{"vcs_events.id": id})
 }
 
-func (ve *vcsEvents) GetEventByTRN(ctx context.Context, trn string) (*models.VCSEvent, error) {
+func (ve *vcsEvents) GetEventByTRN(ctx context.Context, trnValue string) (*models.VCSEvent, error) {
 	ctx, span := tracer.Start(ctx, "db.GetEventByTRN")
 	defer span.End()
 
-	path, err := types.VCSEventModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeVCSEvent.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a vcs event TRN must have the workspace path, and event GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -123,8 +122,8 @@ func (ve *vcsEvents) GetEventByTRN(ctx context.Context, trn string) (*models.VCS
 	}
 
 	return ve.getEvent(ctx, goqu.Ex{
-		"vcs_events.id":   gid.FromGlobalID(path[lastSlashIndex+1:]),
-		"namespaces.path": path[:lastSlashIndex],
+		"vcs_events.id":   gid.FromGlobalID(parsed.BaseName()),
+		"namespaces.path": parsed.ParentPath(),
 	})
 }
 
@@ -360,7 +359,7 @@ func scanVCSEvent(row scanner) (*models.VCSEvent, error) {
 		return nil, err
 	}
 
-	ve.Metadata.TRN = types.VCSEventModelType.BuildTRN(workspacePath, ve.GetGlobalID())
+	ve.Metadata.TRN = trn.TypeVCSEvent.Build(workspacePath, ve.GetGlobalID())
 
 	return ve, nil
 }

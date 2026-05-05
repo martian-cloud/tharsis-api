@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func (sf FederatedRegistrySortableField) getValue() string {
@@ -112,11 +112,11 @@ func TestGetFederatedRegistryByTRN(t *testing.T) {
 		},
 		{
 			name: "resource with TRN not found",
-			trn:  types.FederatedRegistryModelType.BuildTRN(group.FullPath, "invalid.tld"),
+			trn:  trn.TypeFederatedRegistry.Build(group.FullPath, "invalid.tld"),
 		},
 		{
 			name:            "registry trn has less than two parts",
-			trn:             types.FederatedRegistryModelType.BuildTRN(group.FullPath),
+			trn:             trn.TypeFederatedRegistry.Build(group.FullPath),
 			expectErrorCode: errors.EInvalid,
 		},
 		{
@@ -137,7 +137,7 @@ func TestGetFederatedRegistryByTRN(t *testing.T) {
 
 			if test.expectFederatedRegistry {
 				require.NotNil(t, actualFederatedRegistry)
-				assert.Equal(t, types.FederatedRegistryModelType.BuildTRN(group.FullPath, federatedRegistry.Hostname), actualFederatedRegistry.Metadata.TRN)
+				assert.Equal(t, trn.TypeFederatedRegistry.Build(group.FullPath, federatedRegistry.Hostname), actualFederatedRegistry.Metadata.TRN)
 			} else {
 				assert.Nil(t, actualFederatedRegistry)
 			}

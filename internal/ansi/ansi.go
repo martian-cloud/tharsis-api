@@ -2,7 +2,6 @@
 package ansi
 
 import (
-	"fmt"
 	"regexp"
 )
 
@@ -27,7 +26,7 @@ var (
 
 // Colorize wraps the string in the specified ansi color
 func Colorize(s string, color Code) string {
-	return fmt.Sprintf("%s%s%s", color, s, Reset)
+	return string(color) + s + string(Reset)
 }
 
 // UnColorize removes the above ansi color codes from the string.

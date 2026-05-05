@@ -10,16 +10,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TerraformProviderPlatforms encapsulates the logic to access terraform provider platforms from the database
 type TerraformProviderPlatforms interface {
 	GetProviderPlatformByID(ctx context.Context, id string) (*models.TerraformProviderPlatform, error)
-	GetProviderPlatformByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatform, error)
+	GetProviderPlatformByTRN(ctx context.Context, trnValue string) (*models.TerraformProviderPlatform, error)
 	GetProviderPlatforms(ctx context.Context, input *GetProviderPlatformsInput) (*ProviderPlatformsResult, error)
 	CreateProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) (*models.TerraformProviderPlatform, error)
 	UpdateProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) (*models.TerraformProviderPlatform, error)
@@ -95,16 +95,16 @@ func (t *terraformProviderPlatforms) GetProviderPlatformByID(ctx context.Context
 	return t.getProviderPlatform(ctx, goqu.Ex{"terraform_provider_platforms.id": id})
 }
 
-func (t *terraformProviderPlatforms) GetProviderPlatformByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatform, error) {
+func (t *terraformProviderPlatforms) GetProviderPlatformByTRN(ctx context.Context, trnValue string) (*models.TerraformProviderPlatform, error) {
 	ctx, span := tracer.Start(ctx, "db.GetProviderPlatformByTRN")
 	defer span.End()
 
-	path, err := types.TerraformProviderPlatformModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeTerraformProviderPlatform.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	parts := strings.Split(path, "/")
+	parts := parsed.PathParts()
 
 	if len(parts) < 5 {
 		return nil, errors.New("a Terraform Provider platform TRN must have the group path, name, semantic version, os, and arch separated by a forward slash",
@@ -419,7 +419,7 @@ func scanTerraformProviderPlatform(row scanner) (*models.TerraformProviderPlatfo
 		return nil, err
 	}
 
-	providerPlatform.Metadata.TRN = types.TerraformProviderPlatformModelType.BuildTRN(
+	providerPlatform.Metadata.TRN = trn.TypeTerraformProviderPlatform.Build(
 		groupPath,
 		providerName,
 		providerSemVersion,

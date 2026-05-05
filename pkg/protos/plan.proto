@@ -30,10 +30,18 @@ message UpdatePlanRequest {
   optional string error_message = 5;
 }
 
+// PlanSummary contains a summary of the types of changes a plan includes.
+message PlanSummary {
+  int32 resource_additions    = 1;
+  int32 resource_changes      = 2;
+  int32 resource_destructions = 3;
+}
+
 // Plan represents a Terraform plan.
 message Plan {
   metadata.ResourceMetadata metadata      = 1;
   string                    status        = 2;
   optional string           error_message = 3;
   bool                      has_changes   = 4;
+  PlanSummary               summary       = 5;
 }

@@ -1,4 +1,3 @@
-// Package client contains a client implementation for interfacing with the Tharsis server
 package client
 
 import (
@@ -32,6 +31,7 @@ const retryPolicy = `{
 			{"service": "martiancloud.tharsis.api.auth_settings.AuthSettings"},
 			{"service": "martiancloud.tharsis.api.caller.Caller"},
 			{"service": "martiancloud.tharsis.api.configuration_version.ConfigurationVersions"},
+			{"service": "martiancloud.tharsis.api.federated_registry.FederatedRegistries"},
 			{"service": "martiancloud.tharsis.api.gpg_key.GPGKeys"},
 			{"service": "martiancloud.tharsis.api.group.Groups"},
 			{"service": "martiancloud.tharsis.api.job.Jobs"},
@@ -46,6 +46,7 @@ const retryPolicy = `{
 			{"service": "martiancloud.tharsis.api.state_version.StateVersions"},
 			{"service": "martiancloud.tharsis.api.team.Teams"},
 			{"service": "martiancloud.tharsis.api.terraform_module.TerraformModules"},
+			{"service": "martiancloud.tharsis.api.terraform_cli.TerraformCLIVersions"},
 			{"service": "martiancloud.tharsis.api.terraform_provider.TerraformProviders"},
 			{"service": "martiancloud.tharsis.api.terraform_provider_mirror.TerraformProviderMirrors"},
 			{"service": "martiancloud.tharsis.api.user.Users"},
@@ -69,12 +70,12 @@ const retryPolicy = `{
 // contextCredentials implements the credentials.PerRPCCredentials interface and
 // allows us to use a token passed into the RPC request metadata.
 type contextCredentials struct {
-	getter TokenGetter
+	resolver TokenResolver
 }
 
 // GetRequestMetadata sets the token on the context metadata.
 func (c *contextCredentials) GetRequestMetadata(ctx context.Context, _ ...string) (map[string]string, error) {
-	newToken, err := c.getter.Token(ctx)
+	newToken, err := c.resolver.Token(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +91,10 @@ func (c *contextCredentials) RequireTransportSecurity() bool {
 	return false
 }
 
-// TokenGetter is an interface for retrieving and renewing the authentication token.
-type TokenGetter interface {
+// TokenResolver is an interface for retrieving and renewing the authentication token.
+type TokenResolver interface {
 	Token(ctx context.Context) (string, error)
+	Close() error
 }
 
 // LeveledLogger is an interface that can be implemented by any logger or a
@@ -108,12 +110,13 @@ type LeveledLogger interface {
 	Warn(msg string, keysAndValues ...interface{})
 }
 
-// Client is the gateway to interact with the Tharsis API.
-type Client struct {
+// GRPCClient is the gateway to interact with the Tharsis API.
+type GRPCClient struct {
 	connection                     *grpc.ClientConn
 	AuthSettingsClient             pb.AuthSettingsClient
 	CallerIdentityClient           pb.CallerIdentityClient
 	ConfigurationVersionsClient    pb.ConfigurationVersionsClient
+	FederatedRegistriesClient      pb.FederatedRegistriesClient
 	GPGKeysClient                  pb.GPGKeysClient
 	GroupsClient                   pb.GroupsClient
 	JobsClient                     pb.JobsClient
@@ -128,6 +131,7 @@ type Client struct {
 	StateVersionsClient            pb.StateVersionsClient
 	TeamsClient                    pb.TeamsClient
 	TerraformModulesClient         pb.TerraformModulesClient
+	TerraformCLIVersionsClient     pb.TerraformCLIVersionsClient
 	TerraformProvidersClient       pb.TerraformProvidersClient
 	TerraformProviderMirrorsClient pb.TerraformProviderMirrorsClient
 	UsersClient                    pb.UsersClient
@@ -136,17 +140,17 @@ type Client struct {
 	WorkspacesClient               pb.WorkspacesClient
 }
 
-// Config is used to configure the client
-type Config struct {
-	TokenGetter   TokenGetter
+// GRPCClientConfig is used to configure the GRPCClient.
+type GRPCClientConfig struct {
+	TokenResolver TokenResolver
 	HTTPEndpoint  string
 	TLSSkipVerify bool
 	Logger        LeveledLogger
 	UserAgent     string
 }
 
-// New returns a new Client struct.
-func New(ctx context.Context, c *Config) (*Client, error) {
+// NewGRPCClient returns a new GRPCClient.
+func NewGRPCClient(ctx context.Context, c *GRPCClientConfig) (*GRPCClient, error) {
 	dialOptions := []grpc.DialOption{
 		// Set Retry policy.
 		grpc.WithDefaultServiceConfig(retryPolicy),
@@ -171,12 +175,12 @@ func New(ctx context.Context, c *Config) (*Client, error) {
 		dialOptions = append(dialOptions, grpc.WithUserAgent(c.UserAgent))
 	}
 
-	if c.TokenGetter != nil {
+	if c.TokenResolver != nil {
 		// Add token based auth since we're using it.
 		dialOptions = append(
 			dialOptions,
 			grpc.WithPerRPCCredentials(&contextCredentials{
-				getter: c.TokenGetter,
+				resolver: c.TokenResolver,
 			}),
 		)
 	}
@@ -276,11 +280,12 @@ func New(ctx context.Context, c *Config) (*Client, error) {
 		c.Logger.Info("successfully initialized GRPC connection")
 	}
 
-	return &Client{
+	return &GRPCClient{
 		connection:                     clientConn,
 		AuthSettingsClient:             pb.NewAuthSettingsClient(clientConn),
 		CallerIdentityClient:           pb.NewCallerIdentityClient(clientConn),
 		ConfigurationVersionsClient:    pb.NewConfigurationVersionsClient(clientConn),
+		FederatedRegistriesClient:      pb.NewFederatedRegistriesClient(clientConn),
 		GPGKeysClient:                  pb.NewGPGKeysClient(clientConn),
 		GroupsClient:                   pb.NewGroupsClient(clientConn),
 		JobsClient:                     pb.NewJobsClient(clientConn),
@@ -295,6 +300,7 @@ func New(ctx context.Context, c *Config) (*Client, error) {
 		StateVersionsClient:            pb.NewStateVersionsClient(clientConn),
 		TeamsClient:                    pb.NewTeamsClient(clientConn),
 		TerraformModulesClient:         pb.NewTerraformModulesClient(clientConn),
+		TerraformCLIVersionsClient:     pb.NewTerraformCLIVersionsClient(clientConn),
 		TerraformProvidersClient:       pb.NewTerraformProvidersClient(clientConn),
 		TerraformProviderMirrorsClient: pb.NewTerraformProviderMirrorsClient(clientConn),
 		UsersClient:                    pb.NewUsersClient(clientConn),
@@ -304,8 +310,8 @@ func New(ctx context.Context, c *Config) (*Client, error) {
 	}, nil
 }
 
-// Close closes any underlying connections for this client.
-func (c *Client) Close() error {
+// Close closes any underlying connections for this GRPCClient.
+func (c *GRPCClient) Close() error {
 	return c.connection.Close()
 }
 

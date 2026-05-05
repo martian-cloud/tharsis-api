@@ -110,9 +110,9 @@ func (_m *MockServiceAccounts) GetServiceAccountByID(ctx context.Context, id str
 	return r0, r1
 }
 
-// GetServiceAccountByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockServiceAccounts) GetServiceAccountByTRN(ctx context.Context, trn string) (*models.ServiceAccount, error) {
-	ret := _m.Called(ctx, trn)
+// GetServiceAccountByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockServiceAccounts) GetServiceAccountByTRN(ctx context.Context, trnValue string) (*models.ServiceAccount, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetServiceAccountByTRN")
@@ -121,10 +121,10 @@ func (_m *MockServiceAccounts) GetServiceAccountByTRN(ctx context.Context, trn s
 	var r0 *models.ServiceAccount
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.ServiceAccount, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.ServiceAccount); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.ServiceAccount)
@@ -132,7 +132,7 @@ func (_m *MockServiceAccounts) GetServiceAccountByTRN(ctx context.Context, trn s
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

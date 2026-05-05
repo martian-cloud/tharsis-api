@@ -92,9 +92,9 @@ func (_m *MockTerraformProviderPlatforms) GetProviderPlatformByID(ctx context.Co
 	return r0, r1
 }
 
-// GetProviderPlatformByTRN provides a mock function with given fields: ctx, trn
-func (_m *MockTerraformProviderPlatforms) GetProviderPlatformByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatform, error) {
-	ret := _m.Called(ctx, trn)
+// GetProviderPlatformByTRN provides a mock function with given fields: ctx, trnValue
+func (_m *MockTerraformProviderPlatforms) GetProviderPlatformByTRN(ctx context.Context, trnValue string) (*models.TerraformProviderPlatform, error) {
+	ret := _m.Called(ctx, trnValue)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetProviderPlatformByTRN")
@@ -103,10 +103,10 @@ func (_m *MockTerraformProviderPlatforms) GetProviderPlatformByTRN(ctx context.C
 	var r0 *models.TerraformProviderPlatform
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.TerraformProviderPlatform, error)); ok {
-		return rf(ctx, trn)
+		return rf(ctx, trnValue)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.TerraformProviderPlatform); ok {
-		r0 = rf(ctx, trn)
+		r0 = rf(ctx, trnValue)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.TerraformProviderPlatform)
@@ -114,7 +114,7 @@ func (_m *MockTerraformProviderPlatforms) GetProviderPlatformByTRN(ctx context.C
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, trn)
+		r1 = rf(ctx, trnValue)
 	} else {
 		r1 = ret.Error(1)
 	}

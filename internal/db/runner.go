@@ -12,16 +12,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
 )
 
 // Runners encapsulates the logic to access runners from the database
 type Runners interface {
-	GetRunnerByTRN(ctx context.Context, trn string) (*models.Runner, error)
+	GetRunnerByTRN(ctx context.Context, trnValue string) (*models.Runner, error)
 	GetRunnerByID(ctx context.Context, id string) (*models.Runner, error)
 	GetRunners(ctx context.Context, input *GetRunnersInput) (*RunnersResult, error)
 	CreateRunner(ctx context.Context, runner *models.Runner) (*models.Runner, error)
@@ -117,26 +117,24 @@ func NewRunners(dbClient *Client) Runners {
 	return &terraformRunners{dbClient: dbClient}
 }
 
-func (t *terraformRunners) GetRunnerByTRN(ctx context.Context, trn string) (*models.Runner, error) {
+func (t *terraformRunners) GetRunnerByTRN(ctx context.Context, trnValue string) (*models.Runner, error) {
 	ctx, span := tracer.Start(ctx, "db.GetRunnerByTRN")
-	span.SetAttributes(attribute.String("trn", trn))
+	span.SetAttributes(attribute.String("trn", trnValue))
 	defer span.End()
 
-	path, err := types.RunnerModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeRunner.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	ex := goqu.Ex{}
-	lastSlashIndex := strings.LastIndex(path, "/")
-
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		// This is a global runner.
-		ex["runners.name"] = path
+		ex["runners.name"] = parsed.Path()
 	} else {
 		// This is a group runner.
-		ex["runners.name"] = path[lastSlashIndex+1:]
-		ex["namespaces.path"] = path[:lastSlashIndex]
+		ex["runners.name"] = parsed.BaseName()
+		ex["namespaces.path"] = parsed.ParentPath()
 	}
 
 	return t.getRunner(ctx, ex)
@@ -471,9 +469,9 @@ func scanRunner(row scanner) (*models.Runner, error) {
 	}
 
 	if namespacePath.Valid {
-		runner.Metadata.TRN = types.RunnerModelType.BuildTRN(namespacePath.String, runner.Name)
+		runner.Metadata.TRN = trn.TypeRunner.Build(namespacePath.String, runner.Name)
 	} else {
-		runner.Metadata.TRN = types.RunnerModelType.BuildTRN(runner.Name)
+		runner.Metadata.TRN = trn.TypeRunner.Build(runner.Name)
 	}
 
 	return runner, nil

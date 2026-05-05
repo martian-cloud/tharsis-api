@@ -11,11 +11,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestGetAvailablePermissions(t *testing.T) {
@@ -115,7 +115,7 @@ func TestGetRoleByTRN(t *testing.T) {
 	sampleRole := &models.Role{
 		Metadata: models.ResourceMetadata{
 			ID:  "role-id-1",
-			TRN: types.RoleModelType.BuildTRN("my-role/role-1"),
+			TRN: trn.TypeRole.Build("my-role/role-1"),
 		},
 		Name:        "role-1",
 		Description: "Test role",

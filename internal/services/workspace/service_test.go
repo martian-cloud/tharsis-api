@@ -18,7 +18,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	namespace "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -29,6 +28,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 func TestCreateWorkspace(t *testing.T) {
@@ -540,7 +540,7 @@ func TestGetWorkspaceByTRN(t *testing.T) {
 	sampleWorkspace := &models.Workspace{
 		Metadata: models.ResourceMetadata{
 			ID:  "workspace-1",
-			TRN: types.WorkspaceModelType.BuildTRN("group/workspace-name"),
+			TRN: trn.TypeWorkspace.Build("group/workspace-name"),
 		},
 		Name:     "workspace-name",
 		FullPath: "group/workspace-name",
@@ -690,7 +690,7 @@ func TestGetStateVersionByTRN(t *testing.T) {
 	sampleStateVersion := &models.StateVersion{
 		Metadata: models.ResourceMetadata{
 			ID:  "state-version-1",
-			TRN: types.StateVersionModelType.BuildTRN("state-version-gid-1"),
+			TRN: trn.TypeStateVersion.Build("state-version-gid-1"),
 		},
 		WorkspaceID: "workspace-1",
 	}
@@ -760,7 +760,7 @@ func TestGetWorkspaceAssessmentByTRN(t *testing.T) {
 	sampleAssessment := &models.WorkspaceAssessment{
 		Metadata: models.ResourceMetadata{
 			ID:  "assessment-1",
-			TRN: types.WorkspaceAssessmentModelType.BuildTRN("group/workspace-name/assessment-1"),
+			TRN: trn.TypeWorkspaceAssessment.Build("group/workspace-name/assessment-1"),
 		},
 		WorkspaceID: "workspace-1",
 	}
@@ -906,7 +906,7 @@ func TestGetConfigurationVersionByTRN(t *testing.T) {
 	sampleConfigVersion := &models.ConfigurationVersion{
 		Metadata: models.ResourceMetadata{
 			ID:  "config-version-1",
-			TRN: types.ConfigurationVersionModelType.BuildTRN("config-version-gid-1"),
+			TRN: trn.TypeConfigurationVersion.Build("config-version-gid-1"),
 		},
 		WorkspaceID: "workspace-1",
 	}

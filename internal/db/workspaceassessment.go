@@ -12,16 +12,16 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // WorkspaceAssessments encapsulates the logic to access Tharsis workspaceAssessments from the database.
 type WorkspaceAssessments interface {
 	GetWorkspaceAssessmentByID(ctx context.Context, id string) (*models.WorkspaceAssessment, error)
-	GetWorkspaceAssessmentByTRN(ctx context.Context, trn string) (*models.WorkspaceAssessment, error)
+	GetWorkspaceAssessmentByTRN(ctx context.Context, trnValue string) (*models.WorkspaceAssessment, error)
 	GetWorkspaceAssessmentByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceAssessment, error)
 	GetWorkspaceAssessments(ctx context.Context, input *GetWorkspaceAssessmentsInput) (*WorkspaceAssessmentsResult, error)
 	CreateWorkspaceAssessment(ctx context.Context, assessment *models.WorkspaceAssessment) (*models.WorkspaceAssessment, error)
@@ -98,17 +98,16 @@ func (r *workspaceAssessments) GetWorkspaceAssessmentByID(ctx context.Context, i
 	return r.getWorkspaceAssessment(ctx, goqu.Ex{"workspace_assessments.id": id})
 }
 
-func (r *workspaceAssessments) GetWorkspaceAssessmentByTRN(ctx context.Context, trn string) (*models.WorkspaceAssessment, error) {
+func (r *workspaceAssessments) GetWorkspaceAssessmentByTRN(ctx context.Context, trnValue string) (*models.WorkspaceAssessment, error) {
 	ctx, span := tracer.Start(ctx, "db.GetWorkspaceAssessmentByTRN")
 	defer span.End()
 
-	path, err := types.WorkspaceAssessmentModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeWorkspaceAssessment.Parse(trnValue)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
-	if lastSlashIndex == -1 {
+	if !parsed.HasParent() {
 		return nil, errors.New("a workspace assessment TRN must have the workspace path, and assessment GID separated by a forward slash",
 			errors.WithErrorCode(errors.EInvalid),
 			errors.WithSpan(span),
@@ -116,8 +115,8 @@ func (r *workspaceAssessments) GetWorkspaceAssessmentByTRN(ctx context.Context, 
 	}
 
 	return r.getWorkspaceAssessment(ctx, goqu.Ex{
-		"workspace_assessments.id": gid.FromGlobalID(path[lastSlashIndex+1:]),
-		"namespaces.path":          path[:lastSlashIndex],
+		"workspace_assessments.id": gid.FromGlobalID(parsed.BaseName()),
+		"namespaces.path":          parsed.ParentPath(),
 	})
 }
 
@@ -398,7 +397,7 @@ func scanWorkspaceAssessment(row scanner) (*models.WorkspaceAssessment, error) {
 		return nil, err
 	}
 
-	wa.Metadata.TRN = types.WorkspaceAssessmentModelType.BuildTRN(workspacePath, wa.GetGlobalID())
+	wa.Metadata.TRN = trn.TypeWorkspaceAssessment.Build(workspacePath, wa.GetGlobalID())
 
 	return wa, nil
 }

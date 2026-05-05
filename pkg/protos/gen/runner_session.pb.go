@@ -78,7 +78,7 @@ func (RunnerSessionSortableField) EnumDescriptor() ([]byte, []int) {
 // CreateRunnerSessionRequest is the input for creating a runner session.
 type CreateRunnerSessionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RunnerPath    string                 `protobuf:"bytes,1,opt,name=runner_path,json=runnerPath,proto3" json:"runner_path,omitempty"`
+	RunnerId      string                 `protobuf:"bytes,1,opt,name=runner_id,json=runnerId,proto3" json:"runner_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -113,9 +113,9 @@ func (*CreateRunnerSessionRequest) Descriptor() ([]byte, []int) {
 	return file_runner_session_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CreateRunnerSessionRequest) GetRunnerPath() string {
+func (x *CreateRunnerSessionRequest) GetRunnerId() string {
 	if x != nil {
-		return x.RunnerPath
+		return x.RunnerId
 	}
 	return ""
 }
@@ -739,10 +739,9 @@ var File_runner_session_proto protoreflect.FileDescriptor
 
 const file_runner_session_proto_rawDesc = "" +
 	"\n" +
-	"\x14runner_session.proto\x12'martiancloud.tharsis.api.runner_session\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"=\n" +
-	"\x1aCreateRunnerSessionRequest\x12\x1f\n" +
-	"\vrunner_path\x18\x01 \x01(\tR\n" +
-	"runnerPath\"\xa1\x02\n" +
+	"\x14runner_session.proto\x12'martiancloud.tharsis.api.runner_session\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"9\n" +
+	"\x1aCreateRunnerSessionRequest\x12\x1b\n" +
+	"\trunner_id\x18\x01 \x01(\tR\brunnerId\"\xa1\x02\n" +
 	"\x18GetRunnerSessionsRequest\x12\x1b\n" +
 	"\trunner_id\x18\x01 \x01(\tR\brunnerId\x12j\n" +
 	"\x12pagination_options\x18\x02 \x01(\v26.martiancloud.tharsis.api.pagination.PaginationOptionsH\x00R\x11paginationOptions\x88\x01\x01\x12\\\n" +

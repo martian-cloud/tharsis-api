@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
 
 const (
@@ -186,15 +185,8 @@ func (c *cliDownloader) Download(ctx context.Context, terraformVersion string) (
 		return "", fmt.Errorf("no checksum found for file %s", zipFilename)
 	}
 
-	// Prepare the input.
-	input := &types.CreateTerraformCLIDownloadURLInput{
-		Version:      terraformVersion,
-		OS:           runtime.GOOS,
-		Architecture: runtime.GOARCH,
-	}
-
 	// Get the download URL.
-	downloadURL, err := c.client.CreateTerraformCLIDownloadURL(ctx, input)
+	downloadURL, err := c.client.CreateTerraformCLIDownloadURL(ctx, terraformVersion, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return "", err
 	}

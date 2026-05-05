@@ -11,16 +11,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TerraformModules encapsulates the logic to access terraform modules from the database
 type TerraformModules interface {
 	GetModuleByID(ctx context.Context, id string) (*models.TerraformModule, error)
-	GetModuleByTRN(ctx context.Context, trn string) (*models.TerraformModule, error)
+	GetModuleByTRN(ctx context.Context, trnValue string) (*models.TerraformModule, error)
 	GetModules(ctx context.Context, input *GetModulesInput) (*ModulesResult, error)
 	CreateModule(ctx context.Context, module *models.TerraformModule) (*models.TerraformModule, error)
 	UpdateModule(ctx context.Context, module *models.TerraformModule) (*models.TerraformModule, error)
@@ -126,16 +126,16 @@ func (t *terraformModules) GetModuleByID(ctx context.Context, id string) (*model
 	return t.getModule(ctx, goqu.Ex{"terraform_modules.id": id})
 }
 
-func (t *terraformModules) GetModuleByTRN(ctx context.Context, trn string) (*models.TerraformModule, error) {
+func (t *terraformModules) GetModuleByTRN(ctx context.Context, trnValue string) (*models.TerraformModule, error) {
 	ctx, span := tracer.Start(ctx, "db.GetModuleByTRN")
 	defer span.End()
 
-	path, err := types.TerraformModuleModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeTerraformModule.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
-	pathParts := strings.Split(path, "/")
+	pathParts := parsed.PathParts()
 
 	if len(pathParts) < 3 {
 		return nil, errors.New("a Terraform module TRN must have the namespacePath, module name, and module system separated by a forward slash",
@@ -491,7 +491,7 @@ func scanTerraformModule(row scanner) (*models.TerraformModule, error) {
 		}
 	}
 
-	module.Metadata.TRN = types.TerraformModuleModelType.BuildTRN(groupPath, module.Name, module.System)
+	module.Metadata.TRN = trn.TypeTerraformModule.Build(groupPath, module.Name, module.System)
 
 	return module, nil
 }

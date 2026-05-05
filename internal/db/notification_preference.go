@@ -12,10 +12,10 @@ import (
 	"github.com/jackc/pgx/v4"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // NotificationPreferences encapsulates the logic to access preferences from the database
@@ -377,9 +377,9 @@ func scanNotificationPreference(row scanner) (*models.NotificationPreference, er
 	}
 
 	if preference.NamespacePath != nil {
-		preference.Metadata.TRN = types.NotificationPreferenceModelType.BuildTRN(*preference.NamespacePath, preference.GetGlobalID())
+		preference.Metadata.TRN = trn.TypeNotificationPreference.Build(*preference.NamespacePath, preference.GetGlobalID())
 	} else {
-		preference.Metadata.TRN = types.NotificationPreferenceModelType.BuildTRN(preference.GetGlobalID())
+		preference.Metadata.TRN = trn.TypeNotificationPreference.Build(preference.GetGlobalID())
 	}
 
 	return preference, nil

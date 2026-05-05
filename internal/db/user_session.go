@@ -11,16 +11,16 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // UserSessions encapsulates the logic to access user sessions from the database
 type UserSessions interface {
 	GetUserSessionByID(ctx context.Context, id string) (*models.UserSession, error)
-	GetUserSessionByTRN(ctx context.Context, trn string) (*models.UserSession, error)
+	GetUserSessionByTRN(ctx context.Context, trnValue string) (*models.UserSession, error)
 	GetUserSessions(ctx context.Context, input *GetUserSessionsInput) (*UserSessionsResult, error)
 	CreateUserSession(ctx context.Context, session *models.UserSession) (*models.UserSession, error)
 	UpdateUserSession(ctx context.Context, session *models.UserSession) (*models.UserSession, error)
@@ -102,17 +102,17 @@ func (u *userSessions) GetUserSessionByID(ctx context.Context, id string) (*mode
 	return u.getUserSession(ctx, goqu.Ex{"user_sessions.id": id})
 }
 
-func (u *userSessions) GetUserSessionByTRN(ctx context.Context, trn string) (*models.UserSession, error) {
+func (u *userSessions) GetUserSessionByTRN(ctx context.Context, trnValue string) (*models.UserSession, error) {
 	ctx, span := tracer.Start(ctx, "db.GetUserSessionByTRN")
 	defer span.End()
 
-	resourcePath, err := types.UserSessionModelType.ResourcePathFromTRN(trn)
+	parsed, err := trn.TypeUserSession.Parse(trnValue)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Parse the resource path: username/session_global_id
-	parts := strings.Split(resourcePath, "/")
+	parts := parsed.PathParts()
 	if len(parts) != 2 {
 		return nil, errors.New("invalid user session TRN format: expected username/session_id", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
@@ -398,7 +398,7 @@ func scanUserSession(row scanner) (*models.UserSession, error) {
 		return nil, err
 	}
 
-	session.Metadata.TRN = types.UserSessionModelType.BuildTRN(username, session.GetGlobalID())
+	session.Metadata.TRN = trn.TypeUserSession.Build(username, session.GetGlobalID())
 
 	return session, nil
 }

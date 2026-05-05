@@ -152,6 +152,7 @@ func handlePlanMutationProblem(e error, clientMutationID *string) (*PlanMutation
 	return &PlanMutationPayloadResolver{PlanMutationPayload: payload}, nil
 }
 
+// Deprecated: Use the gRPC API instead.
 func updatePlanMutation(ctx context.Context, input *UpdatePlanInput) (*PlanMutationPayloadResolver, error) {
 	serviceCatalog := getServiceCatalog(ctx)
 
