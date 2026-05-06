@@ -455,7 +455,6 @@ func toPBRun(r *models.Run) *pb.Run {
 		HasChanges:       r.HasChanges,
 		IsDestroy:        r.IsDestroy,
 		Speculative:      r.Speculative(),
-		ModuleDigest:     ptr.String(hex.EncodeToString(r.ModuleDigest)),
 		ModuleSource:     r.ModuleSource,
 		ModuleVersion:    r.ModuleVersion,
 		PlanId:           gid.ToGlobalID(types.PlanModelType, r.PlanID),
@@ -465,6 +464,10 @@ func toPBRun(r *models.Run) *pb.Run {
 		TargetAddresses:  r.TargetAddresses,
 		TerraformVersion: r.TerraformVersion,
 		WorkspaceId:      gid.ToGlobalID(types.WorkspaceModelType, r.WorkspaceID),
+	}
+
+	if r.ModuleDigest != nil {
+		pbRun.ModuleDigest = new(hex.EncodeToString(r.ModuleDigest))
 	}
 
 	if r.ConfigurationVersionID != nil {
