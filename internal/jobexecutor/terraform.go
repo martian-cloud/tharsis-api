@@ -416,6 +416,12 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 		}
 	}
 
+	// Remove any state files that may have been included in the module or configuration version.
+	// This prevents Terraform from using a stale state file on the first run.
+	if err = t.removeStateFiles(); err != nil {
+		return nil, err
+	}
+
 	// These output redirections must be done _AFTER_ the above init operation
 	// (which is done only for module source jobs) or Terraform logs the full
 	// final URL that contains a valid (even if temporary) token.
@@ -557,6 +563,23 @@ func (t *terraformWorkspace) downloadCurrentStateVersion(ctx context.Context) er
 	defer stateFile.Close()
 
 	return t.client.DownloadStateVersion(ctx, t.workspace.CurrentStateVersionId, stateFile)
+}
+
+// removeStateFiles removes any Terraform state files from the workspace directory
+// that may have been included in the module or configuration version source.
+func (t *terraformWorkspace) removeStateFiles() error {
+	stateFiles := []string{
+		filepath.Join(t.workspaceDir, "terraform.tfstate"),
+		filepath.Join(t.workspaceDir, "terraform.tfstate.backup"),
+	}
+
+	for _, f := range stateFiles {
+		if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove state file %s: %v", f, err)
+		}
+	}
+
+	return nil
 }
 
 // setBuiltInEnvVars will add Tharsis built in environment variables for the job.
