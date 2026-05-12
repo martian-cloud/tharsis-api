@@ -28,6 +28,10 @@ function DiffActionChip({ action, importing }: Props) {
             label = 'delete then create';
             color = colors.delete;
             break;
+        case 'FORGET':
+            label = 'forget';
+            color = colors.delete;
+            break;
         case 'NOOP':
             label = importing ? 'import' : 'no changes';
             color = importing ? colors.import : colors.noop;

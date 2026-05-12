@@ -28,6 +28,7 @@ const (
 	DeleteThenCreate Action = "DELETE_THEN_CREATE"
 	CreateThenDelete Action = "CREATE_THEN_DELETE"
 	Delete           Action = "DELETE"
+	Forget           Action = "FORGET"
 )
 
 // IsReplace returns true if the action is one of the two actions that
@@ -61,6 +62,8 @@ func UnmarshalActions(actions tjson.Actions) (Action, error) {
 			return Read, nil
 		case "no-op":
 			return NoOp, nil
+		case "forget":
+			return Forget, nil
 		}
 	}
 
