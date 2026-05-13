@@ -38,10 +38,10 @@ type Event struct {
 
 // JobEventData contains the event response data for a row from the jobs table.
 type JobEventData struct {
-	ID              string  `json:"id"`
-	RunnerID        *string `json:"runner_id"`
-	WorkspaceID     string  `json:"workspace_id"`
-	CancelRequested bool    `json:"cancel_requested"`
+	ID          string  `json:"id"`
+	RunnerID    *string `json:"runner_id"`
+	WorkspaceID string  `json:"workspace_id"`
+	Status      string  `json:"status"`
 }
 
 // LogStreamEventData contains the event response data for a row from the log_streams table.

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e599853b379be7f462bf1eaab03863d7>>
+ * @generated SignedSource<<9df5c14fef57b2afc4c4830d58347e87>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,7 +9,7 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type JobStatus = "finished" | "pending" | "queued" | "running" | "%future added value";
+export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
 export type RunnerType = "group" | "shared" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunJobDialog_currentJob$data = {

@@ -33,6 +33,7 @@ func TestClaimJob(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: jobID,
 		},
+		Status:      models.JobQueued,
 		WorkspaceID: workspaceID,
 	}
 
@@ -1013,7 +1014,7 @@ func TestSubscribeToCancellationEvent(t *testing.T) {
 						Metadata: models.ResourceMetadata{
 							ID: "job1",
 						},
-						CancelRequested: true,
+						Status: models.JobCanceling,
 					},
 				},
 			},
@@ -1050,7 +1051,7 @@ func TestSubscribeToCancellationEvent(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: "job1",
 					},
-					CancelRequested: true,
+					Status: models.JobCanceling,
 				}, nil).Maybe()
 
 			// For the calls to GetJob inside the wait-for loop.
@@ -1060,7 +1061,7 @@ func TestSubscribeToCancellationEvent(t *testing.T) {
 						Metadata: models.ResourceMetadata{
 							ID: e.Job.Metadata.ID,
 						},
-						CancelRequested: true,
+						Status: models.JobCanceling,
 					}, nil).Maybe()
 			}
 
@@ -1120,6 +1121,108 @@ func TestSubscribeToCancellationEvent(t *testing.T) {
 			for i, e := range test.expectedEvents {
 				assert.Equal(t, e, *receivedEvents[i])
 			}
+		})
+	}
+}
+
+func TestSetJobStatus(t *testing.T) {
+	jobID := "job-1"
+	workspaceID := "workspace-1"
+	runnerPath := "group-1/runner-1"
+	now := time.Now()
+
+	type testCase struct {
+		name            string
+		existingJob     *models.Job
+		inputStatus     models.JobStatus
+		authError       error
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully set job status to running",
+			existingJob: &models.Job{
+				Metadata:    models.ResourceMetadata{ID: jobID},
+				Status:      models.JobPending,
+				WorkspaceID: workspaceID,
+				RunnerPath:  &runnerPath,
+				Timestamps: models.JobTimestamps{
+					QueuedTimestamp:  &now,
+					PendingTimestamp: &now,
+				},
+			},
+			inputStatus: models.JobRunning,
+		},
+		{
+			name: "successfully set job status to finished",
+			existingJob: &models.Job{
+				Metadata:    models.ResourceMetadata{ID: jobID},
+				Status:      models.JobRunning,
+				WorkspaceID: workspaceID,
+				Timestamps: models.JobTimestamps{
+					RunningTimestamp: &now,
+				},
+			},
+			inputStatus: models.JobFinished,
+		},
+		{
+			name:            "job not found",
+			existingJob:     nil,
+			inputStatus:     models.JobRunning,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject does not have permission to update job",
+			existingJob: &models.Job{
+				Metadata:    models.ResourceMetadata{ID: jobID},
+				Status:      models.JobPending,
+				WorkspaceID: workspaceID,
+			},
+			inputStatus:     models.JobRunning,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockJobs := db.NewMockJobs(t)
+			mockCaller := auth.NewMockCaller(t)
+			mockRunStateManager := state.NewMockRunStateManager(t)
+
+			mockJobs.On("GetJobByID", mock.Anything, jobID).Return(test.existingJob, nil)
+
+			if test.existingJob != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateJobPermission, mock.Anything, mock.Anything).
+					Return(test.authError)
+			}
+
+			if test.existingJob != nil && test.authError == nil {
+				mockRunStateManager.On("UpdateJob", mock.Anything, mock.Anything).
+					Return(test.existingJob, nil)
+			}
+
+			dbClient := &db.Client{
+				Jobs: mockJobs,
+			}
+
+			svc := &service{
+				dbClient:        dbClient,
+				runStateManager: mockRunStateManager,
+			}
+
+			result, err := svc.SetJobStatus(auth.WithCaller(ctx, mockCaller), jobID, test.inputStatus)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
 		})
 	}
 }

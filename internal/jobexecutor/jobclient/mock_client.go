@@ -4,9 +4,11 @@ package jobclient
 
 import (
 	context "context"
-	io "io"
 
 	gen "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	grpc "google.golang.org/grpc"
+
+	io "io"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -565,6 +567,36 @@ func (_m *MockClient) SaveJobLogs(ctx context.Context, jobID string, startOffset
 	return r0
 }
 
+// SetJobStatus provides a mock function with given fields: ctx, jobID, status
+func (_m *MockClient) SetJobStatus(ctx context.Context, jobID string, status gen.JobStatus) (*gen.Job, error) {
+	ret := _m.Called(ctx, jobID, status)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetJobStatus")
+	}
+
+	var r0 *gen.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, gen.JobStatus) (*gen.Job, error)); ok {
+		return rf(ctx, jobID, status)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, gen.JobStatus) *gen.Job); ok {
+		r0 = rf(ctx, jobID, status)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*gen.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, gen.JobStatus) error); ok {
+		r1 = rf(ctx, jobID, status)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SetVariablesIncludedInTFConfig provides a mock function with given fields: ctx, runID, variableKeys
 func (_m *MockClient) SetVariablesIncludedInTFConfig(ctx context.Context, runID string, variableKeys []string) error {
 	ret := _m.Called(ctx, runID, variableKeys)
@@ -584,23 +616,23 @@ func (_m *MockClient) SetVariablesIncludedInTFConfig(ctx context.Context, runID 
 }
 
 // SubscribeToJobCancellationEvent provides a mock function with given fields: ctx, jobID
-func (_m *MockClient) SubscribeToJobCancellationEvent(ctx context.Context, jobID string) (<-chan *gen.JobCancellationEvent, error) {
+func (_m *MockClient) SubscribeToJobCancellationEvent(ctx context.Context, jobID string) (grpc.ServerStreamingClient[gen.JobCancellationEvent], error) {
 	ret := _m.Called(ctx, jobID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeToJobCancellationEvent")
 	}
 
-	var r0 <-chan *gen.JobCancellationEvent
+	var r0 grpc.ServerStreamingClient[gen.JobCancellationEvent]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (<-chan *gen.JobCancellationEvent, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (grpc.ServerStreamingClient[gen.JobCancellationEvent], error)); ok {
 		return rf(ctx, jobID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) <-chan *gen.JobCancellationEvent); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) grpc.ServerStreamingClient[gen.JobCancellationEvent]); ok {
 		r0 = rf(ctx, jobID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan *gen.JobCancellationEvent)
+			r0 = ret.Get(0).(grpc.ServerStreamingClient[gen.JobCancellationEvent])
 		}
 	}
 

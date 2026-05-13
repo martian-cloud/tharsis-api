@@ -1,7 +1,7 @@
 PROTOC_VERSION=25.6
 GO_VERSION = 1.26
 MODULE = $(shell go list -m)
-VERSION ?= $(shell git describe --tags --always --dirty --match=v* 2> /dev/null || echo "1.0.0")
+VERSION ?= $(shell git describe --tags --always --match=v* 2> /dev/null || echo "1.0.0")
 BUILD_TIMESTAMP ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 PACKAGES := $(shell go list -tags noui ./... | grep -vE '/vendor/|/node_modules/')
 LDFLAGS := -ldflags "-X main.Version=${VERSION} -X main.BuildTimestamp=${BUILD_TIMESTAMP}"

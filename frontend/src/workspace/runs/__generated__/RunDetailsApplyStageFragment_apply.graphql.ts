@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<906389aa3506d65edfb146a6859994f0>>
+ * @generated SignedSource<<5d5ac53b8ac8e5e60719b49378b14b47>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,7 @@
 
 import { ReaderFragment } from 'relay-runtime';
 export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type JobStatus = "finished" | "pending" | "queued" | "running" | "%future added value";
+export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
 export type PlanStatus = "canceled" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
 export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "%future added value";
 import { FragmentRefs } from "relay-runtime";

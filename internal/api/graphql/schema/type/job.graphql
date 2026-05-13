@@ -9,6 +9,9 @@ enum JobStatus {
   queued
   pending
   running
+  failed
+  canceled
+  canceling
   finished
 }
 
@@ -63,6 +66,7 @@ type Job implements Node {
   workspace: Workspace!
   timestamps: JobTimestamps!
   cancelRequested: Boolean!
+  forceCanceled: Boolean!
   logLastUpdatedAt: Time
   maxJobDuration: Int!
   logSize: Int!
@@ -72,6 +76,7 @@ type Job implements Node {
   tags: [String!]!
   runnerAvailabilityStatus: RunnerAvailabilityStatus!
   properties: [KeyValueEntry!]!
+  completed: Boolean!
 }
 
 input JobLogStreamSubscriptionInput {

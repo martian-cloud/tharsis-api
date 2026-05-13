@@ -1500,6 +1500,7 @@ input JWTClaimInput {
 
 type Job implements Node {
   cancelRequested: Boolean!
+  completed: Boolean!
   id: ID!
   logLastUpdatedAt: Time
   logSize: Int!
@@ -1566,6 +1567,9 @@ enum JobSort {
 }
 
 enum JobStatus {
+  canceled
+  canceling
+  failed
   finished
   pending
   queued

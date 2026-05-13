@@ -15,6 +15,15 @@ func NewHistogram(name string, help string, start float64, factor float64, count
 	})
 }
 
+// NewHistogramVec returns a new Prometheus HistogramVec with labels.
+func NewHistogramVec(name string, help string, start float64, factor float64, count int, labels []string) *prometheus.HistogramVec {
+	return promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    name,
+		Help:    help,
+		Buckets: prometheus.ExponentialBuckets(start, factor, count),
+	}, labels)
+}
+
 // NewCounter returns a new Prometheus counter.
 func NewCounter(name string, help string) prometheus.Counter {
 	return promauto.NewCounter(prometheus.CounterOpts{

@@ -288,6 +288,36 @@ func (_m *MockService) ReadLogs(ctx context.Context, jobID string, startOffset i
 	return r0, r1
 }
 
+// SetJobStatus provides a mock function with given fields: ctx, jobID, status
+func (_m *MockService) SetJobStatus(ctx context.Context, jobID string, status models.JobStatus) (*models.Job, error) {
+	ret := _m.Called(ctx, jobID, status)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetJobStatus")
+	}
+
+	var r0 *models.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, models.JobStatus) (*models.Job, error)); ok {
+		return rf(ctx, jobID, status)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, models.JobStatus) *models.Job); ok {
+		r0 = rf(ctx, jobID, status)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, models.JobStatus) error); ok {
+		r1 = rf(ctx, jobID, status)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SubscribeToCancellationEvent provides a mock function with given fields: ctx, options
 func (_m *MockService) SubscribeToCancellationEvent(ctx context.Context, options *CancellationSubscriptionsOptions) (<-chan *CancellationEvent, error) {
 	ret := _m.Called(ctx, options)

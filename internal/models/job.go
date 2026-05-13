@@ -14,11 +14,23 @@ type JobStatus string
 
 // Job Status Constants
 const (
-	JobQueued   JobStatus = "queued"
-	JobPending  JobStatus = "pending"
-	JobRunning  JobStatus = "running"
-	JobFinished JobStatus = "finished"
+	JobQueued    JobStatus = "queued"
+	JobPending   JobStatus = "pending"
+	JobRunning   JobStatus = "running"
+	JobFailed    JobStatus = "failed"
+	JobCanceled  JobStatus = "canceled"
+	JobCanceling JobStatus = "canceling"
+	JobFinished  JobStatus = "finished"
 )
+
+// IsFinal returns true if this is a final status for the job
+func (s JobStatus) IsFinal() bool {
+	switch s {
+	case JobFailed, JobCanceled, JobFinished:
+		return true
+	}
+	return false
+}
 
 // JobType indicates the type of job
 type JobType string
@@ -54,7 +66,7 @@ type Job struct {
 	RunnerPath               *string
 	Metadata                 ResourceMetadata
 	MaxJobDuration           int32
-	CancelRequested          bool
+	ForceCanceled            bool
 	Tags                     []string
 	Properties               map[string]string
 }

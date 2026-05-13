@@ -49,7 +49,6 @@ func TestGetJobHandler(t *testing.T) {
 				assert.Equal(t, models.JobRunning, output.Job.Status)
 				assert.Equal(t, models.JobPlanType, output.Job.Type)
 				assert.NotNil(t, output.Job.RunnerID)
-				assert.False(t, output.Job.CancelRequested)
 			},
 		},
 		{
@@ -60,13 +59,12 @@ func TestGetJobHandler(t *testing.T) {
 		{
 			name: "job with cancel requested",
 			jobModel: &models.Job{
-				Metadata:                 models.ResourceMetadata{ID: gid.FromGlobalID(jobID)},
-				Status:                   models.JobFinished,
-				Type:                     models.JobApplyType,
-				CancelRequestedTimestamp: &now,
+				Metadata: models.ResourceMetadata{ID: gid.FromGlobalID(jobID)},
+				Status:   models.JobCanceling,
+				Type:     models.JobApplyType,
 			},
 			validate: func(t *testing.T, output getJobOutput) {
-				assert.True(t, output.Job.CancelRequested)
+				assert.Equal(t, models.JobCanceling, output.Job.Status)
 				assert.Equal(t, models.JobApplyType, output.Job.Type)
 			},
 		},

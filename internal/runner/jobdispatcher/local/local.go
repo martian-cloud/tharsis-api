@@ -85,7 +85,7 @@ func (l *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 		}
 
 		// Start the job executor
-		executor := jobexecutor.NewJobExecutor(&cfg, client, l.logger, l.version)
+		executor := jobexecutor.NewJobExecutor(jobCtx, &cfg, client, l.logger, l.version)
 
 		if err := executor.Execute(jobCtx); err != nil {
 			l.logger.Errorf("Error running job %v", err)

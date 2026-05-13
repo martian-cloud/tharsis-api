@@ -17,6 +17,8 @@ service Jobs {
   rpc GetLatestJobForPlan(GetLatestJobForPlanRequest) returns (Job);
   // GetLatestJobForApply retrieves the latest job for an apply ID.
   rpc GetLatestJobForApply(GetLatestJobForApplyRequest) returns (Job);
+  // SetJobStatus sets the status of a job.
+  rpc SetJobStatus(SetJobStatusInput) returns (Job);
   // SaveJobLogs saves job logs.
   rpc SaveJobLogs(SaveJobLogsRequest) returns (google.protobuf.Empty);
   // ClaimJob claims the next available job for a runner.
@@ -33,6 +35,17 @@ service Jobs {
 enum JobType {
   plan  = 0;
   apply = 1;
+}
+
+// JobStatus defines the status of a job.
+enum JobStatus {
+  queued    = 0;
+  pending   = 1;
+  running   = 2;
+  failed    = 3;
+  canceled  = 4;
+  canceling = 5;
+  finished  = 6;
 }
 
 // GetJobByIDRequest is the input for getting a job by ID.
@@ -55,6 +68,12 @@ message GetLatestJobForPlanRequest {
 // GetLatestJobForApplyRequest is the input for getting the latest job for an apply.
 message GetLatestJobForApplyRequest {
   string apply_id = 1;
+}
+
+// SetJobStatusInput is the input for setting the status of a job.
+message SetJobStatusInput {
+  string job_id = 1;
+  JobStatus status = 2;
 }
 
 // SubscribeToJobLogStreamRequest is the input for subscribing to job log stream events.
@@ -92,10 +111,11 @@ message Job {
   string                    workspace_id     = 2;
   string                    run_id           = 3;
   string                    type             = 4;
-  string                    status           = 5;
+  JobStatus                 status           = 5;
   int32                     max_job_duration = 6;
   map<string, string>       properties       = 7;
   bool                      cancel_requested = 8;
+  bool                      force_canceled   = 9;
 }
 
 // JobLogStreamEventData contains the log data.

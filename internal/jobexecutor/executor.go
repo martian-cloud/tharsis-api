@@ -4,15 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
 	humanize "github.com/dustin/go-humanize"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
-	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -21,6 +23,9 @@ const (
 
 	// waitForcedCancel is the duration to sleep between polls looking for forced cancel.
 	waitForcedCancel = 30 * time.Second
+
+	// jobCancellationSubscriptionTimeout is the context timeout used for the job cancellation subscription.
+	jobCancellationSubscriptionTimeout = time.Minute
 
 	// successIcon is the icon used for success messages
 	successIcon = "\u2705"
@@ -46,20 +51,33 @@ type JobConfig struct {
 
 // JobExecutor executes a job
 type JobExecutor struct {
-	cfg     *JobConfig
-	client  jobclient.Client
-	logger  logger.Logger
-	version string
+	cfg            *JobConfig
+	client         jobclient.Client
+	logger         logger.Logger
+	cancellableCtx context.Context
+	cancelFunc     context.CancelFunc
+	version        string
 }
 
 // NewJobExecutor creates a new JobExecutor
 func NewJobExecutor(
+	ctx context.Context,
 	cfg *JobConfig,
 	client jobclient.Client,
 	logger logger.Logger,
 	version string,
 ) *JobExecutor {
-	return &JobExecutor{cfg, client, logger, version}
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	return &JobExecutor{
+		cfg:            cfg,
+		client:         client,
+		logger:         logger,
+		version:        version,
+		cancellableCtx: ctx,
+		cancelFunc:     cancel,
+	}
 }
 
 // Execute executes the job associated with the JobExecutor instance
@@ -73,6 +91,68 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 
 	jobLogger.Start()
 
+	// Add a defer to handle any panics that may occur during job execution
+	defer func() {
+		if rErr := recover(); rErr != nil {
+			j.handleJobFailureWithError(ctx, jobLogger, fmt.Errorf("job panic: %v", rErr))
+		}
+	}()
+
+	err = j.execute(ctx, jobLogger)
+
+	if j.cancellableCtx.Err() != nil {
+		j.handleJobCanceled(ctx, jobLogger)
+	} else if err != nil {
+		j.handleJobFailureWithError(ctx, jobLogger, err)
+	} else {
+		jobLogger.Flush()
+		if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_finished); err != nil {
+			return fmt.Errorf("failed to set job status to succeeded: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (j *JobExecutor) handleJobFailureWithError(ctx context.Context, jobLogger joblogger.Logger, err error) {
+	jobLogger.Errorf("Error occurred while executing job: %v", err)
+
+	j.handleJobFailure(ctx, jobLogger)
+}
+
+func (j *JobExecutor) handleJobFailure(ctx context.Context, jobLogger joblogger.Logger) {
+	jobLogger.Flush()
+
+	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_failed); err != nil {
+		j.logger.Errorf("failed to set job status to failed: %v", err)
+	}
+}
+
+func (j *JobExecutor) handleJobCanceled(ctx context.Context, jobLogger joblogger.Logger) {
+	jobLogger.Flush()
+
+	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_canceled); err != nil {
+		j.logger.Errorf("failed to set job status to canceled: %v", err)
+	}
+}
+
+func (j *JobExecutor) execute(ctx context.Context, jobLogger joblogger.Logger) error {
+	// Set job status to running
+	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_running); err != nil {
+		return fmt.Errorf("failed to set job status to running: %v", err)
+	}
+
+	jobLogger.Infof("Job executor version %s", j.version)
+	jobLogger.Infof("Starting job %s", j.cfg.JobID)
+
+	// Get Job
+	job, err := j.client.GetJob(ctx, j.cfg.JobID)
+	if err != nil {
+		return fmt.Errorf("failed to get job %v", err)
+	}
+
+	j.startCancellationMonitor(ctx, jobLogger, job)
+
 	// Get the memory limit if one has been passed in.
 	memoryLimit := uint64(0)
 	sLimit := os.Getenv("MEMORY_LIMIT")
@@ -85,9 +165,8 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 	}
 
 	// If there is a defined memory limit, create a memory monitor and launch it.
-	var memoryMonitor MemoryMonitor
 	if memoryLimit > 0 {
-		memoryMonitor, err = NewMemoryMonitor(jobLogger, memoryLimit)
+		memoryMonitor, err := NewMemoryMonitor(jobLogger, memoryLimit)
 		if err != nil {
 			return err
 		}
@@ -101,11 +180,8 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 	}
 	defer os.RemoveAll(workspaceDir)
 
-	jobLogger.Infof("Job executor version %s", j.version)
-	jobLogger.Infof("Starting job %s", j.cfg.JobID)
-
 	// Build job
-	handler, err := j.buildJobHandler(ctx, workspaceDir, jobLogger)
+	handler, err := j.buildJobHandler(ctx, workspaceDir, jobLogger, job)
 	if err != nil {
 		return err
 	}
@@ -116,22 +192,16 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 	}()
 
 	// Execute job
-	if eErr := handler.Execute(ctx); eErr != nil {
-		jobLogger.Errorf("%v", eErr)
+	eErr := handler.Execute(ctx)
+
+	if eErr != nil && j.cancellableCtx.Err() == nil {
 		handler.OnError(ctx, eErr)
-		return nil
 	}
 
-	return nil
+	return eErr
 }
 
-func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, jobLogger joblogger.Logger) (JobHandler, error) {
-	// Get Job
-	job, err := j.client.GetJob(ctx, j.cfg.JobID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get job %v", err)
-	}
-
+func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, jobLogger joblogger.Logger, job *pb.Job) (JobHandler, error) {
 	// Get Run
 	run, err := j.client.GetRun(ctx, job.RunId)
 	if err != nil {
@@ -144,60 +214,85 @@ func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, 
 		return nil, fmt.Errorf("failed to get workspace %v", err)
 	}
 
-	cancellableCtx := j.createCancellableContext(ctx, jobLogger, run.Metadata.Id, job.MaxJobDuration)
-
 	var handler JobHandler
 
 	switch job.Type {
 	case pb.JobType_plan.String():
-		handler, err = NewPlanHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, job, j.logger, jobLogger, j.client)
+		handler, err = NewPlanHandler(j.cancellableCtx, j.cfg, workspaceDir, ws, run, job, j.logger, jobLogger, j.client)
 		if err != nil {
 			return nil, err
 		}
 	case pb.JobType_apply.String():
-		handler, err = NewApplyHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, job, j.logger, jobLogger, j.client)
+		handler, err = NewApplyHandler(j.cancellableCtx, j.cfg, workspaceDir, ws, run, job, j.logger, jobLogger, j.client)
 		if err != nil {
 			return nil, err
 		}
 	default:
-		j.logger.Infof("Invalid job type %s", job.Type)
+		return nil, fmt.Errorf("invalid job type %s", job.Type)
 	}
 
 	return handler, err
 }
 
-func (j *JobExecutor) createCancellableContext(ctx context.Context, jobLogger joblogger.Logger, runID string, maxJobDuration int32) context.Context {
-	// This will gracefully cancel the job after the job timeout is reached.
-	cancellableCtx, cancelFunc := context.WithTimeout(ctx, time.Duration(maxJobDuration)*time.Minute)
-
-	// Listen for cancellation
+func (j *JobExecutor) startCancellationMonitor(
+	ctx context.Context,
+	jobLogger joblogger.Logger,
+	job *pb.Job,
+) {
+	// Listen for job timeout
 	go func() {
+		select {
+		case <-j.cancellableCtx.Done():
+		case <-time.After(time.Duration(job.MaxJobDuration) * time.Minute):
+			jobLogger.Warningf("Max job duration exceeded. Job will gracefully cancel now...")
+			// Cancel job since job timeout has been reached
+			j.cancelFunc()
+		}
+	}()
 
-		// First stage: wait for graceful cancel request.
+	// Listen for graceful cancel
+	go func() {
 		for {
-			// Check if context is cancelled
-			if ctx.Err() != nil {
+			if j.cancellableCtx.Err() != nil {
+				// Context canceled
 				return
 			}
 
-			cancelled, err := j.waitForJobCancellation(ctx)
+			canceled, err := j.waitForJobCancellation(ctx)
 			if err != nil {
-				jobLogger.Infof("Received error when listening for job cancellation: %v \n", err)
+				if status.Code(err) == codes.Canceled {
+					// Context canceled
+					return
+				}
+
+				jobLogger.Errorf("Received error when listening for graceful job cancellation: %v", err)
 				time.Sleep(waitCancelError)
 				continue
 			}
-			if cancelled {
-				jobLogger.Infof("Received job cancellation request\n")
 
-				cancelFunc()
-				// After a non-forced cancellation request, keep waiting but in the next loop.
-				break
+			if canceled {
+				jobLogger.Warningf("Received a graceful job cancel request")
+
+				// Cancel the context
+				j.cancelFunc()
+
+				return
 			}
 		}
+	}()
 
-		// Second stage: wait for switch to forced cancel.
+	// Listen for force cancel
+	go func() {
+		// Wait for graceful cancel before checking for force cancel
+		<-j.cancellableCtx.Done()
+
 		for {
-			run, err := j.client.GetRun(ctx, runID)
+			if ctx.Err() != nil {
+				// If the context is canceled, it means the job is already shutting down
+				return
+			}
+
+			job, err := j.client.GetJob(ctx, job.Metadata.Id)
 			if err != nil {
 				if ctx.Err() != nil {
 					// If the context is canceled, it means the run was already gracefully cancelled,
@@ -205,36 +300,60 @@ func (j *JobExecutor) createCancellableContext(ctx context.Context, jobLogger jo
 					return
 				}
 
-				jobLogger.Infof("Received error when listening for forced run cancellation: %v \n", err)
+				jobLogger.Errorf("Received error when listening for forced job cancellation: %v \n", err)
 				time.Sleep(waitCancelError)
 				continue
 			}
 
 			// If the cancellation was forced, this should kill the main process and force the run to terminate.
-			if run.ForceCanceled {
-				jobLogger.Errorf("Force canceled run ID %s", run.Metadata.Id)
+			if job.ForceCanceled {
+				jobLogger.Warningf("Received force cancel request for this job")
 				os.Exit(1)
 			}
 
 			time.Sleep(waitForcedCancel)
 		}
-
 	}()
-
-	return cancellableCtx
 }
 
 func (j *JobExecutor) waitForJobCancellation(ctx context.Context) (bool, error) {
-	eventChannel, err := j.client.SubscribeToJobCancellationEvent(ctx, j.cfg.JobID)
-	if err == context.DeadlineExceeded || te.IsContextCanceledError(err) {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
+	for {
+		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, jobCancellationSubscriptionTimeout)
 
-	event := <-eventChannel
-	if event == nil {
-		return false, errors.New("channel closed")
+		stream, err := j.client.SubscribeToJobCancellationEvent(timeoutCtx, j.cfg.JobID)
+		if err != nil {
+			timeoutCancel()
+
+			if status.Code(err) == codes.DeadlineExceeded {
+				// Retry if context timed out.
+				continue
+			}
+
+			return false, err
+		}
+
+		for {
+			event, err := stream.Recv()
+			if err != nil {
+				timeoutCancel()
+
+				if status.Code(err) == codes.DeadlineExceeded {
+					// Retry if context timed out.
+					break
+				}
+
+				if errors.Is(err, io.EOF) {
+					// Stream closed
+					return false, nil
+				}
+
+				return false, err
+			}
+
+			if event.Job.Status == pb.JobStatus_canceling || event.Job.Status == pb.JobStatus_canceled {
+				timeoutCancel()
+				return true, nil
+			}
+		}
 	}
-	return event.Job.CancelRequested, nil
 }

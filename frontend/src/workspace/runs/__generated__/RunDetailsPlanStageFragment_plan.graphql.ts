@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<62a4382af33851aab77af0dceef5da03>>
+ * @generated SignedSource<<9730c3072ff593251206f1a4ce5aaae5>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,7 @@
 
 import { ReaderFragment } from 'relay-runtime';
 export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type JobStatus = "finished" | "pending" | "queued" | "running" | "%future added value";
+export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
 export type PlanStatus = "canceled" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunDetailsPlanStageFragment_plan$data = {

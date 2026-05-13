@@ -3,6 +3,9 @@ import { useTheme } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 
 const JOB_STATUS_MAP: Record<string, { label: string }> = {
+    canceling: { label: 'Canceling' },
+    canceled: { label: 'Canceled' },
+    failed: { label: 'Failed' },
     finished: { label: 'Completed' },
     running: { label: 'In Progress' },
     pending: { label: 'Pending' },
@@ -19,7 +22,7 @@ function JobStatusChip({ to, status, onClick }: Props) {
     const theme = useTheme();
     const entry = JOB_STATUS_MAP[status];
     const color = entry
-        ? theme.palette.runStatus[status as keyof typeof theme.palette.runStatus]
+        ? theme.palette.jobStatus[status as keyof typeof theme.palette.jobStatus]
         : theme.palette.runStatus.unknown;
     const label = entry?.label ?? 'Unknown';
 

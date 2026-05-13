@@ -38,6 +38,15 @@ declare module '@mui/material/styles' {
             destroy: string;
             unknown: string;
         };
+        jobStatus: {
+            queued: string;
+            pending: string;
+            running: string;
+            failed: string;
+            canceled: string;
+            canceling: string;
+            finished: string;
+        };
         planDiff: {
             create: string;
             delete: string;
@@ -60,6 +69,7 @@ declare module '@mui/material/styles' {
 
     interface PaletteOptions {
         runStatus?: Palette['runStatus'];
+        jobStatus?: Palette['jobStatus'];
         planDiff?: Palette['planDiff'];
         avatar?: Palette['avatar'];
         announcement?: Palette['announcement'];
@@ -110,6 +120,15 @@ export default createTheme({
             queued: '#fbbf24',
             destroy: '#f87171',
             unknown: '#94a3b8',
+        },
+        jobStatus: {
+            queued: '#fbbf24',
+            pending: '#fbbf24',
+            running: '#60a5fa',
+            failed: '#f87171',
+            canceled: '#f87171',
+            canceling: '#fb923c',
+            finished: '#34d399',
         },
         planDiff: {
             create: '#34d399',

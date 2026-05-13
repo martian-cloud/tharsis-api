@@ -35,6 +35,8 @@ var (
 	planFinished  = metric.NewCounter("plan_completed_count", "Amount of times a plan is completed.")
 	applyFinished = metric.NewCounter("apply_completed_count", "Amount of times an apply is completed.")
 	runFinished   = metric.NewCounter("run_completed_count", "Amount of times a run is completed.")
+
+	jobPendingDuration = metric.NewHistogram("job_pending_duration", "Amount of time a job spent in pending state.", 1, 2, 10)
 )
 
 type eventHandlerFunc func(ctx context.Context, eventType EventType, oldModel interface{}, newModel interface{}) error
@@ -126,8 +128,21 @@ func (r *runStateManager) UpdateJob(ctx context.Context, job *models.Job) (*mode
 		}
 	}()
 
-	if job.Status == models.JobFinished {
-		// Update log stream to completed if job is finished
+	oldJob, err := r.dbClient.Jobs.GetJobByID(txContext, job.Metadata.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if oldJob == nil {
+		return nil, errors.New("job with ID %s not found", job.Metadata.ID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if err := checkJobStatusChange(oldJob.Status, job.Status); err != nil {
+		return nil, err
+	}
+
+	if job.Status.IsFinal() {
+		// Update log stream to completed if job is in a terminal state
 		logStream, err := r.dbClient.LogStreams.GetLogStreamByJobID(txContext, job.Metadata.ID)
 		if err != nil {
 			return nil, err
@@ -141,9 +156,22 @@ func (r *runStateManager) UpdateJob(ctx context.Context, job *models.Job) (*mode
 		}
 	}
 
-	oldJob, err := r.dbClient.Jobs.GetJobByID(txContext, job.Metadata.ID)
-	if err != nil {
-		return nil, err
+	now := time.Now()
+
+	switch job.Status {
+	case models.JobRunning:
+		job.Timestamps.RunningTimestamp = &now
+		if job.Timestamps.PendingTimestamp != nil && job.RunnerPath != nil {
+			jobPendingDuration.Observe(now.Sub(*job.Timestamps.PendingTimestamp).Minutes())
+		}
+	case models.JobFinished, models.JobFailed, models.JobCanceled:
+		job.Timestamps.FinishedTimestamp = &now
+	}
+
+	// Difference between running and finished timestamp equates to execution time.
+	if job.Timestamps.RunningTimestamp != nil && job.Timestamps.FinishedTimestamp != nil {
+		difference := job.Timestamps.FinishedTimestamp.Sub(*job.Timestamps.RunningTimestamp)
+		planExecutionTime.Observe(float64(difference.Minutes()))
 	}
 
 	updatedJob, err := r.dbClient.Jobs.UpdateJob(txContext, job)
@@ -442,27 +470,50 @@ func registerPlanHandlers(manager RunStateManager, dbClient *db.Client) {
 }
 
 func (p *planHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *models.Job, newJob *models.Job) error {
-	if newJob.Type == models.JobPlanType && oldJob.Status != newJob.Status && newJob.Status == models.JobPending {
-		// Get run associated with job
-		run, err := p.dbClient.Runs.GetRunByID(ctx, newJob.RunID)
-		if err != nil {
-			return err
-		}
+	if newJob.Type != models.JobPlanType || oldJob.Status == newJob.Status {
+		return nil
+	}
 
-		if run == nil {
-			return errors.New("run with ID %s not found", newJob.RunID, errors.WithErrorCode(errors.ENotFound))
-		}
+	// Get run associated with job
+	run, err := p.dbClient.Runs.GetRunByID(ctx, newJob.RunID)
+	if err != nil {
+		return err
+	}
 
-		plan, err := p.dbClient.Plans.GetPlanByID(ctx, run.PlanID)
-		if err != nil {
-			return err
-		}
+	if run == nil {
+		return errors.New("run with ID %s not found", newJob.RunID, errors.WithErrorCode(errors.ENotFound))
+	}
 
-		plan.Status = models.PlanPending
+	plan, err := p.dbClient.Plans.GetPlanByID(ctx, run.PlanID)
+	if err != nil {
+		return err
+	}
 
-		if _, err := p.manager.UpdatePlan(ctx, plan); err != nil {
-			return err
-		}
+	var targetStatus models.PlanStatus
+	switch newJob.Status {
+	case models.JobPending:
+		targetStatus = models.PlanPending
+	case models.JobRunning:
+		targetStatus = models.PlanRunning
+	case models.JobFinished:
+		targetStatus = models.PlanFinished
+	case models.JobFailed:
+		targetStatus = models.PlanErrored
+	case models.JobCanceled:
+		targetStatus = models.PlanCanceled
+	default:
+		return nil
+	}
+
+	// Guard against circular updates
+	if plan.Status == targetStatus {
+		return nil
+	}
+
+	plan.Status = targetStatus
+
+	if _, err := p.manager.UpdatePlan(ctx, plan); err != nil {
+		return err
 	}
 
 	return nil
@@ -483,27 +534,50 @@ func registerApplyHandlers(manager RunStateManager, dbClient *db.Client) {
 }
 
 func (a *applyHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *models.Job, newJob *models.Job) error {
-	if newJob.Type == models.JobApplyType && oldJob.Status != newJob.Status && newJob.Status == models.JobPending {
-		// Get run associated with job
-		run, err := a.dbClient.Runs.GetRunByID(ctx, newJob.RunID)
-		if err != nil {
-			return err
-		}
+	if newJob.Type != models.JobApplyType || oldJob.Status == newJob.Status {
+		return nil
+	}
 
-		if run == nil {
-			return errors.New("run with ID %s not found", newJob.RunID, errors.WithErrorCode(errors.ENotFound))
-		}
+	// Get run associated with job
+	run, err := a.dbClient.Runs.GetRunByID(ctx, newJob.RunID)
+	if err != nil {
+		return err
+	}
 
-		apply, err := a.dbClient.Applies.GetApplyByID(ctx, run.ApplyID)
-		if err != nil {
-			return err
-		}
+	if run == nil {
+		return errors.New("run with ID %s not found", newJob.RunID, errors.WithErrorCode(errors.ENotFound))
+	}
 
-		apply.Status = models.ApplyPending
+	apply, err := a.dbClient.Applies.GetApplyByID(ctx, run.ApplyID)
+	if err != nil {
+		return err
+	}
 
-		if _, err := a.manager.UpdateApply(ctx, apply); err != nil {
-			return err
-		}
+	var targetStatus models.ApplyStatus
+	switch newJob.Status {
+	case models.JobPending:
+		targetStatus = models.ApplyPending
+	case models.JobRunning:
+		targetStatus = models.ApplyRunning
+	case models.JobFinished:
+		targetStatus = models.ApplyFinished
+	case models.JobFailed:
+		targetStatus = models.ApplyErrored
+	case models.JobCanceled:
+		targetStatus = models.ApplyCanceled
+	default:
+		return nil
+	}
+
+	// Guard against circular updates
+	if apply.Status == targetStatus {
+		return nil
+	}
+
+	apply.Status = targetStatus
+
+	if _, err := a.manager.UpdateApply(ctx, apply); err != nil {
+		return err
 	}
 
 	return nil
@@ -539,28 +613,26 @@ func (j *jobHandlers) handlePlanStateChangeEvent(ctx context.Context, oldPlan *m
 		}
 
 		if job != nil {
-			now := time.Now()
-
+			var targetStatus models.JobStatus
 			switch newPlan.Status {
 			case models.PlanCanceled:
-				job.Timestamps.FinishedTimestamp = &now
-				job.Status = models.JobFinished
+				targetStatus = models.JobCanceled
 			case models.PlanErrored:
-				job.Timestamps.FinishedTimestamp = &now
-				job.Status = models.JobFinished
+				targetStatus = models.JobFailed
 			case models.PlanRunning:
-				job.Timestamps.RunningTimestamp = &now
-				job.Status = models.JobRunning
+				targetStatus = models.JobRunning
 			case models.PlanFinished:
-				job.Timestamps.FinishedTimestamp = &now
-				job.Status = models.JobFinished
+				targetStatus = models.JobFinished
+			default:
+				return nil
 			}
 
-			// Difference between running and finished timestamp equates to execution time.
-			if job.Timestamps.RunningTimestamp != nil && job.Timestamps.FinishedTimestamp != nil {
-				difference := job.Timestamps.FinishedTimestamp.Sub(*job.Timestamps.RunningTimestamp)
-				planExecutionTime.Observe(float64(difference.Minutes()))
+			// Guard against circular updates
+			if job.Status == targetStatus {
+				return nil
 			}
+
+			job.Status = targetStatus
 
 			if _, err := j.manager.UpdateJob(ctx, job); err != nil {
 				return err
@@ -584,28 +656,26 @@ func (j *jobHandlers) handleApplyStateChangeEvent(ctx context.Context, oldApply 
 		}
 
 		if job != nil {
-			now := time.Now()
-
+			var targetStatus models.JobStatus
 			switch newApply.Status {
 			case models.ApplyCanceled:
-				job.Timestamps.FinishedTimestamp = &now
-				job.Status = models.JobFinished
+				targetStatus = models.JobCanceled
 			case models.ApplyErrored:
-				job.Timestamps.FinishedTimestamp = &now
-				job.Status = models.JobFinished
+				targetStatus = models.JobFailed
 			case models.ApplyRunning:
-				job.Timestamps.RunningTimestamp = &now
-				job.Status = models.JobRunning
+				targetStatus = models.JobRunning
 			case models.ApplyFinished:
-				job.Timestamps.FinishedTimestamp = &now
-				job.Status = models.JobFinished
+				targetStatus = models.JobFinished
+			default:
+				return nil
 			}
 
-			// Difference between running and finished timestamp equates to execution time.
-			if job.Timestamps.RunningTimestamp != nil && job.Timestamps.FinishedTimestamp != nil {
-				difference := job.Timestamps.FinishedTimestamp.Sub(*job.Timestamps.RunningTimestamp)
-				applyExecutionTime.Observe(float64(difference.Minutes()))
+			// Guard against circular updates
+			if job.Status == targetStatus {
+				return nil
 			}
+
+			job.Status = targetStatus
 
 			if _, err := j.manager.UpdateJob(ctx, job); err != nil {
 				return err
@@ -677,7 +747,7 @@ func (w *workspaceHandlers) handleJobStateChangeEvent(ctx context.Context, oldJo
 			}
 		}
 
-		if newJob.Status == models.JobFinished && ws.CurrentJobID == newJob.Metadata.ID {
+		if newJob.Status.IsFinal() && ws.CurrentJobID == newJob.Metadata.ID {
 			ws.Locked = false
 			ws.CurrentJobID = ""
 			if _, err = w.dbClient.Workspaces.UpdateWorkspace(ctx, ws); err != nil {
@@ -788,6 +858,40 @@ func checkRunStatusChange(oldStatus, newStatus models.RunStatus) error {
 	if !transitionValid {
 		return errors.New(
 			"run status is not allowed to transition from %s to %s", oldStatus, newStatus,
+			errors.WithErrorCode(errors.EInvalid))
+	}
+
+	return nil
+}
+
+// Valid transitions for a job:
+// queued -> pending, canceled
+// pending -> running, canceled
+// running -> succeeded, failed, canceling
+// canceling -> canceled, failed, succeeded
+
+// checkJobStatusChange returns an error for an invalid job transition.
+func checkJobStatusChange(oldStatus, newStatus models.JobStatus) error {
+	if oldStatus == newStatus {
+		return nil
+	}
+
+	transitionValid := false
+
+	switch oldStatus {
+	case models.JobQueued:
+		transitionValid = (newStatus == models.JobPending) || (newStatus == models.JobCanceled)
+	case models.JobPending:
+		transitionValid = (newStatus == models.JobRunning) || (newStatus == models.JobCanceled) || (newStatus == models.JobCanceling)
+	case models.JobRunning:
+		transitionValid = (newStatus == models.JobFinished) || (newStatus == models.JobFailed) || (newStatus == models.JobCanceling) || (newStatus == models.JobCanceled)
+	case models.JobCanceling:
+		transitionValid = (newStatus == models.JobCanceled) || (newStatus == models.JobFailed) || (newStatus == models.JobFinished)
+	}
+
+	if !transitionValid {
+		return errors.New(
+			"job status is not allowed to transition from %s to %s", oldStatus, newStatus,
 			errors.WithErrorCode(errors.EInvalid))
 	}
 

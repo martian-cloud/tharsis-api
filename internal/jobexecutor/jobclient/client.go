@@ -50,9 +50,10 @@ type Client interface {
 	CreateManagedIdentityCredentials(ctx context.Context, managedIdentityID string) ([]byte, error)
 	CreateTerraformCLIDownloadURL(ctx context.Context, version, os, architecture string) (string, error)
 	SaveJobLogs(ctx context.Context, jobID string, startOffset int, buffer []byte) error
-	SubscribeToJobCancellationEvent(ctx context.Context, jobID string) (<-chan *pb.JobCancellationEvent, error)
+	SubscribeToJobCancellationEvent(ctx context.Context, jobID string) (pb.Jobs_SubscribeToJobCancellationEventClient, error)
 	UpdateApply(ctx context.Context, input *UpdateApplyInput) (*pb.Apply, error)
 	UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*pb.Plan, error)
+	SetJobStatus(ctx context.Context, jobID string, status pb.JobStatus) (*pb.Job, error)
 	UploadPlanCache(ctx context.Context, planID string, body io.Reader) error
 	UploadPlanData(ctx context.Context, planID string, tfPlan *tfjson.Plan, tfProviderSchemas *tfjson.ProviderSchemas) error
 	DownloadConfigurationVersion(ctx context.Context, configVersionID string, writer io.Writer) error
@@ -175,7 +176,7 @@ func (c *jobClient) GetJob(ctx context.Context, id string) (*pb.Job, error) {
 }
 
 // SubscribeToJobCancellationEvent returns job cancellation events for a job
-func (c *jobClient) SubscribeToJobCancellationEvent(ctx context.Context, jobID string) (<-chan *pb.JobCancellationEvent, error) {
+func (c *jobClient) SubscribeToJobCancellationEvent(ctx context.Context, jobID string) (pb.Jobs_SubscribeToJobCancellationEventClient, error) {
 	stream, err := c.grpcClient.JobsClient.SubscribeToJobCancellationEvent(ctx, &pb.SubscribeToJobCancellationEventRequest{
 		JobId: jobID,
 	})
@@ -183,22 +184,7 @@ func (c *jobClient) SubscribeToJobCancellationEvent(ctx context.Context, jobID s
 		return nil, err
 	}
 
-	eventChan := make(chan *pb.JobCancellationEvent)
-
-	go func() {
-		defer close(eventChan)
-
-		for {
-			event, err := stream.Recv()
-			if err != nil {
-				return
-			}
-
-			eventChan <- event
-		}
-	}()
-
-	return eventChan, nil
+	return stream, nil
 }
 
 // SaveJobLogs saves job logs and returns any errors
@@ -233,6 +219,14 @@ func (c *jobClient) UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*pb
 		Status:       input.Status,
 		HasChanges:   input.HasChanges,
 		ErrorMessage: input.ErrorMessage,
+	})
+}
+
+// SetJobStatus sets the status of a job via gRPC.
+func (c *jobClient) SetJobStatus(ctx context.Context, jobID string, status pb.JobStatus) (*pb.Job, error) {
+	return c.grpcClient.JobsClient.SetJobStatus(ctx, &pb.SetJobStatusInput{
+		JobId:  jobID,
+		Status: status,
 	})
 }
 
