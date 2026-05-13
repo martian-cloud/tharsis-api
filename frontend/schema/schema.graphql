@@ -737,6 +737,7 @@ input CreateRunInput {
   clientMutationId: String
   comment: String
   configurationVersionId: String
+  includeModulePrereleases: Boolean
   isDestroy: Boolean
   moduleSource: String
   moduleVersion: String
@@ -1765,19 +1766,19 @@ type Mutation {
   assignServiceAccountToRunner(input: AssignServiceAccountToRunnerInput!): AssignServiceAccountToRunnerPayload!
   cancelAgentRun(input: CancelAgentRunInput!): CancelAgentRunPayload!
   cancelRun(input: CancelRunInput!): RunMutationPayload!
-  claimJob(input: ClaimJobInput!): ClaimJobPayload!
+  claimJob(input: ClaimJobInput!): ClaimJobPayload! @deprecated(reason: "Use the gRPC API instead.")
   createAgentRun(input: CreateAgentRunInput!): CreateAgentRunPayload!
   createAgentSession(input: CreateAgentSessionInput!): CreateAgentSessionPayload!
   createAnnouncement(input: CreateAnnouncementInput!): CreateAnnouncementPayload!
   createConfigurationVersion(input: CreateConfigurationVersionInput!): ConfigurationVersionMutationPayload!
   createFederatedRegistry(input: CreateFederatedRegistryInput!): FederatedRegistryMutationPayload!
-  createFederatedRegistryTokens(input: CreateFederatedRegistryTokensInput!): CreateFederatedRegistryTokensPayload!
+  createFederatedRegistryTokens(input: CreateFederatedRegistryTokensInput!): CreateFederatedRegistryTokensPayload! @deprecated(reason: "Use the gRPC API instead.")
   createGPGKey(input: CreateGPGKeyInput!): CreateGPGKeyPayload!
   createGroup(input: CreateGroupInput!): CreateGroupPayload!
   createManagedIdentity(input: CreateManagedIdentityInput!): CreateManagedIdentityPayload!
   createManagedIdentityAccessRule(input: CreateManagedIdentityAccessRuleInput!): ManagedIdentityAccessRuleMutationPayload!
   createManagedIdentityAlias(input: CreateManagedIdentityAliasInput!): CreateManagedIdentityAliasPayload!
-  createManagedIdentityCredentials(input: CreateManagedIdentityCredentialsInput!): CreateManagedIdentityCredentialsPayload!
+  createManagedIdentityCredentials(input: CreateManagedIdentityCredentialsInput!): CreateManagedIdentityCredentialsPayload! @deprecated(reason: "Use the gRPC API instead.")
   createNamespaceMembership(input: CreateNamespaceMembershipInput!): NamespaceMembershipMutationPayload!
   createNamespaceVariable(input: CreateNamespaceVariableInput!): NamespaceVariableMutationPayload!
   createRole(input: CreateRoleInput!): CreateRolePayload!
@@ -1787,9 +1788,9 @@ type Mutation {
   createRunnerSessionError(input: CreateRunnerSessionErrorInput!): CreateRunnerSessionErrorPayload!
   createSCIMToken(input: CreateSCIMTokenInput!): CreateSCIMTokenPayload!
   createServiceAccount(input: CreateServiceAccountInput!): CreateServiceAccountPayload!
-  createStateVersion(input: CreateStateVersionInput!): CreateStateVersionPayload!
+  createStateVersion(input: CreateStateVersionInput!): CreateStateVersionPayload! @deprecated(reason: "Use the gRPC API instead.")
   createTeam(input: CreateTeamInput): CreateTeamPayload!
-  createTerraformCLIDownloadURL(input: CreateTerraformCLIDownloadURLInput!): TerraformCLIMutationPayload!
+  createTerraformCLIDownloadURL(input: CreateTerraformCLIDownloadURLInput!): TerraformCLIMutationPayload! @deprecated(reason: "Use the gRPC API instead.")
   createTerraformModule(input: CreateTerraformModuleInput): CreateTerraformModulePayload!
   createTerraformModuleAttestation(input: CreateTerraformModuleAttestationInput): CreateTerraformModuleAttestationPayload!
   createTerraformModuleVersion(input: CreateTerraformModuleVersionInput): CreateTerraformModuleVersionPayload!
@@ -1841,25 +1842,25 @@ type Mutation {
   resetVCSProviderOAuthToken(input: ResetVCSProviderOAuthTokenInput!): ResetVCSProviderOAuthTokenPayload!
   revokeUserSession(input: RevokeUserSessionInput!): RevokeUserSessionPayload!
   runnerSessionHeartbeat(input: RunnerSessionHeartbeatInput!): RunnerSessionHeartbeatPayload!
-  saveJobLogs(input: SaveJobLogsInput!): SaveJobLogsPayload!
+  saveJobLogs(input: SaveJobLogsInput!): SaveJobLogsPayload! @deprecated(reason: "Use the gRPC API instead.")
   serviceAccountCreateToken(input: ServiceAccountCreateTokenInput!): ServiceAccountCreateTokenPayload!
   setNamespaceVariables(input: SetNamespaceVariablesInput!): NamespaceVariableMutationPayload!
   setUserNotificationPreference(input: SetUserNotificationPreferenceInput!): SetUserNotificationPreferencePayload!
   setUserPassword(input: SetUserPasswordInput!): SetUserPasswordPayload!
-  setVariablesIncludedInTFConfig(input: SetVariablesIncludedInTFConfigInput!): SetVariablesIncludedInTFConfigPayload!
+  setVariablesIncludedInTFConfig(input: SetVariablesIncludedInTFConfigInput!): SetVariablesIncludedInTFConfigPayload! @deprecated(reason: "Use the gRPC API instead.")
   unassignManagedIdentity(input: AssignManagedIdentityInput!): AssignManagedIdentityPayload!
   unassignServiceAccountFromRunner(input: AssignServiceAccountToRunnerInput!): AssignServiceAccountToRunnerPayload!
   unfavoriteNamespace(input: NamespaceFavoriteInput!): NamespaceUnfavoriteMutationPayload!
   unlockWorkspace(input: UnlockWorkspaceInput!): UnlockWorkspacePayload!
   updateAnnouncement(input: UpdateAnnouncementInput!): UpdateAnnouncementPayload!
-  updateApply(input: UpdateApplyInput!): UpdateApplyPayload!
+  updateApply(input: UpdateApplyInput!): UpdateApplyPayload! @deprecated(reason: "Use the gRPC API instead.")
   updateFederatedRegistry(input: UpdateFederatedRegistryInput!): FederatedRegistryMutationPayload!
   updateGroup(input: UpdateGroupInput!): UpdateGroupPayload!
   updateManagedIdentity(input: UpdateManagedIdentityInput!): UpdateManagedIdentityPayload!
   updateManagedIdentityAccessRule(input: UpdateManagedIdentityAccessRuleInput!): ManagedIdentityAccessRuleMutationPayload!
   updateNamespaceMembership(input: UpdateNamespaceMembershipInput!): NamespaceMembershipMutationPayload!
   updateNamespaceVariable(input: UpdateNamespaceVariableInput!): NamespaceVariableMutationPayload!
-  updatePlan(input: UpdatePlanInput!): UpdatePlanPayload!
+  updatePlan(input: UpdatePlanInput!): UpdatePlanPayload! @deprecated(reason: "Use the gRPC API instead.")
   updateResourceLimit(input: UpdateResourceLimitInput!): UpdateResourceLimitPayload!
   updateRole(input: UpdateRoleInput!): UpdateRolePayload!
   updateRunner(input: UpdateRunnerInput!): UpdateRunnerPayload!
@@ -2095,6 +2096,7 @@ enum PlanChangeAction {
   CREATE_THEN_DELETE
   DELETE
   DELETE_THEN_CREATE
+  FORGET
   NOOP
   READ
   UPDATE

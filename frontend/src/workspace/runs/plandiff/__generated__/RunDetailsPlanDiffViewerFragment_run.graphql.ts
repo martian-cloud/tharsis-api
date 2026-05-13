@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<516b9b67ed0aee20ccc78558b2811331>>
+ * @generated SignedSource<<6a3b5cdc95cd47473a9fae3c5ee29d4c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,7 +9,7 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type PlanChangeAction = "CREATE" | "CREATE_THEN_DELETE" | "DELETE" | "DELETE_THEN_CREATE" | "NOOP" | "READ" | "UPDATE" | "%future added value";
+export type PlanChangeAction = "CREATE" | "CREATE_THEN_DELETE" | "DELETE" | "DELETE_THEN_CREATE" | "FORGET" | "NOOP" | "READ" | "UPDATE" | "%future added value";
 export type PlanChangeWarningType = "after" | "before" | "%future added value";
 export type PlanStatus = "canceled" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
 export type TerraformResourceMode = "data" | "managed" | "%future added value";

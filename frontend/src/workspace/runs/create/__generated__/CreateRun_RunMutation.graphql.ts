@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9947248ea65f91c1e2f1530c02bde842>>
+ * @generated SignedSource<<5eee7fdeeac5c7595bc5fe629ba689a7>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,6 +15,7 @@ export type CreateRunInput = {
   clientMutationId?: string | null | undefined;
   comment?: string | null | undefined;
   configurationVersionId?: string | null | undefined;
+  includeModulePrereleases?: boolean | null | undefined;
   isDestroy?: boolean | null | undefined;
   moduleSource?: string | null | undefined;
   moduleVersion?: string | null | undefined;
