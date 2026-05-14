@@ -335,6 +335,24 @@ func TestTerraformModuleAttestations_GetModuleAttestations(t *testing.T) {
 				},
 			},
 			expectCount: 1,
+		},
+		{
+			name: "filter by digest with special characters returns no results",
+			input: &GetModuleAttestationsInput{
+				Filter: &TerraformModuleAttestationFilter{
+					Digest: new(`sha256:abc"' OR true OR digests @> '"x`),
+				},
+			},
+			expectCount: 0,
+		},
+		{
+			name: "filter by digest with single quotes returns no results",
+			input: &GetModuleAttestationsInput{
+				Filter: &TerraformModuleAttestationFilter{
+					Digest: new(`sha256:test' OR '1'='1`),
+				},
+			},
+			expectCount: 0,
 		}}
 
 	for _, test := range testCases {
