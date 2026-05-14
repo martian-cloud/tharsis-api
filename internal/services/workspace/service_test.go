@@ -902,6 +902,82 @@ func TestGetConfigurationVersionByID(t *testing.T) {
 	}
 }
 
+func TestCV_UploadConfigurationVersion(t *testing.T) {
+	configVersionID := "config-version-1"
+	workspaceID := "workspace-1"
+
+	tests := []struct {
+		name            string
+		status          models.ConfigurationStatus
+		authError       error
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:   "successfully upload configuration version in pending status",
+			status: models.ConfigurationPending,
+		},
+		{
+			name:            "reject upload when configuration version is already uploaded",
+			status:          models.ConfigurationUploaded,
+			expectErrorCode: errors.EConflict,
+		},
+		{
+			name:            "reject upload when configuration version is errored",
+			status:          models.ConfigurationErrored,
+			expectErrorCode: errors.EConflict,
+		},
+		{
+			name:            "subject does not have permission",
+			status:          models.ConfigurationPending,
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockConfigVersions := db.NewMockConfigurationVersions(t)
+			mockArtifactStore := NewMockArtifactStore(t)
+
+			cv := &models.ConfigurationVersion{
+				Metadata:    models.ResourceMetadata{ID: configVersionID},
+				WorkspaceID: workspaceID,
+				Status:      test.status,
+			}
+
+			mockConfigVersions.On("GetConfigurationVersionByID", mock.Anything, configVersionID).Return(cv, nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewConfigurationVersionPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateConfigurationVersionPermission, mock.Anything).Return(test.authError)
+
+			if test.authError == nil && test.status == models.ConfigurationPending {
+				mockArtifactStore.On("UploadConfigurationVersion", mock.Anything, cv, mock.Anything).Return(nil)
+				mockConfigVersions.On("UpdateConfigurationVersion", mock.Anything, mock.Anything).Return(cv, nil)
+			}
+
+			dbClient := &db.Client{
+				ConfigurationVersions: mockConfigVersions,
+			}
+
+			service := &service{
+				dbClient:      dbClient,
+				artifactStore: mockArtifactStore,
+			}
+
+			err := service.UploadConfigurationVersion(auth.WithCaller(ctx, mockCaller), configVersionID, strings.NewReader("test"))
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestGetConfigurationVersionByTRN(t *testing.T) {
 	sampleConfigVersion := &models.ConfigurationVersion{
 		Metadata: models.ResourceMetadata{

@@ -148,7 +148,12 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 			ex = ex.Append(goqu.I("terraform_module_attestations.module_id").Eq(*input.Filter.ModuleID))
 		}
 		if input.Filter.Digest != nil {
-			ex = ex.Append(goqu.L(fmt.Sprintf("terraform_module_attestations.digests @> '\"%s\"'", *input.Filter.Digest)))
+			digestJSON, err := json.Marshal(*input.Filter.Digest)
+			if err != nil {
+				return nil, err
+			}
+
+			ex = ex.Append(goqu.L("terraform_module_attestations.digests @> ?::jsonb", string(digestJSON)))
 		}
 		if input.Filter.TimeRangeStart != nil {
 			// Must use UTC here otherwise, queries will return unexpected results.

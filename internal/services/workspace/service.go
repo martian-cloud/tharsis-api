@@ -1743,6 +1743,14 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 		return err
 	}
 
+	if cv.Status != models.ConfigurationPending {
+		return errors.New(
+			"configuration version is already uploaded",
+			errors.WithErrorCode(errors.EConflict),
+			errors.WithSpan(span),
+		)
+	}
+
 	if err := s.artifactStore.UploadConfigurationVersion(ctx, cv, reader); err != nil {
 		tracing.RecordError(span, err, "Failed to write configuration version to object storage")
 		return errors.Wrap(
