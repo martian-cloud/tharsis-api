@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<2fce3d1fdcdbf4d1f6d0f35a6d070d23>>
+ * @generated SignedSource<<4ceea3e0b0c6cb8ceabbca5bafecd0ec>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,9 +9,10 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type JobStatus = "finished" | "pending" | "queued" | "running" | "%future added value";
+export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type JobLogsFragment_logs$data = {
+  readonly completed: boolean;
   readonly id: string;
   readonly logLastUpdatedAt: any | null | undefined;
   readonly logSize: number;
@@ -42,6 +43,13 @@ const node: ReaderFragment = {
       "args": null,
       "kind": "ScalarField",
       "name": "status",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "completed",
       "storageKey": null
     },
     {
@@ -81,6 +89,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "777170e3cffb3dc5354967cded3ea59d";
+(node as any).hash = "090e1292e76cd3824800e0949a8c365c";
 
 export default node;

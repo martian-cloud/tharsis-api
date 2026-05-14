@@ -28,7 +28,6 @@ type job struct {
 	WorkspaceID              string           `json:"workspace_id" jsonschema:"ID of the workspace where this job is running"`
 	RunID                    string           `json:"run_id" jsonschema:"ID of the parent run that contains this job"`
 	RunnerID                 *string          `json:"runner_id,omitempty" jsonschema:"ID of the runner agent executing this job (null if not yet assigned)"`
-	CancelRequested          bool             `json:"cancel_requested" jsonschema:"True if cancellation has been requested but not yet completed"`
 	QueuedTimestamp          *time.Time       `json:"queued_timestamp,omitempty" jsonschema:"When the job entered the queue"`
 	PendingTimestamp         *time.Time       `json:"pending_timestamp,omitempty" jsonschema:"When the job was assigned to a runner"`
 	RunningTimestamp         *time.Time       `json:"running_timestamp,omitempty" jsonschema:"When the job started executing"`
@@ -77,7 +76,6 @@ func GetJob(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getJobInput, getJobOu
 				Type:                     j.Type,
 				WorkspaceID:              gid.ToGlobalID(types.WorkspaceModelType, j.WorkspaceID),
 				RunID:                    gid.ToGlobalID(types.RunModelType, j.RunID),
-				CancelRequested:          j.CancelRequestedTimestamp != nil,
 				QueuedTimestamp:          j.Timestamps.QueuedTimestamp,
 				PendingTimestamp:         j.Timestamps.PendingTimestamp,
 				RunningTimestamp:         j.Timestamps.RunningTimestamp,
@@ -150,7 +148,6 @@ func GetLatestJob(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getLatestJobInp
 				Type:                     j.Type,
 				WorkspaceID:              gid.ToGlobalID(types.WorkspaceModelType, j.WorkspaceID),
 				RunID:                    gid.ToGlobalID(types.RunModelType, j.RunID),
-				CancelRequested:          j.CancelRequestedTimestamp != nil,
 				QueuedTimestamp:          j.Timestamps.QueuedTimestamp,
 				PendingTimestamp:         j.Timestamps.PendingTimestamp,
 				RunningTimestamp:         j.Timestamps.RunningTimestamp,

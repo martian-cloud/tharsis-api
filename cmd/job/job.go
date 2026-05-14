@@ -113,7 +113,7 @@ func main() {
 	}
 
 	// Start the run executor
-	executor := jobexecutor.NewJobExecutor(&cfg, client, logger, Version)
+	executor := jobexecutor.NewJobExecutor(ctx, &cfg, client, logger, Version)
 
 	if err := executor.Execute(ctx); err != nil {
 		logger.Infof("Failed to execute job %v", err)

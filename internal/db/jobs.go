@@ -99,8 +99,8 @@ type jobs struct {
 }
 
 var jobFieldList = append(metadataFieldList, "status", "type", "workspace_id", "run_id",
-	"cancel_requested", "cancel_requested_at",
-	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration", "tags", "properties")
+	"cancel_requested_at",
+	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration", "force_canceled", "tags", "properties")
 
 // NewJobs returns an instance of the Jobs interface
 func NewJobs(dbClient *Client) Jobs {
@@ -291,7 +291,6 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 						"type":                job.Type,
 						"workspace_id":        job.WorkspaceID,
 						"run_id":              job.RunID,
-						"cancel_requested":    job.CancelRequested,
 						"cancel_requested_at": job.CancelRequestedTimestamp,
 						"queued_at":           job.Timestamps.QueuedTimestamp,
 						"pending_at":          job.Timestamps.PendingTimestamp,
@@ -299,6 +298,7 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 						"finished_at":         job.Timestamps.FinishedTimestamp,
 						"runner_id":           job.RunnerID,
 						"runner_path":         job.RunnerPath,
+						"force_canceled":      job.ForceCanceled,
 						"tags":                tags,
 					},
 				).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).
@@ -356,7 +356,6 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 					"type":                job.Type,
 					"workspace_id":        job.WorkspaceID,
 					"run_id":              job.RunID,
-					"cancel_requested":    job.CancelRequested,
 					"cancel_requested_at": job.CancelRequestedTimestamp,
 					"queued_at":           job.Timestamps.QueuedTimestamp,
 					"pending_at":          job.Timestamps.PendingTimestamp,
@@ -365,6 +364,7 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 					"max_job_duration":    job.MaxJobDuration,
 					"runner_id":           job.RunnerID,
 					"runner_path":         job.RunnerPath,
+					"force_canceled":      job.ForceCanceled,
 					"tags":                tags,
 					"properties":          properties,
 				}).Returning("*"),
@@ -479,7 +479,6 @@ func scanJob(row scanner) (*models.Job, error) {
 		&job.Type,
 		&job.WorkspaceID,
 		&job.RunID,
-		&job.CancelRequested,
 		&cancelRequestedAt,
 		&job.RunnerID,
 		&job.RunnerPath,
@@ -488,6 +487,7 @@ func scanJob(row scanner) (*models.Job, error) {
 		&runningAt,
 		&finishedAt,
 		&job.MaxJobDuration,
+		&job.ForceCanceled,
 		&job.Tags,
 		&job.Properties,
 		&workspacePath,

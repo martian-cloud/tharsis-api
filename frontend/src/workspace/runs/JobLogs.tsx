@@ -38,6 +38,7 @@ function JobLogs(props: Props) {
         {
             id
             status
+            completed
             logLastUpdatedAt
             logSize
             logs(startOffset:0, limit:51200)
@@ -114,10 +115,10 @@ function JobLogs(props: Props) {
                     </Tooltip>
                 </Box>
             </Paper>
-            {data.status === 'finished' && loadedPercent < 100 && <LinearProgress variant="determinate" value={loadedPercent} />}
+            {data.completed && loadedPercent < 100 && <LinearProgress variant="determinate" value={loadedPercent} />}
             <LogViewer
                 logs={logs}
-                loading={data.status !== 'finished'}
+                loading={!data.completed}
                 sx={{
                     backgroundColor: darken(theme.palette.background.default, 0.5),
                     paddingTop: 1,

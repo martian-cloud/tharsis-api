@@ -24,6 +24,7 @@ const (
 	Jobs_GetJobLogs_FullMethodName                      = "/martiancloud.tharsis.api.job.Jobs/GetJobLogs"
 	Jobs_GetLatestJobForPlan_FullMethodName             = "/martiancloud.tharsis.api.job.Jobs/GetLatestJobForPlan"
 	Jobs_GetLatestJobForApply_FullMethodName            = "/martiancloud.tharsis.api.job.Jobs/GetLatestJobForApply"
+	Jobs_SetJobStatus_FullMethodName                    = "/martiancloud.tharsis.api.job.Jobs/SetJobStatus"
 	Jobs_SaveJobLogs_FullMethodName                     = "/martiancloud.tharsis.api.job.Jobs/SaveJobLogs"
 	Jobs_ClaimJob_FullMethodName                        = "/martiancloud.tharsis.api.job.Jobs/ClaimJob"
 	Jobs_SubscribeToJobLogStream_FullMethodName         = "/martiancloud.tharsis.api.job.Jobs/SubscribeToJobLogStream"
@@ -45,6 +46,8 @@ type JobsClient interface {
 	GetLatestJobForPlan(ctx context.Context, in *GetLatestJobForPlanRequest, opts ...grpc.CallOption) (*Job, error)
 	// GetLatestJobForApply retrieves the latest job for an apply ID.
 	GetLatestJobForApply(ctx context.Context, in *GetLatestJobForApplyRequest, opts ...grpc.CallOption) (*Job, error)
+	// SetJobStatus sets the status of a job.
+	SetJobStatus(ctx context.Context, in *SetJobStatusInput, opts ...grpc.CallOption) (*Job, error)
 	// SaveJobLogs saves job logs.
 	SaveJobLogs(ctx context.Context, in *SaveJobLogsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ClaimJob claims the next available job for a runner.
@@ -99,6 +102,16 @@ func (c *jobsClient) GetLatestJobForApply(ctx context.Context, in *GetLatestJobF
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Job)
 	err := c.cc.Invoke(ctx, Jobs_GetLatestJobForApply_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobsClient) SetJobStatus(ctx context.Context, in *SetJobStatusInput, opts ...grpc.CallOption) (*Job, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Job)
+	err := c.cc.Invoke(ctx, Jobs_SetJobStatus_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +209,8 @@ type JobsServer interface {
 	GetLatestJobForPlan(context.Context, *GetLatestJobForPlanRequest) (*Job, error)
 	// GetLatestJobForApply retrieves the latest job for an apply ID.
 	GetLatestJobForApply(context.Context, *GetLatestJobForApplyRequest) (*Job, error)
+	// SetJobStatus sets the status of a job.
+	SetJobStatus(context.Context, *SetJobStatusInput) (*Job, error)
 	// SaveJobLogs saves job logs.
 	SaveJobLogs(context.Context, *SaveJobLogsRequest) (*emptypb.Empty, error)
 	// ClaimJob claims the next available job for a runner.
@@ -227,6 +242,9 @@ func (UnimplementedJobsServer) GetLatestJobForPlan(context.Context, *GetLatestJo
 }
 func (UnimplementedJobsServer) GetLatestJobForApply(context.Context, *GetLatestJobForApplyRequest) (*Job, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLatestJobForApply not implemented")
+}
+func (UnimplementedJobsServer) SetJobStatus(context.Context, *SetJobStatusInput) (*Job, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetJobStatus not implemented")
 }
 func (UnimplementedJobsServer) SaveJobLogs(context.Context, *SaveJobLogsRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method SaveJobLogs not implemented")
@@ -336,6 +354,24 @@ func _Jobs_GetLatestJobForApply_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Jobs_SetJobStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetJobStatusInput)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobsServer).SetJobStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Jobs_SetJobStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobsServer).SetJobStatus(ctx, req.(*SetJobStatusInput))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Jobs_SaveJobLogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SaveJobLogsRequest)
 	if err := dec(in); err != nil {
@@ -427,6 +463,10 @@ var Jobs_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLatestJobForApply",
 			Handler:    _Jobs_GetLatestJobForApply_Handler,
+		},
+		{
+			MethodName: "SetJobStatus",
+			Handler:    _Jobs_SetJobStatus_Handler,
 		},
 		{
 			MethodName: "SaveJobLogs",

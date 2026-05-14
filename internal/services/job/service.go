@@ -110,6 +110,7 @@ type Service interface {
 	GetJobsByIDs(ctx context.Context, idList []string) ([]models.Job, error)
 	GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsResult, error)
 	GetLatestJobForRun(ctx context.Context, run *models.Run) (*models.Job, error)
+	SetJobStatus(ctx context.Context, jobID string, status models.JobStatus) (*models.Job, error)
 	SubscribeToCancellationEvent(ctx context.Context, options *CancellationSubscriptionsOptions) (<-chan *CancellationEvent, error)
 	WriteLogs(ctx context.Context, jobID string, startOffset int, logs []byte) (int, error)
 	ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error)
@@ -325,6 +326,43 @@ func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*mod
 	return &jobsResult.Jobs[0], nil
 }
 
+func (s *service) SetJobStatus(ctx context.Context, jobID string, status models.JobStatus) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "svc.SetJobStatus")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	job, err := s.dbClient.Jobs.GetJobByID(ctx, jobID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get job")
+		return nil, err
+	}
+
+	if job == nil {
+		return nil, errors.New("job with ID %s not found", jobID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.UpdateJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	job.Status = status
+
+	updatedJob, err := s.runStateManager.UpdateJob(ctx, job)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to update job status")
+		return nil, err
+	}
+
+	return updatedJob, nil
+}
+
 func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsInput) (<-chan *Event, error) {
 	ctx, span := tracer.Start(ctx, "svc.SubscribeToJobs")
 	defer span.End()
@@ -474,7 +512,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 			return
 		}
 
-		if job.CancelRequested {
+		if job.Status == models.JobCanceling || job.Status == models.JobCanceled {
 			select {
 			case <-innerCtx.Done():
 			case outgoing <- &CancellationEvent{Job: *job}:
@@ -499,7 +537,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 				continue
 			}
 
-			if !eventData.CancelRequested {
+			if eventData.Status != string(models.JobCanceling) && eventData.Status != string(models.JobCanceled) {
 				continue
 			}
 

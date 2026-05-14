@@ -47,7 +47,7 @@ import (
 
 const (
 	// forceCancelWait is how long a run must be soft-canceled before it is allowed to be forcefully canceled.
-	forceCancelWait = 1 * time.Minute
+	forceCancelWait = 15 * time.Second
 	// Max error message length for plan and apply errors.
 	maxErrorMessageLength = 2048
 )
@@ -1169,11 +1169,10 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 
 	// Create job for initial plan
 	job := models.Job{
-		Status:          models.JobQueued,
-		Type:            models.JobPlanType,
-		WorkspaceID:     options.WorkspaceID,
-		RunID:           run.Metadata.ID,
-		CancelRequested: false,
+		Status:      models.JobQueued,
+		Type:        models.JobPlanType,
+		WorkspaceID: options.WorkspaceID,
+		RunID:       run.Metadata.ID,
 		Timestamps: models.JobTimestamps{
 			QueuedTimestamp: &now,
 		},
@@ -1383,11 +1382,10 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 
 	// Create job for apply
 	job := models.Job{
-		Status:          models.JobQueued,
-		Type:            models.JobApplyType,
-		WorkspaceID:     run.WorkspaceID,
-		RunID:           run.Metadata.ID,
-		CancelRequested: false,
+		Status:      models.JobQueued,
+		Type:        models.JobApplyType,
+		WorkspaceID: run.WorkspaceID,
+		RunID:       run.Metadata.ID,
 		Timestamps: models.JobTimestamps{
 			QueuedTimestamp: &now,
 		},
@@ -1613,6 +1611,11 @@ func (s *service) gracefullyCancelRun(ctx context.Context, run *models.Run) (*mo
 		run.ForceCancelAvailableAt = &whenForceCancelAllowed
 	}
 
+	run, err := s.runStateManager.UpdateRun(ctx, run)
+	if err != nil {
+		return nil, err
+	}
+
 	// Cancel latest job associated with run
 	job, err := s.jobService.GetLatestJobForRun(ctx, run)
 	if err != nil {
@@ -1628,8 +1631,13 @@ func (s *service) gracefullyCancelRun(ctx context.Context, run *models.Run) (*mo
 			errors.WithErrorCode(errors.EInternal))
 	}
 
+	if job.Status == models.JobQueued {
+		job.Status = models.JobCanceled
+	} else {
+		job.Status = models.JobCanceling
+	}
+
 	now := time.Now().UTC()
-	job.CancelRequested = true
 	job.CancelRequestedTimestamp = &now
 
 	_, err = s.runStateManager.UpdateJob(ctx, job)
@@ -1637,7 +1645,7 @@ func (s *service) gracefullyCancelRun(ctx context.Context, run *models.Run) (*mo
 		return nil, err
 	}
 
-	return s.runStateManager.UpdateRun(ctx, run)
+	return s.dbClient.Runs.GetRunByID(ctx, run.Metadata.ID)
 }
 
 func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.Run, error) {
@@ -1665,47 +1673,11 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 		)
 	}
 
-	if job == nil {
-		return nil, errors.New(
-			"Run has no job",
-			errors.WithErrorCode(errors.EInternal))
-	}
-
-	// If a forced cancel, update the state of the plan or apply directly
-	// and mark the workspace as having dirty state.  Do this before tell the
-	// job to cancel itself to avoid risk of not recording the dirty state.
-
-	// Update the plan or apply directly.
-	switch job.Type {
-	case models.JobPlanType:
-		plan, err := s.GetPlanByID(ctx, run.PlanID)
-		if err != nil {
-			return nil, errors.Wrap(
-				err,
-				"failed to get the plan object to cancel a run",
-			)
-		}
-
-		plan.Status = models.PlanCanceled
-		_, err = s.runStateManager.UpdatePlan(ctx, plan)
-		if err != nil {
-			// This error does not need to be wrapped.
-			return nil, err
-		}
-	case models.JobApplyType:
-		apply, err := s.GetApplyByID(ctx, run.ApplyID)
-		if err != nil {
-			return nil, errors.Wrap(
-				err,
-				"failed to get an apply object to cancel a run",
-			)
-		}
-
-		apply.Status = models.ApplyCanceled
-		_, err = s.runStateManager.UpdateApply(ctx, apply)
-		if err != nil {
-			// This error does not need to be wrapped.
-			return nil, err
+	if job != nil && !job.Status.IsFinal() {
+		job.Status = models.JobCanceled
+		job.ForceCanceled = true
+		if _, err := s.runStateManager.UpdateJob(ctx, job); err != nil {
+			return nil, errors.Wrap(err, "failed to force cancel job %s", job.Metadata.ID)
 		}
 	}
 

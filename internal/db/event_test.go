@@ -103,6 +103,7 @@ func TestListen(t *testing.T) {
 					WorkspaceID: workspace1.Metadata.ID,
 					RunID:       run1.Metadata.ID,
 					RunnerID:    &runner1.Metadata.ID,
+					Status:      models.JobQueued,
 				})
 				if cErr != nil {
 					return fmt.Errorf("failed to create job: %w", cErr)
@@ -147,10 +148,12 @@ func TestListen(t *testing.T) {
 				&JobEventData{
 					// IDs will be filled in later.
 					WorkspaceID: workspace1.Metadata.ID,
+					Status:      string(models.JobQueued),
 				},
 				&JobEventData{
 					// IDs will be filled in later.
 					WorkspaceID: workspace1.Metadata.ID,
+					Status:      string(models.JobFinished),
 				},
 			},
 		},

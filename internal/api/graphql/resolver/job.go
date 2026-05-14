@@ -185,6 +185,11 @@ func (r *JobResolver) Status() models.JobStatus {
 	return r.job.Status
 }
 
+// Completed resolver
+func (r *JobResolver) Completed() bool {
+	return r.job.Status.IsFinal()
+}
+
 // Type resolver
 func (r *JobResolver) Type() string {
 	return string(r.job.Type)
@@ -254,7 +259,12 @@ func (r *JobResolver) Workspace(ctx context.Context) (*WorkspaceResolver, error)
 
 // CancelRequested resolver
 func (r *JobResolver) CancelRequested() bool {
-	return r.job.CancelRequested
+	return r.job.Status == models.JobCanceling
+}
+
+// ForceCanceled resolver
+func (r *JobResolver) ForceCanceled() bool {
+	return r.job.ForceCanceled
 }
 
 // Metadata resolver

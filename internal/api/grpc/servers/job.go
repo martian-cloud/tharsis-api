@@ -89,6 +89,21 @@ func (s *JobServer) GetLatestJobForApply(ctx context.Context, req *pb.GetLatestJ
 	return toPBJob(job), nil
 }
 
+// SetJobStatus sets the status of a job.
+func (s *JobServer) SetJobStatus(ctx context.Context, req *pb.SetJobStatusInput) (*pb.Job, error) {
+	jobID, err := s.serviceCatalog.FetchModelID(ctx, req.JobId)
+	if err != nil {
+		return nil, err
+	}
+
+	job, err := s.serviceCatalog.JobService.SetJobStatus(ctx, jobID, models.JobStatus(req.GetStatus().String()))
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBJob(job), nil
+}
+
 // SaveJobLogs saves job logs.
 func (s *JobServer) SaveJobLogs(ctx context.Context, req *pb.SaveJobLogsRequest) (*emptypb.Empty, error) {
 	jobID, err := s.serviceCatalog.FetchModelID(ctx, req.JobId)
@@ -243,9 +258,10 @@ func toPBJob(j *models.Job) *pb.Job {
 		WorkspaceId:     gid.ToGlobalID(types.WorkspaceModelType, j.WorkspaceID),
 		RunId:           gid.ToGlobalID(types.RunModelType, j.RunID),
 		Type:            string(j.Type),
-		Status:          string(j.Status),
+		Status:          pb.JobStatus(pb.JobStatus_value[string(j.Status)]),
 		MaxJobDuration:  j.MaxJobDuration,
 		Properties:      j.Properties,
-		CancelRequested: j.CancelRequested,
+		CancelRequested: j.Status == models.JobCanceling,
+		ForceCanceled:   j.ForceCanceled,
 	}
 }
