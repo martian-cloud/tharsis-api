@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
+	version "github.com/hashicorp/go-version"
 	tfjson "github.com/hashicorp/terraform-json"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/ansi"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
@@ -182,10 +182,10 @@ func (c CreateRunInput) Validate() error {
 			return errors.New("'latest' is not a valid module version; please specify a valid semantic version", errors.WithErrorCode(errors.EInvalid))
 		}
 
-		// Make sure it's a valid semver.
-		_, err := semver.StrictNewVersion(*c.ModuleVersion)
+		// Make sure it's a valid semver version or constraint expression.
+		_, err := version.NewConstraint(*c.ModuleVersion)
 		if err != nil {
-			return errors.New("module version is not a valid semver string", errors.WithErrorCode(errors.EInvalid))
+			return errors.New("module version is not a valid semver version or constraint expression", errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 
@@ -854,6 +854,17 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		return nil, err
 	}
 
+	// Normalize the module version: strip a leading 'v' followed by a digit
+	// so that "v1.0.0" resolves identically to "1.0.0". Constraint expressions
+	// (e.g., ">= 1.0.0", ">= v1.0.0, < v2.0.0") are left unchanged — the
+	// hashicorp/go-version library handles any embedded 'v' prefixes natively.
+	normalizedModuleVersion := options.ModuleVersion
+	if normalizedModuleVersion != nil && len(*normalizedModuleVersion) > 1 &&
+		(*normalizedModuleVersion)[0] == 'v' && (*normalizedModuleVersion)[1] >= '0' && (*normalizedModuleVersion)[1] <= '9' {
+		stripped := (*normalizedModuleVersion)[1:]
+		normalizedModuleVersion = &stripped
+	}
+
 	// Build run variables
 	runVariables, err := s.buildRunVariables(ctx, options.WorkspaceID, options.Variables)
 	if err != nil {
@@ -868,7 +879,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		ConfigurationVersionID:   options.ConfigurationVersionID,
 		Comment:                  options.Comment,
 		ModuleSource:             options.ModuleSource,
-		ModuleVersion:            options.ModuleVersion,
+		ModuleVersion:            normalizedModuleVersion,
 		Speculative:              options.Speculative,
 		WorkspaceID:              options.WorkspaceID,
 		TerraformVersion:         options.TerraformVersion,

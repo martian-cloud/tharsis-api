@@ -1829,6 +1829,26 @@ func TestCreateRunWithTharsisModule(t *testing.T) {
 			expectIncludeModulePre: true,
 			resolvedVersion:        "2.0.0-rc.1",
 		},
+		{
+			name: "create run with v-prefixed module version normalizes to semver",
+			input: &CreateRunInput{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: ptr.String("v1.0.0"),
+			},
+			expectCreateRun: &models.Run{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				CreatedBy:     createdBySubject,
+				PlanID:        planID,
+				ApplyID:       applyID,
+				Status:        models.RunPlanQueued,
+				ModuleVersion: &moduleVersion, // normalized to "1.0.0"
+				ModuleDigest:  moduleDigest,
+			},
+			expectWantVersion: &moduleVersion, // resolver receives normalized "1.0.0"
+			resolvedVersion:   moduleVersion,
+		},
 	}
 
 	for _, test := range tests {
@@ -4155,11 +4175,64 @@ func TestCreateRunInputValidate(t *testing.T) {
 			expectErrorCode: errors.EInvalid,
 		},
 		{
-			name: "valid module version",
+			name: "valid exact module version",
 			input: CreateRunInput{
 				ModuleSource:  ptr.String("test-source"),
 				ModuleVersion: ptr.String("1.0.0"),
 			},
+		},
+		{
+			name: "valid prerelease module version",
+			input: CreateRunInput{
+				ModuleSource:  ptr.String("test-source"),
+				ModuleVersion: ptr.String("1.0.0-rc.1"),
+			},
+		},
+		{
+			name: "valid constraint expression",
+			input: CreateRunInput{
+				ModuleSource:  ptr.String("test-source"),
+				ModuleVersion: ptr.String(">= 1.0.0"),
+			},
+		},
+		{
+			name: "valid constraint range",
+			input: CreateRunInput{
+				ModuleSource:  ptr.String("test-source"),
+				ModuleVersion: ptr.String(">= 1.0.0, < 2.0.0"),
+			},
+		},
+		{
+			name: "invalid module version string",
+			input: CreateRunInput{
+				ModuleSource:  ptr.String("test-source"),
+				ModuleVersion: ptr.String("not-a-version"),
+			},
+			expectError:     "module version is not a valid semver version or constraint expression",
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "valid v-prefixed module version",
+			input: CreateRunInput{
+				ModuleSource:  ptr.String("test-source"),
+				ModuleVersion: ptr.String("v1.0.0"),
+			},
+		},
+		{
+			name: "valid constraint range with v-prefixed versions",
+			input: CreateRunInput{
+				ModuleSource:  ptr.String("test-source"),
+				ModuleVersion: ptr.String(">= v1.0.0, < v2.0.0"),
+			},
+		},
+		{
+			name: "invalid v-prefixed operator string",
+			input: CreateRunInput{
+				ModuleSource:  ptr.String("test-source"),
+				ModuleVersion: ptr.String("v>= 1.0.0"),
+			},
+			expectError:     "module version is not a valid semver version or constraint expression",
+			expectErrorCode: errors.EInvalid,
 		},
 	}
 
