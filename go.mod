@@ -3,7 +3,6 @@ module gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api
 go 1.26.2
 
 require (
-	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/ProtonMail/go-crypto v1.3.0
 	github.com/apparentlymart/go-versions v1.0.2
 	github.com/avast/retry-go v3.0.0+incompatible
@@ -112,6 +111,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.56.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.56.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
+	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/PuerkitoBio/goquery v1.9.2 // indirect
 	github.com/RoaringBitmap/roaring/v2 v2.4.5 // indirect
