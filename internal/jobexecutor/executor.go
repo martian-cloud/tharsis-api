@@ -34,6 +34,8 @@ const (
 	failureIcon = "\u274c"
 )
 
+var errJobAlreadyCanceled = errors.New("job already canceled")
+
 // JobHandler contains the job lifecycle functions
 type JobHandler interface {
 	Execute(ctx context.Context) error
@@ -100,7 +102,9 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 
 	err = j.execute(ctx, jobLogger)
 
-	if j.cancellableCtx.Err() != nil {
+	if err == errJobAlreadyCanceled {
+		return nil
+	} else if j.cancellableCtx.Err() != nil {
 		j.handleJobCanceled(ctx, jobLogger)
 	} else if err != nil {
 		j.handleJobFailureWithError(ctx, jobLogger, err)
@@ -139,6 +143,16 @@ func (j *JobExecutor) handleJobCanceled(ctx context.Context, jobLogger joblogger
 func (j *JobExecutor) execute(ctx context.Context, jobLogger joblogger.Logger) error {
 	// Set job status to running
 	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_running); err != nil {
+		if status.Code(err) == codes.InvalidArgument {
+			// Check if job is already canceled
+			job, err := j.client.GetJob(ctx, j.cfg.JobID)
+			if err != nil {
+				return fmt.Errorf("failed to get job %v", err)
+			}
+			if job.Status == pb.JobStatus_canceled {
+				return errJobAlreadyCanceled
+			}
+		}
 		return fmt.Errorf("failed to set job status to running: %v", err)
 	}
 
