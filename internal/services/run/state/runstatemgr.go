@@ -773,7 +773,7 @@ func checkPlanStatusChange(oldStatus, newStatus models.PlanStatus) error {
 	case models.PlanQueued:
 		transitionValid = (newStatus == models.PlanPending) || (newStatus == models.PlanCanceled)
 	case models.PlanPending:
-		transitionValid = (newStatus == models.PlanRunning) || (newStatus == models.PlanCanceled)
+		transitionValid = (newStatus == models.PlanRunning) || (newStatus == models.PlanCanceled) || (newStatus == models.PlanErrored)
 	case models.PlanRunning:
 		transitionValid = (newStatus == models.PlanCanceled) || (newStatus == models.PlanErrored) || (newStatus == models.PlanFinished)
 	}
@@ -812,7 +812,7 @@ func checkApplyStatusChange(oldStatus, newStatus models.ApplyStatus) error {
 	case models.ApplyQueued:
 		transitionValid = (newStatus == models.ApplyPending) || (newStatus == models.ApplyCanceled)
 	case models.ApplyPending:
-		transitionValid = (newStatus == models.ApplyRunning) || (newStatus == models.ApplyCanceled)
+		transitionValid = (newStatus == models.ApplyRunning) || (newStatus == models.ApplyCanceled) || (newStatus == models.ApplyErrored)
 	case models.ApplyRunning:
 		transitionValid = (newStatus == models.ApplyCanceled) || (newStatus == models.ApplyErrored) || (newStatus == models.ApplyFinished)
 	}
@@ -882,7 +882,7 @@ func checkJobStatusChange(oldStatus, newStatus models.JobStatus) error {
 	case models.JobQueued:
 		transitionValid = (newStatus == models.JobPending) || (newStatus == models.JobCanceled)
 	case models.JobPending:
-		transitionValid = (newStatus == models.JobRunning) || (newStatus == models.JobCanceled) || (newStatus == models.JobCanceling)
+		transitionValid = (newStatus == models.JobRunning) || (newStatus == models.JobCanceled) || (newStatus == models.JobCanceling) || (newStatus == models.JobFailed)
 	case models.JobRunning:
 		transitionValid = (newStatus == models.JobFinished) || (newStatus == models.JobFailed) || (newStatus == models.JobCanceling) || (newStatus == models.JobCanceled)
 	case models.JobCanceling:

@@ -1631,7 +1631,8 @@ func (s *service) gracefullyCancelRun(ctx context.Context, run *models.Run) (*mo
 			errors.WithErrorCode(errors.EInternal))
 	}
 
-	if job.Status == models.JobQueued {
+	if job.Status == models.JobQueued || job.Status == models.JobPending {
+		// Set directly to canceled because job has not started yet
 		job.Status = models.JobCanceled
 	} else {
 		job.Status = models.JobCanceling
