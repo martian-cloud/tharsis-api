@@ -26,6 +26,7 @@ const (
 	TerraformModules_UpdateTerraformModule_FullMethodName             = "/martiancloud.tharsis.api.terraform_module.TerraformModules/UpdateTerraformModule"
 	TerraformModules_DeleteTerraformModule_FullMethodName             = "/martiancloud.tharsis.api.terraform_module.TerraformModules/DeleteTerraformModule"
 	TerraformModules_GetTerraformModuleVersionByID_FullMethodName     = "/martiancloud.tharsis.api.terraform_module.TerraformModules/GetTerraformModuleVersionByID"
+	TerraformModules_GetTerraformModuleVersionBySource_FullMethodName = "/martiancloud.tharsis.api.terraform_module.TerraformModules/GetTerraformModuleVersionBySource"
 	TerraformModules_GetTerraformModuleVersions_FullMethodName        = "/martiancloud.tharsis.api.terraform_module.TerraformModules/GetTerraformModuleVersions"
 	TerraformModules_CreateTerraformModuleVersion_FullMethodName      = "/martiancloud.tharsis.api.terraform_module.TerraformModules/CreateTerraformModuleVersion"
 	TerraformModules_DeleteTerraformModuleVersion_FullMethodName      = "/martiancloud.tharsis.api.terraform_module.TerraformModules/DeleteTerraformModuleVersion"
@@ -54,6 +55,8 @@ type TerraformModulesClient interface {
 	DeleteTerraformModule(ctx context.Context, in *DeleteTerraformModuleRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// GetTerraformModuleVersionByID returns a TerraformModuleVersion by an ID.
 	GetTerraformModuleVersionByID(ctx context.Context, in *GetTerraformModuleVersionByIDRequest, opts ...grpc.CallOption) (*TerraformModuleVersion, error)
+	// GetTerraformModuleVersionBySource returns a TerraformModuleVersion by its registry source address.
+	GetTerraformModuleVersionBySource(ctx context.Context, in *GetTerraformModuleVersionBySourceRequest, opts ...grpc.CallOption) (*TerraformModuleVersion, error)
 	// GetTerraformModuleVersions returns a paginated list of TerraformModuleVersions.
 	GetTerraformModuleVersions(ctx context.Context, in *GetTerraformModuleVersionsRequest, opts ...grpc.CallOption) (*GetTerraformModuleVersionsResponse, error)
 	// CreateTerraformModuleVersion creates a new TerraformModuleVersion.
@@ -134,6 +137,16 @@ func (c *terraformModulesClient) GetTerraformModuleVersionByID(ctx context.Conte
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(TerraformModuleVersion)
 	err := c.cc.Invoke(ctx, TerraformModules_GetTerraformModuleVersionByID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *terraformModulesClient) GetTerraformModuleVersionBySource(ctx context.Context, in *GetTerraformModuleVersionBySourceRequest, opts ...grpc.CallOption) (*TerraformModuleVersion, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TerraformModuleVersion)
+	err := c.cc.Invoke(ctx, TerraformModules_GetTerraformModuleVersionBySource_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +251,8 @@ type TerraformModulesServer interface {
 	DeleteTerraformModule(context.Context, *DeleteTerraformModuleRequest) (*emptypb.Empty, error)
 	// GetTerraformModuleVersionByID returns a TerraformModuleVersion by an ID.
 	GetTerraformModuleVersionByID(context.Context, *GetTerraformModuleVersionByIDRequest) (*TerraformModuleVersion, error)
+	// GetTerraformModuleVersionBySource returns a TerraformModuleVersion by its registry source address.
+	GetTerraformModuleVersionBySource(context.Context, *GetTerraformModuleVersionBySourceRequest) (*TerraformModuleVersion, error)
 	// GetTerraformModuleVersions returns a paginated list of TerraformModuleVersions.
 	GetTerraformModuleVersions(context.Context, *GetTerraformModuleVersionsRequest) (*GetTerraformModuleVersionsResponse, error)
 	// CreateTerraformModuleVersion creates a new TerraformModuleVersion.
@@ -281,6 +296,9 @@ func (UnimplementedTerraformModulesServer) DeleteTerraformModule(context.Context
 }
 func (UnimplementedTerraformModulesServer) GetTerraformModuleVersionByID(context.Context, *GetTerraformModuleVersionByIDRequest) (*TerraformModuleVersion, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTerraformModuleVersionByID not implemented")
+}
+func (UnimplementedTerraformModulesServer) GetTerraformModuleVersionBySource(context.Context, *GetTerraformModuleVersionBySourceRequest) (*TerraformModuleVersion, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTerraformModuleVersionBySource not implemented")
 }
 func (UnimplementedTerraformModulesServer) GetTerraformModuleVersions(context.Context, *GetTerraformModuleVersionsRequest) (*GetTerraformModuleVersionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTerraformModuleVersions not implemented")
@@ -431,6 +449,24 @@ func _TerraformModules_GetTerraformModuleVersionByID_Handler(srv interface{}, ct
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TerraformModulesServer).GetTerraformModuleVersionByID(ctx, req.(*GetTerraformModuleVersionByIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TerraformModules_GetTerraformModuleVersionBySource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTerraformModuleVersionBySourceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TerraformModulesServer).GetTerraformModuleVersionBySource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TerraformModules_GetTerraformModuleVersionBySource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TerraformModulesServer).GetTerraformModuleVersionBySource(ctx, req.(*GetTerraformModuleVersionBySourceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -609,6 +645,10 @@ var TerraformModules_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTerraformModuleVersionByID",
 			Handler:    _TerraformModules_GetTerraformModuleVersionByID_Handler,
+		},
+		{
+			MethodName: "GetTerraformModuleVersionBySource",
+			Handler:    _TerraformModules_GetTerraformModuleVersionBySource_Handler,
 		},
 		{
 			MethodName: "GetTerraformModuleVersions",

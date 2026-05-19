@@ -59,6 +59,14 @@ message TerraformModuleVersion {
   optional google.protobuf.Timestamp upload_started_timestamp = 11;
 }
 
+// GetTerraformModuleVersionBySourceRequest is the input for retrieving a TerraformModuleVersion by its registry source address.
+message GetTerraformModuleVersionBySourceRequest {
+  string          namespace        = 1;
+  string          name             = 2;
+  string          system           = 3;
+  optional string semantic_version = 4;
+}
+
 // GetTerraformModuleVersionsResponse is the paginated list of TerraformModuleVersions.
 message GetTerraformModuleVersionsResponse {
   repeated TerraformModuleVersion versions  = 1;

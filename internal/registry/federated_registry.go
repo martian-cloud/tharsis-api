@@ -21,7 +21,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 const (
@@ -30,7 +29,7 @@ const (
 
 // remoteClient wraps the gRPC calls needed to communicate with a remote Tharsis instance.
 type remoteClient interface {
-	GetTerraformModuleVersionByID(ctx context.Context, req *pb.GetTerraformModuleVersionByIDRequest) (*pb.TerraformModuleVersion, error)
+	GetTerraformModuleVersionBySource(ctx context.Context, req *pb.GetTerraformModuleVersionBySourceRequest) (*pb.TerraformModuleVersion, error)
 	GetTerraformModuleAttestations(ctx context.Context, req *pb.GetTerraformModuleAttestationsRequest) (*pb.GetTerraformModuleAttestationsResponse, error)
 	Close() error
 }
@@ -40,8 +39,8 @@ type grpcRemoteClient struct {
 	client *client.GRPCClient
 }
 
-func (c *grpcRemoteClient) GetTerraformModuleVersionByID(ctx context.Context, req *pb.GetTerraformModuleVersionByIDRequest) (*pb.TerraformModuleVersion, error) {
-	return c.client.TerraformModulesClient.GetTerraformModuleVersionByID(ctx, req)
+func (c *grpcRemoteClient) GetTerraformModuleVersionBySource(ctx context.Context, req *pb.GetTerraformModuleVersionBySourceRequest) (*pb.TerraformModuleVersion, error) {
+	return c.client.TerraformModulesClient.GetTerraformModuleVersionBySource(ctx, req)
 }
 
 func (c *grpcRemoteClient) GetTerraformModuleAttestations(ctx context.Context, req *pb.GetTerraformModuleAttestationsRequest) (*pb.GetTerraformModuleAttestationsResponse, error) {
@@ -103,8 +102,11 @@ func (r *federatedRegistryClient) GetModuleVersion(ctx context.Context, input *G
 	}
 	defer rc.Close()
 
-	return rc.GetTerraformModuleVersionByID(ctx, &pb.GetTerraformModuleVersionByIDRequest{
-		Id: trn.TypeTerraformModuleVersion.Build(input.ModuleNamespace, input.ModuleName, input.ModuleSystem, input.ModuleVersion),
+	return rc.GetTerraformModuleVersionBySource(ctx, &pb.GetTerraformModuleVersionBySourceRequest{
+		Namespace:       input.ModuleNamespace,
+		Name:            input.ModuleName,
+		System:          input.ModuleSystem,
+		SemanticVersion: &input.ModuleVersion,
 	})
 }
 

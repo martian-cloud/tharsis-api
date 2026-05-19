@@ -62,20 +62,20 @@ func (_m *mockRemoteClient) GetTerraformModuleAttestations(ctx context.Context, 
 	return r0, r1
 }
 
-// GetTerraformModuleVersionByID provides a mock function with given fields: ctx, req
-func (_m *mockRemoteClient) GetTerraformModuleVersionByID(ctx context.Context, req *gen.GetTerraformModuleVersionByIDRequest) (*gen.TerraformModuleVersion, error) {
+// GetTerraformModuleVersionBySource provides a mock function with given fields: ctx, req
+func (_m *mockRemoteClient) GetTerraformModuleVersionBySource(ctx context.Context, req *gen.GetTerraformModuleVersionBySourceRequest) (*gen.TerraformModuleVersion, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetTerraformModuleVersionByID")
+		panic("no return value specified for GetTerraformModuleVersionBySource")
 	}
 
 	var r0 *gen.TerraformModuleVersion
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *gen.GetTerraformModuleVersionByIDRequest) (*gen.TerraformModuleVersion, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *gen.GetTerraformModuleVersionBySourceRequest) (*gen.TerraformModuleVersion, error)); ok {
 		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *gen.GetTerraformModuleVersionByIDRequest) *gen.TerraformModuleVersion); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *gen.GetTerraformModuleVersionBySourceRequest) *gen.TerraformModuleVersion); ok {
 		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
@@ -83,7 +83,7 @@ func (_m *mockRemoteClient) GetTerraformModuleVersionByID(ctx context.Context, r
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *gen.GetTerraformModuleVersionByIDRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *gen.GetTerraformModuleVersionBySourceRequest) error); ok {
 		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Error(1)
