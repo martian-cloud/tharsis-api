@@ -191,10 +191,10 @@ func NewGRPCClient(ctx context.Context, c *GRPCClientConfig) (*GRPCClient, error
 	}
 
 	// Fetch discovery document from API.
-	discoveryDocument, err := NewGRPCDiscoveryDocument(ctx, c.HTTPEndpoint, WithLogger(c.Logger))
+	discoveryDocument, err := NewGRPCDiscoveryDocument(ctx, c.HTTPEndpoint, WithLogger(c.Logger), WithTLSSkipVerify(c.TLSSkipVerify))
 	if err != nil && errors.Is(err, context.DeadlineExceeded) {
 		// The context deadline was exceeded, try one more time before returning an error
-		discoveryDocument, err = NewGRPCDiscoveryDocument(ctx, c.HTTPEndpoint, WithLogger(c.Logger))
+		discoveryDocument, err = NewGRPCDiscoveryDocument(ctx, c.HTTPEndpoint, WithLogger(c.Logger), WithTLSSkipVerify(c.TLSSkipVerify))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get discovery document: %w", err)
@@ -327,7 +327,8 @@ type GRPCDiscoveryDocument struct {
 
 // grpcDiscoveryOptions represents the options for the GRPC discovery document.
 type grpcDiscoveryOptions struct {
-	logger LeveledLogger
+	logger        LeveledLogger
+	tlsSkipVerify bool
 }
 
 // GRPCDiscoveryOption is a function that sets options for the GRPC discovery document.
@@ -337,6 +338,13 @@ type GRPCDiscoveryOption func(*grpcDiscoveryOptions)
 func WithLogger(logger LeveledLogger) GRPCDiscoveryOption {
 	return func(o *grpcDiscoveryOptions) {
 		o.logger = logger
+	}
+}
+
+// WithTLSSkipVerify disables TLS certificate verification for the discovery document fetch.
+func WithTLSSkipVerify(skip bool) GRPCDiscoveryOption {
+	return func(o *grpcDiscoveryOptions) {
+		o.tlsSkipVerify = skip
 	}
 }
 
@@ -371,6 +379,7 @@ func NewGRPCDiscoveryDocument(ctx context.Context, endpoint string, options ...G
 				}).DialContext,
 				DisableKeepAlives:   true,
 				TLSHandshakeTimeout: 30 * time.Second,
+				TLSClientConfig:     &tls.Config{InsecureSkipVerify: opts.tlsSkipVerify, MinVersion: tls.VersionTLS12}, // #nosec G402 -- Controlled by caller
 			},
 		},
 		RetryWaitMin: 1 * time.Second,
