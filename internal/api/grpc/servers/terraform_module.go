@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -210,6 +211,38 @@ func (s *TerraformModuleServer) GetTerraformModuleVersionByID(ctx context.Contex
 	}
 
 	return toPBTerraformModuleVersion(version), nil
+}
+
+// GetTerraformModuleVersionBySource returns a TerraformModuleVersion by its registry source address.
+func (s *TerraformModuleServer) GetTerraformModuleVersionBySource(ctx context.Context, req *pb.GetTerraformModuleVersionBySourceRequest) (*pb.TerraformModuleVersion, error) {
+	module, err := s.serviceCatalog.TerraformModuleRegistryService.GetModuleByAddress(ctx, req.Namespace, req.Name, req.System)
+	if err != nil {
+		return nil, err
+	}
+
+	limit := int32(1)
+	input := moduleregistry.GetModuleVersionsInput{
+		PaginationOptions: &pagination.Options{First: &limit},
+		ModuleID:          module.Metadata.ID,
+		SemanticVersion:   req.SemanticVersion,
+	}
+
+	// If semantic version is not set, search for the latest version.
+	if req.SemanticVersion == nil {
+		latest := true
+		input.Latest = &latest
+	}
+
+	result, err := s.serviceCatalog.TerraformModuleRegistryService.GetModuleVersions(ctx, &input)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result.ModuleVersions) == 0 {
+		return nil, errors.New("module version not found for %s/%s/%s", req.Namespace, req.Name, req.System, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	return toPBTerraformModuleVersion(&result.ModuleVersions[0]), nil
 }
 
 // GetTerraformModuleVersions returns a paginated list of TerraformModuleVersions.

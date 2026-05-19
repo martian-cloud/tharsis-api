@@ -24,6 +24,8 @@ service TerraformModules {
   rpc DeleteTerraformModule(DeleteTerraformModuleRequest) returns (google.protobuf.Empty);
   // GetTerraformModuleVersionByID returns a TerraformModuleVersion by an ID.
   rpc GetTerraformModuleVersionByID(terraform_module_version.GetTerraformModuleVersionByIDRequest) returns (terraform_module_version.TerraformModuleVersion);
+  // GetTerraformModuleVersionBySource returns a TerraformModuleVersion by its registry source address.
+  rpc GetTerraformModuleVersionBySource(terraform_module_version.GetTerraformModuleVersionBySourceRequest) returns (terraform_module_version.TerraformModuleVersion);
   // GetTerraformModuleVersions returns a paginated list of TerraformModuleVersions.
   rpc GetTerraformModuleVersions(terraform_module_version.GetTerraformModuleVersionsRequest) returns (terraform_module_version.GetTerraformModuleVersionsResponse);
   // CreateTerraformModuleVersion creates a new TerraformModuleVersion.

@@ -444,6 +444,75 @@ func (x *TerraformModuleVersion) GetUploadStartedTimestamp() *timestamppb.Timest
 	return nil
 }
 
+// GetTerraformModuleVersionBySourceRequest is the input for retrieving a TerraformModuleVersion by its registry source address.
+type GetTerraformModuleVersionBySourceRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Namespace       string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Name            string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	System          string                 `protobuf:"bytes,3,opt,name=system,proto3" json:"system,omitempty"`
+	SemanticVersion *string                `protobuf:"bytes,4,opt,name=semantic_version,json=semanticVersion,proto3,oneof" json:"semantic_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetTerraformModuleVersionBySourceRequest) Reset() {
+	*x = GetTerraformModuleVersionBySourceRequest{}
+	mi := &file_terraform_module_version_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTerraformModuleVersionBySourceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTerraformModuleVersionBySourceRequest) ProtoMessage() {}
+
+func (x *GetTerraformModuleVersionBySourceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_terraform_module_version_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTerraformModuleVersionBySourceRequest.ProtoReflect.Descriptor instead.
+func (*GetTerraformModuleVersionBySourceRequest) Descriptor() ([]byte, []int) {
+	return file_terraform_module_version_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetTerraformModuleVersionBySourceRequest) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *GetTerraformModuleVersionBySourceRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *GetTerraformModuleVersionBySourceRequest) GetSystem() string {
+	if x != nil {
+		return x.System
+	}
+	return ""
+}
+
+func (x *GetTerraformModuleVersionBySourceRequest) GetSemanticVersion() string {
+	if x != nil && x.SemanticVersion != nil {
+		return *x.SemanticVersion
+	}
+	return ""
+}
+
 // GetTerraformModuleVersionsResponse is the paginated list of TerraformModuleVersions.
 type GetTerraformModuleVersionsResponse struct {
 	state         protoimpl.MessageState    `protogen:"open.v1"`
@@ -455,7 +524,7 @@ type GetTerraformModuleVersionsResponse struct {
 
 func (x *GetTerraformModuleVersionsResponse) Reset() {
 	*x = GetTerraformModuleVersionsResponse{}
-	mi := &file_terraform_module_version_proto_msgTypes[5]
+	mi := &file_terraform_module_version_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +536,7 @@ func (x *GetTerraformModuleVersionsResponse) String() string {
 func (*GetTerraformModuleVersionsResponse) ProtoMessage() {}
 
 func (x *GetTerraformModuleVersionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_terraform_module_version_proto_msgTypes[5]
+	mi := &file_terraform_module_version_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +549,7 @@ func (x *GetTerraformModuleVersionsResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetTerraformModuleVersionsResponse.ProtoReflect.Descriptor instead.
 func (*GetTerraformModuleVersionsResponse) Descriptor() ([]byte, []int) {
-	return file_terraform_module_version_proto_rawDescGZIP(), []int{5}
+	return file_terraform_module_version_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetTerraformModuleVersionsResponse) GetVersions() []*TerraformModuleVersion {
@@ -541,7 +610,13 @@ const file_terraform_module_version_proto_rawDesc = "" +
 	" \x03(\tR\n" +
 	"submodules\x12Y\n" +
 	"\x18upload_started_timestamp\x18\v \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x16uploadStartedTimestamp\x88\x01\x01B\x1b\n" +
-	"\x19_upload_started_timestamp\"\xd7\x01\n" +
+	"\x19_upload_started_timestamp\"\xb9\x01\n" +
+	"(GetTerraformModuleVersionBySourceRequest\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
+	"\x06system\x18\x03 \x01(\tR\x06system\x12.\n" +
+	"\x10semantic_version\x18\x04 \x01(\tH\x00R\x0fsemanticVersion\x88\x01\x01B\x13\n" +
+	"\x11_semantic_version\"\xd7\x01\n" +
 	"\"GetTerraformModuleVersionsResponse\x12e\n" +
 	"\bversions\x18\x01 \x03(\v2I.martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersionR\bversions\x12J\n" +
 	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo*w\n" +
@@ -564,27 +639,28 @@ func file_terraform_module_version_proto_rawDescGZIP() []byte {
 }
 
 var file_terraform_module_version_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_terraform_module_version_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_terraform_module_version_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_terraform_module_version_proto_goTypes = []any{
-	(TerraformModuleVersionSortableField)(0),     // 0: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersionSortableField
-	(*GetTerraformModuleVersionByIDRequest)(nil), // 1: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionByIDRequest
-	(*GetTerraformModuleVersionsRequest)(nil),    // 2: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsRequest
-	(*CreateTerraformModuleVersionRequest)(nil),  // 3: martiancloud.tharsis.api.terraform_module_version.CreateTerraformModuleVersionRequest
-	(*DeleteTerraformModuleVersionRequest)(nil),  // 4: martiancloud.tharsis.api.terraform_module_version.DeleteTerraformModuleVersionRequest
-	(*TerraformModuleVersion)(nil),               // 5: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion
-	(*GetTerraformModuleVersionsResponse)(nil),   // 6: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsResponse
-	(*PaginationOptions)(nil),                    // 7: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),                     // 8: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*timestamppb.Timestamp)(nil),                // 9: google.protobuf.Timestamp
-	(*PageInfo)(nil),                             // 10: martiancloud.tharsis.api.pagination.PageInfo
+	(TerraformModuleVersionSortableField)(0),         // 0: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersionSortableField
+	(*GetTerraformModuleVersionByIDRequest)(nil),     // 1: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionByIDRequest
+	(*GetTerraformModuleVersionsRequest)(nil),        // 2: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsRequest
+	(*CreateTerraformModuleVersionRequest)(nil),      // 3: martiancloud.tharsis.api.terraform_module_version.CreateTerraformModuleVersionRequest
+	(*DeleteTerraformModuleVersionRequest)(nil),      // 4: martiancloud.tharsis.api.terraform_module_version.DeleteTerraformModuleVersionRequest
+	(*TerraformModuleVersion)(nil),                   // 5: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion
+	(*GetTerraformModuleVersionBySourceRequest)(nil), // 6: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionBySourceRequest
+	(*GetTerraformModuleVersionsResponse)(nil),       // 7: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsResponse
+	(*PaginationOptions)(nil),                        // 8: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),                         // 9: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*timestamppb.Timestamp)(nil),                    // 10: google.protobuf.Timestamp
+	(*PageInfo)(nil),                                 // 11: martiancloud.tharsis.api.pagination.PageInfo
 }
 var file_terraform_module_version_proto_depIdxs = []int32{
-	7,  // 0: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	8,  // 0: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsRequest.sort:type_name -> martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersionSortableField
-	8,  // 2: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	9,  // 3: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion.upload_started_timestamp:type_name -> google.protobuf.Timestamp
+	9,  // 2: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	10, // 3: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion.upload_started_timestamp:type_name -> google.protobuf.Timestamp
 	5,  // 4: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsResponse.versions:type_name -> martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion
-	10, // 5: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	11, // 5: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
 	6,  // [6:6] is the sub-list for method output_type
 	6,  // [6:6] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
@@ -602,13 +678,14 @@ func file_terraform_module_version_proto_init() {
 	file_terraform_module_version_proto_msgTypes[1].OneofWrappers = []any{}
 	file_terraform_module_version_proto_msgTypes[3].OneofWrappers = []any{}
 	file_terraform_module_version_proto_msgTypes[4].OneofWrappers = []any{}
+	file_terraform_module_version_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terraform_module_version_proto_rawDesc), len(file_terraform_module_version_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
