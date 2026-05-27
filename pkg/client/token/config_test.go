@@ -42,9 +42,9 @@ func TestConfig_Resolve(t *testing.T) {
 			expectedToken: "env-token",
 		},
 		{
-			name:        "service account ID and path both set errors",
+			name:        "service account path is ignored when ID is also set",
 			config:      Config{ServiceAccountID: "trn:service_account:g/sa", ServiceAccountPath: "g/sa"},
-			expectError: "cannot both be set",
+			expectError: "missing authentication credentials",
 		},
 		{
 			name:          "service account ID without token falls through to static",

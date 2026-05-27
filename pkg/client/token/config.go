@@ -74,12 +74,10 @@ func (c *Config) Resolve(
 		return nil, fmt.Errorf("failed to load env variables: %w", err)
 	}
 
-	if c.ServiceAccountID != "" && c.ServiceAccountPath != "" {
-		return nil, fmt.Errorf("THARSIS_SERVICE_ACCOUNT_ID and THARSIS_SERVICE_ACCOUNT_PATH cannot both be set")
-	}
-
 	// SERVICE_ACCOUNT_PATH is deprecated; convert to TRN for backwards compatibility.
-	if c.ServiceAccountPath != "" {
+	// If THARSIS_SERVICE_ACCOUNT_ID is already set, ignore the path — it may have been
+	// set alongside the ID by an older server for backwards compatibility with older clients.
+	if c.ServiceAccountPath != "" && c.ServiceAccountID == "" {
 		if options.logger != nil {
 			options.logger.Warn("THARSIS_SERVICE_ACCOUNT_PATH is deprecated, use THARSIS_SERVICE_ACCOUNT_ID instead")
 		}
