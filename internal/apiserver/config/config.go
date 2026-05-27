@@ -24,6 +24,8 @@ const (
 	envFederatedRegistryTrustPolicyName                = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
 	defaultMaxGraphQLComplexity                        = 0
 	defaultRateLimitStorePluginType                    = "memory"
+	defaultMaxGRPCRecvMsgSize                          = 1024 * 1024 * 64  // 64 MiB
+	defaultMaxGraphQLRequestBodySize                   = 1024 * 1024 * 64  // 64 MiB
 	defaultModuleRegistryMaxUploadSize                 = 1024 * 1024 * 128 // 128 MiB
 	defaultVCSRepositorySizeLimit                      = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
 	defaultAsyncTaskTimeout                            = 180               // seconds
@@ -56,6 +58,7 @@ type RunnerConfig struct {
 	JobDispatcherData map[string]string `yaml:"job_dispatcher_data"`
 	Name              string            `yaml:"name"`
 	JobDispatcherType string            `yaml:"job_dispatcher_type"`
+	StartupDelay      int               `yaml:"startup_delay"`
 }
 
 // FederatedRegistryTrustPolicy contains the config fields to allow federated registry access to this Tharsis instance.
@@ -165,6 +168,12 @@ type Config struct {
 
 	MaxGraphQLComplexity int `yaml:"max_graphql_complexity" env:"MAX_GRAPHQL_COMPLEXITY"`
 
+	// MaxGRPCRecvMsgSize is the maximum gRPC message size (bytes) the server will accept.
+	MaxGRPCRecvMsgSize int `yaml:"max_grpc_recv_msg_size" env:"MAX_GRPC_RECV_MSG_SIZE"`
+
+	// MaxGraphQLRequestBodySize is the maximum HTTP request body size (bytes) accepted by the GraphQL endpoint.
+	MaxGraphQLRequestBodySize int `yaml:"max_graphql_request_body_size" env:"MAX_GRAPHQL_REQUEST_BODY_SIZE"`
+
 	// Max upload size when uploading a module to the module registry
 	ModuleRegistryMaxUploadSize int `yaml:"module_registry_max_upload_size" env:"MODULE_REGISTRY_MAX_UPLOAD_SIZE"`
 
@@ -235,6 +244,8 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		GRPCServerPort:                              defaultGRPCServerPort,
 		MaxGraphQLComplexity:                        defaultMaxGraphQLComplexity,
 		RateLimitStorePluginType:                    defaultRateLimitStorePluginType,
+		MaxGRPCRecvMsgSize:                          defaultMaxGRPCRecvMsgSize,
+		MaxGraphQLRequestBodySize:                   defaultMaxGraphQLRequestBodySize,
 		ModuleRegistryMaxUploadSize:                 defaultModuleRegistryMaxUploadSize,
 		VCSRepositorySizeLimit:                      defaultVCSRepositorySizeLimit,
 		AsyncTaskTimeout:                            defaultAsyncTaskTimeout,
@@ -482,6 +493,7 @@ func loadRunnerConfigFromEnvironment() ([]RunnerConfig, error) {
 
 			dispatcherTypeKey := envRunnerConfigPrefix + index + "_JOB_DISPATCHER_TYPE"
 			dispatcherDataKey := envRunnerConfigPrefix + index + "_JOB_DISPATCHER_DATA_"
+			startupDelayKey := envRunnerConfigPrefix + index + "_STARTUP_DELAY"
 
 			dispatcherType := os.Getenv(dispatcherTypeKey)
 
@@ -496,10 +508,18 @@ func loadRunnerConfigFromEnvironment() ([]RunnerConfig, error) {
 				jobDispatcherData[k] = v
 			}
 
+			var startupDelay int
+			if v := os.Getenv(startupDelayKey); v != "" {
+				if _, err := fmt.Sscanf(v, "%d", &startupDelay); err != nil {
+					return nil, errors.New("%s must be an integer number of seconds", startupDelayKey)
+				}
+			}
+
 			runnerConfigs = append(runnerConfigs, RunnerConfig{
 				Name:              name,
 				JobDispatcherType: dispatcherType,
 				JobDispatcherData: jobDispatcherData,
+				StartupDelay:      startupDelay,
 			})
 		}
 	}

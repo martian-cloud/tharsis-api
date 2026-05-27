@@ -76,6 +76,7 @@ func NewGraphQL(
 	ratelimitStore ratelimitstore.Store,
 	authenticator auth.Authenticator,
 	maxGraphqlComplexity int,
+	maxBodySize int,
 	maxSubscriptionDuration time.Duration,
 	tharsisUIOrigin string,
 ) (*GraphQL, error) {
@@ -132,6 +133,7 @@ func NewGraphQL(
 			loaders:       loaderCollection,
 		},
 		maxGraphqlComplexity: maxGraphqlComplexity,
+		maxBodySize:          maxBodySize,
 	}
 
 	return &GraphQL{
@@ -164,6 +166,7 @@ type httpHandler struct {
 	ctxGenerator         *contextGenerator
 	rateLimitStore       ratelimitstore.Store
 	maxGraphqlComplexity int
+	maxBodySize          int
 }
 
 var (
@@ -184,6 +187,8 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		respond(w, errorJSON("no subject string in context"), http.StatusInternalServerError)
 		return
 	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, int64(h.maxBodySize))
 
 	req, err := parse(r)
 	if err != nil {

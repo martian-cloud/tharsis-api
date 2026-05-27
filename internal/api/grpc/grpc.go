@@ -41,6 +41,7 @@ type Server struct {
 // NewServer creates a new gRPC server.
 func NewServer(options *ServerOptions) *Server {
 	opts := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(options.APIServerConfig.MaxGRPCRecvMsgSize),
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.ChainStreamInterceptor(
 			interceptors.RequestIDStream(),
