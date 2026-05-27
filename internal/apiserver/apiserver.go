@@ -372,17 +372,29 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 		logger.Infof("starting internal runner %q with job dispatcher type %q", r.Name, r.JobDispatcherType)
 
-		runner, err := rnr.NewRunner(ctx, runnerModel.Metadata.ID, logger, apiVersion, runnerClient, &rnr.JobDispatcherSettings{
-			DispatcherType:       r.JobDispatcherType,
-			ServiceDiscoveryHost: cfg.ServiceDiscoveryHost,
-			PluginData:           r.JobDispatcherData,
-			TokenGetterFunc:      rnr.NewInternalTokenProvider(r.Name, runnerModel.Metadata.ID, signingKeyManager).GetToken,
-		})
+		runner, err := rnr.NewRunner(ctx, runnerModel.Metadata.ID, logger, apiVersion, runnerClient,
+			&rnr.JobDispatcherSettings{
+				DispatcherType:       r.JobDispatcherType,
+				ServiceDiscoveryHost: cfg.ServiceDiscoveryHost,
+				PluginData:           r.JobDispatcherData,
+				TokenGetterFunc:      rnr.NewInternalTokenProvider(r.Name, runnerModel.Metadata.ID, signingKeyManager).GetToken,
+			})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create runner %v", err)
 		}
 
-		go runner.Start(auth.WithCaller(ctx, &auth.SystemCaller{}))
+		startupDelay := time.Duration(r.StartupDelay) * time.Second
+		go func() {
+			if startupDelay > 0 {
+				logger.Infof("Internal runner %q will be started in %s", r.Name, startupDelay)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(startupDelay):
+				}
+			}
+			runner.Start(auth.WithCaller(ctx, &auth.SystemCaller{}))
+		}()
 	}
 
 	// Create a listener for gRPC.

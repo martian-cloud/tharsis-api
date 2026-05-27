@@ -155,6 +155,10 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 		// Create new state version
 		sv, csvErr := a.client.CreateStateVersion(ctx, a.run.Metadata.Id, stateFile)
 		if csvErr != nil {
+			// Log the raw state data so it can be recovered from job logs if needed.
+			if stateData, readErr := os.ReadFile(stateOutputPath); readErr == nil {
+				a.jobLogger.Errorf("State data for recovery (run %s):\n%s", a.run.Metadata.Id, string(stateData))
+			}
 			return fmt.Errorf("failed to create new state version %v", csvErr)
 		}
 		a.jobLogger.Infof("Created new state version %s", sv.Metadata.Id)
