@@ -523,17 +523,11 @@ func fileMapFromChecksums(reader io.Reader) (map[string][]byte, error) {
 }
 
 // verifySumsSignature validates the signature on the checksum file.
-func verifySumsSignature(checksums, signature io.Reader) error {
-	entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(hashicorpPublicGPGKey))
+func verifySumsSignature(checksums, signature io.Reader, keyRing openpgp.EntityList) error {
+	_, err := openpgp.CheckDetachedSignature(keyRing, checksums, signature, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("no signing key matched the checksum signature: %w", err)
 	}
-
-	_, err = openpgp.CheckDetachedSignature(entityList, checksums, signature, nil)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
