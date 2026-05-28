@@ -442,12 +442,12 @@ func TestFederatedTharsisRegistrySource_GetAttestations(t *testing.T) {
 				mockClient.On("GetModuleVersion", mock.Anything, mock.MatchedBy(func(input *GetModuleVersionInput) bool {
 					return input.ModuleVersion == semanticVersion
 				})).Return(&pb.TerraformModuleVersion{
-					Metadata: &pb.ResourceMetadata{Id: "module-version-id"},
+					ModuleId: "module-id",
 				}, nil)
 			},
 			attestationsSetup: func(mockClient *MockFederatedRegistryClient) {
 				mockClient.On("GetModuleAttestations", mock.Anything, mock.MatchedBy(func(input *GetModuleAttestationsInput) bool {
-					return input.ModuleVersionID == "module-version-id" && input.ModuleDigest == "abcdef123456"
+					return input.ModuleID == "module-id" && input.ModuleDigest == "abcdef123456"
 				})).Return([]*pb.TerraformModuleAttestation{
 					{Data: "attestation1"},
 					{Data: "attestation2"},
@@ -461,12 +461,12 @@ func TestFederatedTharsisRegistrySource_GetAttestations(t *testing.T) {
 				mockClient.On("GetModuleVersion", mock.Anything, mock.MatchedBy(func(input *GetModuleVersionInput) bool {
 					return input.ModuleVersion == semanticVersion
 				})).Return(&pb.TerraformModuleVersion{
-					Metadata: &pb.ResourceMetadata{Id: "module-version-id"},
+					ModuleId: "module-id",
 				}, nil)
 			},
 			attestationsSetup: func(mockClient *MockFederatedRegistryClient) {
 				mockClient.On("GetModuleAttestations", mock.Anything, mock.MatchedBy(func(input *GetModuleAttestationsInput) bool {
-					return input.ModuleVersionID == "module-version-id" && input.ModuleDigest == "abcdef123456"
+					return input.ModuleID == "module-id" && input.ModuleDigest == "abcdef123456"
 				})).Return([]*pb.TerraformModuleAttestation{}, nil)
 			},
 			expectedAttestations: []string{},

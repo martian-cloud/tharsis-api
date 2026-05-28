@@ -214,7 +214,7 @@ func (m *federatedTharsisRegistrySource) GetAttestations(ctx context.Context, se
 	}
 	attestations, err := m.federatedRegistryClient.GetModuleAttestations(ctx, &GetModuleAttestationsInput{
 		FederatedRegistry: m.federatedRegistry,
-		ModuleVersionID:   moduleVersion.Metadata.Id,
+		ModuleID:          moduleVersion.ModuleId,
 		ModuleDigest:      moduleDigest,
 	})
 	if err != nil {
