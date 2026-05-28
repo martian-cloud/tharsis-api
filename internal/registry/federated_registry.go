@@ -63,7 +63,7 @@ type GetModuleVersionInput struct {
 // GetModuleAttestationsInput is the input for getting module attestations.
 type GetModuleAttestationsInput struct {
 	FederatedRegistry *models.FederatedRegistry
-	ModuleVersionID   string
+	ModuleID          string
 	ModuleDigest      string
 }
 
@@ -126,7 +126,7 @@ func (r *federatedRegistryClient) GetModuleAttestations(ctx context.Context, inp
 		limit := int32(100)
 		sort := pb.TerraformModuleAttestationSortableField_CREATED_AT_DESC
 		req := &pb.GetTerraformModuleAttestationsRequest{
-			ModuleId: input.ModuleVersionID,
+			ModuleId: input.ModuleID,
 			Digest:   &input.ModuleDigest,
 			Sort:     &sort,
 			PaginationOptions: &pb.PaginationOptions{
