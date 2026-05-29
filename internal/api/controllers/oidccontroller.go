@@ -284,29 +284,53 @@ func (c *oidcController) Token(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	clientID := r.Form.Get("client_id")
-	redirectURI := r.Form.Get("redirect_uri")
-	code := r.Form.Get("code")
-	codeVerifier := r.Form.Get("code_verifier")
+	grantType := r.Form.Get("grant_type")
 
 	if clientID != c.clientID {
 		c.respWriter.RespondWithError(ctx, w, errors.New("invalid client id", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
-	response, err := c.userSessionManager.ExchangeOAuthCodeForSessionToken(ctx, &auth.ExchangeOAuthCodeForSessionTokenInput{
-		OAuthCode:         code,
-		OAuthCodeVerifier: codeVerifier,
-		RedirectURI:       redirectURI,
-	})
-	if err != nil {
-		c.respWriter.RespondWithError(ctx, w, err)
-		return
-	}
+	switch grantType {
+	case "password":
+		username := r.Form.Get("username")
+		password := r.Form.Get("password")
 
-	c.respWriter.RespondWithJSON(ctx, w, &tokenResponse{
-		AccessToken: response.AccessToken,
-		ExpiresIn:   response.ExpiresIn,
-	}, http.StatusOK)
+		createSessionResponse, err := c.userSessionManager.CreateSession(ctx, &auth.CreateSessionInput{
+			Username:  &username,
+			Password:  &password,
+			UserAgent: r.UserAgent(),
+		})
+		if err != nil {
+			c.respWriter.RespondWithError(ctx, w, err)
+			return
+		}
+
+		c.respWriter.RespondWithJSON(ctx, w, &tokenResponse{
+			AccessToken: createSessionResponse.AccessToken,
+			ExpiresIn:   createSessionResponse.ExpiresIn,
+		}, http.StatusOK)
+	default:
+		// authorization_code grant type
+		redirectURI := r.Form.Get("redirect_uri")
+		code := r.Form.Get("code")
+		codeVerifier := r.Form.Get("code_verifier")
+
+		response, err := c.userSessionManager.ExchangeOAuthCodeForSessionToken(ctx, &auth.ExchangeOAuthCodeForSessionTokenInput{
+			OAuthCode:         code,
+			OAuthCodeVerifier: codeVerifier,
+			RedirectURI:       redirectURI,
+		})
+		if err != nil {
+			c.respWriter.RespondWithError(ctx, w, err)
+			return
+		}
+
+		c.respWriter.RespondWithJSON(ctx, w, &tokenResponse{
+			AccessToken: response.AccessToken,
+			ExpiresIn:   response.ExpiresIn,
+		}, http.StatusOK)
+	}
 }
 
 func (c *oidcController) GetOpenIDConfig(w http.ResponseWriter, r *http.Request) {

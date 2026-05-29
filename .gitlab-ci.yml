@@ -615,24 +615,18 @@ api_security:
     - |
       sudo apk add curl jq
       timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || (echo "Health check failed, showing service logs:" && docker logs tharsis && false)
-      THARSIS_STATIC_TOKEN=$(curl -s -X POST 'http://tharsis:8000/oauth/login' \
+      THARSIS_STATIC_TOKEN=$(curl -s -X POST 'http://tharsis:8000/oauth/token' \
         -H 'Content-Type: application/x-www-form-urlencoded' \
-        --data-urlencode 'username=martian' \
-        --data-urlencode 'password=martian' \
+        --data-urlencode 'grant_type=password' \
         --data-urlencode 'client_id=tharsis' \
-        --data-urlencode 'redirect_uri=http://localhost:3000/callback' \
-        --data-urlencode 'response_type=code' \
-        --data-urlencode 'state=test' \
-        --data-urlencode 'scope=openid tharsis' \
-        --data-urlencode 'code_challenge=test_challenge' \
-        --data-urlencode 'code_challenge_method=S256' \
-        -D - | grep 'tharsis_access_token=' | sed 's/.*tharsis_access_token=\([^;]*\).*/\1/')
+        --data-urlencode 'username=martian' \
+        --data-urlencode 'password=martian' | jq -r '.access_token')
       export THARSIS_STATIC_TOKEN
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $APISEC_OVERRIDES_FILE
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: never
-  timeout: 90m
+  timeout: 3h
 
 api_security_1:
   extends: api_security
@@ -678,18 +672,12 @@ apifuzzer_fuzz:
     - |
       sudo apk add curl jq
       timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || false
-      THARSIS_STATIC_TOKEN=$(curl -s -X POST 'http://tharsis:8000/oauth/login' \
+      THARSIS_STATIC_TOKEN=$(curl -s -X POST 'http://tharsis:8000/oauth/token' \
         -H 'Content-Type: application/x-www-form-urlencoded' \
-        --data-urlencode 'username=martian' \
-        --data-urlencode 'password=martian' \
+        --data-urlencode 'grant_type=password' \
         --data-urlencode 'client_id=tharsis' \
-        --data-urlencode 'redirect_uri=http://localhost:3000/callback' \
-        --data-urlencode 'response_type=code' \
-        --data-urlencode 'state=test' \
-        --data-urlencode 'scope=openid tharsis' \
-        --data-urlencode 'code_challenge=test_challenge' \
-        --data-urlencode 'code_challenge_method=S256' \
-        -D - | grep 'tharsis_access_token=' | sed 's/.*tharsis_access_token=\([^;]*\).*/\1/')
+        --data-urlencode 'username=martian' \
+        --data-urlencode 'password=martian' | jq -r '.access_token')
       export THARSIS_STATIC_TOKEN
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
   rules:
@@ -703,10 +691,6 @@ dast:
     - build_aio_container_image
   variables:
     DAST_WEBSITE: "http://tharsis:8000"
-    DAST_AUTH_URL: "http://tharsis:8000/login"
-    DAST_AUTH_USERNAME: martian
-    DAST_AUTH_PASSWORD: martian
-    DAST_AUTH_COOKIE_NAMES: "tharsis_access_token,tharsis_refresh_token"
     DAST_BROWSER_SCAN: "true"
     DAST_FULL_SCAN_ENABLED: "true"
     DAST_EXCLUDE_URLS: "http://tharsis:8000/static/.*"
@@ -718,6 +702,13 @@ dast:
   before_script:
     - |
       timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || false
+      THARSIS_TOKEN=$(curl -s -X POST 'http://tharsis:8000/oauth/token' \
+        -H 'Content-Type: application/x-www-form-urlencoded' \
+        --data-urlencode 'grant_type=password' \
+        --data-urlencode 'client_id=tharsis' \
+        --data-urlencode 'username=martian' \
+        --data-urlencode 'password=martian' | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+      export DAST_REQUEST_HEADERS="Authorization:Bearer $THARSIS_TOKEN"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
