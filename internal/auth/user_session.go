@@ -69,6 +69,7 @@ type CreateSessionResponse struct {
 	RefreshToken string
 	CSRFToken    string
 	Session      *models.UserSession
+	ExpiresIn    int
 }
 
 // RefreshSessionResponse is the response for updating a session
@@ -430,6 +431,7 @@ func (u *userSessionManager) CreateSession(ctx context.Context, input *CreateSes
 		RefreshToken: refreshToken,
 		CSRFToken:    csrfToken,
 		Session:      session,
+		ExpiresIn:    int(u.accessTokenExpirationMinutes.Seconds()),
 	}, nil
 }
 
