@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter/memorystore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/plunk"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/ses"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/smtp"
@@ -157,7 +158,7 @@ func newObjectStorePlugin(ctx context.Context, logger logger.Logger, cfg *config
 	case "aws_s3":
 		store, err = aws.New(ctx, logger, cfg.ObjectStorePluginData)
 	case "filesystem":
-		store, err = filesystem.New(logger, cfg.TharsisAPIURL, cfg.ObjectStorePluginData)
+		store, err = filesystem.New(logger, cfg.TharsisAPIURL, cfg.ObjectStorePluginData, auth.GetSubject)
 	default:
 		err = errors.New(
 			"The specified object store %q is not currently supported", cfg.ObjectStorePluginType,

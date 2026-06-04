@@ -111,9 +111,10 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (Client, error) {
 	}
 
 	restClient, err := client.NewRESTClient(&client.RESTClientConfig{
-		Endpoint:      baseURL.String(),
-		TokenResolver: tokenResolver,
-		UserAgent:     &cfg.UserAgent,
+		Endpoint:           baseURL.String(),
+		TokenResolver:      tokenResolver,
+		UserAgent:          &cfg.UserAgent,
+		InsecureSkipVerify: cfg.TLSSkipVerify,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create REST client: %w", err)

@@ -2,6 +2,8 @@ package filesystem
 
 import (
 	"bytes"
+	"context"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net/http"
@@ -15,10 +17,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 )
+
+type testSubjectKeyType struct{}
+
+var testSubjectKey = testSubjectKeyType{}
+
+func testGetSubject(ctx context.Context) *string {
+	s, ok := ctx.Value(testSubjectKey).(string)
+	if !ok {
+		return nil
+	}
+	return &s
+}
+
+func testWithSubject(ctx context.Context, subject string) context.Context {
+	return context.WithValue(ctx, testSubjectKey, subject)
+}
 
 func TestNew(t *testing.T) {
 	testLogger, _ := logger.NewForTest()
@@ -26,7 +43,7 @@ func TestNew(t *testing.T) {
 	t.Run("valid configuration", func(t *testing.T) {
 		store, err := New(testLogger, "http://localhost:8000", map[string]string{
 			"directory": t.TempDir(),
-		})
+		}, testGetSubject)
 		require.NoError(t, err)
 		assert.NotNil(t, store)
 		assert.NotEmpty(t, store.secretKey)
@@ -36,13 +53,13 @@ func TestNew(t *testing.T) {
 		store, err := New(testLogger, "http://localhost:8000", map[string]string{
 			"directory":  t.TempDir(),
 			"secret_key": "my-secret",
-		})
+		}, testGetSubject)
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret", store.secretKey)
 	})
 
 	t.Run("missing directory field", func(t *testing.T) {
-		_, err := New(testLogger, "http://localhost:8000", map[string]string{})
+		_, err := New(testLogger, "http://localhost:8000", map[string]string{}, testGetSubject)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "directory")
 	})
@@ -50,7 +67,7 @@ func TestNew(t *testing.T) {
 
 func TestUploadObject(t *testing.T) {
 	testLogger, _ := logger.NewForTest()
-	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()})
+	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()}, testGetSubject)
 	require.NoError(t, err)
 	ctx := t.Context()
 
@@ -92,7 +109,7 @@ func TestUploadObject(t *testing.T) {
 
 func TestDownloadObject(t *testing.T) {
 	testLogger, _ := logger.NewForTest()
-	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()})
+	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()}, testGetSubject)
 	require.NoError(t, err)
 	ctx := t.Context()
 	content := []byte("test content for download")
@@ -130,7 +147,7 @@ func TestDownloadObject(t *testing.T) {
 
 func TestGetObjectStream(t *testing.T) {
 	testLogger, _ := logger.NewForTest()
-	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()})
+	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()}, testGetSubject)
 	require.NoError(t, err)
 	ctx := t.Context()
 	content := []byte("stream content")
@@ -173,7 +190,7 @@ func TestGetObjectStream(t *testing.T) {
 
 func TestDoesObjectExist(t *testing.T) {
 	testLogger, _ := logger.NewForTest()
-	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()})
+	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()}, testGetSubject)
 	require.NoError(t, err)
 	ctx := t.Context()
 	require.NoError(t, store.UploadObject(ctx, "exists.txt", bytes.NewReader([]byte("data"))))
@@ -200,13 +217,13 @@ func TestDoesObjectExist(t *testing.T) {
 
 func TestGetPresignedURL(t *testing.T) {
 	testLogger, _ := logger.NewForTest()
-	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()})
+	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()}, testGetSubject)
 	require.NoError(t, err)
 	ctx := t.Context()
 	require.NoError(t, store.UploadObject(ctx, "presign.txt", bytes.NewReader([]byte("data"))))
 
 	t.Run("generates valid URL", func(t *testing.T) {
-		ctxWithSubject := auth.WithSubject(ctx, "user@example.com")
+		ctxWithSubject := testWithSubject(ctx, "user@example.com")
 		presignedURL, err := store.GetPresignedURL(ctxWithSubject, "presign.txt")
 		require.NoError(t, err)
 
@@ -233,17 +250,28 @@ func TestGetPresignedURL(t *testing.T) {
 
 func TestVerifyPresignedURL(t *testing.T) {
 	testLogger, _ := logger.NewForTest()
-	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()})
+	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()}, testGetSubject)
 	require.NoError(t, err)
 	ctx := t.Context()
 	require.NoError(t, store.UploadObject(ctx, "verify.txt", bytes.NewReader([]byte("data"))))
 
-	ctxWithSubject := auth.WithSubject(ctx, "user@example.com")
+	ctxWithSubject := testWithSubject(ctx, "user@example.com")
 	validURL, err := store.GetPresignedURL(ctxWithSubject, "verify.txt")
 	require.NoError(t, err)
 
 	t.Run("valid URL", func(t *testing.T) {
 		parsed, _ := url.Parse(validURL)
+		key, err := store.VerifyPresignedURL(ctx, parsed.RequestURI())
+		require.NoError(t, err)
+		assert.Equal(t, "verify.txt", key)
+	})
+
+	t.Run("subject with slashes", func(t *testing.T) {
+		ctxWithTRN := testWithSubject(ctx, "trn:job:seed/platform/networking/vpc/job-id")
+		trnURL, err := store.GetPresignedURL(ctxWithTRN, "verify.txt")
+		require.NoError(t, err)
+
+		parsed, _ := url.Parse(trnURL)
 		key, err := store.VerifyPresignedURL(ctx, parsed.RequestURI())
 		require.NoError(t, err)
 		assert.Equal(t, "verify.txt", key)
@@ -290,7 +318,7 @@ func TestVerifyPresignedURL(t *testing.T) {
 
 		expiredTime := time.Now().Add(-2 * time.Minute)
 		signedURI, _, _ := store.signer.PresignHTTP(ctx, aws.Credentials{
-			AccessKeyID:     "user@example.com",
+			AccessKeyID:     hex.EncodeToString([]byte("user@example.com")),
 			SecretAccessKey: store.secretKey,
 		}, req, unsignedPayload, awsService, "", expiredTime)
 
@@ -392,7 +420,7 @@ func TestVerifyPresignedURL(t *testing.T) {
 
 func TestSymlinkHandling(t *testing.T) {
 	testLogger, _ := logger.NewForTest()
-	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()})
+	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()}, testGetSubject)
 	require.NoError(t, err)
 	ctx := t.Context()
 

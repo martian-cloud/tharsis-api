@@ -2,8 +2,10 @@
 package controllers
 
 import (
+	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -67,7 +69,11 @@ func (c *ObjectStoreController) DownloadObject(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", "attachment")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(key)))
+
+	if cl, ok := stream.(interface{ ContentLength() int64 }); ok {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", cl.ContentLength()))
+	}
 
 	if _, err := io.Copy(w, stream); err != nil {
 		c.logger.WithContextFields(r.Context()).Errorf("failed to copy object stream for key %s: %v", key, err)
