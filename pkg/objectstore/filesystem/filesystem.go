@@ -19,11 +19,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 )
+
+// SubjectFunc extracts the authenticated subject from a context.
+// Callers provide this at construction time (e.g. auth.GetSubject).
+type SubjectFunc func(ctx context.Context) *string
 
 const (
 	// presignURLExpiration is the duration for which presigned URLs are valid
@@ -39,27 +42,35 @@ const (
 	amzCredentialParam = "X-Amz-Credential"
 )
 
+// fileReadCloser wraps an os.File and exposes its size for Content-Length.
+type fileReadCloser struct {
+	*os.File
+	size int64
+}
+
+func (f *fileReadCloser) ContentLength() int64 { return f.size }
+
 // sectionReadCloser wraps a SectionReader with a closer
 type sectionReadCloser struct {
 	*io.SectionReader
 	closer io.Closer
 }
 
-func (s *sectionReadCloser) Close() error {
-	return s.closer.Close()
-}
+func (s *sectionReadCloser) Close() error         { return s.closer.Close() }
+func (s *sectionReadCloser) ContentLength() int64 { return s.Size() }
 
 // ObjectStore implementation for local filesystem
 type ObjectStore struct {
-	logger    logger.Logger
-	basePath  string
-	apiURL    string
-	signer    *v4.Signer
-	secretKey string
+	logger      logger.Logger
+	subjectFunc SubjectFunc
+	basePath    string
+	apiURL      string
+	signer      *v4.Signer
+	secretKey   string
 }
 
 // New returns a filesystem implementation of the ObjectStore interface
-func New(logger logger.Logger, apiURL string, pluginData map[string]string) (*ObjectStore, error) {
+func New(logger logger.Logger, apiURL string, pluginData map[string]string, subjectFunc SubjectFunc) (*ObjectStore, error) {
 	basePath, ok := pluginData["directory"]
 	if !ok {
 		return nil, errors.New("filesystem object store plugin is missing the 'directory' field")
@@ -76,11 +87,12 @@ func New(logger logger.Logger, apiURL string, pluginData map[string]string) (*Ob
 	}
 
 	return &ObjectStore{
-		logger:    logger,
-		basePath:  basePath,
-		apiURL:    apiURL,
-		signer:    v4.NewSigner(),
-		secretKey: secretKey,
+		logger:      logger,
+		subjectFunc: subjectFunc,
+		basePath:    basePath,
+		apiURL:      apiURL,
+		signer:      v4.NewSigner(),
+		secretKey:   secretKey,
 	}, nil
 }
 
@@ -190,7 +202,14 @@ func (f *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 		return &sectionReadCloser{io.NewSectionReader(file, offset, length), file}, nil
 	}
 
-	return file, nil
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		f.logger.WithContextFields(ctx).Errorf("failed to stat file for key %s: %v", key, err)
+		return nil, err
+	}
+
+	return &fileReadCloser{file, info.Size()}, nil
 }
 
 // DoesObjectExist returns a boolean indicating an object's existence
@@ -218,7 +237,7 @@ func (f *ObjectStore) GetPresignedURL(ctx context.Context, key string) (string, 
 		return "", err
 	}
 
-	subject := auth.GetSubject(ctx)
+	subject := f.subjectFunc(ctx)
 	if subject == nil {
 		return "", te.New("no subject found in context", te.WithErrorCode(te.EUnauthorized))
 	}
@@ -234,7 +253,7 @@ func (f *ObjectStore) GetPresignedURL(ctx context.Context, key string) (string, 
 	req.URL.RawQuery = query.Encode()
 
 	signedURI, _, err := f.signer.PresignHTTP(ctx, aws.Credentials{
-		AccessKeyID:     *subject,
+		AccessKeyID:     hex.EncodeToString([]byte(*subject)),
 		SecretAccessKey: f.secretKey,
 	}, req, unsignedPayload, awsService, "", time.Now())
 	if err != nil {

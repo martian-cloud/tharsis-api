@@ -4,6 +4,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,10 +25,11 @@ var _ RESTClient = (*restClient)(nil)
 
 // RESTClientConfig holds configuration for creating a new REST client.
 type RESTClientConfig struct {
-	TokenResolver TokenResolver
-	Endpoint      string
-	UserAgent     *string      // optional; added to requests when using the default HTTP client
-	HTTPClient    *http.Client // optional override; if nil, a retryable client with user agent is created
+	TokenResolver      TokenResolver
+	Endpoint           string
+	UserAgent          *string      // optional; added to requests when using the default HTTP client
+	HTTPClient         *http.Client // optional override; if nil, a retryable client with user agent is created
+	InsecureSkipVerify bool         // skip TLS certificate verification; ignored when HTTPClient is set
 }
 
 // UploadConfigurationVersionInput is the input for uploading a configuration version.
@@ -143,6 +145,12 @@ func NewRESTClient(cfg *RESTClientConfig) (RESTClient, error) {
 		retryClient.Logger = nil
 		retryClient.RetryWaitMin = 10 * time.Second
 		retryClient.RetryWaitMax = 60 * time.Second
+
+		if cfg.InsecureSkipVerify {
+			baseTransport := http.DefaultTransport.(*http.Transport).Clone()
+			baseTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+			retryClient.HTTPClient = &http.Client{Transport: baseTransport}
+		}
 
 		httpClient = retryClient.StandardClient()
 
