@@ -47,6 +47,9 @@ func NewCSRFMiddleware(
 						"error", err,
 						"subject", ptr.ToString(auth.GetSubject(r.Context())),
 					)
+					// Clear cookies so the browser starts a clean login flow rather than
+					// looping (e.g. after a signing key rotation invalidates existing tokens).
+					sessionManager.ClearUserSessionCookies(w)
 					respWriter.RespondWithError(r.Context(), w, err)
 					return
 				}
