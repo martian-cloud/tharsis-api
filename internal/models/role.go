@@ -102,9 +102,10 @@ type DefaultRoleID string
 
 // DefaultRoleID constants.
 const (
-	OwnerRoleID    DefaultRoleID = "623c83ea-23fe-4de6-874a-a99ccf6a76fc"
-	DeployerRoleID DefaultRoleID = "8aa7adba-b769-471f-8ebb-3215f33991cb"
-	ViewerRoleID   DefaultRoleID = "52da70fd-37b0-4349-bb64-fb4659bcf5f5"
+	OwnerRoleID     DefaultRoleID = "623c83ea-23fe-4de6-874a-a99ccf6a76fc"
+	DeployerRoleID  DefaultRoleID = "8aa7adba-b769-471f-8ebb-3215f33991cb"
+	PublisherRoleID DefaultRoleID = "028fa46b-23ba-443f-a24f-61edcde148ff"
+	ViewerRoleID    DefaultRoleID = "52da70fd-37b0-4349-bb64-fb4659bcf5f5"
 )
 
 // String returns the ID as a string.
@@ -115,7 +116,7 @@ func (d DefaultRoleID) String() string {
 // IsDefaultRole returns true if ID belongs to a default role.
 func (d DefaultRoleID) IsDefaultRole() bool {
 	switch d {
-	case OwnerRoleID, DeployerRoleID, ViewerRoleID:
+	case OwnerRoleID, DeployerRoleID, PublisherRoleID, ViewerRoleID:
 		return true
 	}
 
@@ -246,6 +247,33 @@ var defaultRolePermissions = map[DefaultRoleID][]Permission{
 		CreateFederatedRegistryPermission,
 		UpdateFederatedRegistryPermission,
 		DeleteFederatedRegistryPermission,
+	},
+	// Publisher Role.
+	// Allows publishing terraform modules and providers with read access to all resources — no run/deployment permissions.
+	PublisherRoleID: {
+		ViewGPGKeyPermission,
+		ViewGroupPermission,
+		ViewWorkspacePermission,
+		ViewNamespaceMembershipPermission,
+		ViewRunPermission,
+		ViewJobPermission,
+		ViewRunnerPermission,
+		ViewVariablePermission,
+		ViewTerraformModulePermission,
+		CreateTerraformModulePermission,
+		UpdateTerraformModulePermission,
+		DeleteTerraformModulePermission,
+		ViewTerraformProviderPermission,
+		CreateTerraformProviderPermission,
+		UpdateTerraformProviderPermission,
+		DeleteTerraformProviderPermission,
+		ViewStateVersionPermission,
+		ViewConfigurationVersionPermission,
+		ViewServiceAccountPermission,
+		ViewManagedIdentityPermission,
+		ViewVCSProviderPermission,
+		ViewTerraformProviderMirrorPermission,
+		ViewFederatedRegistryPermission,
 	},
 	// Viewer Role.
 	ViewerRoleID: {
