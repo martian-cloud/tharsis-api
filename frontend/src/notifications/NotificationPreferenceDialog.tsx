@@ -43,6 +43,7 @@ function NotificationPreferenceDialog({ onClose, path, preferenceData, isGlobalP
                     namespacePath
                     customEvents {
                         failedRun
+                        membershipChange
                         serviceAccountSecretExpiration
                     }
                 }

@@ -8,9 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/builder"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -288,15 +292,28 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			}, nil)
 
 			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, mock.Anything).Return(&models.ServiceAccount{
-				Name: "mock-service-account-name",
+				Metadata: models.ResourceMetadata{TRN: trn.TypeServiceAccount.Build("ns1/mock-service-account-name")},
 			}, nil)
 
 			// If a new test case is added that uses a team principal, will need to mock GetTeamByID here.
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
+			mockNamespaceMemberships.On("GetNamespaceMemberships", mock.Anything, mock.Anything).
+				Return(&db.NamespaceMembershipResult{}, nil).Maybe()
+
+			mockEmailClient := email.MockClient{}
+			mockEmailClient.Test(t)
+
+			mockNotifMgr := namespace.MockNotificationManager{}
+			mockNotifMgr.Test(t)
+
+			mockTaskManager := asynctask.MockManager{}
+			mockTaskManager.Test(t)
+			mockTaskManager.On("StartTask", mock.Anything).Maybe()
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockActivityEvents)
+			service := NewService(logger, &dbClient, &mockActivityEvents, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
 
 			namespaceMembership, err := service.CreateNamespaceMembership(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrorCode != "" {
@@ -482,8 +499,18 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
+			mockEmailClient := email.MockClient{}
+			mockEmailClient.Test(t)
+
+			mockNotifMgr := namespace.MockNotificationManager{}
+			mockNotifMgr.Test(t)
+
+			mockTaskManager := asynctask.MockManager{}
+			mockTaskManager.Test(t)
+			mockTaskManager.On("StartTask", mock.Anything).Maybe()
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockActivityEvents)
+			service := NewService(logger, &dbClient, &mockActivityEvents, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
 
 			namespaceMembership, err := service.UpdateNamespaceMembership(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrorCode != "" {
@@ -494,6 +521,242 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 			}
 
 			assert.Equal(t, test.input, namespaceMembership)
+		})
+	}
+}
+
+func TestSendMembershipChangeEmail(t *testing.T) {
+	const (
+		namespacePath = "parent/child"
+		userID        = "user-1"
+		teamID        = "team-1"
+		saID          = "sa-1"
+		ownerUserID   = "owner-1"
+		performedBy   = "caller@example.com"
+	)
+
+	baseMembership := func() *models.NamespaceMembership {
+		return &models.NamespaceMembership{
+			Namespace: models.MembershipNamespace{
+				Path:    namespacePath,
+				GroupID: ptr.String("group-1"),
+			},
+			RoleID: models.DeployerRoleID.String(),
+		}
+	}
+
+	type testCase struct {
+		name            string
+		membership      func() *models.NamespaceMembership
+		setupMocks      func(_ *testing.T, mockSAs *db.MockServiceAccounts, mockTeams *db.MockTeams, mockTeamMembers *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockClient)
+		expectError     bool
+		expectEmailSent bool
+	}
+
+	tests := []testCase{
+		{
+			name: "user membership - email sent",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.UserID = ptr.String(userID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockClient) {
+				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.MatchedBy(func(in *namespace.GetUsersToNotifyInput) bool {
+					return in.NamespacePath == namespacePath && len(in.ParticipantUserIDs) == 1 && in.ParticipantUserIDs[0] == userID
+				})).Return([]string{userID}, nil)
+				mockEmail.On("SendMail", mock.Anything, mock.Anything).Return()
+			},
+			expectEmailSent: true,
+		},
+		{
+			name: "user membership - GetUsersToNotify returns empty - no email",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.UserID = ptr.String(userID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockClient) {
+				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.Anything).Return([]string{}, nil)
+			},
+		},
+		{
+			name: "user membership - GetUsersToNotify error",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.UserID = ptr.String(userID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockClient) {
+				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.Anything).Return(nil, errors.New("db error"))
+			},
+			expectError: true,
+		},
+		{
+			name: "team membership - team members notified",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.TeamID = ptr.String(teamID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, mockTeams *db.MockTeams, mockTeamMembers *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockClient) {
+				mockTeams.On("GetTeamByID", mock.Anything, teamID).Return(&models.Team{Name: "my-team"}, nil)
+				mockTeamMembers.On("GetTeamMembers", mock.Anything, &db.GetTeamMembersInput{
+					Filter: &db.TeamMemberFilter{TeamIDs: []string{teamID}},
+				}).Return(&db.TeamMembersResult{TeamMembers: []models.TeamMember{{UserID: userID}}}, nil)
+				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.MatchedBy(func(in *namespace.GetUsersToNotifyInput) bool {
+					return in.NamespacePath == namespacePath && len(in.ParticipantUserIDs) == 1 && in.ParticipantUserIDs[0] == userID
+				})).Return([]string{userID}, nil)
+				mockEmail.On("SendMail", mock.Anything, mock.Anything).Return()
+			},
+			expectEmailSent: true,
+		},
+		{
+			name: "team membership - team not found",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.TeamID = ptr.String(teamID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, mockTeams *db.MockTeams, _ *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockClient) {
+				mockTeams.On("GetTeamByID", mock.Anything, teamID).Return(nil, nil)
+			},
+			expectError: true,
+		},
+		{
+			name: "team membership - GetTeamMembers error",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.TeamID = ptr.String(teamID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, mockTeams *db.MockTeams, mockTeamMembers *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockClient) {
+				mockTeams.On("GetTeamByID", mock.Anything, teamID).Return(&models.Team{Name: "my-team"}, nil)
+				mockTeamMembers.On("GetTeamMembers", mock.Anything, mock.Anything).Return(nil, errors.New("db error"))
+			},
+			expectError: true,
+		},
+		{
+			name: "SA membership - owners notified",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.ServiceAccountID = ptr.String(saID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockClient) {
+				mockSAs.On("GetServiceAccountByID", mock.Anything, saID).Return(&models.ServiceAccount{
+					Metadata: models.ResourceMetadata{TRN: trn.TypeServiceAccount.Build("parent/child/my-sa")},
+				}, nil)
+				mockNotifMgr.On("GetNamespaceMembersWithRole", mock.Anything, namespacePath, models.OwnerRoleID.String()).Return([]string{ownerUserID}, nil)
+				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.MatchedBy(func(in *namespace.GetUsersToNotifyInput) bool {
+					return in.NamespacePath == namespacePath && len(in.ParticipantUserIDs) == 1 && in.ParticipantUserIDs[0] == ownerUserID
+				})).Return([]string{ownerUserID}, nil)
+				mockEmail.On("SendMail", mock.Anything, mock.Anything).Return()
+			},
+			expectEmailSent: true,
+		},
+		{
+			name: "SA membership - no owners found - no email",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.ServiceAccountID = ptr.String(saID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockClient) {
+				mockSAs.On("GetServiceAccountByID", mock.Anything, saID).Return(&models.ServiceAccount{
+					Metadata: models.ResourceMetadata{TRN: trn.TypeServiceAccount.Build("parent/child/my-sa")},
+				}, nil)
+				mockNotifMgr.On("GetNamespaceMembersWithRole", mock.Anything, namespacePath, models.OwnerRoleID.String()).Return([]string{}, nil)
+				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.Anything).Return([]string{}, nil)
+			},
+		},
+		{
+			name: "SA membership - SA not found",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.ServiceAccountID = ptr.String(saID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockClient) {
+				mockSAs.On("GetServiceAccountByID", mock.Anything, saID).Return(nil, nil)
+			},
+			expectError: true,
+		},
+		{
+			name: "SA membership - GetServiceAccountByID error",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.ServiceAccountID = ptr.String(saID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockClient) {
+				mockSAs.On("GetServiceAccountByID", mock.Anything, saID).Return(nil, errors.New("db error"))
+			},
+			expectError: true,
+		},
+		{
+			name: "SA membership - GetNamespaceMembersWithRole error",
+			membership: func() *models.NamespaceMembership {
+				m := baseMembership()
+				m.ServiceAccountID = ptr.String(saID)
+				return m
+			},
+			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockClient) {
+				mockSAs.On("GetServiceAccountByID", mock.Anything, saID).Return(&models.ServiceAccount{
+					Metadata: models.ResourceMetadata{TRN: trn.TypeServiceAccount.Build("parent/child/my-sa")},
+				}, nil)
+				mockNotifMgr.On("GetNamespaceMembersWithRole", mock.Anything, namespacePath, models.OwnerRoleID.String()).Return(nil, errors.New("db error"))
+			},
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockSAs := db.NewMockServiceAccounts(t)
+			mockTeams := db.NewMockTeams(t)
+			mockTeamMembers := db.NewMockTeamMembers(t)
+			mockNotifMgr := namespace.NewMockNotificationManager(t)
+			mockEmail := email.NewMockClient(t)
+
+			test.setupMocks(t, mockSAs, mockTeams, mockTeamMembers, mockNotifMgr, mockEmail)
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("GetSubject").Return(performedBy).Maybe()
+
+			testLogger, _ := logger.NewForTest()
+			svc := &service{
+				dbClient: &db.Client{
+					ServiceAccounts: mockSAs,
+					Teams:           mockTeams,
+					TeamMembers:     mockTeamMembers,
+				},
+				notificationManager: mockNotifMgr,
+				emailClient:         mockEmail,
+				logger:              testLogger,
+			}
+
+			err := svc.sendMembershipChangeEmail(ctx, &sendMembershipChangeEmailInput{
+				membership: test.membership(),
+				action:     builder.MembershipChangeActionCreated,
+				roleName:   "deployer",
+				caller:     mockCaller,
+			})
+
+			if test.expectError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectEmailSent {
+				mockEmail.AssertCalled(t, "SendMail", mock.Anything, mock.Anything)
+			} else {
+				mockEmail.AssertNotCalled(t, "SendMail", mock.Anything, mock.Anything)
+			}
 		})
 	}
 }
@@ -614,8 +877,18 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
+			mockEmailClient := email.MockClient{}
+			mockEmailClient.Test(t)
+
+			mockNotifMgr := namespace.MockNotificationManager{}
+			mockNotifMgr.Test(t)
+
+			mockTaskManager := asynctask.MockManager{}
+			mockTaskManager.Test(t)
+			mockTaskManager.On("StartTask", mock.Anything).Maybe()
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockActivityEvents)
+			service := NewService(logger, &dbClient, &mockActivityEvents, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)

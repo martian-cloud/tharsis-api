@@ -8,10 +8,15 @@ import (
 	"fmt"
 	"strings"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/builder"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -41,6 +46,16 @@ type GetNamespaceMembershipsForSubjectInput struct {
 	ServiceAccount *models.ServiceAccount
 }
 
+type sendMembershipChangeEmailInput struct {
+	membership       *models.NamespaceMembership
+	action           builder.MembershipChangeAction
+	roleName         string
+	prevRoleName     string
+	isCustomRole     bool
+	isPrevCustomRole bool
+	caller           auth.Caller
+}
+
 // Service implements all namespace membership related functionality
 type Service interface {
 	GetNamespaceMembershipsForNamespace(ctx context.Context, namespacePath string) ([]models.NamespaceMembership, error)
@@ -54,9 +69,12 @@ type Service interface {
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	activityService activityevent.Service
+	logger              logger.Logger
+	dbClient            *db.Client
+	activityService     activityevent.Service
+	emailClient         email.Client
+	notificationManager namespace.NotificationManager
+	asyncTaskManager    asynctask.Manager
 }
 
 // NewService creates an instance of Service
@@ -64,11 +82,17 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	activityService activityevent.Service,
+	emailClient email.Client,
+	notificationManager namespace.NotificationManager,
+	asyncTaskManager asynctask.Manager,
 ) Service {
 	return &service{
-		logger:          logger,
-		dbClient:        dbClient,
-		activityService: activityService,
+		logger:              logger,
+		dbClient:            dbClient,
+		activityService:     activityService,
+		emailClient:         emailClient,
+		notificationManager: notificationManager,
+		asyncTaskManager:    asyncTaskManager,
 	}
 }
 
@@ -288,8 +312,13 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	err := s.requirePermissionForNamespace(ctx, input.NamespacePath, models.CreateNamespaceMembershipPermission)
+	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to authorize caller")
+		return nil, err
+	}
+
+	if err = caller.RequirePermission(ctx, models.CreateNamespaceMembershipPermission, auth.WithNamespacePath(input.NamespacePath)); err != nil {
 		tracing.RecordError(span, err, "namespace permission check failed")
 		return nil, err
 	}
@@ -392,6 +421,19 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		return nil, err
 	}
 
+	emailInput := &sendMembershipChangeEmailInput{
+		membership:   namespaceMembership,
+		action:       builder.MembershipChangeActionCreated,
+		roleName:     role.Name,
+		isCustomRole: !models.DefaultRoleID(role.Metadata.ID).IsDefaultRole(),
+		caller:       caller,
+	}
+	s.asyncTaskManager.StartTask(func(ctx context.Context) {
+		if err := s.sendMembershipChangeEmail(ctx, emailInput); err != nil {
+			s.logger.Errorf("failed to send membership change email: %v", err)
+		}
+	})
+
 	return namespaceMembership, nil
 }
 
@@ -402,8 +444,13 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	err := s.requirePermissionForNamespace(ctx, namespaceMembership.Namespace.Path, models.UpdateNamespaceMembershipPermission)
+	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to authorize caller")
+		return nil, err
+	}
+
+	if err = caller.RequirePermission(ctx, models.UpdateNamespaceMembershipPermission, auth.WithNamespacePath(namespaceMembership.Namespace.Path)); err != nil {
 		tracing.RecordError(span, err, "namespace permission check failed")
 		return nil, err
 	}
@@ -485,6 +532,21 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 		return nil, err
 	}
 
+	input := &sendMembershipChangeEmailInput{
+		membership:       updatedNamespaceMembership,
+		action:           builder.MembershipChangeActionRoleChanged,
+		roleName:         newRole.Name,
+		prevRoleName:     prevRole.Name,
+		isCustomRole:     !models.DefaultRoleID(newRole.Metadata.ID).IsDefaultRole(),
+		isPrevCustomRole: !models.DefaultRoleID(prevRole.Metadata.ID).IsDefaultRole(),
+		caller:           caller,
+	}
+	s.asyncTaskManager.StartTask(func(ctx context.Context) {
+		if err := s.sendMembershipChangeEmail(ctx, input); err != nil {
+			s.logger.Errorf("failed to send membership change email: %v", err)
+		}
+	})
+
 	return updatedNamespaceMembership, nil
 }
 
@@ -493,8 +555,13 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	err := s.requirePermissionForNamespace(ctx, namespaceMembership.Namespace.Path, models.DeleteNamespaceMembershipPermission)
+	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to authorize caller")
+		return err
+	}
+
+	if err = caller.RequirePermission(ctx, models.DeleteNamespaceMembershipPermission, auth.WithNamespacePath(namespaceMembership.Namespace.Path)); err != nil {
 		tracing.RecordError(span, err, "namespace permission check failed")
 		return err
 	}
@@ -543,7 +610,23 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 		return err
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return err
+	}
+
+	input := &sendMembershipChangeEmailInput{
+		membership: namespaceMembership,
+		action:     builder.MembershipChangeActionRemoved,
+		caller:     caller,
+	}
+	s.asyncTaskManager.StartTask(func(ctx context.Context) {
+		if err := s.sendMembershipChangeEmail(ctx, input); err != nil {
+			s.logger.Errorf("failed to send membership change email: %v", err)
+		}
+	})
+
+	return nil
 }
 
 func (s *service) verifyNotOnlyOwner(ctx context.Context, namespaceMembership *models.NamespaceMembership) error {
@@ -572,15 +655,6 @@ func (s *service) verifyNotOnlyOwner(ctx context.Context, namespaceMembership *m
 	return nil
 }
 
-func (s *service) requirePermissionForNamespace(ctx context.Context, namespacePath string, perm models.Permission) error {
-	caller, err := auth.AuthorizeCaller(ctx)
-	if err != nil {
-		return err
-	}
-
-	return caller.RequirePermission(ctx, perm, auth.WithNamespacePath(namespacePath))
-}
-
 func (s *service) getRoleByID(ctx context.Context, id string) (*models.Role, error) {
 	role, err := s.dbClient.Roles.GetRoleByID(ctx, id)
 	if err != nil {
@@ -592,6 +666,100 @@ func (s *service) getRoleByID(ctx context.Context, id string) (*models.Role, err
 	}
 
 	return role, nil
+}
+
+// sendMembershipChangeEmail sends an async notification about a membership change.
+// For SA memberships, namespace owners are the participants so PARTICIPATE-scope owners get notified.
+// For user/team memberships, the affected member(s) are the participants.
+func (s *service) sendMembershipChangeEmail(ctx context.Context, input *sendMembershipChangeEmailInput) error {
+	membership := input.membership
+
+	var participantUserIDs []string
+	var teamName string
+	var saPath, saGroupPath, saID string
+
+	if membership.ServiceAccountID != nil {
+		sa, err := s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, *membership.ServiceAccountID)
+		if err != nil {
+			return errors.Wrap(err, "failed to get service account for membership change email")
+		}
+
+		if sa == nil {
+			return errors.New("service account %s not found for membership change email", *membership.ServiceAccountID)
+		}
+
+		saPath = sa.GetResourcePath()
+		saGroupPath = sa.GetGroupPath()
+		saID = gid.ToGlobalID(types.ServiceAccountModelType, sa.Metadata.ID)
+
+		// Namespace owners are the participants for SA membership changes.
+		participantUserIDs, err = s.notificationManager.GetNamespaceMembersWithRole(ctx, membership.Namespace.Path, models.OwnerRoleID.String())
+		if err != nil {
+			return errors.Wrap(err, "failed to get namespace owners for membership change email")
+		}
+	} else if membership.UserID != nil {
+		participantUserIDs = []string{*membership.UserID}
+	} else if membership.TeamID != nil {
+		team, err := s.dbClient.Teams.GetTeamByID(ctx, *membership.TeamID)
+		if err != nil {
+			return errors.Wrap(err, "failed to get team for membership change email")
+		}
+
+		if team == nil {
+			return errors.New("team %s not found for membership change email", *membership.TeamID)
+		}
+
+		teamName = team.Name
+
+		result, err := s.dbClient.TeamMembers.GetTeamMembers(ctx, &db.GetTeamMembersInput{
+			Filter: &db.TeamMemberFilter{TeamIDs: []string{*membership.TeamID}},
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to get team members for membership change email")
+		}
+
+		for _, m := range result.TeamMembers {
+			participantUserIDs = append(participantUserIDs, m.UserID)
+		}
+	}
+
+	usersToNotify, err := s.notificationManager.GetUsersToNotify(ctx, &namespace.GetUsersToNotifyInput{
+		NamespacePath:      membership.Namespace.Path,
+		ParticipantUserIDs: participantUserIDs,
+		CustomEventCheck: func(e *models.NotificationPreferenceCustomEvents) bool {
+			return e != nil && e.MembershipChange
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to get users to notify for membership change email")
+	}
+
+	if len(usersToNotify) == 0 {
+		return nil
+	}
+
+	emailBuilder := &builder.MembershipChangeEmail{
+		Action:                  input.action,
+		NamespacePath:           membership.Namespace.Path,
+		RoleName:                input.roleName,
+		PrevRoleName:            input.prevRoleName,
+		PerformedBy:             input.caller.GetSubject(),
+		TeamName:                teamName,
+		ServiceAccountPath:      saPath,
+		ServiceAccountID:        saID,
+		ServiceAccountGroupPath: saGroupPath,
+		IsCustomRole:            input.isCustomRole,
+		IsPrevCustomRole:        input.isPrevCustomRole,
+		IsWorkspace:             membership.Namespace.WorkspaceID != nil,
+	}
+
+	s.emailClient.SendMail(ctx, &email.SendMailInput{
+		UsersIDs: usersToNotify,
+		Subject:  emailBuilder.Subject(),
+		Builder:  emailBuilder,
+	})
+
+	return nil
 }
 
 func getTargetTypeID(namespaceMembership *models.NamespaceMembership) (models.ActivityEventTargetType, string) {

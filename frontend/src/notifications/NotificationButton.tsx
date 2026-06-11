@@ -11,6 +11,7 @@ import { NotificationButtonFragment_notificationPreference$key, UserNotification
 export type Preference = {
     readonly customEvents: {
         readonly failedRun: boolean;
+        readonly membershipChange: boolean;
         readonly serviceAccountSecretExpiration: boolean;
     } | null | undefined;
     readonly global: boolean;
@@ -95,6 +96,7 @@ function NotificationButton({ path, fragmentRef, isGlobalPreference = false }: P
                 global
                 customEvents {
                     failedRun
+                    membershipChange
                     serviceAccountSecretExpiration
                 }
             }

@@ -8,8 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -882,7 +884,14 @@ func TestGetGroups(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 			activityService := activityevent.NewService(dbClient.Client, logger)
-			namespaceMembershipService := namespacemembership.NewService(logger, dbClient.Client, activityService)
+			mockEmailClient := email.MockClient{}
+			mockEmailClient.Test(t)
+			mockNotifMgr := namespace.MockNotificationManager{}
+			mockNotifMgr.Test(t)
+			mockTaskManager := asynctask.MockManager{}
+			mockTaskManager.Test(t)
+			mockTaskManager.On("StartTask", mock.Anything).Maybe()
+			namespaceMembershipService := namespacemembership.NewService(logger, dbClient.Client, activityService, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
 			service := NewService(logger, dbClient.Client, limiter, namespaceMembershipService, activityService, nil)
 
 			// Call the service function.

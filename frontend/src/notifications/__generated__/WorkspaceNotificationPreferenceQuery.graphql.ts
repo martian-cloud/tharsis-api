@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c008bde20e888c6c8c74295fd260a907>>
+ * @generated SignedSource<<85a647a483c39450080e9dcf9e246649>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -215,6 +215,13 @@ return {
                                 "alias": null,
                                 "args": null,
                                 "kind": "ScalarField",
+                                "name": "membershipChange",
+                                "storageKey": null
+                              },
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
                                 "name": "serviceAccountSecretExpiration",
                                 "storageKey": null
                               }
@@ -246,12 +253,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "119d8968fc312bb363e00f2f37c0ff43",
+    "cacheID": "a9e835d1b8fd8cfc51075595e1e62aa1",
     "id": null,
     "metadata": {},
     "name": "WorkspaceNotificationPreferenceQuery",
     "operationKind": "query",
-    "text": "query WorkspaceNotificationPreferenceQuery(\n  $workspacePath: String!\n) {\n  userPreferences {\n    workspacePreferences(first: 1, path: $workspacePath) {\n      edges {\n        node {\n          notificationPreference {\n            ...NotificationButtonFragment_notificationPreference\n          }\n          id\n        }\n      }\n    }\n  }\n}\n\nfragment NotificationButtonFragment_notificationPreference on UserNotificationPreference {\n  scope\n  inherited\n  namespacePath\n  global\n  customEvents {\n    failedRun\n    serviceAccountSecretExpiration\n  }\n}\n"
+    "text": "query WorkspaceNotificationPreferenceQuery(\n  $workspacePath: String!\n) {\n  userPreferences {\n    workspacePreferences(first: 1, path: $workspacePath) {\n      edges {\n        node {\n          notificationPreference {\n            ...NotificationButtonFragment_notificationPreference\n          }\n          id\n        }\n      }\n    }\n  }\n}\n\nfragment NotificationButtonFragment_notificationPreference on UserNotificationPreference {\n  scope\n  inherited\n  namespacePath\n  global\n  customEvents {\n    failedRun\n    membershipChange\n    serviceAccountSecretExpiration\n  }\n}\n"
   }
 };
 })();

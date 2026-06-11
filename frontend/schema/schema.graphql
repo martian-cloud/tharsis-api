@@ -1501,6 +1501,7 @@ input JWTClaimInput {
 type Job implements Node {
   cancelRequested: Boolean!
   completed: Boolean!
+  forceCanceled: Boolean!
   id: ID!
   logLastUpdatedAt: Time
   logSize: Int!
@@ -3459,11 +3460,13 @@ type UserNotificationPreference {
 
 type UserNotificationPreferenceCustomEvents {
   failedRun: Boolean!
+  membershipChange: Boolean!
   serviceAccountSecretExpiration: Boolean!
 }
 
 input UserNotificationPreferenceCustomEventsInput {
   failedRun: Boolean!
+  membershipChange: Boolean!
   serviceAccountSecretExpiration: Boolean!
 }
 
