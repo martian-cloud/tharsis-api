@@ -25,6 +25,7 @@ type UserNamespacePreferences {
 type UserNotificationPreferenceCustomEvents {
   failedRun: Boolean!
   serviceAccountSecretExpiration: Boolean!
+  membershipChange: Boolean!
 }
 
 type UserNotificationPreference {
@@ -66,6 +67,7 @@ type UserPreferences {
 input UserNotificationPreferenceCustomEventsInput {
   failedRun: Boolean!
   serviceAccountSecretExpiration: Boolean!
+  membershipChange: Boolean!
 }
 
 input SetUserNotificationPreferenceInput {

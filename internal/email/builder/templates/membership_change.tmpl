@@ -1,0 +1,86 @@
+{{- $nsType := "Group" -}}
+{{- if .this.IsWorkspace }}{{- $nsType = "Workspace" -}}{{end -}}
+{{- $nsURL := printf "%s/groups/%s" .common.FrontendURL .this.NamespacePath -}}
+{{- $saPath := .this.ServiceAccountPath -}}
+{{- $saURL := printf "%s/groups/%s/-/service_accounts/%s" .common.FrontendURL .this.ServiceAccountGroupPath
+.this.ServiceAccountID -}}
+{{- $teamURL := printf "%s/teams/%s" .common.FrontendURL .this.TeamName -}}
+
+{{if eq .this.Action "created"}}
+<h6 class="text">{{$nsType}} Access Granted</h6>
+<hr class="divider" />
+
+<div class="alert-success">
+    <p class="text">
+        {{if $saPath -}}
+        Service account <strong><a href="{{$saURL}}" class="link" target="_blank">{{$saPath}}</a></strong> has been
+        granted access to
+        {{- else -}}
+        You've been granted access to
+        {{- end}}
+        <a href="{{$nsURL}}" class="link" target="_blank">{{.this.NamespacePath}}</a>
+        with the role <strong>{{.this.RoleName}}</strong>{{if .this.IsCustomRole}} <em>(custom role)</em>{{end}}{{if
+        .this.TeamName}} (via team <strong><a href="{{$teamURL}}" class="link"
+                target="_blank">{{.this.TeamName}}</a></strong>){{end}}.
+    </p>
+</div>
+{{else if eq .this.Action "role_changed"}}
+<h6 class="text">{{$nsType}} Role Updated</h6>
+<hr class="divider" />
+
+<div class="alert-info">
+    <p class="text">
+        {{if $saPath -}}
+        Service account <strong><a href="{{$saURL}}" class="link" target="_blank">{{$saPath}}</a></strong>'s role in
+        {{- else -}}
+        Your role in
+        {{- end}}
+        <a href="{{$nsURL}}" class="link" target="_blank">{{.this.NamespacePath}}</a>
+        has been updated to <strong>{{.this.RoleName}}</strong>{{if .this.IsCustomRole}} <em>(custom
+            role)</em>{{end}}{{if .this.TeamName}} (via team <strong><a href="{{$teamURL}}" class="link"
+                target="_blank">{{.this.TeamName}}</a></strong>){{end}}.
+    </p>
+</div>
+
+<p class="text">
+    <strong>Previous role:</strong>
+</p>
+<p class="text gutter-bottom">
+    {{.this.PrevRoleName}}{{if .this.IsPrevCustomRole}} <em>(custom role)</em>{{end}}
+</p>
+{{else}}
+<h6 class="text">{{$nsType}} Access Revoked</h6>
+<hr class="divider" />
+
+<div class="alert-warning">
+    <p class="text">
+        {{if $saPath -}}
+        Service account <strong><a href="{{$saURL}}" class="link" target="_blank">{{$saPath}}</a></strong>'s access to
+        {{- else -}}
+        Your access to
+        {{- end}}
+        <strong>{{.this.NamespacePath}}</strong> has been revoked.
+    </p>
+</div>
+{{end}}
+
+<p class="text">
+    <strong>Performed by:</strong>
+</p>
+<p class="text gutter-bottom">
+    {{.this.PerformedBy}}
+</p>
+
+{{if .this.ShowCTA}}
+<a class="primary-button" style="margin-top: 24px;" href="{{$nsURL}}" target="_blank">
+    <span class="primary-button-text">
+        View {{$nsType}}
+    </span>
+</a>
+{{end}}
+
+{{if $saPath}}
+<p class="text" style="margin-top: 24px; font-size: 13px; color: #6b7280;">
+    You are receiving this email because you are an owner of this namespace.
+</p>
+{{end}}

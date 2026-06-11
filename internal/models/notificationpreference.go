@@ -40,6 +40,7 @@ func (s NotificationPreferenceScope) Valid() bool {
 type NotificationPreferenceCustomEvents struct {
 	FailedRun                      bool `json:"failed_run"`
 	ServiceAccountSecretExpiration bool `json:"service_account_secret_expiration"`
+	MembershipChange               bool `json:"membership_change"`
 }
 
 // NotificationPreference is used to control which notifications are sent to a user

@@ -2,6 +2,7 @@ import { Box, Checkbox, Divider, Paper, Typography, FormControlLabel } from '@mu
 
 export interface CustomEvents {
     failedRun: boolean;
+    membershipChange: boolean;
     serviceAccountSecretExpiration: boolean;
 }
 
@@ -18,6 +19,9 @@ const EVENT_CONFIG: Record<string, EventConfig[]> = {
     ],
     'Service Account Events': [
         { key: 'serviceAccountSecretExpiration', label: 'Secret Expiration', description: 'Receive a notification when a service account client secret is about to expire' },
+    ],
+    'Membership Events': [
+        { key: 'membershipChange', label: 'Membership Change', description: 'Receive a notification when you are added to, removed from, or have your role updated in a namespace' },
     ],
 };
 

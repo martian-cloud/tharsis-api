@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b2006fa0755d280578269d32cb46da76>>
+ * @generated SignedSource<<ba0e843f0455cfad800e9097f4cd25be>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,6 +14,7 @@ import { FragmentRefs } from "relay-runtime";
 export type NotificationButtonFragment_notificationPreference$data = {
   readonly customEvents: {
     readonly failedRun: boolean;
+    readonly membershipChange: boolean;
     readonly serviceAccountSecretExpiration: boolean;
   } | null | undefined;
   readonly global: boolean;
@@ -80,6 +81,13 @@ const node: ReaderFragment = {
           "alias": null,
           "args": null,
           "kind": "ScalarField",
+          "name": "membershipChange",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
           "name": "serviceAccountSecretExpiration",
           "storageKey": null
         }
@@ -91,6 +99,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "5a96a8ff145cb528438f42310f18c375";
+(node as any).hash = "1f7ebacaffa20406bb2cdfaf3c85551c";
 
 export default node;

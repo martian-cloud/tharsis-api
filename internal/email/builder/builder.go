@@ -30,11 +30,12 @@ const (
 	FailedRunEmailType                      EmailType = "failed_run"
 	ServiceAccountSecretExpirationEmailType EmailType = "service_account_secret_expiration"
 	SigningKeyDecommissionEmailType         EmailType = "signing_key_decommission"
+	MembershipChangeEmailType               EmailType = "membership_change"
 )
 
 // EmailTypes returns a list of email types
 func EmailTypes() []EmailType {
-	return []EmailType{FailedRunEmailType, ServiceAccountSecretExpirationEmailType, SigningKeyDecommissionEmailType}
+	return []EmailType{FailedRunEmailType, ServiceAccountSecretExpirationEmailType, SigningKeyDecommissionEmailType, MembershipChangeEmailType}
 }
 
 // TemplateFilename returns the template filename for this type
@@ -51,6 +52,8 @@ func (et EmailType) NewBuilder() (EmailBuilder, error) {
 		return &ServiceAccountSecretExpirationEmail{}, nil
 	case SigningKeyDecommissionEmailType:
 		return &SigningKeyDecommissionEmail{}, nil
+	case MembershipChangeEmailType:
+		return &MembershipChangeEmail{}, nil
 	default:
 		return nil, fmt.Errorf("unknown email type: %s", et)
 	}

@@ -211,7 +211,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		activityService            = activityevent.NewService(dbClient, logger)
 		announcementService        = announcement.NewService(logger, dbClient)
 		userService                = user.NewService(logger, dbClient, inheritedSettingsResolver)
-		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService)
+		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService, emailClient, notificationManager, taskManager)
 		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, activityService, inheritedSettingsResolver)
 		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore, cfg.TerraformCLIVersionConstraint)
 		workspaceService           = workspacesvc.NewService(logger, dbClient, limits, artifactStore, eventManager, cliService, activityService, inheritedSettingsResolver)
