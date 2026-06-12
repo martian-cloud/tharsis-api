@@ -5,7 +5,7 @@ package pagination
 import (
 	context "context"
 
-	pgx "github.com/jackc/pgx/v4"
+	pgx "github.com/jackc/pgx/v5"
 	mock "github.com/stretchr/testify/mock"
 )
 

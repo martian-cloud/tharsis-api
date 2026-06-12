@@ -6,7 +6,7 @@ import (
 	"net/url"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/pgx" // Instantiating migrate command
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5" // Instantiating migrate command
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -30,7 +30,7 @@ func newMigrations(logger logger.Logger, databaseURL string) (*migrations, error
 	if err != nil {
 		return nil, err
 	}
-	dbURL.Scheme = "pgx" // Change the scheme.
+	dbURL.Scheme = "pgx5" // Change the scheme.
 
 	return &migrations{
 		logger:      logger,
