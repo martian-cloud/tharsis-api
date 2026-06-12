@@ -12,10 +12,10 @@ import (
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres" // Register Postgres dialect
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/google/uuid"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -157,8 +157,14 @@ func NewClient(
 
 	logger.WithContextFields(ctx).Infof("Connecting to DB (host=%s, maxConnections=%d)", dbHost, cfg.MaxConns)
 
-	pool, err := pgxpool.ConnectConfig(ctx, cfg)
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
+		logger.WithContextFields(ctx).Errorf("Failed to create DB connection pool: %v\n", err)
+		return nil, err
+	}
+
+	// NewWithConfig connects lazily; Ping to fail fast at startup like v4's ConnectConfig.
+	if err := pool.Ping(ctx); err != nil {
 		logger.WithContextFields(ctx).Errorf("Unable to connect to DB: %v\n", err)
 		return nil, err
 	}

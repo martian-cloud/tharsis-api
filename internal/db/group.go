@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 

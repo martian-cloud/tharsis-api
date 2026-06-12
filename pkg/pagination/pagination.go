@@ -3,7 +3,7 @@
 package pagination
 
 //go:generate go tool mockery --name Connection --inpackage --case underscore
-//go:generate go tool mockery --srcpkg github.com/jackc/pgx/v4 --name Rows
+//go:generate go tool mockery --srcpkg github.com/jackc/pgx/v5 --name Rows
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
