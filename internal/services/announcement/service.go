@@ -151,8 +151,8 @@ func (s *service) CreateAnnouncement(ctx context.Context, input *CreateAnnouncem
 		return nil, err
 	}
 
-	if !caller.IsAdmin() {
-		return nil, errors.New("only system admins can create announcements", errors.WithErrorCode(errors.EForbidden))
+	if !caller.IsAdminModeActivated() {
+		return nil, errors.New("only admins with admin mode activated can create announcements", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	// Default start time to current time if not provided
@@ -198,8 +198,8 @@ func (s *service) UpdateAnnouncement(ctx context.Context, input *UpdateAnnouncem
 		return nil, err
 	}
 
-	if !caller.IsAdmin() {
-		return nil, errors.New("only system admins can update announcements", errors.WithErrorCode(errors.EForbidden))
+	if !caller.IsAdminModeActivated() {
+		return nil, errors.New("only admins with admin mode activated can update announcements", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	existing, err := s.dbClient.Announcements.GetAnnouncementByID(ctx, input.ID)
@@ -259,8 +259,8 @@ func (s *service) DeleteAnnouncement(ctx context.Context, input *DeleteAnnouncem
 		return err
 	}
 
-	if !caller.IsAdmin() {
-		return errors.New("only system admins can delete announcements", errors.WithErrorCode(errors.EForbidden))
+	if !caller.IsAdminModeActivated() {
+		return errors.New("only admins with admin mode activated can delete announcements", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	announcement, err := s.dbClient.Announcements.GetAnnouncementByID(ctx, input.ID)

@@ -263,11 +263,8 @@ func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsRes
 		if rErr = rnr.RequireViewerAccessToRunnerResource(ctx, runner); rErr != nil {
 			return nil, rErr
 		}
-	} else if !caller.IsAdmin() {
-		return nil, errors.New(
-			"Only system admins can subscribe to all job events without filters",
-			errors.WithErrorCode(errors.EForbidden),
-		)
+	} else if !caller.IsAdminModeActivated() {
+		return nil, errors.New("only admins with admin mode activated can subscribe to all job events without filters", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	dbInput := &db.GetJobsInput{
@@ -388,11 +385,8 @@ func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsI
 		if rErr = rnr.RequireViewerAccessToRunnerResource(ctx, runner); rErr != nil {
 			return nil, rErr
 		}
-	} else if !caller.IsAdmin() {
-		return nil, errors.New(
-			"Only system admins can subscribe to all job events without filters",
-			errors.WithErrorCode(errors.EForbidden),
-		)
+	} else if !caller.IsAdminModeActivated() {
+		return nil, errors.New("only admins with admin mode activated can perform this operation", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	subscription := events.Subscription{

@@ -61,6 +61,8 @@ type User implements Node {
     sort: TeamSort
   ): TeamConnection!
   admin: Boolean!
+  adminModeEnabled: Boolean!
+  adminModeExpiration: Time
   active: Boolean!
   scimExternalId: String
   agentCreditUsage: Float!
@@ -117,4 +119,14 @@ input SetUserPasswordInput {
   userId: String!
   currentPassword: String!
   newPassword: String!
+}
+
+input ActivateAdminModeInput {
+  clientMutationId: String
+  "Duration in minutes. Defaults to 30, maximum 360 (6 hours)."
+  durationMinutes: Int
+}
+
+input DeactivateAdminModeInput {
+  clientMutationId: String
 }

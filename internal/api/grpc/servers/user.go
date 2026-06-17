@@ -3,6 +3,7 @@ package servers
 
 import (
 	"context"
+	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -12,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // UserServer embeds the UnimplementedUsersServer.
@@ -135,5 +137,37 @@ func toPBUser(u *models.User) *pb.User {
 		Admin:          u.Admin,
 		Active:         u.Active,
 		ScimExternalId: u.SCIMExternalID,
+		AdminModeExpiration: func() *timestamppb.Timestamp {
+			if u.AdminModeExpiration != nil {
+				return timestamppb.New(*u.AdminModeExpiration)
+			}
+			return nil
+		}(),
 	}
+}
+
+// ActivateAdminMode activates admin mode for the calling user.
+func (s *UserServer) ActivateAdminMode(ctx context.Context, req *pb.ActivateAdminModeRequest) (*pb.User, error) {
+	input := &user.ActivateAdminModeInput{}
+	if req.DurationMinutes != nil {
+		duration := time.Duration(req.GetDurationMinutes()) * time.Minute
+		input.Duration = &duration
+	}
+
+	updatedUser, err := s.serviceCatalog.UserService.ActivateAdminMode(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBUser(updatedUser), nil
+}
+
+// DeactivateAdminMode deactivates admin mode for the calling user.
+func (s *UserServer) DeactivateAdminMode(ctx context.Context, _ *emptypb.Empty) (*pb.User, error) {
+	updatedUser, err := s.serviceCatalog.UserService.DeactivateAdminMode(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBUser(updatedUser), nil
 }

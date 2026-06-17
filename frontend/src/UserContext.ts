@@ -5,6 +5,8 @@ export interface User {
     username: string;
     email: string;
     admin: boolean;
+    adminModeEnabled: boolean;
+    adminModeExpiration: string | null;
 }
 
 // User will never be null so it's safe to use an empty object as the default value here

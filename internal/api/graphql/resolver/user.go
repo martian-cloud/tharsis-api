@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -185,6 +186,19 @@ func (r *UserResolver) Teams(ctx context.Context,
 // Admin resolver
 func (r *UserResolver) Admin() bool {
 	return r.user.Admin
+}
+
+// AdminModeEnabled resolver
+func (r *UserResolver) AdminModeEnabled() bool {
+	return r.user.IsAdminModeActive()
+}
+
+// AdminModeExpiration resolver
+func (r *UserResolver) AdminModeExpiration() *graphql.Time {
+	if r.user.AdminModeExpiration == nil {
+		return nil
+	}
+	return &graphql.Time{Time: *r.user.AdminModeExpiration}
 }
 
 // Active resolver
@@ -502,4 +516,43 @@ func userBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) 
 	}
 
 	return batch, nil
+}
+
+// ActivateAdminModeInput is the input for the activateAdminMode mutation.
+type ActivateAdminModeInput struct {
+	ClientMutationID *string
+	DurationMinutes  *int32
+}
+
+func activateAdminModeMutation(ctx context.Context, input *ActivateAdminModeInput) (*UserMutationPayloadResolver, error) {
+	var duration *time.Duration
+	if input.DurationMinutes != nil {
+		d := time.Duration(*input.DurationMinutes) * time.Minute
+		duration = &d
+	}
+
+	updatedUser, err := getServiceCatalog(ctx).UserService.ActivateAdminMode(ctx, &user.ActivateAdminModeInput{
+		Duration: duration,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := UserMutationPayload{ClientMutationID: input.ClientMutationID, User: updatedUser, Problems: []Problem{}}
+	return &UserMutationPayloadResolver{UserMutationPayload: payload}, nil
+}
+
+// DeactivateAdminModeInput is the input for the deactivateAdminMode mutation.
+type DeactivateAdminModeInput struct {
+	ClientMutationID *string
+}
+
+func deactivateAdminModeMutation(ctx context.Context, input *DeactivateAdminModeInput) (*UserMutationPayloadResolver, error) {
+	updatedUser, err := getServiceCatalog(ctx).UserService.DeactivateAdminMode(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := UserMutationPayload{ClientMutationID: input.ClientMutationID, User: updatedUser, Problems: []Problem{}}
+	return &UserMutationPayloadResolver{UserMutationPayload: payload}, nil
 }

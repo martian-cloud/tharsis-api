@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<166ec720cd3bc49986d0a3c6d212f163>>
+ * @generated SignedSource<<06b455ab70183b96ba6da7c65cfbf07e>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -20,6 +20,8 @@ export type RootQuery$data = {
   };
   readonly me: {
     readonly admin?: boolean;
+    readonly adminModeEnabled?: boolean;
+    readonly adminModeExpiration?: any | null | undefined;
     readonly email?: string;
     readonly id?: string;
     readonly username?: string;
@@ -62,6 +64,20 @@ v1 = {
       "args": null,
       "kind": "ScalarField",
       "name": "admin",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "adminModeEnabled",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "adminModeExpiration",
       "storageKey": null
     }
   ],
@@ -212,16 +228,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "731ac7051d41349012aa6b58f7df3cee",
+    "cacheID": "2ce740aa2c2534e6fbd719f578b3ef83",
     "id": null,
     "metadata": {},
     "name": "RootQuery",
     "operationKind": "query",
-    "text": "query RootQuery {\n  me {\n    __typename\n    ... on User {\n      id\n      username\n      email\n      admin\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  config {\n    tharsisSupportUrl\n    serviceDiscoveryHost\n    serviceAccountClientSecretMaxExpirationDays\n    aiEnabled\n  }\n  ...AppHeaderFragment\n}\n\nfragment AccountMenuFragment on Query {\n  version {\n    version\n    dbMigrationVersion\n    dbMigrationDirty\n    buildTimestamp\n  }\n}\n\nfragment AppHeaderFragment on Query {\n  ...AccountMenuFragment\n}\n"
+    "text": "query RootQuery {\n  me {\n    __typename\n    ... on User {\n      id\n      username\n      email\n      admin\n      adminModeEnabled\n      adminModeExpiration\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  config {\n    tharsisSupportUrl\n    serviceDiscoveryHost\n    serviceAccountClientSecretMaxExpirationDays\n    aiEnabled\n  }\n  ...AppHeaderFragment\n}\n\nfragment AccountMenuFragment on Query {\n  version {\n    version\n    dbMigrationVersion\n    dbMigrationDirty\n    buildTimestamp\n  }\n}\n\nfragment AppHeaderFragment on Query {\n  ...AccountMenuFragment\n}\n"
   }
 };
 })();
 
-(node as any).hash = "e1e4603f26e568e13ae3d3ad0eb29d92";
+(node as any).hash = "deffe708976d37ac1baa53823a45774f";
 
 export default node;

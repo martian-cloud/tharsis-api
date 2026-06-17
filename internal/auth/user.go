@@ -49,9 +49,9 @@ func (u *UserCaller) GetSubject() string {
 	return u.User.Email
 }
 
-// IsAdmin returns true if the caller is an admin
-func (u *UserCaller) IsAdmin() bool {
-	return u.User.Admin
+// IsAdminModeActivated returns true if the caller is an admin with admin mode currently active
+func (u *UserCaller) IsAdminModeActivated() bool {
+	return u.User.IsAdminModeActive()
 }
 
 // UnauthorizedError returns the unauthorized error for this specific caller type
@@ -74,7 +74,8 @@ func (u *UserCaller) UnauthorizedError(_ context.Context, hasViewerAccess bool) 
 
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller
 func (u *UserCaller) GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error) {
-	if u.User.Admin {
+	// Admin mode must be active for full namespace access.
+	if u.User.IsAdminModeActive() {
 		return &NamespaceAccessPolicy{AllowAll: true}, nil
 	}
 
@@ -103,8 +104,8 @@ func (u *UserCaller) RequirePermission(ctx context.Context, perm models.Permissi
 		return errInMaintenanceMode
 	}
 
-	if perm.IsAssignable() && u.User.Admin {
-		// User is an admin, so assignable permission can be granted.
+	if perm.IsAssignable() && u.User.IsAdminModeActive() {
+		// User is an admin with admin mode active, so assignable permission can be granted.
 		return nil
 	}
 
@@ -118,7 +119,7 @@ func (u *UserCaller) RequirePermission(ctx context.Context, perm models.Permissi
 
 // RequireRole will return an error if the caller doesn't have the specified role.
 func (u *UserCaller) RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error {
-	if u.User.Admin {
+	if u.User.IsAdminModeActive() {
 		return nil
 	}
 
@@ -128,8 +129,8 @@ func (u *UserCaller) RequireRole(ctx context.Context, roleID string, checks ...f
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
 func (u *UserCaller) RequireAccessToInheritableResource(ctx context.Context, modelType types.ModelType, checks ...func(*constraints)) error {
 	perm := models.Permission{Action: models.ViewAction, ResourceType: modelType.Name()}
-	if perm.IsAssignable() && u.User.Admin {
-		// User is an admin, so assignable permission can be granted.
+	if perm.IsAssignable() && u.User.IsAdminModeActive() {
+		// User is an admin with admin mode active, so assignable permission can be granted.
 		return nil
 	}
 
@@ -142,7 +143,7 @@ func (u *UserCaller) requireTeamUpdateAccess(ctx context.Context, _ *models.Perm
 		return errMissingConstraints
 	}
 
-	if u.User.Admin {
+	if u.User.IsAdminModeActive() {
 		return nil
 	}
 
@@ -161,7 +162,7 @@ func (u *UserCaller) requireTeamUpdateAccess(ctx context.Context, _ *models.Perm
 }
 
 func (u *UserCaller) requireAdmin(ctx context.Context, _ *models.Permission, _ *constraints) error {
-	if u.User.Admin {
+	if u.User.IsAdminModeActive() {
 		return nil
 	}
 

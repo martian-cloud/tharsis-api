@@ -568,7 +568,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
 				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
-				m.caller.On("IsAdmin").Return(false)
+				m.caller.On("IsAdminModeActivated").Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
 						ServiceAccountID: &serviceAccountID,
@@ -599,7 +599,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
-				m.caller.On("IsAdmin").Return(false)
+				m.caller.On("IsAdminModeActivated").Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
 						ServiceAccountID: &serviceAccountID,
@@ -634,7 +634,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
-				m.caller.On("IsAdmin").Return(true)
+				m.caller.On("IsAdminModeActivated").Return(true)
 
 				updated := *existingSA
 				updated.Description = updatedDescription
@@ -658,7 +658,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
-				m.caller.On("IsAdmin").Return(false)
+				m.caller.On("IsAdminModeActivated").Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
 						ServiceAccountID: &serviceAccountID,
@@ -684,7 +684,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
 				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
-				m.caller.On("IsAdmin").Return(false)
+				m.caller.On("IsAdminModeActivated").Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
 						ServiceAccountID: &serviceAccountID,
@@ -723,7 +723,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
-				m.caller.On("IsAdmin").Return(false)
+				m.caller.On("IsAdminModeActivated").Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
 						ServiceAccountID: &serviceAccountID,
@@ -1289,7 +1289,7 @@ func TestResetClientCredentials(t *testing.T) {
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(saWithClientCreds, nil)
 				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
-				m.caller.On("IsAdmin").Return(false)
+				m.caller.On("IsAdminModeActivated").Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
 						ServiceAccountID: &serviceAccountID,
@@ -1317,7 +1317,7 @@ func TestResetClientCredentials(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(saWithClientCreds, nil)
-				m.caller.On("IsAdmin").Return(false)
+				m.caller.On("IsAdminModeActivated").Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
 						ServiceAccountID: &serviceAccountID,
@@ -1337,7 +1337,7 @@ func TestResetClientCredentials(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(saWithClientCreds, nil)
-				m.caller.On("IsAdmin").Return(false)
+				m.caller.On("IsAdminModeActivated").Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
 						ServiceAccountID: &serviceAccountID,
@@ -1361,7 +1361,7 @@ func TestResetClientCredentials(t *testing.T) {
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(saWithoutClientCreds, nil)
 				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
-				m.caller.On("IsAdmin").Return(false)
+				m.caller.On("IsAdminModeActivated").Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
 						ServiceAccountID: &serviceAccountID,

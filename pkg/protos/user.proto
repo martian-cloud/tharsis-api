@@ -7,6 +7,7 @@ option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pk
 import "metadata.proto";
 import "pagination.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 // Users implements all functionality related to a Tharsis User.
 service Users {
@@ -18,7 +19,18 @@ service Users {
   rpc CreateUser(CreateUserRequest) returns (User);
   // DeleteUser deletes a User.
   rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
+  // ActivateAdminMode activates admin mode for the calling user.
+  rpc ActivateAdminMode(ActivateAdminModeRequest) returns (User);
+  // DeactivateAdminMode deactivates admin mode for the calling user.
+  rpc DeactivateAdminMode(google.protobuf.Empty) returns (User);
 }
+
+// ActivateAdminModeRequest is the input for activating admin mode.
+message ActivateAdminModeRequest {
+  // Duration in minutes. Defaults to 30, maximum 360 (6 hours).
+  optional int32 duration_minutes = 1;
+}
+
 
 // UserSortableField defines enums that allow sorting a paginated list of Users.
 enum UserSortableField {
@@ -53,12 +65,13 @@ message DeleteUserRequest {
 
 // User defines a user within Tharsis.
 message User {
-  metadata.ResourceMetadata metadata         = 1;
-  string                    username         = 2;
-  string                    email            = 3;
-  bool                      admin            = 4;
-  bool                      active           = 5;
-  string                    scim_external_id = 6;
+  metadata.ResourceMetadata          metadata              = 1;
+  string                             username              = 2;
+  string                             email                 = 3;
+  bool                               admin                 = 4;
+  bool                               active                = 5;
+  string                             scim_external_id      = 6;
+  optional google.protobuf.Timestamp admin_mode_expiration = 7;
 }
 
 // GetUsersResponse is the paginated list of Users.

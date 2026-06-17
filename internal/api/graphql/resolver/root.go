@@ -1469,6 +1469,28 @@ func (r RootResolver) DisableMaintenanceMode(ctx context.Context,
 	return response, nil
 }
 
+// ActivateAdminMode activates admin mode for the current user
+func (r RootResolver) ActivateAdminMode(ctx context.Context,
+	args *struct{ Input ActivateAdminModeInput },
+) (*UserMutationPayloadResolver, error) {
+	response, err := activateAdminModeMutation(ctx, &args.Input)
+	if err != nil {
+		return handleUserMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// DeactivateAdminMode deactivates admin mode for the current user
+func (r RootResolver) DeactivateAdminMode(ctx context.Context,
+	args *struct{ Input DeactivateAdminModeInput },
+) (*UserMutationPayloadResolver, error) {
+	response, err := deactivateAdminModeMutation(ctx, &args.Input)
+	if err != nil {
+		return handleUserMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
 /* Announcement Queries and Mutations */
 
 // Announcements returns a list of announcements

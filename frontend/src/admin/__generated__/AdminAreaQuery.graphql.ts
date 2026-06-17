@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<868b10f93aae5b04a2c0ffee3b88ba94>>
+ * @generated SignedSource<<e36a3e417501a858c012ec8445e71f6b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -65,6 +65,13 @@ const node: ConcreteRequest = {
                 "kind": "ScalarField",
                 "name": "admin",
                 "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "adminModeEnabled",
+                "storageKey": null
               }
             ],
             "type": "User",
@@ -90,12 +97,12 @@ const node: ConcreteRequest = {
     ]
   },
   "params": {
-    "cacheID": "b473416c6574c12076772b9d61c0cb27",
+    "cacheID": "f991fdaca304a7040456d919927bc721",
     "id": null,
     "metadata": {},
     "name": "AdminAreaQuery",
     "operationKind": "query",
-    "text": "query AdminAreaQuery {\n  ...AdminAreaEntryPointFragment_me\n}\n\nfragment AdminAreaEntryPointFragment_me on Query {\n  me {\n    __typename\n    ... on User {\n      admin\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "query AdminAreaQuery {\n  ...AdminAreaEntryPointFragment_me\n}\n\nfragment AdminAreaEntryPointFragment_me on Query {\n  me {\n    __typename\n    ... on User {\n      admin\n      adminModeEnabled\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 

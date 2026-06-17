@@ -3,6 +3,7 @@ package scim
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -50,8 +51,9 @@ func TestCreateSCIMToken(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: "user-1",
 					},
-					Email: "user-1@example.com",
-					Admin: true,
+					Email:               "user-1@example.com",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			existingTokens: []models.SCIMToken{existingToken},
@@ -79,8 +81,9 @@ func TestCreateSCIMToken(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: resourceUUID,
 					},
-					Email: "admin@example.com",
-					Admin: true,
+					Email:               "admin@example.com",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			existingTokens:  []models.SCIMToken{},

@@ -124,7 +124,7 @@ func TestEnableMaintenanceMode(t *testing.T) {
 			mockMaintenanceModes := db.NewMockMaintenanceModes(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("IsAdmin").Return(test.isAdmin)
+			mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
 
 			if test.expectCreated {
 				mockCaller.On("GetSubject").Return(testSubject)
@@ -195,7 +195,7 @@ func TestDisableMaintenanceMode(t *testing.T) {
 			mockMaintenanceModes := db.NewMockMaintenanceModes(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("IsAdmin").Return(test.isAdmin)
+			mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
 
 			if test.isAdmin {
 				mockMaintenanceModes.On("GetMaintenanceMode", mock.Anything).Return(test.existingMaintenanceMode, nil)

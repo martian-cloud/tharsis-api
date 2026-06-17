@@ -265,4 +265,10 @@ type Mutation {
   ): CreateAgentSessionPayload!
   createAgentRun(input: CreateAgentRunInput!): CreateAgentRunPayload!
   cancelAgentRun(input: CancelAgentRunInput!): CancelAgentRunPayload!
+  activateAdminMode(
+    input: ActivateAdminModeInput!
+  ): UpdateUserAdminStatusPayload!
+  deactivateAdminMode(
+    input: DeactivateAdminModeInput!
+  ): UpdateUserAdminStatusPayload!
 }

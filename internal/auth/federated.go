@@ -125,8 +125,8 @@ func (f *FederatedRegistryCaller) GetSubject() string {
 	return f.subject
 }
 
-// IsAdmin returns true if the caller is an admin
-func (f *FederatedRegistryCaller) IsAdmin() bool {
+// IsAdminModeActivated returns true if the caller is an admin
+func (f *FederatedRegistryCaller) IsAdminModeActivated() bool {
 	return false
 }
 

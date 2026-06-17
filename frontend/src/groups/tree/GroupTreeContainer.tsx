@@ -43,7 +43,7 @@ function GroupTreeContainer(props: Props) {
         {
             me {
                 ...on User {
-                    admin
+                    adminModeEnabled
                 }
             }
         }
@@ -111,7 +111,7 @@ function GroupTreeContainer(props: Props) {
         [environment, refetch],
     );
 
-    const isAdmin = userData.me?.admin;
+    const isAdmin = userData.me?.adminModeEnabled;
 
     const onSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         fetch(event.target.value.toLowerCase());

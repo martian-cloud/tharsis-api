@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<de286a8837ef509ef5598a039fc03964>>
+ * @generated SignedSource<<d3c6780a5f1d2df906c1ab9891ac5fd8>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,7 +12,7 @@ import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type GroupTreeContainerFragment_me$data = {
   readonly me: {
-    readonly admin?: boolean;
+    readonly adminModeEnabled?: boolean;
   } | null | undefined;
   readonly " $fragmentType": "GroupTreeContainerFragment_me";
 };
@@ -42,7 +42,7 @@ const node: ReaderFragment = {
               "alias": null,
               "args": null,
               "kind": "ScalarField",
-              "name": "admin",
+              "name": "adminModeEnabled",
               "storageKey": null
             }
           ],
@@ -57,6 +57,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "9b2ec4ef3e8a368e1c21071091757c12";
+(node as any).hash = "6ae848ebd40c7846cc0df9109ca41a0e";
 
 export default node;

@@ -3,6 +3,7 @@ package user
 
 import (
 	"context"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
@@ -131,6 +132,18 @@ type DeleteNamespaceFavoriteInput struct {
 	NamespaceType namespace.Type
 }
 
+const (
+	// DefaultAdminModeDuration is the default admin mode duration.
+	DefaultAdminModeDuration = 30 * time.Minute
+	// MaxAdminModeDuration is the maximum allowed admin mode duration.
+	MaxAdminModeDuration = 6 * time.Hour
+)
+
+// ActivateAdminModeInput is the input for activating admin mode.
+type ActivateAdminModeInput struct {
+	Duration *time.Duration
+}
+
 // Service implements all user related functionality
 type Service interface {
 	GetUserByID(ctx context.Context, userID string) (*models.User, error)
@@ -152,6 +165,8 @@ type Service interface {
 	GetNamespaceFavorites(ctx context.Context, input *GetNamespaceFavoritesInput) (*db.NamespaceFavoritesResult, error)
 	CreateNamespaceFavorite(ctx context.Context, input *CreateNamespaceFavoriteInput) (*models.NamespaceFavorite, error)
 	DeleteNamespaceFavorite(ctx context.Context, input *DeleteNamespaceFavoriteInput) error
+	ActivateAdminMode(ctx context.Context, input *ActivateAdminModeInput) (*models.User, error)
+	DeactivateAdminMode(ctx context.Context) (*models.User, error)
 }
 
 type service struct {
@@ -423,7 +438,7 @@ func (s *service) GetUserSessions(ctx context.Context, input *GetUserSessionsInp
 	}
 
 	// Only admins or the current user can query user sessions
-	if !userCaller.IsAdmin() && userCaller.User.Metadata.ID != input.UserID {
+	if !userCaller.IsAdminModeActivated() && userCaller.User.Metadata.ID != input.UserID {
 		return nil, errors.New("only admins or the current user can query user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -466,7 +481,7 @@ func (s *service) GetUserSessionByID(ctx context.Context, userSessionID string) 
 	}
 
 	// Only admins or the session owner can access the user session
-	if !userCaller.IsAdmin() && userCaller.User.Metadata.ID != userSession.UserID {
+	if !userCaller.IsAdminModeActivated() && userCaller.User.Metadata.ID != userSession.UserID {
 		return nil, errors.New("only admins or the session owner can access user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -498,7 +513,7 @@ func (s *service) GetUserSessionByTRN(ctx context.Context, trn string) (*models.
 	}
 
 	// Only admins or the session owner can access the user session
-	if !userCaller.IsAdmin() && userCaller.User.Metadata.ID != userSession.UserID {
+	if !userCaller.IsAdminModeActivated() && userCaller.User.Metadata.ID != userSession.UserID {
 		return nil, errors.New("only admins or the session owner can access user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -521,8 +536,8 @@ func (s *service) UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdm
 		return nil, errors.New("only users can update admin status for other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
-	if !userCaller.IsAdmin() {
-		return nil, errors.New("only admins users can alter admin status of other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	if !userCaller.IsAdminModeActivated() {
+		return nil, errors.New("only admins with admin mode activated can alter admin status of other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
 	// Nothing wrong with this just prevents accidental changes to self.
@@ -553,6 +568,11 @@ func (s *service) UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdm
 	}
 
 	user.Admin = input.Admin
+
+	// If revoking admin rights, clear admin mode expiration.
+	if !input.Admin && user.AdminModeExpiration != nil {
+		user.AdminModeExpiration = nil
+	}
 
 	updateUser, err := s.dbClient.Users.UpdateUser(ctx, user)
 	if err != nil {
@@ -593,7 +613,7 @@ func (s *service) RevokeUserSession(ctx context.Context, input *RevokeUserSessio
 	}
 
 	// Only admins or the session owner can revoke the user session
-	if !userCaller.IsAdmin() && userCaller.User.Metadata.ID != userSession.UserID {
+	if !userCaller.IsAdminModeActivated() && userCaller.User.Metadata.ID != userSession.UserID {
 		return errors.New("only admins or the session owner can revoke user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -619,8 +639,8 @@ func (s *service) CreateUser(ctx context.Context, input *CreateUserInput) (*mode
 		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
 	}
 
-	if !caller.IsAdmin() {
-		return nil, errors.New("only admin users can create other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	if !caller.IsAdminModeActivated() {
+		return nil, errors.New("only admins with admin mode activated can create other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
 	user := &models.User{
@@ -663,8 +683,8 @@ func (s *service) DeleteUser(ctx context.Context, input *DeleteUserInput) error 
 		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
 	}
 
-	if !caller.IsAdmin() {
-		return errors.New("only admin users can delete other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	if !caller.IsAdminModeActivated() {
+		return errors.New("only admins with admin mode activated can delete other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -986,4 +1006,89 @@ func (s *service) DeleteNamespaceFavorite(ctx context.Context, input *DeleteName
 		return errors.Wrap(err, "failed to delete namespace favorite", errors.WithSpan(span))
 	}
 	return nil
+}
+
+func (s *service) ActivateAdminMode(ctx context.Context, input *ActivateAdminModeInput) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "svc.ActivateAdminMode")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can activate admin mode", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	if !userCaller.User.Admin {
+		return nil, errors.New("only admin users can activate admin mode", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	duration := DefaultAdminModeDuration
+	if input.Duration != nil {
+		duration = *input.Duration
+	}
+
+	if duration <= 0 {
+		return nil, errors.New("duration must be greater than zero", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+	if duration > MaxAdminModeDuration {
+		return nil, errors.New("duration cannot exceed 6 hours", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	expiration := time.Now().UTC().Add(duration)
+
+	userToUpdate := *userCaller.User
+	userToUpdate.AdminModeExpiration = &expiration
+
+	updatedUser, err := s.dbClient.Users.UpdateUser(ctx, &userToUpdate)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update user", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Admin mode activated",
+		"userID", userCaller.User.Metadata.ID,
+		"email", userCaller.User.Email,
+		"duration", duration.String(),
+		"expiresAt", expiration,
+	)
+
+	return updatedUser, nil
+}
+
+func (s *service) DeactivateAdminMode(ctx context.Context) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "svc.DeactivateAdminMode")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can deactivate admin mode", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	if userCaller.User.AdminModeExpiration == nil {
+		return nil, errors.New("admin mode is not active", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	userToUpdate := *userCaller.User
+	userToUpdate.AdminModeExpiration = nil
+
+	updatedUser, err := s.dbClient.Users.UpdateUser(ctx, &userToUpdate)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update user", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Admin mode deactivated",
+		"userID", userCaller.User.Metadata.ID,
+		"email", userCaller.User.Email,
+		"reason", "manual",
+	)
+
+	return updatedUser, nil
 }

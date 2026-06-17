@@ -2,6 +2,7 @@ package models
 
 import (
 	"net/mail"
+	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
@@ -13,18 +14,24 @@ var _ Model = (*User)(nil)
 
 // User represents a human user account
 type User struct {
-	Username       string
-	Email          string
-	PasswordHash   []byte
-	SCIMExternalID string
-	Metadata       ResourceMetadata
-	Admin          bool
-	Active         bool
+	Username            string
+	Email               string
+	PasswordHash        []byte
+	SCIMExternalID      string
+	Metadata            ResourceMetadata
+	Admin               bool
+	Active              bool
+	AdminModeExpiration *time.Time
 }
 
 // GetID returns the Metadata ID.
 func (u *User) GetID() string {
 	return u.Metadata.ID
+}
+
+// IsAdminModeActive returns true if admin mode is currently active for this user.
+func (u *User) IsAdminModeActive() bool {
+	return u.Admin && u.AdminModeExpiration != nil && u.AdminModeExpiration.After(time.Now().UTC())
 }
 
 // GetGlobalID returns the Metadata ID as a GID.

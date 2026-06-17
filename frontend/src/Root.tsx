@@ -21,6 +21,8 @@ const query = graphql`
                 username
                 email
                 admin
+                adminModeEnabled
+                adminModeExpiration
             }
         }
         config {

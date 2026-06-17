@@ -1,3 +1,7 @@
+input ActivateAdminModeInput {
+  durationMinutes: Int
+}
+
 type ActivityEvent implements Node {
   action: ActivityEventAction!
   id: ID!
@@ -1044,6 +1048,10 @@ type CreateWorkspaceVCSProviderLinkPayload {
   webhookUrl: String
 }
 
+input DeactivateAdminModeInput {
+  clientMutationId: String
+}
+
 input DeleteAnnouncementInput {
   clientMutationId: String
   id: ID!
@@ -1764,6 +1772,7 @@ type MoveManagedIdentityPayload {
 
 """The Mutation type represents all of the entry points into the API."""
 type Mutation {
+  activateAdminMode(input: ActivateAdminModeInput!): UpdateUserAdminStatusPayload!
   addUserToTeam(input: AddUserToTeamInput): AddUserToTeamPayload!
   applyRun(input: ApplyRunInput!): RunMutationPayload!
   assessWorkspace(input: AssessWorkspaceInput!): AssessWorkspacePayload!
@@ -1808,6 +1817,7 @@ type Mutation {
   createVCSRun(input: CreateVCSRunInput!): CreateVCSRunPayload!
   createWorkspace(input: CreateWorkspaceInput!): CreateWorkspacePayload!
   createWorkspaceVCSProviderLink(input: CreateWorkspaceVCSProviderLinkInput!): CreateWorkspaceVCSProviderLinkPayload!
+  deactivateAdminMode(input: DeactivateAdminModeInput!): UpdateUserAdminStatusPayload!
   deleteAnnouncement(input: DeleteAnnouncementInput!): DeleteAnnouncementPayload!
   deleteFederatedRegistry(input: DeleteFederatedRegistryInput!): FederatedRegistryMutationPayload!
   deleteGPGKey(input: DeleteGPGKeyInput!): DeleteGPGKeyPayload!
@@ -3405,6 +3415,8 @@ type User implements Node {
   active: Boolean!
   activityEvents(actions: [ActivityEventAction!], after: String, before: String, first: Int, last: Int, namespacePath: String, sort: ActivityEventSort, targetTypes: [ActivityEventTargetType!], timeRangeEnd: Time, timeRangeStart: Time): ActivityEventConnection!
   admin: Boolean!
+  adminModeEnabled: Boolean!
+  adminModeExpiration: Time
   agentCreditUsage: Float!
   email: String!
   id: ID!

@@ -3,6 +3,7 @@ package role
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -307,8 +308,9 @@ func TestCreateRole(t *testing.T) {
 			name: "successfully create a role",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Admin: true,
-					Email: "user@email",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+					Email:               "user@email",
 				},
 			},
 			input: &CreateRoleInput{
@@ -328,7 +330,8 @@ func TestCreateRole(t *testing.T) {
 			name: "permissions are not assignable",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Admin: true,
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &CreateRoleInput{
@@ -435,8 +438,9 @@ func TestUpdateRole(t *testing.T) {
 			name: "successfully update a role",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Admin: true,
-					Email: "user@email",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+					Email:               "user@email",
 				},
 			},
 			input: &UpdateRoleInput{
@@ -463,7 +467,8 @@ func TestUpdateRole(t *testing.T) {
 			name: "permissions are not assignable",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Admin: true,
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &UpdateRoleInput{
@@ -483,7 +488,8 @@ func TestUpdateRole(t *testing.T) {
 			name: "updating a default role",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Admin: true,
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &UpdateRoleInput{
@@ -590,8 +596,9 @@ func TestDeleteRole(t *testing.T) {
 			name: "successfully delete a role without force option",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Admin: true,
-					Email: "user@email",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+					Email:               "user@email",
 				},
 			},
 			input: &DeleteRoleInput{
@@ -606,8 +613,9 @@ func TestDeleteRole(t *testing.T) {
 			name: "successfully deleting a role associated with namespace memberships with force option",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Admin: true,
-					Email: "user@email",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+					Email:               "user@email",
 				},
 			},
 			memberships: []models.NamespaceMembership{{}, {}},
@@ -624,8 +632,9 @@ func TestDeleteRole(t *testing.T) {
 			name: "deleting a role associated with namespace memberships without force option",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Admin: true,
-					Email: "user@email",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+					Email:               "user@email",
 				},
 			},
 			memberships: []models.NamespaceMembership{{}, {}},
@@ -642,7 +651,8 @@ func TestDeleteRole(t *testing.T) {
 			name: "deleting a default role",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Admin: true,
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &DeleteRoleInput{

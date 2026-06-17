@@ -45,6 +45,7 @@ function AdminArea({ queryRef }: Props) {
                 me {
                     ... on User {
                         admin
+                        adminModeEnabled
                     }
                 }
             }`,
@@ -58,7 +59,7 @@ function AdminArea({ queryRef }: Props) {
     }, [location]);
 
     return (
-        data.me?.admin ?
+        data.me?.adminModeEnabled ?
             <Box display="flex">
                 <AdminDetailsDrawer />
                 <Box component="main" sx={{ flexGrow: 1 }}>

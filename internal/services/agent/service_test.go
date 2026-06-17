@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/m-mizutani/gollem"
@@ -40,10 +41,11 @@ var (
 	}
 
 	adminUser = &models.User{
-		Metadata: models.ResourceMetadata{ID: sampleUserID},
-		Username: "adminuser",
-		Email:    "admin@example.com",
-		Admin:    true,
+		Metadata:            models.ResourceMetadata{ID: sampleUserID},
+		Username:            "adminuser",
+		Email:               "admin@example.com",
+		Admin:               true,
+		AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 	}
 
 	sampleSession = &models.AgentSession{
@@ -639,7 +641,7 @@ func TestGetAgentTrace(t *testing.T) {
 			testLogger, _ := logger.NewForTest()
 
 			if test.caller != nil {
-				if uc, ok := test.caller.(*auth.UserCaller); ok && uc.IsAdmin() {
+				if uc, ok := test.caller.(*auth.UserCaller); ok && uc.IsAdminModeActivated() {
 					mockRuns.On("GetAgentSessionRunByID", mock.Anything, sampleRunID).Return(sampleRun, nil)
 					mockStore.On("GetTrace", mock.Anything, sampleSessionID, sampleRunID).Return(traceData, nil)
 				}

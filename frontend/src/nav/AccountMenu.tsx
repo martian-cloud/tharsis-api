@@ -7,7 +7,7 @@ import Popover from '@mui/material/Popover';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import { Link } from 'react-router-dom';
-import React, { useContext, useState } from 'react';
+import { useContext, useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import AuthServiceContext from '../auth/AuthServiceContext';
 import AuthenticationService from '../auth/AuthenticationService';
@@ -17,6 +17,8 @@ import { AccountMenuFragment$key } from './__generated__/AccountMenuFragment.gra
 import AboutDialog from './AboutDialog';
 import { ApiConfigContext } from '../ApiConfigContext';
 import { UserContext } from '../UserContext';
+import DeactivateAdminModeListItem from './DeactivateAdminModeListItem';
+import ActivateAdminModeDialog from '../admin/ActivateAdminModeDialog';
 
 interface Props {
     fragmentRef: AccountMenuFragment$key
@@ -25,9 +27,11 @@ interface Props {
 function AccountMenu({ fragmentRef }: Props) {
     const authService = useContext<AuthenticationService>(AuthServiceContext);
     const [showAboutDialog, setShowAboutDialog] = useState(false);
+    const [showActivateDialog, setShowActivateDialog] = useState(false);
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const apiConfig = useContext(ApiConfigContext);
     const user = useContext(UserContext);
+
 
     const data = useFragment<AccountMenuFragment$key>(
         graphql`
@@ -81,9 +85,13 @@ function AccountMenu({ fragmentRef }: Props) {
                         <ListItemButton component={Link} to="/preferences" onClick={onMenuClose}>
                             <ListItemText primary="Preferences" />
                         </ListItemButton>
-                        {user.admin && <ListItemButton component={Link} to="/admin" onClick={onMenuClose}>
+                        {user.admin && !user.adminModeEnabled && <ListItemButton onClick={() => setShowActivateDialog(true)}>
+                            <ListItemText primary="Activate Admin Mode" />
+                        </ListItemButton>}
+                        {user.adminModeEnabled && <ListItemButton component={Link} to="/admin" onClick={onMenuClose}>
                             <ListItemText primary="Admin Area" />
                         </ListItemButton>}
+                        {user.adminModeEnabled && user.adminModeExpiration && <DeactivateAdminModeListItem expiresAt={user.adminModeExpiration} onMenuClose={onMenuClose} />}
                         <ListItemButton component={Link} to="/graphiql" onClick={onMenuClose}>
                             <ListItemText primary="GraphQL Editor" />
                         </ListItemButton>
@@ -137,6 +145,10 @@ function AccountMenu({ fragmentRef }: Props) {
                 dbMigrationVersion={data.version.dbMigrationVersion}
                 dbMigrationDirty={data.version.dbMigrationDirty}
                 onClose={() => setShowAboutDialog(false)}
+            />}
+            {showActivateDialog && <ActivateAdminModeDialog
+                open={showActivateDialog}
+                onClose={() => { setShowActivateDialog(false); onMenuClose(); }}
             />}
         </div>
     );

@@ -3,6 +3,7 @@ package resourcelimit
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -143,8 +144,9 @@ func TestUpdateResourceLimit(t *testing.T) {
 						Metadata: models.ResourceMetadata{
 							ID: userMemberID,
 						},
-						Admin:    true,
-						Username: "user1",
+						Admin:               true,
+						AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+						Username:            "user1",
 					},
 					&mockAuthorizer,
 					dbClient,

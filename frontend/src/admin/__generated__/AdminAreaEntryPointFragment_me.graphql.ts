@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<19f11f7f4f082fe046cbb5fa772440cb>>
+ * @generated SignedSource<<44fdb4bb6ff3f53f38a1fb00c05e566e>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -13,6 +13,7 @@ import { FragmentRefs } from "relay-runtime";
 export type AdminAreaEntryPointFragment_me$data = {
   readonly me: {
     readonly admin?: boolean;
+    readonly adminModeEnabled?: boolean;
   } | null | undefined;
   readonly " $fragmentType": "AdminAreaEntryPointFragment_me";
 };
@@ -44,6 +45,13 @@ const node: ReaderFragment = {
               "kind": "ScalarField",
               "name": "admin",
               "storageKey": null
+            },
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "adminModeEnabled",
+              "storageKey": null
             }
           ],
           "type": "User",
@@ -57,6 +65,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "12d0c4ac8b2e300df4508b9b64aebdec";
+(node as any).hash = "6288918c6778ea5e93bbddcb5b6f7411";
 
 export default node;
