@@ -7,7 +7,6 @@ package auth
 import (
 	"context"
 	"fmt"
-
 	"github.com/aws/smithy-go/ptr"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -153,7 +152,6 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 		}
 
 		sessionGID := output.PrivateClaims[SessionIDClaim]
-
 		return NewUserCaller(
 			user,
 			newNamespaceMembershipAuthorizer(t.dbClient, &user.Metadata.ID, nil, useCache),

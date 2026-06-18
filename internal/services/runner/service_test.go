@@ -396,7 +396,7 @@ func TestGetRunners(t *testing.T) {
 
 			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunnerPermission, mock.Anything).
 				Return(test.authError).Maybe()
-			mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
+			mockCaller.On("IsAdminModeActivated").Return(test.isAdmin).Maybe()
 
 			mockRunners := db.NewMockRunners(t)
 
@@ -530,7 +530,7 @@ func TestCreateRunner(t *testing.T) {
 			mockCaller.Test(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunnerPermission, mock.Anything).Return(test.authError)
-			mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
+			mockCaller.On("IsAdminModeActivated").Return(test.isAdmin).Maybe()
 
 			mockCaller.On("GetSubject").Return("mockSubject")
 
@@ -988,7 +988,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 			}
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunnerPermission, mock.Anything).Return(test.authError).Maybe()
-			mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
+			mockCaller.On("IsAdminModeActivated").Return(test.isAdmin).Maybe()
 
 			if test.expectErrCode == "" {
 				mockServiceAccounts.On("AssignServiceAccountToRunner", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -1082,7 +1082,7 @@ func TestUnassignServiceAccountFromRunner(t *testing.T) {
 				if test.runner.Type.Equals(models.GroupRunnerType) {
 					mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunnerPermission, mock.Anything).Return(test.authError)
 				} else {
-					mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
+					mockCaller.On("IsAdminModeActivated").Return(test.isAdmin).Maybe()
 				}
 			}
 
@@ -1344,7 +1344,7 @@ func TestGetRunnerSessions(t *testing.T) {
 						mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 						Return(test.authError)
 				} else {
-					mockCaller.On("IsAdmin").Return(test.isAdmin)
+					mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
 				}
 			}
 
@@ -1443,7 +1443,7 @@ func TestGetRunnerSessionByID(t *testing.T) {
 						mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 						Return(test.authError)
 				} else {
-					mockCaller.On("IsAdmin").Return(test.isAdmin)
+					mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
 				}
 			}
 
@@ -1549,7 +1549,7 @@ func TestGetRunnerSessionByTRN(t *testing.T) {
 				if test.runnerType == models.GroupRunnerType {
 					mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).Return(test.authError)
 				} else {
-					mockCaller.On("IsAdmin").Return(test.isAdmin)
+					mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
 				}
 			}
 
@@ -1813,7 +1813,7 @@ func TestReadRunnerSessionErrorLog(t *testing.T) {
 						mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 						Return(test.authError)
 				} else {
-					mockCaller.On("IsAdmin").Return(test.isAdmin)
+					mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
 				}
 			}
 
@@ -1932,7 +1932,7 @@ func TestGetLogStreamsByRunnerSessionIDs(t *testing.T) {
 						mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 						Return(test.authError)
 				} else {
-					mockCaller.On("IsAdmin").Return(test.isAdmin)
+					mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
 				}
 			}
 
@@ -2076,7 +2076,7 @@ func TestSubscribeToRunnerSessionErrorLog(t *testing.T) {
 						mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 						Return(test.authError)
 				} else {
-					mockCaller.On("IsAdmin").Return(test.isAdmin)
+					mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
 				}
 			}
 
@@ -2339,9 +2339,9 @@ func TestSubscribeToRunnerSessions(t *testing.T) {
 				mockCaller.On("RequireAccessToInheritableResource",
 					mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 					Return(test.authError).Maybe()
-				mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
+				mockCaller.On("IsAdminModeActivated").Return(test.isAdmin).Maybe()
 			} else {
-				mockCaller.On("IsAdmin").Return(test.isAdmin)
+				mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
 			}
 
 			for _, e := range test.sendEventData {

@@ -3,6 +3,7 @@ package federatedregistry
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -554,7 +555,14 @@ func TestGetFederatedRegistries(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: "user-1-id",
 					},
-					Admin:    test.isAdmin,
+					Admin: test.isAdmin,
+					AdminModeExpiration: func() *time.Time {
+						if test.isAdmin {
+							t := time.Now().Add(time.Hour)
+							return &t
+						}
+						return nil
+					}(),
 					Username: "user1",
 				},
 				&mockAuthorizer,

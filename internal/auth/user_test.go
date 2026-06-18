@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
@@ -21,24 +22,39 @@ func TestUserCaller_GetSubject(t *testing.T) {
 
 func TestUserCaller_IsAdmin(t *testing.T) {
 	caller := UserCaller{User: &models.User{}}
-	assert.False(t, caller.IsAdmin())
+	assert.False(t, caller.IsAdminModeActivated())
 
 	caller.User.Admin = true
-	assert.True(t, caller.IsAdmin())
+	caller.User.AdminModeExpiration = func() *time.Time { t := time.Now().Add(time.Hour); return &t }()
+	assert.True(t, caller.IsAdminModeActivated())
 }
 
 func TestUserCaller_GetNamespaceAccessPolicy(t *testing.T) {
 	caller := UserCaller{User: &models.User{}}
 	ctx := WithCaller(context.Background(), &caller)
 
-	// Admin case.
+	// Admin case with admin mode active.
 	caller.User.Admin = true
+	expiration := time.Now().Add(time.Hour)
+	caller.User.AdminModeExpiration = &expiration
 	policy, err := caller.GetNamespaceAccessPolicy(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, &NamespaceAccessPolicy{AllowAll: true}, policy)
 
+	// Admin without admin mode — should NOT get AllowAll.
+	caller.User.Admin = true
+	caller.User.AdminModeExpiration = nil
+	mockAuthorizer2 := NewMockAuthorizer(t)
+	mockAuthorizer2.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{{ID: "nm-2"}}, nil)
+	caller.authorizer = mockAuthorizer2
+
+	policy, err = caller.GetNamespaceAccessPolicy(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, &NamespaceAccessPolicy{AllowAll: false, RootNamespaceIDs: []string{"nm-2"}}, policy)
+
 	// Non-admin case.
 	caller.User.Admin = false
+	caller.User.AdminModeExpiration = nil
 	membershipNamespaceID := "nm-1"
 
 	mockAuthorizer := NewMockAuthorizer(t)
@@ -62,6 +78,7 @@ func TestUserCaller_RequirePermissions(t *testing.T) {
 		perm              models.Permission
 		constraints       []func(*constraints)
 		isAdmin           bool
+		isAdminNoMode     bool
 		withAuthorizer    bool
 		inMaintenanceMode bool
 	}{
@@ -82,6 +99,12 @@ func TestUserCaller_RequirePermissions(t *testing.T) {
 			name:    "permissions are only granted since user is admin",
 			perm:    models.CreateTeamPermission,
 			isAdmin: true,
+		},
+		{
+			name:            "admin without active admin mode is denied assignable permission",
+			perm:            models.CreateTeamPermission,
+			isAdminNoMode:   true,
+			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access forbidden because user must be an admin",
@@ -152,8 +175,14 @@ func TestUserCaller_RequirePermissions(t *testing.T) {
 				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{test.perm}, mock.Anything).Return(requireAccessAuthorizerFunc)
 			}
 
-			caller.User.Admin = test.isAdmin
+			caller.User.Admin = test.isAdmin || test.isAdminNoMode
 			caller.authorizer = mockAuthorizer
+			if test.isAdmin {
+				t := time.Now().Add(time.Hour)
+				caller.User.AdminModeExpiration = &t
+			} else {
+				caller.User.AdminModeExpiration = nil
+			}
 			caller.maintenanceMonitor = mockMaintenanceMonitor
 			caller.dbClient = &db.Client{TeamMembers: mockTeamMembers}
 
@@ -178,6 +207,7 @@ func TestUserCaller_RequireInheritedPermissions(t *testing.T) {
 		modelType       types.ModelType
 		constraints     []func(*constraints)
 		isAdmin         bool
+		isAdminNoMode   bool
 		withAuthorizer  bool
 	}{
 		{
@@ -199,6 +229,13 @@ func TestUserCaller_RequireInheritedPermissions(t *testing.T) {
 			isAdmin:   true,
 		},
 		{
+			name:           "admin without admin mode falls through to authorizer",
+			modelType:      types.GPGKeyModelType,
+			isAdminNoMode:  true,
+			constraints:    []func(*constraints){WithGroupID("group1")},
+			withAuthorizer: true,
+		},
+		{
 			name:            "access denied because required constraints are not specified",
 			modelType:       types.TerraformModuleModelType,
 			expectErrorCode: errors.EInternal,
@@ -215,8 +252,14 @@ func TestUserCaller_RequireInheritedPermissions(t *testing.T) {
 			}
 
 			caller.authorizer = mockAuthorizer
-			caller.User.Admin = test.isAdmin
+			caller.User.Admin = test.isAdmin || test.isAdminNoMode
 
+			if test.isAdmin {
+				t := time.Now().Add(time.Hour)
+				caller.User.AdminModeExpiration = &t
+			} else {
+				caller.User.AdminModeExpiration = nil
+			}
 			err := caller.RequireAccessToInheritableResource(ctx, test.modelType, test.constraints...)
 			if test.expectErrorCode != "" {
 				require.NotNil(t, err)
@@ -236,11 +279,16 @@ func TestUserCaller_RequireRole(t *testing.T) {
 		name            string
 		expectErrorCode errors.CodeType
 		isAdmin         bool
+		isAdminNoMode   bool
 		authorizerError error
 	}{
 		{
 			name:    "admin bypasses role check",
 			isAdmin: true,
+		},
+		{
+			name:          "admin without admin mode falls through to authorizer",
+			isAdminNoMode: true,
 		},
 		{
 			name: "non-admin delegates to authorizer",
@@ -260,8 +308,14 @@ func TestUserCaller_RequireRole(t *testing.T) {
 				mockAuthorizer.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).Return(test.authorizerError)
 			}
 
-			caller.User.Admin = test.isAdmin
+			caller.User.Admin = test.isAdmin || test.isAdminNoMode
 			caller.authorizer = mockAuthorizer
+			if test.isAdmin {
+				t := time.Now().Add(time.Hour)
+				caller.User.AdminModeExpiration = &t
+			} else {
+				caller.User.AdminModeExpiration = nil
+			}
 
 			err := caller.RequireRole(ctx, models.OwnerRoleID.String(), WithNamespacePaths([]string{"ns1"}))
 			if test.expectErrorCode != "" {

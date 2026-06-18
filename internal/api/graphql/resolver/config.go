@@ -429,7 +429,7 @@ func configQuery(ctx context.Context) (*ConfigResolver, error) {
 
 	config := getConfig(ctx)
 
-	if !caller.IsAdmin() {
+	if !caller.IsAdminModeActivated() {
 		config = filterSensitiveFields(*config)
 	}
 

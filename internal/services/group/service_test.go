@@ -3,6 +3,7 @@ package group
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -205,7 +206,7 @@ func TestCreateTopLevelGroup(t *testing.T) {
 				RunnerTags: []string{"tag1"},
 			},
 			caller: &auth.UserCaller{
-				User: &models.User{Metadata: models.ResourceMetadata{ID: "user1"}, Admin: true},
+				User: &models.User{Metadata: models.ResourceMetadata{ID: "user1"}, Admin: true, AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }()},
 			},
 		},
 		{
@@ -837,8 +838,9 @@ func TestGetGroups(t *testing.T) {
 						Metadata: models.ResourceMetadata{
 							ID: userMemberID,
 						},
-						Admin:    true,
-						Username: "user1",
+						Admin:               true,
+						AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+						Username:            "user1",
 					},
 					&mockAuthorizer,
 					dbClient.Client,
@@ -1294,7 +1296,14 @@ func TestMigrateGroup(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: "123",
 					},
-					Admin:    test.isUserAdmin,
+					Admin: test.isUserAdmin,
+					AdminModeExpiration: func() *time.Time {
+						if test.isUserAdmin {
+							t := time.Now().Add(time.Hour)
+							return &t
+						}
+						return nil
+					}(),
 					Username: "user1",
 				},
 				&mockAuthorizer,

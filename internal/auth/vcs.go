@@ -39,8 +39,8 @@ func (v *VCSWorkspaceLinkCaller) GetSubject() string {
 	return v.Provider.GetResourcePath()
 }
 
-// IsAdmin returns true if the caller is an admin.
-func (v *VCSWorkspaceLinkCaller) IsAdmin() bool {
+// IsAdminModeActivated returns true if the caller is an admin.
+func (v *VCSWorkspaceLinkCaller) IsAdminModeActivated() bool {
 	return false
 }
 

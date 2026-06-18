@@ -89,7 +89,7 @@ type users struct {
 	dbClient *Client
 }
 
-var userFieldList = append(metadataFieldList, "username", "email", "admin", "scim_external_id", "active", "password_hash")
+var userFieldList = append(metadataFieldList, "username", "email", "admin", "scim_external_id", "active", "password_hash", "admin_mode_expiration")
 
 // NewUsers returns an instance of the Users interface
 func NewUsers(dbClient *Client) Users {
@@ -332,14 +332,15 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 		Prepared(true).
 		Set(
 			goqu.Record{
-				"version":          goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":       timestamp,
-				"username":         user.Username,
-				"email":            user.Email,
-				"scim_external_id": nullableString(user.SCIMExternalID),
-				"active":           user.Active,
-				"admin":            user.Admin,
-				"password_hash":    user.PasswordHash,
+				"version":               goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":            timestamp,
+				"username":              user.Username,
+				"email":                 user.Email,
+				"scim_external_id":      nullableString(user.SCIMExternalID),
+				"active":                user.Active,
+				"admin":                 user.Admin,
+				"password_hash":         user.PasswordHash,
+				"admin_mode_expiration": user.AdminModeExpiration,
 			},
 		).Where(goqu.Ex{"id": user.Metadata.ID, "version": user.Metadata.Version}).Returning(userFieldList...).ToSQL()
 	if err != nil {
@@ -376,16 +377,17 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 	sql, args, err := dialect.Insert("users").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":               newResourceID(),
-			"version":          initialResourceVersion,
-			"created_at":       timestamp,
-			"updated_at":       timestamp,
-			"username":         user.Username,
-			"email":            user.Email,
-			"admin":            user.Admin,
-			"scim_external_id": nullableString(user.SCIMExternalID),
-			"active":           user.Active,
-			"password_hash":    user.PasswordHash,
+			"id":                    newResourceID(),
+			"version":               initialResourceVersion,
+			"created_at":            timestamp,
+			"updated_at":            timestamp,
+			"username":              user.Username,
+			"email":                 user.Email,
+			"admin":                 user.Admin,
+			"scim_external_id":      nullableString(user.SCIMExternalID),
+			"active":                user.Active,
+			"password_hash":         user.PasswordHash,
+			"admin_mode_expiration": user.AdminModeExpiration,
 		}).
 		Returning(userFieldList...).ToSQL()
 	if err != nil {
@@ -499,6 +501,7 @@ func scanUser(row scanner) (*models.User, error) {
 		&scimExternalID,
 		&user.Active,
 		&user.PasswordHash,
+		&user.AdminModeExpiration,
 	}
 
 	err := row.Scan(fields...)

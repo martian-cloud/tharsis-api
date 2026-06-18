@@ -2874,6 +2874,13 @@ func TestGetRuns(t *testing.T) {
 						ID: userID,
 					},
 					Admin: test.isAdmin,
+					AdminModeExpiration: func() *time.Time {
+						if test.isAdmin {
+							t := time.Now().Add(time.Hour)
+							return &t
+						}
+						return nil
+					}(),
 				},
 				mockAuthorizer,
 				dbClient,
@@ -3416,6 +3423,13 @@ func TestSubscribeToRunEvents(t *testing.T) {
 							ID: userID,
 						},
 						Admin: test.isAdmin,
+						AdminModeExpiration: func() *time.Time {
+							if test.isAdmin {
+								t := time.Now().Add(time.Hour)
+								return &t
+							}
+							return nil
+						}(),
 					},
 					mockAuthorizer,
 					&dbClient,

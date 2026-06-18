@@ -711,8 +711,8 @@ func (s *service) GetAgentTrace(ctx context.Context, runID string) (json.RawMess
 		return nil, err
 	}
 
-	if !userCaller.IsAdmin() {
-		return nil, errors.New("only admins can view trace data", errors.WithErrorCode(errors.EForbidden))
+	if !userCaller.IsAdminModeActivated() {
+		return nil, errors.New("only admins with admin mode activated can view trace data", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	s.logger.Infow("accessing agent session run trace", "caller", userCaller.GetSubject(), "runId", runID)
@@ -743,7 +743,7 @@ func (s *service) GetAgentCreditUsage(ctx context.Context, userID string) (float
 		return 0, err
 	}
 
-	if !userCaller.IsAdmin() && userCaller.User.Metadata.ID != userID {
+	if !userCaller.IsAdminModeActivated() && userCaller.User.Metadata.ID != userID {
 		return 0, errors.New("cannot view credit usage for other users", errors.WithErrorCode(errors.EForbidden))
 	}
 

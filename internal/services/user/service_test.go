@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -676,9 +677,10 @@ func TestUpdateAdminStatusForUser(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: userID,
 				},
-				Username: "user.name",
-				Admin:    true,
-				Active:   true,
+				Username:            "user.name",
+				Admin:               true,
+				AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				Active:              true,
 			},
 		},
 		{
@@ -689,9 +691,10 @@ func TestUpdateAdminStatusForUser(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: userID,
 				},
-				Username: "user.name",
-				Admin:    true,
-				Active:   false,
+				Username:            "user.name",
+				Admin:               true,
+				AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				Active:              false,
 			},
 		},
 	}
@@ -710,6 +713,13 @@ func TestUpdateAdminStatusForUser(t *testing.T) {
 						},
 						Username: "calling user",
 						Admin:    tc.callerIsAdmin,
+						AdminModeExpiration: func() *time.Time {
+							if tc.callerIsAdmin {
+								t := time.Now().Add(time.Hour)
+								return &t
+							}
+							return nil
+						}(),
 					},
 				}
 			} else {
@@ -746,6 +756,9 @@ func TestUpdateAdminStatusForUser(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, actualUser)
 			assert.Equal(t, tc.expectAdmin, actualUser.Admin)
+			if !tc.newAdminStatus {
+				assert.Nil(t, actualUser.AdminModeExpiration)
+			}
 		})
 	}
 }
@@ -770,8 +783,9 @@ func TestGetUserSessions(t *testing.T) {
 			},
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 		},
@@ -877,8 +891,9 @@ func TestGetUserSessionByID(t *testing.T) {
 			userSessionID: userSessionID,
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 		},
@@ -932,7 +947,7 @@ func TestGetUserSessionByID(t *testing.T) {
 			} else if tc.expectErrorCode == errors.EForbidden {
 				// For forbidden cases where we need to check ownership, we still need to return the session
 				userCaller, isUserCaller := tc.caller.(*auth.UserCaller)
-				if isUserCaller && !userCaller.IsAdmin() {
+				if isUserCaller && !userCaller.IsAdminModeActivated() {
 					mockUserSessions.On("GetUserSessionByID", mock.Anything, tc.userSessionID).Return(&models.UserSession{
 						Metadata: models.ResourceMetadata{ID: tc.userSessionID},
 						UserID:   userID, // Session belongs to userID, but caller is otherUserID
@@ -981,8 +996,9 @@ func TestGetUserSessionByTRN(t *testing.T) {
 			trn:  sessionTRN,
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 		},
@@ -1020,8 +1036,9 @@ func TestGetUserSessionByTRN(t *testing.T) {
 			trn:  "invalid-trn",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			expectError:     true,
@@ -1048,7 +1065,7 @@ func TestGetUserSessionByTRN(t *testing.T) {
 			} else if tc.expectErrorCode == errors.EForbidden {
 				// For forbidden cases where we need to check ownership, we still need to return the session
 				userCaller, isUserCaller := tc.caller.(*auth.UserCaller)
-				if isUserCaller && !userCaller.IsAdmin() {
+				if isUserCaller && !userCaller.IsAdminModeActivated() {
 					mockUserSessions.On("GetUserSessionByTRN", mock.Anything, tc.trn).Return(&models.UserSession{
 						Metadata: models.ResourceMetadata{ID: userSessionID, TRN: tc.trn},
 						UserID:   userID, // Session belongs to userID, but caller is otherUserID
@@ -1101,8 +1118,9 @@ func TestRevokeUserSession(t *testing.T) {
 			},
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 		},
@@ -1148,8 +1166,9 @@ func TestRevokeUserSession(t *testing.T) {
 			},
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			expectError:     true,
@@ -1182,7 +1201,7 @@ func TestRevokeUserSession(t *testing.T) {
 			} else if tc.expectErrorCode == errors.EForbidden {
 				// For forbidden cases where we need to check ownership, we still need to return the session
 				userCaller, isUserCaller := tc.caller.(*auth.UserCaller)
-				if isUserCaller && !userCaller.IsAdmin() {
+				if isUserCaller && !userCaller.IsAdminModeActivated() {
 					mockUserSessions.On("GetUserSessionByID", mock.Anything, tc.input.UserSessionID).Return(&models.UserSession{
 						Metadata: models.ResourceMetadata{ID: tc.input.UserSessionID},
 						UserID:   userID, // Session belongs to userID, but caller is otherUserID
@@ -1227,8 +1246,9 @@ func TestService_CreateUser(t *testing.T) {
 			name: "admin creates user successfully",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &CreateUserInput{
@@ -1242,8 +1262,9 @@ func TestService_CreateUser(t *testing.T) {
 			name: "admin creates user without password",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &CreateUserInput{
@@ -1287,8 +1308,9 @@ func TestService_CreateUser(t *testing.T) {
 			name: "validation fails for empty username",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &CreateUserInput{
@@ -1304,8 +1326,9 @@ func TestService_CreateUser(t *testing.T) {
 			name: "validation fails for empty email",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &CreateUserInput{
@@ -1382,8 +1405,9 @@ func TestService_DeleteUser(t *testing.T) {
 			name: "admin deletes user successfully",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &DeleteUserInput{
@@ -1408,8 +1432,9 @@ func TestService_DeleteUser(t *testing.T) {
 			name: "admin cannot delete themselves",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &DeleteUserInput{
@@ -1422,8 +1447,9 @@ func TestService_DeleteUser(t *testing.T) {
 			name: "user not found",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &DeleteUserInput{
@@ -1495,8 +1521,9 @@ func TestService_SetUserPassword(t *testing.T) {
 			name: "admins cannot set user password",
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: adminUserID},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			input: &SetUserPasswordInput{
@@ -2154,8 +2181,9 @@ func TestGetNamespaceFavoriteByID(t *testing.T) {
 			favoriteID: favoriteID,
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: "admin-user-id"},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: "admin-user-id"},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			mockFavorite: &models.NamespaceFavorite{
@@ -2278,8 +2306,9 @@ func TestGetNamespaceFavoriteByTRN(t *testing.T) {
 			trn:  favoriteTRN,
 			caller: &auth.UserCaller{
 				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: "admin-user-id"},
-					Admin:    true,
+					Metadata:            models.ResourceMetadata{ID: "admin-user-id"},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 				},
 			},
 			mockFavorite: &models.NamespaceFavorite{
@@ -2355,6 +2384,196 @@ func TestGetNamespaceFavoriteByTRN(t *testing.T) {
 			assert.Equal(t, tc.mockFavorite.Metadata.ID, result.Metadata.ID)
 			assert.Equal(t, tc.mockFavorite.UserID, result.UserID)
 
+		})
+	}
+}
+
+func TestActivateAdminMode(t *testing.T) {
+	adminUserID := "admin-user-id"
+
+	type testCase struct {
+		name            string
+		caller          auth.Caller
+		input           *ActivateAdminModeInput
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "admin activates with default duration",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &ActivateAdminModeInput{},
+		},
+		{
+			name: "admin activates with custom duration",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &ActivateAdminModeInput{
+				Duration: func() *time.Duration { d := 2 * time.Hour; return &d }(),
+			},
+		},
+		{
+			name: "non-admin user cannot activate",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: "regular-user"},
+					Admin:    false,
+				},
+			},
+			input:           &ActivateAdminModeInput{},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "duration exceeds maximum",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &ActivateAdminModeInput{
+				Duration: func() *time.Duration { d := 7 * time.Hour; return &d }(),
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "duration is zero",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &ActivateAdminModeInput{
+				Duration: func() *time.Duration { d := time.Duration(0); return &d }(),
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "non-user caller cannot activate",
+			caller:          auth.NewMockCaller(t),
+			input:           &ActivateAdminModeInput{},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := auth.WithCaller(context.Background(), tc.caller)
+
+			mockUsers := db.NewMockUsers(t)
+			if !tc.expectError {
+				mockUsers.On("UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
+					return u.AdminModeExpiration != nil && u.AdminModeExpiration.After(time.Now())
+				})).Return(&models.User{
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				}, nil)
+			}
+
+			dbClient := &db.Client{Users: mockUsers}
+			testLogger, _ := logger.NewForTest()
+			svc := NewService(testLogger, dbClient, nil)
+
+			result, err := svc.ActivateAdminMode(ctx, tc.input)
+
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.True(t, result.AdminModeExpiration.After(time.Now()))
+			}
+		})
+	}
+}
+
+func TestDeactivateAdminMode(t *testing.T) {
+	adminUserID := "admin-user-id"
+
+	type testCase struct {
+		name            string
+		caller          auth.Caller
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "admin deactivates successfully",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				},
+			},
+		},
+		{
+			name: "admin mode not active",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "non-user caller cannot deactivate",
+			caller:          auth.NewMockCaller(t),
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := auth.WithCaller(context.Background(), tc.caller)
+
+			mockUsers := db.NewMockUsers(t)
+			if !tc.expectError {
+				mockUsers.On("UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
+					return u.AdminModeExpiration == nil
+				})).Return(&models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				}, nil)
+			}
+
+			dbClient := &db.Client{Users: mockUsers}
+			testLogger, _ := logger.NewForTest()
+			svc := NewService(testLogger, dbClient, nil)
+
+			result, err := svc.DeactivateAdminMode(ctx)
+
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Nil(t, result.AdminModeExpiration)
+			}
 		})
 	}
 }

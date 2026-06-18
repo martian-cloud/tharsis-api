@@ -25,7 +25,7 @@ func TestVCSWorkspaceLinkCaller_GetSubject(t *testing.T) {
 
 func TestVCSWorkspaceLinkCaller_IsAdmin(t *testing.T) {
 	caller := VCSWorkspaceLinkCaller{}
-	assert.False(t, caller.IsAdmin())
+	assert.False(t, caller.IsAdminModeActivated())
 }
 
 func TestVCSWorkspaceLinkCaller_GetNamespaceAccessPolicy(t *testing.T) {

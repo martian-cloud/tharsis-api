@@ -63,12 +63,12 @@ func (_m *MockCaller) GetSubject() string {
 	return r0
 }
 
-// IsAdmin provides a mock function with no fields
-func (_m *MockCaller) IsAdmin() bool {
+// IsAdminModeActivated provides a mock function with no fields
+func (_m *MockCaller) IsAdminModeActivated() bool {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for IsAdmin")
+		panic("no return value specified for IsAdminModeActivated")
 	}
 
 	var r0 bool

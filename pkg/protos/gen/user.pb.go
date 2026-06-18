@@ -10,6 +10,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -69,6 +70,52 @@ func (UserSortableField) EnumDescriptor() ([]byte, []int) {
 	return file_user_proto_rawDescGZIP(), []int{0}
 }
 
+// ActivateAdminModeRequest is the input for activating admin mode.
+type ActivateAdminModeRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Duration in minutes. Defaults to 30, maximum 360 (6 hours).
+	DurationMinutes *int32 `protobuf:"varint,1,opt,name=duration_minutes,json=durationMinutes,proto3,oneof" json:"duration_minutes,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ActivateAdminModeRequest) Reset() {
+	*x = ActivateAdminModeRequest{}
+	mi := &file_user_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActivateAdminModeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActivateAdminModeRequest) ProtoMessage() {}
+
+func (x *ActivateAdminModeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_user_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActivateAdminModeRequest.ProtoReflect.Descriptor instead.
+func (*ActivateAdminModeRequest) Descriptor() ([]byte, []int) {
+	return file_user_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ActivateAdminModeRequest) GetDurationMinutes() int32 {
+	if x != nil && x.DurationMinutes != nil {
+		return *x.DurationMinutes
+	}
+	return 0
+}
+
 // GetUserByIDRequest is the input for retrieving a User by its ID.
 type GetUserByIDRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -79,7 +126,7 @@ type GetUserByIDRequest struct {
 
 func (x *GetUserByIDRequest) Reset() {
 	*x = GetUserByIDRequest{}
-	mi := &file_user_proto_msgTypes[0]
+	mi := &file_user_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -91,7 +138,7 @@ func (x *GetUserByIDRequest) String() string {
 func (*GetUserByIDRequest) ProtoMessage() {}
 
 func (x *GetUserByIDRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[0]
+	mi := &file_user_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -104,7 +151,7 @@ func (x *GetUserByIDRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserByIDRequest.ProtoReflect.Descriptor instead.
 func (*GetUserByIDRequest) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{0}
+	return file_user_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetUserByIDRequest) GetId() string {
@@ -126,7 +173,7 @@ type GetUsersRequest struct {
 
 func (x *GetUsersRequest) Reset() {
 	*x = GetUsersRequest{}
-	mi := &file_user_proto_msgTypes[1]
+	mi := &file_user_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -138,7 +185,7 @@ func (x *GetUsersRequest) String() string {
 func (*GetUsersRequest) ProtoMessage() {}
 
 func (x *GetUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[1]
+	mi := &file_user_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -151,7 +198,7 @@ func (x *GetUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUsersRequest.ProtoReflect.Descriptor instead.
 func (*GetUsersRequest) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{1}
+	return file_user_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetUsersRequest) GetPaginationOptions() *PaginationOptions {
@@ -188,7 +235,7 @@ type CreateUserRequest struct {
 
 func (x *CreateUserRequest) Reset() {
 	*x = CreateUserRequest{}
-	mi := &file_user_proto_msgTypes[2]
+	mi := &file_user_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -200,7 +247,7 @@ func (x *CreateUserRequest) String() string {
 func (*CreateUserRequest) ProtoMessage() {}
 
 func (x *CreateUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[2]
+	mi := &file_user_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -213,7 +260,7 @@ func (x *CreateUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUserRequest.ProtoReflect.Descriptor instead.
 func (*CreateUserRequest) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{2}
+	return file_user_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateUserRequest) GetUsername() string {
@@ -254,7 +301,7 @@ type DeleteUserRequest struct {
 
 func (x *DeleteUserRequest) Reset() {
 	*x = DeleteUserRequest{}
-	mi := &file_user_proto_msgTypes[3]
+	mi := &file_user_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -266,7 +313,7 @@ func (x *DeleteUserRequest) String() string {
 func (*DeleteUserRequest) ProtoMessage() {}
 
 func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[3]
+	mi := &file_user_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -279,7 +326,7 @@ func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUserRequest) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{3}
+	return file_user_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *DeleteUserRequest) GetId() string {
@@ -291,20 +338,21 @@ func (x *DeleteUserRequest) GetId() string {
 
 // User defines a user within Tharsis.
 type User struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Metadata       *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Username       string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
-	Email          string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
-	Admin          bool                   `protobuf:"varint,4,opt,name=admin,proto3" json:"admin,omitempty"`
-	Active         bool                   `protobuf:"varint,5,opt,name=active,proto3" json:"active,omitempty"`
-	ScimExternalId string                 `protobuf:"bytes,6,opt,name=scim_external_id,json=scimExternalId,proto3" json:"scim_external_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Metadata            *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Username            string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	Email               string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	Admin               bool                   `protobuf:"varint,4,opt,name=admin,proto3" json:"admin,omitempty"`
+	Active              bool                   `protobuf:"varint,5,opt,name=active,proto3" json:"active,omitempty"`
+	ScimExternalId      string                 `protobuf:"bytes,6,opt,name=scim_external_id,json=scimExternalId,proto3" json:"scim_external_id,omitempty"`
+	AdminModeExpiration *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=admin_mode_expiration,json=adminModeExpiration,proto3,oneof" json:"admin_mode_expiration,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
 	*x = User{}
-	mi := &file_user_proto_msgTypes[4]
+	mi := &file_user_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -316,7 +364,7 @@ func (x *User) String() string {
 func (*User) ProtoMessage() {}
 
 func (x *User) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[4]
+	mi := &file_user_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -329,7 +377,7 @@ func (x *User) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User.ProtoReflect.Descriptor instead.
 func (*User) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{4}
+	return file_user_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *User) GetMetadata() *ResourceMetadata {
@@ -374,6 +422,13 @@ func (x *User) GetScimExternalId() string {
 	return ""
 }
 
+func (x *User) GetAdminModeExpiration() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AdminModeExpiration
+	}
+	return nil
+}
+
 // GetUsersResponse is the paginated list of Users.
 type GetUsersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -385,7 +440,7 @@ type GetUsersResponse struct {
 
 func (x *GetUsersResponse) Reset() {
 	*x = GetUsersResponse{}
-	mi := &file_user_proto_msgTypes[5]
+	mi := &file_user_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -397,7 +452,7 @@ func (x *GetUsersResponse) String() string {
 func (*GetUsersResponse) ProtoMessage() {}
 
 func (x *GetUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[5]
+	mi := &file_user_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -410,7 +465,7 @@ func (x *GetUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUsersResponse.ProtoReflect.Descriptor instead.
 func (*GetUsersResponse) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{5}
+	return file_user_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetUsersResponse) GetUsers() []*User {
@@ -432,7 +487,10 @@ var File_user_proto protoreflect.FileDescriptor
 const file_user_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"user.proto\x12\x1dmartiancloud.tharsis.api.user\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\"$\n" +
+	"user.proto\x12\x1dmartiancloud.tharsis.api.user\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"_\n" +
+	"\x18ActivateAdminModeRequest\x12.\n" +
+	"\x10duration_minutes\x18\x01 \x01(\x05H\x00R\x0fdurationMinutes\x88\x01\x01B\x13\n" +
+	"\x11_duration_minutes\"$\n" +
 	"\x12GetUserByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x90\x02\n" +
 	"\x0fGetUsersRequest\x12j\n" +
@@ -449,27 +507,31 @@ const file_user_proto_rawDesc = "" +
 	"\x05admin\x18\x04 \x01(\bR\x05adminB\v\n" +
 	"\t_password\"#\n" +
 	"\x11DeleteUserRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xe1\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xd0\x02\n" +
 	"\x04User\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
 	"\x05admin\x18\x04 \x01(\bR\x05admin\x12\x16\n" +
 	"\x06active\x18\x05 \x01(\bR\x06active\x12(\n" +
-	"\x10scim_external_id\x18\x06 \x01(\tR\x0escimExternalId\"\x99\x01\n" +
+	"\x10scim_external_id\x18\x06 \x01(\tR\x0escimExternalId\x12S\n" +
+	"\x15admin_mode_expiration\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x13adminModeExpiration\x88\x01\x01B\x18\n" +
+	"\x16_admin_mode_expiration\"\x99\x01\n" +
 	"\x10GetUsersResponse\x129\n" +
 	"\x05users\x18\x01 \x03(\v2#.martiancloud.tharsis.api.user.UserR\x05users\x12J\n" +
 	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo*<\n" +
 	"\x11UserSortableField\x12\x12\n" +
 	"\x0eUPDATED_AT_ASC\x10\x00\x12\x13\n" +
-	"\x0fUPDATED_AT_DESC\x10\x012\x98\x03\n" +
+	"\x0fUPDATED_AT_DESC\x10\x012\xdf\x04\n" +
 	"\x05Users\x12e\n" +
 	"\vGetUserByID\x121.martiancloud.tharsis.api.user.GetUserByIDRequest\x1a#.martiancloud.tharsis.api.user.User\x12k\n" +
 	"\bGetUsers\x12..martiancloud.tharsis.api.user.GetUsersRequest\x1a/.martiancloud.tharsis.api.user.GetUsersResponse\x12c\n" +
 	"\n" +
 	"CreateUser\x120.martiancloud.tharsis.api.user.CreateUserRequest\x1a#.martiancloud.tharsis.api.user.User\x12V\n" +
 	"\n" +
-	"DeleteUser\x120.martiancloud.tharsis.api.user.DeleteUserRequest\x1a\x16.google.protobuf.EmptyBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
+	"DeleteUser\x120.martiancloud.tharsis.api.user.DeleteUserRequest\x1a\x16.google.protobuf.Empty\x12q\n" +
+	"\x11ActivateAdminMode\x127.martiancloud.tharsis.api.user.ActivateAdminModeRequest\x1a#.martiancloud.tharsis.api.user.User\x12R\n" +
+	"\x13DeactivateAdminMode\x12\x16.google.protobuf.Empty\x1a#.martiancloud.tharsis.api.user.UserBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var (
 	file_user_proto_rawDescOnce sync.Once
@@ -484,39 +546,46 @@ func file_user_proto_rawDescGZIP() []byte {
 }
 
 var file_user_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_user_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_user_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_user_proto_goTypes = []any{
-	(UserSortableField)(0),     // 0: martiancloud.tharsis.api.user.UserSortableField
-	(*GetUserByIDRequest)(nil), // 1: martiancloud.tharsis.api.user.GetUserByIDRequest
-	(*GetUsersRequest)(nil),    // 2: martiancloud.tharsis.api.user.GetUsersRequest
-	(*CreateUserRequest)(nil),  // 3: martiancloud.tharsis.api.user.CreateUserRequest
-	(*DeleteUserRequest)(nil),  // 4: martiancloud.tharsis.api.user.DeleteUserRequest
-	(*User)(nil),               // 5: martiancloud.tharsis.api.user.User
-	(*GetUsersResponse)(nil),   // 6: martiancloud.tharsis.api.user.GetUsersResponse
-	(*PaginationOptions)(nil),  // 7: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),   // 8: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),           // 9: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),      // 10: google.protobuf.Empty
+	(UserSortableField)(0),           // 0: martiancloud.tharsis.api.user.UserSortableField
+	(*ActivateAdminModeRequest)(nil), // 1: martiancloud.tharsis.api.user.ActivateAdminModeRequest
+	(*GetUserByIDRequest)(nil),       // 2: martiancloud.tharsis.api.user.GetUserByIDRequest
+	(*GetUsersRequest)(nil),          // 3: martiancloud.tharsis.api.user.GetUsersRequest
+	(*CreateUserRequest)(nil),        // 4: martiancloud.tharsis.api.user.CreateUserRequest
+	(*DeleteUserRequest)(nil),        // 5: martiancloud.tharsis.api.user.DeleteUserRequest
+	(*User)(nil),                     // 6: martiancloud.tharsis.api.user.User
+	(*GetUsersResponse)(nil),         // 7: martiancloud.tharsis.api.user.GetUsersResponse
+	(*PaginationOptions)(nil),        // 8: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),         // 9: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*timestamppb.Timestamp)(nil),    // 10: google.protobuf.Timestamp
+	(*PageInfo)(nil),                 // 11: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),            // 12: google.protobuf.Empty
 }
 var file_user_proto_depIdxs = []int32{
-	7,  // 0: martiancloud.tharsis.api.user.GetUsersRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	8,  // 0: martiancloud.tharsis.api.user.GetUsersRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.user.GetUsersRequest.sort:type_name -> martiancloud.tharsis.api.user.UserSortableField
-	8,  // 2: martiancloud.tharsis.api.user.User.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	5,  // 3: martiancloud.tharsis.api.user.GetUsersResponse.users:type_name -> martiancloud.tharsis.api.user.User
-	9,  // 4: martiancloud.tharsis.api.user.GetUsersResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	1,  // 5: martiancloud.tharsis.api.user.Users.GetUserByID:input_type -> martiancloud.tharsis.api.user.GetUserByIDRequest
-	2,  // 6: martiancloud.tharsis.api.user.Users.GetUsers:input_type -> martiancloud.tharsis.api.user.GetUsersRequest
-	3,  // 7: martiancloud.tharsis.api.user.Users.CreateUser:input_type -> martiancloud.tharsis.api.user.CreateUserRequest
-	4,  // 8: martiancloud.tharsis.api.user.Users.DeleteUser:input_type -> martiancloud.tharsis.api.user.DeleteUserRequest
-	5,  // 9: martiancloud.tharsis.api.user.Users.GetUserByID:output_type -> martiancloud.tharsis.api.user.User
-	6,  // 10: martiancloud.tharsis.api.user.Users.GetUsers:output_type -> martiancloud.tharsis.api.user.GetUsersResponse
-	5,  // 11: martiancloud.tharsis.api.user.Users.CreateUser:output_type -> martiancloud.tharsis.api.user.User
-	10, // 12: martiancloud.tharsis.api.user.Users.DeleteUser:output_type -> google.protobuf.Empty
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	9,  // 2: martiancloud.tharsis.api.user.User.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	10, // 3: martiancloud.tharsis.api.user.User.admin_mode_expiration:type_name -> google.protobuf.Timestamp
+	6,  // 4: martiancloud.tharsis.api.user.GetUsersResponse.users:type_name -> martiancloud.tharsis.api.user.User
+	11, // 5: martiancloud.tharsis.api.user.GetUsersResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	2,  // 6: martiancloud.tharsis.api.user.Users.GetUserByID:input_type -> martiancloud.tharsis.api.user.GetUserByIDRequest
+	3,  // 7: martiancloud.tharsis.api.user.Users.GetUsers:input_type -> martiancloud.tharsis.api.user.GetUsersRequest
+	4,  // 8: martiancloud.tharsis.api.user.Users.CreateUser:input_type -> martiancloud.tharsis.api.user.CreateUserRequest
+	5,  // 9: martiancloud.tharsis.api.user.Users.DeleteUser:input_type -> martiancloud.tharsis.api.user.DeleteUserRequest
+	1,  // 10: martiancloud.tharsis.api.user.Users.ActivateAdminMode:input_type -> martiancloud.tharsis.api.user.ActivateAdminModeRequest
+	12, // 11: martiancloud.tharsis.api.user.Users.DeactivateAdminMode:input_type -> google.protobuf.Empty
+	6,  // 12: martiancloud.tharsis.api.user.Users.GetUserByID:output_type -> martiancloud.tharsis.api.user.User
+	7,  // 13: martiancloud.tharsis.api.user.Users.GetUsers:output_type -> martiancloud.tharsis.api.user.GetUsersResponse
+	6,  // 14: martiancloud.tharsis.api.user.Users.CreateUser:output_type -> martiancloud.tharsis.api.user.User
+	12, // 15: martiancloud.tharsis.api.user.Users.DeleteUser:output_type -> google.protobuf.Empty
+	6,  // 16: martiancloud.tharsis.api.user.Users.ActivateAdminMode:output_type -> martiancloud.tharsis.api.user.User
+	6,  // 17: martiancloud.tharsis.api.user.Users.DeactivateAdminMode:output_type -> martiancloud.tharsis.api.user.User
+	12, // [12:18] is the sub-list for method output_type
+	6,  // [6:12] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_user_proto_init() }
@@ -526,15 +595,17 @@ func file_user_proto_init() {
 	}
 	file_metadata_proto_init()
 	file_pagination_proto_init()
-	file_user_proto_msgTypes[1].OneofWrappers = []any{}
+	file_user_proto_msgTypes[0].OneofWrappers = []any{}
 	file_user_proto_msgTypes[2].OneofWrappers = []any{}
+	file_user_proto_msgTypes[3].OneofWrappers = []any{}
+	file_user_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_user_proto_rawDesc), len(file_user_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

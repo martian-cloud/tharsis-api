@@ -379,7 +379,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 			return nil, errors.New("only users can subscribe to run events without a WorkspaceID filter", errors.WithErrorCode(errors.EForbidden))
 		}
 
-		if !userCaller.User.Admin {
+		if !userCaller.IsAdminModeActivated() {
 			userMemberID = &userCaller.User.Metadata.ID
 		}
 	}
@@ -1779,7 +1779,7 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 			return nil, errors.New("only users can query for runs without a workspace or group filter", errors.WithErrorCode(errors.EForbidden))
 		}
 
-		if !userCaller.IsAdmin() {
+		if !userCaller.IsAdminModeActivated() {
 			// Add filter is user isn't an admin.
 			filter.UserMemberID = &userCaller.User.Metadata.ID
 		}

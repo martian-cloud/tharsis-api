@@ -64,9 +64,9 @@ func (s *service) EnableMaintenanceMode(ctx context.Context) (*models.Maintenanc
 		return nil, err
 	}
 
-	if !caller.IsAdmin() {
+	if !caller.IsAdminModeActivated() {
 		tracing.RecordError(span, nil, "only system admins can enable maintenance mode")
-		return nil, errors.New("only system admins can enable maintenance mode", errors.WithErrorCode(errors.EForbidden))
+		return nil, errors.New("only admins with admin mode activated can enable maintenance mode", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	toCreate := &models.MaintenanceMode{
@@ -96,9 +96,9 @@ func (s *service) DisableMaintenanceMode(ctx context.Context) error {
 		return err
 	}
 
-	if !caller.IsAdmin() {
+	if !caller.IsAdminModeActivated() {
 		tracing.RecordError(span, nil, "only system admins can disable maintenance mode")
-		return errors.New("only system admins can disable maintenance mode", errors.WithErrorCode(errors.EForbidden))
+		return errors.New("only admins with admin mode activated can perform this operation", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	maintenanceMode, err := s.dbClient.MaintenanceModes.GetMaintenanceMode(ctx)

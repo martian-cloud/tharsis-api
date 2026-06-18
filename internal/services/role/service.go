@@ -189,9 +189,9 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 		return nil, errors.New("Unsupported caller type, only users are allowed to create roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
-	// Only admins are allowed to create roles
-	if !userCaller.User.Admin {
-		return nil, errors.New("Only system admins can create roles", errors.WithErrorCode(errors.EForbidden))
+	// Only admins with admin mode activated are allowed to create roles
+	if !userCaller.IsAdminModeActivated() {
+		return nil, errors.New("only admins with admin mode activated can create roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	toCreate := &models.Role{
@@ -264,9 +264,9 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 		return nil, errors.New("Unsupported caller type, only users are allowed to update roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
-	// Only admins are allowed to update roles
-	if !userCaller.User.Admin {
-		return nil, errors.New("Only system admins can update roles", errors.WithErrorCode(errors.EForbidden))
+	// Only admins with admin mode activated are allowed to update roles
+	if !userCaller.IsAdminModeActivated() {
+		return nil, errors.New("only admins with admin mode activated can update roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	if models.DefaultRoleID(input.Role.Metadata.ID).IsDefaultRole() {
@@ -335,9 +335,9 @@ func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error 
 		return errors.New("Unsupported caller type, only users are allowed to delete roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
-	// Only admins are allowed to delete roles
-	if !userCaller.User.Admin {
-		return errors.New("Only system admins can delete roles", errors.WithErrorCode(errors.EForbidden))
+	// Only admins with admin mode activated are allowed to delete roles
+	if !userCaller.IsAdminModeActivated() {
+		return errors.New("only admins with admin mode activated can delete roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	if models.DefaultRoleID(input.Role.Metadata.ID).IsDefaultRole() {

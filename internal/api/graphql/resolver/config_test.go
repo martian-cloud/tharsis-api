@@ -59,7 +59,7 @@ func TestConfigQuery(t *testing.T) {
 			if !tc.noCaller {
 				// Mock auth caller
 				mockCaller := &auth.MockCaller{}
-				mockCaller.On("IsAdmin").Return(tc.isAdmin)
+				mockCaller.On("IsAdminModeActivated").Return(tc.isAdmin)
 				ctx = auth.WithCaller(ctx, mockCaller)
 			}
 

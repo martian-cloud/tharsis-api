@@ -41,8 +41,8 @@ func (s *ServiceAccountCaller) GetSubject() string {
 	return s.ServiceAccountPath
 }
 
-// IsAdmin returns true if the caller is an admin
-func (s *ServiceAccountCaller) IsAdmin() bool {
+// IsAdminModeActivated returns true if the caller is an admin
+func (s *ServiceAccountCaller) IsAdminModeActivated() bool {
 	return false
 }
 
