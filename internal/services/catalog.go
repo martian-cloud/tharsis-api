@@ -8,6 +8,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/adminlogtail"
 	agentsvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/agent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/announcement"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
@@ -46,6 +47,7 @@ type modelFetcherFunc func(ctx context.Context, value string) (models.Model, err
 type Catalog struct {
 	AgentService                     agentsvc.Service
 	ActivityEventService             activityevent.Service
+	AdminLogTailService              adminlogtail.Service
 	AnnouncementService              announcement.Service
 	CLIService                       cli.Service
 	FederatedRegistryService         federatedregistry.Service

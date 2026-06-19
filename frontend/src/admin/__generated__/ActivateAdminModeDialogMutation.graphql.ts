@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<83663f9667faaaf9fc606f54f286d1c3>>
+ * @generated SignedSource<<745d6515c3763f7a78299b4f7136ebb8>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,6 +11,7 @@
 import { ConcreteRequest } from 'relay-runtime';
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type ActivateAdminModeInput = {
+  clientMutationId?: string | null | undefined;
   durationMinutes?: number | null | undefined;
 };
 export type ActivateAdminModeDialogMutation$variables = {

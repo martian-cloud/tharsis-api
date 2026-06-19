@@ -20,13 +20,25 @@ func TestUserCaller_GetSubject(t *testing.T) {
 	assert.Equal(t, "user@email", caller.GetSubject())
 }
 
-func TestUserCaller_IsAdmin(t *testing.T) {
-	caller := UserCaller{User: &models.User{}}
-	assert.False(t, caller.IsAdminModeActivated())
+func TestUserCaller_IsAdminModeActivated(t *testing.T) {
+	// IsAdminModeActivated re-queries the latest user, so the result tracks the DB, not the
+	// in-memory caller.
+	t.Run("admin mode inactive", func(t *testing.T) {
+		user := &models.User{Metadata: models.ResourceMetadata{ID: "u1"}}
+		mockUsers := db.NewMockUsers(t)
+		mockUsers.On("GetUserByID", mock.Anything, "u1").Return(user, nil)
+		caller := UserCaller{User: user, dbClient: &db.Client{Users: mockUsers}}
+		assert.False(t, caller.IsAdminModeActivated(t.Context()))
+	})
 
-	caller.User.Admin = true
-	caller.User.AdminModeExpiration = func() *time.Time { t := time.Now().Add(time.Hour); return &t }()
-	assert.True(t, caller.IsAdminModeActivated())
+	t.Run("admin mode active", func(t *testing.T) {
+		expiration := time.Now().Add(time.Hour)
+		user := &models.User{Metadata: models.ResourceMetadata{ID: "u1"}, Admin: true, AdminModeExpiration: &expiration}
+		mockUsers := db.NewMockUsers(t)
+		mockUsers.On("GetUserByID", mock.Anything, "u1").Return(user, nil)
+		caller := UserCaller{User: user, dbClient: &db.Client{Users: mockUsers}}
+		assert.True(t, caller.IsAdminModeActivated(t.Context()))
+	})
 }
 
 func TestUserCaller_GetNamespaceAccessPolicy(t *testing.T) {

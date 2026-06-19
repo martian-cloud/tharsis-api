@@ -149,7 +149,7 @@ func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) ([]b
 	}
 
 	// Only admins with admin mode activated are allowed to create SCIM tokens.
-	if !userCaller.IsAdminModeActivated() {
+	if !userCaller.IsAdminModeActivated(ctx) {
 		return nil, errors.New(
 			"only admins with admin mode activated can create SCIM tokens",
 			errors.WithErrorCode(errors.EForbidden))

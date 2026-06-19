@@ -354,7 +354,7 @@ func TestCreateAnnouncement(t *testing.T) {
 
 			if test.authError == nil {
 				ctx = auth.WithCaller(ctx, mockCaller)
-				mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
+				mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin)
 
 				if test.isAdmin {
 					mockCaller.On("GetSubject").Return(testSubject)
@@ -448,7 +448,7 @@ func TestUpdateAnnouncement(t *testing.T) {
 			mockAnnouncements := db.NewMockAnnouncements(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
+			mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin)
 
 			if test.isAdmin {
 				mockCaller.On("GetSubject").Return(testSubject).Maybe()
@@ -536,7 +536,7 @@ func TestDeleteAnnouncement(t *testing.T) {
 			mockAnnouncements := db.NewMockAnnouncements(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
+			mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin)
 
 			if test.isAdmin {
 				mockCaller.On("GetSubject").Return(testSubject).Maybe()

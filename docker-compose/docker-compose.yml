@@ -29,6 +29,7 @@ services:
       - THARSIS_DB_HOST=postgres
       - THARSIS_DB_PORT=5432
       - THARSIS_DB_SSL_MODE=disable
+      - THARSIS_ADMIN_LOG_TAIL_STORE_PLUGIN_TYPE=memory
       - THARSIS_OBJECT_STORE_PLUGIN_TYPE=filesystem
       - THARSIS_OBJECT_STORE_PLUGIN_DATA_DIRECTORY=/var/lib/tharsis
       - THARSIS_API_URL=http://localhost:6560

@@ -376,7 +376,14 @@ func TestCreateRole(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := auth.WithCaller(context.TODO(), test.caller)
+			caller := test.caller
+			if uc, ok := caller.(*auth.UserCaller); ok {
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, uc.User.Metadata.ID).Return(uc.User, nil).Maybe()
+				caller = auth.NewUserCaller(uc.User, nil, &db.Client{Users: mockUsers}, nil, nil)
+			}
+
+			ctx := auth.WithCaller(context.TODO(), caller)
 
 			mockRoles := db.NewMockRoles(t)
 			mockActivityEvents := activityevent.NewMockService(t)
@@ -532,7 +539,14 @@ func TestUpdateRole(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := auth.WithCaller(context.TODO(), test.caller)
+			caller := test.caller
+			if uc, ok := caller.(*auth.UserCaller); ok {
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, uc.User.Metadata.ID).Return(uc.User, nil).Maybe()
+				caller = auth.NewUserCaller(uc.User, nil, &db.Client{Users: mockUsers}, nil, nil)
+			}
+
+			ctx := auth.WithCaller(context.TODO(), caller)
 
 			mockRoles := db.NewMockRoles(t)
 			mockActivityEvents := activityevent.NewMockService(t)
@@ -716,7 +730,14 @@ func TestDeleteRole(t *testing.T) {
 			logger, _ := logger.NewForTest()
 			service := NewService(logger, &dbClient, nil)
 
-			err := service.DeleteRole(auth.WithCaller(context.TODO(), test.caller), test.input)
+			caller := test.caller
+			if uc, ok := caller.(*auth.UserCaller); ok {
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, uc.User.Metadata.ID).Return(uc.User, nil).Maybe()
+				caller = auth.NewUserCaller(uc.User, nil, &db.Client{Users: mockUsers}, nil, nil)
+			}
+
+			err := service.DeleteRole(auth.WithCaller(context.TODO(), caller), test.input)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))

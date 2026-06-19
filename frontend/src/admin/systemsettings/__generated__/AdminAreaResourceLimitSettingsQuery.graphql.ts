@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ce28b44f8dad56ae5e4575f5948c993a>>
+ * @generated SignedSource<<5f8cea151b8ff0d866feefdd7f517af2>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,19 +9,21 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
-export type MaintenanceSettingsQuery$variables = Record<PropertyKey, never>;
-export type MaintenanceSettingsQuery$data = {
-  readonly maintenanceMode: {
-    readonly createdBy: string;
+export type AdminAreaResourceLimitSettingsQuery$variables = Record<PropertyKey, never>;
+export type AdminAreaResourceLimitSettingsQuery$data = {
+  readonly resourceLimits: ReadonlyArray<{
     readonly id: string;
     readonly metadata: {
-      readonly createdAt: any;
+      readonly updatedAt: any;
+      readonly version: string;
     };
-  } | null | undefined;
+    readonly name: string;
+    readonly value: number;
+  }>;
 };
-export type MaintenanceSettingsQuery = {
-  response: MaintenanceSettingsQuery$data;
-  variables: MaintenanceSettingsQuery$variables;
+export type AdminAreaResourceLimitSettingsQuery = {
+  response: AdminAreaResourceLimitSettingsQuery$data;
+  variables: AdminAreaResourceLimitSettingsQuery$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -29,10 +31,10 @@ var v0 = [
   {
     "alias": null,
     "args": null,
-    "concreteType": "MaintenanceMode",
+    "concreteType": "ResourceLimit",
     "kind": "LinkedField",
-    "name": "maintenanceMode",
-    "plural": false,
+    "name": "resourceLimits",
+    "plural": true,
     "selections": [
       {
         "alias": null,
@@ -45,7 +47,14 @@ var v0 = [
         "alias": null,
         "args": null,
         "kind": "ScalarField",
-        "name": "createdBy",
+        "name": "name",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "value",
         "storageKey": null
       },
       {
@@ -60,7 +69,14 @@ var v0 = [
             "alias": null,
             "args": null,
             "kind": "ScalarField",
-            "name": "createdAt",
+            "name": "version",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "updatedAt",
             "storageKey": null
           }
         ],
@@ -75,7 +91,7 @@ return {
     "argumentDefinitions": [],
     "kind": "Fragment",
     "metadata": null,
-    "name": "MaintenanceSettingsQuery",
+    "name": "AdminAreaResourceLimitSettingsQuery",
     "selections": (v0/*: any*/),
     "type": "Query",
     "abstractKey": null
@@ -84,20 +100,20 @@ return {
   "operation": {
     "argumentDefinitions": [],
     "kind": "Operation",
-    "name": "MaintenanceSettingsQuery",
+    "name": "AdminAreaResourceLimitSettingsQuery",
     "selections": (v0/*: any*/)
   },
   "params": {
-    "cacheID": "8c60b698feb528e6a4e1238f245d5843",
+    "cacheID": "ea9654ae9f9a971834b8b96148a4318f",
     "id": null,
     "metadata": {},
-    "name": "MaintenanceSettingsQuery",
+    "name": "AdminAreaResourceLimitSettingsQuery",
     "operationKind": "query",
-    "text": "query MaintenanceSettingsQuery {\n  maintenanceMode {\n    id\n    createdBy\n    metadata {\n      createdAt\n    }\n  }\n}\n"
+    "text": "query AdminAreaResourceLimitSettingsQuery {\n  resourceLimits {\n    id\n    name\n    value\n    metadata {\n      version\n      updatedAt\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "ba894116d687388b94327791799f20e9";
+(node as any).hash = "ec43d71fc2d58b3182050c6c60d5e36f";
 
 export default node;

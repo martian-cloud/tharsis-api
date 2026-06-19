@@ -9,4 +9,5 @@ type Subscription {
   runnerSessionEvents(input: RunnerSessionEventSubscriptionInput!): RunnerSessionEvent!
   runnerSessionErrorLogEvents(input: RunnerSessionErrorLogSubscriptionInput!): RunnerSessionErrorLogEvent!
   agentSessionEvents(input: AgentSessionEventSubscriptionInput!): AgentSessionEvent!
+  adminLogTailEvents(input: AdminLogTailSubscriptionInput!): AdminLogTailEvent!
 }

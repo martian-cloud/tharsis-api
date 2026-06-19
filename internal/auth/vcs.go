@@ -40,7 +40,7 @@ func (v *VCSWorkspaceLinkCaller) GetSubject() string {
 }
 
 // IsAdminModeActivated returns true if the caller is an admin.
-func (v *VCSWorkspaceLinkCaller) IsAdminModeActivated() bool {
+func (v *VCSWorkspaceLinkCaller) IsAdminModeActivated(_ context.Context) bool {
 	return false
 }
 

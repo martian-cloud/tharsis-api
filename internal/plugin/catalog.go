@@ -27,6 +27,10 @@ import (
 	jwsawskms "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws/awskms"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws/memory"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger/logstore"
+	logstorememory "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger/logstore/memory"
+	logstoreNoop "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger/logstore/noop"
+	logstoreredis "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger/logstore/redis"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore/aws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore/filesystem"
@@ -41,6 +45,7 @@ type Catalog struct {
 	SecretManager         secret.Manager
 	EmailProvider         email.Provider
 	LLMClient             llm.Client
+	AdminLogTailStore     logstore.Store
 }
 
 // NewCatalog creates a new Catalog
@@ -83,6 +88,11 @@ func NewCatalog(ctx context.Context, logger logger.Logger, cfg *config.Config) (
 		return nil, fmt.Errorf("failed to initialize LLM client plugin: %v", err)
 	}
 
+	adminLogTailStore, err := newAdminLogTailStore(ctx, cfg.AdminLogTailStorePluginType, cfg.AdminLogTailStorePluginData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize admin log tail store plugin: %v", err)
+	}
+
 	return &Catalog{
 		ObjectStore:           objectStore,
 		JWSProvider:           jwsProvider,
@@ -91,6 +101,7 @@ func NewCatalog(ctx context.Context, logger logger.Logger, cfg *config.Config) (
 		SecretManager:         secretManager,
 		EmailProvider:         emailProvider,
 		LLMClient:             llmClient,
+		AdminLogTailStore:     adminLogTailStore,
 	}, nil
 }
 
@@ -283,6 +294,19 @@ func newEmailProvider(ctx context.Context, logger logger.Logger, pluginType stri
 		return &email.NoopProvider{}, nil
 	default:
 		return nil, fmt.Errorf("the specified email client plugin %s is not currently supported", pluginType)
+	}
+}
+
+func newAdminLogTailStore(ctx context.Context, pluginType string, pluginData map[string]string) (logstore.Store, error) {
+	switch pluginType {
+	case "redis":
+		return logstoreredis.New(ctx, pluginData)
+	case "memory":
+		return logstorememory.New()
+	case "", "noop":
+		return logstoreNoop.New(), nil
+	default:
+		return nil, errors.New("the specified admin log tail store plugin type %q is not supported", pluginType)
 	}
 }
 

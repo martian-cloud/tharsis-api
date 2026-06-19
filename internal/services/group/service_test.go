@@ -193,7 +193,7 @@ func TestGroupByTRN(t *testing.T) {
 func TestCreateTopLevelGroup(t *testing.T) {
 	// Test cases
 	tests := []struct {
-		caller          *auth.UserCaller
+		user            *models.User
 		name            string
 		expectErrorCode errors.CodeType
 		input           models.Group
@@ -205,9 +205,7 @@ func TestCreateTopLevelGroup(t *testing.T) {
 				Metadata:   models.ResourceMetadata{ID: "group1"},
 				RunnerTags: []string{"tag1"},
 			},
-			caller: &auth.UserCaller{
-				User: &models.User{Metadata: models.ResourceMetadata{ID: "user1"}, Admin: true, AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }()},
-			},
+			user: &models.User{Metadata: models.ResourceMetadata{ID: "user1"}, Admin: true, AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }()},
 		},
 		{
 			name: "cannot create top-level group because caller is not an admin",
@@ -215,9 +213,7 @@ func TestCreateTopLevelGroup(t *testing.T) {
 				Name:     "group1",
 				Metadata: models.ResourceMetadata{ID: "group1"},
 			},
-			caller: &auth.UserCaller{
-				User: &models.User{Metadata: models.ResourceMetadata{ID: "user1"}, Admin: false},
-			},
+			user:            &models.User{Metadata: models.ResourceMetadata{ID: "user1"}, Admin: false},
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -231,11 +227,14 @@ func TestCreateTopLevelGroup(t *testing.T) {
 			mockGroups := db.NewMockGroups(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
+			mockUsers := db.NewMockUsers(t)
+
+			mockUsers.On("GetUserByID", mock.Anything, test.user.Metadata.ID).Return(test.user, nil).Maybe()
 
 			createNamespaceMembershipInput := &namespacemembership.CreateNamespaceMembershipInput{
 				NamespacePath: test.input.FullPath,
 				RoleID:        models.OwnerRoleID.String(),
-				User:          test.caller.User,
+				User:          test.user,
 			}
 
 			if test.expectErrorCode == "" {
@@ -253,6 +252,7 @@ func TestCreateTopLevelGroup(t *testing.T) {
 			dbClient := &db.Client{
 				Groups:       mockGroups,
 				Transactions: mockTransactions,
+				Users:        mockUsers,
 			}
 
 			limiter := limits.NewLimitChecker(dbClient)
@@ -260,7 +260,9 @@ func TestCreateTopLevelGroup(t *testing.T) {
 			logger, _ := logger.NewForTest()
 			service := NewService(logger, dbClient, limiter, mockNamespaceMemberships, mockActivityEvents, nil)
 
-			group, err := service.CreateGroup(auth.WithCaller(ctx, test.caller), &test.input)
+			caller := auth.NewUserCaller(test.user, nil, dbClient, nil, nil)
+
+			group, err := service.CreateGroup(auth.WithCaller(ctx, caller), &test.input)
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 			} else if err != nil {
@@ -1283,29 +1285,36 @@ func TestMigrateGroup(t *testing.T) {
 
 			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
 
+			mockUsers := db.NewMockUsers(t)
+
+			callerUser := &models.User{
+				Metadata: models.ResourceMetadata{
+					ID: "123",
+				},
+				Admin: test.isUserAdmin,
+				AdminModeExpiration: func() *time.Time {
+					if test.isUserAdmin {
+						t := time.Now().Add(time.Hour)
+						return &t
+					}
+					return nil
+				}(),
+				Username: "user1",
+			}
+
+			mockUsers.On("GetUserByID", mock.Anything, callerUser.Metadata.ID).Return(callerUser, nil).Maybe()
+
 			dbClient := db.Client{
 				Groups:         &mockGroups,
 				Transactions:   &mockTransactions,
 				ResourceLimits: mockResourceLimits,
+				Users:          mockUsers,
 			}
 
 			limiter := limits.NewLimitChecker(&dbClient)
 
 			testCaller := auth.NewUserCaller(
-				&models.User{
-					Metadata: models.ResourceMetadata{
-						ID: "123",
-					},
-					Admin: test.isUserAdmin,
-					AdminModeExpiration: func() *time.Time {
-						if test.isUserAdmin {
-							t := time.Now().Add(time.Hour)
-							return &t
-						}
-						return nil
-					}(),
-					Username: "user1",
-				},
+				callerUser,
 				&mockAuthorizer,
 				&dbClient,
 				mockMaintenanceMonitor,

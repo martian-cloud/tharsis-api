@@ -11,7 +11,10 @@ import AdminAreaUsers from "./users/AdminAreaUsers";
 import AdminAreaAnnouncementList from "./announcements/AdminAreaAnnouncementList";
 import AdminAreaNewAnnouncement from "./announcements/AdminAreaNewAnnouncement";
 import EditAdminAreaAnnouncement from "./announcements/EditAdminAreaAnnouncement";
-import SystemSettings from "./systemsettings/SystemSettings";
+import AdminAreaSystemSettings from "./systemsettings/AdminAreaSystemSettings";
+import AdminAreaConfigurationPage from "./systemsettings/AdminAreaConfigurationPage";
+import AdminAreaResourceLimitsPage from "./systemsettings/AdminAreaResourceLimitsPage";
+import AdminAreaLogs from "./logs/AdminAreaLogs";
 
 const query = graphql`
      query AdminAreaQuery {
@@ -81,7 +84,10 @@ function AdminArea({ queryRef }: Props) {
                                 <Route path={`announcements`} element={<AdminAreaAnnouncementList />} />
                                 <Route path={`announcements/new`} element={<AdminAreaNewAnnouncement />} />
                                 <Route path={`announcements/:announcementId/edit`} element={<EditAdminAreaAnnouncement />} />
-                                <Route path={`system_settings`} element={<SystemSettings />} />
+                                <Route path={`system_settings`} element={<AdminAreaSystemSettings />} />
+                                <Route path={`configuration`} element={<AdminAreaConfigurationPage />} />
+                                <Route path={`resource_limits`} element={<AdminAreaResourceLimitsPage />} />
+                                <Route path={`logs`} element={<AdminAreaLogs />} />
                             </Routes>
                         </Box>
                     </Suspense>

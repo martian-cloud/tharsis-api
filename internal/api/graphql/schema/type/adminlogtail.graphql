@@ -1,0 +1,26 @@
+enum AdminLogTailLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+type AdminLogTailEntry {
+  id: ID!
+  timestamp: Time!
+  level: AdminLogTailLevel!
+  message: String!
+  caller: String
+  stack: String
+  fields: String
+}
+
+input AdminLogTailSubscriptionInput {
+  levels: [AdminLogTailLevel!]
+  search: String
+}
+
+type AdminLogTailEvent {
+  logEntry: AdminLogTailEntry
+  error: String
+}

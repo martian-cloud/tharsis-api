@@ -49,9 +49,14 @@ func (u *UserCaller) GetSubject() string {
 	return u.User.Email
 }
 
-// IsAdminModeActivated returns true if the caller is an admin with admin mode currently active
-func (u *UserCaller) IsAdminModeActivated() bool {
-	return u.User.IsAdminModeActive()
+// IsAdminModeActivated returns true if the caller is an admin with admin mode currently active.
+func (u *UserCaller) IsAdminModeActivated(ctx context.Context) bool {
+	user, err := u.dbClient.Users.GetUserByID(ctx, u.User.Metadata.ID)
+	if err != nil || user == nil {
+		return false
+	}
+
+	return user.IsAdminModeActive()
 }
 
 // UnauthorizedError returns the unauthorized error for this specific caller type

@@ -704,28 +704,6 @@ func TestUpdateAdminStatusForUser(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			var mockCaller auth.Caller
-			if tc.callerType == "user" {
-				mockCaller = &auth.UserCaller{
-					User: &models.User{
-						Metadata: models.ResourceMetadata{
-							ID: tc.callerUserID,
-						},
-						Username: "calling user",
-						Admin:    tc.callerIsAdmin,
-						AdminModeExpiration: func() *time.Time {
-							if tc.callerIsAdmin {
-								t := time.Now().Add(time.Hour)
-								return &t
-							}
-							return nil
-						}(),
-					},
-				}
-			} else {
-				mockCaller = auth.NewMockCaller(t)
-			}
-
 			mockUsers := db.NewMockUsers(t)
 
 			mockUsers.On("GetUserByID", mock.Anything, userID).Return(tc.userToUpdate, nil).Maybe()
@@ -736,6 +714,29 @@ func TestUpdateAdminStatusForUser(t *testing.T) {
 
 			dbClient := &db.Client{
 				Users: mockUsers,
+			}
+
+			var mockCaller auth.Caller
+			if tc.callerType == "user" {
+				callerUser := &models.User{
+					Metadata: models.ResourceMetadata{
+						ID: tc.callerUserID,
+					},
+					Username: "calling user",
+					Admin:    tc.callerIsAdmin,
+					AdminModeExpiration: func() *time.Time {
+						if tc.callerIsAdmin {
+							t := time.Now().Add(time.Hour)
+							return &t
+						}
+						return nil
+					}(),
+				}
+				callerMockUsers := db.NewMockUsers(t)
+				callerMockUsers.On("GetUserByID", mock.Anything, callerUser.Metadata.ID).Return(callerUser, nil).Maybe()
+				mockCaller = auth.NewUserCaller(callerUser, nil, &db.Client{Users: callerMockUsers}, nil, nil)
+			} else {
+				mockCaller = auth.NewMockCaller(t)
 			}
 
 			service := &service{
@@ -855,7 +856,14 @@ func TestGetUserSessions(t *testing.T) {
 			logger, _ := logger.NewForTest()
 			testService := NewService(logger, dbClient, nil)
 
-			ctx = auth.WithCaller(ctx, tc.caller)
+			caller := tc.caller
+			if uc, ok := caller.(*auth.UserCaller); ok {
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, uc.User.Metadata.ID).Return(uc.User, nil).Maybe()
+				caller = auth.NewUserCaller(uc.User, nil, &db.Client{Users: mockUsers}, nil, nil)
+			}
+
+			ctx = auth.WithCaller(ctx, caller)
 
 			result, err := testService.GetUserSessions(ctx, tc.input)
 
@@ -947,7 +955,7 @@ func TestGetUserSessionByID(t *testing.T) {
 			} else if tc.expectErrorCode == errors.EForbidden {
 				// For forbidden cases where we need to check ownership, we still need to return the session
 				userCaller, isUserCaller := tc.caller.(*auth.UserCaller)
-				if isUserCaller && !userCaller.IsAdminModeActivated() {
+				if isUserCaller && !userCaller.User.IsAdminModeActive() {
 					mockUserSessions.On("GetUserSessionByID", mock.Anything, tc.userSessionID).Return(&models.UserSession{
 						Metadata: models.ResourceMetadata{ID: tc.userSessionID},
 						UserID:   userID, // Session belongs to userID, but caller is otherUserID
@@ -959,7 +967,14 @@ func TestGetUserSessionByID(t *testing.T) {
 			logger, _ := logger.NewForTest()
 			testService := NewService(logger, dbClient, nil)
 
-			ctx = auth.WithCaller(ctx, tc.caller)
+			caller := tc.caller
+			if uc, ok := caller.(*auth.UserCaller); ok {
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, uc.User.Metadata.ID).Return(uc.User, nil).Maybe()
+				caller = auth.NewUserCaller(uc.User, nil, &db.Client{Users: mockUsers}, nil, nil)
+			}
+
+			ctx = auth.WithCaller(ctx, caller)
 
 			result, err := testService.GetUserSessionByID(ctx, tc.userSessionID)
 
@@ -1065,7 +1080,7 @@ func TestGetUserSessionByTRN(t *testing.T) {
 			} else if tc.expectErrorCode == errors.EForbidden {
 				// For forbidden cases where we need to check ownership, we still need to return the session
 				userCaller, isUserCaller := tc.caller.(*auth.UserCaller)
-				if isUserCaller && !userCaller.IsAdminModeActivated() {
+				if isUserCaller && !userCaller.User.IsAdminModeActive() {
 					mockUserSessions.On("GetUserSessionByTRN", mock.Anything, tc.trn).Return(&models.UserSession{
 						Metadata: models.ResourceMetadata{ID: userSessionID, TRN: tc.trn},
 						UserID:   userID, // Session belongs to userID, but caller is otherUserID
@@ -1080,7 +1095,14 @@ func TestGetUserSessionByTRN(t *testing.T) {
 			logger, _ := logger.NewForTest()
 			testService := NewService(logger, dbClient, nil)
 
-			ctx = auth.WithCaller(ctx, tc.caller)
+			caller := tc.caller
+			if uc, ok := caller.(*auth.UserCaller); ok {
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, uc.User.Metadata.ID).Return(uc.User, nil).Maybe()
+				caller = auth.NewUserCaller(uc.User, nil, &db.Client{Users: mockUsers}, nil, nil)
+			}
+
+			ctx = auth.WithCaller(ctx, caller)
 
 			result, err := testService.GetUserSessionByTRN(ctx, tc.trn)
 
@@ -1201,7 +1223,7 @@ func TestRevokeUserSession(t *testing.T) {
 			} else if tc.expectErrorCode == errors.EForbidden {
 				// For forbidden cases where we need to check ownership, we still need to return the session
 				userCaller, isUserCaller := tc.caller.(*auth.UserCaller)
-				if isUserCaller && !userCaller.IsAdminModeActivated() {
+				if isUserCaller && !userCaller.User.IsAdminModeActive() {
 					mockUserSessions.On("GetUserSessionByID", mock.Anything, tc.input.UserSessionID).Return(&models.UserSession{
 						Metadata: models.ResourceMetadata{ID: tc.input.UserSessionID},
 						UserID:   userID, // Session belongs to userID, but caller is otherUserID
@@ -1212,7 +1234,14 @@ func TestRevokeUserSession(t *testing.T) {
 			logger, _ := logger.NewForTest()
 			testService := NewService(logger, dbClient, nil)
 
-			ctx = auth.WithCaller(ctx, tc.caller)
+			caller := tc.caller
+			if uc, ok := caller.(*auth.UserCaller); ok {
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, uc.User.Metadata.ID).Return(uc.User, nil).Maybe()
+				caller = auth.NewUserCaller(uc.User, nil, &db.Client{Users: mockUsers}, nil, nil)
+			}
+
+			ctx = auth.WithCaller(ctx, caller)
 
 			err := testService.RevokeUserSession(ctx, tc.input)
 
@@ -1345,7 +1374,14 @@ func TestService_CreateUser(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			ctx = auth.WithCaller(ctx, tc.caller)
+			caller := tc.caller
+			if uc, ok := caller.(*auth.UserCaller); ok {
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, uc.User.Metadata.ID).Return(uc.User, nil).Maybe()
+				caller = auth.NewUserCaller(uc.User, nil, &db.Client{Users: mockUsers}, nil, nil)
+			}
+
+			ctx = auth.WithCaller(ctx, caller)
 
 			mockUsers := db.NewMockUsers(t)
 
@@ -1463,7 +1499,14 @@ func TestService_DeleteUser(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			ctx = auth.WithCaller(ctx, tc.caller)
+			caller := tc.caller
+			if uc, ok := caller.(*auth.UserCaller); ok {
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, uc.User.Metadata.ID).Return(uc.User, nil).Maybe()
+				caller = auth.NewUserCaller(uc.User, nil, &db.Client{Users: mockUsers}, nil, nil)
+			}
+
+			ctx = auth.WithCaller(ctx, caller)
 
 			mockUsers := db.NewMockUsers(t)
 

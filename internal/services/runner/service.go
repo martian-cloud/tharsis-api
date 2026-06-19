@@ -159,7 +159,7 @@ func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.R
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
-	} else if !caller.IsAdminModeActivated() {
+	} else if !caller.IsAdminModeActivated(ctx) {
 		// Non admin caller shouldn't be able to access all runners, so require a type.
 		if input.RunnerType == nil {
 			return nil, errors.New("only admins with admin mode activated can view all runners", errors.WithErrorCode(errors.EForbidden))
@@ -276,7 +276,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 		}
 
 		// Only admins with admin mode activated are allowed to delete shared runners.
-		if !userCaller.IsAdminModeActivated() {
+		if !userCaller.IsAdminModeActivated(ctx) {
 			return errors.New(
 				"only admins with admin mode activated can delete shared runners",
 				errors.WithErrorCode(errors.EForbidden))
@@ -764,7 +764,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 		}
 
 		// Only admins with admin mode activated are allowed to update shared runners.
-		if !userCaller.IsAdminModeActivated() {
+		if !userCaller.IsAdminModeActivated(ctx) {
 			return nil, errors.New(
 				"only admins with admin mode activated can update shared runners",
 				errors.WithErrorCode(errors.EForbidden))
@@ -1131,7 +1131,7 @@ func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *Subscr
 		if err = RequireViewerAccessToRunnerResource(ctx, runner); err != nil {
 			return nil, err
 		}
-	} else if !caller.IsAdminModeActivated() {
+	} else if !caller.IsAdminModeActivated(ctx) {
 		return nil, errors.New("only admins with admin mode activated can subscribe to all runner sessions", errors.WithErrorCode(errors.EForbidden))
 	}
 
@@ -1250,7 +1250,7 @@ func RequireViewerAccessToRunnerResource(ctx context.Context, runner *models.Run
 			return err
 		}
 	case models.SharedRunnerType:
-		if !caller.IsAdminModeActivated() {
+		if !caller.IsAdminModeActivated(ctx) {
 			return errors.New("only admins with admin mode activated can access shared runner's resources like jobs, sessions and logs", errors.WithErrorCode(errors.EForbidden))
 		}
 	default:

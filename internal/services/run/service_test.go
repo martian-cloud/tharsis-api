@@ -2835,6 +2835,7 @@ func TestGetRuns(t *testing.T) {
 			mockRuns := db.NewMockRuns(t)
 			mockAuthorizer := auth.NewMockAuthorizer(t)
 			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+			mockUsers := db.NewMockUsers(t)
 
 			filter := &db.RunFilter{}
 
@@ -2861,27 +2862,32 @@ func TestGetRuns(t *testing.T) {
 			}
 
 			dbClient := &db.Client{
-				Runs: mockRuns,
+				Runs:  mockRuns,
+				Users: mockUsers,
 			}
 
 			service := &service{
 				dbClient: dbClient,
 			}
 
-			userCaller := auth.NewUserCaller(
-				&models.User{
-					Metadata: models.ResourceMetadata{
-						ID: userID,
-					},
-					Admin: test.isAdmin,
-					AdminModeExpiration: func() *time.Time {
-						if test.isAdmin {
-							t := time.Now().Add(time.Hour)
-							return &t
-						}
-						return nil
-					}(),
+			callerUser := &models.User{
+				Metadata: models.ResourceMetadata{
+					ID: userID,
 				},
+				Admin: test.isAdmin,
+				AdminModeExpiration: func() *time.Time {
+					if test.isAdmin {
+						t := time.Now().Add(time.Hour)
+						return &t
+					}
+					return nil
+				}(),
+			}
+
+			mockUsers.On("GetUserByID", mock.Anything, callerUser.Metadata.ID).Return(callerUser, nil).Maybe()
+
+			userCaller := auth.NewUserCaller(
+				callerUser,
 				mockAuthorizer,
 				dbClient,
 				mockMaintenanceMonitor,
@@ -3354,6 +3360,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 			mockRunners := db.NewMockRunners(t)
 			mockRuns := db.NewMockRuns(t)
 			mockEvents := db.NewMockEvents(t)
+			mockUsers := db.NewMockUsers(t)
 
 			mockAuthorizer := auth.NewMockAuthorizer(t)
 			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
@@ -3403,6 +3410,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 				Runners: mockRunners,
 				Runs:    mockRuns,
 				Events:  mockEvents,
+				Users:   mockUsers,
 			}
 
 			logger, _ := logger.NewForTest()
@@ -3417,20 +3425,24 @@ func TestSubscribeToRunEvents(t *testing.T) {
 
 			var useCaller auth.Caller = mockCaller
 			if test.useUserCaller {
-				useCaller = auth.NewUserCaller(
-					&models.User{
-						Metadata: models.ResourceMetadata{
-							ID: userID,
-						},
-						Admin: test.isAdmin,
-						AdminModeExpiration: func() *time.Time {
-							if test.isAdmin {
-								t := time.Now().Add(time.Hour)
-								return &t
-							}
-							return nil
-						}(),
+				callerUser := &models.User{
+					Metadata: models.ResourceMetadata{
+						ID: userID,
 					},
+					Admin: test.isAdmin,
+					AdminModeExpiration: func() *time.Time {
+						if test.isAdmin {
+							t := time.Now().Add(time.Hour)
+							return &t
+						}
+						return nil
+					}(),
+				}
+
+				mockUsers.On("GetUserByID", mock.Anything, callerUser.Metadata.ID).Return(callerUser, nil).Maybe()
+
+				useCaller = auth.NewUserCaller(
+					callerUser,
 					mockAuthorizer,
 					&dbClient,
 					mockMaintenanceMonitor,

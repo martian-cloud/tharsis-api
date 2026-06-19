@@ -24,6 +24,7 @@ const (
 	envFederatedRegistryTrustPolicyName                = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
 	defaultMaxGraphQLComplexity                        = 0
 	defaultRateLimitStorePluginType                    = "memory"
+	defaultAdminLogTailStorePluginType                 = "noop"
 	defaultMaxGRPCRecvMsgSize                          = 1024 * 1024 * 64  // 64 MiB
 	defaultMaxGraphQLRequestBodySize                   = 1024 * 1024 * 64  // 64 MiB
 	defaultModuleRegistryMaxUploadSize                 = 1024 * 1024 * 128 // 128 MiB
@@ -221,6 +222,10 @@ type Config struct {
 
 	// ServiceAccountClientSecretMaxExpirationDays is the maximum number of days a service account client secret can be valid
 	ServiceAccountClientSecretMaxExpirationDays int `yaml:"service_account_client_secret_max_expiration_days" env:"SERVICE_ACCOUNT_CLIENT_SECRET_MAX_EXPIRATION_DAYS"`
+
+	// AdminLogTailStorePluginType selects the admin log tail store backend. Defaults to "noop".
+	AdminLogTailStorePluginType string            `yaml:"admin_log_tail_store_plugin_type" env:"ADMIN_LOG_TAIL_STORE_PLUGIN_TYPE"`
+	AdminLogTailStorePluginData map[string]string `yaml:"admin_log_tail_store_plugin_data" sensitive:"true"`
 }
 
 // Validate validates the application configuration.
@@ -263,6 +268,7 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		JWSProviderPluginType:                       defaultJWSProviderPluginType,
 		OIDCInternalIdentityProviderClientID:        defaultOIDCInternalIdentityProviderClientID,
 		ServiceAccountClientSecretMaxExpirationDays: defaultServiceAccountClientSecretMaxExpirationDays,
+		AdminLogTailStorePluginType:                 defaultAdminLogTailStorePluginType,
 	}
 
 	// load from YAML config file
@@ -379,6 +385,15 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	// Load LLM Client plugin data
 	for k, v := range loadPluginData("THARSIS_LLM_CLIENT_PLUGIN_DATA_") {
 		c.LLMClientPluginData[k] = v
+	}
+
+	if c.AdminLogTailStorePluginData == nil {
+		c.AdminLogTailStorePluginData = make(map[string]string)
+	}
+
+	// Load Admin Log Tail Store plugin data
+	for k, v := range loadPluginData("THARSIS_ADMIN_LOG_TAIL_STORE_PLUGIN_DATA_") {
+		c.AdminLogTailStorePluginData[k] = v
 	}
 
 	// Load MCP Server config from env vars

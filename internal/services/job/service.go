@@ -263,7 +263,7 @@ func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsRes
 		if rErr = rnr.RequireViewerAccessToRunnerResource(ctx, runner); rErr != nil {
 			return nil, rErr
 		}
-	} else if !caller.IsAdminModeActivated() {
+	} else if !caller.IsAdminModeActivated(ctx) {
 		return nil, errors.New("only admins with admin mode activated can subscribe to all job events without filters", errors.WithErrorCode(errors.EForbidden))
 	}
 
@@ -385,7 +385,7 @@ func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsI
 		if rErr = rnr.RequireViewerAccessToRunnerResource(ctx, runner); rErr != nil {
 			return nil, rErr
 		}
-	} else if !caller.IsAdminModeActivated() {
+	} else if !caller.IsAdminModeActivated(ctx) {
 		return nil, errors.New("only admins with admin mode activated can perform this operation", errors.WithErrorCode(errors.EForbidden))
 	}
 

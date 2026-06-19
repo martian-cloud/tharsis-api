@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -59,7 +60,7 @@ func TestConfigQuery(t *testing.T) {
 			if !tc.noCaller {
 				// Mock auth caller
 				mockCaller := &auth.MockCaller{}
-				mockCaller.On("IsAdminModeActivated").Return(tc.isAdmin)
+				mockCaller.On("IsAdminModeActivated", mock.Anything).Return(tc.isAdmin)
 				ctx = auth.WithCaller(ctx, mockCaller)
 			}
 

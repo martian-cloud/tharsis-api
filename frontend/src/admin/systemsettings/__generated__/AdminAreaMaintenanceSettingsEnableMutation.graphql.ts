@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<80622fdaed07975c516305bd5dcb2939>>
+ * @generated SignedSource<<1749a0f528923cce35e95a0ca51a2ea6>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,10 +12,10 @@ import { ConcreteRequest } from 'relay-runtime';
 export type EnableMaintenanceModeInput = {
   clientMutationId?: string | null | undefined;
 };
-export type MaintenanceSettingsEnableMutation$variables = {
+export type AdminAreaMaintenanceSettingsEnableMutation$variables = {
   input: EnableMaintenanceModeInput;
 };
-export type MaintenanceSettingsEnableMutation$data = {
+export type AdminAreaMaintenanceSettingsEnableMutation$data = {
   readonly enableMaintenanceMode: {
     readonly maintenanceMode: {
       readonly createdBy: string;
@@ -30,9 +30,9 @@ export type MaintenanceSettingsEnableMutation$data = {
     }>;
   };
 };
-export type MaintenanceSettingsEnableMutation = {
-  response: MaintenanceSettingsEnableMutation$data;
-  variables: MaintenanceSettingsEnableMutation$variables;
+export type AdminAreaMaintenanceSettingsEnableMutation = {
+  response: AdminAreaMaintenanceSettingsEnableMutation$data;
+  variables: AdminAreaMaintenanceSettingsEnableMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -135,7 +135,7 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "MaintenanceSettingsEnableMutation",
+    "name": "AdminAreaMaintenanceSettingsEnableMutation",
     "selections": (v1/*: any*/),
     "type": "Mutation",
     "abstractKey": null
@@ -144,20 +144,20 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "MaintenanceSettingsEnableMutation",
+    "name": "AdminAreaMaintenanceSettingsEnableMutation",
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "26eaf9bd52c01e134bb0746787ccfa30",
+    "cacheID": "1aa403e368ec9c27bec7e5abccdedde5",
     "id": null,
     "metadata": {},
-    "name": "MaintenanceSettingsEnableMutation",
+    "name": "AdminAreaMaintenanceSettingsEnableMutation",
     "operationKind": "mutation",
-    "text": "mutation MaintenanceSettingsEnableMutation(\n  $input: EnableMaintenanceModeInput!\n) {\n  enableMaintenanceMode(input: $input) {\n    maintenanceMode {\n      id\n      createdBy\n      metadata {\n        createdAt\n      }\n    }\n    problems {\n      message\n      field\n    }\n  }\n}\n"
+    "text": "mutation AdminAreaMaintenanceSettingsEnableMutation(\n  $input: EnableMaintenanceModeInput!\n) {\n  enableMaintenanceMode(input: $input) {\n    maintenanceMode {\n      id\n      createdBy\n      metadata {\n        createdAt\n      }\n    }\n    problems {\n      message\n      field\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "735dc3c753964289041ca74479499dba";
+(node as any).hash = "afa4b4e8ea34afedb80c288d931cd053";
 
 export default node;

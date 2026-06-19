@@ -12,16 +12,16 @@ import { useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import { useSnackbar } from "notistack";
 import { MutationError } from "../../common/error";
 import Timestamp from "../../common/Timestamp";
-import { MaintenanceSettingsQuery } from "./__generated__/MaintenanceSettingsQuery.graphql";
-import { MaintenanceSettingsEnableMutation } from "./__generated__/MaintenanceSettingsEnableMutation.graphql";
-import { MaintenanceSettingsDisableMutation } from "./__generated__/MaintenanceSettingsDisableMutation.graphql";
+import { AdminAreaMaintenanceSettingsQuery } from "./__generated__/AdminAreaMaintenanceSettingsQuery.graphql";
+import { AdminAreaMaintenanceSettingsEnableMutation } from "./__generated__/AdminAreaMaintenanceSettingsEnableMutation.graphql";
+import { AdminAreaMaintenanceSettingsDisableMutation } from "./__generated__/AdminAreaMaintenanceSettingsDisableMutation.graphql";
 
-function MaintenanceSettings() {
+function AdminAreaMaintenanceSettings() {
     const { enqueueSnackbar } = useSnackbar();
     const [error, setError] = useState<MutationError>();
 
-    const data = useLazyLoadQuery<MaintenanceSettingsQuery>(graphql`
-        query MaintenanceSettingsQuery {
+    const data = useLazyLoadQuery<AdminAreaMaintenanceSettingsQuery>(graphql`
+        query AdminAreaMaintenanceSettingsQuery {
             maintenanceMode {
                 id
                 createdBy
@@ -35,8 +35,8 @@ function MaintenanceSettings() {
     const [currentMaintenanceMode, setCurrentMaintenanceMode] = useState(data.maintenanceMode);
     const [isMaintenanceModeEnabled, setIsMaintenanceModeEnabled] = useState(!!data.maintenanceMode);
 
-    const [enableMaintenanceMode, isEnabling] = useMutation<MaintenanceSettingsEnableMutation>(graphql`
-        mutation MaintenanceSettingsEnableMutation($input: EnableMaintenanceModeInput!) {
+    const [enableMaintenanceMode, isEnabling] = useMutation<AdminAreaMaintenanceSettingsEnableMutation>(graphql`
+        mutation AdminAreaMaintenanceSettingsEnableMutation($input: EnableMaintenanceModeInput!) {
             enableMaintenanceMode(input: $input) {
                 maintenanceMode {
                     id
@@ -53,8 +53,8 @@ function MaintenanceSettings() {
         }
     `);
 
-    const [disableMaintenanceMode, isDisabling] = useMutation<MaintenanceSettingsDisableMutation>(graphql`
-        mutation MaintenanceSettingsDisableMutation($input: DisableMaintenanceModeInput!) {
+    const [disableMaintenanceMode, isDisabling] = useMutation<AdminAreaMaintenanceSettingsDisableMutation>(graphql`
+        mutation AdminAreaMaintenanceSettingsDisableMutation($input: DisableMaintenanceModeInput!) {
             disableMaintenanceMode(input: $input) {
                 problems {
                     message
@@ -178,4 +178,4 @@ function MaintenanceSettings() {
     );
 }
 
-export default MaintenanceSettings;
+export default AdminAreaMaintenanceSettings;

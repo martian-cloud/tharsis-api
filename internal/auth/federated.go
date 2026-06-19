@@ -126,7 +126,7 @@ func (f *FederatedRegistryCaller) GetSubject() string {
 }
 
 // IsAdminModeActivated returns true if the caller is an admin
-func (f *FederatedRegistryCaller) IsAdminModeActivated() bool {
+func (f *FederatedRegistryCaller) IsAdminModeActivated(_ context.Context) bool {
 	return false
 }
 

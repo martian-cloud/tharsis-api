@@ -31,6 +31,7 @@ type Config {
   jwsProviderPluginType: String!
   secretManagerPluginType: String!
   emailClientPluginType: String!
+  adminLogTailStorePluginType: String!
   aiEnabled: Boolean!
   oauthProviders: [IdpConfig!]!
   federatedRegistryTrustPolicies: [FederatedRegistryTrustPolicy!]!
@@ -55,7 +56,9 @@ type Config {
   jwsProviderPluginData: [KeyValueEntry!]!
   secretManagerPluginData: [KeyValueEntry!]!
   emailClientPluginData: [KeyValueEntry!]!
+  adminLogTailStorePluginData: [KeyValueEntry!]!
   mcpServerConfig: MCPServerConfig!
+  sensitiveFields: [String!]!
 }
 
 type MCPServerConfig {

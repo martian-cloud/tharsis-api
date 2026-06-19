@@ -20,7 +20,7 @@ func TestJobCaller_GetSubject(t *testing.T) {
 
 func TestJobCaller_IsAdmin(t *testing.T) {
 	caller := JobCaller{}
-	assert.False(t, caller.IsAdminModeActivated())
+	assert.False(t, caller.IsAdminModeActivated(t.Context()))
 }
 
 func TestJobCaller_GetNamespaceAccessPolicy(t *testing.T) {

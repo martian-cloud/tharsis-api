@@ -80,7 +80,7 @@ func (s *service) UpdateResourceLimit(ctx context.Context, input *UpdateResource
 		return nil, errors.New("Unsupported caller type, only users are allowed to update resource limits", errors.WithErrorCode(errors.EForbidden))
 	}
 	// Only admins with admin mode activated are allowed to update resource limits.
-	if !userCaller.IsAdminModeActivated() {
+	if !userCaller.IsAdminModeActivated(ctx) {
 		tracing.RecordError(span, nil, "only admins with admin mode activated can update resource limits")
 		return nil, errors.New("only admins with admin mode activated can update resource limits", errors.WithErrorCode(errors.EForbidden))
 	}

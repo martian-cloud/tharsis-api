@@ -151,7 +151,7 @@ func (s *service) CreateAnnouncement(ctx context.Context, input *CreateAnnouncem
 		return nil, err
 	}
 
-	if !caller.IsAdminModeActivated() {
+	if !caller.IsAdminModeActivated(ctx) {
 		return nil, errors.New("only admins with admin mode activated can create announcements", errors.WithErrorCode(errors.EForbidden))
 	}
 
@@ -198,7 +198,7 @@ func (s *service) UpdateAnnouncement(ctx context.Context, input *UpdateAnnouncem
 		return nil, err
 	}
 
-	if !caller.IsAdminModeActivated() {
+	if !caller.IsAdminModeActivated(ctx) {
 		return nil, errors.New("only admins with admin mode activated can update announcements", errors.WithErrorCode(errors.EForbidden))
 	}
 
@@ -259,7 +259,7 @@ func (s *service) DeleteAnnouncement(ctx context.Context, input *DeleteAnnouncem
 		return err
 	}
 
-	if !caller.IsAdminModeActivated() {
+	if !caller.IsAdminModeActivated(ctx) {
 		return errors.New("only admins with admin mode activated can delete announcements", errors.WithErrorCode(errors.EForbidden))
 	}
 

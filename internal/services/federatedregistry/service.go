@@ -251,7 +251,7 @@ func (s *service) GetFederatedRegistries(ctx context.Context, input *GetFederate
 	}
 
 	// Only an admin user can ask for information on all registries.
-	if input.GroupPath == nil && !caller.IsAdminModeActivated() {
+	if input.GroupPath == nil && !caller.IsAdminModeActivated(ctx) {
 		return nil, errors.New("only admins with admin mode activated can query for federated registries without a local registry or group filter", errors.WithErrorCode(errors.EForbidden))
 	}
 

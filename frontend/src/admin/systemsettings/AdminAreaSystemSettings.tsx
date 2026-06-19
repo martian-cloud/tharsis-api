@@ -1,10 +1,10 @@
 import { Box, Typography } from "@mui/material";
 import AdminAreaBreadcrumbs from "../AdminAreaBreadcrumbs";
-import MaintenanceSettings from "./MaintenanceSettings";
+import AdminAreaMaintenanceSettings from "./AdminAreaMaintenanceSettings";
 
 const DESCRIPTION = 'Configure system-wide settings that affect the entire Tharsis platform, including maintenance mode and other operational controls.';
 
-function SystemSettings() {
+function AdminAreaSystemSettings() {
     return (
         <Box>
             <AdminAreaBreadcrumbs
@@ -15,10 +15,10 @@ function SystemSettings() {
             <Box>
                 <Typography variant="h5" gutterBottom>System Settings</Typography>
                 <Typography variant="body2" sx={{ mb: 3 }}>{DESCRIPTION}</Typography>
-                <MaintenanceSettings />
+                <AdminAreaMaintenanceSettings />
             </Box>
         </Box>
     );
 }
 
-export default SystemSettings;
+export default AdminAreaSystemSettings;

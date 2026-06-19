@@ -190,7 +190,7 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 	}
 
 	// Only admins with admin mode activated are allowed to create roles
-	if !userCaller.IsAdminModeActivated() {
+	if !userCaller.IsAdminModeActivated(ctx) {
 		return nil, errors.New("only admins with admin mode activated can create roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
@@ -265,7 +265,7 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 	}
 
 	// Only admins with admin mode activated are allowed to update roles
-	if !userCaller.IsAdminModeActivated() {
+	if !userCaller.IsAdminModeActivated(ctx) {
 		return nil, errors.New("only admins with admin mode activated can update roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
@@ -336,7 +336,7 @@ func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error 
 	}
 
 	// Only admins with admin mode activated are allowed to delete roles
-	if !userCaller.IsAdminModeActivated() {
+	if !userCaller.IsAdminModeActivated(ctx) {
 		return errors.New("only admins with admin mode activated can delete roles", errors.WithErrorCode(errors.EForbidden))
 	}
 

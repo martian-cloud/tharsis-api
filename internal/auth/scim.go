@@ -41,7 +41,7 @@ func (s *SCIMCaller) GetIDPIssuerURL() string {
 }
 
 // IsAdminModeActivated returns true if the caller is an admin.
-func (s *SCIMCaller) IsAdminModeActivated() bool {
+func (s *SCIMCaller) IsAdminModeActivated(_ context.Context) bool {
 	return false
 }
 

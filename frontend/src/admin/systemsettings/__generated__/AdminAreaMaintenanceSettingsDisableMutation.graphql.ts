@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<84a7b503b4c0c054d68432d7c77b57cd>>
+ * @generated SignedSource<<fe38e6a9d1f49412fa3e6cd03a8270b4>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,10 +12,10 @@ import { ConcreteRequest } from 'relay-runtime';
 export type DisableMaintenanceModeInput = {
   clientMutationId?: string | null | undefined;
 };
-export type MaintenanceSettingsDisableMutation$variables = {
+export type AdminAreaMaintenanceSettingsDisableMutation$variables = {
   input: DisableMaintenanceModeInput;
 };
-export type MaintenanceSettingsDisableMutation$data = {
+export type AdminAreaMaintenanceSettingsDisableMutation$data = {
   readonly disableMaintenanceMode: {
     readonly problems: ReadonlyArray<{
       readonly field: ReadonlyArray<string> | null | undefined;
@@ -23,9 +23,9 @@ export type MaintenanceSettingsDisableMutation$data = {
     }>;
   };
 };
-export type MaintenanceSettingsDisableMutation = {
-  response: MaintenanceSettingsDisableMutation$data;
-  variables: MaintenanceSettingsDisableMutation$variables;
+export type AdminAreaMaintenanceSettingsDisableMutation = {
+  response: AdminAreaMaintenanceSettingsDisableMutation$data;
+  variables: AdminAreaMaintenanceSettingsDisableMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -85,7 +85,7 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "MaintenanceSettingsDisableMutation",
+    "name": "AdminAreaMaintenanceSettingsDisableMutation",
     "selections": (v1/*: any*/),
     "type": "Mutation",
     "abstractKey": null
@@ -94,20 +94,20 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "MaintenanceSettingsDisableMutation",
+    "name": "AdminAreaMaintenanceSettingsDisableMutation",
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "38af89a8c4359d95e80c63c8edf2d664",
+    "cacheID": "83ee7bfc76e8a74ccf9ca59720a1af9d",
     "id": null,
     "metadata": {},
-    "name": "MaintenanceSettingsDisableMutation",
+    "name": "AdminAreaMaintenanceSettingsDisableMutation",
     "operationKind": "mutation",
-    "text": "mutation MaintenanceSettingsDisableMutation(\n  $input: DisableMaintenanceModeInput!\n) {\n  disableMaintenanceMode(input: $input) {\n    problems {\n      message\n      field\n    }\n  }\n}\n"
+    "text": "mutation AdminAreaMaintenanceSettingsDisableMutation(\n  $input: DisableMaintenanceModeInput!\n) {\n  disableMaintenanceMode(input: $input) {\n    problems {\n      message\n      field\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "46561c41664cddc4d35b6ff0fc88fe35";
+(node as any).hash = "86091fd8d90082217bf559bb0c8fa383";
 
 export default node;

@@ -27,7 +27,7 @@ func (j *JobCaller) GetSubject() string {
 }
 
 // IsAdminModeActivated returns true if the caller is an admin
-func (j *JobCaller) IsAdminModeActivated() bool {
+func (j *JobCaller) IsAdminModeActivated(_ context.Context) bool {
 	return false
 }
 

@@ -63,17 +63,17 @@ func (_m *MockCaller) GetSubject() string {
 	return r0
 }
 
-// IsAdminModeActivated provides a mock function with no fields
-func (_m *MockCaller) IsAdminModeActivated() bool {
-	ret := _m.Called()
+// IsAdminModeActivated provides a mock function with given fields: ctx
+func (_m *MockCaller) IsAdminModeActivated(ctx context.Context) bool {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IsAdminModeActivated")
 	}
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) bool); ok {
+		r0 = rf(ctx)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}

@@ -1,4 +1,5 @@
 input ActivateAdminModeInput {
+  clientMutationId: String
   durationMinutes: Int
 }
 
@@ -152,6 +153,33 @@ type AddUserToTeamPayload {
   clientMutationId: String
   problems: [Problem!]!
   teamMember: TeamMember
+}
+
+type AdminLogTailEntry {
+  caller: String
+  fields: String
+  id: ID!
+  level: AdminLogTailLevel!
+  message: String!
+  stack: String
+  timestamp: Time!
+}
+
+type AdminLogTailEvent {
+  error: String
+  logEntry: AdminLogTailEntry
+}
+
+enum AdminLogTailLevel {
+  DEBUG
+  ERROR
+  INFO
+  WARN
+}
+
+input AdminLogTailSubscriptionInput {
+  levels: [AdminLogTailLevel!]
+  search: String
 }
 
 type AgentSession implements Node {
@@ -476,6 +504,8 @@ type ClaimJobPayload {
 }
 
 type Config {
+  adminLogTailStorePluginData: [KeyValueEntry!]!
+  adminLogTailStorePluginType: String!
   adminUserEmail: String!
   aiEnabled: Boolean!
   asymmetricSigningKeyDecommissionPeriodDays: Int!
@@ -517,6 +547,7 @@ type Config {
   rateLimitStorePluginType: String!
   secretManagerPluginData: [KeyValueEntry!]!
   secretManagerPluginType: String!
+  sensitiveFields: [String!]!
   serverPort: String!
   serviceAccountClientSecretMaxExpirationDays: Int!
   serviceDiscoveryHost: String!
@@ -2194,6 +2225,7 @@ enum ProblemType {
 type Query {
   """There is no query for an activity event by ID."""
   activityEvents(actions: [ActivityEventAction!], after: String, before: String, first: Int, includeNested: Boolean, last: Int, namespacePath: String, serviceAccountId: String, serviceAccountPath: String, sort: ActivityEventSort, targetTypes: [ActivityEventTargetType!], timeRangeEnd: Time, timeRangeStart: Time, userId: String, username: String): ActivityEventConnection!
+  adminLogTail(levels: [AdminLogTailLevel!], limit: Int, search: String): [AdminLogTailEntry!]!
   agentTrace(input: AgentTraceInput!): String
   announcements(active: Boolean, after: String, before: String, first: Int, last: Int, sort: AnnouncementSort): AnnouncementConnection!
   authSettings: AuthSettings
@@ -2718,6 +2750,7 @@ enum StateVersionSort {
 }
 
 type Subscription {
+  adminLogTailEvents(input: AdminLogTailSubscriptionInput!): AdminLogTailEvent!
   agentSessionEvents(input: AgentSessionEventSubscriptionInput!): AgentSessionEvent!
   jobCancellationEvent(input: JobCancellationEventSubscriptionInput!): JobCancellationEvent!
   jobEvents(input: JobSubscriptionInput!): JobEvent!
