@@ -42,7 +42,7 @@ func (s *ServiceAccountCaller) GetSubject() string {
 }
 
 // IsAdminModeActivated returns true if the caller is an admin
-func (s *ServiceAccountCaller) IsAdminModeActivated() bool {
+func (s *ServiceAccountCaller) IsAdminModeActivated(_ context.Context) bool {
 	return false
 }
 

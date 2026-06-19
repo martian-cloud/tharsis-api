@@ -43,6 +43,20 @@ lint: ## run linting on Go and UI code
 		echo "$$UNFORMATTED"; \
 		exit 1; \
 	fi
+	@echo "Checking migration file ordering..."
+	@MAIN_MAX=$$(git ls-tree -r --name-only origin/main -- internal/db/migrations/ 2>/dev/null \
+		| grep -oE '[0-9]{14}' | sort | tail -1); \
+	if [ -n "$$MAIN_MAX" ]; then \
+		STALE=$$({ git diff --name-only --diff-filter=A origin/main HEAD -- internal/db/migrations/ 2>/dev/null; \
+			git ls-files --others --exclude-standard internal/db/migrations/ 2>/dev/null; } \
+			| grep -oE '[0-9]{14}' | sort -u \
+			| awk -v max="$$MAIN_MAX" '$$0+0 <= max+0'); \
+		if [ -n "$$STALE" ]; then \
+			printf 'ERROR: Migration timestamp(s) predate latest in main (%s): %s\n' "$$MAIN_MAX" "$$STALE"; \
+			echo "Regenerate with: migrate create -ext sql -dir internal/db/migrations <name>"; \
+			exit 1; \
+		fi; \
+	fi
 	@echo "Linting UI code..."
 	@cd frontend && npm run lint
 

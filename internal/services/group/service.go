@@ -406,7 +406,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 			return nil, errors.New("Unsupported caller type, only users are allowed to create top-level groups", errors.WithErrorCode(errors.EForbidden))
 		}
 		// Only admins with admin mode activated are allowed to create top level groups
-		if !userCaller.IsAdminModeActivated() {
+		if !userCaller.IsAdminModeActivated(ctx) {
 			tracing.RecordError(span, nil, "only admins with admin mode activated can create top-level groups")
 			return nil, errors.New("only admins with admin mode activated can create top-level groups", errors.WithErrorCode(errors.EForbidden))
 		}
@@ -654,7 +654,7 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 				errors.WithErrorCode(errors.EForbidden),
 			)
 		}
-		if !userCaller.IsAdminModeActivated() {
+		if !userCaller.IsAdminModeActivated(ctx) {
 			tracing.RecordError(span, nil, "only admins with admin mode activated can move groups to top-level")
 			return nil, errors.New("only admins with admin mode activated can move groups to top-level", errors.WithErrorCode(errors.EForbidden))
 		}

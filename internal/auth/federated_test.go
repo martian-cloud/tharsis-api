@@ -275,7 +275,7 @@ func TestFederatedRegistryCaller_IsAdmin(t *testing.T) {
 	caller := NewFederatedRegistryCaller(mockDBClient, trustPolicies, subject)
 
 	// Execute
-	result := caller.IsAdminModeActivated()
+	result := caller.IsAdminModeActivated(t.Context())
 
 	// Verify
 	require.False(t, result)

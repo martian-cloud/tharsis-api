@@ -131,37 +131,44 @@ func TestUpdateResourceLimit(t *testing.T) {
 
 			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
 
+			mockUsers := db.NewMockUsers(t)
+
 			dbClient := &db.Client{
 				Transactions:   mockTransactions,
 				ResourceLimits: mockResourceLimits,
+				Users:          mockUsers,
 			}
 
 			var testCaller auth.Caller
 			switch test.callerType {
 			case "admin":
-				testCaller = auth.NewUserCaller(
-					&models.User{
-						Metadata: models.ResourceMetadata{
-							ID: userMemberID,
-						},
-						Admin:               true,
-						AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
-						Username:            "user1",
+				adminUser := &models.User{
+					Metadata: models.ResourceMetadata{
+						ID: userMemberID,
 					},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+					Username:            "user1",
+				}
+				mockUsers.On("GetUserByID", mock.Anything, adminUser.Metadata.ID).Return(adminUser, nil).Maybe()
+				testCaller = auth.NewUserCaller(
+					adminUser,
 					&mockAuthorizer,
 					dbClient,
 					mockMaintenanceMonitor,
 					nil,
 				)
 			case "user":
-				testCaller = auth.NewUserCaller(
-					&models.User{
-						Metadata: models.ResourceMetadata{
-							ID: userMemberID,
-						},
-						Admin:    false,
-						Username: "user1",
+				nonAdminUser := &models.User{
+					Metadata: models.ResourceMetadata{
+						ID: userMemberID,
 					},
+					Admin:    false,
+					Username: "user1",
+				}
+				mockUsers.On("GetUserByID", mock.Anything, nonAdminUser.Metadata.ID).Return(nonAdminUser, nil).Maybe()
+				testCaller = auth.NewUserCaller(
+					nonAdminUser,
 					&mockAuthorizer,
 					dbClient,
 					mockMaintenanceMonitor,

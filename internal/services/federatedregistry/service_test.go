@@ -30,6 +30,7 @@ type mockDBClient struct {
 	MockGroups              *db.MockGroups
 	MockFederatedRegistries *db.MockFederatedRegistries
 	MockWorkspaces          *db.MockWorkspaces
+	MockUsers               *db.MockUsers
 }
 
 func buildDBClientWithMocks(t *testing.T) *mockDBClient {
@@ -49,6 +50,9 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 	mockWorkspaces := db.MockWorkspaces{}
 	mockWorkspaces.Test(t)
 
+	mockUsers := db.MockUsers{}
+	mockUsers.Test(t)
+
 	return &mockDBClient{
 		Client: &db.Client{
 			Transactions:        &mockTransactions,
@@ -56,12 +60,14 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 			Groups:              &mockGroups,
 			FederatedRegistries: &mockFederatedRegistries,
 			Workspaces:          &mockWorkspaces,
+			Users:               &mockUsers,
 		},
 		MockTransactions:        &mockTransactions,
 		MockResourceLimits:      &mockResourceLimits,
 		MockGroups:              &mockGroups,
 		MockFederatedRegistries: &mockFederatedRegistries,
 		MockWorkspaces:          &mockWorkspaces,
+		MockUsers:               &mockUsers,
 	}
 }
 
@@ -550,21 +556,25 @@ func TestGetFederatedRegistries(t *testing.T) {
 				models.ViewFederatedRegistryPermission, mock.Anything).
 				Return(test.injectRegistryPermissionError).Maybe()
 
-			testCaller := auth.NewUserCaller(
-				&models.User{
-					Metadata: models.ResourceMetadata{
-						ID: "user-1-id",
-					},
-					Admin: test.isAdmin,
-					AdminModeExpiration: func() *time.Time {
-						if test.isAdmin {
-							t := time.Now().Add(time.Hour)
-							return &t
-						}
-						return nil
-					}(),
-					Username: "user1",
+			testUser := &models.User{
+				Metadata: models.ResourceMetadata{
+					ID: "user-1-id",
 				},
+				Admin: test.isAdmin,
+				AdminModeExpiration: func() *time.Time {
+					if test.isAdmin {
+						t := time.Now().Add(time.Hour)
+						return &t
+					}
+					return nil
+				}(),
+				Username: "user1",
+			}
+
+			mockDBClient.MockUsers.On("GetUserByID", mock.Anything, testUser.Metadata.ID).Return(testUser, nil).Maybe()
+
+			testCaller := auth.NewUserCaller(
+				testUser,
 				&mockAuthorizer,
 				mockDBClient.Client,
 				mockMaintenanceMonitor,

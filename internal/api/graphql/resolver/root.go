@@ -1668,3 +1668,15 @@ func (r RootResolver) AgentSessionEvents(ctx context.Context, args *struct {
 }) (<-chan *AgentSessionEventResolver, error) {
 	return r.agentSessionEventsSubscription(ctx, &args.Input)
 }
+
+// AdminLogTail returns the most recent buffered admin log tail entries.
+func (r RootResolver) AdminLogTail(ctx context.Context, args *AdminLogTailQueryArgs) ([]*AdminLogTailEntryResolver, error) {
+	return adminLogTailQuery(ctx, args)
+}
+
+// AdminLogTailEvents streams live admin log tail entries to the caller.
+func (r RootResolver) AdminLogTailEvents(ctx context.Context, args *struct {
+	Input AdminLogTailSubscriptionInput
+}) (<-chan *AdminLogTailEventResolver, error) {
+	return adminLogTailEventsSubscription(ctx, args)
+}

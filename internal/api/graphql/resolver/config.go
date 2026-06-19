@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 	"reflect"
+	"sort"
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
@@ -239,6 +240,11 @@ func (r *ConfigResolver) EmailClientPluginType() string {
 	return r.cfg.EmailClientPluginType
 }
 
+// AdminLogTailStorePluginType resolver
+func (r *ConfigResolver) AdminLogTailStorePluginType() string {
+	return r.cfg.AdminLogTailStorePluginType
+}
+
 // AIEnabled resolver
 func (r *ConfigResolver) AIEnabled() bool {
 	return r.cfg.AIEnabled
@@ -257,6 +263,21 @@ func (r *ConfigResolver) TLSKeyFile() string {
 // AdminUserEmail resolver
 func (r *ConfigResolver) AdminUserEmail() string {
 	return r.cfg.AdminUserEmail
+}
+
+// SensitiveFields resolver
+func (r *ConfigResolver) SensitiveFields() []string {
+	t := reflect.TypeFor[config.Config]()
+
+	fields := []string{}
+	for field := range t.Fields() {
+		if field.Tag.Get("sensitive") == "true" {
+			fields = append(fields, strings.ToLower(field.Name))
+		}
+	}
+
+	sort.Strings(fields)
+	return fields
 }
 
 // IdpConfigResolver resolves IDP config
@@ -330,6 +351,11 @@ func (r *ConfigResolver) SecretManagerPluginData() []*PluginDataEntryResolver {
 // EmailClientPluginData resolver
 func (r *ConfigResolver) EmailClientPluginData() []*PluginDataEntryResolver {
 	return mapToPluginDataEntries(r.cfg.EmailClientPluginData)
+}
+
+// AdminLogTailStorePluginData resolver
+func (r *ConfigResolver) AdminLogTailStorePluginData() []*PluginDataEntryResolver {
+	return mapToPluginDataEntries(r.cfg.AdminLogTailStorePluginData)
 }
 
 // MCPServerConfig resolver
@@ -429,7 +455,7 @@ func configQuery(ctx context.Context) (*ConfigResolver, error) {
 
 	config := getConfig(ctx)
 
-	if !caller.IsAdminModeActivated() {
+	if !caller.IsAdminModeActivated(ctx) {
 		config = filterSensitiveFields(*config)
 	}
 

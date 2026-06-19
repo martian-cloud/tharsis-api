@@ -21,7 +21,7 @@ func TestSCIMCaller_GetSubject(t *testing.T) {
 
 func TestSCIMCaller_IsAdmin(t *testing.T) {
 	caller := SCIMCaller{}
-	assert.False(t, caller.IsAdminModeActivated())
+	assert.False(t, caller.IsAdminModeActivated(t.Context()))
 }
 
 func TestSCIMCaller_GetNamespaceAccessPolicy(t *testing.T) {

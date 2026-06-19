@@ -438,7 +438,7 @@ func (s *service) GetUserSessions(ctx context.Context, input *GetUserSessionsInp
 	}
 
 	// Only admins or the current user can query user sessions
-	if !userCaller.IsAdminModeActivated() && userCaller.User.Metadata.ID != input.UserID {
+	if !userCaller.IsAdminModeActivated(ctx) && userCaller.User.Metadata.ID != input.UserID {
 		return nil, errors.New("only admins or the current user can query user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -481,7 +481,7 @@ func (s *service) GetUserSessionByID(ctx context.Context, userSessionID string) 
 	}
 
 	// Only admins or the session owner can access the user session
-	if !userCaller.IsAdminModeActivated() && userCaller.User.Metadata.ID != userSession.UserID {
+	if !userCaller.IsAdminModeActivated(ctx) && userCaller.User.Metadata.ID != userSession.UserID {
 		return nil, errors.New("only admins or the session owner can access user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -513,7 +513,7 @@ func (s *service) GetUserSessionByTRN(ctx context.Context, trn string) (*models.
 	}
 
 	// Only admins or the session owner can access the user session
-	if !userCaller.IsAdminModeActivated() && userCaller.User.Metadata.ID != userSession.UserID {
+	if !userCaller.IsAdminModeActivated(ctx) && userCaller.User.Metadata.ID != userSession.UserID {
 		return nil, errors.New("only admins or the session owner can access user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -536,7 +536,7 @@ func (s *service) UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdm
 		return nil, errors.New("only users can update admin status for other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
-	if !userCaller.IsAdminModeActivated() {
+	if !userCaller.IsAdminModeActivated(ctx) {
 		return nil, errors.New("only admins with admin mode activated can alter admin status of other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -613,7 +613,7 @@ func (s *service) RevokeUserSession(ctx context.Context, input *RevokeUserSessio
 	}
 
 	// Only admins or the session owner can revoke the user session
-	if !userCaller.IsAdminModeActivated() && userCaller.User.Metadata.ID != userSession.UserID {
+	if !userCaller.IsAdminModeActivated(ctx) && userCaller.User.Metadata.ID != userSession.UserID {
 		return errors.New("only admins or the session owner can revoke user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -639,7 +639,7 @@ func (s *service) CreateUser(ctx context.Context, input *CreateUserInput) (*mode
 		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
 	}
 
-	if !caller.IsAdminModeActivated() {
+	if !caller.IsAdminModeActivated(ctx) {
 		return nil, errors.New("only admins with admin mode activated can create other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -683,7 +683,7 @@ func (s *service) DeleteUser(ctx context.Context, input *DeleteUserInput) error 
 		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
 	}
 
-	if !caller.IsAdminModeActivated() {
+	if !caller.IsAdminModeActivated(ctx) {
 		return errors.New("only admins with admin mode activated can delete other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 

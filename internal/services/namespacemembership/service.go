@@ -178,7 +178,7 @@ func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,
 	switch {
 	case input.UserID != nil:
 		userCaller, ok := caller.(*auth.UserCaller)
-		if !ok || (!userCaller.IsAdminModeActivated() && userCaller.User.Metadata.ID != *input.UserID) {
+		if !ok || (!userCaller.IsAdminModeActivated(ctx) && userCaller.User.Metadata.ID != *input.UserID) {
 			return nil, errors.New("User %s is not authorized to query namespace memberships for %s", userCaller.User.Username, *input.UserID, errors.WithErrorCode(errors.EForbidden))
 		}
 	case input.ServiceAccount != nil:

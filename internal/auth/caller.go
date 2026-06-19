@@ -175,7 +175,7 @@ func (s *SystemCaller) GetSubject() string {
 }
 
 // IsAdminModeActivated returns true if the caller is an admin
-func (s *SystemCaller) IsAdminModeActivated() bool {
+func (s *SystemCaller) IsAdminModeActivated(_ context.Context) bool {
 	// System caller is always an admin
 	return true
 }
@@ -222,7 +222,7 @@ type NamespaceAccessPolicy struct {
 // Caller represents a subject performing an API request
 type Caller interface {
 	GetSubject() string
-	IsAdminModeActivated() bool
+	IsAdminModeActivated(ctx context.Context) bool
 	GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error)
 	RequirePermission(ctx context.Context, perms models.Permission, checks ...func(*constraints)) error
 	RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error

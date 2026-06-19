@@ -626,9 +626,9 @@ func TestSubscribeToJobs(t *testing.T) {
 				mockCaller.On("RequireAccessToInheritableResource",
 					mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(test.authError).Maybe()
-				mockCaller.On("IsAdminModeActivated").Return(test.isAdmin).Maybe()
+				mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin).Maybe()
 			} else {
-				mockCaller.On("IsAdminModeActivated").Return(test.isAdmin)
+				mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin)
 			}
 
 			for _, e := range test.sendEventData {
@@ -930,7 +930,7 @@ func TestGetJobs(t *testing.T) {
 					mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 					Return(test.injectRunnerPermError).Maybe()
 			}
-			mockCaller.On("IsAdminModeActivated").Return(test.isAdmin).Maybe()
+			mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin).Maybe()
 
 			if test.authError == nil {
 				dbInput := &db.GetJobsInput{

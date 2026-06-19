@@ -1,3 +1,6 @@
+import TerminalOutlinedIcon from '@mui/icons-material/TerminalOutlined';
+import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
+import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined';
 import { Box, List, ListItemButton, ListItemIcon, ListItemText, useTheme } from "@mui/material";
 import { Link, useLocation } from 'react-router-dom';
 import { AnnouncementIcon, RunnerIcon, SettingsIcon, UserIcon } from "../common/Icons";
@@ -7,7 +10,10 @@ const LIST_ITEMS = [
     { route: 'users', label: 'Users', icon: <UserIcon /> },
     { route: 'runners', label: 'Runner Agents', icon: <RunnerIcon /> },
     { route: 'announcements', label: 'Announcements', icon: <AnnouncementIcon /> },
-    { route: 'system_settings', label: 'System Settings', icon: <SettingsIcon /> }
+    { route: 'system_settings', label: 'System Settings', icon: <SettingsIcon /> },
+    { route: 'configuration', label: 'Configuration', icon: <TuneOutlinedIcon /> },
+    { route: 'resource_limits', label: 'Resource Limits', icon: <SpeedOutlinedIcon /> },
+    { route: 'logs', label: 'API Logs', icon: <TerminalOutlinedIcon /> },
 ]
 
 const DRAWER_WIDTH = 240;

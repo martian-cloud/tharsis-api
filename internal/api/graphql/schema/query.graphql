@@ -234,4 +234,9 @@ type Query {
   ): AnnouncementConnection!
   version: Version!
   agentTrace(input: AgentTraceInput!): String
+  adminLogTail(
+    limit: Int
+    levels: [AdminLogTailLevel!]
+    search: String
+  ): [AdminLogTailEntry!]!
 }

@@ -114,6 +114,7 @@ services:
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_EXTRA_HOSTS=localhost:host-gateway
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_IMAGE=registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/job-executor:latest
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_LOCAL_IMAGE=false # Set to true if using local image.
+      - THARSIS_ADMIN_LOG_TAIL_STORE_PLUGIN_TYPE=memory
       - THARSIS_OTEL_TRACE_ENABLED=true
       - THARSIS_OTEL_TRACE_TYPE=otlp
       - THARSIS_OTEL_TRACE_HOST=jaeger

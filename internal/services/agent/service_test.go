@@ -60,8 +60,10 @@ var (
 	}
 )
 
-func userCaller(user *models.User) auth.Caller {
-	return &auth.UserCaller{User: user}
+func userCaller(t *testing.T, user *models.User) auth.Caller {
+	mockUsers := db.NewMockUsers(t)
+	mockUsers.On("GetUserByID", mock.Anything, user.Metadata.ID).Return(user, nil).Maybe()
+	return auth.NewUserCaller(user, nil, &db.Client{Users: mockUsers}, nil, nil)
 }
 
 func withCaller(ctx context.Context, caller auth.Caller) context.Context {
@@ -77,11 +79,11 @@ func TestGetAgentSessionByID(t *testing.T) {
 	}{
 		{
 			name:   "owner can access session",
-			caller: userCaller(sampleUser),
+			caller: userCaller(t, sampleUser),
 		},
 		{
 			name:            "different user cannot access session",
-			caller:          userCaller(otherUser),
+			caller:          userCaller(t, otherUser),
 			expectErrorCode: errors.ENotFound,
 		},
 		{
@@ -131,7 +133,7 @@ func TestGetAgentSessionByID(t *testing.T) {
 
 // TestGetAgentSessionByID_NotFound tests that a non-existent session returns not found.
 func TestGetAgentSessionByID_NotFound(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	mockSessions := db.NewMockAgentSessions(t)
 	mockSessions.On("GetAgentSessionByID", mock.Anything, "nonexistent").Return(nil, nil)
@@ -152,11 +154,11 @@ func TestGetAgentSessionByTRN(t *testing.T) {
 	}{
 		{
 			name:   "owner can access session by TRN",
-			caller: userCaller(sampleUser),
+			caller: userCaller(t, sampleUser),
 		},
 		{
 			name:            "different user cannot access session by TRN",
-			caller:          userCaller(otherUser),
+			caller:          userCaller(t, otherUser),
 			expectErrorCode: errors.ENotFound,
 		},
 		{
@@ -202,11 +204,11 @@ func TestGetAgentSessionRunByID(t *testing.T) {
 	}{
 		{
 			name:   "session owner can access run",
-			caller: userCaller(sampleUser),
+			caller: userCaller(t, sampleUser),
 		},
 		{
 			name:            "different user cannot access run",
-			caller:          userCaller(otherUser),
+			caller:          userCaller(t, otherUser),
 			expectErrorCode: errors.ENotFound,
 		},
 		{
@@ -256,7 +258,7 @@ func TestGetAgentSessionRunByID(t *testing.T) {
 
 // TestGetAgentSessionRunByID_NotFound tests that a non-existent run returns not found.
 func TestGetAgentSessionRunByID_NotFound(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	mockRuns := db.NewMockAgentSessionRuns(t)
 	mockRuns.On("GetAgentSessionRunByID", mock.Anything, "nonexistent").Return(nil, nil)
@@ -277,11 +279,11 @@ func TestGetAgentSessionRunByTRN(t *testing.T) {
 	}{
 		{
 			name:   "session owner can access run by TRN",
-			caller: userCaller(sampleUser),
+			caller: userCaller(t, sampleUser),
 		},
 		{
 			name:            "different user cannot access run by TRN",
-			caller:          userCaller(otherUser),
+			caller:          userCaller(t, otherUser),
 			expectErrorCode: errors.ENotFound,
 		},
 	}
@@ -324,7 +326,7 @@ func TestCreateAgentSession(t *testing.T) {
 	}{
 		{
 			name:   "user can create session",
-			caller: userCaller(sampleUser),
+			caller: userCaller(t, sampleUser),
 		},
 		{
 			name:            "service account cannot create session",
@@ -385,18 +387,18 @@ func TestCreateAgentRun(t *testing.T) {
 	}{
 		{
 			name:   "session owner can create run",
-			caller: userCaller(sampleUser),
+			caller: userCaller(t, sampleUser),
 			input:  &CreateAgentRunInput{SessionID: sampleSessionID, Message: "hello"},
 		},
 		{
 			name:            "different user cannot create run in another user's session",
-			caller:          userCaller(otherUser),
+			caller:          userCaller(t, otherUser),
 			input:           &CreateAgentRunInput{SessionID: sampleSessionID, Message: "hello"},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "empty message is invalid",
-			caller:          userCaller(sampleUser),
+			caller:          userCaller(t, sampleUser),
 			input:           &CreateAgentRunInput{SessionID: sampleSessionID, Message: ""},
 			expectErrorCode: errors.EInvalid,
 		},
@@ -468,11 +470,11 @@ func TestCancelAgentRun(t *testing.T) {
 	}{
 		{
 			name:   "session owner can cancel run",
-			caller: userCaller(sampleUser),
+			caller: userCaller(t, sampleUser),
 		},
 		{
 			name:            "different user cannot cancel run",
-			caller:          userCaller(otherUser),
+			caller:          userCaller(t, otherUser),
 			expectErrorCode: errors.ENotFound,
 		},
 		{
@@ -523,7 +525,7 @@ func TestCancelAgentRun(t *testing.T) {
 
 // TestCancelAgentRun_NotRunning tests that cancelling a finished run fails.
 func TestCancelAgentRun_NotRunning(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	finishedRun := &models.AgentSessionRun{
 		Metadata:  models.ResourceMetadata{ID: sampleRunID},
@@ -554,11 +556,11 @@ func TestGetAgentSessionRuns(t *testing.T) {
 	}{
 		{
 			name:   "session owner can list runs",
-			caller: userCaller(sampleUser),
+			caller: userCaller(t, sampleUser),
 		},
 		{
 			name:            "different user cannot list runs",
-			caller:          userCaller(otherUser),
+			caller:          userCaller(t, otherUser),
 			expectErrorCode: errors.ENotFound,
 		},
 		{
@@ -619,11 +621,11 @@ func TestGetAgentTrace(t *testing.T) {
 	}{
 		{
 			name:   "admin can access trace",
-			caller: userCaller(adminUser),
+			caller: userCaller(t, adminUser),
 		},
 		{
 			name:            "non-admin cannot access trace",
-			caller:          userCaller(sampleUser),
+			caller:          userCaller(t, sampleUser),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -641,7 +643,7 @@ func TestGetAgentTrace(t *testing.T) {
 			testLogger, _ := logger.NewForTest()
 
 			if test.caller != nil {
-				if uc, ok := test.caller.(*auth.UserCaller); ok && uc.IsAdminModeActivated() {
+				if uc, ok := test.caller.(*auth.UserCaller); ok && uc.User.IsAdminModeActive() {
 					mockRuns.On("GetAgentSessionRunByID", mock.Anything, sampleRunID).Return(sampleRun, nil)
 					mockStore.On("GetTrace", mock.Anything, sampleSessionID, sampleRunID).Return(traceData, nil)
 				}
@@ -679,19 +681,19 @@ func TestGetAgentCreditUsage(t *testing.T) {
 	}{
 		{
 			name:          "user can view own credit usage",
-			caller:        userCaller(sampleUser),
+			caller:        userCaller(t, sampleUser),
 			queryUserID:   sampleUserID,
 			expectCredits: 42.5,
 		},
 		{
 			name:            "user cannot view another user's credit usage",
-			caller:          userCaller(sampleUser),
+			caller:          userCaller(t, sampleUser),
 			queryUserID:     otherUserID,
 			expectErrorCode: errors.EForbidden,
 		},
 		{
 			name:          "admin can view any user's credit usage",
-			caller:        userCaller(adminUser),
+			caller:        userCaller(t, adminUser),
 			queryUserID:   otherUserID,
 			expectCredits: 42.5,
 		},
@@ -734,7 +736,7 @@ func TestGetAgentCreditUsage(t *testing.T) {
 
 // TestGetAgentCreditUsage_NoQuota tests that missing quota returns 0.
 func TestGetAgentCreditUsage_NoQuota(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	mockQuotas := db.NewMockAgentCreditQuotas(t)
 	mockQuotas.On("GetAgentCreditQuota", mock.Anything, sampleUserID, mock.Anything).Return(nil, nil)
@@ -748,7 +750,7 @@ func TestGetAgentCreditUsage_NoQuota(t *testing.T) {
 
 // TestGetAgentSessionByTRN_NotFound tests that a non-existent session TRN returns not found.
 func TestGetAgentSessionByTRN_NotFound(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	mockSessions := db.NewMockAgentSessions(t)
 	mockSessions.On("GetAgentSessionByTRN", mock.Anything, "trn:tharsis:agent_session:nonexistent").Return(nil, nil)
@@ -762,7 +764,7 @@ func TestGetAgentSessionByTRN_NotFound(t *testing.T) {
 
 // TestGetAgentSessionRunByTRN_NotFound tests that a non-existent run TRN returns not found.
 func TestGetAgentSessionRunByTRN_NotFound(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	mockRuns := db.NewMockAgentSessionRuns(t)
 	mockRuns.On("GetAgentSessionRunByTRN", mock.Anything, "trn:tharsis:agent_session_run:nonexistent").Return(nil, nil)
@@ -776,7 +778,7 @@ func TestGetAgentSessionRunByTRN_NotFound(t *testing.T) {
 
 // TestCancelAgentRun_NotFound tests that cancelling a non-existent run returns not found.
 func TestCancelAgentRun_NotFound(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	mockRuns := db.NewMockAgentSessionRuns(t)
 	mockRuns.On("GetAgentSessionRunByID", mock.Anything, "nonexistent").Return(nil, nil)
@@ -790,7 +792,7 @@ func TestCancelAgentRun_NotFound(t *testing.T) {
 
 // TestGetAgentTrace_RunNotFound tests that trace for a non-existent run returns not found.
 func TestGetAgentTrace_RunNotFound(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(adminUser))
+	ctx := withCaller(t.Context(), userCaller(t, adminUser))
 
 	testLogger, _ := logger.NewForTest()
 	mockRuns := db.NewMockAgentSessionRuns(t)
@@ -805,7 +807,7 @@ func TestGetAgentTrace_RunNotFound(t *testing.T) {
 
 // TestCreateAgentRun_PreviousRunNotFound tests that referencing a non-existent previous run fails.
 func TestCreateAgentRun_PreviousRunNotFound(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	mockSessions := db.NewMockAgentSessions(t)
 	mockRuns := db.NewMockAgentSessionRuns(t)
@@ -837,7 +839,7 @@ func TestCreateAgentRun_PreviousRunNotFound(t *testing.T) {
 
 // TestCreateAgentRun_PreviousRunStillRunning tests that referencing a still-running previous run fails.
 func TestCreateAgentRun_PreviousRunStillRunning(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	runningPrevRun := &models.AgentSessionRun{
 		Metadata:  models.ResourceMetadata{ID: "prev-run"},
@@ -875,7 +877,7 @@ func TestCreateAgentRun_PreviousRunStillRunning(t *testing.T) {
 
 // TestCreateAgentRun_PreviousRunAlreadyReferenced tests that a previous run already referenced by another run fails.
 func TestCreateAgentRun_PreviousRunAlreadyReferenced(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	finishedPrevRun := &models.AgentSessionRun{
 		Metadata:  models.ResourceMetadata{ID: "prev-run"},
@@ -922,7 +924,7 @@ func TestCreateAgentRun_PreviousRunAlreadyReferenced(t *testing.T) {
 
 // TestCreateAgentRun_PreviousRunFromDifferentSession tests that referencing a run from a different session fails.
 func TestCreateAgentRun_PreviousRunFromDifferentSession(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	otherSessionRun := &models.AgentSessionRun{
 		Metadata:  models.ResourceMetadata{ID: "other-run"},
@@ -960,7 +962,7 @@ func TestCreateAgentRun_PreviousRunFromDifferentSession(t *testing.T) {
 
 // TestCreateAgentRun_SessionNotFound tests that creating a run in a non-existent session fails.
 func TestCreateAgentRun_SessionNotFound(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	mockSessions := db.NewMockAgentSessions(t)
 	mockSessions.On("GetAgentSessionByID", mock.Anything, "nonexistent").Return(nil, nil)
@@ -984,7 +986,7 @@ func TestSubscribeToAgentSession(t *testing.T) {
 	}{
 		{
 			name:            "different user cannot subscribe to session",
-			caller:          userCaller(otherUser),
+			caller:          userCaller(t, otherUser),
 			expectErrorCode: errors.ENotFound,
 		},
 		{
@@ -1022,7 +1024,7 @@ func TestSubscribeToAgentSession(t *testing.T) {
 
 // TestSubscribeToAgentSession_NotFound tests subscribing to a non-existent session.
 func TestSubscribeToAgentSession_NotFound(t *testing.T) {
-	ctx := withCaller(t.Context(), userCaller(sampleUser))
+	ctx := withCaller(t.Context(), userCaller(t, sampleUser))
 
 	mockSessions := db.NewMockAgentSessions(t)
 	mockSessions.On("GetAgentSessionByID", mock.Anything, "nonexistent").Return(nil, nil)
@@ -1036,7 +1038,7 @@ func TestSubscribeToAgentSession_NotFound(t *testing.T) {
 
 // TestSubscribeToAgentSession_OwnerSuccess tests that the session owner can subscribe and receive events.
 func TestSubscribeToAgentSession_OwnerSuccess(t *testing.T) {
-	ctx, cancel := context.WithCancel(withCaller(t.Context(), userCaller(sampleUser)))
+	ctx, cancel := context.WithCancel(withCaller(t.Context(), userCaller(t, sampleUser)))
 	defer cancel()
 
 	mockSessions := db.NewMockAgentSessions(t)

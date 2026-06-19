@@ -886,7 +886,7 @@ func (s *service) verifyOneTrustPolicy(ctx context.Context, inputToken []byte, t
 // If the service account has namespace memberships, the caller must be an owner in all of them.
 // Otherwise, falls back to a standard permission check.
 func (s *service) authorizeServiceAccountUpdate(ctx context.Context, caller auth.Caller, serviceAccount *models.ServiceAccount) error {
-	if caller.IsAdminModeActivated() {
+	if caller.IsAdminModeActivated(ctx) {
 		return nil
 	}
 

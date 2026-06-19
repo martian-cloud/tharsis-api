@@ -16,11 +16,10 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	"github.com/m-mizutani/gollem"
 	_ "gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity" // Placeholder to ensure private packages are being downloaded
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/agent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api"
-
-	"github.com/m-mizutani/gollem"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/grpc"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
@@ -41,6 +40,7 @@ import (
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/adminlogtail"
 	agentsvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/agent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/announcement"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
@@ -73,6 +73,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger/logstore"
 	mcpserver "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/mcp"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -92,6 +93,18 @@ type APIServer struct {
 
 // New creates a new APIServer instance
 func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersion string, buildTimestamp string) (*APIServer, error) {
+	pluginCatalog, err := plugin.NewCatalog(ctx, logger, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create plugin catalog %v", err)
+	}
+
+	// Tee all subsequent log output into the API log store so it can be viewed in the admin UI.
+	logger = logger.WithCore(logstore.NewCore(pluginCatalog.AdminLogTailStore))
+
+	// Route standard library log output (e.g. from dependencies) through our logger so it is
+	// captured by the store too. The redirect lives for the process lifetime, so the restore is ignored.
+	logger.RedirectStdLog()
+
 	openIDConfigFetcher := auth.NewOpenIDConfigFetcher(logger)
 
 	tlsConfig, err := loadTLSConfig(cfg, logger)
@@ -129,11 +142,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create DB client %v", err)
-	}
-
-	pluginCatalog, err := plugin.NewCatalog(ctx, logger, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create plugin catalog %v", err)
 	}
 
 	httpClient := tharsishttp.NewHTTPClient()
@@ -209,6 +217,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	// Services.
 	var (
 		activityService            = activityevent.NewService(dbClient, logger)
+		adminLogTailService        = adminlogtail.NewService(pluginCatalog.AdminLogTailStore)
 		announcementService        = announcement.NewService(logger, dbClient)
 		userService                = user.NewService(logger, dbClient, inheritedSettingsResolver)
 		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService, emailClient, notificationManager, taskManager)
@@ -260,6 +269,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	serviceCatalog := &services.Catalog{
 		ActivityEventService:             activityService,
+		AdminLogTailService:              adminLogTailService,
 		AnnouncementService:              announcementService,
 		CLIService:                       cliService,
 		FederatedRegistryService:         federatedRegistryService,

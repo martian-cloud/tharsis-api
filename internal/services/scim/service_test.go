@@ -113,10 +113,16 @@ func TestCreateSCIMToken(t *testing.T) {
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
+			mockUsers := db.NewMockUsers(t)
+			mockUsers.On("GetUserByID", mock.Anything, test.caller.User.Metadata.ID).Return(test.caller.User, nil).Maybe()
+
 			dbClient := &db.Client{
 				SCIMTokens:   &mockScimTokens,
 				Transactions: &mockTransactions,
+				Users:        mockUsers,
 			}
+
+			caller := auth.NewUserCaller(test.caller.User, nil, dbClient, nil, nil)
 
 			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
@@ -127,7 +133,7 @@ func TestCreateSCIMToken(t *testing.T) {
 			cfg := &config.Config{OauthProviders: []config.IdpConfig{{IssuerURL: "https://example.com/scim"}}}
 			service := NewService(logger, dbClient, mockSigningKeyManager, cfg.OauthProviders)
 
-			token, err := service.CreateSCIMToken(auth.WithCaller(ctx, test.caller), test.idpIssuerURL)
+			token, err := service.CreateSCIMToken(auth.WithCaller(ctx, caller), test.idpIssuerURL)
 			if test.expectErrorCode != "" {
 				// Negative case.
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))

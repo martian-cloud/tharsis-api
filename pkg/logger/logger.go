@@ -20,6 +20,15 @@ type Logger interface {
 	// WithContextFields returns a logger with the available context fields
 	WithContextFields(ctx context.Context) Logger
 
+	// WithCore returns a logger that also writes entries to the given core, gated at
+	// this logger's level (the core won't receive entries below LOG_LEVEL).
+	WithCore(extra zapcore.Core) Logger
+
+	// RedirectStdLog routes output from the standard library's log package into
+	// this logger at INFO level. It returns a function that restores the
+	// previous standard library log behavior.
+	RedirectStdLog() func()
+
 	// Slog returns an *slog.Logger that wraps this logger
 	Slog() *slog.Logger
 
@@ -103,6 +112,23 @@ func (l *logger) With(args ...interface{}) Logger {
 
 func (l *logger) Slog() *slog.Logger {
 	return slog.New(zapslog.NewHandler(l.SugaredLogger.Desugar().Core()))
+}
+
+func (l *logger) WithCore(extra zapcore.Core) Logger {
+	return &logger{l.Desugar().WithOptions(zap.WrapCore(func(base zapcore.Core) zapcore.Core {
+		// Gate the added core at the base logger's level so it doesn't capture entries
+		// below LOG_LEVEL (base is a zapcore.Core, which satisfies LevelEnabler).
+		gated, err := zapcore.NewIncreaseLevelCore(extra, base)
+		if err != nil {
+			gated = extra
+		}
+
+		return zapcore.NewTee(base, gated)
+	})).Sugar()}
+}
+
+func (l *logger) RedirectStdLog() func() {
+	return zap.RedirectStdLog(l.Desugar())
 }
 
 func (l *logger) WithContextFields(ctx context.Context) Logger {

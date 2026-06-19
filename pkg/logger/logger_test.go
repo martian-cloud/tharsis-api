@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestNew(t *testing.T) {
@@ -22,6 +24,20 @@ func Test_logger_With(t *testing.T) {
 	l := New()
 	l2 := l.With(nil)
 	assert.True(t, reflect.DeepEqual(l2, l))
+}
+
+func Test_logger_WithCore_gatesByLevel(t *testing.T) {
+	// Base logger at info; the added core is enabled at debug but should still only
+	// receive entries the base logger would emit (info+).
+	base, _ := observer.New(zapcore.InfoLevel)
+	added, addedLogs := observer.New(zapcore.DebugLevel)
+	l := NewWithZap(zap.New(base)).WithCore(added)
+
+	l.Debug("dbg")
+	assert.Equal(t, 0, addedLogs.Len(), "debug is gated out below LOG_LEVEL")
+
+	l.Info("nfo")
+	assert.Equal(t, 1, addedLogs.Len(), "info reaches the added core")
 }
 
 func TestNewForTest(t *testing.T) {

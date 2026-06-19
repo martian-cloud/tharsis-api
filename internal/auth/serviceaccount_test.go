@@ -20,7 +20,7 @@ func TestServiceAccountCaller_GetSubject(t *testing.T) {
 
 func TestServiceAccountCaller_IsAdmin(t *testing.T) {
 	caller := ServiceAccountCaller{}
-	assert.False(t, caller.IsAdminModeActivated())
+	assert.False(t, caller.IsAdminModeActivated(t.Context()))
 }
 
 func TestServiceAccountCaller_GetNamespaceAccessPolicy(t *testing.T) {
