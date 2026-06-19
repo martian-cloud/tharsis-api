@@ -8,7 +8,7 @@ import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
-import React, { Suspense, useContext, useState } from 'react';
+import React, { Suspense, useContext, useMemo, useState } from 'react';
 import { PreloadedQuery, useFragment, usePreloadedQuery } from 'react-relay/hooks';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -16,11 +16,11 @@ import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles
 import AuthServiceContext from '../auth/AuthServiceContext';
 import AuthenticationService from '../auth/AuthenticationService';
 import TRNButton from '../common/TRNButton';
-import cfg from '../common/config';
 import downloadFile from '../common/filedownload';
 import ListSkeleton from '../skeletons/ListSkeleton';
 import TerraformModuleVersionAttestList from './TerraformModuleVersionAttestList';
 import TerraformModuleVersionDetailsSidebar, { SidebarWidth } from './TerraformModuleVersionDetailsSidebar';
+import TerraformModuleVersionFiles, { fetchModulePackage } from './TerraformModuleVersionFiles';
 import TerraformModuleVersionList from './TerraformModuleVersionList';
 import { TerraformModuleVersionDetailsIndexFragment_details$key } from './__generated__/TerraformModuleVersionDetailsIndexFragment_details.graphql';
 import { TerraformModuleVersionDetailsQuery } from './__generated__/TerraformModuleVersionDetailsQuery.graphql';
@@ -53,7 +53,7 @@ function TerraformModuleVersionDetails(props: Props) {
 
     return (
         <Box display="flex">
-            <Box component="main" flexGrow={1}>
+            <Box component="main" flexGrow={1} minWidth={0}>
                 <Suspense fallback={<Box
                     sx={{
                         width: '100%',
@@ -101,6 +101,7 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
               id
               version
               status
+              error
               metadata {
                   trn
               }
@@ -128,47 +129,32 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
     };
 
     const onTabChange = (event: React.SyntheticEvent, newValue: string) => {
-        searchParams.set('tab', newValue);
-
-        if (newValue !== 'docs') {
-            searchParams.delete('item');
-        }
-
-        setSearchParams(searchParams, { replace: true });
+        // replace the whole query string so the previous tab's params don't linger
+        setSearchParams({ tab: newValue }, { replace: true });
     };
+
+    const moduleParams = useMemo(() => ({
+        registryNamespace: data.module.registryNamespace,
+        name: data.module.name,
+        system: data.module.system,
+        version: data.version,
+    }), [data.module.registryNamespace, data.module.name, data.module.system, data.version]);
 
     const onDownloadModule = async () => {
         try {
-            const { registryNamespace, name, system } = data.module;
-            let response = await authService.fetchWithAuth(`${cfg.apiUrl}/v1/module-registry/modules/${registryNamespace}/${name}/${system}/${data.version}/download`, {
-                method: 'GET',
-            });
-
-            if (!response.ok) {
-                throw new Error(`request for module download url returned status ${response.status}`);
-            }
-
-            const downloadUrl = response.headers.get('X-Terraform-Get')
-            if (!downloadUrl) {
-                throw new Error(`response for module download url is missing header X-Terraform-Get`);
-            }
-
-            response = await fetch(downloadUrl, {
-                method: 'GET',
-            });
-
-            if (!response.ok) {
-                throw new Error(`requested to download module returned status ${response.status}`);
-            }
-
-            const blob = await response.blob();
-            downloadFile(`${registryNamespace}_${name}_${system}_${data.version}.tar.gz`, blob);
+            const { registryNamespace, name, system, version } = moduleParams;
+            const buffer = await fetchModulePackage(authService, moduleParams);
+            downloadFile(`${registryNamespace}_${name}_${system}_${version}.tar.gz`, new Blob([buffer]));
         } catch (error) {
-            enqueueSnackbar(`failed to download: ${error}`, { variant: 'error' });
+            console.error('failed to download module', error);
+            enqueueSnackbar('failed to download module', { variant: 'error' });
         }
     };
 
     const usageInfo = buildUsageInfo(data.module.name, data.version, data.module.source);
+
+    const filesAvailable = data.status === 'uploaded';
+    const uploading = data.status === 'pending' || data.status === 'upload_in_progress';
 
     return (
         <Box>
@@ -180,8 +166,11 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
             />
             <Box>
                 <Box sx={{ paddingRight: { xs: 0, md: `${SidebarWidth}px` } }}>
-                    {data.status === 'pending' && <Alert sx={{ marginBottom: 2 }} severity="warning">
+                    {uploading && <Alert sx={{ marginBottom: 2 }} severity="warning">
                         Upload is still in progress
+                    </Alert>}
+                    {data.status === 'errored' && <Alert sx={{ marginBottom: 2 }} severity="error">
+                        {data.error || 'Upload failed'}
                     </Alert>}
                     <Box
                         sx={{
@@ -214,6 +203,7 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
                         <Tabs value={tab} onChange={onTabChange}>
                             <Tab label="Docs" value="docs" />
                             <Tab label="How To Use" value="usage" />
+                            <Tab label="Files" value="files" />
                             <Tab label="Versions" value="versions" />
                             <Tab label="Attestations" value="attestations" />
                         </Tabs>
@@ -227,6 +217,13 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
                                 <CopyIcon sx={{ width: 16, height: 16 }} />
                             </IconButton>
                             <SyntaxHighlighter wrapLines customStyle={{ fontSize: 14 }} language="hcl" style={prismTheme} children={usageInfo} />
+                        </Box>}
+                        {tab === 'files' && <Box mt={2}>
+                            {filesAvailable
+                                ? <TerraformModuleVersionFiles module={moduleParams} />
+                                : <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+                                    <Typography color="textSecondary">No files are available for this version.</Typography>
+                                </Box>}
                         </Box>}
                         {tab === 'versions' && <Box marginTop={2}>
                             <Suspense fallback={<ListSkeleton rowCount={3} />}>

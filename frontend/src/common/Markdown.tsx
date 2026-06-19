@@ -224,7 +224,7 @@ const components = {
     input: MarkdownInput,
 };
 
-export default function Markdown(props: {children: string | null | undefined;}) {
+export default function Markdown(props: { children: string | null | undefined; }) {
     return (
         <Box
             sx={{

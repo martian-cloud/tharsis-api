@@ -1,5 +1,5 @@
 import CopyIcon from '@mui/icons-material/ContentCopy';
-import { Chip, List, Link as MuiLink, Stack, Tooltip, Typography, Button } from '@mui/material';
+import { Chip, List, Stack, Tooltip, Typography, Button } from '@mui/material';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -10,12 +10,8 @@ import { useContext, useMemo } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { Link as LinkRouter } from 'react-router-dom';
 import { ApiConfigContext } from '../../ApiConfigContext';
-import AuthenticationService from '../../auth/AuthenticationService';
-import AuthServiceContext from '../../auth/AuthServiceContext';
-import cfg from '../../common/config';
 import Drawer from '../../common/Drawer';
 import { MutationError } from '../../common/error';
-import downloadFile from '../../common/filedownload';
 import Gravatar from '../../common/Gravatar';
 import Timestamp from '../../common/Timestamp';
 import Link from '../../routes/Link';
@@ -39,7 +35,6 @@ const RUN_FINALITY_STATES = ['planned_and_finished', 'applied', 'errored', 'canc
 
 function RunDetailsSidebar(props: Props) {
     const { stage, open, temporary, onClose, onError } = props;
-    const authService = useContext<AuthenticationService>(AuthServiceContext);
     const apiConfig = useContext(ApiConfigContext);
 
     const data = useFragment<RunDetailsSidebarFragment_details$key>(
@@ -124,23 +119,6 @@ function RunDetailsSidebar(props: Props) {
         })
     }
 
-    const onDownloadConfigVersion = async (configVersionId: string) => {
-        try {
-            const response = await authService.fetchWithAuth(`${cfg.apiUrl}/tfe/v2/configuration-versions/${configVersionId}/content`, {
-                method: 'GET',
-            });
-
-            if (!response.ok) {
-                throw new Error(`request for configuration version content returned status ${response.status}`);
-            }
-
-            const blob = await response.blob();
-            downloadFile(`${configVersionId}.tar.gz`, blob);
-        } catch (error) {
-            onError({ message: `failed to download: ${error}`, severity: 'error' })
-        }
-    }
-
     // If module source references a module in the tharsis registry than strip the host
     const moduleSource = useMemo(
         () => (data.moduleSource && data.moduleSource?.startsWith(apiConfig.serviceDiscoveryHost)) ? data.moduleSource.substring(apiConfig.serviceDiscoveryHost.length + 1) : data.moduleSource,
@@ -190,19 +168,16 @@ function RunDetailsSidebar(props: Props) {
                 {data.configurationVersion && <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Configuration Version</Typography>
                     <Stack direction="row" spacing={1} alignItems="center">
-                        <Tooltip title="download">
-                            <MuiLink
-                                color="textPrimary"
+                        <Tooltip title="view files">
+                            <Link
+                                color="secondary"
                                 underline="none"
-                                sx={{ wordBreak: 'break-all', cursor: 'pointer' }}
-                                onClick={() => onDownloadConfigVersion(data.configurationVersion?.id as string)}
+                                sx={{ wordBreak: 'break-all' }}
+                                to={`/groups/${data.workspace.fullPath}/-/configuration_versions/${data.configurationVersion.id}`}
                             >
                                 {data.configurationVersion.id.substring(0, 8)}...
-                            </MuiLink>
+                            </Link>
                         </Tooltip>
-                        <IconButton sx={{ padding: 0 }} onClick={() => navigator.clipboard.writeText(data.configurationVersion?.id ?? '')}>
-                            <CopyIcon sx={{ width: 16, height: 16 }} />
-                        </IconButton>
                     </Stack>
                 </Box>}
                 {moduleSource && <Box marginBottom={3}>

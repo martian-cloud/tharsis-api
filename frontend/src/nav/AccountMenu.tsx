@@ -11,10 +11,10 @@ import { useContext, useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import AuthServiceContext from '../auth/AuthServiceContext';
 import AuthenticationService from '../auth/AuthenticationService';
-import Gravatar from '../common/Gravatar';
 import config from '../common/config';
 import { AccountMenuFragment$key } from './__generated__/AccountMenuFragment.graphql';
 import AboutDialog from './AboutDialog';
+import AccountMenuGravatar from './AccountMenuGravatar';
 import { ApiConfigContext } from '../ApiConfigContext';
 import { UserContext } from '../UserContext';
 import DeactivateAdminModeListItem from './DeactivateAdminModeListItem';
@@ -31,7 +31,6 @@ function AccountMenu({ fragmentRef }: Props) {
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const apiConfig = useContext(ApiConfigContext);
     const user = useContext(UserContext);
-
 
     const data = useFragment<AccountMenuFragment$key>(
         graphql`
@@ -61,7 +60,7 @@ function AccountMenu({ fragmentRef }: Props) {
 
     return (
         <div>
-            <IconButton onClick={onMenuOpen}><Gravatar width={32} height={32} email={user.email} /></IconButton>
+            <AccountMenuGravatar onClick={onMenuOpen} />
             <Popover
                 id="account-menu"
                 open={Boolean(menuAnchorEl)}

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation } from 'react-relay/hooks';
 import graphql from 'babel-plugin-relay/macro';
 import humanizeDuration from 'humanize-duration';
+import { useSnackbar } from 'notistack';
 
 interface Props {
     expiresAt: string;
@@ -14,6 +15,7 @@ function DeactivateAdminModeListItem({ expiresAt, onMenuClose }: Props) {
     const [display, setDisplay] = useState('');
     const [showConfirm, setShowConfirm] = useState(false);
     const navigate = useNavigate();
+    const { enqueueSnackbar } = useSnackbar();
 
     const [commitDeactivate] = useMutation(graphql`
         mutation DeactivateAdminModeListItemMutation($input: DeactivateAdminModeInput!) {
@@ -40,9 +42,10 @@ function DeactivateAdminModeListItem({ expiresAt, onMenuClose }: Props) {
             },
             onCompleted: () => {
                 navigate('/');
+                enqueueSnackbar('Admin mode deactivated', { variant: 'success' });
             },
         });
-    }, [commitDeactivate, navigate]);
+    }, [commitDeactivate, navigate, enqueueSnackbar]);
 
     useEffect(() => {
         const update = () => {
@@ -61,16 +64,16 @@ function DeactivateAdminModeListItem({ expiresAt, onMenuClose }: Props) {
     return (
         <>
             <ListItemButton onClick={() => setShowConfirm(true)}>
-                <ListItemText primary={`Deactivate Admin Mode (${display})`} />
+                <ListItemText primary="Deactivate Admin Mode" secondary={display} />
             </ListItemButton>
             <Dialog open={showConfirm} onClose={() => setShowConfirm(false)} maxWidth="xs" fullWidth>
                 <DialogTitle>Deactivate Admin Mode</DialogTitle>
-                <DialogContent>
+                <DialogContent dividers>
                     Are you sure you want to deactivate admin mode?
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setShowConfirm(false)}>Cancel</Button>
-                    <Button onClick={() => { setShowConfirm(false); onMenuClose(); handleDeactivate(); }} variant="contained" color="error">Deactivate</Button>
+                    <Button color="inherit" onClick={() => setShowConfirm(false)}>Cancel</Button>
+                    <Button color="error" onClick={() => { setShowConfirm(false); onMenuClose(); handleDeactivate(); }}>Deactivate</Button>
                 </DialogActions>
             </Dialog>
         </>

@@ -11,6 +11,7 @@ import Variables from '../namespace/variables/Variables';
 import ProviderMirrors from '../namespace/providermirror/ProviderMirrors';
 import WorkspaceSettings from './settings/WorkspaceSettings';
 import AssignedManagedIdentityList from './managedidentity/AssignedManagedIdentityList';
+import ConfigurationVersionDetails from './runs/ConfigurationVersionDetails';
 import { GetConnections } from './runs/WorkspaceRunList';
 import Runs from './runs/Runs';
 import StateVersions from './state/StateVersions';
@@ -62,6 +63,7 @@ function WorkspaceDetails(props: Props) {
       ...WorkspaceDetailsIndexFragment_workspace
       ...AssignedManagedIdentityListFragment_assignedManagedIdentities
       ...RunsFragment_runs
+      ...ConfigurationVersionDetailsFragment_workspace
       ...StateVersionsFragment_stateVersions
       ...VariablesFragment_variables
       ...NamespaceMembershipsFragment_memberships
@@ -149,6 +151,7 @@ function WorkspaceDetails(props: Props) {
               <Route path={`${workspacePath}/*`} element={<WorkspaceDetailsIndex fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/activity/*`} element={<NamespaceActivity fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/runs/*`} element={<Runs fragmentRef={data} />} />
+              <Route path={`${workspacePath}/-/configuration_versions/:id/*`} element={<ConfigurationVersionDetails fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/state_versions/*`} element={<StateVersions fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/managed_identities/*`} element={<AssignedManagedIdentityList fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/variables/*`} element={<Variables fragmentRef={data} />} />
