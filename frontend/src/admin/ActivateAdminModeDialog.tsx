@@ -3,6 +3,7 @@ import { useState } from 'react';
 import graphql from 'babel-plugin-relay/macro';
 import { useMutation } from 'react-relay/hooks';
 import { useNavigate } from 'react-router-dom';
+import { useSnackbar } from 'notistack';
 import { ActivateAdminModeDialogMutation } from './__generated__/ActivateAdminModeDialogMutation.graphql';
 
 interface Props {
@@ -14,6 +15,7 @@ function ActivateAdminModeDialog({ open, onClose }: Props) {
     const [duration, setDuration] = useState(30);
     const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
+    const { enqueueSnackbar } = useSnackbar();
 
     const [commit, isInFlight] = useMutation<ActivateAdminModeDialogMutation>(graphql`
         mutation ActivateAdminModeDialogMutation($input: ActivateAdminModeInput!) {
@@ -42,6 +44,7 @@ function ActivateAdminModeDialog({ open, onClose }: Props) {
             onCompleted: (data) => {
                 if (data.activateAdminMode.problems.length === 0) {
                     onClose();
+                    enqueueSnackbar('Admin mode activated', { variant: 'success' });
                     navigate('/admin');
                 } else {
                     setError(data.activateAdminMode.problems.map(p => p.message).join('; '));
@@ -53,7 +56,7 @@ function ActivateAdminModeDialog({ open, onClose }: Props) {
     return (
         <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
             <DialogTitle>Activate Admin Mode</DialogTitle>
-            <DialogContent>
+            <DialogContent dividers>
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
                 <FormControl fullWidth sx={{ mt: 1 }}>
                     <InputLabel>Duration</InputLabel>
@@ -71,8 +74,8 @@ function ActivateAdminModeDialog({ open, onClose }: Props) {
                 </FormControl>
             </DialogContent>
             <DialogActions>
-                <Button onClick={onClose}>Cancel</Button>
-                <Button onClick={handleActivate} variant="contained" disabled={isInFlight}>
+                <Button color="inherit" onClick={onClose}>Cancel</Button>
+                <Button onClick={handleActivate} loading={isInFlight}>
                     Activate
                 </Button>
             </DialogActions>

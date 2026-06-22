@@ -1,4 +1,4 @@
-import { IconButton, Stack, Breadcrumbs } from '@mui/material';
+import { IconButton, Stack, Breadcrumbs, Typography } from '@mui/material';
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import React from 'react';
 import Link from '../routes/Link';
@@ -6,6 +6,7 @@ import Link from '../routes/Link';
 interface Route {
     title: string;
     path: string;
+    disabled?: boolean;
 }
 
 interface Props {
@@ -28,11 +29,13 @@ function NamespaceBreadcrumbs(props: Props) {
                         {name}
                     </Link>
                 ))}
-                {props?.childRoutes?.map(({ title, path }, i) => (
-                    path[0] === '/' ?
-                        <Link key={path} color="inherit" to={path}>{title}</Link>
-                        :
-                        <Link key={path} color="inherit" to={`/groups/${props.namespacePath}/-/${childRoutePaths.slice(0, i + 1).join('/')}`}>{title}</Link>
+                {props?.childRoutes?.map(({ title, path, disabled }, i) => (
+                    disabled ?
+                        <Typography key={path} color="inherit">{title}</Typography>
+                        : path[0] === '/' ?
+                            <Link key={path} color="inherit" to={path}>{title}</Link>
+                            :
+                            <Link key={path} color="inherit" to={`/groups/${props.namespacePath}/-/${childRoutePaths.slice(0, i + 1).join('/')}`}>{title}</Link>
                 ))}
             </Breadcrumbs>
             {childRoutePaths.length == 0 &&
