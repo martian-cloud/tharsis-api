@@ -116,8 +116,8 @@ func NewManagedIdentityConnectionResolver(ctx context.Context, input *managedide
 }
 
 // TotalCount returns the total result count for the connection
-func (r *ManagedIdentityConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *ManagedIdentityConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

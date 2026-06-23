@@ -78,10 +78,15 @@ func (s *TeamServer) GetTeams(ctx context.Context, req *pb.GetTeamsRequest) (*pb
 		pbTeams[ix] = toPBTeam(&teams[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(teams) > 0 {
@@ -224,10 +229,15 @@ func (s *TeamServer) GetTeamMembers(ctx context.Context, req *pb.GetTeamMembersR
 		pbTeamMembers[ix] = toPBTeamMember(&teamMembers[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(teamMembers) > 0 {

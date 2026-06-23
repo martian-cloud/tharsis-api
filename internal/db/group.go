@@ -445,7 +445,7 @@ func (g *groups) getChildDepth(ctx context.Context, conn connection, span trace.
 		return 0, err
 	}
 
-	if resp.PageInfo.TotalCount == 0 {
+	if len(resp.Groups) == 0 {
 		return 0, nil
 	}
 

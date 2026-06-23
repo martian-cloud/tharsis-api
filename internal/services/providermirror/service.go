@@ -483,14 +483,20 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 			return pErr
 		}
 
-		if result.PageInfo.TotalCount > 0 {
+		if result.PageInfo.HasResults {
+			totalCount, cErr := result.PageInfo.TotalCount(ctx)
+			if cErr != nil {
+				tracing.RecordError(span, cErr, "failed to get platform mirror count")
+				return cErr
+			}
+
 			tracing.RecordError(span, nil,
 				"This provider version mirror can't be deleted because it currently mirrors %d platform(s). "+
-					"Setting force to true will automatically remove all mirrored Terraform provider platform mirrors. ", result.PageInfo.TotalCount,
+					"Setting force to true will automatically remove all mirrored Terraform provider platform mirrors. ", totalCount,
 			)
 			return errors.New(
 				"This provider version mirror can't be deleted because it currently mirrors %d platform(s). "+
-					"Setting force to true will automatically remove all mirrored Terraform provider platform mirrors. ", result.PageInfo.TotalCount,
+					"Setting force to true will automatically remove all mirrored Terraform provider platform mirrors. ", totalCount,
 				errors.WithErrorCode(errors.EConflict),
 			)
 		}
@@ -745,7 +751,7 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 		return err
 	}
 
-	if result.PageInfo.TotalCount > 0 {
+	if result.PageInfo.HasResults {
 		tracing.RecordError(span, nil, "provider platform package is already mirrored")
 		return errors.New("provider platform package is already mirrored", errors.WithErrorCode(errors.EConflict))
 	}
@@ -874,13 +880,13 @@ func (s *service) GetAvailableProviderVersions(ctx context.Context, input *GetAv
 	}
 
 	// Per Terraform docs, must return a ENotFound when we have no mirrored provider versions.
-	if result.PageInfo.TotalCount == 0 {
+	if len(result.VersionMirrors) == 0 {
 		tracing.RecordError(span, nil, "no versions are currently mirrored for Terraform provider %s", prov)
 		return nil, errors.New("no versions are currently mirrored for Terraform provider %s", prov, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Must convert to a map here as needed by Terraform CLI.
-	versionsMap := make(map[string]struct{}, result.PageInfo.TotalCount)
+	versionsMap := make(map[string]struct{}, len(result.VersionMirrors))
 	for _, v := range result.VersionMirrors {
 		versionsMap[v.SemanticVersion] = struct{}{}
 	}
@@ -935,7 +941,7 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 		return nil, err
 	}
 
-	if versionsResult.PageInfo.TotalCount == 0 {
+	if len(versionsResult.VersionMirrors) == 0 {
 		tracing.RecordError(span, nil, "version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, prov)
 		return nil, errors.New("version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, prov, errors.WithErrorCode(errors.ENotFound))
 	}
@@ -952,7 +958,7 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 		return nil, err
 	}
 
-	if result.PageInfo.TotalCount == 0 {
+	if len(result.PlatformMirrors) == 0 {
 		tracing.RecordError(span, nil, "no installation packages are currently mirrored for Terraform provider %s", prov)
 		return nil, errors.New("no installation packages are currently mirrored for Terraform provider %s", prov, errors.WithErrorCode(errors.ENotFound))
 	}

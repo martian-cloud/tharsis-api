@@ -97,8 +97,8 @@ func NewGPGKeyConnectionResolver(ctx context.Context, input *gpgkey.GetGPGKeysIn
 }
 
 // TotalCount returns the total result count for the connection
-func (r *GPGKeyConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *GPGKeyConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

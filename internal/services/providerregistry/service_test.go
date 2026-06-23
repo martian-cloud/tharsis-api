@@ -726,7 +726,7 @@ func TestCreateProvider(t *testing.T) {
 
 					return &db.ProvidersResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectProvidersPerGroup,
+							TotalCount: pagination.StaticCount(test.injectProvidersPerGroup),
 						},
 					}
 				}, nil)
@@ -1014,7 +1014,7 @@ func TestCreateProviderVersion(t *testing.T) {
 					_ = input
 
 					return &db.ProviderVersionsResult{PageInfo: &pagination.PageInfo{
-						TotalCount: test.injectVersionsPerProvider,
+						TotalCount: pagination.StaticCount(test.injectVersionsPerProvider),
 					},
 					}
 				}, nil)
@@ -1371,7 +1371,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 
 					return &db.ProviderPlatformsResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectPlatformsPerProvider,
+							TotalCount: pagination.StaticCount(test.injectPlatformsPerProvider),
 						},
 					}
 				}, nil)

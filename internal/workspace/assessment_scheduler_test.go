@@ -196,7 +196,7 @@ func TestAssessmentScheduler_execute(t *testing.T) {
 							},
 						}).Return(&db.WorkspaceAssessmentsResult{
 							PageInfo: &pagination.PageInfo{
-								TotalCount: 0,
+								TotalCount: pagination.StaticCount(0),
 							},
 						}, nil)
 					}

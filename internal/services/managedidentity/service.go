@@ -389,7 +389,7 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 		return err
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
-		limits.ResourceLimitAssignedManagedIdentitiesPerWorkspace, int32(len(newManagedIdentities))); err != nil {
+		limits.ResourceLimitAssignedManagedIdentitiesPerWorkspace, limits.StaticCount(int32(len(newManagedIdentities)))); err != nil {
 		tracing.RecordError(span, err, "limit check failed")
 		return err
 	}

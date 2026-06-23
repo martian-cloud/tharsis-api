@@ -896,8 +896,8 @@ func NewAgentSessionRunConnectionResolver(ctx context.Context, input *agentsvc.G
 }
 
 // TotalCount returns the total result count for the connection
-func (r *AgentSessionRunConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *AgentSessionRunConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

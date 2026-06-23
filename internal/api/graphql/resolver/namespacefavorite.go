@@ -128,8 +128,8 @@ func NewNamespaceFavoriteConnectionResolver(ctx context.Context, input *user.Get
 }
 
 // TotalCount returns the total result count for the connection
-func (r *NamespaceFavoriteConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *NamespaceFavoriteConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

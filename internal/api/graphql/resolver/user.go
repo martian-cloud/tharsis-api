@@ -98,8 +98,8 @@ func NewUserConnectionResolver(ctx context.Context, input *user.GetUsersInput) (
 }
 
 // TotalCount returns the total result count for the connection
-func (r *UserConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *UserConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

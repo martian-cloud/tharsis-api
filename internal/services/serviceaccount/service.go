@@ -899,7 +899,7 @@ func (s *service) authorizeServiceAccountUpdate(ctx context.Context, caller auth
 		return errors.Wrap(err, "failed to get service account memberships")
 	}
 
-	if saMemberships.PageInfo.TotalCount == 0 {
+	if len(saMemberships.NamespaceMemberships) == 0 {
 		return caller.RequirePermission(ctx, models.UpdateServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
 	}
 

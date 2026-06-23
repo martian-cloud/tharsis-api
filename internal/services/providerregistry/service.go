@@ -1546,7 +1546,7 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 			NamespacePaths: group.ExpandPath(),
 		}})
 
-	if searchKeyResult.PageInfo.TotalCount == 0 {
+	if len(searchKeyResult.GPGKeys) == 0 {
 		return errors.Wrap(err, "a trusted gpg key for key id %d does not exist", gpgKeyID, errors.WithErrorCode(errors.EInvalid))
 	}
 

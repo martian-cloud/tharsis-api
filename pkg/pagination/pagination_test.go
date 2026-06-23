@@ -40,7 +40,6 @@ func TestExecute(t *testing.T) {
 		name                string
 		sortDirection       SortDirection
 		expectSQL           string
-		expectCountSQL      string
 		expectErrCode       errors.CodeType
 		expectArguments     []interface{}
 		resultCount         int
@@ -59,7 +58,6 @@ func TestExecute(t *testing.T) {
 			resultCount:         10,
 			expectSQL:           `SELECT * FROM "tests" ORDER BY "tests"."id" ASC`,
 			expectArguments:     nil,
-			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   false,
 			expectHasPrevPage:   false,
 			expectedResultCount: 10,
@@ -70,7 +68,6 @@ func TestExecute(t *testing.T) {
 			resultCount:         6,
 			expectSQL:           `SELECT * FROM "tests" ORDER BY "tests"."id" ASC LIMIT ?`,
 			expectArguments:     []interface{}{int64(6)},
-			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   true,
 			expectHasPrevPage:   false,
 			expectedResultCount: 5,
@@ -81,7 +78,6 @@ func TestExecute(t *testing.T) {
 			resultCount:         6,
 			expectSQL:           `SELECT * FROM "tests" ORDER BY "tests"."id" DESC LIMIT ?`,
 			expectArguments:     []interface{}{int64(6)},
-			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   false,
 			expectHasPrevPage:   true,
 			expectedResultCount: 5,
@@ -94,7 +90,6 @@ func TestExecute(t *testing.T) {
 			resultCount:         6,
 			expectSQL:           `SELECT * FROM "tests" WHERE (("tests"."name" > ?) OR (("tests"."id" > ?) AND ("tests"."name" = ?))) ORDER BY "tests"."name" ASC, "tests"."id" ASC LIMIT ?`,
 			expectArguments:     []interface{}{"test1", "1", "test1", int64(6)},
-			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   true,
 			expectHasPrevPage:   true,
 			expectedResultCount: 5,
@@ -107,7 +102,6 @@ func TestExecute(t *testing.T) {
 			resultCount:         6,
 			expectSQL:           `SELECT * FROM "tests" WHERE (("tests"."name" < ?) OR (("tests"."id" < ?) AND ("tests"."name" = ?))) ORDER BY "tests"."name" DESC, "tests"."id" DESC LIMIT ?`,
 			expectArguments:     []interface{}{"test1", "1", "test1", int64(6)},
-			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   true,
 			expectHasPrevPage:   true,
 			expectedResultCount: 5,
@@ -118,7 +112,6 @@ func TestExecute(t *testing.T) {
 			resultCount:         6,
 			expectSQL:           `SELECT * FROM "tests" WHERE ("tests"."id" < ?) ORDER BY "tests"."id" ASC LIMIT ?`,
 			expectArguments:     []interface{}{"1", int64(6)},
-			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   true,
 			expectHasPrevPage:   false,
 			expectedResultCount: 5,
@@ -129,7 +122,6 @@ func TestExecute(t *testing.T) {
 			resultCount:         6,
 			expectSQL:           `SELECT * FROM (SELECT * FROM "tests" WHERE ("tests"."id" < ?) ORDER BY "tests"."id" DESC LIMIT ?) AS "t1" ORDER BY "id" ASC`,
 			expectArguments:     []interface{}{"1", int64(6)},
-			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   true,
 			expectHasPrevPage:   true,
 			expectedResultCount: 5,
@@ -149,11 +141,7 @@ func TestExecute(t *testing.T) {
 
 			mockRows.On("Scan", mock.Anything).Return(nil).Maybe()
 			mockRows.On("Close").Return(nil).Maybe()
-
-			mockCountRows := mocks.Rows{}
-			mockCountRows.Test(t)
-
-			mockCountRows.On("Scan", mock.Anything).Return(nil)
+			mockRows.On("Err").Return(nil).Maybe()
 
 			mockDBConn := MockConnection{}
 			mockDBConn.Test(t)
@@ -163,7 +151,6 @@ func TestExecute(t *testing.T) {
 			queryArguments = append(queryArguments, test.expectArguments...)
 
 			mockDBConn.On("Query", queryArguments...).Return(&mockRows, nil)
-			mockDBConn.On("QueryRow", mock.Anything, mock.Anything).Return(&mockCountRows, nil)
 
 			qBuilder, err := NewPaginatedQueryBuilder(
 				&test.paginationOptions,
@@ -220,4 +207,158 @@ func TestExecute(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestExecute_HasResultsReflectsRowsNotCount documents that HasResults is derived from the
+// rows actually returned, not from COUNT, which Execute runs as a separate lazy statement. A
+// concurrent commit (or a mid-stream error) between the two can leave COUNT > 0 while the row
+// set is empty; HasResults stays false, so callers that gate on it never index an empty slice.
+// TotalCount remains available but is computed lazily on demand.
+func TestExecute_HasResultsReflectsRowsNotCount(t *testing.T) {
+	ctx := t.Context()
+
+	// SELECT returns zero rows (the row was filtered out by a concurrent commit).
+	selectRows := mocks.Rows{}
+	selectRows.Test(t)
+	selectRows.On("Next").Return(false)
+	selectRows.On("Err").Return(nil).Maybe()
+	selectRows.On("Close").Return().Maybe()
+
+	// COUNT returns 1, evaluated only when TotalCount is invoked.
+	countRow := mocks.Rows{}
+	countRow.Test(t)
+	countRow.On("Scan", mock.Anything).Run(func(args mock.Arguments) {
+		*(args.Get(0).(*int32)) = 1
+	}).Return(nil)
+
+	conn := MockConnection{}
+	conn.Test(t)
+	conn.On("Query", mock.Anything, mock.Anything, mock.Anything).Return(&selectRows, nil)
+	conn.On("QueryRow", mock.Anything, mock.Anything).Return(&countRow)
+
+	qBuilder, err := NewPaginatedQueryBuilder(
+		&Options{First: ptr.Int32(1)},
+		&FieldDescriptor{Key: "id", Table: "runs", Col: "id"},
+	)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	rows, err := qBuilder.Execute(ctx, &conn, goqu.From("runs"))
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	results := []testModel{}
+	for rows.Next() {
+		results = append(results, testModel{})
+	}
+	assert.NoError(t, rows.Finalize(&results))
+
+	pageInfo := rows.GetPageInfo()
+
+	// No rows were returned, so HasResults is false even though COUNT says 1.
+	assert.False(t, pageInfo.HasResults)
+	assert.Len(t, results, 0)
+
+	// TotalCount is computed lazily and still reports the COUNT value.
+	totalCount, err := pageInfo.TotalCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), totalCount)
+
+	// Gating existence on HasResults is safe; the old TotalCount-based check was not.
+	assert.NotPanics(t, func() {
+		if !pageInfo.HasResults {
+			return
+		}
+		_ = results[0]
+	})
+}
+
+// TestExecute_TotalCountLazyAndMemoized verifies the COUNT runs only when TotalCount is
+// invoked, and at most once across repeated calls.
+func TestExecute_TotalCountLazyAndMemoized(t *testing.T) {
+	ctx := t.Context()
+
+	selectRows := mocks.Rows{}
+	selectRows.Test(t)
+	selectRows.On("Next").Return(true).Once()
+	selectRows.On("Next").Return(false)
+	selectRows.On("Scan", mock.Anything).Return(nil).Maybe()
+	selectRows.On("Err").Return(nil).Maybe()
+	selectRows.On("Close").Return().Maybe()
+
+	countRow := mocks.Rows{}
+	countRow.Test(t)
+	countRow.On("Scan", mock.Anything).Run(func(args mock.Arguments) {
+		*(args.Get(0).(*int32)) = 7
+	}).Return(nil)
+
+	conn := MockConnection{}
+	conn.Test(t)
+	conn.On("Query", mock.Anything, mock.Anything, mock.Anything).Return(&selectRows, nil)
+	// .Once() makes a second COUNT a test failure, proving memoization.
+	conn.On("QueryRow", mock.Anything, mock.Anything).Return(&countRow).Once()
+
+	qBuilder, err := NewPaginatedQueryBuilder(&Options{First: ptr.Int32(1)}, &FieldDescriptor{Key: "id", Table: "runs", Col: "id"})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	rows, err := qBuilder.Execute(ctx, &conn, goqu.From("runs"))
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	results := []testModel{}
+	for rows.Next() {
+		results = append(results, testModel{})
+	}
+	assert.NoError(t, rows.Finalize(&results))
+
+	pageInfo := rows.GetPageInfo()
+
+	// Lazy: no COUNT until TotalCount is invoked.
+	conn.AssertNotCalled(t, "QueryRow", mock.Anything, mock.Anything)
+
+	for range 3 {
+		count, err := pageInfo.TotalCount(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(7), count)
+	}
+
+	conn.AssertExpectations(t)
+}
+
+// TestExecute_TotalCountError surfaces a COUNT scan error.
+func TestExecute_TotalCountError(t *testing.T) {
+	ctx := t.Context()
+
+	selectRows := mocks.Rows{}
+	selectRows.Test(t)
+	selectRows.On("Next").Return(false)
+	selectRows.On("Err").Return(nil).Maybe()
+	selectRows.On("Close").Return().Maybe()
+
+	countRow := mocks.Rows{}
+	countRow.Test(t)
+	countRow.On("Scan", mock.Anything).Return(fmt.Errorf("boom"))
+
+	conn := MockConnection{}
+	conn.Test(t)
+	conn.On("Query", mock.Anything, mock.Anything, mock.Anything).Return(&selectRows, nil)
+	conn.On("QueryRow", mock.Anything, mock.Anything).Return(&countRow)
+
+	qBuilder, err := NewPaginatedQueryBuilder(&Options{First: ptr.Int32(1)}, &FieldDescriptor{Key: "id", Table: "runs", Col: "id"})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	rows, err := qBuilder.Execute(ctx, &conn, goqu.From("runs"))
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	_, err = rows.GetPageInfo().TotalCount(ctx)
+	assert.Error(t, err)
 }

@@ -244,6 +244,11 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 		rules = append(rules, *rule)
 	}
 
+	if err := rows.Finalize(&rules); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
+		return nil, err
+	}
+
 	for i, rule := range rules {
 		allowedUserIDs, err := m.getManagedIdentityAccessRuleAllowedUserIDs(ctx, conn, rule.Metadata.ID)
 		if err != nil {

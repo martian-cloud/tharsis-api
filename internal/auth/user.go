@@ -370,7 +370,13 @@ func (u *UserAuth) createUser(ctx context.Context, identity *externalIdentity) (
 			if uErr != nil {
 				return nil, uErr
 			}
-			newUsername := fmt.Sprintf("%s%d", identity.Username, resp.PageInfo.TotalCount+1)
+
+			totalCount, uErr := resp.PageInfo.TotalCount(ctx)
+			if uErr != nil {
+				return nil, uErr
+			}
+
+			newUsername := fmt.Sprintf("%s%d", identity.Username, totalCount+1)
 			// Create user with new username
 			user, err = u.createUserWithExternalID(ctx, &externalIdentity{
 				ID:       identity.ID,

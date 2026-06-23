@@ -159,10 +159,15 @@ func GetWorkspaces(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getWorkspacesI
 			}
 		}
 
+		totalCount, err := result.PageInfo.TotalCount(ctx)
+		if err != nil {
+			return nil, getWorkspacesOutput{}, WrapMCPToolError(err, "failed to get workspace count")
+		}
+
 		pi := pageInfo{
 			HasNextPage:     result.PageInfo.HasNextPage,
 			HasPreviousPage: result.PageInfo.HasPreviousPage,
-			TotalCount:      result.PageInfo.TotalCount,
+			TotalCount:      totalCount,
 		}
 
 		if len(result.Workspaces) > 0 {

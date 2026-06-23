@@ -205,7 +205,7 @@ func TestCreateWorkspace(t *testing.T) {
 
 					return &db.WorkspacesResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectWorkspacesPerGroup,
+							TotalCount: pagination.StaticCount(test.injectWorkspacesPerGroup),
 						},
 					}
 				}, nil)
@@ -1167,7 +1167,7 @@ func TestGetWorkspaces(t *testing.T) {
 						},
 					},
 				},
-				PageInfo: &pagination.PageInfo{TotalCount: 1},
+				PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)},
 			},
 			expectResult: []models.Workspace{
 				{
@@ -1202,7 +1202,7 @@ func TestGetWorkspaces(t *testing.T) {
 						},
 					},
 				},
-				PageInfo: &pagination.PageInfo{TotalCount: 1},
+				PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)},
 			},
 			expectResult: []models.Workspace{
 				{
@@ -1226,7 +1226,7 @@ func TestGetWorkspaces(t *testing.T) {
 			},
 			dbResult: &db.WorkspacesResult{
 				Workspaces: []models.Workspace{},
-				PageInfo:   &pagination.PageInfo{TotalCount: 0},
+				PageInfo:   &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 			},
 			expectResult: []models.Workspace{},
 		},
@@ -1729,7 +1729,7 @@ func TestCreateStateVersion(t *testing.T) {
 			mockStateVersions.On("GetStateVersions", mock.Anything, mock.Anything).
 				Return(&db.StateVersionsResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: test.injectSVsPerWorkspace,
+						TotalCount: pagination.StaticCount(test.injectSVsPerWorkspace),
 					},
 				}, nil).Maybe()
 
@@ -1915,7 +1915,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 			mockConfigurationVersions.On("GetConfigurationVersions", mock.Anything, mock.Anything).
 				Return(&db.ConfigurationVersionsResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: test.injectSVsPerWorkspace,
+						TotalCount: pagination.StaticCount(test.injectSVsPerWorkspace),
 					},
 				}, nil).Maybe()
 
@@ -2098,7 +2098,7 @@ func TestMigrateWorkspace(t *testing.T) {
 			mockWorkspaces.On("GetWorkspaces", mock.Anything, mock.Anything).Return(
 				&db.WorkspacesResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: test.newParentChildren,
+						TotalCount: pagination.StaticCount(test.newParentChildren),
 					},
 				}, nil)
 

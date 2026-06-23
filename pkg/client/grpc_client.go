@@ -6,18 +6,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"time"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/hashicorp/go-retryablehttp"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -313,6 +317,70 @@ func NewGRPCClient(ctx context.Context, c *GRPCClientConfig) (*GRPCClient, error
 // Close closes any underlying connections for this GRPCClient.
 func (c *GRPCClient) Close() error {
 	return c.connection.Close()
+}
+
+// reconnectableStreamCodes are the status codes that warrant a stream reconnect:
+// Unavailable (a draining instance) and Aborted. Unknown is excluded so a non-gRPC
+// stream error doesn't retry forever under the unbounded attempt count.
+var reconnectableStreamCodes = map[codes.Code]struct{}{
+	codes.Unavailable: {},
+	codes.Aborted:     {},
+}
+
+// StreamWithReconnect drives a server stream, reconnecting with backoff while the server
+// is unavailable, until handle reports done, the stream ends, or a non-reconnectable error.
+func StreamWithReconnect[T any](
+	ctx context.Context,
+	open func(context.Context) (grpc.ServerStreamingClient[T], error),
+	handle func(*T) (bool, error),
+	opts ...retry.Option,
+) error {
+	// Cancel on return so the underlying stream is torn down when we stop.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// ctx and the reconnect predicate are applied last so caller opts can't override them.
+	options := []retry.Option{
+		retry.Attempts(0),
+		retry.DelayType(retry.BackOffDelay),
+		retry.Delay(500 * time.Millisecond),
+		retry.MaxDelay(30 * time.Second),
+		retry.LastErrorOnly(true),
+	}
+	options = append(options, opts...)
+	options = append(options,
+		retry.Context(ctx),
+		retry.RetryIf(func(err error) bool {
+			_, ok := reconnectableStreamCodes[status.Code(err)]
+			return ok
+		}),
+	)
+
+	return retry.Do(func() error {
+		stream, err := open(ctx)
+		if err != nil {
+			return err
+		}
+
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					return nil
+				}
+
+				return err
+			}
+
+			done, err := handle(msg)
+			if err != nil {
+				return retry.Unrecoverable(err)
+			}
+			if done {
+				return nil
+			}
+		}
+	}, options...)
 }
 
 // ServiceDiscoveryPath is the path to the service discovery document.

@@ -769,7 +769,7 @@ func TestCreateModule(t *testing.T) {
 
 					return &db.ModulesResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectModulesPerGroup,
+							TotalCount: pagination.StaticCount(test.injectModulesPerGroup),
 						},
 					}
 				}, nil)
@@ -1719,7 +1719,7 @@ func TestCreateModuleVersion(t *testing.T) {
 
 					return &db.ModuleVersionsResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectVersionsPerModule,
+							TotalCount: pagination.StaticCount(test.injectVersionsPerModule),
 						},
 					}
 				}, nil)
@@ -2544,7 +2544,7 @@ func TestCreateModuleAttestation(t *testing.T) {
 
 					return &db.ModuleAttestationsResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectAttestationsPerModule,
+							TotalCount: pagination.StaticCount(test.injectAttestationsPerModule),
 						},
 					}
 				}, nil)

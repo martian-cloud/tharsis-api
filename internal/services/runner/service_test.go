@@ -579,7 +579,7 @@ func TestCreateRunner(t *testing.T) {
 
 					return &db.RunnersResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectRunnersPerGroup,
+							TotalCount: pagination.StaticCount(test.injectRunnersPerGroup),
 						},
 					}
 				}, nil).Maybe()
@@ -1199,7 +1199,7 @@ func TestCreateRunnerSession(t *testing.T) {
 			}, nil).Maybe()
 
 			mockLimitChecker.On("CheckLimit", mock.Anything,
-				limits.ResourceLimitRunnerSessionsPerRunner, int32(0)).
+				limits.ResourceLimitRunnerSessionsPerRunner, mock.Anything).
 				Return(test.limitError).Maybe()
 
 			if test.createdRunnerSession != nil {

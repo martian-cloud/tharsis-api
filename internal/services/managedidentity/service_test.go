@@ -36,7 +36,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			Cursor: func(_ pagination.CursorPaginatable) (*string, error) {
 				return nil, nil
 			},
-			TotalCount:      1,
+			TotalCount:      pagination.StaticCount(1),
 			HasNextPage:     false,
 			HasPreviousPage: false,
 		},
@@ -1169,7 +1169,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 
 					return &db.ManagedIdentitiesResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectAliasesPerGroup,
+							TotalCount: pagination.StaticCount(test.injectAliasesPerGroup),
 						},
 					}
 				}, nil)
@@ -1188,7 +1188,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 
 						return &db.ManagedIdentitiesResult{
 							PageInfo: &pagination.PageInfo{
-								TotalCount: test.injectAliasesPerMI,
+								TotalCount: pagination.StaticCount(test.injectAliasesPerMI),
 							},
 						}
 					}, nil)
@@ -1655,7 +1655,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 					return &db.ManagedIdentitiesResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectMIPerGroup,
+							TotalCount: pagination.StaticCount(test.injectMIPerGroup),
 						},
 					}
 				}, nil)
@@ -2493,7 +2493,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 
 					return &db.ManagedIdentityAccessRulesResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectRulesPerMI,
+							TotalCount: pagination.StaticCount(test.injectRulesPerMI),
 						},
 					}
 				}, nil)
@@ -2968,7 +2968,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			// For the positive test case, GetManagedIdentities is hit when checking the resource limit and for aliases.
 			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
 				PageInfo: &pagination.PageInfo{
-					TotalCount: 0,
+					TotalCount: pagination.StaticCount(0),
 				},
 			},
 		},
@@ -2995,7 +2995,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			},
 			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
 				PageInfo: &pagination.PageInfo{
-					TotalCount: 0,
+					TotalCount: pagination.StaticCount(0),
 				},
 			},
 			expectErrorCode: errors.EInvalid,
@@ -3014,7 +3014,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			},
 			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
 				PageInfo: &pagination.PageInfo{
-					TotalCount: 0,
+					TotalCount: pagination.StaticCount(0),
 				},
 			},
 			injectMoveError: errors.New("Not found", errors.WithErrorCode(errors.ENotFound)),
@@ -3197,7 +3197,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			mockManagedIdentities.On("GetManagedIdentities", mock.Anything, mock.Anything).
 				Return(test.injectGetManagedIdentities, nil).Maybe()
 
-			mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitManagedIdentitiesPerGroup, int32(0)).
+			mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitManagedIdentitiesPerGroup, mock.Anything).
 				Return(test.limitError).Maybe()
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).

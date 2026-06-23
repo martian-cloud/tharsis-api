@@ -420,9 +420,9 @@ func TestCreateServiceAccount(t *testing.T) {
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
 				m.serviceAccounts.On("CreateServiceAccount", mock.Anything, mock.Anything).Return(createdSA, nil)
 				m.serviceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).Return(&db.ServiceAccountsResult{
-					PageInfo: &pagination.PageInfo{TotalCount: 5},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(5)},
 				}, nil)
-				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, int32(5)).Return(nil)
+				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, mock.MatchedBy(func(c pagination.CountFunc) bool { v, _ := c(context.Background()); return v == 5 })).Return(nil)
 				m.activityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			},
 		},
@@ -451,9 +451,9 @@ func TestCreateServiceAccount(t *testing.T) {
 					ClientSecretExpiresAt: &clientSecretExpiry,
 				}, nil)
 				m.serviceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).Return(&db.ServiceAccountsResult{
-					PageInfo: &pagination.PageInfo{TotalCount: 5},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(5)},
 				}, nil)
-				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, int32(5)).Return(nil)
+				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, mock.MatchedBy(func(c pagination.CountFunc) bool { v, _ := c(context.Background()); return v == 5 })).Return(nil)
 				m.activityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			},
 			expectClientCredentialsEnabled: true,
@@ -486,9 +486,9 @@ func TestCreateServiceAccount(t *testing.T) {
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.serviceAccounts.On("CreateServiceAccount", mock.Anything, mock.Anything).Return(createdSA, nil)
 				m.serviceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).Return(&db.ServiceAccountsResult{
-					PageInfo: &pagination.PageInfo{TotalCount: 6},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(6)},
 				}, nil)
-				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, int32(6)).Return(terrs.New("limit exceeded", terrs.WithErrorCode(terrs.EInvalid)))
+				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, mock.MatchedBy(func(c pagination.CountFunc) bool { v, _ := c(context.Background()); return v == 6 })).Return(terrs.New("limit exceeded", terrs.WithErrorCode(terrs.EInvalid)))
 			},
 			expectErrCode: terrs.EInvalid,
 		},
@@ -574,7 +574,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 						ServiceAccountID: &serviceAccountID,
 					},
 				}).Return(&db.NamespaceMembershipResult{
-					PageInfo: &pagination.PageInfo{TotalCount: 0},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 				}, nil)
 
 				updated := *existingSA
@@ -608,7 +608,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 					NamespaceMemberships: []models.NamespaceMembership{
 						{Namespace: models.MembershipNamespace{Path: "other-group"}},
 					},
-					PageInfo: &pagination.PageInfo{TotalCount: 1},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)},
 				}, nil)
 				m.caller.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).Return(nil)
 
@@ -667,7 +667,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 					NamespaceMemberships: []models.NamespaceMembership{
 						{Namespace: models.MembershipNamespace{Path: "other-group"}},
 					},
-					PageInfo: &pagination.PageInfo{TotalCount: 1},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)},
 				}, nil)
 				m.caller.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).
 					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
@@ -690,7 +690,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 						ServiceAccountID: &serviceAccountID,
 					},
 				}).Return(&db.NamespaceMembershipResult{
-					PageInfo: &pagination.PageInfo{TotalCount: 0},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 				}, nil)
 
 				// Can't match exact model since client secret hash is generated
@@ -729,7 +729,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 						ServiceAccountID: &serviceAccountID,
 					},
 				}).Return(&db.NamespaceMembershipResult{
-					PageInfo: &pagination.PageInfo{TotalCount: 0},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 				}, nil)
 				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).
 					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
@@ -1295,7 +1295,7 @@ func TestResetClientCredentials(t *testing.T) {
 						ServiceAccountID: &serviceAccountID,
 					},
 				}).Return(&db.NamespaceMembershipResult{
-					PageInfo: &pagination.PageInfo{TotalCount: 0},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 				}, nil)
 				m.serviceAccounts.On("UpdateServiceAccount", mock.Anything, mock.Anything).Return(saWithClientCreds, nil)
 			},
@@ -1323,7 +1323,7 @@ func TestResetClientCredentials(t *testing.T) {
 						ServiceAccountID: &serviceAccountID,
 					},
 				}).Return(&db.NamespaceMembershipResult{
-					PageInfo: &pagination.PageInfo{TotalCount: 0},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 				}, nil)
 				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).
 					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
@@ -1346,7 +1346,7 @@ func TestResetClientCredentials(t *testing.T) {
 					NamespaceMemberships: []models.NamespaceMembership{
 						{Namespace: models.MembershipNamespace{Path: "other-group"}},
 					},
-					PageInfo: &pagination.PageInfo{TotalCount: 1},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)},
 				}, nil)
 				m.caller.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).
 					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
@@ -1367,7 +1367,7 @@ func TestResetClientCredentials(t *testing.T) {
 						ServiceAccountID: &serviceAccountID,
 					},
 				}).Return(&db.NamespaceMembershipResult{
-					PageInfo: &pagination.PageInfo{TotalCount: 0},
+					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 				}, nil)
 			},
 			expectErrCode: terrs.EInvalid,

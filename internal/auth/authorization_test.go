@@ -1498,7 +1498,7 @@ func TestRequireRole(t *testing.T) {
 					},
 				}).Return(&db.NamespaceMembershipResult{
 					NamespaceMemberships: test.namespaceMemberships,
-					PageInfo:             &pagination.PageInfo{TotalCount: int32(len(test.namespaceMemberships))},
+					PageInfo:             &pagination.PageInfo{HasResults: len(test.namespaceMemberships) > 0, TotalCount: pagination.StaticCount(int32(len(test.namespaceMemberships)))},
 				}, nil)
 			}
 

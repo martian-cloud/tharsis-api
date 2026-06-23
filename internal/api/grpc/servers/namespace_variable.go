@@ -194,10 +194,15 @@ func (s *NamespaceVariableServer) GetNamespaceVariableVersions(ctx context.Conte
 		pbVersions[ix] = toPBNamespaceVariableVersion(&versions[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(versions) > 0 {

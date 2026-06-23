@@ -456,7 +456,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				continue
 			}
 
-			if runsResult.PageInfo.TotalCount == 0 {
+			if len(runsResult.Runs) == 0 {
 				// Run isn't for the target workspace or user.
 				continue
 			}
@@ -2616,7 +2616,7 @@ func (s *service) GetStateVersionsByRunIDs(ctx context.Context, runIDs []string)
 		}
 	}
 
-	if runsResult.PageInfo.TotalCount > 0 {
+	if runsResult.PageInfo.HasResults {
 		result, err := s.dbClient.StateVersions.GetStateVersions(ctx, &db.GetStateVersionsInput{
 			Filter: &db.StateVersionFilter{
 				RunIDs: runIDs,

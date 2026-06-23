@@ -247,7 +247,7 @@ func TestUserSessionManager_CreateSession(t *testing.T) {
 				mockUserSessions.On("CreateUserSession", mock.Anything, mock.AnythingOfType("*models.UserSession")).Return(session, nil)
 				mockUserSessions.On("GetUserSessions", mock.Anything, mock.AnythingOfType("*db.GetUserSessionsInput")).Return(&db.UserSessionsResult{
 					UserSessions: []models.UserSession{},
-					PageInfo:     &pagination.PageInfo{TotalCount: 0},
+					PageInfo:     &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 				}, nil)
 
 				mockSigning.On("GenerateToken", mock.Anything, mock.AnythingOfType("*auth.TokenInput")).Return([]byte("access-token"), nil).Times(3)
@@ -284,7 +284,7 @@ func TestUserSessionManager_CreateSession(t *testing.T) {
 				mockUserSessions.On("CreateUserSession", mock.Anything, mock.AnythingOfType("*models.UserSession")).Return(session, nil)
 				mockUserSessions.On("GetUserSessions", mock.Anything, mock.AnythingOfType("*db.GetUserSessionsInput")).Return(&db.UserSessionsResult{
 					UserSessions: []models.UserSession{},
-					PageInfo:     &pagination.PageInfo{TotalCount: 0},
+					PageInfo:     &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 				}, nil)
 
 				mockSigning.On("GenerateToken", mock.Anything, mock.AnythingOfType("*auth.TokenInput")).Return([]byte("access-token"), nil).Times(3)

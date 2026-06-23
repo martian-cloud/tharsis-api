@@ -201,7 +201,7 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 
 						return &db.GPGKeysResult{
 							PageInfo: &pagination.PageInfo{
-								TotalCount: test.keyCount,
+								TotalCount: pagination.StaticCount(test.keyCount),
 							},
 						}
 					},

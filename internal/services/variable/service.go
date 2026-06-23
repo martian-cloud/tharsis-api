@@ -625,7 +625,7 @@ func (s *service) CreateVariable(ctx context.Context, input *CreateVariableInput
 		return nil, errors.Wrap(err, "failed to query variables in namespace", errors.WithSpan(span))
 	}
 
-	if existingVariables.PageInfo.TotalCount > 0 {
+	if existingVariables.PageInfo.HasResults {
 		return nil, errors.New("variable with key %q and category %q already exists in namespace", input.Key, input.Category, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 	}
 
@@ -756,7 +756,7 @@ func (s *service) UpdateVariable(ctx context.Context, input *UpdateVariableInput
 			return nil, errors.Wrap(err, "failed to query variables in namespace", errors.WithSpan(span))
 		}
 
-		if existingVariables.PageInfo.TotalCount > 0 {
+		if existingVariables.PageInfo.HasResults {
 			return nil, errors.New("variable with key %q and category %q already exists in namespace", input.Key, variable.Category, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 		}
 	}

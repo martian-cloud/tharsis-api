@@ -425,9 +425,9 @@ func TestCreateAgentRun(t *testing.T) {
 					// Only set up run creation mocks for the owner with a valid message
 					if test.expectErrorCode == "" {
 						mockRuns.On("GetAgentSessionRuns", mock.Anything, mock.Anything).Return(&db.AgentSessionRunsResult{
-							PageInfo: &pagination.PageInfo{TotalCount: 0},
+							PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 						}, nil)
-						mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitAgentSessionRunsPerSession, int32(0)).Return(nil)
+						mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitAgentSessionRunsPerSession, mock.MatchedBy(func(c pagination.CountFunc) bool { v, _ := c(context.Background()); return v == 0 })).Return(nil)
 						mockRuns.On("CreateAgentSessionRun", mock.Anything, mock.Anything).Return(sampleRun, nil)
 						mockTaskManager.On("StartTask", mock.Anything).Return()
 					}
@@ -815,9 +815,9 @@ func TestCreateAgentRun_PreviousRunNotFound(t *testing.T) {
 
 	mockSessions.On("GetAgentSessionByID", mock.Anything, sampleSessionID).Return(sampleSession, nil)
 	mockRuns.On("GetAgentSessionRuns", mock.Anything, mock.Anything).Return(&db.AgentSessionRunsResult{
-		PageInfo: &pagination.PageInfo{TotalCount: 0},
+		PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 	}, nil)
-	mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitAgentSessionRunsPerSession, int32(0)).Return(nil)
+	mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitAgentSessionRunsPerSession, mock.MatchedBy(func(c pagination.CountFunc) bool { v, _ := c(context.Background()); return v == 0 })).Return(nil)
 	mockRuns.On("GetAgentSessionRunByID", mock.Anything, "nonexistent").Return(nil, nil)
 
 	svc := &service{aiEnabled: true,
@@ -853,9 +853,9 @@ func TestCreateAgentRun_PreviousRunStillRunning(t *testing.T) {
 
 	mockSessions.On("GetAgentSessionByID", mock.Anything, sampleSessionID).Return(sampleSession, nil)
 	mockRuns.On("GetAgentSessionRuns", mock.Anything, mock.Anything).Return(&db.AgentSessionRunsResult{
-		PageInfo: &pagination.PageInfo{TotalCount: 0},
+		PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 	}, nil)
-	mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitAgentSessionRunsPerSession, int32(0)).Return(nil)
+	mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitAgentSessionRunsPerSession, mock.MatchedBy(func(c pagination.CountFunc) bool { v, _ := c(context.Background()); return v == 0 })).Return(nil)
 	mockRuns.On("GetAgentSessionRunByID", mock.Anything, "prev-run").Return(runningPrevRun, nil)
 
 	svc := &service{aiEnabled: true,
@@ -894,15 +894,15 @@ func TestCreateAgentRun_PreviousRunAlreadyReferenced(t *testing.T) {
 	mockRuns.On("GetAgentSessionRuns", mock.Anything, mock.MatchedBy(func(input *db.GetAgentSessionRunsInput) bool {
 		return input.Filter != nil && input.Filter.SessionID != nil
 	})).Return(&db.AgentSessionRunsResult{
-		PageInfo: &pagination.PageInfo{TotalCount: 0},
+		PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 	}, nil).Once()
-	mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitAgentSessionRunsPerSession, int32(0)).Return(nil)
+	mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitAgentSessionRunsPerSession, mock.MatchedBy(func(c pagination.CountFunc) bool { v, _ := c(context.Background()); return v == 0 })).Return(nil)
 	mockRuns.On("GetAgentSessionRunByID", mock.Anything, "prev-run").Return(finishedPrevRun, nil)
 	// Second call: previous run chain check (filter by PreviousRunID)
 	mockRuns.On("GetAgentSessionRuns", mock.Anything, mock.MatchedBy(func(input *db.GetAgentSessionRunsInput) bool {
 		return input.Filter != nil && input.Filter.PreviousRunID != nil
 	})).Return(&db.AgentSessionRunsResult{
-		PageInfo: &pagination.PageInfo{TotalCount: 1},
+		PageInfo: &pagination.PageInfo{HasResults: true, TotalCount: pagination.StaticCount(1)},
 	}, nil).Once()
 
 	svc := &service{aiEnabled: true,
@@ -938,9 +938,9 @@ func TestCreateAgentRun_PreviousRunFromDifferentSession(t *testing.T) {
 
 	mockSessions.On("GetAgentSessionByID", mock.Anything, sampleSessionID).Return(sampleSession, nil)
 	mockRuns.On("GetAgentSessionRuns", mock.Anything, mock.Anything).Return(&db.AgentSessionRunsResult{
-		PageInfo: &pagination.PageInfo{TotalCount: 0},
+		PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
 	}, nil)
-	mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitAgentSessionRunsPerSession, int32(0)).Return(nil)
+	mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitAgentSessionRunsPerSession, mock.MatchedBy(func(c pagination.CountFunc) bool { v, _ := c(context.Background()); return v == 0 })).Return(nil)
 	mockRuns.On("GetAgentSessionRunByID", mock.Anything, "other-run").Return(otherSessionRun, nil)
 
 	svc := &service{aiEnabled: true,

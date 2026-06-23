@@ -71,10 +71,15 @@ func (s *GPGKeyServer) GetGPGKeys(ctx context.Context, req *pb.GetGPGKeysRequest
 		pbGPGKeys[ix] = toPBGPGKey(&gpgKeys[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(gpgKeys) > 0 {

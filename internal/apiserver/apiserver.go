@@ -420,7 +420,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		grpcListener = listener
 	}
 
-	grpcServer := grpc.NewServer(&grpc.ServerOptions{
+	grpcServer := grpc.NewServer(ctx, &grpc.ServerOptions{
 		Listener:        grpcListener,
 		Logger:          logger,
 		Authenticator:   authenticator,
@@ -506,6 +506,10 @@ func (api *APIServer) Start() {
 // Shutdown will shutdown the API server
 func (api *APIServer) Shutdown(ctx context.Context) {
 	api.shutdownOnce.Do(func() {
+		// Drain gRPC streams first so long-lived streams (also served over the
+		// multiplexed HTTP server) don't block the HTTP shutdown below.
+		api.grpcServer.Drain()
+
 		api.logger.Info("Starting HTTP server shutdown")
 
 		// Shutdown HTTP server

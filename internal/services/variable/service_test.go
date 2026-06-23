@@ -860,7 +860,7 @@ func TestCreateVariable(t *testing.T) {
 				}).Return(func(_ context.Context, _ *db.GetVariablesInput) *db.VariableResult {
 					return &db.VariableResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: 0,
+							TotalCount: pagination.StaticCount(0),
 						},
 					}
 				}, nil).Once()
@@ -888,7 +888,7 @@ func TestCreateVariable(t *testing.T) {
 				}).Return(func(_ context.Context, _ *db.GetVariablesInput) *db.VariableResult {
 					return &db.VariableResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectVariablesPerNamespace,
+							TotalCount: pagination.StaticCount(test.injectVariablesPerNamespace),
 						},
 					}
 				}, nil)
@@ -1056,7 +1056,7 @@ func TestUpdateVariable(t *testing.T) {
 				}).Return(func(_ context.Context, _ *db.GetVariablesInput) *db.VariableResult {
 					return &db.VariableResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: 0,
+							TotalCount: pagination.StaticCount(0),
 						},
 					}
 				}, nil).Maybe()

@@ -449,7 +449,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 		}
 
 		// Check the limit on depth of the tree.
-		if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitGroupTreeDepth, int32(group.GetDepth())); err != nil {
+		if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitGroupTreeDepth, limits.StaticCount(int32(group.GetDepth()))); err != nil {
 			tracing.RecordError(span, err, "limit check failed")
 			return nil, err
 		}
@@ -707,7 +707,7 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		}
 
 		if err = s.limitChecker.CheckLimit(txContext,
-			limits.ResourceLimitGroupTreeDepth, int32(migratedGroup.GetDepth()+childDepth)); err != nil {
+			limits.ResourceLimitGroupTreeDepth, limits.StaticCount(int32(migratedGroup.GetDepth()+childDepth))); err != nil {
 			tracing.RecordError(span, err, "limit check failed")
 			return nil, err
 		}
