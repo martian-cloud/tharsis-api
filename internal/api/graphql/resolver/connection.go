@@ -80,5 +80,5 @@ type Edge struct {
 type Connection struct {
 	PageInfo   PageInfo
 	Edges      []Edge
-	TotalCount int32
+	TotalCount pagination.CountFunc
 }

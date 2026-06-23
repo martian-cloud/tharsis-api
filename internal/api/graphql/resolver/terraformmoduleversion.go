@@ -114,8 +114,8 @@ func NewTerraformModuleVersionConnectionResolver(ctx context.Context, input *mod
 }
 
 // TotalCount returns the total result count for the connection
-func (r *TerraformModuleVersionConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *TerraformModuleVersionConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

@@ -736,12 +736,12 @@ func TestCreateFederatedRegistry(t *testing.T) {
 				}).
 				Return(&db.FederatedRegistriesResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: 1,
+						TotalCount: pagination.StaticCount(1),
 					},
 					FederatedRegistries: []*models.FederatedRegistry{&testRegistry},
 				}, nil).Maybe()
 
-			mockLimits.On("CheckLimit", mock.Anything, mock.Anything, int32(1)).
+			mockLimits.On("CheckLimit", mock.Anything, mock.Anything, mock.Anything).
 				Return(test.exceedsLimitError).Maybe()
 
 			mockDBClient.MockGroups.On("GetGroupByID", mock.Anything, groupID).
@@ -883,7 +883,7 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 				}).
 				Return(&db.FederatedRegistriesResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: 1,
+						TotalCount: pagination.StaticCount(1),
 					},
 					FederatedRegistries: []*models.FederatedRegistry{&testRegistry},
 				}, nil).Maybe()
@@ -1017,7 +1017,7 @@ func TestDeleteFederatedRegistry(t *testing.T) {
 				}).
 				Return(&db.FederatedRegistriesResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: 1,
+						TotalCount: pagination.StaticCount(1),
 					},
 					FederatedRegistries: []*models.FederatedRegistry{&testRegistry},
 				}, nil).Maybe()

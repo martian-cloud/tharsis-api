@@ -79,10 +79,15 @@ func (s *StateVersionServer) GetStateVersions(ctx context.Context, req *pb.GetSt
 		pbStateVersions[ix] = toPBStateVersion(&stateVersions[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(stateVersions) > 0 {

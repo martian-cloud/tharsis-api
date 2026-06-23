@@ -112,8 +112,8 @@ func NewRunConnectionResolver(ctx context.Context, input *run.GetRunsInput) (*Ru
 }
 
 // TotalCount returns the total result count for the connection
-func (r *RunConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *RunConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

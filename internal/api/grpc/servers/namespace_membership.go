@@ -106,10 +106,15 @@ func (s *NamespaceMembershipServer) GetNamespaceMembershipsForSubject(ctx contex
 		pbMemberships[ix] = toPBNamespaceMembership(&memberships[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(memberships) > 0 {

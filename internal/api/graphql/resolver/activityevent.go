@@ -111,8 +111,8 @@ func NewActivityEventConnectionResolver(ctx context.Context,
 }
 
 // TotalCount returns the total result count for the connection
-func (r *ActivityEventConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *ActivityEventConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

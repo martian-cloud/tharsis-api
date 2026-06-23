@@ -332,7 +332,7 @@ func (s *service) CreateAgentRun(ctx context.Context, input *CreateAgentRunInput
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to validate previous run chain")
 		}
-		if result.PageInfo.TotalCount > 0 {
+		if result.PageInfo.HasResults {
 			return nil, errors.New("previous run is already referenced by another run", errors.WithErrorCode(errors.EInvalid))
 		}
 	}

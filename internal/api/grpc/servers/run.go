@@ -98,10 +98,15 @@ func (s *RunServer) GetRuns(ctx context.Context, req *pb.GetRunsRequest) (*pb.Ge
 		pbRuns[ix] = toPBRun(&runs[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(runs) > 0 {

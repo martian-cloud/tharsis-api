@@ -104,8 +104,8 @@ func NewTeamConnectionResolver(ctx context.Context, input *team.GetTeamsInput) (
 }
 
 // TotalCount returns the total result count for the connection
-func (r *TeamConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *TeamConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information
@@ -485,8 +485,8 @@ func NewTeamMemberConnectionResolver(ctx context.Context,
 }
 
 // TotalCount returns the total result count for the connection
-func (r *TeamMemberConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *TeamMemberConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

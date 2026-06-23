@@ -95,8 +95,8 @@ func NewVCSProviderConnectionResolver(ctx context.Context, input *vcs.GetVCSProv
 }
 
 // TotalCount returns the total result count for the connection
-func (r *VCSProviderConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *VCSProviderConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

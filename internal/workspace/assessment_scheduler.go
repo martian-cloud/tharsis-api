@@ -204,7 +204,13 @@ func (a *AssessmentScheduler) checkInProgressAssessmentLimit(ctx context.Context
 	if err != nil {
 		return 0, false, err
 	}
-	return response.PageInfo.TotalCount, int(response.PageInfo.TotalCount) < limit, nil
+
+	totalCount, err := response.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return 0, false, err
+	}
+
+	return totalCount, int(totalCount) < limit, nil
 }
 
 func (a *AssessmentScheduler) startWorkspaceAssessment(ctx context.Context, workspace *models.Workspace) (bool, error) {

@@ -103,8 +103,8 @@ func NewNamespaceVariableVersionConnectionResolver(ctx context.Context, input *v
 }
 
 // TotalCount returns the total result count for the connection
-func (r *NamespaceVariableVersionConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *NamespaceVariableVersionConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

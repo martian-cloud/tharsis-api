@@ -95,10 +95,15 @@ func (s *TerraformModuleServer) GetTerraformModules(ctx context.Context, req *pb
 		pbModules[ix] = toPBTerraformModule(&modules[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(modules) > 0 {
@@ -280,10 +285,15 @@ func (s *TerraformModuleServer) GetTerraformModuleVersions(ctx context.Context, 
 		pbVersions[ix] = toPBTerraformModuleVersion(&versions[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(versions) > 0 {
@@ -400,10 +410,15 @@ func (s *TerraformModuleServer) GetTerraformModuleAttestations(ctx context.Conte
 		pbAttestations[ix] = toPBTerraformModuleAttestation(&attestations[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(attestations) > 0 {

@@ -95,8 +95,8 @@ func NewStateVersionConnectionResolver(ctx context.Context, input *workspace.Get
 }
 
 // TotalCount returns the total result count for the connection
-func (r *StateVersionConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *StateVersionConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

@@ -690,7 +690,11 @@ func (u *userSessionManager) cleanupOldSessions(ctx context.Context, userID stri
 
 	if len(oldestSessionResponse.UserSessions) > 0 {
 		oldestSession := &oldestSessionResponse.UserSessions[0]
-		if oldestSession.IsExpired() || int(oldestSessionResponse.PageInfo.TotalCount) > u.maxSessionsPerUser {
+		totalCount, cErr := oldestSessionResponse.PageInfo.TotalCount(ctx)
+		if cErr != nil {
+			return errors.Wrap(cErr, "failed to get user session count")
+		}
+		if oldestSession.IsExpired() || int(totalCount) > u.maxSessionsPerUser {
 			// Delete the oldest session if it is expired or if there are more than max number of sessions
 			if err := u.dbClient.UserSessions.DeleteUserSession(ctx, oldestSession); err != nil {
 				return fmt.Errorf("failed to delete oldest user session: %w", err)

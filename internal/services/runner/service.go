@@ -514,7 +514,7 @@ func (s *service) CreateRunnerSession(ctx context.Context, input *CreateRunnerSe
 	}
 
 	// Check if the sessions per runner limit has been exceeded
-	if err := s.limitChecker.CheckLimit(ctx, limits.ResourceLimitRunnerSessionsPerRunner, activeSessionsResponse.PageInfo.TotalCount); err != nil {
+	if err := s.limitChecker.CheckLimit(txContext, limits.ResourceLimitRunnerSessionsPerRunner, activeSessionsResponse.PageInfo.TotalCount); err != nil {
 		if errors.ErrorCode(err) != errors.EInvalid {
 			return nil, errors.Wrap(err, "failed to check limit", errors.WithSpan(span))
 		}

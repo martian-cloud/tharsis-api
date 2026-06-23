@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -52,6 +53,17 @@ type CursorPaginatable interface {
 // CursorFunc creates an opaque cursor string
 type CursorFunc func(cp CursorPaginatable) (*string, error)
 
+// CountFunc lazily returns the total number of records matching the query,
+// executing the COUNT query only when invoked.
+type CountFunc func(ctx context.Context) (int32, error)
+
+// StaticCount returns a CountFunc that always yields the given value without querying.
+func StaticCount(count int32) CountFunc {
+	return func(_ context.Context) (int32, error) {
+		return count, nil
+	}
+}
+
 // Options contain the cursor based pagination options
 type Options struct {
 	Before *string
@@ -84,12 +96,14 @@ func (f *FieldDescriptor) getFullColName() string {
 	return fmt.Sprintf("%s.%s", f.Table, f.Col)
 }
 
-// PageInfo contains the page information
+// PageInfo contains the page information. Use HasResults for existence checks; reach for
+// TotalCount only when the actual number is needed, since it runs a COUNT query on demand.
 type PageInfo struct {
 	Cursor          CursorFunc
-	TotalCount      int32
+	TotalCount      CountFunc
 	HasNextPage     bool
 	HasPreviousPage bool
+	HasResults      bool
 }
 
 // PaginatedRows contains the paginated query results
@@ -102,14 +116,37 @@ type PaginatedRows interface {
 // cursorPaginatedRows represents DB rows with pagination
 type cursorPaginatedRows struct {
 	pgx.Rows
-	limit      *int32
-	first      *int32
-	last       *int32
-	before     *string
-	after      *string
-	cursorFunc CursorFunc
-	totalCount int32
-	count      int32
+	limit          *int32
+	first          *int32
+	last           *int32
+	before         *string
+	after          *string
+	cursorFunc     CursorFunc
+	totalCountFunc CountFunc
+	count          int32
+}
+
+// newLazyCount returns a CountFunc that runs the COUNT query at most once and memoizes the
+// result (including an error, which is therefore sticky). The connection and query are
+// captured; ctx is supplied per call, so deferred callers (e.g. a GraphQL totalCount field)
+// resolve on the pool while synchronous callers invoke it within their own transaction, and
+// the connection is always still live.
+func newLazyCount(conn Connection, countSQL string, countArgs []any) CountFunc {
+	var (
+		once  sync.Once
+		count int32
+		err   error
+	)
+
+	return func(ctx context.Context) (int32, error) {
+		once.Do(func() {
+			if scanErr := conn.QueryRow(ctx, countSQL, countArgs...).Scan(&count); scanErr != nil {
+				err = te.Wrap(scanErr, "failed to count results")
+			}
+		})
+
+		return count, err
+	}
 }
 
 // Next returns true if there are more rows.
@@ -135,6 +172,12 @@ func (c *cursorPaginatedRows) Finalize(resultsPtr any) error {
 		return fmt.Errorf("expected slice type, got %T", resultsPtr)
 	}
 
+	// pgx Rows.Next returns false on both EOF and a fatal mid-stream error, so a
+	// SELECT failing after Next started yields zero rows with no error unless Err is checked.
+	if err := c.Err(); err != nil {
+		return err
+	}
+
 	if c.limit != nil && c.count > *c.limit {
 		if c.before != nil && c.first != nil {
 			// Remove the first element
@@ -150,7 +193,10 @@ func (c *cursorPaginatedRows) Finalize(resultsPtr any) error {
 
 // GetPageInfo returns the PageInfo
 func (c *cursorPaginatedRows) GetPageInfo() *PageInfo {
-	pageInfo := PageInfo{TotalCount: c.totalCount}
+	pageInfo := PageInfo{
+		TotalCount: c.totalCountFunc,
+		HasResults: c.count > 0,
+	}
 
 	// Handle all possible permutations
 	// Limit will be non nil if first or last is set
@@ -313,26 +359,19 @@ func (p *PaginatedQueryBuilder) Execute(ctx context.Context, conn Connection, qu
 		return nil, err
 	}
 
-	row := conn.QueryRow(ctx, countSQL, countArgs...)
-
-	var count int32
-	if err = row.Scan(&count); err != nil {
-		return nil, fmt.Errorf("failed to scan query count result: %s: %w", countSQL, err)
-	}
-
 	rows, err := conn.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, fmt.Errorf("paginated query failed: %s: %w", sql, err)
 	}
 
 	return &cursorPaginatedRows{
-		Rows:       rows,
-		totalCount: count,
-		limit:      p.limit,
-		first:      p.options.First,
-		last:       p.options.Last,
-		before:     p.options.Before,
-		after:      p.options.After,
+		Rows:           rows,
+		totalCountFunc: newLazyCount(conn, countSQL, countArgs),
+		limit:          p.limit,
+		first:          p.options.First,
+		last:           p.options.Last,
+		before:         p.options.Before,
+		after:          p.options.After,
 		cursorFunc: func(cp CursorPaginatable) (*string, error) {
 			pKeyVal, err := cp.ResolveMetadata(p.primaryKey.Key)
 			if err != nil {

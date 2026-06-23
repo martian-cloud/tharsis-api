@@ -144,8 +144,8 @@ func NewWorkspaceConnectionResolver(ctx context.Context, input *workspace.GetWor
 }
 
 // TotalCount returns the total result count for the connection
-func (r *WorkspaceConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *WorkspaceConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

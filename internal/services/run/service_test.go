@@ -847,7 +847,7 @@ func TestCreateRunWithSensitiveVariables(t *testing.T) {
 	dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
 		Return(&db.RunsResult{
 			PageInfo: &pagination.PageInfo{
-				TotalCount: 1,
+				TotalCount: pagination.StaticCount(1),
 			},
 		}, nil)
 	dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(&run, nil)
@@ -1070,7 +1070,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
 				Return(&db.RunsResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: test.injectRunsPerWorkspace,
+						TotalCount: pagination.StaticCount(test.injectRunsPerWorkspace),
 					},
 				}, nil)
 			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(&run, nil)
@@ -1334,7 +1334,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
 				Return(&db.RunsResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: test.injectRunsPerWorkspace,
+						TotalCount: pagination.StaticCount(test.injectRunsPerWorkspace),
 					},
 				}, nil)
 
@@ -1657,7 +1657,7 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
 				Return(&db.RunsResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: test.injectRunsPerWorkspace,
+						TotalCount: pagination.StaticCount(test.injectRunsPerWorkspace),
 					},
 				}, nil)
 			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
@@ -1890,7 +1890,7 @@ func TestCreateRunWithTharsisModule(t *testing.T) {
 			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
 				Return(&db.RunsResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: 1,
+						TotalCount: pagination.StaticCount(1),
 					},
 				}, nil)
 			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
@@ -2176,7 +2176,7 @@ func TestCreateRunWithJobTags(t *testing.T) {
 			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
 				Return(&db.RunsResult{
 					PageInfo: &pagination.PageInfo{
-						TotalCount: 1,
+						TotalCount: pagination.StaticCount(1),
 					},
 				}, nil)
 
@@ -2563,7 +2563,7 @@ func TestCreateDestroyRunForWorkspace(t *testing.T) {
 				dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
 					Return(&db.RunsResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: 1,
+							TotalCount: pagination.StaticCount(1),
 						},
 					}, nil)
 				dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
@@ -2710,7 +2710,8 @@ func TestGetStateVersionsByRunIDs(t *testing.T) {
 				return &db.RunsResult{
 					Runs: runs,
 					PageInfo: &pagination.PageInfo{
-						TotalCount: int32(runsCount),
+						TotalCount: pagination.StaticCount(int32(runsCount)),
+						HasResults: runsCount > 0,
 					},
 				}, nil
 			})
@@ -2739,7 +2740,7 @@ func TestGetStateVersionsByRunIDs(t *testing.T) {
 						return &db.StateVersionsResult{
 							StateVersions: stateVersions,
 							PageInfo: &pagination.PageInfo{
-								TotalCount: int32(runsCount),
+								TotalCount: pagination.StaticCount(int32(runsCount)),
 							},
 						}, nil
 					})
@@ -3395,7 +3396,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 				}).
 					Return(&db.RunsResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: 1,
+							TotalCount: pagination.StaticCount(1),
 						},
 						Runs: []models.Run{
 							{
@@ -3854,7 +3855,7 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
 					Return(&db.RunsResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: 1,
+							TotalCount: pagination.StaticCount(1),
 						},
 					}, nil)
 				dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)

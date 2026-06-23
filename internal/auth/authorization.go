@@ -185,7 +185,7 @@ func (a *authorizer) requireRoleInNamespace(ctx context.Context, namespacePath s
 		return err
 	}
 
-	if resp.PageInfo.TotalCount > 0 {
+	if resp.PageInfo.HasResults {
 		return nil
 	}
 

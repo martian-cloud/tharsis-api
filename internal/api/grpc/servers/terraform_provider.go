@@ -85,10 +85,15 @@ func (s *TerraformProviderServer) GetTerraformProviders(ctx context.Context, req
 		pbProviders[ix] = toPBTerraformProvider(&providers[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(providers) > 0 {
@@ -231,10 +236,15 @@ func (s *TerraformProviderServer) GetTerraformProviderVersions(ctx context.Conte
 		pbVersions[ix] = toPBTerraformProviderVersion(&versions[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(versions) > 0 {
@@ -352,10 +362,15 @@ func (s *TerraformProviderServer) GetTerraformProviderPlatforms(ctx context.Cont
 		pbPlatforms[ix] = toPBTerraformProviderPlatform(&platforms[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(platforms) > 0 {

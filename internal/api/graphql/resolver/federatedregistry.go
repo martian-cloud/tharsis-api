@@ -97,8 +97,8 @@ func NewFederatedRegistryConnectionResolver(ctx context.Context,
 }
 
 // TotalCount returns the total result count for the connection
-func (r *FederatedRegistryConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *FederatedRegistryConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

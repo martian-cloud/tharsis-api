@@ -80,10 +80,15 @@ func (s *RunnerServer) GetRunners(ctx context.Context, req *pb.GetRunnersRequest
 		pbRunners[ix] = toPBRunner(&runners[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(runners) > 0 {
@@ -278,10 +283,15 @@ func (s *RunnerServer) GetRunnerSessions(ctx context.Context, req *pb.GetRunnerS
 		pbSessions[ix] = toPBRunnerSession(&sessions[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(sessions) > 0 {

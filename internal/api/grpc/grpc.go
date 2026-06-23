@@ -2,6 +2,7 @@
 package grpc
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"strings"
@@ -34,12 +35,15 @@ type ServerOptions struct {
 
 // Server implements functions needed to configure, start and stop the gRPC server.
 type Server struct {
-	server  *grpc.Server
-	options *ServerOptions
+	server      *grpc.Server
+	options     *ServerOptions
+	drainCancel context.CancelFunc
 }
 
 // NewServer creates a new gRPC server.
-func NewServer(options *ServerOptions) *Server {
+func NewServer(ctx context.Context, options *ServerOptions) *Server {
+	drainCtx, drainCancel := context.WithCancel(ctx)
+
 	opts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(options.APIServerConfig.MaxGRPCRecvMsgSize),
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
@@ -47,6 +51,7 @@ func NewServer(options *ServerOptions) *Server {
 			interceptors.RequestIDStream(),
 			interceptors.UserAgentStream(),
 			interceptors.ErrorHandlerStream(options.Logger),
+			interceptors.DrainStream(drainCtx),
 			interceptors.AuthenticationStream(options.Authenticator),
 			interceptors.SubjectStream(),
 			interceptors.RateLimiterStream(options.RateLimitStore),
@@ -139,8 +144,9 @@ func NewServer(options *ServerOptions) *Server {
 	reflection.Register(s)
 
 	return &Server{
-		options: options,
-		server:  s,
+		options:     options,
+		server:      s,
+		drainCancel: drainCancel,
 	}
 }
 
@@ -152,6 +158,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) Start() error {
 	s.options.Logger.Infof("gRPC server listening on %s", s.options.Listener.Addr())
 	return s.server.Serve(s.options.Listener)
+}
+
+// Drain signals active streams to terminate with codes.Unavailable so clients
+// reconnect to another instance. Call before Shutdown so long-lived streams
+// don't block GracefulStop until SIGKILL.
+func (s *Server) Drain() {
+	s.options.Logger.Info("Draining gRPC server streams")
+	s.drainCancel()
 }
 
 // Shutdown gracefully stops the server. Will block until

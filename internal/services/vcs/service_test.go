@@ -205,7 +205,7 @@ func TestGetVCSProviders(t *testing.T) {
 	// a sample DB result object.
 	sampleResult := &db.VCSProvidersResult{
 		PageInfo: &pagination.PageInfo{
-			TotalCount:      1,
+			TotalCount:      pagination.StaticCount(1),
 			HasNextPage:     false,
 			HasPreviousPage: false,
 		},
@@ -292,7 +292,7 @@ func TestGetVCSProvidersByIDs(t *testing.T) {
 	// a sample DB result object.
 	sampleResult := &db.VCSProvidersResult{
 		PageInfo: &pagination.PageInfo{
-			TotalCount:      1,
+			TotalCount:      pagination.StaticCount(1),
 			HasNextPage:     false,
 			HasPreviousPage: false,
 		},
@@ -757,7 +757,7 @@ func TestCreateVCSProvider(t *testing.T) {
 
 					return &db.VCSProvidersResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectProviders,
+							TotalCount: pagination.StaticCount(test.injectProviders),
 						},
 					}
 				}, nil)

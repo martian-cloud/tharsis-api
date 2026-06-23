@@ -383,7 +383,7 @@ func TestCreateNestedGroup(t *testing.T) {
 
 						return &db.GroupsResult{
 							PageInfo: &pagination.PageInfo{
-								TotalCount: test.parentChildren,
+								TotalCount: pagination.StaticCount(test.parentChildren),
 							},
 						}
 					}, nil)
@@ -1250,7 +1250,7 @@ func TestMigrateGroup(t *testing.T) {
 				mockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(
 					&db.GroupsResult{
 						PageInfo: &pagination.PageInfo{
-							TotalCount: test.newParentChildren,
+							TotalCount: pagination.StaticCount(test.newParentChildren),
 						},
 					}, nil)
 

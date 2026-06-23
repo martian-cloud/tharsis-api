@@ -78,10 +78,15 @@ func (s *GroupServer) GetGroups(ctx context.Context, req *pb.GetGroupsRequest) (
 		pbGroups[ix] = toPBGroup(&groups[ix])
 	}
 
+	totalCount, err := result.PageInfo.TotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	pageInfo := &pb.PageInfo{
 		HasNextPage:     result.PageInfo.HasNextPage,
 		HasPreviousPage: result.PageInfo.HasPreviousPage,
-		TotalCount:      result.PageInfo.TotalCount,
+		TotalCount:      totalCount,
 	}
 
 	if len(groups) > 0 {

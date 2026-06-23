@@ -101,8 +101,8 @@ func NewRunnerConnectionResolver(ctx context.Context, input *runner.GetRunnersIn
 }
 
 // TotalCount returns the total result count for the connection
-func (r *RunnerConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *RunnerConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

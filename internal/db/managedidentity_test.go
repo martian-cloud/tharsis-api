@@ -1078,7 +1078,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				Filter:            nil,
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDs,
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(len(allManagedIdentityIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allManagedIdentityIDs))), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1093,7 +1093,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				Filter: nil,
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDsByCreateTime,
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(len(allManagedIdentityIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allManagedIdentityIDs))), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1104,7 +1104,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				Sort: ptrManagedIdentitySortableField(ManagedIdentitySortableFieldCreatedAtDesc),
 			},
 			expectManagedIdentityIDs: reverseManagedIdentityIDsByCreateTime,
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(len(allManagedIdentityIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allManagedIdentityIDs))), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1119,7 +1119,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				Filter: nil,
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDsByUpdateTime,
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(len(allManagedIdentityIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allManagedIdentityIDs))), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1130,7 +1130,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				Sort: ptrManagedIdentitySortableField(ManagedIdentitySortableFieldUpdatedAtDesc),
 			},
 			expectManagedIdentityIDs: reverseManagedIdentityIDsByUpdateTime,
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(len(allManagedIdentityIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allManagedIdentityIDs))), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1144,7 +1144,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				},
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDsByUpdateTime,
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(len(allManagedIdentityIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allManagedIdentityIDs))), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1159,7 +1159,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDsByUpdateTime[:2],
 			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allManagedIdentityIDs)),
+				TotalCount:      pagination.StaticCount(int32(len(allManagedIdentityIDs))),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
 				HasPreviousPage: false,
@@ -1179,7 +1179,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			getAfterCursorFromPrevious: true,
 			expectManagedIdentityIDs:   allManagedIdentityIDsByUpdateTime[2:4],
 			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allManagedIdentityIDs)),
+				TotalCount:      pagination.StaticCount(int32(len(allManagedIdentityIDs))),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
 				HasPreviousPage: true,
@@ -1199,7 +1199,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			getAfterCursorFromPrevious: true,
 			expectManagedIdentityIDs:   allManagedIdentityIDsByUpdateTime[4:],
 			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allManagedIdentityIDs)),
+				TotalCount:      pagination.StaticCount(int32(len(allManagedIdentityIDs))),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
 				HasPreviousPage: true,
@@ -1219,7 +1219,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			},
 			expectManagedIdentityIDs: reverseManagedIdentityIDsByUpdateTime[:3],
 			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allManagedIdentityIDs)),
+				TotalCount:      pagination.StaticCount(int32(len(allManagedIdentityIDs))),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
 				HasPreviousPage: true,
@@ -1262,7 +1262,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			},
 			expectMsg: ptr.String("only first or last can be defined, not both"),
 			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allManagedIdentityIDs)),
+				TotalCount:      pagination.StaticCount(int32(len(allManagedIdentityIDs))),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
 				HasPreviousPage: false,
@@ -1287,7 +1287,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDsByCreateTime,
 			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allManagedIdentityIDs)),
+				TotalCount:      pagination.StaticCount(int32(len(allManagedIdentityIDs))),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
 				HasPreviousPage: false,
@@ -1305,7 +1305,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				},
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDsByName,
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(len(allManagedIdentityIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allManagedIdentityIDs))), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1319,7 +1319,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				},
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDsByName[0:2],
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(2)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1333,7 +1333,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				},
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDsByName[2:4],
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(2)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1347,7 +1347,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				},
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDsByName[4:5],
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(1)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1361,7 +1361,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				},
 			},
 			expectManagedIdentityIDs: []string{},
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(0)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1375,7 +1375,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				},
 			},
 			expectManagedIdentityIDs: allManagedIdentityIDsByName,
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(len(allManagedIdentityIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allManagedIdentityIDs))), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1389,7 +1389,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				},
 			},
 			expectManagedIdentityIDs: []string{},
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(0)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1402,7 +1402,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				},
 			},
 			expectManagedIdentityIDs: []string{createdAlias.Metadata.ID},
-			expectPageInfo:           pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectPageInfo:           pagination.PageInfo{TotalCount: pagination.StaticCount(int32(1)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1468,7 +1468,10 @@ func TestGetManagedIdentities(t *testing.T) {
 
 				assert.Equal(t, test.expectPageInfo.HasNextPage, pageInfo.HasNextPage)
 				assert.Equal(t, test.expectPageInfo.HasPreviousPage, pageInfo.HasPreviousPage)
-				assert.Equal(t, test.expectPageInfo.TotalCount, pageInfo.TotalCount)
+				expectedTotalCount, _ := test.expectPageInfo.TotalCount(ctx)
+				actualTotalCount, err := pageInfo.TotalCount(ctx)
+				assert.NoError(t, err)
+				assert.Equal(t, expectedTotalCount, actualTotalCount)
 				assert.Equal(t, test.expectPageInfo.Cursor != nil, pageInfo.Cursor != nil)
 
 				// Compare the cursor function results only if there is at least one managed identity returned.

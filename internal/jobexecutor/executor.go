@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
 	humanize "github.com/dustin/go-humanize"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/client"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -23,9 +24,6 @@ const (
 
 	// waitForcedCancel is the duration to sleep between polls looking for forced cancel.
 	waitForcedCancel = 30 * time.Second
-
-	// jobCancellationSubscriptionTimeout is the context timeout used for the job cancellation subscription.
-	jobCancellationSubscriptionTimeout = time.Minute
 
 	// successIcon is the icon used for success messages
 	successIcon = "\u2705"
@@ -274,8 +272,8 @@ func (j *JobExecutor) startCancellationMonitor(
 
 			canceled, err := j.waitForJobCancellation(ctx)
 			if err != nil {
-				if status.Code(err) == codes.Canceled {
-					// Context canceled
+				if ctx.Err() != nil {
+					// Job is shutting down.
 					return
 				}
 
@@ -331,43 +329,19 @@ func (j *JobExecutor) startCancellationMonitor(
 }
 
 func (j *JobExecutor) waitForJobCancellation(ctx context.Context) (bool, error) {
-	for {
-		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, jobCancellationSubscriptionTimeout)
+	canceled := false
 
-		stream, err := j.client.SubscribeToJobCancellationEvent(timeoutCtx, j.cfg.JobID)
-		if err != nil {
-			timeoutCancel()
+	// StreamWithReconnect keeps the subscription alive across server drains, so no outer
+	// timeout/re-subscribe loop is needed here.
+	err := client.StreamWithReconnect(ctx,
+		func(streamCtx context.Context) (grpc.ServerStreamingClient[pb.JobCancellationEvent], error) {
+			return j.client.SubscribeToJobCancellationEvent(streamCtx, j.cfg.JobID)
+		},
+		func(event *pb.JobCancellationEvent) (bool, error) {
+			canceled = event.Job.Status == pb.JobStatus_canceling || event.Job.Status == pb.JobStatus_canceled
+			return canceled, nil
+		},
+	)
 
-			if status.Code(err) == codes.DeadlineExceeded {
-				// Retry if context timed out.
-				continue
-			}
-
-			return false, err
-		}
-
-		for {
-			event, err := stream.Recv()
-			if err != nil {
-				timeoutCancel()
-
-				if status.Code(err) == codes.DeadlineExceeded {
-					// Retry if context timed out.
-					break
-				}
-
-				if errors.Is(err, io.EOF) {
-					// Stream closed
-					return false, nil
-				}
-
-				return false, err
-			}
-
-			if event.Job.Status == pb.JobStatus_canceling || event.Job.Status == pb.JobStatus_canceled {
-				timeoutCancel()
-				return true, nil
-			}
-		}
-	}
+	return canceled, err
 }

@@ -121,8 +121,8 @@ func NewServiceAccountConnectionResolver(ctx context.Context, input *serviceacco
 }
 
 // TotalCount returns the total result count for the connection
-func (r *ServiceAccountConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *ServiceAccountConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

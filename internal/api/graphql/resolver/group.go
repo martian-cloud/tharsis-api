@@ -122,8 +122,8 @@ func NewGroupConnectionResolver(ctx context.Context, input *group.GetGroupsInput
 }
 
 // TotalCount returns the total result count for the connection
-func (r *GroupConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *GroupConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

@@ -92,8 +92,8 @@ func NewJobConnectionResolver(ctx context.Context, input *job.GetJobsInput) (*Jo
 }
 
 // TotalCount returns the total result count for the connection
-func (r *JobConnectionResolver) TotalCount() int32 {
-	return r.connection.TotalCount
+func (r *JobConnectionResolver) TotalCount(ctx context.Context) (int32, error) {
+	return r.connection.TotalCount(ctx)
 }
 
 // PageInfo returns the connection page information

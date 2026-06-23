@@ -756,7 +756,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 					PaginationOptions: &pagination.Options{
 						First: ptr.Int32(0),
 					},
-				}).Return(&db.ProviderVersionMirrorsResult{PageInfo: &pagination.PageInfo{TotalCount: test.injectMirrorsPerGroup}}, nil)
+				}).Return(&db.ProviderVersionMirrorsResult{PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(test.injectMirrorsPerGroup)}}, nil)
 
 				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).Return(&models.ResourceLimit{Value: test.limit}, nil)
 
@@ -890,7 +890,7 @@ func TestDeleteProviderVersionMirror(t *testing.T) {
 					PaginationOptions: &pagination.Options{
 						First: ptr.Int32(0),
 					},
-				}).Return(&db.ProviderPlatformMirrorsResult{PageInfo: &pagination.PageInfo{TotalCount: test.mirroredPlatforms}}, nil)
+				}).Return(&db.ProviderPlatformMirrorsResult{PageInfo: &pagination.PageInfo{HasResults: test.mirroredPlatforms > 0, TotalCount: pagination.StaticCount(test.mirroredPlatforms)}}, nil)
 			}
 
 			if test.expectErrorCode == "" {
@@ -1416,8 +1416,8 @@ func TestUploadInstallationPackage(t *testing.T) {
 					}
 
 					if test.platformAlreadyMirrored {
-						// Simply increase the totalCount to verify the logic works.
-						result.PageInfo.TotalCount = 1
+						// Mark the page as having results to verify the logic works.
+						result.PageInfo.HasResults = true
 					}
 
 					mockPlatformMirrors.On("GetPlatformMirrors", mock.Anything, &db.GetProviderPlatformMirrorsInput{
@@ -1570,7 +1570,8 @@ func TestGetAvailableProviderVersions(t *testing.T) {
 
 				if test.expectVersion != nil {
 					result.VersionMirrors = append(result.VersionMirrors, *test.expectVersion)
-					result.PageInfo.TotalCount = 1
+					result.PageInfo.HasResults = true
+					result.PageInfo.TotalCount = pagination.StaticCount(1)
 				}
 
 				sort := db.TerraformProviderVersionMirrorSortableFieldCreatedAtAsc
@@ -1741,7 +1742,8 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 
 				if test.versionMirror != nil {
 					versionsResult.VersionMirrors = append(versionsResult.VersionMirrors, *test.versionMirror)
-					versionsResult.PageInfo.TotalCount = 1
+					versionsResult.PageInfo.HasResults = true
+					versionsResult.PageInfo.TotalCount = pagination.StaticCount(1)
 				}
 
 				mockVersionMirrors.On("GetVersionMirrors", mock.Anything, &db.GetProviderVersionMirrorsInput{
@@ -1765,7 +1767,8 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 
 				if test.expectPlatformMirror != nil {
 					platformsResult.PlatformMirrors = append(platformsResult.PlatformMirrors, *test.expectPlatformMirror)
-					platformsResult.PageInfo.TotalCount = 1
+					platformsResult.PageInfo.HasResults = true
+					platformsResult.PageInfo.TotalCount = pagination.StaticCount(1)
 				}
 
 				mockPlatformMirrors.On("GetPlatformMirrors", mock.Anything, &db.GetProviderPlatformMirrorsInput{
