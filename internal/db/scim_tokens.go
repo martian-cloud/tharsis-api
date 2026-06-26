@@ -47,10 +47,9 @@ func (s *scimTokens) GetTokens(ctx context.Context) ([]models.SCIMToken, error) 
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("scim_tokens").
+	sql, args, err := toSQLWithTag("scim_tokens.GetTokens", dialect.From("scim_tokens").
 		Prepared(true).
-		Select(s.getSelectFields()...).
-		ToSQL()
+		Select(s.getSelectFields()...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -85,7 +84,7 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("scim_tokens").
+	sql, args, err := toSQLWithTag("scim_tokens.CreateToken", dialect.Insert("scim_tokens").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":         newResourceID(),
@@ -95,7 +94,7 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 			"created_by": token.CreatedBy,
 			"nonce":      token.Nonce,
 		}).
-		Returning(scimTokensFieldList...).ToSQL()
+		Returning(scimTokensFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -121,14 +120,14 @@ func (s *scimTokens) DeleteToken(ctx context.Context, token *models.SCIMToken) e
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("scim_tokens").
+	sql, args, err := toSQLWithTag("scim_tokens.DeleteToken", dialect.Delete("scim_tokens").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"id":      token.Metadata.ID,
 				"version": token.Metadata.Version,
 			},
-		).Returning(scimTokensFieldList...).ToSQL()
+		).Returning(scimTokensFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -151,11 +150,10 @@ func (s *scimTokens) getToken(ctx context.Context, exp exp.Ex) (*models.SCIMToke
 	ctx, span := tracer.Start(ctx, "db.getToken")
 	defer span.End()
 
-	sql, args, err := dialect.From("scim_tokens").
+	sql, args, err := toSQLWithTag("scim_tokens.getToken", dialect.From("scim_tokens").
 		Prepared(true).
 		Select(s.getSelectFields()...).
-		Where(exp).
-		ToSQL()
+		Where(exp))
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))

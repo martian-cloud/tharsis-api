@@ -143,7 +143,7 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 	timestamp := currentTime()
 	variableID := newResourceID()
 
-	createVariableSQL, createVariableSQLArgs, err := dialect.Insert("namespace_variables").
+	createVariableSQL, createVariableSQLArgs, err := toSQLWithTag("variable.CreateVariable", dialect.Insert("namespace_variables").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":           variableID,
@@ -154,7 +154,7 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 			"key":          input.Key,
 			"category":     input.Category,
 			"sensitive":    input.Sensitive,
-		}).ToSQL()
+		}))
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -162,7 +162,7 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 
 	variableVersionID := newResourceID()
 
-	createVariableVersionSQL, createVariableVersionSQLArgs, err := dialect.From("namespace_variable_versions").
+	createVariableVersionSQL, createVariableVersionSQLArgs, err := toSQLWithTag("variable.CreateVariable", dialect.From("namespace_variable_versions").
 		Prepared(true).
 		With("namespace_variable_versions",
 			dialect.Insert("namespace_variable_versions").
@@ -180,19 +180,18 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 				Returning("*"),
 		).Select(m.getSelectFields()...).
 		InnerJoin(goqu.T("namespace_variables"), goqu.On(goqu.Ex{"namespace_variable_versions.variable_id": goqu.I("namespace_variables.id")})).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_variables.namespace_id": goqu.I("namespaces.id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_variables.namespace_id": goqu.I("namespaces.id")})))
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	createLatestVariableRowSQL, createLatestVariableRowArgs, err := dialect.Insert("latest_namespace_variable_versions").
+	createLatestVariableRowSQL, createLatestVariableRowArgs, err := toSQLWithTag("variable.CreateVariable", dialect.Insert("latest_namespace_variable_versions").
 		Prepared(true).
 		Rows(goqu.Record{
 			"variable_id": variableID,
 			"version_id":  variableVersionID,
-		}).ToSQL()
+		}))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -323,10 +322,9 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 		}
 	}()
 
-	sql, args, err := dialect.Insert("namespace_variables").
+	sql, args, err := toSQLWithTag("variable.CreateVariables", dialect.Insert("namespace_variables").
 		Prepared(true).
-		Rows(variableRecords).
-		ToSQL()
+		Rows(variableRecords))
 
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -352,10 +350,9 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 	}
 
 	// Insert variable versions
-	sql, args, err = dialect.Insert("namespace_variable_versions").
+	sql, args, err = toSQLWithTag("variable.CreateVariables", dialect.Insert("namespace_variable_versions").
 		Prepared(true).
-		Rows(variableVersionRecords).
-		ToSQL()
+		Rows(variableVersionRecords))
 
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -373,10 +370,9 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
-	sql, args, err = dialect.Insert("latest_namespace_variable_versions").
+	sql, args, err = toSQLWithTag("variable.CreateVariables", dialect.Insert("latest_namespace_variable_versions").
 		Prepared(true).
-		Rows(latestVersionRecords).
-		ToSQL()
+		Rows(latestVersionRecords))
 
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -414,7 +410,7 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 
 	newVersionID := newResourceID()
 
-	sql, args, err := dialect.Insert("namespace_variable_versions").
+	sql, args, err := toSQLWithTag("variable.UpdateVariable", dialect.Insert("namespace_variable_versions").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":          newVersionID,
@@ -426,7 +422,7 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 			"value":       variable.Value,
 			"hcl":         variable.Hcl,
 			"secret_data": variable.SecretData,
-		}).ToSQL()
+		}))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -447,12 +443,12 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 		return nil, err
 	}
 
-	sql, args, err = dialect.Update("latest_namespace_variable_versions").
+	sql, args, err = toSQLWithTag("variable.UpdateVariable", dialect.Update("latest_namespace_variable_versions").
 		Prepared(true).
 		Set(goqu.Record{
 			"variable_id": variable.Metadata.ID,
 			"version_id":  newVersionID,
-		}).Where(goqu.Ex{"variable_id": variable.Metadata.ID}).ToSQL()
+		}).Where(goqu.Ex{"variable_id": variable.Metadata.ID}))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -461,7 +457,7 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
-	sql, args, err = dialect.From("namespace_variables").
+	sql, args, err = toSQLWithTag("variable.UpdateVariable", dialect.From("namespace_variables").
 		Prepared(true).
 		With("namespace_variables",
 			dialect.Update("namespace_variables").
@@ -474,8 +470,7 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 		).Select(m.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_variables.namespace_id": goqu.I("namespaces.id")})).
 		InnerJoin(goqu.T("latest_namespace_variable_versions"), goqu.On(goqu.Ex{"namespace_variables.id": goqu.I("latest_namespace_variable_versions.variable_id")})).
-		InnerJoin(goqu.T("namespace_variable_versions"), goqu.On(goqu.Ex{"latest_namespace_variable_versions.version_id": goqu.I("namespace_variable_versions.id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespace_variable_versions"), goqu.On(goqu.Ex{"latest_namespace_variable_versions.version_id": goqu.I("namespace_variable_versions.id")})))
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -510,7 +505,7 @@ func (m *variables) DeleteVariable(ctx context.Context, variable *models.Variabl
 	ctx, span := tracer.Start(ctx, "db.DeleteVariable")
 	defer span.End()
 
-	sql, args, err := dialect.From("namespace_variables").
+	sql, args, err := toSQLWithTag("variable.DeleteVariable", dialect.From("namespace_variables").
 		Prepared(true).
 		With("namespace_variables",
 			dialect.Delete("namespace_variables").
@@ -519,8 +514,7 @@ func (m *variables) DeleteVariable(ctx context.Context, variable *models.Variabl
 		).Select(m.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_variables.namespace_id": goqu.I("namespaces.id")})).
 		InnerJoin(goqu.T("latest_namespace_variable_versions"), goqu.On(goqu.Ex{"namespace_variables.id": goqu.I("latest_namespace_variable_versions.variable_id")})).
-		InnerJoin(goqu.T("namespace_variable_versions"), goqu.On(goqu.Ex{"latest_namespace_variable_versions.version_id": goqu.I("namespace_variable_versions.id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespace_variable_versions"), goqu.On(goqu.Ex{"latest_namespace_variable_versions.version_id": goqu.I("namespace_variable_versions.id")})))
 
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -583,6 +577,7 @@ func (m *variables) GetVariables(ctx context.Context, input *GetVariablesInput) 
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "namespace_variables", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("variable.GetVariables"),
 	)
 
 	if err != nil {
@@ -623,12 +618,12 @@ func (m *variables) getVariable(ctx context.Context, ex goqu.Ex) (*models.Variab
 	ctx, span := tracer.Start(ctx, "db.getVariable")
 	defer span.End()
 
-	sql, _, err := dialect.From("namespace_variables").
+	sql, _, err := toSQLWithTag("variable.getVariable", dialect.From("namespace_variables").
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_variables.namespace_id": goqu.I("namespaces.id")})).
 		InnerJoin(goqu.T("latest_namespace_variable_versions"), goqu.On(goqu.Ex{"namespace_variables.id": goqu.I("latest_namespace_variable_versions.variable_id")})).
 		InnerJoin(goqu.T("namespace_variable_versions"), goqu.On(goqu.Ex{"latest_namespace_variable_versions.version_id": goqu.I("namespace_variable_versions.id")})).
 		Select(m.getSelectFields()...).
-		Where(ex).ToSQL()
+		Where(ex))
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL for query to get variable by ID", errors.WithSpan(span))

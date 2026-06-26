@@ -45,7 +45,7 @@ func (s *stateVersionOutputs) CreateStateVersionOutput(ctx context.Context,
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("state_version_outputs").
+	sql, args, err := toSQLWithTag("state_version_output.CreateStateVersionOutput", dialect.From("state_version_outputs").
 		Prepared(true).
 		With("state_version_outputs",
 			dialect.Insert("state_version_outputs").
@@ -63,8 +63,7 @@ func (s *stateVersionOutputs) CreateStateVersionOutput(ctx context.Context,
 				Returning("*"),
 		).Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("state_versions"), goqu.On(goqu.Ex{"state_version_outputs.state_version_id": goqu.I("state_versions.id")})).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -88,13 +87,12 @@ func (s *stateVersionOutputs) GetStateVersionOutputs(ctx context.Context,
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("state_version_outputs").
+	sql, args, err := toSQLWithTag("state_version_output.GetStateVersionOutputs", dialect.From("state_version_outputs").
 		Prepared(true).
 		Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("state_versions"), goqu.On(goqu.Ex{"state_version_outputs.state_version_id": goqu.I("state_versions.id")})).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
-		Where(goqu.Ex{"state_version_id": stateVersionID}).
-		ToSQL()
+		Where(goqu.Ex{"state_version_id": stateVersionID}))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -161,13 +159,12 @@ func (s *stateVersionOutputs) getStateVersionOutput(ctx context.Context, ex goqu
 	ctx, span := tracer.Start(ctx, "db.getStateVersionOutput")
 	defer span.End()
 
-	sql, args, err := dialect.From("state_version_outputs").
+	sql, args, err := toSQLWithTag("state_version_output.getStateVersionOutput", dialect.From("state_version_outputs").
 		Prepared(true).
 		Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("state_versions"), goqu.On(goqu.Ex{"state_version_outputs.state_version_id": goqu.I("state_versions.id")})).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
-		Where(ex).
-		ToSQL()
+		Where(ex))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 	}

@@ -44,7 +44,7 @@ func (a *agentSessions) GetAgentSessionByID(ctx context.Context, id string) (*mo
 		Select(a.getSelectFields()...).
 		Where(goqu.Ex{"agent_sessions.id": id})
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("agent_session.GetAgentSessionByID", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -83,7 +83,7 @@ func (a *agentSessions) CreateAgentSession(ctx context.Context, session *models.
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("agent_sessions").Rows(
+	sql, args, err := toSQLWithTag("agent_session.CreateAgentSession", dialect.Insert("agent_sessions").Rows(
 		goqu.Record{
 			"id":            newResourceID(),
 			"version":       initialResourceVersion,
@@ -92,7 +92,7 @@ func (a *agentSessions) CreateAgentSession(ctx context.Context, session *models.
 			"user_id":       session.UserID,
 			"total_credits": session.TotalCredits,
 		},
-	).Returning(agentSessionFieldList...).ToSQL()
+	).Returning(agentSessionFieldList...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -119,15 +119,14 @@ func (a *agentSessions) UpdateAgentSession(ctx context.Context, session *models.
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("agent_sessions").
+	sql, args, err := toSQLWithTag("agent_session.UpdateAgentSession", dialect.Update("agent_sessions").
 		Set(goqu.Record{
 			"version":       goqu.L("? + ?", goqu.C("version"), 1),
 			"updated_at":    timestamp,
 			"total_credits": session.TotalCredits,
 		}).
 		Where(goqu.Ex{"id": session.Metadata.ID, "version": session.Metadata.Version}).
-		Returning(agentSessionFieldList...).
-		ToSQL()
+		Returning(agentSessionFieldList...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -150,7 +149,7 @@ func (a *agentSessions) DeleteOldestSessionsByUserID(ctx context.Context, userID
 	defer span.End()
 
 	// Delete all sessions except the N most recent (by created_at desc)
-	sql, args, err := dialect.Delete("agent_sessions").
+	sql, args, err := toSQLWithTag("agent_session.DeleteOldestSessionsByUserID", dialect.Delete("agent_sessions").
 		Prepared(true).
 		Where(
 			goqu.C("user_id").Eq(userID),
@@ -161,7 +160,7 @@ func (a *agentSessions) DeleteOldestSessionsByUserID(ctx context.Context, userID
 					Order(goqu.C("created_at").Desc()).
 					Limit(uint(keepCount)),
 			),
-		).ToSQL()
+		))
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

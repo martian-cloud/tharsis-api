@@ -365,7 +365,12 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 		return nil, err
 	}
 
-	var userMemberID *string
+	var rootNamespaceMemberships []models.MembershipNamespace
+	// checkRootNamespaceMemberships is true when each run's workspace must be verified against
+	// the caller's root namespace memberships. It stays false when the caller has admin mode
+	// activated (sees everything) or is filtering by a specific workspace (ViewRun permission
+	// already verified below).
+	checkRootNamespaceMemberships := false
 	switch {
 	case options.WorkspaceID != nil:
 		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithWorkspaceID(*options.WorkspaceID))
@@ -380,7 +385,13 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 		}
 
 		if !userCaller.IsAdminModeActivated(ctx) {
-			userMemberID = &userCaller.User.Metadata.ID
+			rootNamespaces, rErr := userCaller.GetRootNamespaceMemberships(ctx)
+			if rErr != nil {
+				tracing.RecordError(span, rErr, "failed to get root namespaces")
+				return nil, rErr
+			}
+			rootNamespaceMemberships = rootNamespaces
+			checkRootNamespaceMemberships = true
 		}
 	}
 
@@ -438,16 +449,28 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				// Not the workspace we're looking for.
 				continue
 			}
-			runsResult, err := s.dbClient.Runs.GetRuns(ctx, &db.GetRunsInput{
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(1),
-				},
-				Filter: &db.RunFilter{
-					WorkspaceID:  options.WorkspaceID,
-					UserMemberID: userMemberID,
-					RunIDs:       []string{event.ID},
-				},
-			})
+			// Manually verify the caller can view the run by checking the run's workspace path
+			// against the caller's root namespace memberships before querying the run itself,
+			// avoiding a wasted run query when the caller doesn't have access. Skipped when the
+			// caller has admin mode activated or is filtering by a specific workspace (already
+			// permission checked).
+			if checkRootNamespaceMemberships {
+				ws, wErr := s.dbClient.Workspaces.GetWorkspaceByID(ctx, eventData.WorkspaceID)
+				if wErr != nil {
+					if errors.IsContextCanceledError(wErr) || errors.IsDeadlineExceededError(wErr) {
+						return
+					}
+					s.logger.WithContextFields(ctx).Errorf("Error occurred while querying for workspace %s associated with run event %s: %v", eventData.WorkspaceID, event.ID, wErr)
+					continue
+				}
+
+				if ws == nil || !callerHasRootNamespaceAccess(ws.FullPath, rootNamespaceMemberships) {
+					// Caller doesn't have access to the run's workspace.
+					continue
+				}
+			}
+
+			run, err := s.dbClient.Runs.GetRunByID(ctx, event.ID)
 			if err != nil {
 				if errors.IsContextCanceledError(err) || errors.IsDeadlineExceededError(err) {
 					return
@@ -456,17 +479,15 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				continue
 			}
 
-			if len(runsResult.Runs) == 0 {
-				// Run isn't for the target workspace or user.
+			if run == nil {
+				// Run no longer exists.
 				continue
 			}
 
 			// Group filtering: check if run's workspace belongs to the specified group using TRN
 			if options.AncestorGroupID != nil {
-				run := runsResult.Runs[0]
-
 				var isInGroup bool
-				isInGroup, err = s.isRunInTargetGroup(&run, ancestorGroupPath)
+				isInGroup, err = s.isRunInTargetGroup(run, ancestorGroupPath)
 				if err != nil {
 					s.logger.WithContextFields(ctx).Errorf("Error checking run group membership for run %s: %v", run.Metadata.ID, err)
 					continue
@@ -480,12 +501,23 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 			select {
 			case <-ctx.Done():
 				return
-			case outgoing <- &Event{Action: event.Action, Run: runsResult.Runs[0]}:
+			case outgoing <- &Event{Action: event.Action, Run: *run}:
 			}
 		}
 	}()
 
 	return outgoing, nil
+}
+
+// callerHasRootNamespaceAccess returns true if the workspace path is at or under one of the
+// caller's root namespace memberships, mirroring the DB-level root namespace membership filter.
+func callerHasRootNamespaceAccess(workspacePath string, rootNamespaceMemberships []models.MembershipNamespace) bool {
+	for _, ns := range rootNamespaceMemberships {
+		if workspacePath == ns.Path || namespaceutils.IsDescendantOfPath(workspacePath, ns.Path) {
+			return true
+		}
+	}
+	return false
 }
 
 // isRunInTargetGroup checks if a run's workspace belongs to the specified group or its descendants
@@ -1780,8 +1812,13 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 		}
 
 		if !userCaller.IsAdminModeActivated(ctx) {
-			// Add filter is user isn't an admin.
-			filter.UserMemberID = &userCaller.User.Metadata.ID
+			// Restrict to runs in the user's member namespaces (and descendants).
+			rootNamespaces, rErr := userCaller.GetRootNamespaceMemberships(ctx)
+			if rErr != nil {
+				tracing.RecordError(span, rErr, "failed to get root namespaces")
+				return nil, rErr
+			}
+			filter.RootNamespaceMemberships = rootNamespaces
 		}
 	}
 	if input.IncludeNestedRuns != nil && *input.IncludeNestedRuns && input.Group == nil {

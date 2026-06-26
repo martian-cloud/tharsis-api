@@ -12,7 +12,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -69,24 +68,17 @@ func (s *service) GetActivityEvents(ctx context.Context,
 		return nil, err
 	}
 
-	accessPolicy, err := caller.GetNamespaceAccessPolicy(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace access policy")
-		return nil, err
-	}
+	// A nil slice means no membership filter (admin sees all); a non-nil (possibly empty) slice
+	// restricts results to the caller's root member namespaces and their descendants.
+	var rootNamespaceMemberships []models.MembershipNamespace
 
-	var membershipRequirement *db.ActivityEventNamespaceMembershipRequirement
-
-	if !accessPolicy.AllowAll {
-		switch c := caller.(type) {
-		case *auth.UserCaller:
-			membershipRequirement = &db.ActivityEventNamespaceMembershipRequirement{UserID: &c.User.Metadata.ID}
-		case *auth.ServiceAccountCaller:
-			membershipRequirement = &db.ActivityEventNamespaceMembershipRequirement{ServiceAccountID: &c.ServiceAccountID}
-		default:
-			tracing.RecordError(span, nil, "invalid caller type: %T", caller)
-			return nil, errors.New("invalid caller type", errors.WithErrorCode(errors.EUnauthorized))
+	if !caller.IsAdminModeActivated(ctx) {
+		rootNamespaces, rErr := caller.GetRootNamespaceMemberships(ctx)
+		if rErr != nil {
+			tracing.RecordError(span, rErr, "failed to get root namespaces")
+			return nil, rErr
 		}
+		rootNamespaceMemberships = rootNamespaces
 	}
 
 	dbInput := db.GetActivityEventsInput{
@@ -101,9 +93,9 @@ func (s *service) GetActivityEvents(ctx context.Context,
 			TimeRangeEnd:     input.TimeRangeEnd,
 			Actions:          input.Actions,
 			TargetTypes:      input.TargetTypes,
-			// The NamespaceMembershipRequirement filter will verify that the caller can only query events
-			// from namespaces they are a member of
-			NamespaceMembershipRequirement: membershipRequirement,
+			// RootNamespaceMemberships ensures the caller can only query events from namespaces
+			// they are a member of (or descendants thereof).
+			RootNamespaceMemberships: rootNamespaceMemberships,
 		},
 	}
 

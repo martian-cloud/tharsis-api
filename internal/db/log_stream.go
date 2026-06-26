@@ -136,6 +136,7 @@ func (l *logStreams) GetLogStreams(ctx context.Context, input *GetLogStreamsInpu
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "log_streams", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("log_stream.GetLogStreams"),
 	)
 
 	if err != nil {
@@ -178,7 +179,7 @@ func (l *logStreams) CreateLogStream(ctx context.Context, logStream *models.LogS
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("log_streams").
+	sql, args, err := toSQLWithTag("log_stream.CreateLogStream", dialect.Insert("log_streams").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":                newResourceID(),
@@ -190,7 +191,7 @@ func (l *logStreams) CreateLogStream(ctx context.Context, logStream *models.LogS
 			"runner_session_id": logStream.RunnerSessionID,
 			"completed":         logStream.Completed,
 		}).
-		Returning(logStreamFieldList...).ToSQL()
+		Returning(logStreamFieldList...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -230,7 +231,7 @@ func (l *logStreams) UpdateLogStream(ctx context.Context, logStream *models.LogS
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("log_streams").
+	sql, args, err := toSQLWithTag("log_stream.UpdateLogStream", dialect.Update("log_streams").
 		Prepared(true).
 		Set(
 			goqu.Record{
@@ -240,7 +241,7 @@ func (l *logStreams) UpdateLogStream(ctx context.Context, logStream *models.LogS
 				"completed":  logStream.Completed,
 			},
 		).Where(goqu.Ex{"id": logStream.Metadata.ID, "version": logStream.Metadata.Version}).
-		Returning(logStreamFieldList...).ToSQL()
+		Returning(logStreamFieldList...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -262,7 +263,7 @@ func (l *logStreams) getLogStream(ctx context.Context, exp exp.Expression) (*mod
 		Select(l.getSelectFields()...).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("log_stream.getLogStream", query)
 	if err != nil {
 		return nil, err
 	}

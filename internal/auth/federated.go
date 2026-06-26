@@ -148,12 +148,11 @@ func (f *FederatedRegistryCaller) UnauthorizedError(_ context.Context, hasViewer
 	)
 }
 
-// GetNamespaceAccessPolicy returns the namespace access policy for this caller
-func (f *FederatedRegistryCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
-	return &NamespaceAccessPolicy{
-		// RootNamespaceIDs is empty to indicate the caller doesn't have access to any root namespaces.
-		RootNamespaceIDs: []string{},
-	}, nil
+// GetRootNamespaceMemberships returns a non-nil empty slice; a federated registry caller has no root
+// namespace memberships. It must be non-nil so the membership filter is applied and denies access —
+// a nil slice would be treated as "no filter".
+func (f *FederatedRegistryCaller) GetRootNamespaceMemberships(_ context.Context) ([]models.MembershipNamespace, error) {
+	return []models.MembershipNamespace{}, nil
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified models.

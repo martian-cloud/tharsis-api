@@ -227,6 +227,7 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "jobs", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("jobs.GetJobs"),
 	)
 
 	if err != nil {
@@ -279,7 +280,7 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("jobs").
+	sql, args, err := toSQLWithTag("jobs.UpdateJob", dialect.From("jobs").
 		Prepared(true).
 		With("jobs",
 			dialect.Update("jobs").
@@ -304,8 +305,7 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 				).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).
 				Returning("*"),
 		).Select(j.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -343,7 +343,7 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("jobs").
+	sql, args, err := toSQLWithTag("jobs.CreateJob", dialect.From("jobs").
 		Prepared(true).
 		With("jobs",
 			dialect.Insert("jobs").
@@ -369,8 +369,7 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 					"properties":          properties,
 				}).Returning("*"),
 		).Select(j.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -399,7 +398,7 @@ func (j *jobs) GetJobCountForRunner(ctx context.Context, runnerID string) (int, 
 		"status":    []string{string(models.JobPending), string(models.JobRunning)},
 	})
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("jobs.GetJobCountForRunner", query)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return 0, err
@@ -424,7 +423,7 @@ func (j *jobs) getJob(ctx context.Context, exp goqu.Ex) (*models.Job, error) {
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("jobs.getJob", query)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err

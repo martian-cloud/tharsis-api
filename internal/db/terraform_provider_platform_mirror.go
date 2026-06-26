@@ -164,6 +164,7 @@ func (t *terraformProviderPlatformMirrors) GetPlatformMirrors(ctx context.Contex
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_provider_platform_mirrors", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("terraform_provider_platform_mirror.GetPlatformMirrors"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -208,7 +209,7 @@ func (t *terraformProviderPlatformMirrors) CreatePlatformMirror(ctx context.Cont
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("terraform_provider_platform_mirrors").
+	sql, args, err := toSQLWithTag("terraform_provider_platform_mirror.CreatePlatformMirror", dialect.From("terraform_provider_platform_mirrors").
 		Prepared(true).
 		With("terraform_provider_platform_mirrors",
 			dialect.Insert("terraform_provider_platform_mirrors").
@@ -223,8 +224,7 @@ func (t *terraformProviderPlatformMirrors) CreatePlatformMirror(ctx context.Cont
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_provider_version_mirrors"), goqu.On(goqu.I("terraform_provider_platform_mirrors.version_mirror_id").Eq(goqu.I("terraform_provider_version_mirrors.id")))).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_provider_version_mirrors.group_id").Eq(goqu.I("namespaces.group_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_provider_version_mirrors.group_id").Eq(goqu.I("namespaces.group_id")))))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -250,7 +250,7 @@ func (t *terraformProviderPlatformMirrors) DeletePlatformMirror(ctx context.Cont
 	ctx, span := tracer.Start(ctx, "db.DeletePlatformMirror")
 	defer span.End()
 
-	sql, args, err := dialect.From("terraform_provider_platform_mirrors").
+	sql, args, err := toSQLWithTag("terraform_provider_platform_mirror.DeletePlatformMirror", dialect.From("terraform_provider_platform_mirrors").
 		Prepared(true).
 		With("terraform_provider_platform_mirrors",
 			dialect.Delete("terraform_provider_platform_mirrors").
@@ -262,8 +262,7 @@ func (t *terraformProviderPlatformMirrors) DeletePlatformMirror(ctx context.Cont
 				).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_provider_version_mirrors"), goqu.On(goqu.I("terraform_provider_platform_mirrors.version_mirror_id").Eq(goqu.I("terraform_provider_version_mirrors.id")))).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_provider_version_mirrors.group_id").Eq(goqu.I("namespaces.group_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_provider_version_mirrors.group_id").Eq(goqu.I("namespaces.group_id")))))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -289,7 +288,7 @@ func (t *terraformProviderPlatformMirrors) getPlatformMirror(ctx context.Context
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_provider_version_mirrors.group_id").Eq(goqu.I("namespaces.group_id")))).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("terraform_provider_platform_mirror.getPlatformMirror", query)
 	if err != nil {
 		return nil, err
 	}

@@ -38,12 +38,12 @@ func (s *agentStore) UploadToolContent(ctx context.Context, sessionID, messageID
 
 // GetToolContent retrieves tool response content from object storage.
 func (s *agentStore) GetToolContent(ctx context.Context, sessionID, messageID string) (json.RawMessage, error) {
-	reader, err := s.objectStore.GetObjectStream(ctx, getToolContentKey(sessionID, messageID), nil)
+	result, err := s.objectStore.GetObjectStream(ctx, getToolContentKey(sessionID, messageID), nil)
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
-	return io.ReadAll(reader)
+	defer result.Body.Close()
+	return io.ReadAll(result.Body)
 }
 
 func getToolContentKey(sessionID, messageID string) string {
@@ -57,12 +57,12 @@ func (s *agentStore) UploadTrace(ctx context.Context, sessionID, traceID string,
 
 // GetTrace retrieves trace data from object storage.
 func (s *agentStore) GetTrace(ctx context.Context, sessionID, traceID string) ([]byte, error) {
-	reader, err := s.objectStore.GetObjectStream(ctx, getTraceKey(sessionID, traceID), nil)
+	result, err := s.objectStore.GetObjectStream(ctx, getTraceKey(sessionID, traceID), nil)
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
-	return io.ReadAll(reader)
+	defer result.Body.Close()
+	return io.ReadAll(result.Body)
 }
 
 func getTraceKey(sessionID, traceID string) string {
@@ -83,12 +83,12 @@ func (s *agentStore) LoadHistory(ctx context.Context, sessionID string) ([]byte,
 	if !exists {
 		return nil, nil
 	}
-	reader, err := s.objectStore.GetObjectStream(ctx, getHistoryKey(sessionID), nil)
+	result, err := s.objectStore.GetObjectStream(ctx, getHistoryKey(sessionID), nil)
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
-	return io.ReadAll(reader)
+	defer result.Body.Close()
+	return io.ReadAll(result.Body)
 }
 
 func getHistoryKey(sessionID string) string {

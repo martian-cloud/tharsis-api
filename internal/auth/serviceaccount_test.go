@@ -23,16 +23,16 @@ func TestServiceAccountCaller_IsAdmin(t *testing.T) {
 	assert.False(t, caller.IsAdminModeActivated(t.Context()))
 }
 
-func TestServiceAccountCaller_GetNamespaceAccessPolicy(t *testing.T) {
-	membershipNamespaceID := "nm-1"
+func TestServiceAccountCaller_GetRootNamespaceMemberships(t *testing.T) {
+	expectedNamespaces := []models.MembershipNamespace{{ID: "nm-1"}}
 
 	mockAuthorizer := NewMockAuthorizer(t)
-	mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{{ID: membershipNamespaceID}}, nil)
+	mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return(expectedNamespaces, nil)
 
 	caller := ServiceAccountCaller{authorizer: mockAuthorizer}
-	policy, err := caller.GetNamespaceAccessPolicy(WithCaller(context.Background(), &caller))
+	namespaces, err := caller.GetRootNamespaceMemberships(WithCaller(context.Background(), &caller))
 	assert.Nil(t, err)
-	assert.Equal(t, &NamespaceAccessPolicy{AllowAll: false, RootNamespaceIDs: []string{membershipNamespaceID}}, policy)
+	assert.Equal(t, expectedNamespaces, namespaces)
 }
 
 func TestServiceAccountCaller_RequirePermissions(t *testing.T) {

@@ -206,6 +206,7 @@ func (t *terraformProviderVersionMirrors) GetVersionMirrors(ctx context.Context,
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_provider_version_mirrors", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("terraform_provider_version_mirror.GetVersionMirrors"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -256,7 +257,7 @@ func (t *terraformProviderVersionMirrors) CreateVersionMirror(ctx context.Contex
 		return nil, err
 	}
 
-	sql, args, err := dialect.From("terraform_provider_version_mirrors").
+	sql, args, err := toSQLWithTag("terraform_provider_version_mirror.CreateVersionMirror", dialect.From("terraform_provider_version_mirrors").
 		Prepared(true).
 		With("terraform_provider_version_mirrors",
 			dialect.Insert("terraform_provider_version_mirrors").
@@ -274,8 +275,7 @@ func (t *terraformProviderVersionMirrors) CreateVersionMirror(ctx context.Contex
 					"group_id":           versionMirror.GroupID,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_provider_version_mirrors.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_provider_version_mirrors.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -300,7 +300,7 @@ func (t *terraformProviderVersionMirrors) DeleteVersionMirror(ctx context.Contex
 	ctx, span := tracer.Start(ctx, "db.DeleteVersionMirror")
 	defer span.End()
 
-	sql, args, err := dialect.From("terraform_provider_version_mirrors").
+	sql, args, err := toSQLWithTag("terraform_provider_version_mirror.DeleteVersionMirror", dialect.From("terraform_provider_version_mirrors").
 		Prepared(true).
 		With("terraform_provider_version_mirrors",
 			dialect.Delete("terraform_provider_version_mirrors").
@@ -309,8 +309,7 @@ func (t *terraformProviderVersionMirrors) DeleteVersionMirror(ctx context.Contex
 					"version": versionMirror.Metadata.Version,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_provider_version_mirrors.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_provider_version_mirrors.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -335,7 +334,7 @@ func (t *terraformProviderVersionMirrors) getVersionMirror(ctx context.Context, 
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_provider_version_mirrors.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("terraform_provider_version_mirror.getVersionMirror", query)
 	if err != nil {
 		return nil, err
 	}

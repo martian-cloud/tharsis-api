@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/doug-martin/goqu/v9"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -360,5 +361,98 @@ func TestExecute_TotalCountError(t *testing.T) {
 	}
 
 	_, err = rows.GetPageInfo().TotalCount(ctx)
+	assert.Error(t, err)
+}
+
+// fakeTx satisfies both pagination.Connection and pgx.Tx, so Execute takes the
+// transaction (eager-count) path. Only Query/QueryRow are implemented (delegating
+// to a MockConnection); the remaining pgx.Tx methods come from the embedded nil
+// interface and are never called by Execute.
+type fakeTx struct {
+	pgx.Tx
+	conn *MockConnection
+}
+
+func (f *fakeTx) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	return f.conn.Query(ctx, sql, args...)
+}
+
+func (f *fakeTx) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+	return f.conn.QueryRow(ctx, sql, args...)
+}
+
+// TestExecute_TotalCountEagerWithinTransaction verifies that when the connection is a
+// transaction, the COUNT runs during Execute (while the tx is open) and is memoized,
+// so later TotalCount calls return the value without issuing another COUNT.
+func TestExecute_TotalCountEagerWithinTransaction(t *testing.T) {
+	ctx := t.Context()
+
+	selectRows := mocks.Rows{}
+	selectRows.Test(t)
+	selectRows.On("Next").Return(false)
+	selectRows.On("Err").Return(nil).Maybe()
+	selectRows.On("Close").Return().Maybe()
+
+	countRow := mocks.Rows{}
+	countRow.Test(t)
+	countRow.On("Scan", mock.Anything).Run(func(args mock.Arguments) {
+		*(args.Get(0).(*int32)) = 7
+	}).Return(nil)
+
+	conn := MockConnection{}
+	conn.Test(t)
+	conn.On("Query", mock.Anything, mock.Anything, mock.Anything).Return(&selectRows, nil)
+	// .Once() makes a second COUNT a failure, proving the eager result is memoized.
+	conn.On("QueryRow", mock.Anything, mock.Anything).Return(&countRow).Once()
+
+	qBuilder, err := NewPaginatedQueryBuilder(&Options{First: ptr.Int32(1)}, &FieldDescriptor{Key: "id", Table: "runs", Col: "id"})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	rows, err := qBuilder.Execute(ctx, &fakeTx{conn: &conn}, goqu.From("runs"))
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// Eager: the COUNT already ran during Execute, while the transaction was open.
+	conn.AssertCalled(t, "QueryRow", mock.Anything, mock.Anything)
+
+	results := []testModel{}
+	for rows.Next() {
+		results = append(results, testModel{})
+	}
+	assert.NoError(t, rows.Finalize(&results))
+
+	// TotalCount returns the memoized value without another COUNT.
+	for range 3 {
+		count, err := rows.GetPageInfo().TotalCount(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(7), count)
+	}
+
+	conn.AssertExpectations(t)
+}
+
+// TestExecute_TotalCountEagerError verifies that when the connection is a transaction,
+// a COUNT error is surfaced from Execute itself (resolved while the tx is open).
+func TestExecute_TotalCountEagerError(t *testing.T) {
+	ctx := t.Context()
+
+	countRow := mocks.Rows{}
+	countRow.Test(t)
+	countRow.On("Scan", mock.Anything).Return(fmt.Errorf("boom"))
+
+	conn := MockConnection{}
+	conn.Test(t)
+	conn.On("QueryRow", mock.Anything, mock.Anything).Return(&countRow)
+
+	qBuilder, err := NewPaginatedQueryBuilder(&Options{First: ptr.Int32(1)}, &FieldDescriptor{Key: "id", Table: "runs", Col: "id"})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// The transaction path resolves the count eagerly, so its error comes back from Execute.
+	_, err = qBuilder.Execute(ctx, &fakeTx{conn: &conn}, goqu.From("runs"))
 	assert.Error(t, err)
 }

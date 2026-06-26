@@ -190,6 +190,7 @@ func (f *namespaceFavorites) GetNamespaceFavorites(ctx context.Context, input *G
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "namespace_favorites", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("namespace_favorite.GetNamespaceFavorites"),
 	)
 
 	if err != nil {
@@ -241,7 +242,7 @@ func (f *namespaceFavorites) CreateNamespaceFavorite(ctx context.Context, favori
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("namespace_favorites").
+	sql, args, err := toSQLWithTag("namespace_favorite.CreateNamespaceFavorite", dialect.From("namespace_favorites").
 		Prepared(true).
 		With("namespace_favorites",
 			dialect.Insert("namespace_favorites").
@@ -261,8 +262,7 @@ func (f *namespaceFavorites) CreateNamespaceFavorite(ctx context.Context, favori
 				goqu.I("namespace_favorites.group_id").Eq(goqu.I("namespaces.group_id")),
 				goqu.I("namespace_favorites.workspace_id").Eq(goqu.I("namespaces.workspace_id")),
 			),
-		)).
-		ToSQL()
+		)))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -296,15 +296,14 @@ func (f *namespaceFavorites) DeleteNamespaceFavorite(ctx context.Context, favori
 	ctx, span := tracer.Start(ctx, "db.DeleteNamespaceFavorite")
 	defer span.End()
 
-	sql, args, err := dialect.Delete("namespace_favorites").
+	sql, args, err := toSQLWithTag("namespace_favorite.DeleteNamespaceFavorite", dialect.Delete("namespace_favorites").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"id":      favorite.Metadata.ID,
 				"version": favorite.Metadata.Version,
 			},
-		).
-		ToSQL()
+		))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")

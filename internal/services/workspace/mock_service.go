@@ -189,23 +189,23 @@ func (_m *MockService) GetConfigurationVersionByTRN(ctx context.Context, configu
 }
 
 // GetConfigurationVersionContent provides a mock function with given fields: ctx, configurationVersionID
-func (_m *MockService) GetConfigurationVersionContent(ctx context.Context, configurationVersionID string) (io.ReadCloser, error) {
+func (_m *MockService) GetConfigurationVersionContent(ctx context.Context, configurationVersionID string) (*GetConfigurationVersionContentOutput, error) {
 	ret := _m.Called(ctx, configurationVersionID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetConfigurationVersionContent")
 	}
 
-	var r0 io.ReadCloser
+	var r0 *GetConfigurationVersionContentOutput
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (io.ReadCloser, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*GetConfigurationVersionContentOutput, error)); ok {
 		return rf(ctx, configurationVersionID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) io.ReadCloser); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *GetConfigurationVersionContentOutput); ok {
 		r0 = rf(ctx, configurationVersionID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(io.ReadCloser)
+			r0 = ret.Get(0).(*GetConfigurationVersionContentOutput)
 		}
 	}
 

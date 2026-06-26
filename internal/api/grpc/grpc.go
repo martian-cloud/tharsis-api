@@ -168,12 +168,37 @@ func (s *Server) Drain() {
 	s.drainCancel()
 }
 
-// Shutdown gracefully stops the server. Will block until
-// all pending RPCs are finished.
-func (s *Server) Shutdown() {
+// grpcShutdownTimeout bounds how long Shutdown waits for in-flight RPCs to
+// finish gracefully before forcing a hard stop.
+const grpcShutdownTimeout = 30 * time.Second
+
+// Shutdown gracefully stops the server, waiting for in-flight RPCs to finish.
+// Drain should be called first so long-lived streams have been signalled to
+// terminate. If graceful shutdown does not complete within grpcShutdownTimeout
+// (or the supplied ctx is cancelled first), it falls back to a hard Stop so
+// shutdown is always bounded: a stream handler that ignores its context must
+// not be able to block shutdown forever.
+func (s *Server) Shutdown(ctx context.Context) {
 	s.options.Logger.Info("Gracefully shutting down gRPC server")
-	s.server.GracefulStop()
-	s.options.Logger.Info("Successfully shutdown gRPC server")
+
+	ctx, cancel := context.WithTimeout(ctx, grpcShutdownTimeout)
+	defer cancel()
+
+	stopped := make(chan struct{})
+	go func() {
+		s.server.GracefulStop()
+		close(stopped)
+	}()
+
+	select {
+	case <-stopped:
+		s.options.Logger.Info("Successfully shutdown gRPC server")
+	case <-ctx.Done():
+		s.options.Logger.Warnf("gRPC graceful shutdown did not complete (%v); forcing stop", ctx.Err())
+		s.server.Stop()
+		<-stopped
+		s.options.Logger.Info("Forced shutdown of gRPC server complete")
+	}
 }
 
 // IsGRPCRequest returns true if this is a GRPC request

@@ -165,6 +165,7 @@ func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResul
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "plans", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("plan.GetPlans"),
 	)
 
 	if err != nil {
@@ -213,7 +214,7 @@ func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("plans").
+	sql, args, err := toSQLWithTag("plan.CreatePlan", dialect.From("plans").
 		Prepared(true).
 		With("plans",
 			dialect.Insert("plans").
@@ -237,8 +238,7 @@ func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 					"diff_size":             plan.PlanDiffSize,
 				}).Returning("*"),
 		).Select(p.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"plans.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"plans.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -263,7 +263,7 @@ func (p *plans) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("plans").
+	sql, args, err := toSQLWithTag("plan.UpdatePlan", dialect.From("plans").
 		Prepared(true).
 		With("plans",
 			dialect.Update("plans").
@@ -287,8 +287,7 @@ func (p *plans) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 				).Where(goqu.Ex{"id": plan.Metadata.ID, "version": plan.Metadata.Version}).
 				Returning("*"),
 		).Select(p.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"plans.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"plans.workspace_id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -312,12 +311,11 @@ func (p *plans) getPlan(ctx context.Context, ex goqu.Ex) (*models.Plan, error) {
 	ctx, span := tracer.Start(ctx, "db.getPlan")
 	defer span.End()
 
-	sql, args, err := dialect.From("plans").
+	sql, args, err := toSQLWithTag("plan.getPlan", dialect.From("plans").
 		Prepared(true).
 		Select(p.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"plans.workspace_id": goqu.I("namespaces.workspace_id")})).
-		Where(ex).
-		ToSQL()
+		Where(ex))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")

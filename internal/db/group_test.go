@@ -327,6 +327,122 @@ func TestGroups_GetGroups(t *testing.T) {
 	}
 }
 
+func TestGroups_GetGroupsWithMembershipFilters(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Build a hierarchy:
+	//   mbr-root            top-level, the caller's "root" membership
+	//   mbr-root/mbr-child  a descendant of the root membership
+	//   mbr-other           top-level, NOT a membership of the caller
+	//   team_a              top-level, a membership whose path contains a LIKE wildcard ('_')
+	//   team_a/child        a legitimate descendant of team_a
+	//   teamXa              top-level decoy: an unescaped "team_a/%" LIKE would match its tree
+	//   teamXa/child        the decoy descendant that must NOT leak into team_a's results
+	root, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "mbr-root", CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "mbr-child", ParentID: root.Metadata.ID, CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "mbr-other", CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	teamA, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "team_a", CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "child", ParentID: teamA.Metadata.ID, CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	teamX, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "teamXa", CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "child", ParentID: teamX.Metadata.ID, CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// The RootOnly membership filter matches by namespace ID, so resolve the root group's
+	// namespace ID.
+	rootNS, err := getNamespaceByPath(ctx, testClient.client.getConnection(ctx), "mbr-root")
+	require.NoError(t, err)
+	require.NotNil(t, rootNS)
+
+	rootMembership := models.MembershipNamespace{ID: rootNS.id, Path: "mbr-root"}
+
+	teamANS, err := getNamespaceByPath(ctx, testClient.client.getConnection(ctx), "team_a")
+	require.NoError(t, err)
+	require.NotNil(t, teamANS)
+
+	teamAMembership := models.MembershipNamespace{ID: teamANS.id, Path: "team_a"}
+
+	testCases := []struct {
+		filter      *GroupFilter
+		name        string
+		expectPaths []string
+	}{
+		{
+			name:        "membership filter returns the root and its descendants",
+			filter:      &GroupFilter{RootNamespaceMemberships: []models.MembershipNamespace{rootMembership}},
+			expectPaths: []string{"mbr-root", "mbr-root/mbr-child"},
+		},
+		{
+			name:        "membership filter with root-only returns only the exact root",
+			filter:      &GroupFilter{RootNamespaceMemberships: []models.MembershipNamespace{rootMembership}, RootOnly: true},
+			expectPaths: []string{"mbr-root"},
+		},
+		{
+			// Regression: an unescaped "team_a/%" LIKE prefix would also match "teamXa/child"
+			// because '_' is a LIKE single-char wildcard. The escaped prefix must only return
+			// team_a and its real descendants.
+			name:        "membership root containing a LIKE wildcard does not leak sibling namespaces",
+			filter:      &GroupFilter{RootNamespaceMemberships: []models.MembershipNamespace{teamAMembership}},
+			expectPaths: []string{"team_a", "team_a/child"},
+		},
+		{
+			name:        "root-only without a membership restriction returns top-level groups",
+			filter:      &GroupFilter{RootOnly: true},
+			expectPaths: []string{"mbr-root", "mbr-other", "team_a", "teamXa"},
+		},
+		{
+			name:        "empty memberships match nothing",
+			filter:      &GroupFilter{RootNamespaceMemberships: []models.MembershipNamespace{}},
+			expectPaths: []string{},
+		},
+		{
+			name:        "empty memberships with root-only match nothing",
+			filter:      &GroupFilter{RootNamespaceMemberships: []models.MembershipNamespace{}, RootOnly: true},
+			expectPaths: []string{},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := testClient.client.Groups.GetGroups(ctx, &GetGroupsInput{Filter: test.filter})
+			require.NoError(t, err)
+
+			gotPaths := []string{}
+			for _, g := range result.Groups {
+				gotPaths = append(gotPaths, g.FullPath)
+			}
+			assert.ElementsMatch(t, test.expectPaths, gotPaths)
+		})
+	}
+}
+
 func TestGroups_GetGroupsWithPaginationAndSorting(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)

@@ -151,6 +151,7 @@ func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*Appl
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "applies", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("apply.GetApplies"),
 	)
 
 	if err != nil {
@@ -198,7 +199,7 @@ func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("applies").
+	sql, args, err := toSQLWithTag("apply.CreateApply", dialect.From("applies").
 		Prepared(true).
 		With("applies",
 			dialect.Insert("applies").
@@ -214,8 +215,7 @@ func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models
 					"triggered_by":  nullableString(apply.TriggeredBy),
 				}).Returning("*"),
 		).Select(a.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"applies.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"applies.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -239,7 +239,7 @@ func (a *applies) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("applies").
+	sql, args, err := toSQLWithTag("apply.UpdateApply", dialect.From("applies").
 		Prepared(true).
 		With("applies",
 			dialect.Update("applies").
@@ -255,8 +255,7 @@ func (a *applies) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 				).Where(goqu.Ex{"id": apply.Metadata.ID, "version": apply.Metadata.Version}).
 				Returning("*"),
 		).Select(a.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"applies.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"applies.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -281,12 +280,11 @@ func (a *applies) getApply(ctx context.Context, ex goqu.Ex) (*models.Apply, erro
 	ctx, span := tracer.Start(ctx, "db.getApply")
 	defer span.End()
 
-	sql, args, err := dialect.From("applies").
+	sql, args, err := toSQLWithTag("apply.getApply", dialect.From("applies").
 		Prepared(true).
 		Select(a.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"applies.workspace_id": goqu.I("namespaces.workspace_id")})).
-		Where(ex).
-		ToSQL()
+		Where(ex))
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))

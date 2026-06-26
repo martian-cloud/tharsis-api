@@ -51,6 +51,13 @@ func (u *UserCaller) GetSubject() string {
 
 // IsAdminModeActivated returns true if the caller is an admin with admin mode currently active.
 func (u *UserCaller) IsAdminModeActivated(ctx context.Context) bool {
+	// If user is not an admin we can short circuit and return false
+	if !u.User.Admin {
+		return false
+	}
+
+	// If user is an admin, check if admin mode is active by querying the database for the user
+	// to ensure that we get the latest value of the admin mode expiration timestamp
 	user, err := u.dbClient.Users.GetUserByID(ctx, u.User.Metadata.ID)
 	if err != nil || user == nil {
 		return false
@@ -77,24 +84,10 @@ func (u *UserCaller) UnauthorizedError(_ context.Context, hasViewerAccess bool) 
 	)
 }
 
-// GetNamespaceAccessPolicy returns the namespace access policy for this caller
-func (u *UserCaller) GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error) {
-	// Admin mode must be active for full namespace access.
-	if u.User.IsAdminModeActive() {
-		return &NamespaceAccessPolicy{AllowAll: true}, nil
-	}
-
-	rootNamespaces, err := u.authorizer.GetRootNamespaces(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	ids := []string{}
-	for _, ns := range rootNamespaces {
-		ids = append(ids, ns.ID)
-	}
-
-	return &NamespaceAccessPolicy{AllowAll: false, RootNamespaceIDs: ids}, nil
+// GetRootNamespaceMemberships returns the deduplicated, team-aware top-most namespaces the user
+// is a member of. Only meaningful when IsAdminModeActivated is false.
+func (u *UserCaller) GetRootNamespaceMemberships(ctx context.Context) ([]models.MembershipNamespace, error) {
+	return u.authorizer.GetRootNamespaces(ctx)
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions

@@ -131,6 +131,7 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "state_versions", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("state_version.GetStateVersions"),
 	)
 
 	if err != nil {
@@ -208,7 +209,7 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("state_versions").
+	sql, args, err := toSQLWithTag("state_version.CreateStateVersion", dialect.From("state_versions").
 		Prepared(true).
 		With("state_versions",
 			dialect.Insert("state_versions").
@@ -222,8 +223,7 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 					"created_by":   stateVersion.CreatedBy,
 				}).Returning("*"),
 		).Select(s.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -244,12 +244,11 @@ func (s *stateVersions) getStateVersion(ctx context.Context, ex goqu.Ex) (*model
 	ctx, span := tracer.Start(ctx, "db.getStateVersion")
 	defer span.End()
 
-	sql, args, err := dialect.From("state_versions").
+	sql, args, err := toSQLWithTag("state_version.getStateVersion", dialect.From("state_versions").
 		Prepared(true).
 		Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
-		Where(ex).
-		ToSQL()
+		Where(ex))
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))

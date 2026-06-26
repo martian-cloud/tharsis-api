@@ -37,11 +37,10 @@ func (a *agentCreditQuotas) GetAgentCreditQuota(ctx context.Context, userID stri
 	ctx, span := tracer.Start(ctx, "db.GetAgentCreditQuota")
 	defer span.End()
 
-	sql, args, err := dialect.From(goqu.T("agent_credit_quotas")).
+	sql, args, err := toSQLWithTag("agent_credit_quota.GetAgentCreditQuota", dialect.From(goqu.T("agent_credit_quotas")).
 		Prepared(true).
 		Select(a.getSelectFields()...).
-		Where(goqu.Ex{"user_id": userID, "month_date": monthDate}).
-		ToSQL()
+		Where(goqu.Ex{"user_id": userID, "month_date": monthDate}))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -63,7 +62,7 @@ func (a *agentCreditQuotas) CreateAgentCreditQuota(ctx context.Context, quota *m
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("agent_credit_quotas").Prepared(true).Rows(
+	sql, args, err := toSQLWithTag("agent_credit_quota.CreateAgentCreditQuota", dialect.Insert("agent_credit_quotas").Prepared(true).Rows(
 		goqu.Record{
 			"id":            newResourceID(),
 			"version":       initialResourceVersion,
@@ -73,7 +72,7 @@ func (a *agentCreditQuotas) CreateAgentCreditQuota(ctx context.Context, quota *m
 			"month_date":    quota.MonthDate,
 			"total_credits": quota.TotalCredits,
 		},
-	).Returning(a.getSelectFields()...).ToSQL()
+	).Returning(a.getSelectFields()...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -98,14 +97,13 @@ func (a *agentCreditQuotas) AddCredits(ctx context.Context, id string, credits f
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("agent_credit_quotas").Prepared(true).
+	sql, args, err := toSQLWithTag("agent_credit_quota.AddCredits", dialect.Update("agent_credit_quotas").Prepared(true).
 		Set(goqu.Record{
 			"version":       goqu.L("? + ?", goqu.C("version"), 1),
 			"updated_at":    timestamp,
 			"total_credits": goqu.L("? + ?", goqu.C("total_credits"), credits),
 		}).
-		Where(goqu.Ex{"id": id}).
-		ToSQL()
+		Where(goqu.Ex{"id": id}))
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

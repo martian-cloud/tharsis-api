@@ -658,6 +658,56 @@ func TestRequireAccessToGroup(t *testing.T) {
 	}
 }
 
+// TestRequireAccessToGroupCachesGroupLookup verifies that repeated group-scoped permission
+// checks for the same group within a single request fetch the group from the DB at most once
+// (the group analogue of the runs-page workspace N+1 fix).
+func TestRequireAccessToGroupCachesGroupLookup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	userID := "user1"
+	groupID := "group1"
+	group := &models.Group{
+		Metadata: models.ResourceMetadata{ID: groupID},
+		FullPath: "ns1/ns11",
+	}
+
+	mockNamespaceMemberships := db.NewMockNamespaceMemberships(t)
+	mockGroups := db.NewMockGroups(t)
+	mockCaller := NewMockCaller(t)
+
+	mockCaller.On("GetSubject").Return("testsubject").Maybe()
+	mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(
+		errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))).Maybe()
+
+	// Inherited (parent-namespace) viewer membership: the groupID permission cache is never
+	// populated for this, so without the path-lookup memoization every check below would
+	// re-run GetGroupByID.
+	mockNamespaceMemberships.On("GetNamespaceMemberships", mock.Anything, mock.Anything).Return(
+		&db.NamespaceMembershipResult{
+			NamespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+		}, nil)
+
+	// .Once() makes a second group fetch a test failure, proving the lookup is memoized.
+	mockGroups.On("GetGroupByID", mock.Anything, groupID).Return(group, nil).Once()
+
+	dbClient := db.Client{
+		NamespaceMemberships: mockNamespaceMemberships,
+		Groups:               mockGroups,
+	}
+
+	authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, true)
+	callerCtx := WithCaller(ctx, mockCaller)
+
+	for range 5 {
+		assert.NoError(t, authorizer.requireAccessToGroup(callerCtx, groupID, &models.ViewGroupPermission))
+	}
+
+	mockGroups.AssertNumberOfCalls(t, "GetGroupByID", 1)
+}
+
 func TestRequireAccessToWorkspace(t *testing.T) {
 	userID := "user1"
 	workspaceID := "ws1"
@@ -823,6 +873,60 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestRequireAccessToWorkspaceCachesWorkspaceLookup verifies that repeated workspace-scoped
+// permission checks for the same workspace within a single request fetch the workspace from
+// the DB at most once. This is the fix for the runs-page N+1, where every run triggered a
+// workspace-scoped check and re-ran GetWorkspaceByID because access is inherited from a
+// parent namespace (so the workspaceID permission cache never gets populated).
+func TestRequireAccessToWorkspaceCachesWorkspaceLookup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	userID := "user1"
+	workspaceID := "ws1"
+	workspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{ID: workspaceID},
+		FullPath: "ns1/ns11",
+	}
+
+	mockNamespaceMemberships := db.NewMockNamespaceMemberships(t)
+	mockWorkspaces := db.NewMockWorkspaces(t)
+	mockCaller := NewMockCaller(t)
+
+	mockCaller.On("GetSubject").Return("testsubject").Maybe()
+	mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(
+		errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))).Maybe()
+
+	// Inherited (parent-namespace) viewer membership: the workspaceID permission cache is
+	// never populated for this, so without the path-lookup memoization every check below
+	// would re-run GetWorkspaceByID.
+	mockNamespaceMemberships.On("GetNamespaceMemberships", mock.Anything, mock.Anything).Return(
+		&db.NamespaceMembershipResult{
+			NamespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+		}, nil)
+
+	// .Once() makes a second workspace fetch a test failure, proving the lookup is memoized.
+	mockWorkspaces.On("GetWorkspaceByID", mock.Anything, workspaceID).Return(workspace, nil).Once()
+
+	dbClient := db.Client{
+		NamespaceMemberships: mockNamespaceMemberships,
+		Workspaces:           mockWorkspaces,
+	}
+
+	// useCache must be true for per-request memoization (it is, for real request callers).
+	authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, true)
+	callerCtx := WithCaller(ctx, mockCaller)
+
+	// Simulate the per-run checks that happen when loading a workspace's runs page.
+	for range 5 {
+		assert.NoError(t, authorizer.requireAccessToWorkspace(callerCtx, workspaceID, &models.ViewGroupPermission))
+	}
+
+	mockWorkspaces.AssertNumberOfCalls(t, "GetWorkspaceByID", 1)
 }
 
 func TestRequireAccessToNamespace(t *testing.T) {

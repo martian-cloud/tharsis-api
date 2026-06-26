@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/sqltag"
 )
 
 const initialResourceVersion int = 1
@@ -155,6 +156,10 @@ func NewClient(
 		cfg.MaxConns = int32(dbMaxConnections)
 	}
 
+	// Record per-query Prometheus metrics for every query, on pooled connections
+	// and transactions alike. See instrumentation.go.
+	cfg.ConnConfig.Tracer = queryMetricsTracer{}
+
 	logger.WithContextFields(ctx).Infof("Connecting to DB (host=%s, maxConnections=%d)", dbHost, cfg.MaxConns)
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
@@ -264,6 +269,22 @@ func (db *Client) getConnection(ctx context.Context) connection {
 	}
 	// Return transaction if it exists on the context
 	return trx
+}
+
+// sqlGenerator is implemented by all goqu dataset types (Select/Insert/Update/Delete).
+type sqlGenerator interface {
+	ToSQL() (string, []interface{}, error)
+}
+
+// toSQLWithTag generates the SQL for a goqu query and prepends an operation comment used
+// to tag the query for DB-side correlation and per-query Prometheus metrics. The
+// tag must be a static, bounded literal (e.g. "jobs.getJob").
+func toSQLWithTag(tag string, query sqlGenerator) (string, []interface{}, error) {
+	sql, args, err := query.ToSQL()
+	if err != nil {
+		return "", nil, err
+	}
+	return sqltag.Inject(tag, sql), args, nil
 }
 
 // RetryOnOLE will retry the given function if an optimistic lock error occurs

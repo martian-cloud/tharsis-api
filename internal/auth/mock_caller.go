@@ -15,24 +15,24 @@ type MockCaller struct {
 	mock.Mock
 }
 
-// GetNamespaceAccessPolicy provides a mock function with given fields: ctx
-func (_m *MockCaller) GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error) {
+// GetRootNamespaceMemberships provides a mock function with given fields: ctx
+func (_m *MockCaller) GetRootNamespaceMemberships(ctx context.Context) ([]models.MembershipNamespace, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetNamespaceAccessPolicy")
+		panic("no return value specified for GetRootNamespaceMemberships")
 	}
 
-	var r0 *NamespaceAccessPolicy
+	var r0 []models.MembershipNamespace
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*NamespaceAccessPolicy, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) ([]models.MembershipNamespace, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *NamespaceAccessPolicy); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) []models.MembershipNamespace); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*NamespaceAccessPolicy)
+			r0 = ret.Get(0).([]models.MembershipNamespace)
 		}
 	}
 

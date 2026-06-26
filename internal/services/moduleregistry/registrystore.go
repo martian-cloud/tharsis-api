@@ -61,11 +61,15 @@ func (r *registryStore) GetModuleConfigurationDetails(
 	module *models.TerraformModule,
 	path string,
 ) (io.ReadCloser, error) {
-	return r.objectStore.GetObjectStream(
+	result, err := r.objectStore.GetObjectStream(
 		ctx,
 		getModuleConfigurationDetailsObjectKey(path, moduleVersion, module),
 		nil,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return result.Body, nil
 }
 
 func (r *registryStore) UploadModulePackage(

@@ -63,13 +63,11 @@ func (v *VCSWorkspaceLinkCaller) UnauthorizedError(_ context.Context, hasViewerA
 	)
 }
 
-// GetNamespaceAccessPolicy returns the namespace access policy for this caller.
-func (v *VCSWorkspaceLinkCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
-	return &NamespaceAccessPolicy{
-		AllowAll: false,
-		// RootNamespaceIDs is empty to indicate the caller doesn't have access to any root namespaces.
-		RootNamespaceIDs: []string{},
-	}, nil
+// GetRootNamespaceMemberships returns a non-nil empty slice; a VCS workspace-link caller is scoped
+// to a single workspace and has no root namespace memberships. It must be non-nil so the membership
+// filter is applied and denies access — a nil slice would be treated as "no filter".
+func (v *VCSWorkspaceLinkCaller) GetRootNamespaceMemberships(_ context.Context) ([]models.MembershipNamespace, error) {
+	return []models.MembershipNamespace{}, nil
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions.

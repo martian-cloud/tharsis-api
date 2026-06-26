@@ -118,6 +118,12 @@ type CreateConfigurationVersionInput struct {
 	Speculative bool
 }
 
+// GetConfigurationVersionContentOutput is the result of GetConfigurationVersionContent.
+type GetConfigurationVersionContentOutput struct {
+	Body          io.ReadCloser
+	ContentLength int64
+}
+
 // Service implements all workspace related functionality
 type Service interface {
 	SubscribeToWorkspaceEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error)
@@ -144,7 +150,7 @@ type Service interface {
 	GetConfigurationVersionByID(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error)
 	GetConfigurationVersionByTRN(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error)
 	UploadConfigurationVersion(ctx context.Context, configurationVersionID string, reader io.Reader) error
-	GetConfigurationVersionContent(ctx context.Context, configurationVersionID string) (io.ReadCloser, error)
+	GetConfigurationVersionContent(ctx context.Context, configurationVersionID string) (*GetConfigurationVersionContentOutput, error)
 	GetConfigurationVersionsByIDs(ctx context.Context, idList []string) ([]models.ConfigurationVersion, error)
 	GetStateVersionOutputByID(ctx context.Context, id string) (*models.StateVersionOutput, error)
 	GetStateVersionOutputByTRN(ctx context.Context, trn string) (*models.StateVersionOutput, error)
@@ -358,29 +364,13 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 			return nil, err
 		}
 		dbInput.Filter.GroupID = input.GroupID
-	} else {
-		policy, napErr := caller.GetNamespaceAccessPolicy(ctx)
-		if napErr != nil {
-			tracing.RecordError(span, napErr, "failed to get namespace access policy")
-			return nil, napErr
+	} else if !caller.IsAdminModeActivated(ctx) {
+		rootNamespaces, rErr := caller.GetRootNamespaceMemberships(ctx)
+		if rErr != nil {
+			tracing.RecordError(span, rErr, "failed to get root namespaces")
+			return nil, rErr
 		}
-
-		if !policy.AllowAll {
-			if err = s.handleCaller(
-				ctx,
-				func(_ context.Context, c *auth.UserCaller) error {
-					dbInput.Filter.UserMemberID = &c.User.Metadata.ID
-					return nil
-				},
-				func(_ context.Context, c *auth.ServiceAccountCaller) error {
-					dbInput.Filter.ServiceAccountMemberID = &c.ServiceAccountID
-					return nil
-				},
-			); err != nil {
-				tracing.RecordError(span, err, "failed to set filters for non-admin caller")
-				return nil, err
-			}
-		}
+		dbInput.Filter.RootNamespaceMemberships = rootNamespaces
 	}
 
 	workspacesResult, err := s.dbClient.Workspaces.GetWorkspaces(ctx, &dbInput)
@@ -1519,7 +1509,7 @@ func (s *service) GetStateVersionsByIDs(ctx context.Context,
 	return result.StateVersions, nil
 }
 
-func (s *service) GetConfigurationVersionContent(ctx context.Context, configurationVersionID string) (io.ReadCloser, error) {
+func (s *service) GetConfigurationVersionContent(ctx context.Context, configurationVersionID string) (*GetConfigurationVersionContentOutput, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetConfigurationVersionContent")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
@@ -1529,7 +1519,7 @@ func (s *service) GetConfigurationVersionContent(ctx context.Context, configurat
 		return nil, err
 	}
 
-	result, err := s.artifactStore.GetConfigurationVersion(ctx, cv)
+	body, contentLength, err := s.artifactStore.GetConfigurationVersion(ctx, cv)
 	if err != nil {
 		tracing.RecordError(span, err, "Failed to get configuration version from artifact store")
 		return nil, errors.Wrap(
@@ -1538,7 +1528,10 @@ func (s *service) GetConfigurationVersionContent(ctx context.Context, configurat
 		)
 	}
 
-	return result, nil
+	return &GetConfigurationVersionContentOutput{
+		Body:          body,
+		ContentLength: contentLength,
+	}, nil
 }
 
 // CreateConfigurationVersion creates a new configuration version

@@ -56,25 +56,20 @@ func (sf ActivityEventSortableField) getSortDirection() pagination.SortDirection
 	return pagination.AscSort
 }
 
-// ActivityEventNamespaceMembershipRequirement specifies the namespace requirements for returning
-// activity events
-type ActivityEventNamespaceMembershipRequirement struct {
-	UserID           *string
-	ServiceAccountID *string
-}
-
 // ActivityEventFilter contains the supported fields for filtering activity event resources
 type ActivityEventFilter struct {
-	TimeRangeEnd                   *time.Time
-	UserID                         *string
-	ServiceAccountID               *string
-	NamespacePath                  *string
-	TimeRangeStart                 *time.Time
-	NamespaceMembershipRequirement *ActivityEventNamespaceMembershipRequirement
-	ActivityEventIDs               []string
-	Actions                        []models.ActivityEventAction
-	TargetTypes                    []models.ActivityEventTargetType
-	IncludeNested                  bool
+	TimeRangeEnd     *time.Time
+	UserID           *string
+	ServiceAccountID *string
+	NamespacePath    *string
+	TimeRangeStart   *time.Time
+	// RootNamespaceMemberships limits results to events in namespaces at or under one of the
+	// caller's root member namespace paths. Non-nil empty = no memberships; nil = no filter.
+	RootNamespaceMemberships []models.MembershipNamespace
+	ActivityEventIDs         []string
+	Actions                  []models.ActivityEventAction
+	TargetTypes              []models.ActivityEventTargetType
+	IncludeNested            bool
 }
 
 // GetActivityEventsInput is the input for listing activity events
@@ -180,11 +175,8 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 
 		// This filters out any activity events related to any namespace to which a user or
 		//  service account may have LOST membership after the activity events were created.
-		if input.Filter.NamespaceMembershipRequirement != nil {
-			ex = ex.Append(namespaceMembershipExpressionBuilder{
-				userID:           input.Filter.NamespaceMembershipRequirement.UserID,
-				serviceAccountID: input.Filter.NamespaceMembershipRequirement.ServiceAccountID,
-			}.build())
+		if input.Filter.RootNamespaceMemberships != nil {
+			ex = ex.Append(membershipFilterByRootNamespaces(input.Filter.RootNamespaceMemberships))
 		}
 	}
 
@@ -207,6 +199,7 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "activity_events", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("activity_event.GetActivityEvents"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -378,10 +371,10 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		"federated_registry_target_id":                federatedRegistryTargetID,
 	}
 
-	sql, args, err := dialect.Insert("activity_events").
+	sql, args, err := toSQLWithTag("activity_event.CreateActivityEvent", dialect.Insert("activity_events").
 		Prepared(true).
 		Rows(record).
-		Returning(m.getSelectFields(false)...).ToSQL()
+		Returning(m.getSelectFields(false)...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to insert to table")
 		return nil, err

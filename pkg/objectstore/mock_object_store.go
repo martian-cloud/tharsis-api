@@ -61,23 +61,23 @@ func (_m *MockObjectStore) DownloadObject(ctx context.Context, key string, w io.
 }
 
 // GetObjectStream provides a mock function with given fields: ctx, key, options
-func (_m *MockObjectStore) GetObjectStream(ctx context.Context, key string, options *DownloadOptions) (io.ReadCloser, error) {
+func (_m *MockObjectStore) GetObjectStream(ctx context.Context, key string, options *DownloadOptions) (*GetObjectStreamOutput, error) {
 	ret := _m.Called(ctx, key, options)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetObjectStream")
 	}
 
-	var r0 io.ReadCloser
+	var r0 *GetObjectStreamOutput
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *DownloadOptions) (io.ReadCloser, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *DownloadOptions) (*GetObjectStreamOutput, error)); ok {
 		return rf(ctx, key, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *DownloadOptions) io.ReadCloser); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *DownloadOptions) *GetObjectStreamOutput); ok {
 		r0 = rf(ctx, key, options)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(io.ReadCloser)
+			r0 = ret.Get(0).(*GetObjectStreamOutput)
 		}
 	}
 

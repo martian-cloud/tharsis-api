@@ -64,13 +64,11 @@ func (s *SCIMCaller) UnauthorizedError(_ context.Context, hasViewerAccess bool) 
 	)
 }
 
-// GetNamespaceAccessPolicy returns the namespace access policy for this caller.
-func (s *SCIMCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
-	return &NamespaceAccessPolicy{
-		AllowAll: false,
-		// RootNamespaceIDs is empty to indicate the caller doesn't have access to any root namespaces.
-		RootNamespaceIDs: []string{},
-	}, nil
+// GetRootNamespaceMemberships returns a non-nil empty slice; a SCIM caller has no root namespace
+// memberships. It must be non-nil so the membership filter is applied and denies access — a nil
+// slice would be treated as "no filter".
+func (s *SCIMCaller) GetRootNamespaceMemberships(_ context.Context) ([]models.MembershipNamespace, error) {
+	return []models.MembershipNamespace{}, nil
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions.

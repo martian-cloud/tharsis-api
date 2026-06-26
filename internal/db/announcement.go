@@ -142,6 +142,7 @@ func (a *announcements) GetAnnouncements(ctx context.Context, input *GetAnnounce
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "announcements", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("announcement.GetAnnouncements"),
 	)
 
 	if err != nil {
@@ -184,7 +185,7 @@ func (a *announcements) CreateAnnouncement(ctx context.Context, announcement *mo
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("announcements").
+	sql, args, err := toSQLWithTag("announcement.CreateAnnouncement", dialect.From("announcements").
 		Prepared(true).
 		With("announcements",
 			dialect.Insert("announcements").Rows(
@@ -200,8 +201,7 @@ func (a *announcements) CreateAnnouncement(ctx context.Context, announcement *mo
 					"type":        announcement.Type,
 					"dismissible": announcement.Dismissible,
 				}).Returning("*"),
-		).Select(a.getSelectFields()...).
-		ToSQL()
+		).Select(a.getSelectFields()...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -220,7 +220,7 @@ func (a *announcements) UpdateAnnouncement(ctx context.Context, announcement *mo
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("announcements").
+	sql, args, err := toSQLWithTag("announcement.UpdateAnnouncement", dialect.From("announcements").
 		Prepared(true).
 		With("announcements",
 			dialect.Update("announcements").
@@ -234,8 +234,7 @@ func (a *announcements) UpdateAnnouncement(ctx context.Context, announcement *mo
 					"dismissible": announcement.Dismissible,
 				}).Where(goqu.Ex{"id": announcement.Metadata.ID, "version": announcement.Metadata.Version}).
 				Returning("*"),
-		).Select(a.getSelectFields()...).
-		ToSQL()
+		).Select(a.getSelectFields()...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -255,14 +254,13 @@ func (a *announcements) DeleteAnnouncement(ctx context.Context, announcement *mo
 	ctx, span := tracer.Start(ctx, "db.DeleteAnnouncement")
 	defer span.End()
 
-	sql, args, err := dialect.From("announcements").
+	sql, args, err := toSQLWithTag("announcement.DeleteAnnouncement", dialect.From("announcements").
 		Prepared(true).
 		With("announcements",
 			dialect.Delete("announcements").
 				Where(goqu.Ex{"id": announcement.Metadata.ID, "version": announcement.Metadata.Version}).
 				Returning("*"),
-		).Select(a.getSelectFields()...).
-		ToSQL()
+		).Select(a.getSelectFields()...))
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -287,7 +285,7 @@ func (a *announcements) getAnnouncement(ctx context.Context, exp goqu.Ex) (*mode
 		Select(a.getSelectFields()...).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("announcement.getAnnouncement", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

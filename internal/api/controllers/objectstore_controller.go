@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -53,7 +54,7 @@ func (c *ObjectStoreController) DownloadObject(w http.ResponseWriter, r *http.Re
 		return
 	}
 	defer func() {
-		if closeErr := stream.Close(); closeErr != nil {
+		if closeErr := stream.Body.Close(); closeErr != nil {
 			c.logger.WithContextFields(r.Context()).Errorf("failed to close object stream for key %s: %v", key, closeErr)
 		}
 	}()
@@ -71,11 +72,11 @@ func (c *ObjectStoreController) DownloadObject(w http.ResponseWriter, r *http.Re
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(key)))
 
-	if cl, ok := stream.(interface{ ContentLength() int64 }); ok {
-		w.Header().Set("Content-Length", fmt.Sprintf("%d", cl.ContentLength()))
+	if stream.ContentLength > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(stream.ContentLength, 10))
 	}
 
-	if _, err := io.Copy(w, stream); err != nil {
+	if _, err := io.Copy(w, stream.Body); err != nil {
 		c.logger.WithContextFields(r.Context()).Errorf("failed to copy object stream for key %s: %v", key, err)
 	}
 }

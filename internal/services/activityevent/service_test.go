@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -43,22 +44,22 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 func TestGetActivityEvents(t *testing.T) {
 
 	type testCase struct {
-		name                    string
-		caller                  string
-		allowAllNamespacePolicy bool
+		name      string
+		caller    string
+		adminMode bool
 	}
 
 	// Test cases
 	testCases := []testCase{
 		{
-			name:                    "verify membership filter is set when the namespace access policy does allow all namespaces",
-			caller:                  "user",
-			allowAllNamespacePolicy: true,
+			name:      "admin mode activated means no root namespace membership filter is applied",
+			caller:    "user",
+			adminMode: true,
 		},
 		{
-			name:                    "verify membership filter is not when the namespace access policy does not allow all namespaces",
-			caller:                  "serviceAccount",
-			allowAllNamespacePolicy: false,
+			name:      "non-admin caller restricts results to root namespace memberships",
+			caller:    "serviceAccount",
+			adminMode: false,
 		},
 	}
 
@@ -77,12 +78,24 @@ func TestGetActivityEvents(t *testing.T) {
 			var testCaller auth.Caller
 			switch test.caller {
 			case "user":
+				adminModeExpiration := time.Now().UTC().Add(time.Hour)
+
+				mockUsers := db.MockUsers{}
+				mockUsers.Test(t)
+				mockUsers.On("GetUserByID", mock.Anything, "123").Return(&models.User{
+					Metadata:            models.ResourceMetadata{ID: "123"},
+					Admin:               test.adminMode,
+					AdminModeExpiration: &adminModeExpiration,
+					Username:            "user1",
+				}, nil)
+				dbClient.Client.Users = &mockUsers
+
 				testCaller = auth.NewUserCaller(
 					&models.User{
 						Metadata: models.ResourceMetadata{
 							ID: "123",
 						},
-						Admin:    test.allowAllNamespacePolicy,
+						Admin:    test.adminMode,
 						Username: "user1",
 					},
 					&mockAuthorizer,
@@ -121,10 +134,12 @@ func TestGetActivityEvents(t *testing.T) {
 			}, actualOutput)
 
 			dbClient.MockActivityEvents.AssertCalled(t, "GetActivityEvents", mock.Anything, mock.MatchedBy(func(input *db.GetActivityEventsInput) bool {
-				if !test.allowAllNamespacePolicy {
-					return input.Filter.NamespaceMembershipRequirement != nil
+				if test.adminMode {
+					// Admin sees all: a nil slice means no membership filter.
+					return input.Filter.RootNamespaceMemberships == nil
 				}
-				return true
+				// Non-admin: a non-nil (possibly empty) slice restricts results.
+				return input.Filter.RootNamespaceMemberships != nil
 			}))
 		})
 	}

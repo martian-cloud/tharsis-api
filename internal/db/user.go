@@ -152,7 +152,7 @@ func (u *users) GetUserByExternalID(ctx context.Context, issuer string, external
 		InnerJoin(goqu.T("user_external_identities"), goqu.On(goqu.Ex{"users.id": goqu.I("user_external_identities.user_id")})).
 		Where(goqu.Ex{"user_external_identities.external_id": externalID, "user_external_identities.issuer": issuer})
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("user.GetUserByExternalID", query)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -177,7 +177,7 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("user_external_identities").
+	sql, args, err := toSQLWithTag("user.LinkUserWithExternalID", dialect.Insert("user_external_identities").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":          newResourceID(),
@@ -187,7 +187,7 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 			"issuer":      issuer,
 			"external_id": externalID,
 			"user_id":     userID,
-		}).ToSQL()
+		}))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -214,12 +214,12 @@ func (u *users) UnlinkUserExternalID(ctx context.Context, issuer string, externa
 	ctx, span := tracer.Start(ctx, "db.UnlinkUserExternalID")
 	defer span.End()
 
-	sql, args, err := dialect.Delete("user_external_identities").
+	sql, args, err := toSQLWithTag("user.UnlinkUserExternalID", dialect.Delete("user_external_identities").
 		Prepared(true).
 		Where(goqu.Ex{
 			"issuer":      issuer,
 			"external_id": externalID,
-		}).ToSQL()
+		}))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -282,6 +282,7 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "users", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("user.GetUsers"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -328,7 +329,7 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("users").
+	sql, args, err := toSQLWithTag("user.UpdateUser", dialect.Update("users").
 		Prepared(true).
 		Set(
 			goqu.Record{
@@ -342,7 +343,7 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 				"password_hash":         user.PasswordHash,
 				"admin_mode_expiration": user.AdminModeExpiration,
 			},
-		).Where(goqu.Ex{"id": user.Metadata.ID, "version": user.Metadata.Version}).Returning(userFieldList...).ToSQL()
+		).Where(goqu.Ex{"id": user.Metadata.ID, "version": user.Metadata.Version}).Returning(userFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -374,7 +375,7 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("users").
+	sql, args, err := toSQLWithTag("user.CreateUser", dialect.Insert("users").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":                    newResourceID(),
@@ -389,7 +390,7 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 			"password_hash":         user.PasswordHash,
 			"admin_mode_expiration": user.AdminModeExpiration,
 		}).
-		Returning(userFieldList...).ToSQL()
+		Returning(userFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -419,14 +420,14 @@ func (u *users) DeleteUser(ctx context.Context, user *models.User) error {
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("users").
+	sql, args, err := toSQLWithTag("user.DeleteUser", dialect.Delete("users").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"id":      user.Metadata.ID,
 				"version": user.Metadata.Version,
 			},
-		).Returning(userFieldList...).ToSQL()
+		).Returning(userFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -454,7 +455,7 @@ func (u *users) getUser(ctx context.Context, exp goqu.Ex) (*models.User, error) 
 		Select(userFieldList...).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("user.getUser", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

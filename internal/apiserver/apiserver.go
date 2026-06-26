@@ -520,7 +520,7 @@ func (api *APIServer) Shutdown(ctx context.Context) {
 		api.logger.Info("HTTP server shutdown successfully")
 
 		// Shutdown gRPC server.
-		api.grpcServer.Shutdown()
+		api.grpcServer.Shutdown(ctx)
 
 		// Shutdown trace provider.
 		if err := api.traceShutdown(ctx); err != nil {

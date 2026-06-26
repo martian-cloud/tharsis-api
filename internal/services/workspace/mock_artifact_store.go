@@ -71,7 +71,7 @@ func (_m *MockArtifactStore) DownloadStateVersion(ctx context.Context, stateVers
 }
 
 // GetConfigurationVersion provides a mock function with given fields: ctx, configurationVersion
-func (_m *MockArtifactStore) GetConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion) (io.ReadCloser, error) {
+func (_m *MockArtifactStore) GetConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion) (io.ReadCloser, int64, error) {
 	ret := _m.Called(ctx, configurationVersion)
 
 	if len(ret) == 0 {
@@ -79,8 +79,9 @@ func (_m *MockArtifactStore) GetConfigurationVersion(ctx context.Context, config
 	}
 
 	var r0 io.ReadCloser
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.ConfigurationVersion) (io.ReadCloser, error)); ok {
+	var r1 int64
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.ConfigurationVersion) (io.ReadCloser, int64, error)); ok {
 		return rf(ctx, configurationVersion)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, *models.ConfigurationVersion) io.ReadCloser); ok {
@@ -91,13 +92,19 @@ func (_m *MockArtifactStore) GetConfigurationVersion(ctx context.Context, config
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.ConfigurationVersion) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *models.ConfigurationVersion) int64); ok {
 		r1 = rf(ctx, configurationVersion)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(int64)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, *models.ConfigurationVersion) error); ok {
+		r2 = rf(ctx, configurationVersion)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetPlanCache provides a mock function with given fields: ctx, run

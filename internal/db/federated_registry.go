@@ -157,6 +157,7 @@ func (p *federatedRegistries) GetFederatedRegistries(ctx context.Context,
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "federated_registries", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("federated_registry.GetFederatedRegistries"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -202,7 +203,7 @@ func (p *federatedRegistries) CreateFederatedRegistry(ctx context.Context, input
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("federated_registries").
+	sql, args, err := toSQLWithTag("federated_registry.CreateFederatedRegistry", dialect.From("federated_registries").
 		Prepared(true).
 		With("federated_registries",
 			dialect.Insert("federated_registries").
@@ -217,8 +218,7 @@ func (p *federatedRegistries) CreateFederatedRegistry(ctx context.Context, input
 					"created_by": input.CreatedBy,
 				}).Returning("*"),
 		).Select(p.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -251,7 +251,7 @@ func (p *federatedRegistries) UpdateFederatedRegistry(ctx context.Context,
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("federated_registries").
+	sql, args, err := toSQLWithTag("federated_registry.UpdateFederatedRegistry", dialect.From("federated_registries").
 		Prepared(true).
 		With("federated_registries",
 			dialect.Update("federated_registries").
@@ -265,8 +265,7 @@ func (p *federatedRegistries) UpdateFederatedRegistry(ctx context.Context,
 				).Where(goqu.Ex{"id": federatedRegistry.Metadata.ID, "version": federatedRegistry.Metadata.Version}).
 				Returning("*"),
 		).Select(p.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -298,7 +297,7 @@ func (p *federatedRegistries) DeleteFederatedRegistry(ctx context.Context, input
 	ctx, span := tracer.Start(ctx, "db.DeleteFederatedRegistry")
 	defer span.End()
 
-	sql, args, err := dialect.From("federated_registries").
+	sql, args, err := toSQLWithTag("federated_registry.DeleteFederatedRegistry", dialect.From("federated_registries").
 		Prepared(true).
 		With("federated_registries",
 			dialect.Delete("federated_registries").
@@ -309,8 +308,7 @@ func (p *federatedRegistries) DeleteFederatedRegistry(ctx context.Context, input
 					},
 				).Returning("*"),
 		).Select(p.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -340,7 +338,7 @@ func (p *federatedRegistries) getFederatedRegistry(ctx context.Context, exp goqu
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("federated_registry.getFederatedRegistry", query)
 	if err != nil {
 		return nil, err
 	}

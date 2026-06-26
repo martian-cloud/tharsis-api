@@ -24,9 +24,9 @@ func TestUserCaller_IsAdminModeActivated(t *testing.T) {
 	// IsAdminModeActivated re-queries the latest user, so the result tracks the DB, not the
 	// in-memory caller.
 	t.Run("admin mode inactive", func(t *testing.T) {
+		// A non-admin user short-circuits to false without querying the DB.
 		user := &models.User{Metadata: models.ResourceMetadata{ID: "u1"}}
 		mockUsers := db.NewMockUsers(t)
-		mockUsers.On("GetUserByID", mock.Anything, "u1").Return(user, nil)
 		caller := UserCaller{User: user, dbClient: &db.Client{Users: mockUsers}}
 		assert.False(t, caller.IsAdminModeActivated(t.Context()))
 	})
@@ -41,41 +41,19 @@ func TestUserCaller_IsAdminModeActivated(t *testing.T) {
 	})
 }
 
-func TestUserCaller_GetNamespaceAccessPolicy(t *testing.T) {
+func TestUserCaller_GetRootNamespaceMemberships(t *testing.T) {
 	caller := UserCaller{User: &models.User{}}
 	ctx := WithCaller(context.Background(), &caller)
 
-	// Admin case with admin mode active.
-	caller.User.Admin = true
-	expiration := time.Now().Add(time.Hour)
-	caller.User.AdminModeExpiration = &expiration
-	policy, err := caller.GetNamespaceAccessPolicy(ctx)
-	assert.Nil(t, err)
-	assert.Equal(t, &NamespaceAccessPolicy{AllowAll: true}, policy)
-
-	// Admin without admin mode — should NOT get AllowAll.
-	caller.User.Admin = true
-	caller.User.AdminModeExpiration = nil
-	mockAuthorizer2 := NewMockAuthorizer(t)
-	mockAuthorizer2.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{{ID: "nm-2"}}, nil)
-	caller.authorizer = mockAuthorizer2
-
-	policy, err = caller.GetNamespaceAccessPolicy(ctx)
-	assert.Nil(t, err)
-	assert.Equal(t, &NamespaceAccessPolicy{AllowAll: false, RootNamespaceIDs: []string{"nm-2"}}, policy)
-
-	// Non-admin case.
-	caller.User.Admin = false
-	caller.User.AdminModeExpiration = nil
-	membershipNamespaceID := "nm-1"
+	expectedNamespaces := []models.MembershipNamespace{{ID: "nm-1"}}
 
 	mockAuthorizer := NewMockAuthorizer(t)
-	mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{{ID: membershipNamespaceID}}, nil)
+	mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return(expectedNamespaces, nil)
 	caller.authorizer = mockAuthorizer
 
-	policy, err = caller.GetNamespaceAccessPolicy(ctx)
+	namespaces, err := caller.GetRootNamespaceMemberships(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, &NamespaceAccessPolicy{AllowAll: false, RootNamespaceIDs: []string{membershipNamespaceID}}, policy)
+	assert.Equal(t, expectedNamespaces, namespaces)
 }
 
 func TestUserCaller_RequirePermissions(t *testing.T) {

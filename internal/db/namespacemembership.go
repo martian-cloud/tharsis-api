@@ -176,15 +176,14 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 		record["team_id"] = input.TeamID
 	}
 
-	sql, args, err := dialect.From("namespace_memberships").
+	sql, args, err := toSQLWithTag("namespacemembership.CreateNamespaceMembership", dialect.From("namespace_memberships").
 		Prepared(true).
 		With("namespace_memberships",
 			dialect.Insert("namespace_memberships").
 				Rows(record).
 				Returning("*"),
 		).Select(m.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -233,7 +232,7 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("namespace_memberships").
+	sql, args, err := toSQLWithTag("namespacemembership.UpdateNamespaceMembership", dialect.From("namespace_memberships").
 		Prepared(true).
 		With("namespace_memberships",
 			dialect.Update("namespace_memberships").
@@ -248,8 +247,7 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 				}).
 				Returning("*"),
 		).Select(m.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -286,7 +284,7 @@ func (m *namespaceMemberships) DeleteNamespaceMembership(ctx context.Context, na
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("namespace_memberships").
+	sql, args, err := toSQLWithTag("namespacemembership.DeleteNamespaceMembership", dialect.From("namespace_memberships").
 		Prepared(true).
 		With("namespace_memberships",
 			dialect.Delete("namespace_memberships").
@@ -296,8 +294,7 @@ func (m *namespaceMemberships) DeleteNamespaceMembership(ctx context.Context, na
 				}).
 				Returning("*"),
 		).Select(m.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -369,7 +366,7 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 		if input.Filter.NamespacePathPrefix != nil {
 			ex = ex.Append(goqu.Or(
 				goqu.I("namespaces.path").Eq(*input.Filter.NamespacePathPrefix),
-				goqu.I("namespaces.path").Like(*input.Filter.NamespacePathPrefix+"/%"),
+				goqu.I("namespaces.path").Like(escapeLikePattern(*input.Filter.NamespacePathPrefix)+"/%"),
 			))
 		}
 
@@ -398,6 +395,7 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "namespace_memberships", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("namespacemembership.GetNamespaceMemberships"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -441,12 +439,11 @@ func (m *namespaceMemberships) getNamespaceMembership(ctx context.Context, ex go
 	ctx, span := tracer.Start(ctx, "db.getNamespaceMembership")
 	defer span.End()
 
-	sql, args, err := dialect.From("namespace_memberships").
+	sql, args, err := toSQLWithTag("namespacemembership.getNamespaceMembership", dialect.From("namespace_memberships").
 		Prepared(true).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
 		Select(m.getSelectFields()...).
-		Where(ex).
-		ToSQL()
+		Where(ex))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -527,39 +524,41 @@ func scanNamespaceMembership(row scanner) (*models.NamespaceMembership, error) {
 	return namespaceMembership, nil
 }
 
-type namespaceMembershipExpressionBuilder struct {
-	userID           *string
-	serviceAccountID *string
-}
-
-func (n namespaceMembershipExpressionBuilder) build() exp.Expression {
-	var whereEx exp.Expression
-
-	if n.userID != nil {
-		// If dealing with a user ID, must also check team member relationships.
-		whereEx = goqu.Or().
-			Append(goqu.I("namespace_memberships.user_id").Eq(*n.userID)).
-			Append(
-				goqu.I("namespace_memberships.team_id").In(
-					dialect.From("team_members").
-						Select("team_id").
-						Where(goqu.I("team_members.user_id").Eq(*n.userID))))
-	} else {
-		whereEx = goqu.I("namespace_memberships.service_account_id").Eq(*n.serviceAccountID)
+// membershipFilterByRootNamespaces builds a predicate matching namespaces whose path is one of
+// the caller's root member namespace paths, or a descendant of one. The caller resolves the
+// roots (deduplicated, team-aware) via caller.GetRootNamespaceMemberships, so this is a simple,
+// index-usable path filter rather than the old LIKE ANY(subquery) that could not use an index.
+//
+// Each root yields `namespaces.path = p` (served by the unique index on path) OR
+// `namespaces.path LIKE p || '/%'` (served by the namespaces(path varchar_pattern_ops) index).
+// An empty set matches nothing — IMPORTANT: it must return a literal false, never an absent
+// predicate, otherwise the caller would see all rows.
+func membershipFilterByRootNamespaces(rootNamespaces []models.MembershipNamespace) exp.Expression {
+	if len(rootNamespaces) == 0 {
+		return goqu.L("false")
 	}
 
-	return goqu.Or(
-		goqu.I("namespaces.path").In(
-			dialect.From("namespace_memberships").
-				Select(goqu.L("path")).
-				InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
-				Where(whereEx),
-		),
-		goqu.I("namespaces.path").Like(goqu.Any(
-			dialect.From("namespace_memberships").
-				Select(goqu.L("path || '/%'")).
-				InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
-				Where(whereEx),
-		)),
-	)
+	ors := make([]exp.Expression, 0, len(rootNamespaces)*2)
+	for _, ns := range rootNamespaces {
+		ors = append(ors,
+			goqu.I("namespaces.path").Eq(ns.Path),
+			goqu.I("namespaces.path").Like(escapeLikePattern(ns.Path)+"/%"),
+		)
+	}
+
+	return goqu.Or(ors...)
+}
+
+// escapeLikePattern escapes the LIKE metacharacters in s so it can be used as a
+// literal prefix in a LIKE pattern. Namespace path segments may contain '_'
+// (a LIKE single-char wildcard), so an unescaped prefix like "team_a/%" would
+// also match sibling trees such as "teamXa/...". PostgreSQL's LIKE treats '\' as
+// the default escape character, so escaping '\', '%' and '_' makes the prefix
+// match literally. The trailing "/%" the caller appends is intentionally left as
+// a wildcard.
+func escapeLikePattern(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
 }
