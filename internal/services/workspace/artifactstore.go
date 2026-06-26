@@ -16,7 +16,7 @@ import (
 type ArtifactStore interface {
 	DownloadConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion, writer io.WriterAt) error
 	UploadConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion, body io.Reader) error
-	GetConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion) (io.ReadCloser, error)
+	GetConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion) (io.ReadCloser, int64, error)
 	DownloadStateVersion(ctx context.Context, stateVersion *models.StateVersion, writer io.WriterAt) error
 	GetStateVersion(ctx context.Context, stateVersion *models.StateVersion) (io.ReadCloser, error)
 	UploadStateVersion(ctx context.Context, stateVersion *models.StateVersion, body io.Reader) error
@@ -72,20 +72,28 @@ func (a *artifactStore) DownloadStateVersion(ctx context.Context, stateVersion *
 	)
 }
 
-func (a *artifactStore) GetConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion) (io.ReadCloser, error) {
-	return a.objectStore.GetObjectStream(
+func (a *artifactStore) GetConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion) (io.ReadCloser, int64, error) {
+	result, err := a.objectStore.GetObjectStream(
 		ctx,
 		getConfigurationVersionObjectKey(configurationVersion),
 		nil,
 	)
+	if err != nil {
+		return nil, 0, err
+	}
+	return result.Body, result.ContentLength, nil
 }
 
 func (a *artifactStore) GetStateVersion(ctx context.Context, stateVersion *models.StateVersion) (io.ReadCloser, error) {
-	return a.objectStore.GetObjectStream(
+	result, err := a.objectStore.GetObjectStream(
 		ctx,
 		getStateVersionObjectKey(stateVersion),
 		nil,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return result.Body, nil
 }
 
 func (a *artifactStore) UploadPlanJSON(ctx context.Context, run *models.Run, body io.Reader) error {
@@ -97,11 +105,15 @@ func (a *artifactStore) UploadPlanJSON(ctx context.Context, run *models.Run, bod
 }
 
 func (a *artifactStore) GetPlanJSON(ctx context.Context, run *models.Run) (io.ReadCloser, error) {
-	return a.objectStore.GetObjectStream(
+	result, err := a.objectStore.GetObjectStream(
 		ctx,
 		getPlanJSONObjectKey(run),
 		nil,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return result.Body, nil
 }
 
 func (a *artifactStore) UploadPlanDiff(ctx context.Context, run *models.Run, body io.Reader) error {
@@ -113,11 +125,15 @@ func (a *artifactStore) UploadPlanDiff(ctx context.Context, run *models.Run, bod
 }
 
 func (a *artifactStore) GetPlanDiff(ctx context.Context, run *models.Run) (io.ReadCloser, error) {
-	return a.objectStore.GetObjectStream(
+	result, err := a.objectStore.GetObjectStream(
 		ctx,
 		getPlanDiffObjectKey(run),
 		nil,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return result.Body, nil
 }
 
 func (a *artifactStore) UploadPlanCache(ctx context.Context, run *models.Run, body io.Reader) error {
@@ -137,11 +153,15 @@ func (a *artifactStore) DownloadPlanCache(ctx context.Context, run *models.Run, 
 }
 
 func (a *artifactStore) GetPlanCache(ctx context.Context, run *models.Run) (io.ReadCloser, error) {
-	return a.objectStore.GetObjectStream(
+	result, err := a.objectStore.GetObjectStream(
 		ctx,
 		getPlanCacheObjectKey(run),
 		nil,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return result.Body, nil
 }
 
 func (a *artifactStore) UploadRunVariables(ctx context.Context, run *models.Run, body io.Reader) error {
@@ -153,11 +173,15 @@ func (a *artifactStore) UploadRunVariables(ctx context.Context, run *models.Run,
 }
 
 func (a *artifactStore) GetRunVariables(ctx context.Context, run *models.Run) (io.ReadCloser, error) {
-	return a.objectStore.GetObjectStream(
+	result, err := a.objectStore.GetObjectStream(
 		ctx,
 		getRunVariablesObjectKey(run),
 		nil,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return result.Body, nil
 }
 
 func (a *artifactStore) upload(ctx context.Context, key string, body io.Reader) error {

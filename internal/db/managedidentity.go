@@ -218,6 +218,7 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "managed_identity_rules", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("managedidentity.GetManagedIdentityAccessRules"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -344,7 +345,7 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 	}
 
 	// Create rule
-	sql, args, err := dialect.From("managed_identity_rules").
+	sql, args, err := toSQLWithTag("managedidentity.CreateManagedIdentityAccessRule", dialect.From("managed_identity_rules").
 		Prepared(true).
 		With("managed_identity_rules",
 			dialect.Insert("managed_identity_rules").
@@ -362,8 +363,7 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 				Returning("*"),
 		).Select(m.getManagedIdentityRuleSelectFields()...).
 		InnerJoin(goqu.T("managed_identities"), goqu.On(goqu.Ex{"managed_identity_rules.managed_identity_id": goqu.I("managed_identities.id")})).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -383,13 +383,13 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 
 	// Create allowed users
 	for _, userID := range rule.AllowedUserIDs {
-		sql, args, err := dialect.Insert("managed_identity_rule_allowed_users").
+		sql, args, err := toSQLWithTag("managedidentity.CreateManagedIdentityAccessRule", dialect.Insert("managed_identity_rule_allowed_users").
 			Prepared(true).
 			Rows(goqu.Record{
 				"id":      newResourceID(),
 				"rule_id": createdRule.Metadata.ID,
 				"user_id": userID,
-			}).ToSQL()
+			}))
 		if err != nil {
 			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
@@ -403,13 +403,13 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 
 	// Create allowed service accounts
 	for _, serviceAccountID := range rule.AllowedServiceAccountIDs {
-		sql, args, err := dialect.Insert("managed_identity_rule_allowed_service_accounts").
+		sql, args, err := toSQLWithTag("managedidentity.CreateManagedIdentityAccessRule", dialect.Insert("managed_identity_rule_allowed_service_accounts").
 			Prepared(true).
 			Rows(goqu.Record{
 				"id":                 newResourceID(),
 				"rule_id":            createdRule.Metadata.ID,
 				"service_account_id": serviceAccountID,
-			}).ToSQL()
+			}))
 		if err != nil {
 			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
@@ -423,13 +423,13 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 
 	// Create allowed teams
 	for _, teamID := range rule.AllowedTeamIDs {
-		sql, args, err := dialect.Insert("managed_identity_rule_allowed_teams").
+		sql, args, err := toSQLWithTag("managedidentity.CreateManagedIdentityAccessRule", dialect.Insert("managed_identity_rule_allowed_teams").
 			Prepared(true).
 			Rows(goqu.Record{
 				"id":      newResourceID(),
 				"rule_id": createdRule.Metadata.ID,
 				"team_id": teamID,
-			}).ToSQL()
+			}))
 		if err != nil {
 			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
@@ -483,7 +483,7 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 		}
 	}
 
-	sql, args, err := dialect.From("managed_identity_rules").
+	sql, args, err := toSQLWithTag("managedidentity.UpdateManagedIdentityAccessRule", dialect.From("managed_identity_rules").
 		Prepared(true).
 		With("managed_identity_rules",
 			dialect.Update("managed_identity_rules").
@@ -499,8 +499,7 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				Returning("*"),
 		).Select(m.getManagedIdentityRuleSelectFields()...).
 		InnerJoin(goqu.T("managed_identities"), goqu.On(goqu.Ex{"managed_identity_rules.managed_identity_id": goqu.I("managed_identities.id")})).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -523,13 +522,13 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 	}
 
 	// Delete allowed users
-	deleteAllowedUsersSQL, args, err := dialect.Delete("managed_identity_rule_allowed_users").
+	deleteAllowedUsersSQL, args, err := toSQLWithTag("managedidentity.UpdateManagedIdentityAccessRule", dialect.Delete("managed_identity_rule_allowed_users").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"rule_id": rule.Metadata.ID,
 			},
-		).ToSQL()
+		))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -541,13 +540,13 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 	}
 
 	// Delete allowed service accounts
-	deleteAllowedServiceAccountsSQL, args, err := dialect.Delete("managed_identity_rule_allowed_service_accounts").
+	deleteAllowedServiceAccountsSQL, args, err := toSQLWithTag("managedidentity.UpdateManagedIdentityAccessRule", dialect.Delete("managed_identity_rule_allowed_service_accounts").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"rule_id": rule.Metadata.ID,
 			},
-		).ToSQL()
+		))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -559,13 +558,13 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 	}
 
 	// Delete allowed teams
-	deleteAllowedTeamsSQL, args, err := dialect.Delete("managed_identity_rule_allowed_teams").
+	deleteAllowedTeamsSQL, args, err := toSQLWithTag("managedidentity.UpdateManagedIdentityAccessRule", dialect.Delete("managed_identity_rule_allowed_teams").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"rule_id": rule.Metadata.ID,
 			},
-		).ToSQL()
+		))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -578,13 +577,13 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 
 	// Create allowed users
 	for _, userID := range rule.AllowedUserIDs {
-		sql, args, err := dialect.Insert("managed_identity_rule_allowed_users").
+		sql, args, err := toSQLWithTag("managedidentity.UpdateManagedIdentityAccessRule", dialect.Insert("managed_identity_rule_allowed_users").
 			Prepared(true).
 			Rows(goqu.Record{
 				"id":      newResourceID(),
 				"rule_id": rule.Metadata.ID,
 				"user_id": userID,
-			}).ToSQL()
+			}))
 		if err != nil {
 			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
@@ -598,13 +597,13 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 
 	// Create allowed service accounts
 	for _, serviceAccountID := range rule.AllowedServiceAccountIDs {
-		sql, args, err := dialect.Insert("managed_identity_rule_allowed_service_accounts").
+		sql, args, err := toSQLWithTag("managedidentity.UpdateManagedIdentityAccessRule", dialect.Insert("managed_identity_rule_allowed_service_accounts").
 			Prepared(true).
 			Rows(goqu.Record{
 				"id":                 newResourceID(),
 				"rule_id":            rule.Metadata.ID,
 				"service_account_id": serviceAccountID,
-			}).ToSQL()
+			}))
 		if err != nil {
 			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
@@ -618,13 +617,13 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 
 	// Create allowed teams
 	for _, teamID := range rule.AllowedTeamIDs {
-		sql, args, err := dialect.Insert("managed_identity_rule_allowed_teams").
+		sql, args, err := toSQLWithTag("managedidentity.UpdateManagedIdentityAccessRule", dialect.Insert("managed_identity_rule_allowed_teams").
 			Prepared(true).
 			Rows(goqu.Record{
 				"id":      newResourceID(),
 				"rule_id": rule.Metadata.ID,
 				"team_id": teamID,
-			}).ToSQL()
+			}))
 		if err != nil {
 			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
@@ -653,7 +652,7 @@ func (m *managedIdentities) DeleteManagedIdentityAccessRule(ctx context.Context,
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("managed_identity_rules").
+	sql, args, err := toSQLWithTag("managedidentity.DeleteManagedIdentityAccessRule", dialect.From("managed_identity_rules").
 		Prepared(true).
 		With("managed_identity_rules",
 			dialect.Delete("managed_identity_rules").
@@ -665,8 +664,7 @@ func (m *managedIdentities) DeleteManagedIdentityAccessRule(ctx context.Context,
 				).Returning("*"),
 		).Select(m.getManagedIdentityRuleSelectFields()...).
 		InnerJoin(goqu.T("managed_identities"), goqu.On(goqu.Ex{"managed_identity_rules.managed_identity_id": goqu.I("managed_identities.id")})).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -690,13 +688,13 @@ func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From(t1).
+	sql, args, err := toSQLWithTag("managedidentity.GetManagedIdentitiesForWorkspace", dialect.From(t1).
 		Prepared(true).
 		Select(m.getManagedIdentitySelectFields(true)...).
 		InnerJoin(goqu.T("workspace_managed_identity_relation"), goqu.On(goqu.Ex{"t1.id": goqu.I("workspace_managed_identity_relation.managed_identity_id")})).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
-		Where(goqu.Ex{"workspace_managed_identity_relation.workspace_id": workspaceID}).ToSQL()
+		Where(goqu.Ex{"workspace_managed_identity_relation.workspace_id": workspaceID}))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -730,12 +728,12 @@ func (m *managedIdentities) AddManagedIdentityToWorkspace(ctx context.Context, m
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Insert("workspace_managed_identity_relation").
+	sql, args, err := toSQLWithTag("managedidentity.AddManagedIdentityToWorkspace", dialect.Insert("workspace_managed_identity_relation").
 		Prepared(true).
 		Rows(goqu.Record{
 			"managed_identity_id": managedIdentityID,
 			"workspace_id":        workspaceID,
-		}).ToSQL()
+		}))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -760,14 +758,14 @@ func (m *managedIdentities) RemoveManagedIdentityFromWorkspace(ctx context.Conte
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("workspace_managed_identity_relation").
+	sql, args, err := toSQLWithTag("managedidentity.RemoveManagedIdentityFromWorkspace", dialect.Delete("workspace_managed_identity_relation").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"managed_identity_id": managedIdentityID,
 				"workspace_id":        workspaceID,
 			},
-		).ToSQL()
+		))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -899,6 +897,7 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 		&pagination.FieldDescriptor{Key: "id", Table: "t1", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
 		pagination.WithSortByTransform(sortTransformFunc),
+		pagination.WithQueryTag("managedidentity.GetManagedIdentities"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -961,7 +960,7 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 		}
 	}()
 
-	sql, args, err := dialect.Insert("managed_identities").
+	sql, args, err := toSQLWithTag("managedidentity.CreateManagedIdentity", dialect.Insert("managed_identities").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":              createdID,
@@ -975,7 +974,7 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 			"data":            managedIdentity.Data,
 			"created_by":      managedIdentity.CreatedBy,
 			"alias_source_id": managedIdentity.AliasSourceID,
-		}).ToSQL()
+		}))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -993,13 +992,12 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 	}
 
 	// A separate query allows backfilling empty columns in the alias with that of the source managed identity.
-	sql, args, err = dialect.From(t1).
+	sql, args, err = toSQLWithTag("managedidentity.CreateManagedIdentity", dialect.From(t1).
 		Prepared(true).
 		Select(m.getManagedIdentitySelectFields(true)...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
-		Where(goqu.Ex{"t1.id": createdID}).
-		ToSQL()
+		Where(goqu.Ex{"t1.id": createdID}))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -1030,7 +1028,7 @@ func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context,
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From(t1).
+	sql, args, err := toSQLWithTag("managedidentity.UpdateManagedIdentity", dialect.From(t1).
 		Prepared(true).
 		With("managed_identities",
 			dialect.Update("managed_identities").
@@ -1045,8 +1043,7 @@ func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context,
 				).Where(goqu.Ex{"id": managedIdentity.Metadata.ID, "version": managedIdentity.Metadata.Version}).
 				Returning("*"),
 		).Select(m.getManagedIdentitySelectFields(false)...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -1070,7 +1067,7 @@ func (m *managedIdentities) DeleteManagedIdentity(ctx context.Context, managedId
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From(t1).
+	sql, args, err := toSQLWithTag("managedidentity.DeleteManagedIdentity", dialect.From(t1).
 		Prepared(true).
 		With("managed_identities",
 			dialect.Delete("managed_identities").
@@ -1081,8 +1078,7 @@ func (m *managedIdentities) DeleteManagedIdentity(ctx context.Context, managedId
 					},
 				).Returning("*"),
 		).Select(m.getManagedIdentitySelectFields(false)...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -1138,13 +1134,12 @@ func (m *managedIdentities) getManagedIdentity(ctx context.Context, ex goqu.Ex) 
 	ctx, span := tracer.Start(ctx, "db.getManagedIdentity")
 	defer span.End()
 
-	sql, args, err := dialect.From(t1).
+	sql, args, err := toSQLWithTag("managedidentity.getManagedIdentity", dialect.From(t1).
 		Prepared(true).
 		Select(m.getManagedIdentitySelectFields(true)...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
-		Where(ex).
-		ToSQL()
+		Where(ex))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -1174,12 +1169,12 @@ func (m *managedIdentities) getManagedIdentityAccessRule(ctx context.Context, ex
 
 	conn := m.dbClient.getConnection(ctx)
 
-	sql, args, err := dialect.From("managed_identity_rules").
+	sql, args, err := toSQLWithTag("managedidentity.getManagedIdentityAccessRule", dialect.From("managed_identity_rules").
 		Prepared(true).
 		Select(m.getManagedIdentityRuleSelectFields()...).
 		InnerJoin(goqu.T("managed_identities"), goqu.On(goqu.Ex{"managed_identity_rules.managed_identity_id": goqu.I("managed_identities.id")})).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})).
-		Where(ex).ToSQL()
+		Where(ex))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -1232,10 +1227,10 @@ func (m *managedIdentities) getManagedIdentityAccessRule(ctx context.Context, ex
 }
 
 func (m *managedIdentities) getManagedIdentityAccessRuleAllowedUserIDs(ctx context.Context, conn connection, ruleID string) ([]string, error) {
-	sql, args, err := dialect.From("managed_identity_rule_allowed_users").
+	sql, args, err := toSQLWithTag("managedidentity.getManagedIdentityAccessRuleAllowedUserIDs", dialect.From("managed_identity_rule_allowed_users").
 		Prepared(true).
 		Select("user_id").
-		Where(goqu.Ex{"rule_id": ruleID}).ToSQL()
+		Where(goqu.Ex{"rule_id": ruleID}))
 	if err != nil {
 		return nil, err
 	}
@@ -1263,10 +1258,10 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedUserIDs(ctx conte
 }
 
 func (m *managedIdentities) getManagedIdentityAccessRuleAllowedServiceAccountIDs(ctx context.Context, conn connection, ruleID string) ([]string, error) {
-	sql, args, err := dialect.From("managed_identity_rule_allowed_service_accounts").
+	sql, args, err := toSQLWithTag("managedidentity.getManagedIdentityAccessRuleAllowedServiceAccountIDs", dialect.From("managed_identity_rule_allowed_service_accounts").
 		Prepared(true).
 		Select("service_account_id").
-		Where(goqu.Ex{"rule_id": ruleID}).ToSQL()
+		Where(goqu.Ex{"rule_id": ruleID}))
 	if err != nil {
 		return nil, err
 	}
@@ -1294,10 +1289,10 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedServiceAccountIDs
 }
 
 func (m *managedIdentities) getManagedIdentityAccessRuleAllowedTeamIDs(ctx context.Context, conn connection, ruleID string) ([]string, error) {
-	sql, args, err := dialect.From("managed_identity_rule_allowed_teams").
+	sql, args, err := toSQLWithTag("managedidentity.getManagedIdentityAccessRuleAllowedTeamIDs", dialect.From("managed_identity_rule_allowed_teams").
 		Prepared(true).
 		Select("team_id").
-		Where(goqu.Ex{"rule_id": ruleID}).ToSQL()
+		Where(goqu.Ex{"rule_id": ruleID}))
 	if err != nil {
 		return nil, err
 	}

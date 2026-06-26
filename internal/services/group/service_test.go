@@ -30,6 +30,7 @@ type mockDBClient struct {
 	MockTransactions   *db.MockTransactions
 	MockResourceLimits *db.MockResourceLimits
 	MockGroups         *db.MockGroups
+	MockUsers          *db.MockUsers
 }
 
 func buildDBClientWithMocks(t *testing.T) *mockDBClient {
@@ -42,15 +43,20 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 	mockGroups := db.MockGroups{}
 	mockGroups.Test(t)
 
+	mockUsers := db.MockUsers{}
+	mockUsers.Test(t)
+
 	return &mockDBClient{
 		Client: &db.Client{
 			Transactions:   &mockTransactions,
 			ResourceLimits: &mockResourceLimits,
 			Groups:         &mockGroups,
+			Users:          &mockUsers,
 		},
 		MockTransactions:   &mockTransactions,
 		MockResourceLimits: &mockResourceLimits,
 		MockGroups:         &mockGroups,
+		MockUsers:          &mockUsers,
 	}
 }
 
@@ -411,6 +417,7 @@ func TestCreateNestedGroup(t *testing.T) {
 // This test currently mainly exercises the search feature.
 func TestGetGroups(t *testing.T) {
 	rootNamespaceID := "root-namespace-1"
+	rootNamespacePath := "root-namespace-path"
 	parentGroupID := "this-is-a-fake-parent-group-ID"
 	emptySearch := ""
 	nonEmptySearch := "non-empty-search-string"
@@ -553,7 +560,9 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					UserMemberID: &userMemberID,
+					RootNamespaceMemberships: []models.MembershipNamespace{
+						{ID: rootNamespaceID, Path: rootNamespacePath},
+					},
 				},
 			},
 		},
@@ -565,8 +574,8 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					NamespaceIDs: []string{rootNamespaceID},
-					RootOnly:     false,
+					RootNamespaceMemberships: []models.MembershipNamespace{{ID: rootNamespaceID, Path: rootNamespacePath}},
+					RootOnly:                 true,
 				},
 			},
 		},
@@ -578,8 +587,10 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					UserMemberID: &userMemberID,
-					Search:       &emptySearch,
+					RootNamespaceMemberships: []models.MembershipNamespace{
+						{ID: rootNamespaceID, Path: rootNamespacePath},
+					},
+					Search: &emptySearch,
 				},
 			},
 		},
@@ -592,9 +603,9 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					Search:       &emptySearch,
-					NamespaceIDs: []string{rootNamespaceID},
-					RootOnly:     false,
+					Search:                   &emptySearch,
+					RootNamespaceMemberships: []models.MembershipNamespace{{ID: rootNamespaceID, Path: rootNamespacePath}},
+					RootOnly:                 true,
 				},
 			},
 		},
@@ -606,8 +617,10 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					UserMemberID: &userMemberID,
-					Search:       &nonEmptySearch,
+					RootNamespaceMemberships: []models.MembershipNamespace{
+						{ID: rootNamespaceID, Path: rootNamespacePath},
+					},
+					Search: &nonEmptySearch,
 				},
 			},
 		},
@@ -620,9 +633,9 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					Search:       &nonEmptySearch,
-					NamespaceIDs: []string{rootNamespaceID},
-					RootOnly:     false,
+					Search:                   &nonEmptySearch,
+					RootNamespaceMemberships: []models.MembershipNamespace{{ID: rootNamespaceID, Path: rootNamespacePath}},
+					RootOnly:                 true,
 				},
 			},
 		},
@@ -674,7 +687,9 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					ServiceAccountMemberID: &serviceAccountMemberID,
+					RootNamespaceMemberships: []models.MembershipNamespace{
+						{ID: rootNamespaceID, Path: rootNamespacePath},
+					},
 				},
 			},
 		},
@@ -686,8 +701,8 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					NamespaceIDs: []string{rootNamespaceID},
-					RootOnly:     false,
+					RootNamespaceMemberships: []models.MembershipNamespace{{ID: rootNamespaceID, Path: rootNamespacePath}},
+					RootOnly:                 true,
 				},
 			},
 		},
@@ -699,8 +714,10 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					ServiceAccountMemberID: &serviceAccountMemberID,
-					Search:                 &emptySearch,
+					RootNamespaceMemberships: []models.MembershipNamespace{
+						{ID: rootNamespaceID, Path: rootNamespacePath},
+					},
+					Search: &emptySearch,
 				},
 			},
 		},
@@ -713,9 +730,9 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					Search:       &emptySearch,
-					NamespaceIDs: []string{rootNamespaceID},
-					RootOnly:     false,
+					Search:                   &emptySearch,
+					RootNamespaceMemberships: []models.MembershipNamespace{{ID: rootNamespaceID, Path: rootNamespacePath}},
+					RootOnly:                 true,
 				},
 			},
 		},
@@ -727,8 +744,10 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					ServiceAccountMemberID: &serviceAccountMemberID,
-					Search:                 &nonEmptySearch,
+					RootNamespaceMemberships: []models.MembershipNamespace{
+						{ID: rootNamespaceID, Path: rootNamespacePath},
+					},
+					Search: &nonEmptySearch,
 				},
 			},
 		},
@@ -741,9 +760,9 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					Search:       &nonEmptySearch,
-					NamespaceIDs: []string{rootNamespaceID},
-					RootOnly:     false,
+					Search:                   &nonEmptySearch,
+					RootNamespaceMemberships: []models.MembershipNamespace{{ID: rootNamespaceID, Path: rootNamespacePath}},
+					RootOnly:                 true,
 				},
 			},
 		},
@@ -795,7 +814,9 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					UserMemberID:   &userMemberID,
+					RootNamespaceMemberships: []models.MembershipNamespace{
+						{ID: rootNamespaceID, Path: rootNamespacePath},
+					},
 					FavoriteUserID: &userMemberID,
 				},
 			},
@@ -827,23 +848,27 @@ func TestGetGroups(t *testing.T) {
 			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
 
 			mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{
-				{ID: rootNamespaceID},
-			}, nil)
+				{ID: rootNamespaceID, Path: rootNamespacePath},
+			}, nil).Maybe()
 
 			mockAuthorizer.On("RequireAccess", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			adminUser := &models.User{
+				Metadata: models.ResourceMetadata{
+					ID: userMemberID,
+				},
+				Admin:               true,
+				AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				Username:            "user1",
+			}
 
 			var testCaller auth.Caller
 			switch test.callerType {
 			case "admin":
+				// IsAdminModeActivated re-fetches the user from the DB to verify admin mode.
+				dbClient.MockUsers.On("GetUserByID", mock.Anything, userMemberID).Return(adminUser, nil).Maybe()
 				testCaller = auth.NewUserCaller(
-					&models.User{
-						Metadata: models.ResourceMetadata{
-							ID: userMemberID,
-						},
-						Admin:               true,
-						AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
-						Username:            "user1",
-					},
+					adminUser,
 					&mockAuthorizer,
 					dbClient.Client,
 					mockMaintenanceMonitor,

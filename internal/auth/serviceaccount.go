@@ -64,19 +64,10 @@ func (s *ServiceAccountCaller) UnauthorizedError(_ context.Context, hasViewerAcc
 	)
 }
 
-// GetNamespaceAccessPolicy returns the namespace access policy for this caller
-func (s *ServiceAccountCaller) GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error) {
-	rootNamespaces, err := s.authorizer.GetRootNamespaces(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	ids := []string{}
-	for _, ns := range rootNamespaces {
-		ids = append(ids, ns.ID)
-	}
-
-	return &NamespaceAccessPolicy{AllowAll: false, RootNamespaceIDs: ids}, nil
+// GetRootNamespaceMemberships returns the deduplicated top-most namespaces the service account
+// is a member of. Only meaningful when IsAdminModeActivated is false.
+func (s *ServiceAccountCaller) GetRootNamespaceMemberships(ctx context.Context) ([]models.MembershipNamespace, error) {
+	return s.authorizer.GetRootNamespaces(ctx)
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions

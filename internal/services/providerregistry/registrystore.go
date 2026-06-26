@@ -76,11 +76,15 @@ func (r *registryStore) GetProviderVersionReadme(
 	providerVersion *models.TerraformProviderVersion,
 	provider *models.TerraformProvider,
 ) (io.ReadCloser, error) {
-	return r.objectStore.GetObjectStream(
+	result, err := r.objectStore.GetObjectStream(
 		ctx,
 		getProviderVersionReadmeObjectKey(providerVersion, provider),
 		nil,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return result.Body, nil
 }
 
 func (r *registryStore) UploadProviderPlatformBinary(

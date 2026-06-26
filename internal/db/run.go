@@ -63,15 +63,18 @@ func (sf RunSortableField) getSortDirection() pagination.SortDirection {
 
 // RunFilter contains the supported fields for filtering Run resources
 type RunFilter struct {
-	TimeRangeStart      *time.Time
-	PlanID              *string
-	ApplyID             *string
-	WorkspaceID         *string
-	GroupID             *string
-	UserMemberID        *string
-	RunIDs              []string
-	WorkspaceAssessment *bool
-	IncludeNestedRuns   *bool
+	TimeRangeStart *time.Time
+	PlanID         *string
+	ApplyID        *string
+	WorkspaceID    *string
+	GroupID        *string
+	// RootNamespaceMemberships limits results to runs in workspaces at or under one of the
+	// caller's root member namespace paths. Non-nil empty = no memberships (matches nothing);
+	// nil = no membership filter.
+	RootNamespaceMemberships []models.MembershipNamespace
+	RunIDs                   []string
+	WorkspaceAssessment      *bool
+	IncludeNestedRuns        *bool
 }
 
 // GetRunsInput is the input for listing runs
@@ -254,8 +257,8 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 			}
 		}
 
-		if input.Filter.UserMemberID != nil {
-			ex = ex.Append(namespaceMembershipFilterQuery("namespace_memberships.user_id", *input.Filter.UserMemberID))
+		if input.Filter.RootNamespaceMemberships != nil {
+			ex = ex.Append(membershipFilterByRootNamespaces(input.Filter.RootNamespaceMemberships))
 		}
 
 		if input.Filter.TimeRangeStart != nil {
@@ -282,6 +285,7 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "runs", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("run.GetRuns"),
 	)
 
 	if err != nil {
@@ -336,7 +340,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 		return nil, err
 	}
 
-	sql, args, err := dialect.From("runs").
+	sql, args, err := toSQLWithTag("run.CreateRun", dialect.From("runs").
 		Prepared(true).
 		With("runs",
 			dialect.Insert("runs").
@@ -368,8 +372,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 					"is_assessment_run":         run.IsAssessmentRun,
 				}).Returning("*"),
 		).Select(r.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -394,7 +397,7 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, err
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("runs").
+	sql, args, err := toSQLWithTag("run.UpdateRun", dialect.From("runs").
 		Prepared(true).
 		With("runs",
 			dialect.Update("runs").
@@ -416,8 +419,7 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, err
 				).Where(goqu.Ex{"id": run.Metadata.ID, "version": run.Metadata.Version}).
 				Returning("*"),
 		).Select(r.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -442,12 +444,11 @@ func (r *runs) getRun(ctx context.Context, ex goqu.Ex) (*models.Run, error) {
 	ctx, span := tracer.Start(ctx, "db.getRun")
 	defer span.End()
 
-	sql, args, err := dialect.From("runs").
+	sql, args, err := toSQLWithTag("run.getRun", dialect.From("runs").
 		Prepared(true).
 		Select(r.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})).
-		Where(ex).
-		ToSQL()
+		Where(ex))
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))

@@ -238,6 +238,7 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 		&pagination.FieldDescriptor{Key: "id", Table: "vcs_providers", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
 		pagination.WithSortByTransform(sortTransformFunc),
+		pagination.WithQueryTag("vcsprovider.GetProviders"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -284,7 +285,7 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("vcs_providers").
+	sql, args, err := toSQLWithTag("vcsprovider.CreateProvider", dialect.From("vcs_providers").
 		Prepared(true).
 		With("vcs_providers",
 			dialect.Insert("vcs_providers").
@@ -308,8 +309,7 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 					"group_id":                      provider.GroupID,
 				}).Returning("*"),
 		).Select(vp.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -343,7 +343,7 @@ func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCS
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("vcs_providers").
+	sql, args, err := toSQLWithTag("vcsprovider.UpdateProvider", dialect.From("vcs_providers").
 		Prepared(true).
 		With("vcs_providers",
 			dialect.Update("vcs_providers").
@@ -362,8 +362,7 @@ func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCS
 				).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).
 				Returning("*"),
 		).Select(vp.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -387,7 +386,7 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("vcs_providers").
+	sql, args, err := toSQLWithTag("vcsprovider.DeleteProvider", dialect.From("vcs_providers").
 		Prepared(true).
 		With("vcs_providers",
 			dialect.Delete("vcs_providers").
@@ -398,8 +397,7 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 					},
 				).Returning("*"),
 		).Select(vp.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -430,12 +428,11 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 }
 
 func (vp *vcsProviders) getProvider(ctx context.Context, exp goqu.Ex) (*models.VCSProvider, error) {
-	sql, args, err := dialect.From(goqu.T("vcs_providers")).
+	sql, args, err := toSQLWithTag("vcsprovider.getProvider", dialect.From(goqu.T("vcs_providers")).
 		Prepared(true).
 		Select(vp.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})).
-		Where(exp).
-		ToSQL()
+		Where(exp))
 	if err != nil {
 		return nil, err
 	}

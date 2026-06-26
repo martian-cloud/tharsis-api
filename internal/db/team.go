@@ -168,6 +168,7 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "teams", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("team.GetTeams"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -214,7 +215,7 @@ func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("teams").
+	sql, args, err := toSQLWithTag("team.CreateTeam", dialect.Insert("teams").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":               newResourceID(),
@@ -225,7 +226,7 @@ func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team
 			"description":      team.Description,
 			"scim_external_id": nullableString(team.SCIMExternalID),
 		}).
-		Returning(teamFieldList...).ToSQL()
+		Returning(teamFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -253,7 +254,7 @@ func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("teams").
+	sql, args, err := toSQLWithTag("team.UpdateTeam", dialect.Update("teams").
 		Prepared(true).
 		Set(
 			goqu.Record{
@@ -262,7 +263,7 @@ func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team
 				"description":      team.Description,
 				"scim_external_id": nullableString(team.SCIMExternalID),
 			},
-		).Where(goqu.Ex{"id": team.Metadata.ID, "version": team.Metadata.Version}).Returning(teamFieldList...).ToSQL()
+		).Where(goqu.Ex{"id": team.Metadata.ID, "version": team.Metadata.Version}).Returning(teamFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -286,14 +287,14 @@ func (t *teams) DeleteTeam(ctx context.Context, team *models.Team) error {
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("teams").
+	sql, args, err := toSQLWithTag("team.DeleteTeam", dialect.Delete("teams").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"id":      team.Metadata.ID,
 				"version": team.Metadata.Version,
 			},
-		).Returning(teamFieldList...).ToSQL()
+		).Returning(teamFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -317,7 +318,7 @@ func (t *teams) getTeam(ctx context.Context, exp goqu.Ex) (*models.Team, error) 
 		Select(teamFieldList...).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("team.getTeam", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

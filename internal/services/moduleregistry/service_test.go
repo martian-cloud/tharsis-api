@@ -444,15 +444,15 @@ func TestGetModules(t *testing.T) {
 	groupID := "group-1"
 	// Test cases
 	tests := []struct {
-		input                 *GetModulesInput
-		namespaceAccessPolicy *auth.NamespaceAccessPolicy
-		expectModule          *models.TerraformModule
-		userID                *string
-		serviceAccountID      *string
-		handleCaller          handleCallerFunc
-		name                  string
-		authError             error
-		expectErrCode         errors.CodeType
+		input              *GetModulesInput
+		expectModule       *models.TerraformModule
+		handleCaller       handleCallerFunc
+		name               string
+		authError          error
+		expectErrCode      errors.CodeType
+		rootNamespacePaths []string
+		nonGroupFilter     bool
+		adminMode          bool
 	}{
 		{
 			name: "filter modules by group and allow access",
@@ -490,11 +490,10 @@ func TestGetModules(t *testing.T) {
 			},
 		},
 		{
-			name:  "subject has allow all namespace access policy",
-			input: &GetModulesInput{},
-			namespaceAccessPolicy: &auth.NamespaceAccessPolicy{
-				AllowAll: true,
-			},
+			name:           "subject has admin mode activated",
+			input:          &GetModulesInput{},
+			nonGroupFilter: true,
+			adminMode:      true,
 			expectModule: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{ID: groupID},
 				GroupID:  groupID,
@@ -503,37 +502,27 @@ func TestGetModules(t *testing.T) {
 			},
 		},
 		{
-			name:  "user does not have allow all namespace access policy",
-			input: &GetModulesInput{},
-			namespaceAccessPolicy: &auth.NamespaceAccessPolicy{
-				AllowAll: false,
-			},
+			name:               "subject does not have admin mode activated and has root namespace memberships",
+			input:              &GetModulesInput{},
+			nonGroupFilter:     true,
+			rootNamespacePaths: []string{"group-1", "group-2"},
 			expectModule: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{ID: groupID},
 				GroupID:  groupID,
 				Name:     "test-module",
 				Private:  true,
-			},
-			userID: ptr.String("user-1"),
-			handleCaller: func(ctx context.Context, userHandler func(ctx context.Context, caller *auth.UserCaller) error, _ func(ctx context.Context, caller *auth.ServiceAccountCaller) error) error {
-				return userHandler(ctx, &auth.UserCaller{User: &models.User{Metadata: models.ResourceMetadata{ID: "user-1"}}})
 			},
 		},
 		{
-			name:  "service account does not have allow all namespace access policy",
-			input: &GetModulesInput{},
-			namespaceAccessPolicy: &auth.NamespaceAccessPolicy{
-				AllowAll: false,
-			},
+			name:               "subject does not have admin mode activated and has no root namespace memberships",
+			input:              &GetModulesInput{},
+			nonGroupFilter:     true,
+			rootNamespacePaths: []string{},
 			expectModule: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{ID: groupID},
 				GroupID:  groupID,
 				Name:     "test-module",
 				Private:  true,
-			},
-			serviceAccountID: ptr.String("sa-1"),
-			handleCaller: func(ctx context.Context, _ func(ctx context.Context, caller *auth.UserCaller) error, serviceAccountHandler func(ctx context.Context, caller *auth.ServiceAccountCaller) error) error {
-				return serviceAccountHandler(ctx, &auth.ServiceAccountCaller{ServiceAccountID: "sa-1"})
 			},
 		},
 	}
@@ -548,9 +537,16 @@ func TestGetModules(t *testing.T) {
 				mockCaller.On("RequirePermission", mock.Anything, models.ViewTerraformModulePermission, mock.Anything).Return(test.authError)
 			}
 
-			if test.namespaceAccessPolicy != nil {
-				mockCaller.On("GetNamespaceAccessPolicy", mock.Anything, mock.Anything).
-					Return(test.namespaceAccessPolicy, nil)
+			if test.nonGroupFilter {
+				mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.adminMode)
+
+				if !test.adminMode {
+					rootNamespaces := make([]models.MembershipNamespace, len(test.rootNamespacePaths))
+					for i, p := range test.rootNamespacePaths {
+						rootNamespaces[i] = models.MembershipNamespace{Path: p}
+					}
+					mockCaller.On("GetRootNamespaceMemberships", mock.Anything).Return(rootNamespaces, nil)
+				}
 			}
 
 			mockModules := db.NewMockTerraformModules(t)
@@ -574,12 +570,18 @@ func TestGetModules(t *testing.T) {
 				}).Return(&getModulesResponse, nil)
 			}
 
-			if test.namespaceAccessPolicy != nil {
+			if test.nonGroupFilter {
+				expectedFilter := &db.TerraformModuleFilter{}
+				if !test.adminMode {
+					rootNamespaces := make([]models.MembershipNamespace, len(test.rootNamespacePaths))
+					for i, p := range test.rootNamespacePaths {
+						rootNamespaces[i] = models.MembershipNamespace{Path: p}
+					}
+					expectedFilter.RootNamespaceMemberships = rootNamespaces
+				}
+
 				mockModules.On("GetModules", mock.Anything, &db.GetModulesInput{
-					Filter: &db.TerraformModuleFilter{
-						UserID:           test.userID,
-						ServiceAccountID: test.serviceAccountID,
-					},
+					Filter: expectedFilter,
 				}).Return(&getModulesResponse, nil)
 			}
 

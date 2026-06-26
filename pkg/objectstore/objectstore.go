@@ -13,11 +13,17 @@ type DownloadOptions struct {
 	ContentRange *string
 }
 
+// GetObjectStreamOutput is the result of GetObjectStream.
+type GetObjectStreamOutput struct {
+	Body          io.ReadCloser
+	ContentLength int64
+}
+
 // ObjectStore interface
 type ObjectStore interface {
 	UploadObject(ctx context.Context, key string, body io.Reader) error
 	DownloadObject(ctx context.Context, key string, w io.WriterAt, option *DownloadOptions) error
-	GetObjectStream(ctx context.Context, key string, options *DownloadOptions) (io.ReadCloser, error)
+	GetObjectStream(ctx context.Context, key string, options *DownloadOptions) (*GetObjectStreamOutput, error)
 	GetPresignedURL(ctx context.Context, key string) (string, error)
 	DoesObjectExist(ctx context.Context, key string) (bool, error)
 	VerifyPresignedURL(ctx context.Context, urlStr string) (string, error)

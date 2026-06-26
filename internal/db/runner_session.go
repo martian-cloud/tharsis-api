@@ -166,6 +166,7 @@ func (a *sessions) GetRunnerSessions(ctx context.Context, input *GetRunnerSessio
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "runner_sessions", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("runner_session.GetRunnerSessions"),
 	)
 
 	if err != nil {
@@ -208,7 +209,7 @@ func (a *sessions) CreateRunnerSession(ctx context.Context, session *models.Runn
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("runner_sessions").
+	sql, args, err := toSQLWithTag("runner_session.CreateRunnerSession", dialect.From("runner_sessions").
 		Prepared(true).
 		With("runner_sessions",
 			dialect.Insert("runner_sessions").Rows(
@@ -224,8 +225,7 @@ func (a *sessions) CreateRunnerSession(ctx context.Context, session *models.Runn
 				}).Returning("*"),
 		).Select(a.getSelectFields()...).
 		InnerJoin(goqu.T("runners"), goqu.On(goqu.I("runner_sessions.runner_id").Eq(goqu.I("runners.id")))).
-		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))).
-		ToSQL()
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -249,7 +249,7 @@ func (a *sessions) UpdateRunnerSession(ctx context.Context, session *models.Runn
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("runner_sessions").
+	sql, args, err := toSQLWithTag("runner_session.UpdateRunnerSession", dialect.From("runner_sessions").
 		Prepared(true).
 		With("runner_sessions",
 			dialect.Update("runner_sessions").
@@ -262,8 +262,7 @@ func (a *sessions) UpdateRunnerSession(ctx context.Context, session *models.Runn
 				Returning("*"),
 		).Select(a.getSelectFields()...).
 		InnerJoin(goqu.T("runners"), goqu.On(goqu.I("runner_sessions.runner_id").Eq(goqu.I("runners.id")))).
-		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))).
-		ToSQL()
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -284,7 +283,7 @@ func (a *sessions) DeleteRunnerSession(ctx context.Context, session *models.Runn
 	ctx, span := tracer.Start(ctx, "db.DeleteRunnerSession")
 	defer span.End()
 
-	sql, args, err := dialect.From("runner_sessions").
+	sql, args, err := toSQLWithTag("runner_session.DeleteRunnerSession", dialect.From("runner_sessions").
 		Prepared(true).
 		With("runner_sessions",
 			dialect.Delete("runner_sessions").
@@ -292,8 +291,7 @@ func (a *sessions) DeleteRunnerSession(ctx context.Context, session *models.Runn
 				Returning("*"),
 		).Select(a.getSelectFields()...).
 		InnerJoin(goqu.T("runners"), goqu.On(goqu.I("runner_sessions.runner_id").Eq(goqu.I("runners.id")))).
-		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))).
-		ToSQL()
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))))
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -321,7 +319,7 @@ func (a *sessions) getRunnerSession(ctx context.Context, exp goqu.Ex) (*models.R
 		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("runner_session.getRunnerSession", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

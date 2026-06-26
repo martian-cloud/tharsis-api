@@ -2840,6 +2840,8 @@ func TestGetRuns(t *testing.T) {
 
 			filter := &db.RunFilter{}
 
+			rootNamespacePath := "root-namespace-path"
+
 			switch {
 			case test.input.Workspace != nil:
 				filter.WorkspaceID = ptr.String(test.input.Workspace.Metadata.ID)
@@ -2847,7 +2849,12 @@ func TestGetRuns(t *testing.T) {
 				filter.GroupID = ptr.String(test.input.Group.Metadata.ID)
 			default:
 				if !test.isAdmin {
-					filter.UserMemberID = &userID
+					filter.RootNamespaceMemberships = []models.MembershipNamespace{
+						{ID: "root-namespace-1", Path: rootNamespacePath},
+					}
+					mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{
+						{ID: "root-namespace-1", Path: rootNamespacePath},
+					}, nil).Maybe()
 				}
 			}
 
@@ -3210,6 +3217,7 @@ func TestProcessPlanData(t *testing.T) {
 
 func TestSubscribeToRunEvents(t *testing.T) {
 	userID := "user1"
+	rootNamespacePath := "root-namespace-path"
 
 	// Test cases
 	tests := []struct {
@@ -3220,6 +3228,10 @@ func TestSubscribeToRunEvents(t *testing.T) {
 		runner         *models.Runner
 		sendEventData  []*db.RunEventData
 		expectedEvents []Event
+		// workspacePaths maps an event's workspace ID to the workspace's full path, used to
+		// drive the non-admin root namespace membership access check. When nil, every workspace
+		// resolves to rootNamespacePath (so the membership check passes).
+		workspacePaths map[string]string
 		isAdmin        bool
 		useUserCaller  bool
 		nilUserMember  bool
@@ -3350,6 +3362,38 @@ func TestSubscribeToRunEvents(t *testing.T) {
 			input:         &EventSubscriptionOptions{},
 			expectErrCode: errors.EForbidden,
 		},
+		{
+			name:           "non-admin user only receives runs in workspaces under their root namespace memberships",
+			input:          &EventSubscriptionOptions{},
+			useUserCaller:  true,
+			nilWorkspaceID: true,
+			sendEventData: []*db.RunEventData{
+				// run1's workspace is a descendant of the caller's root namespace, so it is delivered.
+				{
+					ID:          "run1",
+					WorkspaceID: "workspace1",
+				},
+				// run2's workspace is outside the caller's root namespace, so it is filtered out.
+				{
+					ID:          "run2",
+					WorkspaceID: "workspace2",
+				},
+			},
+			workspacePaths: map[string]string{
+				"workspace1": rootNamespacePath + "/child",
+				"workspace2": "other-root/child",
+			},
+			expectedEvents: []Event{
+				{
+					Run: models.Run{
+						Metadata: models.ResourceMetadata{
+							ID: "run1",
+						},
+					},
+					Action: "UPDATE",
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -3360,6 +3404,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockRunners := db.NewMockRunners(t)
 			mockRuns := db.NewMockRuns(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
 			mockEvents := db.NewMockEvents(t)
 			mockUsers := db.NewMockUsers(t)
 
@@ -3378,40 +3423,39 @@ func TestSubscribeToRunEvents(t *testing.T) {
 			for _, d := range test.sendEventData {
 				dCopy := d
 
-				getRunsFilter := &db.RunFilter{
-					WorkspaceID: &dCopy.WorkspaceID,
-					RunIDs:      []string{dCopy.ID},
-				}
-				if test.nilWorkspaceID {
-					getRunsFilter.WorkspaceID = nil
-				}
-				if test.useUserCaller && !test.nilUserMember {
-					getRunsFilter.UserMemberID = &userID
-				}
-				mockRuns.On("GetRuns", mock.Anything, &db.GetRunsInput{
-					PaginationOptions: &pagination.Options{
-						First: ptr.Int32(1),
-					},
-					Filter: getRunsFilter,
-				}).
-					Return(&db.RunsResult{
-						PageInfo: &pagination.PageInfo{
-							TotalCount: pagination.StaticCount(1),
+				mockRuns.On("GetRunByID", mock.Anything, dCopy.ID).
+					Return(&models.Run{
+						Metadata: models.ResourceMetadata{
+							ID: dCopy.ID,
 						},
-						Runs: []models.Run{
-							{
-								Metadata: models.ResourceMetadata{
-									ID: dCopy.ID,
-								},
-							}},
 					}, nil).Maybe()
 			}
 
+			if test.useUserCaller && !test.nilUserMember {
+				// Non-admin user callers verify each run's workspace path against their root
+				// namespace memberships before delivering the event.
+				if test.workspacePaths != nil {
+					for wsID, fullPath := range test.workspacePaths {
+						mockWorkspaces.On("GetWorkspaceByID", mock.Anything, wsID).
+							Return(&models.Workspace{
+								FullPath: fullPath,
+							}, nil).Maybe()
+					}
+				} else {
+					// The workspace path matches the membership path so the access check passes.
+					mockWorkspaces.On("GetWorkspaceByID", mock.Anything, mock.Anything).
+						Return(&models.Workspace{
+							FullPath: rootNamespacePath,
+						}, nil).Maybe()
+				}
+			}
+
 			dbClient := db.Client{
-				Runners: mockRunners,
-				Runs:    mockRuns,
-				Events:  mockEvents,
-				Users:   mockUsers,
+				Runners:    mockRunners,
+				Runs:       mockRuns,
+				Workspaces: mockWorkspaces,
+				Events:     mockEvents,
+				Users:      mockUsers,
 			}
 
 			logger, _ := logger.NewForTest()
@@ -3441,6 +3485,12 @@ func TestSubscribeToRunEvents(t *testing.T) {
 				}
 
 				mockUsers.On("GetUserByID", mock.Anything, callerUser.Metadata.ID).Return(callerUser, nil).Maybe()
+
+				// Non-admin user callers querying without a workspace/group resolve their root
+				// namespace memberships.
+				mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{
+					{ID: "root-namespace-1", Path: rootNamespacePath},
+				}, nil).Maybe()
 
 				useCaller = auth.NewUserCaller(
 					callerUser,
@@ -3494,6 +3544,87 @@ func TestSubscribeToRunEvents(t *testing.T) {
 			for i, e := range test.expectedEvents {
 				assert.Equal(t, e, *receivedEvents[i])
 			}
+		})
+	}
+}
+
+func TestCallerHasRootNamespaceAccess(t *testing.T) {
+	roots := []models.MembershipNamespace{
+		{ID: "ns-1", Path: "group-a"},
+		{ID: "ns-2", Path: "group-b/sub"},
+	}
+
+	tests := []struct {
+		name                     string
+		workspacePath            string
+		rootNamespaceMemberships []models.MembershipNamespace
+		expectAccess             bool
+	}{
+		{
+			name:                     "exact match on a root membership",
+			workspacePath:            "group-a",
+			rootNamespaceMemberships: roots,
+			expectAccess:             true,
+		},
+		{
+			name:                     "immediate descendant of a root membership",
+			workspacePath:            "group-a/workspace",
+			rootNamespaceMemberships: roots,
+			expectAccess:             true,
+		},
+		{
+			name:                     "deeply nested descendant of a root membership",
+			workspacePath:            "group-a/sub/deeper/workspace",
+			rootNamespaceMemberships: roots,
+			expectAccess:             true,
+		},
+		{
+			name:                     "exact match on a nested root membership",
+			workspacePath:            "group-b/sub",
+			rootNamespaceMemberships: roots,
+			expectAccess:             true,
+		},
+		{
+			name:                     "descendant of a nested root membership",
+			workspacePath:            "group-b/sub/workspace",
+			rootNamespaceMemberships: roots,
+			expectAccess:             true,
+		},
+		{
+			name:                     "unrelated path is denied",
+			workspacePath:            "group-c/workspace",
+			rootNamespaceMemberships: roots,
+			expectAccess:             false,
+		},
+		{
+			name:                     "path with a matching prefix but no segment boundary is denied",
+			workspacePath:            "group-a-other",
+			rootNamespaceMemberships: roots,
+			expectAccess:             false,
+		},
+		{
+			name:                     "ancestor of a root membership is denied",
+			workspacePath:            "group-b",
+			rootNamespaceMemberships: roots,
+			expectAccess:             false,
+		},
+		{
+			name:                     "empty memberships deny all access",
+			workspacePath:            "group-a",
+			rootNamespaceMemberships: []models.MembershipNamespace{},
+			expectAccess:             false,
+		},
+		{
+			name:                     "nil memberships deny all access",
+			workspacePath:            "group-a",
+			rootNamespaceMemberships: nil,
+			expectAccess:             false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expectAccess, callerHasRootNamespaceAccess(test.workspacePath, test.rootNamespaceMemberships))
 		})
 	}
 }

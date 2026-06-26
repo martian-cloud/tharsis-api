@@ -176,36 +176,18 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 		}
 		dbInput.Filter.ParentID = input.ParentGroupID
 	} else {
-		// Only return groups that the caller is a member of
-		policy, err := caller.GetNamespaceAccessPolicy(ctx)
-		if err != nil {
-			tracing.RecordError(span, err, "failed to get namespace access policy")
-			return nil, err
-		}
+		// Only return groups that the caller is a member of.
+		dbInput.Filter.RootOnly = input.RootOnly
 
-		if policy.AllowAll {
-			// Policy is set to allow all so no need for additional authorization
-			dbInput.Filter.RootOnly = input.RootOnly
-		} else {
-			if input.RootOnly {
-				// RootOnly is true so filter by root namesapce IDs from the policy
-				dbInput.Filter.NamespaceIDs = policy.RootNamespaceIDs
-			} else {
-				// RootOnly if false so filter by group memberships
-				if err = auth.HandleCaller(
-					ctx,
-					func(_ context.Context, c *auth.UserCaller) error {
-						dbInput.Filter.UserMemberID = &c.User.Metadata.ID
-						return nil
-					},
-					func(_ context.Context, c *auth.ServiceAccountCaller) error {
-						dbInput.Filter.ServiceAccountMemberID = &c.ServiceAccountID
-						return nil
-					},
-				); err != nil {
-					return nil, err
-				}
+		if !caller.IsAdminModeActivated(ctx) {
+			rootNamespaces, err := caller.GetRootNamespaceMemberships(ctx)
+			if err != nil {
+				tracing.RecordError(span, err, "failed to get root namespaces")
+				return nil, err
 			}
+			// The db layer restricts to these memberships: exact root namespaces when RootOnly,
+			// or their descendants otherwise.
+			dbInput.Filter.RootNamespaceMemberships = rootNamespaces
 		}
 	}
 

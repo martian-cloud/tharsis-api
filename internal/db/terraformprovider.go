@@ -57,13 +57,14 @@ func (ts TerraformProviderSortableField) getSortDirection() pagination.SortDirec
 
 // TerraformProviderFilter contains the supported fields for filtering TerraformProvider resources
 type TerraformProviderFilter struct {
-	Search               *string
-	Name                 *string
-	RootGroupID          *string
-	GroupID              *string
-	UserID               *string
-	ServiceAccountID     *string
-	TerraformProviderIDs []string
+	Search      *string
+	Name        *string
+	RootGroupID *string
+	GroupID     *string
+	// RootNamespaceMemberships limits private providers to those at or under one of the
+	// caller's root member namespace paths. Non-nil empty = no memberships; nil = no filter.
+	RootNamespaceMemberships []models.MembershipNamespace
+	TerraformProviderIDs     []string
 }
 
 // GetProvidersInput is the input for listing terraform providers
@@ -173,22 +174,11 @@ func (t *terraformProviders) GetProviders(ctx context.Context, input *GetProvide
 		if input.Filter.Name != nil {
 			ex = ex.Append(goqu.I("terraform_providers.name").Eq(*input.Filter.Name))
 		}
-		if input.Filter.UserID != nil {
+		if input.Filter.RootNamespaceMemberships != nil {
 			ex = ex.Append(
 				goqu.Or(
 					goqu.I("terraform_providers.private").Eq(false),
-					namespaceMembershipExpressionBuilder{
-						userID: input.Filter.UserID,
-					}.build(),
-				))
-		}
-		if input.Filter.ServiceAccountID != nil {
-			ex = ex.Append(
-				goqu.Or(
-					goqu.I("terraform_providers.private").Eq(false),
-					namespaceMembershipExpressionBuilder{
-						serviceAccountID: input.Filter.ServiceAccountID,
-					}.build(),
+					membershipFilterByRootNamespaces(input.Filter.RootNamespaceMemberships),
 				))
 		}
 	}
@@ -210,6 +200,7 @@ func (t *terraformProviders) GetProviders(ctx context.Context, input *GetProvide
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_providers", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("terraformprovider.GetProviders"),
 	)
 
 	if err != nil {
@@ -257,7 +248,7 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("terraform_providers").
+	sql, args, err := toSQLWithTag("terraformprovider.CreateProvider", dialect.From("terraform_providers").
 		Prepared(true).
 		With("terraform_providers",
 			dialect.Insert("terraform_providers").
@@ -274,8 +265,7 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 					"created_by":    provider.CreatedBy,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -304,7 +294,7 @@ func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *model
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("terraform_providers").
+	sql, args, err := toSQLWithTag("terraformprovider.UpdateProvider", dialect.From("terraform_providers").
 		Prepared(true).
 		With("terraform_providers",
 			dialect.Update("terraform_providers").
@@ -318,8 +308,7 @@ func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *model
 				).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).
 				Returning("*"),
 		).Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -345,7 +334,7 @@ func (t *terraformProviders) DeleteProvider(ctx context.Context, provider *model
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("terraform_providers").
+	sql, args, err := toSQLWithTag("terraformprovider.DeleteProvider", dialect.From("terraform_providers").
 		Prepared(true).
 		With("terraform_providers",
 			dialect.Delete("terraform_providers").
@@ -356,8 +345,7 @@ func (t *terraformProviders) DeleteProvider(ctx context.Context, provider *model
 					},
 				).Returning("*"),
 		).Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -383,7 +371,7 @@ func (t *terraformProviders) getProvider(ctx context.Context, exp goqu.Ex) (*mod
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("terraformprovider.getProvider", query)
 	if err != nil {
 		return nil, err
 	}

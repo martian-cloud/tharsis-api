@@ -36,10 +36,9 @@ func (sm *schemaMigrations) GetCurrentMigration(ctx context.Context) (*SchemaMig
 	ctx, span := tracer.Start(ctx, "db.GetCurrentMigration")
 	defer span.End()
 
-	sql, args, err := dialect.From("schema_migrations").
+	sql, args, err := toSQLWithTag("schema_migration.GetCurrentMigration", dialect.From("schema_migrations").
 		Prepared(true).
-		Select(schemaMigrationFieldList...).
-		ToSQL()
+		Select(schemaMigrationFieldList...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build SQL", errors.WithSpan(span))
 	}

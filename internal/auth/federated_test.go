@@ -326,7 +326,7 @@ func TestFederatedRegistryCaller_UnauthorizedError(t *testing.T) {
 	}
 }
 
-func TestFederatedRegistryCaller_GetNamespaceAccessPolicy(t *testing.T) {
+func TestFederatedRegistryCaller_GetRootNamespaceMemberships(t *testing.T) {
 	// Test setup
 	ctx := context.Background()
 	mockDBClient := &db.Client{}
@@ -343,12 +343,14 @@ func TestFederatedRegistryCaller_GetNamespaceAccessPolicy(t *testing.T) {
 	caller := NewFederatedRegistryCaller(mockDBClient, trustPolicies, subject)
 
 	// Execute
-	policy, err := caller.GetNamespaceAccessPolicy(ctx)
+	namespaces, err := caller.GetRootNamespaceMemberships(ctx)
 
 	// Verify
 	require.NoError(t, err)
-	require.NotNil(t, policy)
-	require.Empty(t, policy.RootNamespaceIDs)
+	// Must be a non-nil empty slice: a nil slice is treated as "no filter" by the membership
+	// filter and would expose all resources. A federated registry caller must deny by default.
+	require.NotNil(t, namespaces)
+	require.Empty(t, namespaces)
 }
 
 func TestFederatedRegistryCaller_RequirePermission(t *testing.T) {

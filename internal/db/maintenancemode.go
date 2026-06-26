@@ -41,10 +41,9 @@ func (s *maintenanceModes) GetMaintenanceMode(ctx context.Context) (*models.Main
 	ctx, span := tracer.Start(ctx, "db.GetMaintenanceMode")
 	defer span.End()
 
-	sql, args, err := dialect.From("maintenance_mode").
+	sql, args, err := toSQLWithTag("maintenancemode.GetMaintenanceMode", dialect.From("maintenance_mode").
 		Prepared(true).
-		Select(maintenanceModesFieldList...).
-		ToSQL()
+		Select(maintenanceModesFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -67,7 +66,7 @@ func (s *maintenanceModes) CreateMaintenanceMode(ctx context.Context, mode *mode
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("maintenance_mode").
+	sql, args, err := toSQLWithTag("maintenancemode.CreateMaintenanceMode", dialect.Insert("maintenance_mode").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":         maintenanceModeUUID,
@@ -76,7 +75,7 @@ func (s *maintenanceModes) CreateMaintenanceMode(ctx context.Context, mode *mode
 			"updated_at": timestamp,
 			"created_by": mode.CreatedBy,
 		}).
-		Returning(maintenanceModesFieldList...).ToSQL()
+		Returning(maintenanceModesFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -100,14 +99,14 @@ func (s *maintenanceModes) DeleteMaintenanceMode(ctx context.Context, mode *mode
 	ctx, span := tracer.Start(ctx, "db.DeleteMaintenanceMode")
 	defer span.End()
 
-	sql, args, err := dialect.Delete("maintenance_mode").
+	sql, args, err := toSQLWithTag("maintenancemode.DeleteMaintenanceMode", dialect.Delete("maintenance_mode").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"id":      mode.Metadata.ID,
 				"version": mode.Metadata.Version,
 			},
-		).Returning(maintenanceModesFieldList...).ToSQL()
+		).Returning(maintenanceModesFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err

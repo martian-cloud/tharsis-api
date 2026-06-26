@@ -24,16 +24,14 @@ func TestSCIMCaller_IsAdmin(t *testing.T) {
 	assert.False(t, caller.IsAdminModeActivated(t.Context()))
 }
 
-func TestSCIMCaller_GetNamespaceAccessPolicy(t *testing.T) {
-	expectedAccessPolicy := &NamespaceAccessPolicy{
-		AllowAll:         false,
-		RootNamespaceIDs: []string{},
-	}
-
+func TestSCIMCaller_GetRootNamespaceMemberships(t *testing.T) {
 	caller := SCIMCaller{}
-	accessPolicy, err := caller.GetNamespaceAccessPolicy(WithCaller(context.Background(), &caller))
+	namespaces, err := caller.GetRootNamespaceMemberships(WithCaller(context.Background(), &caller))
 	assert.Nil(t, err)
-	assert.Equal(t, expectedAccessPolicy, accessPolicy)
+	// Must be a non-nil empty slice: a nil slice is treated as "no filter" by the membership
+	// filter and would expose all resources. A SCIM caller must deny by default.
+	assert.NotNil(t, namespaces)
+	assert.Empty(t, namespaces)
 }
 
 func TestSCIMCaller_RequirePermissions(t *testing.T) {

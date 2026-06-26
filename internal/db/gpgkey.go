@@ -172,6 +172,7 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 		&pagination.FieldDescriptor{Key: "id", Table: "gpg_keys", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
 		pagination.WithSortByTransform(sortTransformFunc),
+		pagination.WithQueryTag("gpgkey.GetGPGKeys"),
 	)
 
 	if err != nil {
@@ -219,7 +220,7 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("gpg_keys").
+	sql, args, err := toSQLWithTag("gpgkey.CreateGPGKey", dialect.From("gpg_keys").
 		Prepared(true).
 		With("gpg_keys",
 			dialect.Insert("gpg_keys").
@@ -237,8 +238,7 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 					},
 				).Returning("*"),
 		).Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"gpg_keys.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"gpg_keys.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -268,7 +268,7 @@ func (t *terraformGPGKeys) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGK
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("gpg_keys").
+	sql, args, err := toSQLWithTag("gpgkey.DeleteGPGKey", dialect.From("gpg_keys").
 		Prepared(true).
 		With("gpg_keys",
 			dialect.Delete("gpg_keys").
@@ -279,8 +279,7 @@ func (t *terraformGPGKeys) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGK
 					},
 				).Returning("*"),
 		).Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"gpg_keys.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"gpg_keys.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -308,7 +307,7 @@ func (t *terraformGPGKeys) getGPGKey(ctx context.Context, exp goqu.Ex) (*models.
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"gpg_keys.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("gpgkey.getGPGKey", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

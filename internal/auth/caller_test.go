@@ -14,11 +14,13 @@ func TestSystemCaller_GetSubject(t *testing.T) {
 	assert.Equal(t, "system", caller.GetSubject())
 }
 
-func TestSystemCaller_GetNamespaceAccessPolicy(t *testing.T) {
+func TestSystemCaller_GetRootNamespaceMemberships(t *testing.T) {
 	caller := SystemCaller{}
-	policy, err := caller.GetNamespaceAccessPolicy(context.Background())
+	namespaces, err := caller.GetRootNamespaceMemberships(context.Background())
 	assert.Nil(t, err)
-	assert.Equal(t, &NamespaceAccessPolicy{AllowAll: true}, policy)
+	// The system caller is always an admin (IsAdminModeActivated returns true), so this is never
+	// used for filtering; it returns nil and is gated on IsAdminModeActivated by consumers.
+	assert.Nil(t, namespaces)
 }
 
 func TestSystemCaller_RequirePermissions(t *testing.T) {

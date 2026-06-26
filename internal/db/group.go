@@ -43,15 +43,15 @@ type Groups interface {
 
 // GroupFilter contains the supported fields for filtering Group resources
 type GroupFilter struct {
-	ParentID               *string
-	UserMemberID           *string
-	ServiceAccountMemberID *string
-	Search                 *string
-	GroupIDs               []string
-	NamespaceIDs           []string
-	RootOnly               bool
-	GroupPaths             []string
-	FavoriteUserID         *string
+	ParentID *string
+	// RootNamespaceMemberships limits results to groups at or under one of the caller's root
+	// member namespace paths. Non-nil empty = no memberships (matches nothing); nil = no filter.
+	RootNamespaceMemberships []models.MembershipNamespace
+	Search                   *string
+	GroupIDs                 []string
+	RootOnly                 bool
+	GroupPaths               []string
+	FavoriteUserID           *string
 }
 
 // GroupSortableField represents the fields that a group can be sorted by
@@ -150,10 +150,6 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 	ex := goqu.And()
 
 	if input.Filter != nil {
-		if input.Filter.RootOnly {
-			ex = ex.Append(goqu.I("groups.parent_id").Eq(nil))
-		}
-
 		if len(input.Filter.GroupIDs) > 0 {
 			ex = ex.Append(goqu.I("groups.id").In(input.Filter.GroupIDs))
 		}
@@ -162,31 +158,30 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 			ex = ex.Append(goqu.I("groups.parent_id").Eq(*input.Filter.ParentID))
 		}
 
-		if input.Filter.NamespaceIDs != nil {
-			if len(input.Filter.NamespaceIDs) == 0 {
-				return &GroupsResult{
-					PageInfo: &pagination.PageInfo{},
-					Groups:   []models.Group{},
-				}, nil
+		switch {
+		case input.Filter.RootNamespaceMemberships != nil:
+			// The caller is restricted to its member namespaces.
+			if input.Filter.RootOnly {
+				// Root groups only: exact match on the caller's top-most member namespaces.
+				if len(input.Filter.RootNamespaceMemberships) == 0 {
+					// No root memberships: match nothing (deny-by-default). Append a false
+					// predicate rather than returning early so the normal count/pagination
+					// path still builds a valid result.
+					ex = ex.Append(goqu.L("false"))
+				} else {
+					ids := make([]string, len(input.Filter.RootNamespaceMemberships))
+					for i, ns := range input.Filter.RootNamespaceMemberships {
+						ids[i] = ns.ID
+					}
+					ex = ex.Append(goqu.I("namespaces.id").In(ids))
+				}
+			} else {
+				// All groups the caller is a member of (roots and their descendants).
+				ex = ex.Append(membershipFilterByRootNamespaces(input.Filter.RootNamespaceMemberships))
 			}
-
-			ex = ex.Append(goqu.I("namespaces.id").In(input.Filter.NamespaceIDs))
-		}
-
-		if input.Filter.UserMemberID != nil {
-			ex = ex.Append(
-				namespaceMembershipExpressionBuilder{
-					userID: input.Filter.UserMemberID,
-				}.build(),
-			)
-		}
-
-		if input.Filter.ServiceAccountMemberID != nil {
-			ex = ex.Append(
-				namespaceMembershipExpressionBuilder{
-					serviceAccountID: input.Filter.ServiceAccountMemberID,
-				}.build(),
-			)
+		case input.Filter.RootOnly:
+			// No membership restriction (e.g. admin): all top-level groups.
+			ex = ex.Append(goqu.I("groups.parent_id").Eq(nil))
 		}
 
 		if input.Filter.Search != nil && *input.Filter.Search != "" {
@@ -227,6 +222,7 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 		&pagination.FieldDescriptor{Key: "id", Table: "groups", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
 		pagination.WithSortByTransform(sortTransformFunc),
+		pagination.WithQueryTag("group.GetGroups"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -297,7 +293,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("groups").
+	sql, args, err := toSQLWithTag("group.CreateGroup", dialect.Insert("groups").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":                      newResourceID(),
@@ -312,7 +308,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 			"drift_detection_enabled": group.EnableDriftDetection,
 			"provider_mirror_enabled": group.EnableProviderMirror,
 		}).
-		Returning(groupFieldList...).ToSQL()
+		Returning(groupFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -383,7 +379,7 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("groups").
+	sql, args, err := toSQLWithTag("group.UpdateGroup", dialect.From("groups").
 		Prepared(true).
 		With("groups",
 			dialect.Update("groups").
@@ -399,8 +395,7 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 				).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).
 				Returning("*"),
 		).Select(g.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -503,7 +498,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 	}
 
 	// Update the parent_id field in the group being migrated.
-	sql, args, err := dialect.From("groups").
+	sql, args, err := toSQLWithTag("group.MigrateGroup", dialect.From("groups").
 		Prepared(true).
 		With("groups",
 			dialect.Update("groups").
@@ -516,8 +511,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 				).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).
 				Returning("*"),
 		).Select(g.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err,
 			"failed to generate SQL to update the migrating group's parent ID")
@@ -538,7 +532,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 	// Delete managed identity assignments to a workspace
 	// where the workspace is in the tree being migrated
 	// and the home group path of the managed identity is no longer a direct ancestor of the workspace.
-	sql, args, err = dialect.Delete("workspace_managed_identity_relation").
+	sql, args, err = toSQLWithTag("group.MigrateGroup", dialect.Delete("workspace_managed_identity_relation").
 		Prepared(true).
 		Where(goqu.And(
 			goqu.I("workspace_managed_identity_relation.workspace_id").In(
@@ -562,7 +556,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 						// Managed identity's home group path is no longer a direct ancestor of the workspace.
 						goqu.I("namespaces.path").NotIn(migratedGroup.ExpandPath()),
 					)),
-		)).ToSQL()
+		)))
 	if err != nil {
 		tracing.RecordError(span, err,
 			"failed to generate SQL to delete managed identity assignments")
@@ -577,7 +571,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 	// Delete service accounts assigned to runners
 	// where the runner is in the tree being migrated
 	// and the group path of the service account is no longer a direct ancestor of the group.
-	sql, args, err = dialect.Delete("service_account_runner_relation").
+	sql, args, err = toSQLWithTag("group.MigrateGroup", dialect.Delete("service_account_runner_relation").
 		Prepared(true).
 		Where(goqu.And(
 			goqu.I("service_account_runner_relation.runner_id").
@@ -602,7 +596,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 						// Service account's group path is no longer a direct ancestor of the runner's group.
 						goqu.I("namespaces.path").NotIn(migratedGroup.ExpandPath()),
 					)),
-		)).ToSQL()
+		)))
 	if err != nil {
 		tracing.RecordError(span, err,
 			"failed to generate SQL to delete runner service account assignments")
@@ -617,7 +611,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 	// Delete namespace memberships of service accounts
 	// where the namespace (group or workspace) is in the tree being migrated
 	// and the home group path of the service account is no longer a direct ancestor of the namespace.
-	sql, args, err = dialect.Delete("namespace_memberships").
+	sql, args, err = toSQLWithTag("group.MigrateGroup", dialect.Delete("namespace_memberships").
 		Prepared(true).
 		Where(goqu.And(
 			goqu.I("namespace_memberships.namespace_id").In(
@@ -641,7 +635,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 						// Home group of the service account is no longer a direct ancestor of the namespace.
 						goqu.I("namespaces.path").NotIn(migratedGroup.ExpandPath()),
 					)),
-		)).ToSQL()
+		)))
 	if err != nil {
 		tracing.RecordError(span, err,
 			"failed to generate SQL to delete service account namespace memberships")
@@ -656,7 +650,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 	// Delete workspace VCS provider links to workspaces
 	// where the workspace is in the tree being migrated
 	// and the home group path of the VCS provider link is no longer a direct ancestor of the workspace.
-	sql, args, err = dialect.Delete("workspace_vcs_provider_links").
+	sql, args, err = toSQLWithTag("group.MigrateGroup", dialect.Delete("workspace_vcs_provider_links").
 		Prepared(true).
 		Where(goqu.And(
 			goqu.I("workspace_vcs_provider_links.workspace_id").In(
@@ -680,7 +674,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 						// Home group of the provider is no longer a direct ancestor of the namespace.
 						goqu.I("namespaces.path").NotIn(migratedGroup.ExpandPath()),
 					)),
-		)).ToSQL()
+		)))
 	if err != nil {
 		tracing.RecordError(span, err,
 			"failed to generate SQL to delete workspace VCS provider links")
@@ -706,7 +700,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 
 	// For any affected Terraform providers, find all of them under the new path and update the root_group_id
 	// wherever it is not equal to the new root group ID.
-	sql, args, err = dialect.Update("terraform_providers").
+	sql, args, err = toSQLWithTag("group.MigrateGroup", dialect.Update("terraform_providers").
 		Prepared(true).
 		Set(
 			goqu.Record{
@@ -731,7 +725,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 							),
 						)),
 				goqu.I("terraform_providers.root_group_id").Neq(newRootGroupID),
-			)).ToSQL()
+			)))
 	if err != nil {
 		tracing.RecordError(span, err,
 			"failed to prepare SQL to update the root group of Terraform providers")
@@ -745,7 +739,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 
 	// For any affected Terraform modules, find all of them under the new path and update the root_group_id
 	// wherever it is not equal to the new root group ID.
-	sql, args, err = dialect.Update("terraform_modules").
+	sql, args, err = toSQLWithTag("group.MigrateGroup", dialect.Update("terraform_modules").
 		Prepared(true).
 		Set(
 			goqu.Record{
@@ -770,7 +764,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 							),
 						)),
 				goqu.I("terraform_modules.root_group_id").Neq(newRootGroupID),
-			)).ToSQL()
+			)))
 	if err != nil {
 		tracing.RecordError(span, err,
 			"failed to prepare SQL to update the root group of Terraform modules")
@@ -784,7 +778,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 
 	// For any affected Terraform provider mirrors, find all of them under the new path and update the group_id
 	// wherever it is not equal to the new root group ID.
-	sql, args, err = dialect.Update("terraform_provider_version_mirrors").
+	sql, args, err = toSQLWithTag("group.MigrateGroup", dialect.Update("terraform_provider_version_mirrors").
 		Prepared(true).
 		Set(
 			goqu.Record{
@@ -809,7 +803,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 							),
 						)),
 				goqu.I("terraform_provider_version_mirrors.group_id").Neq(newRootGroupID),
-			)).ToSQL()
+			)))
 	if err != nil {
 		tracing.RecordError(span, err,
 			"failed to prepare SQL to update the root group of Terraform provider version mirrors")
@@ -834,7 +828,7 @@ func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("groups").
+	sql, args, err := toSQLWithTag("group.DeleteGroup", dialect.From("groups").
 		Prepared(true).
 		With("groups",
 			dialect.Delete("groups").
@@ -845,8 +839,7 @@ func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 					},
 				).Returning("*"),
 		).Select(g.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -883,7 +876,7 @@ func (g *groups) getGroup(ctx context.Context, exp goqu.Ex) (*models.Group, erro
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("group.getGroup", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

@@ -1062,7 +1062,7 @@ func TestGetWorkspaces(t *testing.T) {
 	type testCase struct {
 		getWorkspacesError              error
 		requireWorkspacePermissionError error
-		namespaceAccessPolicyError      error
+		getRootNamespacesError          error
 		input                           *GetWorkspacesInput
 		handleCaller                    handleCallerFunc
 		userID                          *string
@@ -1070,8 +1070,10 @@ func TestGetWorkspaces(t *testing.T) {
 		name                            string
 		expectErrorCode                 errors.CodeType
 		expectResult                    []models.Workspace
+		expectMemberships               []models.MembershipNamespace
+		rootNamespaces                  []models.MembershipNamespace
 		failAuthorization               bool
-		accessPolicyAllowAll            bool
+		adminMode                       bool
 		dbResult                        *db.WorkspacesResult
 		dbError                         error
 		authError                       error
@@ -1094,58 +1096,66 @@ func TestGetWorkspaces(t *testing.T) {
 			expectErrorCode:   errors.EUnauthorized,
 		},
 		{
-			name:                 "positive: successfully returns workspaces",
-			input:                &GetWorkspacesInput{},
-			accessPolicyAllowAll: true,
+			name:      "positive: successfully returns workspaces",
+			input:     &GetWorkspacesInput{},
+			adminMode: true,
 			expectResult: []models.Workspace{
 				sampleWorkspace,
 			},
 		},
 		{
-			name:                       "negative: failed to get namespace access policy",
-			input:                      &GetWorkspacesInput{},
-			namespaceAccessPolicyError: errors.New("failure", errors.WithErrorCode(errors.EInvalid)),
-			expectErrorCode:            errors.EInvalid,
+			name:                   "negative: failed to get root namespaces",
+			input:                  &GetWorkspacesInput{},
+			adminMode:              false,
+			getRootNamespacesError: errors.New("failure", errors.WithErrorCode(errors.EInvalid)),
+			expectErrorCode:        errors.EInvalid,
 		},
 		{
-			name:                 "positive: successfully returns workspaces the user has permission to",
-			input:                &GetWorkspacesInput{},
-			userID:               ptr.String("user-1"),
-			accessPolicyAllowAll: false,
-			handleCaller: func(ctx context.Context, userHandler func(ctx context.Context, caller *auth.UserCaller) error, _ func(ctx context.Context, caller *auth.ServiceAccountCaller) error) error {
-				return userHandler(ctx, &auth.UserCaller{User: &models.User{Metadata: models.ResourceMetadata{ID: "user-1"}}})
+			name:      "positive: successfully returns workspaces the user has permission to",
+			input:     &GetWorkspacesInput{},
+			adminMode: false,
+			rootNamespaces: []models.MembershipNamespace{
+				{ID: "ns-1", Path: "group-a"},
+				{ID: "ns-2", Path: "group-b/sub"},
 			},
-			expectResult: []models.Workspace{
-				sampleWorkspace,
-			},
-		},
-		{
-			name:                 "positive: successfully returns workspaces the service account has permission to",
-			input:                &GetWorkspacesInput{},
-			serviceAccountID:     ptr.String("sa-1"),
-			accessPolicyAllowAll: false,
-			handleCaller: func(ctx context.Context, _ func(ctx context.Context, caller *auth.UserCaller) error, serviceAccountHandler func(ctx context.Context, caller *auth.ServiceAccountCaller) error) error {
-				return serviceAccountHandler(ctx, &auth.ServiceAccountCaller{ServiceAccountID: "sa-1"})
+			expectMemberships: []models.MembershipNamespace{
+				{ID: "ns-1", Path: "group-a"},
+				{ID: "ns-2", Path: "group-b/sub"},
 			},
 			expectResult: []models.Workspace{
 				sampleWorkspace,
 			},
 		},
 		{
-			name:                 "negative: failed to set filters for non admin caller",
-			input:                &GetWorkspacesInput{},
-			accessPolicyAllowAll: false,
-			handleCaller: func(_ context.Context, _ func(ctx context.Context, caller *auth.UserCaller) error, _ func(ctx context.Context, caller *auth.ServiceAccountCaller) error) error {
-				return errors.New("failure", errors.WithErrorCode(errors.EInvalid))
+			name:      "positive: successfully returns workspaces the service account has permission to",
+			input:     &GetWorkspacesInput{},
+			adminMode: false,
+			rootNamespaces: []models.MembershipNamespace{
+				{ID: "ns-3", Path: "group-c"},
 			},
-			expectErrorCode: errors.EInvalid,
+			expectMemberships: []models.MembershipNamespace{
+				{ID: "ns-3", Path: "group-c"},
+			},
+			expectResult: []models.Workspace{
+				sampleWorkspace,
+			},
 		},
 		{
-			name:                 "negative: failed to get workspaces",
-			input:                &GetWorkspacesInput{},
-			accessPolicyAllowAll: true,
-			getWorkspacesError:   errors.New("failure", errors.WithErrorCode(errors.EInvalid)),
-			expectErrorCode:      errors.EInvalid,
+			name:              "positive: non admin caller with no root namespaces yields empty membership filter",
+			input:             &GetWorkspacesInput{},
+			adminMode:         false,
+			rootNamespaces:    []models.MembershipNamespace{},
+			expectMemberships: []models.MembershipNamespace{},
+			expectResult: []models.Workspace{
+				sampleWorkspace,
+			},
+		},
+		{
+			name:               "negative: failed to get workspaces",
+			input:              &GetWorkspacesInput{},
+			adminMode:          true,
+			getWorkspacesError: errors.New("failure", errors.WithErrorCode(errors.EInvalid)),
+			expectErrorCode:    errors.EInvalid,
 		},
 		{
 			name: "positive: filter workspaces by single label",
@@ -1257,8 +1267,9 @@ func TestGetWorkspaces(t *testing.T) {
 			input: &GetWorkspacesInput{
 				Favorites: ptr.Bool(true),
 			},
-			userID:               ptr.String("user-1"),
-			accessPolicyAllowAll: false,
+			userID:            ptr.String("user-1"),
+			adminMode:         false,
+			expectMemberships: []models.MembershipNamespace{},
 			expectResult: []models.Workspace{
 				sampleWorkspace,
 			},
@@ -1268,9 +1279,9 @@ func TestGetWorkspaces(t *testing.T) {
 			input: &GetWorkspacesInput{
 				Favorites: ptr.Bool(true),
 			},
-			serviceAccountID:     ptr.String("sa-1"),
-			accessPolicyAllowAll: false,
-			expectErrorCode:      errors.EInvalid,
+			serviceAccountID: ptr.String("sa-1"),
+			adminMode:        false,
+			expectErrorCode:  errors.EInvalid,
 		},
 	}
 
@@ -1324,15 +1335,17 @@ func TestGetWorkspaces(t *testing.T) {
 				}
 			}
 
-			policy := auth.NamespaceAccessPolicy{AllowAll: test.accessPolicyAllowAll}
-			mockCaller.On("GetNamespaceAccessPolicy", mock.Anything).Return(&policy, test.namespaceAccessPolicyError).Maybe()
-
-			if test.userID != nil {
-				input.Filter.UserMemberID = test.userID
+			// The membership filter branch only runs for non-group queries on the mockCaller.
+			usesMockCaller := !(test.input.Favorites != nil && *test.input.Favorites && test.userID != nil)
+			if test.input.GroupID == nil && usesMockCaller {
+				mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.adminMode).Maybe()
+				if !test.adminMode {
+					mockCaller.On("GetRootNamespaceMemberships", mock.Anything).Return(test.rootNamespaces, test.getRootNamespacesError).Maybe()
+				}
 			}
 
-			if test.serviceAccountID != nil {
-				input.Filter.ServiceAccountMemberID = test.serviceAccountID
+			if test.expectMemberships != nil {
+				input.Filter.RootNamespaceMemberships = test.expectMemberships
 			}
 
 			// Handle label filter test cases

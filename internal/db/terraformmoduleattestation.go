@@ -179,6 +179,7 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_module_attestations", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("terraformmoduleattestation.GetModuleAttestations"),
 	)
 
 	if err != nil {
@@ -232,7 +233,7 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 		return nil, err
 	}
 
-	sql, args, err := dialect.From("terraform_module_attestations").
+	sql, args, err := toSQLWithTag("terraformmoduleattestation.CreateModuleAttestation", dialect.From("terraform_module_attestations").
 		Prepared(true).
 		With("terraform_module_attestations",
 			dialect.Insert("terraform_module_attestations").
@@ -252,8 +253,7 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_attestations.module_id")))).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -295,7 +295,7 @@ func (t *terraformModuleAttestations) UpdateModuleAttestation(ctx context.Contex
 		"description": nullableString(moduleAttestation.Description),
 	}
 
-	sql, args, err := dialect.From("terraform_module_attestations").
+	sql, args, err := toSQLWithTag("terraformmoduleattestation.UpdateModuleAttestation", dialect.From("terraform_module_attestations").
 		Prepared(true).
 		With("terraform_module_attestations",
 			dialect.Update("terraform_module_attestations").
@@ -304,8 +304,7 @@ func (t *terraformModuleAttestations) UpdateModuleAttestation(ctx context.Contex
 				Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_attestations.module_id")))).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -330,7 +329,7 @@ func (t *terraformModuleAttestations) DeleteModuleAttestation(ctx context.Contex
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("terraform_module_attestations").
+	sql, args, err := toSQLWithTag("terraformmoduleattestation.DeleteModuleAttestation", dialect.From("terraform_module_attestations").
 		Prepared(true).
 		With("terraform_module_attestations",
 			dialect.Delete("terraform_module_attestations").
@@ -342,8 +341,7 @@ func (t *terraformModuleAttestations) DeleteModuleAttestation(ctx context.Contex
 				).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_attestations.module_id")))).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -370,7 +368,7 @@ func (t *terraformModuleAttestations) getModuleAttestation(ctx context.Context, 
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("terraformmoduleattestation.getModuleAttestation", query)
 	if err != nil {
 		return nil, err
 	}

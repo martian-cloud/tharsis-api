@@ -322,27 +322,13 @@ func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.M
 			dbInput.Filter.GroupID = &input.Group.Metadata.ID
 		}
 	} else {
-		policy, napErr := caller.GetNamespaceAccessPolicy(ctx)
-		if napErr != nil {
-			tracing.RecordError(span, napErr, "failed to get namespace access policy")
-			return nil, napErr
-		}
-
-		if !policy.AllowAll {
-			if err = s.handleCaller(
-				ctx,
-				func(_ context.Context, c *auth.UserCaller) error {
-					dbInput.Filter.UserID = &c.User.Metadata.ID
-					return nil
-				},
-				func(_ context.Context, c *auth.ServiceAccountCaller) error {
-					dbInput.Filter.ServiceAccountID = &c.ServiceAccountID
-					return nil
-				},
-			); err != nil {
-				tracing.RecordError(span, err, "failed to set filters for non-admin access")
-				return nil, err
+		if !caller.IsAdminModeActivated(ctx) {
+			rootNamespaces, rErr := caller.GetRootNamespaceMemberships(ctx)
+			if rErr != nil {
+				tracing.RecordError(span, rErr, "failed to get root namespaces")
+				return nil, rErr
 			}
+			dbInput.Filter.RootNamespaceMemberships = rootNamespaces
 		}
 	}
 

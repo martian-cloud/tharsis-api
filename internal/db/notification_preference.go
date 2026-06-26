@@ -132,6 +132,7 @@ func (np *notificationPreferences) GetNotificationPreferences(ctx context.Contex
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "notification_preferences", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("notification_preference.GetNotificationPreferences"),
 	)
 
 	if err != nil {
@@ -187,7 +188,7 @@ func (np *notificationPreferences) UpdateNotificationPreference(ctx context.Cont
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("notification_preferences").
+	sql, args, err := toSQLWithTag("notification_preference.UpdateNotificationPreference", dialect.From("notification_preferences").
 		Prepared(true).
 		With("notification_preferences",
 			dialect.Update("notification_preferences").
@@ -202,8 +203,7 @@ func (np *notificationPreferences) UpdateNotificationPreference(ctx context.Cont
 				Where(goqu.Ex{"id": preference.Metadata.ID, "version": preference.Metadata.Version}).
 				Returning("*"),
 		).Select(np.getSelectFields()...).
-		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"notification_preferences.namespace_id": goqu.I("namespaces.id")})).
-		ToSQL()
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"notification_preferences.namespace_id": goqu.I("namespaces.id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -257,7 +257,7 @@ func (np *notificationPreferences) CreateNotificationPreference(ctx context.Cont
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("notification_preferences").
+	sql, args, err := toSQLWithTag("notification_preference.CreateNotificationPreference", dialect.From("notification_preferences").
 		Prepared(true).
 		With("notification_preferences",
 			dialect.Insert("notification_preferences").
@@ -273,8 +273,7 @@ func (np *notificationPreferences) CreateNotificationPreference(ctx context.Cont
 				}).
 				Returning("*"),
 		).Select(np.getSelectFields()...).
-		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"notification_preferences.namespace_id": goqu.I("namespaces.id")})).
-		ToSQL()
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"notification_preferences.namespace_id": goqu.I("namespaces.id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -311,7 +310,7 @@ func (np *notificationPreferences) DeleteNotificationPreference(ctx context.Cont
 	ctx, span := tracer.Start(ctx, "db.DeleteNotificationPreference")
 	defer span.End()
 
-	sql, args, err := dialect.From("notification_preferences").
+	sql, args, err := toSQLWithTag("notification_preference.DeleteNotificationPreference", dialect.From("notification_preferences").
 		Prepared(true).
 		With("notification_preferences",
 			dialect.Delete("notification_preferences").
@@ -323,8 +322,7 @@ func (np *notificationPreferences) DeleteNotificationPreference(ctx context.Cont
 				).
 				Returning("*"),
 		).Select(np.getSelectFields()...).
-		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"notification_preferences.namespace_id": goqu.I("namespaces.id")})).
-		ToSQL()
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"notification_preferences.namespace_id": goqu.I("namespaces.id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")

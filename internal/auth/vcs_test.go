@@ -28,16 +28,14 @@ func TestVCSWorkspaceLinkCaller_IsAdmin(t *testing.T) {
 	assert.False(t, caller.IsAdminModeActivated(t.Context()))
 }
 
-func TestVCSWorkspaceLinkCaller_GetNamespaceAccessPolicy(t *testing.T) {
-	expectedAccessPolicy := &NamespaceAccessPolicy{
-		AllowAll:         false,
-		RootNamespaceIDs: []string{},
-	}
-
+func TestVCSWorkspaceLinkCaller_GetRootNamespaceMemberships(t *testing.T) {
 	caller := VCSWorkspaceLinkCaller{}
-	accessPolicy, err := caller.GetNamespaceAccessPolicy(WithCaller(context.Background(), &caller))
+	namespaces, err := caller.GetRootNamespaceMemberships(WithCaller(context.Background(), &caller))
 	assert.Nil(t, err)
-	assert.Equal(t, expectedAccessPolicy, accessPolicy)
+	// Must be a non-nil empty slice: a nil slice is treated as "no filter" by the membership
+	// filter and would expose all resources. A VCS workspace-link caller must deny by default.
+	assert.NotNil(t, namespaces)
+	assert.Empty(t, namespaces)
 }
 
 func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {

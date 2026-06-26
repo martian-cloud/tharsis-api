@@ -136,6 +136,7 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "configuration_versions", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("configurationversion.GetConfigurationVersions"),
 	)
 
 	if err != nil {
@@ -213,7 +214,7 @@ func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, 
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("configuration_versions").
+	sql, args, err := toSQLWithTag("configurationversion.CreateConfigurationVersion", dialect.From("configuration_versions").
 		Prepared(true).
 		With("configuration_versions",
 			dialect.Insert("configuration_versions").
@@ -229,8 +230,7 @@ func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, 
 					"vcs_event_id": configurationVersion.VCSEventID,
 				}).Returning("*"),
 		).Select(c.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"configuration_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"configuration_versions.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -253,7 +253,7 @@ func (c *configurationVersions) UpdateConfigurationVersion(ctx context.Context, 
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("configuration_versions").
+	sql, args, err := toSQLWithTag("configurationversion.UpdateConfigurationVersion", dialect.From("configuration_versions").
 		Prepared(true).
 		With("configuration_versions",
 			dialect.Update("configuration_versions").
@@ -268,8 +268,7 @@ func (c *configurationVersions) UpdateConfigurationVersion(ctx context.Context, 
 				).Where(goqu.Ex{"id": configurationVersion.Metadata.ID, "version": configurationVersion.Metadata.Version}).
 				Returning("*"),
 		).Select(c.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"configuration_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"configuration_versions.workspace_id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -293,12 +292,11 @@ func (c *configurationVersions) getConfigurationVersion(ctx context.Context, ex 
 	ctx, span := tracer.Start(ctx, "db.getConfigurationVersion")
 	defer span.End()
 
-	sql, args, err := dialect.From("configuration_versions").
+	sql, args, err := toSQLWithTag("configurationversion.getConfigurationVersion", dialect.From("configuration_versions").
 		Prepared(true).
 		Select(c.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"configuration_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
-		Where(ex).
-		ToSQL()
+		Where(ex))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")

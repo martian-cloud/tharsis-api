@@ -58,12 +58,11 @@ func (wpl *workspaceVCSProviderLinks) GetLinksByProviderID(ctx context.Context, 
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("workspace_vcs_provider_links").
+	sql, args, err := toSQLWithTag("workspacevcsproviderlink.GetLinksByProviderID", dialect.From("workspace_vcs_provider_links").
 		Prepared(true).
 		Select(wpl.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspace_vcs_provider_links.workspace_id": goqu.I("namespaces.workspace_id")})).
-		Where(goqu.Ex{"workspace_vcs_provider_links.provider_id": providerID}).
-		ToSQL()
+		Where(goqu.Ex{"workspace_vcs_provider_links.provider_id": providerID}))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -145,7 +144,7 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 		return nil, err
 	}
 
-	sql, args, err := dialect.From("workspace_vcs_provider_links").
+	sql, args, err := toSQLWithTag("workspacevcsproviderlink.CreateLink", dialect.From("workspace_vcs_provider_links").
 		Prepared(true).
 		With("workspace_vcs_provider_links",
 			dialect.Insert("workspace_vcs_provider_links").
@@ -168,8 +167,7 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 					"webhook_disabled":      link.WebhookDisabled,
 				}).Returning("*"),
 		).Select(wpl.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_vcs_provider_links.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_vcs_provider_links.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -215,7 +213,7 @@ func (wpl *workspaceVCSProviderLinks) UpdateLink(ctx context.Context, link *mode
 		return nil, err
 	}
 
-	sql, args, err := dialect.From("workspace_vcs_provider_links").
+	sql, args, err := toSQLWithTag("workspacevcsproviderlink.UpdateLink", dialect.From("workspace_vcs_provider_links").
 		Prepared(true).
 		With("workspace_vcs_provider_links",
 			dialect.Update("workspace_vcs_provider_links").
@@ -234,8 +232,7 @@ func (wpl *workspaceVCSProviderLinks) UpdateLink(ctx context.Context, link *mode
 				).Where(goqu.Ex{"id": link.Metadata.ID, "version": link.Metadata.Version}).
 				Returning("*"),
 		).Select(wpl.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_vcs_provider_links.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_vcs_provider_links.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -261,7 +258,7 @@ func (wpl *workspaceVCSProviderLinks) DeleteLink(ctx context.Context, provider *
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("workspace_vcs_provider_links").
+	sql, args, err := toSQLWithTag("workspacevcsproviderlink.DeleteLink", dialect.From("workspace_vcs_provider_links").
 		Prepared(true).
 		With("workspace_vcs_provider_links",
 			dialect.Delete("workspace_vcs_provider_links").
@@ -272,8 +269,7 @@ func (wpl *workspaceVCSProviderLinks) DeleteLink(ctx context.Context, provider *
 					},
 				).Returning("*"),
 		).Select(wpl.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_vcs_provider_links.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_vcs_provider_links.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -300,7 +296,7 @@ func (wpl *workspaceVCSProviderLinks) getLink(ctx context.Context, exp goqu.Ex) 
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_vcs_provider_links.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("workspacevcsproviderlink.getLink", query)
 	if err != nil {
 		return nil, err
 	}

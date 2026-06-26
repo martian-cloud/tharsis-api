@@ -160,6 +160,7 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "vcs_events", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("vcsevent.GetEvents"),
 	)
 
 	if err != nil {
@@ -207,7 +208,7 @@ func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("vcs_events").
+	sql, args, err := toSQLWithTag("vcsevent.CreateEvent", dialect.From("vcs_events").
 		Prepared(true).
 		With("vcs_events",
 			dialect.Insert("vcs_events").
@@ -226,8 +227,7 @@ func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*
 				}).
 				Returning("*"),
 		).Select(ve.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_events.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_events.workspace_id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -258,7 +258,7 @@ func (ve *vcsEvents) UpdateEvent(ctx context.Context, event *models.VCSEvent) (*
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("vcs_events").
+	sql, args, err := toSQLWithTag("vcsevent.UpdateEvent", dialect.From("vcs_events").
 		Prepared(true).
 		With("vcs_events",
 			dialect.Update("vcs_events").
@@ -272,8 +272,7 @@ func (ve *vcsEvents) UpdateEvent(ctx context.Context, event *models.VCSEvent) (*
 				).Where(goqu.Ex{"id": event.Metadata.ID, "version": event.Metadata.Version}).
 				Returning("*"),
 		).Select(ve.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_events.workspace_id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_events.workspace_id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -294,12 +293,11 @@ func (ve *vcsEvents) UpdateEvent(ctx context.Context, event *models.VCSEvent) (*
 }
 
 func (ve *vcsEvents) getEvent(ctx context.Context, exp goqu.Ex) (*models.VCSEvent, error) {
-	sql, args, err := dialect.From("vcs_events").
+	sql, args, err := toSQLWithTag("vcsevent.getEvent", dialect.From("vcs_events").
 		Prepared(true).
 		Select(ve.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_events.workspace_id": goqu.I("namespaces.workspace_id")})).
-		Where(exp).
-		ToSQL()
+		Where(exp))
 
 	if err != nil {
 		return nil, err

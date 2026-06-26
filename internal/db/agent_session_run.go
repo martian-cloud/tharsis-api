@@ -86,11 +86,10 @@ func (a *agentSessionRuns) GetAgentSessionRunByID(ctx context.Context, id string
 	ctx, span := tracer.Start(ctx, "db.GetAgentSessionRunByID")
 	defer span.End()
 
-	sql, args, err := dialect.From(goqu.T("agent_session_runs")).
+	sql, args, err := toSQLWithTag("agent_session_run.GetAgentSessionRunByID", dialect.From(goqu.T("agent_session_runs")).
 		Prepared(true).
 		Select(a.getSelectFields()...).
-		Where(goqu.Ex{"agent_session_runs.id": id}).
-		ToSQL()
+		Where(goqu.Ex{"agent_session_runs.id": id}))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -154,6 +153,7 @@ func (a *agentSessionRuns) GetAgentSessionRuns(ctx context.Context, input *GetAg
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "agent_session_runs", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("agent_session_run.GetAgentSessionRuns"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -194,7 +194,7 @@ func (a *agentSessionRuns) CreateAgentSessionRun(ctx context.Context, run *model
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("agent_session_runs").Prepared(true).Rows(
+	sql, args, err := toSQLWithTag("agent_session_run.CreateAgentSessionRun", dialect.Insert("agent_session_runs").Prepared(true).Rows(
 		goqu.Record{
 			"id":               newResourceID(),
 			"version":          initialResourceVersion,
@@ -207,7 +207,7 @@ func (a *agentSessionRuns) CreateAgentSessionRun(ctx context.Context, run *model
 			"error_message":    run.ErrorMessage,
 			"cancel_requested": run.CancelRequested,
 		},
-	).Returning(agentSessionRunFieldList...).ToSQL()
+	).Returning(agentSessionRunFieldList...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -234,7 +234,7 @@ func (a *agentSessionRuns) UpdateAgentSessionRun(ctx context.Context, run *model
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("agent_session_runs").
+	sql, args, err := toSQLWithTag("agent_session_run.UpdateAgentSessionRun", dialect.Update("agent_session_runs").
 		Prepared(true).
 		Set(goqu.Record{
 			"version":          goqu.L("? + ?", goqu.C("version"), 1),
@@ -245,8 +245,7 @@ func (a *agentSessionRuns) UpdateAgentSessionRun(ctx context.Context, run *model
 			"cancel_requested": run.CancelRequested,
 		}).
 		Where(goqu.Ex{"id": run.Metadata.ID, "version": run.Metadata.Version}).
-		Returning(agentSessionRunFieldList...).
-		ToSQL()
+		Returning(agentSessionRunFieldList...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

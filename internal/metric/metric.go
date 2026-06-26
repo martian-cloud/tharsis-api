@@ -31,3 +31,11 @@ func NewCounter(name string, help string) prometheus.Counter {
 		Help: help,
 	})
 }
+
+// NewCounterVec returns a new Prometheus CounterVec with labels.
+func NewCounterVec(name string, help string, labels []string) *prometheus.CounterVec {
+	return promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: name,
+		Help: help,
+	}, labels)
+}

@@ -146,6 +146,7 @@ func (m *variableVersions) GetVariableVersions(ctx context.Context, input *GetVa
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "namespace_variable_versions", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("variable_version.GetVariableVersions"),
 	)
 
 	if err != nil {
@@ -186,11 +187,11 @@ func (m *variableVersions) getVariableVersion(ctx context.Context, ex goqu.Ex) (
 	ctx, span := tracer.Start(ctx, "db.getVariableVersion")
 	defer span.End()
 
-	sql, _, err := dialect.From("namespace_variable_versions").
+	sql, _, err := toSQLWithTag("variable_version.getVariableVersion", dialect.From("namespace_variable_versions").
 		Select(m.getSelectFields()...).
 		InnerJoin(goqu.T("namespace_variables"), goqu.On(goqu.I("namespace_variable_versions.variable_id").Eq(goqu.I("namespace_variables.id")))).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("namespace_variables.namespace_id").Eq(goqu.I("namespaces.id")))).
-		Where(ex).ToSQL()
+		Where(ex))
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))

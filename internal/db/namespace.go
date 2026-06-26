@@ -50,11 +50,10 @@ func getNamespace(ctx context.Context, conn connection, ex goqu.Ex) (*namespaceR
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("namespaces").
+	sql, args, err := toSQLWithTag("namespace.getNamespace", dialect.From("namespaces").
 		Prepared(true).
 		Select(namespaceFieldList...).
-		Where(ex).
-		ToSQL()
+		Where(ex))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -79,7 +78,7 @@ func createNamespace(ctx context.Context, conn connection, namespace *namespaceR
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("namespaces").
+	sql, args, err := toSQLWithTag("namespace.createNamespace", dialect.Insert("namespaces").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":           newResourceID(),
@@ -90,7 +89,7 @@ func createNamespace(ctx context.Context, conn connection, namespace *namespaceR
 			"group_id":     nullableString(namespace.groupID),
 			"workspace_id": nullableString(namespace.workspaceID),
 		}).
-		Returning(namespaceFieldList...).ToSQL()
+		Returning(namespaceFieldList...))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -120,7 +119,7 @@ func migrateNamespaces(ctx context.Context, conn connection, oldPath, newPath st
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("namespaces").
+	sql, args, err := toSQLWithTag("namespace.migrateNamespaces", dialect.Update("namespaces").
 		Prepared(true).
 		Set(
 			goqu.Record{
@@ -131,7 +130,7 @@ func migrateNamespaces(ctx context.Context, conn connection, oldPath, newPath st
 		).Where(goqu.Or(
 		goqu.I("path").Eq(oldPath),
 		goqu.I("path").Like(oldPath+"/%"),
-	)).Returning(namespaceFieldList...).ToSQL()
+	)).Returning(namespaceFieldList...))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
-	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v5"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -65,9 +64,11 @@ func (gs WorkspaceSortableField) getSortDirection() pagination.SortDirection {
 
 // WorkspaceFilter contains the supported fields for filtering Workspace resources
 type WorkspaceFilter struct {
-	GroupID                        *string
-	UserMemberID                   *string
-	ServiceAccountMemberID         *string
+	GroupID *string
+	// RootNamespaceMemberships limits results to workspaces at or under one of the caller's
+	// root member namespace paths. A non-nil empty slice matches nothing (caller has no
+	// memberships); nil means no membership filter (e.g. admin).
+	RootNamespaceMemberships       []models.MembershipNamespace
 	Search                         *string
 	AssignedManagedIdentityID      *string
 	WorkspaceIDs                   []string
@@ -171,12 +172,8 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 			ex = ex.Append(goqu.I("workspaces.group_id").Eq(*input.Filter.GroupID))
 		}
 
-		if input.Filter.UserMemberID != nil {
-			ex = ex.Append(namespaceMembershipFilterQuery("namespace_memberships.user_id", *input.Filter.UserMemberID))
-		}
-
-		if input.Filter.ServiceAccountMemberID != nil {
-			ex = ex.Append(namespaceMembershipFilterQuery("namespace_memberships.service_account_id", *input.Filter.ServiceAccountMemberID))
+		if input.Filter.RootNamespaceMemberships != nil {
+			ex = ex.Append(membershipFilterByRootNamespaces(input.Filter.RootNamespaceMemberships))
 		}
 
 		if input.Filter.Search != nil && *input.Filter.Search != "" {
@@ -260,6 +257,7 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "workspaces", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("workspaces.GetWorkspaces"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -325,7 +323,7 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("workspaces").
+	sql, args, err := toSQLWithTag("workspaces.UpdateWorkspace", dialect.From("workspaces").
 		Prepared(true).
 		With("workspaces",
 			dialect.Update("workspaces").
@@ -349,8 +347,7 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 				).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).
 				Returning("*"),
 		).Select(w.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -410,7 +407,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("workspaces").
+	sql, args, err := toSQLWithTag("workspaces.CreateWorkspace", dialect.Insert("workspaces").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":                       newResourceID(),
@@ -433,7 +430,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"provider_mirror_enabled":  workspace.EnableProviderMirror,
 			"labels":                   labelsJSON,
 		}).
-		Returning(workspaceFieldList...).ToSQL()
+		Returning(workspaceFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -489,7 +486,7 @@ func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Work
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("workspaces").
+	sql, args, err := toSQLWithTag("workspaces.DeleteWorkspace", dialect.From("workspaces").
 		Prepared(true).
 		With("workspaces",
 			dialect.Delete("workspaces").
@@ -500,8 +497,7 @@ func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Work
 					},
 				).Returning("*"),
 		).Select(w.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -525,12 +521,12 @@ func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, manage
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("workspaces").
+	sql, args, err := toSQLWithTag("workspaces.GetWorkspacesForManagedIdentity", dialect.From("workspaces").
 		Prepared(true).
 		Select(w.getSelectFields()...).
 		InnerJoin(goqu.T("workspace_managed_identity_relation"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("workspace_managed_identity_relation.workspace_id")})).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
-		Where(goqu.Ex{"workspace_managed_identity_relation.managed_identity_id": managedIdentityID}).ToSQL()
+		Where(goqu.Ex{"workspace_managed_identity_relation.managed_identity_id": managedIdentityID}))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -588,7 +584,7 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 	}
 
 	// Update the group_id field in the workspace being migrated.
-	sql, args, err := dialect.From("workspaces").
+	sql, args, err := toSQLWithTag("workspaces.MigrateWorkspace", dialect.From("workspaces").
 		Prepared(true).
 		With("workspaces",
 			dialect.Update("workspaces").
@@ -601,8 +597,7 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 				).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).
 				Returning("*"),
 		).Select(w.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL to update the migrating workspace's group ID", errors.WithSpan(span))
 	}
@@ -618,7 +613,7 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 
 	// Delete managed identity assignments to the workspace being migrated
 	// if the home group path of the managed identity is no longer a direct ancestor of the workspace.
-	sql, args, err = dialect.Delete("workspace_managed_identity_relation").
+	sql, args, err = toSQLWithTag("workspaces.MigrateWorkspace", dialect.Delete("workspace_managed_identity_relation").
 		Prepared(true).
 		Where(goqu.And(
 			goqu.I("workspace_managed_identity_relation.workspace_id").Eq(migratedWorkspace.Metadata.ID),
@@ -633,7 +628,7 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 						// Managed identity's home group path is no longer a direct ancestor of the workspace.
 						goqu.I("namespaces.path").NotIn(migratedWorkspace.ExpandPath()),
 					)),
-		)).ToSQL()
+		)))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL to delete managed identity assignments", errors.WithSpan(span))
 	}
@@ -644,7 +639,7 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 	// Delete namespace memberships of service accounts
 	// where the namespace (workspace) is being migrated
 	// and the home group path of the service account is no longer a direct ancestor of the namespace.
-	sql, args, err = dialect.Delete("namespace_memberships").
+	sql, args, err = toSQLWithTag("workspaces.MigrateWorkspace", dialect.Delete("namespace_memberships").
 		Prepared(true).
 		Where(goqu.And(
 			goqu.I("namespace_memberships.id").In(
@@ -667,7 +662,7 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 						// Home group of the service account is no longer a direct ancestor of the namespace.
 						goqu.I("namespaces.path").NotIn(migratedWorkspace.ExpandPath()),
 					)),
-		)).ToSQL()
+		)))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL to delete service account namespace memberships", errors.WithSpan(span))
 	}
@@ -678,7 +673,7 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 	// Delete workspace VCS provider links to workspaces
 	// where the workspace is being migrated
 	// and the home group path of the VCS provider link is no longer a direct ancestor of the workspace.
-	sql, args, err = dialect.Delete("workspace_vcs_provider_links").
+	sql, args, err = toSQLWithTag("workspaces.MigrateWorkspace", dialect.Delete("workspace_vcs_provider_links").
 		Prepared(true).
 		Where(goqu.And(
 			goqu.I("workspace_vcs_provider_links.workspace_id").Eq(migratedWorkspace.Metadata.ID),
@@ -693,7 +688,7 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 						// Home group of the provider is no longer a direct ancestor of the namespace.
 						goqu.I("namespaces.path").NotIn(migratedWorkspace.ExpandPath()),
 					)),
-		)).ToSQL()
+		)))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL to delete workspace VCS provider links", errors.WithSpan(span))
 	}
@@ -715,7 +710,7 @@ func (w *workspaces) getWorkspace(ctx context.Context, exp goqu.Ex) (*models.Wor
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("workspaces.getWorkspace", query)
 	if err != nil {
 		return nil, err
 	}
@@ -736,38 +731,6 @@ func (w *workspaces) getWorkspace(ctx context.Context, exp goqu.Ex) (*models.Wor
 	}
 
 	return workspace, nil
-}
-
-// TODO: Remove this function and use namespaceMembershipExpressionBuilder after DB integration tests have been merged
-func namespaceMembershipFilterQuery(col string, id string) exp.Expression {
-	// The base column ID comparison, to be ORed with a sub-query based on team member relationships.
-	whereExOr := goqu.Or()
-	whereExOr = whereExOr.Append(goqu.I(col).Eq(id))
-
-	// If dealing with a user ID, must also check team member relationships.
-	if strings.HasSuffix(col, ".user_id") {
-		// This is a logical OR with the base column ID comparison.
-		whereExOr = whereExOr.Append(
-			goqu.I("namespace_memberships.team_id").In(
-				dialect.From("team_members").
-					Select("team_id").
-					Where(goqu.I("team_members.user_id").Eq(id))))
-	}
-
-	return goqu.Or(
-		goqu.I("namespaces.path").Like(goqu.Any(
-			dialect.From("namespace_memberships").
-				Select(goqu.L("path || '/%'")).
-				InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
-				Where(whereExOr, goqu.I("namespaces.workspace_id").IsNull()),
-		)),
-		goqu.I("namespaces.path").In(
-			dialect.From("namespace_memberships").
-				Select("path").
-				InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
-				Where(whereExOr, goqu.I("namespaces.group_id").IsNull()),
-		),
-	)
 }
 
 func (w *workspaces) getSelectFields() []interface{} {

@@ -41,7 +41,7 @@ func (t *resourceLimits) GetResourceLimit(ctx context.Context, name string) (*mo
 		Select(resourceLimitFieldList...).
 		Where(goqu.Ex{"resource_limits.name": name})
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("resourcelimits.GetResourceLimit", query)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -78,7 +78,7 @@ func (t *resourceLimits) GetResourceLimits(ctx context.Context) ([]models.Resour
 		Select(resourceLimitFieldList...).
 		Order(goqu.I("name").Asc())
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("resourcelimits.GetResourceLimits", query)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -115,7 +115,7 @@ func (t *resourceLimits) UpdateResourceLimit(ctx context.Context, resourceLimit 
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("resource_limits").
+	sql, args, err := toSQLWithTag("resourcelimits.UpdateResourceLimit", dialect.Update("resource_limits").
 		Prepared(true).
 		Set(
 			goqu.Record{
@@ -123,7 +123,7 @@ func (t *resourceLimits) UpdateResourceLimit(ctx context.Context, resourceLimit 
 				"updated_at": timestamp,
 				"value":      resourceLimit.Value,
 			},
-		).Where(goqu.Ex{"id": resourceLimit.Metadata.ID, "version": resourceLimit.Metadata.Version}).Returning(resourceLimitFieldList...).ToSQL()
+		).Where(goqu.Ex{"id": resourceLimit.Metadata.ID, "version": resourceLimit.Metadata.Version}).Returning(resourceLimitFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err

@@ -156,9 +156,11 @@ func TestGetObjectStream(t *testing.T) {
 	t.Run("full content", func(t *testing.T) {
 		stream, err := store.GetObjectStream(ctx, "stream.txt", nil)
 		require.NoError(t, err)
-		defer stream.Close()
+		defer stream.Body.Close()
 
-		data, err := io.ReadAll(stream)
+		assert.Equal(t, int64(len(content)), stream.ContentLength)
+
+		data, err := io.ReadAll(stream.Body)
 		require.NoError(t, err)
 		assert.Equal(t, content, data)
 	})
@@ -168,9 +170,11 @@ func TestGetObjectStream(t *testing.T) {
 			ContentRange: aws.String("bytes=0-5"),
 		})
 		require.NoError(t, err)
-		defer stream.Close()
+		defer stream.Body.Close()
 
-		data, err := io.ReadAll(stream)
+		assert.Equal(t, int64(6), stream.ContentLength)
+
+		data, err := io.ReadAll(stream.Body)
 		require.NoError(t, err)
 		assert.Equal(t, []byte("stream"), data)
 	})
@@ -436,9 +440,9 @@ func TestSymlinkHandling(t *testing.T) {
 
 		stream, err := store.GetObjectStream(ctx, "link/file.txt", nil)
 		require.NoError(t, err)
-		defer stream.Close()
+		defer stream.Body.Close()
 
-		data, err := io.ReadAll(stream)
+		data, err := io.ReadAll(stream.Body)
 		require.NoError(t, err)
 		assert.Equal(t, []byte("real content"), data)
 	})

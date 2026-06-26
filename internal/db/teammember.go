@@ -142,6 +142,7 @@ func (tm *teamMembers) GetTeamMembers(ctx context.Context, input *GetTeamMembers
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "team_members", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("teammember.GetTeamMembers"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -188,7 +189,7 @@ func (tm *teamMembers) AddUserToTeam(ctx context.Context, teamMember *models.Tea
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("team_members").
+	sql, args, err := toSQLWithTag("teammember.AddUserToTeam", dialect.From("team_members").
 		Prepared(true).
 		With("team_members",
 			dialect.Insert("team_members").
@@ -204,8 +205,7 @@ func (tm *teamMembers) AddUserToTeam(ctx context.Context, teamMember *models.Tea
 				Returning("*"),
 		).Select(tm.getSelectFields()...).
 		InnerJoin(goqu.T("teams"), goqu.On(goqu.I("team_members.team_id").Eq(goqu.I("teams.id")))).
-		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))).
-		ToSQL()
+		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -254,7 +254,7 @@ func (tm *teamMembers) UpdateTeamMember(ctx context.Context, teamMember *models.
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("team_members").
+	sql, args, err := toSQLWithTag("teammember.UpdateTeamMember", dialect.From("team_members").
 		Prepared(true).
 		With("team_members",
 			dialect.Update("team_members").
@@ -268,8 +268,7 @@ func (tm *teamMembers) UpdateTeamMember(ctx context.Context, teamMember *models.
 				Returning("*"),
 		).Select(tm.getSelectFields()...).
 		InnerJoin(goqu.T("teams"), goqu.On(goqu.I("team_members.team_id").Eq(goqu.I("teams.id")))).
-		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))).
-		ToSQL()
+		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -294,7 +293,7 @@ func (tm *teamMembers) RemoveUserFromTeam(ctx context.Context, teamMember *model
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("team_members").
+	sql, args, err := toSQLWithTag("teammember.RemoveUserFromTeam", dialect.From("team_members").
 		Prepared(true).
 		With("team_members",
 			dialect.Delete("team_members").
@@ -306,8 +305,7 @@ func (tm *teamMembers) RemoveUserFromTeam(ctx context.Context, teamMember *model
 				).Returning("*"),
 		).Select(tm.getSelectFields()...).
 		InnerJoin(goqu.T("teams"), goqu.On(goqu.I("team_members.team_id").Eq(goqu.I("teams.id")))).
-		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))).
-		ToSQL()
+		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -337,7 +335,7 @@ func (tm *teamMembers) getTeamMember(ctx context.Context, exp exp.Expression) (*
 		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("teammember.getTeamMember", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

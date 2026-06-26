@@ -85,14 +85,13 @@ func (a *agentSessionMessages) GetAgentSessionMessageByID(ctx context.Context, s
 	ctx, span := tracer.Start(ctx, "db.GetAgentSessionMessageByID")
 	defer span.End()
 
-	sql, args, err := dialect.From(goqu.T("agent_session_messages")).
+	sql, args, err := toSQLWithTag("agent_session_message.GetAgentSessionMessageByID", dialect.From(goqu.T("agent_session_messages")).
 		Prepared(true).
 		Select(a.getSelectFields()...).
 		Where(goqu.Ex{
 			"agent_session_messages.id":         id,
 			"agent_session_messages.session_id": sessionID,
-		}).
-		ToSQL()
+		}))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -143,6 +142,7 @@ func (a *agentSessionMessages) GetAgentSessionMessages(ctx context.Context, inpu
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "agent_session_messages", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("agent_session_message.GetAgentSessionMessages"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -183,7 +183,7 @@ func (a *agentSessionMessages) CreateAgentSessionMessage(ctx context.Context, ms
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("agent_session_messages").Prepared(true).Rows(
+	sql, args, err := toSQLWithTag("agent_session_message.CreateAgentSessionMessage", dialect.Insert("agent_session_messages").Prepared(true).Rows(
 		goqu.Record{
 			"id":         newResourceID(),
 			"version":    initialResourceVersion,
@@ -195,7 +195,7 @@ func (a *agentSessionMessages) CreateAgentSessionMessage(ctx context.Context, ms
 			"role":       msg.Role,
 			"content":    nullableRawJSON(msg.Content),
 		},
-	).Returning(agentSessionMessageFieldList...).ToSQL()
+	).Returning(agentSessionMessageFieldList...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

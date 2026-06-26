@@ -192,7 +192,7 @@ func TestGetStateVersion(t *testing.T) {
 			sv := models.StateVersion{Metadata: models.ResourceMetadata{ID: "1"}, WorkspaceID: "ws-1"}
 
 			key := fmt.Sprintf("workspaces/%s/state_versions/%s.json", sv.WorkspaceID, sv.Metadata.ID)
-			mockObjectStore.On("GetObjectStream", mock.Anything, key, mock.Anything).Return(io.NopCloser(strings.NewReader("test payload")), test.retErr)
+			mockObjectStore.On("GetObjectStream", mock.Anything, key, mock.Anything).Return(&objectstore.GetObjectStreamOutput{Body: io.NopCloser(strings.NewReader("test payload"))}, test.retErr)
 
 			resp, err := NewArtifactStore(&mockObjectStore).GetStateVersion(ctx, &sv)
 			if err != nil {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
@@ -299,13 +300,21 @@ func (c *workspaceController) DownloadConfigurationVersion(w http.ResponseWriter
 		return
 	}
 
-	defer result.Close()
+	defer result.Body.Close()
 
 	w.Header().Set("Content-Type", "application/json")
+	if result.ContentLength > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(result.ContentLength, 10))
+	}
 	w.WriteHeader(http.StatusOK)
-	if _, err := io.Copy(w, result); err != nil {
-		c.respWriter.RespondWithError(r.Context(), w, err)
-		return
+	if _, err := io.Copy(w, result.Body); err != nil {
+		// Status 200 and part of the body are already on the wire, so we can no
+		// longer change the status or send an error document. Log it and abort the
+		// connection so the client sees a failed transfer, not a clean EOF.
+		c.logger.WithContextFields(r.Context()).Errorf(
+			"failed to stream configuration version %s: %v", configVersionID, err)
+		// Use the http abort handler to terminate the connection gracefully
+		panic(http.ErrAbortHandler)
 	}
 }
 

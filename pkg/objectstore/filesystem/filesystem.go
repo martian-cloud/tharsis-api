@@ -42,22 +42,13 @@ const (
 	amzCredentialParam = "X-Amz-Credential"
 )
 
-// fileReadCloser wraps an os.File and exposes its size for Content-Length.
-type fileReadCloser struct {
-	*os.File
-	size int64
-}
-
-func (f *fileReadCloser) ContentLength() int64 { return f.size }
-
 // sectionReadCloser wraps a SectionReader with a closer
 type sectionReadCloser struct {
 	*io.SectionReader
 	closer io.Closer
 }
 
-func (s *sectionReadCloser) Close() error         { return s.closer.Close() }
-func (s *sectionReadCloser) ContentLength() int64 { return s.Size() }
+func (s *sectionReadCloser) Close() error { return s.closer.Close() }
 
 // ObjectStore implementation for local filesystem
 type ObjectStore struct {
@@ -178,7 +169,7 @@ func (f *ObjectStore) DownloadObject(ctx context.Context, key string, w io.Write
 }
 
 // GetObjectStream returns an object stream for the object at the specified key
-func (f *ObjectStore) GetObjectStream(ctx context.Context, key string, options *objectstore.DownloadOptions) (io.ReadCloser, error) {
+func (f *ObjectStore) GetObjectStream(ctx context.Context, key string, options *objectstore.DownloadOptions) (*objectstore.GetObjectStreamOutput, error) {
 	fullPath, err := f.sanitizeKey(key)
 	if err != nil {
 		return nil, err
@@ -199,7 +190,10 @@ func (f *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 			file.Close()
 			return nil, te.New("invalid range %s for key %s", *options.ContentRange, key, te.WithErrorCode(te.EInvalid))
 		}
-		return &sectionReadCloser{io.NewSectionReader(file, offset, length), file}, nil
+		return &objectstore.GetObjectStreamOutput{
+			Body:          &sectionReadCloser{io.NewSectionReader(file, offset, length), file},
+			ContentLength: length,
+		}, nil
 	}
 
 	info, err := file.Stat()
@@ -209,7 +203,10 @@ func (f *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 		return nil, err
 	}
 
-	return &fileReadCloser{file, info.Size()}, nil
+	return &objectstore.GetObjectStreamOutput{
+		Body:          file,
+		ContentLength: info.Size(),
+	}, nil
 }
 
 // DoesObjectExist returns a boolean indicating an object's existence

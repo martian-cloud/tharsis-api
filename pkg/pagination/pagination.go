@@ -16,6 +16,7 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v5"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/sqltag"
 )
 
 // Constants used for sorting
@@ -235,6 +236,7 @@ type extraOptions struct {
 	sortBy            *FieldDescriptor
 	sortTransformFunc SortTransformFunc
 	sortDirection     SortDirection
+	queryTag          string
 }
 
 // ExtraOptionFunc is a function to set extra options
@@ -255,6 +257,21 @@ func WithSortByTransform(f SortTransformFunc) ExtraOptionFunc {
 	}
 }
 
+// countQueryTagSuffix differentiates the count query's metric tag from the rows
+// query's so the two can be told apart (count queries often have very different
+// latency than the rows fetch).
+const countQueryTagSuffix = ".count"
+
+// WithQueryTag tags the paginated rows query and its count query with op, injected
+// as a leading SQL comment. The count query is tagged op+".count". op must be a
+// static, bounded literal (e.g. "jobs.GetJobs") to keep pgx's prepared-statement
+// cache key stable.
+func WithQueryTag(op string) ExtraOptionFunc {
+	return func(o *extraOptions) {
+		o.queryTag = op
+	}
+}
+
 // PaginatedQueryBuilder represents a paginated DB query
 type PaginatedQueryBuilder struct {
 	options           *Options
@@ -264,6 +281,7 @@ type PaginatedQueryBuilder struct {
 	cur               *cursor
 	sortDirection     SortDirection
 	sortTransformFunc SortTransformFunc
+	queryTag          string
 }
 
 // NewPaginatedQueryBuilder returns a PaginatedQueryBuilder
@@ -323,6 +341,7 @@ func NewPaginatedQueryBuilder(
 		sortTransformFunc: extra.sortTransformFunc,
 		limit:             limit,
 		cur:               cur,
+		queryTag:          extra.queryTag,
 	}, nil
 }
 
@@ -359,6 +378,25 @@ func (p *PaginatedQueryBuilder) Execute(ctx context.Context, conn Connection, qu
 		return nil, err
 	}
 
+	if p.queryTag != "" {
+		sql = sqltag.Comment(p.queryTag) + sql
+		countSQL = sqltag.Comment(p.queryTag+countQueryTagSuffix) + countSQL
+	}
+
+	totalCountFunc := newLazyCount(conn, countSQL, countArgs)
+
+	// When conn is a transaction, it may be committed (and its underlying connection
+	// returned to the pool) before a deferred TotalCount call resolves, which would
+	// fail. Resolve the count now, while the transaction is still open, and surface
+	// any error immediately. This must happen before conn.Query opens the rows,
+	// because the rows and the count would otherwise contend for the transaction's
+	// single busy connection. On a pooled (non-tx) connection the count stays lazy.
+	if _, isTx := conn.(pgx.Tx); isTx {
+		if _, err := totalCountFunc(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	rows, err := conn.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, fmt.Errorf("paginated query failed: %s: %w", sql, err)
@@ -366,7 +404,7 @@ func (p *PaginatedQueryBuilder) Execute(ctx context.Context, conn Connection, qu
 
 	return &cursorPaginatedRows{
 		Rows:           rows,
-		totalCountFunc: newLazyCount(conn, countSQL, countArgs),
+		totalCountFunc: totalCountFunc,
 		limit:          p.limit,
 		first:          p.options.First,
 		last:           p.options.Last,

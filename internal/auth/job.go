@@ -64,13 +64,11 @@ func (j *JobCaller) UnauthorizedError(ctx context.Context, hasViewerAccess bool)
 	)
 }
 
-// GetNamespaceAccessPolicy returns the namespace access policy for this caller
-func (j *JobCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
-	return &NamespaceAccessPolicy{
-		AllowAll: false,
-		// RootNamespaceIDs is empty to indicate the caller doesn't have access to any root namespaces
-		RootNamespaceIDs: []string{},
-	}, nil
+// GetRootNamespaceMemberships returns a non-nil empty slice; a job caller has no root namespace
+// memberships (it is scoped to its workspace). It must be non-nil so the membership filter is
+// applied and denies access — a nil slice would be treated as "no filter" and expose all resources.
+func (j *JobCaller) GetRootNamespaceMemberships(_ context.Context) ([]models.MembershipNamespace, error) {
+	return []models.MembershipNamespace{}, nil
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions

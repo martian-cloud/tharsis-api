@@ -180,9 +180,11 @@ func (s *SystemCaller) IsAdminModeActivated(_ context.Context) bool {
 	return true
 }
 
-// GetNamespaceAccessPolicy returns the namespace access policy for this caller
-func (s *SystemCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
-	return &NamespaceAccessPolicy{AllowAll: true}, nil
+// GetRootNamespaceMemberships returns the root namespaces the caller is a member of. The system caller
+// is always an admin (IsAdminModeActivated returns true), so this is never used for filtering
+// and returns an empty slice.
+func (s *SystemCaller) GetRootNamespaceMemberships(_ context.Context) ([]models.MembershipNamespace, error) {
+	return nil, nil
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions
@@ -211,19 +213,15 @@ func (s *SystemCaller) UnauthorizedError(_ context.Context, _ bool) error {
 	)
 }
 
-// NamespaceAccessPolicy specifies the namespaces that a caller has access to
-type NamespaceAccessPolicy struct {
-	// RootNamespaceIDs restricts the caller to the specified root namespaces
-	RootNamespaceIDs []string
-	// AllowAll indicates that the caller has access to all namespaces
-	AllowAll bool
-}
-
 // Caller represents a subject performing an API request
 type Caller interface {
 	GetSubject() string
 	IsAdminModeActivated(ctx context.Context) bool
-	GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error)
+	// GetRootNamespaceMemberships returns the caller's deduplicated, top-most member namespaces. It is
+	// only meaningful when IsAdminModeActivated returns false; admin/system callers have
+	// unrestricted access and must be gated on IsAdminModeActivated before this is used for
+	// filtering.
+	GetRootNamespaceMemberships(ctx context.Context) ([]models.MembershipNamespace, error)
 	RequirePermission(ctx context.Context, perms models.Permission, checks ...func(*constraints)) error
 	RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error
 	RequireAccessToInheritableResource(ctx context.Context, modelType types.ModelType, checks ...func(*constraints)) error

@@ -174,6 +174,7 @@ func (u *userSessions) GetUserSessions(ctx context.Context, input *GetUserSessio
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "user_sessions", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("user_session.GetUserSessions"),
 	)
 
 	if err != nil {
@@ -216,7 +217,7 @@ func (u *userSessions) CreateUserSession(ctx context.Context, session *models.Us
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("user_sessions").
+	sql, args, err := toSQLWithTag("user_session.CreateUserSession", dialect.From("user_sessions").
 		Prepared(true).
 		With("user_sessions",
 			dialect.Insert("user_sessions").Rows(
@@ -236,8 +237,7 @@ func (u *userSessions) CreateUserSession(ctx context.Context, session *models.Us
 					"oauth_redirect_uri":          session.OAuthRedirectURI,
 				}).Returning("*"),
 		).Select(u.getSelectFields()...).
-		InnerJoin(goqu.T("users"), goqu.On(goqu.Ex{"user_sessions.user_id": goqu.I("users.id")})).
-		ToSQL()
+		InnerJoin(goqu.T("users"), goqu.On(goqu.Ex{"user_sessions.user_id": goqu.I("users.id")})))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -264,7 +264,7 @@ func (u *userSessions) UpdateUserSession(ctx context.Context, session *models.Us
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("user_sessions").
+	sql, args, err := toSQLWithTag("user_session.UpdateUserSession", dialect.From("user_sessions").
 		Prepared(true).
 		With("user_sessions",
 			dialect.Update("user_sessions").
@@ -281,8 +281,7 @@ func (u *userSessions) UpdateUserSession(ctx context.Context, session *models.Us
 				}).Where(goqu.Ex{"id": session.Metadata.ID, "version": session.Metadata.Version}).
 				Returning("*"),
 		).Select(u.getSelectFields()...).
-		InnerJoin(goqu.T("users"), goqu.On(goqu.Ex{"user_sessions.user_id": goqu.I("users.id")})).
-		ToSQL()
+		InnerJoin(goqu.T("users"), goqu.On(goqu.Ex{"user_sessions.user_id": goqu.I("users.id")})))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -303,15 +302,14 @@ func (u *userSessions) DeleteUserSession(ctx context.Context, session *models.Us
 	ctx, span := tracer.Start(ctx, "db.DeleteUserSession")
 	defer span.End()
 
-	sql, args, err := dialect.From("user_sessions").
+	sql, args, err := toSQLWithTag("user_session.DeleteUserSession", dialect.From("user_sessions").
 		Prepared(true).
 		With("user_sessions",
 			dialect.Delete("user_sessions").
 				Where(goqu.Ex{"id": session.Metadata.ID, "version": session.Metadata.Version}).
 				Returning("*"),
 		).Select(u.getSelectFields()...).
-		InnerJoin(goqu.T("users"), goqu.On(goqu.Ex{"user_sessions.user_id": goqu.I("users.id")})).
-		ToSQL()
+		InnerJoin(goqu.T("users"), goqu.On(goqu.Ex{"user_sessions.user_id": goqu.I("users.id")})))
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -338,7 +336,7 @@ func (u *userSessions) getUserSession(ctx context.Context, exp goqu.Ex) (*models
 		InnerJoin(goqu.T("users"), goqu.On(goqu.Ex{"user_sessions.user_id": goqu.I("users.id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("user_session.getUserSession", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

@@ -183,6 +183,7 @@ func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, inp
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_provider_versions", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("terraformproviderversion.GetProviderVersions"),
 	)
 
 	if err != nil {
@@ -236,7 +237,7 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 		return nil, err
 	}
 
-	sql, args, err := dialect.From("terraform_provider_versions").
+	sql, args, err := toSQLWithTag("terraformproviderversion.CreateProviderVersion", dialect.From("terraform_provider_versions").
 		Prepared(true).
 		With("terraform_provider_versions",
 			dialect.Insert("terraform_provider_versions").
@@ -258,8 +259,7 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_providers"), goqu.On(goqu.I("terraform_providers.id").Eq(goqu.I("terraform_provider_versions.provider_id")))).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -294,7 +294,7 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 		return nil, err
 	}
 
-	sql, args, err := dialect.From("terraform_provider_versions").
+	sql, args, err := toSQLWithTag("terraformproviderversion.UpdateProviderVersion", dialect.From("terraform_provider_versions").
 		Prepared(true).
 		With("terraform_provider_versions",
 			dialect.Update("terraform_provider_versions").
@@ -314,8 +314,7 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 				Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_providers"), goqu.On(goqu.I("terraform_providers.id").Eq(goqu.I("terraform_provider_versions.provider_id")))).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -339,7 +338,7 @@ func (t *terraformProviderVersions) DeleteProviderVersion(ctx context.Context, p
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("terraform_provider_versions").
+	sql, args, err := toSQLWithTag("terraformproviderversion.DeleteProviderVersion", dialect.From("terraform_provider_versions").
 		Prepared(true).
 		With("terraform_provider_versions",
 			dialect.Delete("terraform_provider_versions").
@@ -351,8 +350,7 @@ func (t *terraformProviderVersions) DeleteProviderVersion(ctx context.Context, p
 				).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_providers"), goqu.On(goqu.I("terraform_providers.id").Eq(goqu.I("terraform_provider_versions.provider_id")))).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -380,7 +378,7 @@ func (t *terraformProviderVersions) getProviderVersion(ctx context.Context, exp 
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("terraformproviderversion.getProviderVersion", query)
 	if err != nil {
 		return nil, err
 	}

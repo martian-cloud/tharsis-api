@@ -79,16 +79,17 @@ type TerraformModuleLabelFilter struct {
 
 // TerraformModuleFilter contains the supported fields for filtering TerraformModule resources
 type TerraformModuleFilter struct {
-	Search             *string
-	Name               *string
-	System             *string
-	RootGroupID        *string
-	GroupID            *string
-	UserID             *string
-	ServiceAccountID   *string
-	TerraformModuleIDs []string
-	NamespacePaths     []string
-	LabelFilters       []TerraformModuleLabelFilter
+	Search      *string
+	Name        *string
+	System      *string
+	RootGroupID *string
+	GroupID     *string
+	// RootNamespaceMemberships limits private modules to those at or under one of the
+	// caller's root member namespace paths. Non-nil empty = no memberships; nil = no filter.
+	RootNamespaceMemberships []models.MembershipNamespace
+	TerraformModuleIDs       []string
+	NamespacePaths           []string
+	LabelFilters             []TerraformModuleLabelFilter
 }
 
 // GetModulesInput is the input for listing terraform modules
@@ -187,22 +188,11 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 		if input.Filter.System != nil {
 			ex = ex.Append(goqu.I("terraform_modules.system").Eq(*input.Filter.System))
 		}
-		if input.Filter.UserID != nil {
+		if input.Filter.RootNamespaceMemberships != nil {
 			ex = ex.Append(
 				goqu.Or(
 					goqu.I("terraform_modules.private").Eq(false),
-					namespaceMembershipExpressionBuilder{
-						userID: input.Filter.UserID,
-					}.build(),
-				))
-		}
-		if input.Filter.ServiceAccountID != nil {
-			ex = ex.Append(
-				goqu.Or(
-					goqu.I("terraform_modules.private").Eq(false),
-					namespaceMembershipExpressionBuilder{
-						serviceAccountID: input.Filter.ServiceAccountID,
-					}.build(),
+					membershipFilterByRootNamespaces(input.Filter.RootNamespaceMemberships),
 				))
 		}
 		if len(input.Filter.LabelFilters) > 0 {
@@ -230,6 +220,7 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_modules", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
 		pagination.WithSortByTransform(sortTransformFunc),
+		pagination.WithQueryTag("terraformmodule.GetModules"),
 	)
 
 	if err != nil {
@@ -283,7 +274,7 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 		return nil, labelsErr
 	}
 
-	sql, args, err := dialect.From("terraform_modules").
+	sql, args, err := toSQLWithTag("terraformmodule.CreateModule", dialect.From("terraform_modules").
 		Prepared(true).
 		With("terraform_modules",
 			dialect.Insert("terraform_modules").
@@ -302,8 +293,7 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 					"labels":        labelsJSON,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -338,7 +328,7 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 		return nil, labelsErr
 	}
 
-	sql, args, err := dialect.From("terraform_modules").
+	sql, args, err := toSQLWithTag("terraformmodule.UpdateModule", dialect.From("terraform_modules").
 		Prepared(true).
 		With("terraform_modules",
 			dialect.Update("terraform_modules").
@@ -353,8 +343,7 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 				).Where(goqu.Ex{"id": module.Metadata.ID, "version": module.Metadata.Version}).
 				Returning("*"),
 		).Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -387,7 +376,7 @@ func (t *terraformModules) DeleteModule(ctx context.Context, module *models.Terr
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("terraform_modules").
+	sql, args, err := toSQLWithTag("terraformmodule.DeleteModule", dialect.From("terraform_modules").
 		Prepared(true).
 		With("terraform_modules",
 			dialect.Delete("terraform_modules").
@@ -398,8 +387,7 @@ func (t *terraformModules) DeleteModule(ctx context.Context, module *models.Terr
 					},
 				).Returning("*"),
 		).Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -425,7 +413,7 @@ func (t *terraformModules) getModule(ctx context.Context, exp goqu.Ex) (*models.
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("terraformmodule.getModule", query)
 	if err != nil {
 		return nil, err
 	}

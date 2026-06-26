@@ -47,6 +47,8 @@ type authorizer struct {
 	serviceAccountID         *string
 	rolePermissionCache      map[string][]models.Permission
 	namespaceMembershipCache map[string]map[string]struct{}
+	workspaceFullPathCache   map[string]string
+	groupFullPathCache       map[string]string
 	lock                     sync.RWMutex
 	useCache                 bool
 }
@@ -59,6 +61,8 @@ func newNamespaceMembershipAuthorizer(dbClient *db.Client, userID *string, servi
 		useCache:                 useCache,
 		rolePermissionCache:      map[string][]models.Permission{},
 		namespaceMembershipCache: map[string]map[string]struct{}{},
+		workspaceFullPathCache:   map[string]string{},
+		groupFullPathCache:       map[string]string{},
 	}
 }
 
@@ -198,16 +202,46 @@ func (a *authorizer) requireAccessToGroup(ctx context.Context, groupID string, p
 		return nil
 	}
 
-	group, err := a.dbClient.Groups.GetGroupByID(ctx, groupID)
+	fullPath, err := a.getGroupFullPath(ctx, groupID)
 	if err != nil {
 		return err
 	}
 
-	if group == nil {
+	if fullPath == "" {
 		return a.authorizationError(ctx, false)
 	}
 
-	return a.requireAccessToNamespace(ctx, group.FullPath, perm)
+	return a.requireAccessToNamespace(ctx, fullPath, perm)
+}
+
+// getGroupFullPath returns a group's full namespace path, memoizing the groupID -> path
+// mapping for the lifetime of the authorizer (one request).
+func (a *authorizer) getGroupFullPath(ctx context.Context, groupID string) (string, error) {
+	if a.useCache {
+		a.lock.RLock()
+		path, ok := a.groupFullPathCache[groupID]
+		a.lock.RUnlock()
+		if ok {
+			return path, nil
+		}
+	}
+
+	group, err := a.dbClient.Groups.GetGroupByID(ctx, groupID)
+	if err != nil {
+		return "", err
+	}
+
+	if group == nil {
+		return "", nil
+	}
+
+	if a.useCache {
+		a.lock.Lock()
+		a.groupFullPathCache[groupID] = group.FullPath
+		a.lock.Unlock()
+	}
+
+	return group.FullPath, nil
 }
 
 func (a *authorizer) requireAccessToWorkspace(ctx context.Context, workspaceID string, perm *models.Permission) error {
@@ -216,16 +250,48 @@ func (a *authorizer) requireAccessToWorkspace(ctx context.Context, workspaceID s
 		return nil
 	}
 
-	ws, err := a.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
+	// Resolve the workspace's namespace path (memoized per request) and authorize against
+	// it. The per-perm result is cached under the path key by requireAccessToNamespace.
+	fullPath, err := a.getWorkspaceFullPath(ctx, workspaceID)
 	if err != nil {
 		return err
 	}
 
-	if ws == nil {
+	if fullPath == "" {
 		return a.authorizationError(ctx, false)
 	}
 
-	return a.requireAccessToNamespace(ctx, ws.FullPath, perm)
+	return a.requireAccessToNamespace(ctx, fullPath, perm)
+}
+
+// getWorkspaceFullPath returns a workspace's full namespace path, memoizing the
+// workspaceID -> path mapping for the lifetime of the authorizer (one request).
+func (a *authorizer) getWorkspaceFullPath(ctx context.Context, workspaceID string) (string, error) {
+	if a.useCache {
+		a.lock.RLock()
+		path, ok := a.workspaceFullPathCache[workspaceID]
+		a.lock.RUnlock()
+		if ok {
+			return path, nil
+		}
+	}
+
+	ws, err := a.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
+	if err != nil {
+		return "", err
+	}
+
+	if ws == nil {
+		return "", nil
+	}
+
+	if a.useCache {
+		a.lock.Lock()
+		a.workspaceFullPathCache[workspaceID] = ws.FullPath
+		a.lock.Unlock()
+	}
+
+	return ws.FullPath, nil
 }
 
 func (a *authorizer) requireAccessToNamespace(ctx context.Context, namespacePath string, perm *models.Permission) error {
@@ -279,16 +345,16 @@ func (a *authorizer) requireAccessToInheritedGroupResource(ctx context.Context, 
 		return nil
 	}
 
-	group, err := a.dbClient.Groups.GetGroupByID(ctx, groupID)
+	fullPath, err := a.getGroupFullPath(ctx, groupID)
 	if err != nil {
 		return err
 	}
 
-	if group == nil {
+	if fullPath == "" {
 		return a.authorizationError(ctx, false)
 	}
 
-	return a.requireAccessToInheritedNamespaceResource(ctx, group.FullPath, perm)
+	return a.requireAccessToInheritedNamespaceResource(ctx, fullPath, perm)
 }
 
 func (a *authorizer) requireAccessToInheritedNamespaceResource(ctx context.Context, namespace string, perm *models.Permission) error {

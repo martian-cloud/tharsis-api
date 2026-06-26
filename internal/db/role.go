@@ -151,6 +151,7 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "roles", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("role.GetRoles"),
 	)
 
 	if err != nil {
@@ -204,7 +205,7 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 		return nil, err
 	}
 
-	sql, args, err := dialect.Insert("roles").
+	sql, args, err := toSQLWithTag("role.CreateRole", dialect.Insert("roles").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":          newResourceID(),
@@ -216,7 +217,7 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 			"description": role.Description,
 			"permissions": permissions,
 		}).
-		Returning(rolesFieldList...).ToSQL()
+		Returning(rolesFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -250,7 +251,7 @@ func (r *roles) UpdateRole(ctx context.Context, role *models.Role) (*models.Role
 		return nil, err
 	}
 
-	sql, args, err := dialect.Update("roles").
+	sql, args, err := toSQLWithTag("role.UpdateRole", dialect.Update("roles").
 		Prepared(true).
 		Set(
 			goqu.Record{
@@ -259,7 +260,7 @@ func (r *roles) UpdateRole(ctx context.Context, role *models.Role) (*models.Role
 				"description": role.Description,
 				"permissions": permissions,
 			},
-		).Where(goqu.Ex{"id": role.Metadata.ID, "version": role.Metadata.Version}).Returning(rolesFieldList...).ToSQL()
+		).Where(goqu.Ex{"id": role.Metadata.ID, "version": role.Metadata.Version}).Returning(rolesFieldList...))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -283,14 +284,14 @@ func (r *roles) DeleteRole(ctx context.Context, role *models.Role) error {
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("roles").
+	sql, args, err := toSQLWithTag("role.DeleteRole", dialect.Delete("roles").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"id":      role.Metadata.ID,
 				"version": role.Metadata.Version,
 			},
-		).Returning(rolesFieldList...).ToSQL()
+		).Returning(rolesFieldList...))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -323,11 +324,10 @@ func (r *roles) getRole(ctx context.Context, exp exp.Ex) (*models.Role, error) {
 	ctx, span := tracer.Start(ctx, "db.getRole")
 	defer span.End()
 
-	sql, args, err := dialect.From("roles").
+	sql, args, err := toSQLWithTag("role.getRole", dialect.From("roles").
 		Prepared(true).
 		Select(rolesFieldList...).
-		Where(exp).
-		ToSQL()
+		Where(exp))
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))

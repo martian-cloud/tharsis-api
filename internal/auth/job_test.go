@@ -23,16 +23,16 @@ func TestJobCaller_IsAdmin(t *testing.T) {
 	assert.False(t, caller.IsAdminModeActivated(t.Context()))
 }
 
-func TestJobCaller_GetNamespaceAccessPolicy(t *testing.T) {
+func TestJobCaller_GetRootNamespaceMemberships(t *testing.T) {
 	caller := JobCaller{}
-	policy, err := caller.GetNamespaceAccessPolicy(context.Background())
+	namespaces, err := caller.GetRootNamespaceMemberships(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, &NamespaceAccessPolicy{
-		AllowAll:         false,
-		RootNamespaceIDs: []string{},
-	}, policy)
+	// Must be a non-nil empty slice: a nil slice is treated as "no filter" by the membership
+	// filter and would expose all resources. A job caller must deny by default.
+	assert.NotNil(t, namespaces)
+	assert.Empty(t, namespaces)
 }
 
 func TestJobCaller_RequirePermissions(t *testing.T) {

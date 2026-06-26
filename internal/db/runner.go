@@ -220,6 +220,7 @@ func (t *terraformRunners) GetRunners(ctx context.Context, input *GetRunnersInpu
 		&pagination.FieldDescriptor{Key: "id", Table: "runners", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
 		pagination.WithSortByTransform(sortTransformFunc),
+		pagination.WithQueryTag("runner.GetRunners"),
 	)
 
 	if err != nil {
@@ -272,7 +273,7 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("runners").
+	sql, args, err := toSQLWithTag("runner.CreateRunner", dialect.From("runners").
 		Prepared(true).
 		With("runners",
 			dialect.Insert("runners").
@@ -292,8 +293,7 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 						"run_untagged_jobs": runner.RunUntaggedJobs,
 					}).Returning("*"),
 		).Select(t.getSelectFields()...).
-		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -329,7 +329,7 @@ func (t *terraformRunners) UpdateRunner(ctx context.Context, runner *models.Runn
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("runners").
+	sql, args, err := toSQLWithTag("runner.UpdateRunner", dialect.From("runners").
 		Prepared(true).
 		With("runners",
 			dialect.Update("runners").
@@ -344,8 +344,7 @@ func (t *terraformRunners) UpdateRunner(ctx context.Context, runner *models.Runn
 					}).Where(goqu.Ex{"id": runner.Metadata.ID, "version": runner.Metadata.Version}).
 				Returning("*"),
 		).Select(t.getSelectFields()...).
-		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -369,7 +368,7 @@ func (t *terraformRunners) DeleteRunner(ctx context.Context, runner *models.Runn
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("runners").
+	sql, args, err := toSQLWithTag("runner.DeleteRunner", dialect.From("runners").
 		Prepared(true).
 		With("runners",
 			dialect.Delete("runners").
@@ -380,8 +379,7 @@ func (t *terraformRunners) DeleteRunner(ctx context.Context, runner *models.Runn
 					},
 				).Returning("*"),
 		).Select(t.getSelectFields()...).
-		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -409,7 +407,7 @@ func (t *terraformRunners) getRunner(ctx context.Context, exp goqu.Ex) (*models.
 		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("runner.getRunner", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

@@ -250,6 +250,7 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 		&pagination.FieldDescriptor{Key: "id", Table: "service_accounts", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
 		pagination.WithSortByTransform(sortTransformFunc),
+		pagination.WithQueryTag("serviceaccount.GetServiceAccounts"),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -303,7 +304,7 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 		return nil, err
 	}
 
-	sql, args, err := dialect.From("service_accounts").
+	sql, args, err := toSQLWithTag("serviceaccount.CreateServiceAccount", dialect.From("service_accounts").
 		Prepared(true).
 		With("service_accounts",
 			dialect.Insert("service_accounts").Rows(
@@ -322,8 +323,7 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 					"secret_expiration_email_sent_at": serviceAccount.SecretExpirationEmailSentAt,
 				}).Returning("*"),
 		).Select(s.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -366,7 +366,7 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("service_accounts").
+	sql, args, err := toSQLWithTag("serviceaccount.UpdateServiceAccount", dialect.From("service_accounts").
 		Prepared(true).
 		With("service_accounts",
 			dialect.Update("service_accounts").
@@ -383,8 +383,7 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 				).Where(goqu.Ex{"id": serviceAccount.Metadata.ID, "version": serviceAccount.Metadata.Version}).
 				Returning("*"),
 		).Select(s.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -408,15 +407,14 @@ func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccou
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("service_accounts").
+	sql, args, err := toSQLWithTag("serviceaccount.DeleteServiceAccount", dialect.From("service_accounts").
 		Prepared(true).
 		With("service_accounts",
 			dialect.Delete("service_accounts").
 				Where(goqu.Ex{"id": serviceAccount.Metadata.ID, "version": serviceAccount.Metadata.Version}).
 				Returning("*"),
 		).Select(s.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -450,12 +448,11 @@ func (s *serviceAccounts) getServiceAccount(ctx context.Context, exp exp.Ex) (*m
 	ctx, span := tracer.Start(ctx, "db.getServiceAccount")
 	defer span.End()
 
-	sql, args, err := dialect.From("service_accounts").
+	sql, args, err := toSQLWithTag("serviceaccount.getServiceAccount", dialect.From("service_accounts").
 		Prepared(true).
 		Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
-		Where(exp).
-		ToSQL()
+		Where(exp))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -483,12 +480,12 @@ func (s *serviceAccounts) AssignServiceAccountToRunner(ctx context.Context, serv
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Insert("service_account_runner_relation").
+	sql, args, err := toSQLWithTag("serviceaccount.AssignServiceAccountToRunner", dialect.Insert("service_account_runner_relation").
 		Prepared(true).
 		Rows(goqu.Record{
 			"service_account_id": serviceAccountID,
 			"runner_id":          runnerID,
-		}).ToSQL()
+		}))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -514,14 +511,14 @@ func (s *serviceAccounts) UnassignServiceAccountFromRunner(ctx context.Context, 
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("service_account_runner_relation").
+	sql, args, err := toSQLWithTag("serviceaccount.UnassignServiceAccountFromRunner", dialect.Delete("service_account_runner_relation").
 		Prepared(true).
 		Where(
 			goqu.Ex{
 				"service_account_id": serviceAccountID,
 				"runner_id":          runnerID,
 			},
-		).ToSQL()
+		))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")

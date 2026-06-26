@@ -163,6 +163,7 @@ func (r *workspaceAssessments) GetWorkspaceAssessments(ctx context.Context, inpu
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "workspace_assessments", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("workspaceassessment.GetWorkspaceAssessments"),
 	)
 
 	if err != nil {
@@ -209,7 +210,7 @@ func (r *workspaceAssessments) CreateWorkspaceAssessment(ctx context.Context, as
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("workspace_assessments").
+	sql, args, err := toSQLWithTag("workspaceassessment.CreateWorkspaceAssessment", dialect.From("workspace_assessments").
 		Prepared(true).
 		With("workspace_assessments",
 			dialect.Insert("workspace_assessments").
@@ -226,8 +227,7 @@ func (r *workspaceAssessments) CreateWorkspaceAssessment(ctx context.Context, as
 					"started_at":            assessment.StartedAtTimestamp,
 				}).Returning("*"),
 		).Select(r.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -256,7 +256,7 @@ func (r *workspaceAssessments) UpdateWorkspaceAssessment(ctx context.Context, as
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("workspace_assessments").
+	sql, args, err := toSQLWithTag("workspaceassessment.UpdateWorkspaceAssessment", dialect.From("workspace_assessments").
 		Prepared(true).
 		With("workspace_assessments",
 			dialect.Update("workspace_assessments").
@@ -272,8 +272,7 @@ func (r *workspaceAssessments) UpdateWorkspaceAssessment(ctx context.Context, as
 					},
 				).Where(goqu.Ex{"id": assessment.Metadata.ID, "version": assessment.Metadata.Version}).Returning("*"),
 		).Select(r.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -296,7 +295,7 @@ func (r *workspaceAssessments) DeleteWorkspaceAssessment(ctx context.Context, as
 	ctx, span := tracer.Start(ctx, "db.DeleteWorkspaceAssessment")
 	defer span.End()
 
-	sql, args, err := dialect.From("workspace_assessments").
+	sql, args, err := toSQLWithTag("workspaceassessment.DeleteWorkspaceAssessment", dialect.From("workspace_assessments").
 		Prepared(true).
 		With("workspace_assessments",
 			dialect.Delete("workspace_assessments").
@@ -307,8 +306,7 @@ func (r *workspaceAssessments) DeleteWorkspaceAssessment(ctx context.Context, as
 					},
 				).Returning("*"),
 		).Select(r.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
-		ToSQL()
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -332,12 +330,11 @@ func (r *workspaceAssessments) getWorkspaceAssessment(ctx context.Context, exp e
 	ctx, span := tracer.Start(ctx, "db.getWorkspaceAssessment")
 	defer span.End()
 
-	sql, args, err := dialect.From("workspace_assessments").
+	sql, args, err := toSQLWithTag("workspaceassessment.getWorkspaceAssessment", dialect.From("workspace_assessments").
 		Prepared(true).
 		Select(r.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
-		Where(exp).
-		ToSQL()
+		Where(exp))
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")

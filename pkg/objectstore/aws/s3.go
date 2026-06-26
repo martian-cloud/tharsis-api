@@ -148,7 +148,7 @@ func (s *ObjectStore) DownloadObject(ctx context.Context, key string, w io.Write
 }
 
 // GetObjectStream returns an object stream for the object at the specified key
-func (s *ObjectStore) GetObjectStream(ctx context.Context, key string, options *objectstore.DownloadOptions) (io.ReadCloser, error) {
+func (s *ObjectStore) GetObjectStream(ctx context.Context, key string, options *objectstore.DownloadOptions) (*objectstore.GetObjectStreamOutput, error) {
 	s3Options := s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -174,7 +174,15 @@ func (s *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 		return nil, err
 	}
 
-	return result.Body, nil
+	var contentLength int64
+	if result.ContentLength != nil {
+		contentLength = *result.ContentLength
+	}
+
+	return &objectstore.GetObjectStreamOutput{
+		Body:          result.Body,
+		ContentLength: contentLength,
+	}, nil
 }
 
 // DoesObjectExist returns a boolean indicating an object's existence.

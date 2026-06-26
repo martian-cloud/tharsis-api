@@ -130,6 +130,7 @@ func (a *asymSigningKeys) GetAsymSigningKeys(ctx context.Context, input *GetAsym
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "asym_signing_keys", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithQueryTag("asymsigningkey.GetAsymSigningKeys"),
 	)
 
 	if err != nil {
@@ -172,7 +173,7 @@ func (a *asymSigningKeys) CreateAsymSigningKey(ctx context.Context, asymSigningK
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("asym_signing_keys").
+	sql, args, err := toSQLWithTag("asymsigningkey.CreateAsymSigningKey", dialect.From("asym_signing_keys").
 		Prepared(true).
 		With("asym_signing_keys",
 			dialect.Insert("asym_signing_keys").Rows(
@@ -187,8 +188,7 @@ func (a *asymSigningKeys) CreateAsymSigningKey(ctx context.Context, asymSigningK
 					"plugin_type": asymSigningKey.PluginType,
 					"status":      asymSigningKey.Status,
 				}).Returning("*"),
-		).Select(a.getSelectFields()...).
-		ToSQL()
+		).Select(a.getSelectFields()...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -207,7 +207,7 @@ func (a *asymSigningKeys) UpdateAsymSigningKey(ctx context.Context, asymSigningK
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.From("asym_signing_keys").
+	sql, args, err := toSQLWithTag("asymsigningkey.UpdateAsymSigningKey", dialect.From("asym_signing_keys").
 		Prepared(true).
 		With("asym_signing_keys",
 			dialect.Update("asym_signing_keys").
@@ -221,8 +221,7 @@ func (a *asymSigningKeys) UpdateAsymSigningKey(ctx context.Context, asymSigningK
 					"status":      asymSigningKey.Status,
 				}).Where(goqu.Ex{"id": asymSigningKey.Metadata.ID, "version": asymSigningKey.Metadata.Version}).
 				Returning("*"),
-		).Select(a.getSelectFields()...).
-		ToSQL()
+		).Select(a.getSelectFields()...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -242,14 +241,13 @@ func (a *asymSigningKeys) DeleteAsymSigningKey(ctx context.Context, asymSigningK
 	ctx, span := tracer.Start(ctx, "db.DeleteAsymSigningKey")
 	defer span.End()
 
-	sql, args, err := dialect.From("asym_signing_keys").
+	sql, args, err := toSQLWithTag("asymsigningkey.DeleteAsymSigningKey", dialect.From("asym_signing_keys").
 		Prepared(true).
 		With("asym_signing_keys",
 			dialect.Delete("asym_signing_keys").
 				Where(goqu.Ex{"id": asymSigningKey.Metadata.ID, "version": asymSigningKey.Metadata.Version}).
 				Returning("*"),
-		).Select(a.getSelectFields()...).
-		ToSQL()
+		).Select(a.getSelectFields()...))
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -274,7 +272,7 @@ func (a *asymSigningKeys) getAsymSigningKey(ctx context.Context, exp goqu.Ex) (*
 		Select(a.getSelectFields()...).
 		Where(exp)
 
-	sql, args, err := query.ToSQL()
+	sql, args, err := toSQLWithTag("asymsigningkey.getAsymSigningKey", query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
