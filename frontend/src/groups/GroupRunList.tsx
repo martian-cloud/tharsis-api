@@ -64,7 +64,6 @@ function GroupRunList({ groupPath, includeAssessmentRuns }: Props) {
                         workspaceAssessment: $workspaceAssessment
                         includeNestedRuns: $includeNestedRuns
                     ) @connection(key: "GroupRunList_runs") {
-                        totalCount
                         edges {
                             node {
                                 id

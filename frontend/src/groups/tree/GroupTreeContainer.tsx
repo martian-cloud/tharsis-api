@@ -62,7 +62,6 @@ function GroupTreeContainer(props: Props) {
                 parentPath: $parentPath
                 sort: $sort
             ) @connection(key: "GroupTreeContainer_groups") {
-                totalCount
                 edges {
                     node {
                         id

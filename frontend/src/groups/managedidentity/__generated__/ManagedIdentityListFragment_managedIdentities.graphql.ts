@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b710bed585de6fd8fd3e821221783020>>
+ * @generated SignedSource<<4f9ca917034e9b68c17ec05be0b5f99c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -20,7 +20,6 @@ export type ManagedIdentityListFragment_managedIdentities$data = {
         readonly " $fragmentSpreads": FragmentRefs<"ManagedIdentityListItemFragment_managedIdentity">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
   };
   readonly " $fragmentType": "ManagedIdentityListFragment_managedIdentities";
 };
@@ -126,13 +125,6 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
           "concreteType": "ManagedIdentityEdge",
           "kind": "LinkedField",
           "name": "edges",
@@ -228,6 +220,6 @@ return {
 };
 })();
 
-(node as any).hash = "be9554f770c64d06a4f067041ba1a56e";
+(node as any).hash = "4d6c6bbe1af8fe7f777da89f2f16918d";
 
 export default node;

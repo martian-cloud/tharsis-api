@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9c5d6ca97f220e028d615bef8b3be2cb>>
+ * @generated SignedSource<<3125bd1eef943b1763880427df50095e>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -19,7 +19,6 @@ export type TerraformProviderVersionListFragment_versions$data = {
           readonly " $fragmentSpreads": FragmentRefs<"TerraformProviderVersionListItemFragment_version">;
         } | null | undefined;
       } | null | undefined> | null | undefined;
-      readonly totalCount: number;
     };
   } | null | undefined;
   readonly " $fragmentType": "TerraformProviderVersionListFragment_versions";
@@ -118,13 +117,6 @@ return {
               "name": "__TerraformProviderVersionList_versions_connection",
               "plural": false,
               "selections": [
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "totalCount",
-                  "storageKey": null
-                },
                 {
                   "alias": null,
                   "args": null,
@@ -228,6 +220,6 @@ return {
 };
 })();
 
-(node as any).hash = "efd644663d240bdcf489ceedc0a67d99";
+(node as any).hash = "70c089ce1c450a2d7833b299af22bb97";
 
 export default node;

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<aa12f5955a927e4818ea09fb19f945d9>>
+ * @generated SignedSource<<f187672105a258cbe61a094344beab10>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -169,13 +169,6 @@ return {
                   {
                     "alias": null,
                     "args": null,
-                    "kind": "ScalarField",
-                    "name": "totalCount",
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
                     "concreteType": "NamespaceVariableVersionEdge",
                     "kind": "LinkedField",
                     "name": "edges",
@@ -299,12 +292,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "863d6b25861e4327ed255953a4f07c13",
+    "cacheID": "322bb480470b49dfbce5de77ae7e1ff7",
     "id": null,
     "metadata": {},
     "name": "VariableHistoryDialogQuery",
     "operationKind": "query",
-    "text": "query VariableHistoryDialogQuery(\n  $id: String!\n  $first: Int!\n  $after: String\n  $includeValues: Boolean!\n) {\n  node(id: $id) {\n    __typename\n    ... on NamespaceVariable {\n      sensitive\n      ...VariableHistoryDialogFragment_variable\n    }\n    id\n  }\n}\n\nfragment VariableHistoryDialogFragment_variable on NamespaceVariable {\n  versions(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    totalCount\n    edges {\n      node {\n        metadata {\n          createdAt\n        }\n        id\n        key\n        value @include(if: $includeValues)\n        hcl\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n"
+    "text": "query VariableHistoryDialogQuery(\n  $id: String!\n  $first: Int!\n  $after: String\n  $includeValues: Boolean!\n) {\n  node(id: $id) {\n    __typename\n    ... on NamespaceVariable {\n      sensitive\n      ...VariableHistoryDialogFragment_variable\n    }\n    id\n  }\n}\n\nfragment VariableHistoryDialogFragment_variable on NamespaceVariable {\n  versions(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        metadata {\n          createdAt\n        }\n        id\n        key\n        value @include(if: $includeValues)\n        hcl\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n"
   }
 };
 })();

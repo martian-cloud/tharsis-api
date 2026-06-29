@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ae60cc794f825d0336e1f9b4c2f87b34>>
+ * @generated SignedSource<<7cf50970bb9eb4f5d298d1a201055d24>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -103,22 +103,21 @@ v1 = [
     "variableName": "sort"
   }
 ],
-v2 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "totalCount",
-  "storageKey": null
-},
-v3 = [
+v2 = [
   {
     "kind": "Literal",
     "name": "first",
     "value": 0
   }
 ],
-v4 = [
-  (v2/*: any*/)
+v3 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "totalCount",
+    "storageKey": null
+  }
 ];
 return {
   "fragment": {
@@ -150,7 +149,6 @@ return {
         "name": "groups",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
           {
             "alias": null,
             "args": null,
@@ -222,22 +220,22 @@ return {
                   },
                   {
                     "alias": null,
-                    "args": (v3/*: any*/),
+                    "args": (v2/*: any*/),
                     "concreteType": "GroupConnection",
                     "kind": "LinkedField",
                     "name": "descendentGroups",
                     "plural": false,
-                    "selections": (v4/*: any*/),
+                    "selections": (v3/*: any*/),
                     "storageKey": "descendentGroups(first:0)"
                   },
                   {
                     "alias": null,
-                    "args": (v3/*: any*/),
+                    "args": (v2/*: any*/),
                     "concreteType": "WorkspaceConnection",
                     "kind": "LinkedField",
                     "name": "workspaces",
                     "plural": false,
-                    "selections": (v4/*: any*/),
+                    "selections": (v3/*: any*/),
                     "storageKey": "workspaces(first:0)"
                   }
                 ],
@@ -311,16 +309,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "035e36356ea2859f7c3053d407270a67",
+    "cacheID": "b079ca6740344be8765e30cc155217ef",
     "id": null,
     "metadata": {},
     "name": "GroupsPaginationQuery",
     "operationKind": "query",
-    "text": "query GroupsPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $parentPath: String\n  $search: String\n  $sort: GroupSort\n) {\n  ...GroupTreeContainerFragment_groups\n}\n\nfragment GroupTreeContainerFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, search: $search, parentPath: $parentPath, sort: $sort) {\n    totalCount\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...GroupTreeFragment_connection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment GroupTreeFragment_connection on GroupConnection {\n  totalCount\n  edges {\n    node {\n      id\n      ...GroupTreeListItemFragment_group\n    }\n  }\n}\n\nfragment GroupTreeListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n"
+    "text": "query GroupsPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $parentPath: String\n  $search: String\n  $sort: GroupSort\n) {\n  ...GroupTreeContainerFragment_groups\n}\n\nfragment GroupTreeContainerFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, search: $search, parentPath: $parentPath, sort: $sort) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...GroupTreeFragment_connection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment GroupTreeFragment_connection on GroupConnection {\n  edges {\n    node {\n      id\n      ...GroupTreeListItemFragment_group\n    }\n  }\n}\n\nfragment GroupTreeListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "0e182ad85e2a571871b3807f22988048";
+(node as any).hash = "ab6bbb309282e0299057d696add60ace";
 
 export default node;

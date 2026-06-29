@@ -49,7 +49,6 @@ function VariableHistory({ variableId, sensitive }: { variableId: string, sensit
                 after: $after
                 sort: CREATED_AT_DESC
                 ) @connection(key: "VariableHistoryDialog_versions") {
-                    totalCount
                     edges {
                         node {
                             metadata {

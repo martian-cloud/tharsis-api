@@ -52,7 +52,6 @@ function GroupList(props: Props) {
                 search: $search
                 sort:FULL_PATH_ASC
             ) @connection(key: "GroupList_groups") {
-                totalCount
                 edges {
                     node {
                         id

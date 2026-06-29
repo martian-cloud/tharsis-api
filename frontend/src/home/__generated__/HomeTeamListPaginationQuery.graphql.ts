@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<63331d8cead70f6a3fbf0cd86c2eaee5>>
+ * @generated SignedSource<<ad2a4a0ed35ffbe11ecf6f6e941ba1ab>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -138,13 +138,6 @@ return {
                   {
                     "alias": null,
                     "args": null,
-                    "kind": "ScalarField",
-                    "name": "totalCount",
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
                     "concreteType": "TeamEdge",
                     "kind": "LinkedField",
                     "name": "edges",
@@ -229,16 +222,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "2f249cbf0f063ac7257b741ea23048d0",
+    "cacheID": "4e1a7608c9204ac188486b5e395063ff",
     "id": null,
     "metadata": {},
     "name": "HomeTeamListPaginationQuery",
     "operationKind": "query",
-    "text": "query HomeTeamListPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...HomeTeamListFragment_teams\n    id\n  }\n}\n\nfragment HomeTeamListFragment_teams on User {\n  teams(first: $first, after: $after, sort: NAME_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeTeamListItemFragment_team\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n\nfragment HomeTeamListItemFragment_team on Team {\n  name\n}\n"
+    "text": "query HomeTeamListPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...HomeTeamListFragment_teams\n    id\n  }\n}\n\nfragment HomeTeamListFragment_teams on User {\n  teams(first: $first, after: $after, sort: NAME_ASC) {\n    edges {\n      node {\n        id\n        ...HomeTeamListItemFragment_team\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n\nfragment HomeTeamListItemFragment_team on Team {\n  name\n}\n"
   }
 };
 })();
 
-(node as any).hash = "3375f1e450b84df963a7955cdcd53bf7";
+(node as any).hash = "9f33e78effba0e45b00ed9f1eee71011";
 
 export default node;

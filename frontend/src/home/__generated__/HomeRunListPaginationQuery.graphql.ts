@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8d5437e416b3084c32b32577d5d5f188>>
+ * @generated SignedSource<<a55b315c0c355c27245bb0f6b279fac2>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -104,13 +104,6 @@ return {
         "name": "runs",
         "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "totalCount",
-            "storageKey": null
-          },
           {
             "alias": null,
             "args": null,
@@ -255,16 +248,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "c4770402587492005cdff7623220099a",
+    "cacheID": "4715d3a15cb4a8b709a1068feaef62c4",
     "id": null,
     "metadata": {},
     "name": "HomeRunListPaginationQuery",
     "operationKind": "query",
-    "text": "query HomeRunListPaginationQuery(\n  $after: String\n  $first: Int\n) {\n  ...HomeRunListFragment_runs\n}\n\nfragment HomeRunListFragment_runs on Query {\n  runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: false) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeRunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  metadata {\n    createdAt\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
+    "text": "query HomeRunListPaginationQuery(\n  $after: String\n  $first: Int\n) {\n  ...HomeRunListFragment_runs\n}\n\nfragment HomeRunListFragment_runs on Query {\n  runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: false) {\n    edges {\n      node {\n        id\n        ...HomeRunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  metadata {\n    createdAt\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "75c03ebdbca29479db14594ff29f174b";
+(node as any).hash = "3f6959bd8c42a5f36875dad77d168e8b";
 
 export default node;

@@ -63,7 +63,6 @@ function TerraformModuleList({ group, queryRef, search = '', labelFilters = [], 
                 includeInherited: true
                 labelFilter: $labelFilter
             ) @connection(key: "TerraformModuleList_terraformModules") {
-                totalCount
                 edges {
                     node {
                         id

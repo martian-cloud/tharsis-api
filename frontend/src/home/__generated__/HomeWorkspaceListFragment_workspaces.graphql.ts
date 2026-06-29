@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c2691206d02266cebb1260c2d2338464>>
+ * @generated SignedSource<<4fa0e582cb56bd675b7aa3314d9ff491>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,7 +18,6 @@ export type HomeWorkspaceListFragment_workspaces$data = {
         readonly " $fragmentSpreads": FragmentRefs<"HomeWorkspaceListItemFragment_workspace">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
   };
   readonly " $fragmentType": "HomeWorkspaceListFragment_workspaces";
 };
@@ -92,13 +91,6 @@ return {
       "name": "__HomeWorkspaceList_workspaces_connection",
       "plural": false,
       "selections": [
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
         {
           "alias": null,
           "args": null,
@@ -181,6 +173,6 @@ return {
 };
 })();
 
-(node as any).hash = "f9d2d0f08007c5caa220d281fb0b9f42";
+(node as any).hash = "85ee465afff52ffd5f3f4de788058218";
 
 export default node;

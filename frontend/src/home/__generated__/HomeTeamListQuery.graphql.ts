@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<4e82d59eef2bdcea97254590a6371e05>>
+ * @generated SignedSource<<308ef5ab72ab588971f9611d54138352>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -135,13 +135,6 @@ return {
                   {
                     "alias": null,
                     "args": null,
-                    "kind": "ScalarField",
-                    "name": "totalCount",
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
                     "concreteType": "TeamEdge",
                     "kind": "LinkedField",
                     "name": "edges",
@@ -235,12 +228,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "122868f8b213f3649312dd17a59f842a",
+    "cacheID": "67f1655956c2bb9599933db11fcee6f7",
     "id": null,
     "metadata": {},
     "name": "HomeTeamListQuery",
     "operationKind": "query",
-    "text": "query HomeTeamListQuery(\n  $first: Int!\n  $after: String\n) {\n  me {\n    __typename\n    ... on User {\n      ...HomeTeamListFragment_teams\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment HomeTeamListFragment_teams on User {\n  teams(first: $first, after: $after, sort: NAME_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeTeamListItemFragment_team\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n\nfragment HomeTeamListItemFragment_team on Team {\n  name\n}\n"
+    "text": "query HomeTeamListQuery(\n  $first: Int!\n  $after: String\n) {\n  me {\n    __typename\n    ... on User {\n      ...HomeTeamListFragment_teams\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment HomeTeamListFragment_teams on User {\n  teams(first: $first, after: $after, sort: NAME_ASC) {\n    edges {\n      node {\n        id\n        ...HomeTeamListItemFragment_team\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n\nfragment HomeTeamListItemFragment_team on Team {\n  name\n}\n"
   }
 };
 })();

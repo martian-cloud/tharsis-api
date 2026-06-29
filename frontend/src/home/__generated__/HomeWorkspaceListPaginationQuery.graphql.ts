@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<2a8844ac669d7ca70da79f7f68e3a44a>>
+ * @generated SignedSource<<ef24b214def86f2489fe5711f72c8915>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -93,13 +93,6 @@ return {
         "name": "workspaces",
         "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "totalCount",
-            "storageKey": null
-          },
           {
             "alias": null,
             "args": null,
@@ -200,16 +193,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "7b1babaf512bb6977b8746dab2901520",
+    "cacheID": "2bd5926bfd22da0dbbf46f578fbdc075",
     "id": null,
     "metadata": {},
     "name": "HomeWorkspaceListPaginationQuery",
     "operationKind": "query",
-    "text": "query HomeWorkspaceListPaginationQuery(\n  $after: String\n  $first: Int\n  $search: String\n) {\n  ...HomeWorkspaceListFragment_workspaces\n}\n\nfragment HomeWorkspaceListFragment_workspaces on Query {\n  workspaces(first: $first, after: $after, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeWorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeWorkspaceListItemFragment_workspace on Workspace {\n  name\n  fullPath\n}\n"
+    "text": "query HomeWorkspaceListPaginationQuery(\n  $after: String\n  $first: Int\n  $search: String\n) {\n  ...HomeWorkspaceListFragment_workspaces\n}\n\nfragment HomeWorkspaceListFragment_workspaces on Query {\n  workspaces(first: $first, after: $after, search: $search, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        ...HomeWorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeWorkspaceListItemFragment_workspace on Workspace {\n  name\n  fullPath\n}\n"
   }
 };
 })();
 
-(node as any).hash = "f9d2d0f08007c5caa220d281fb0b9f42";
+(node as any).hash = "85ee465afff52ffd5f3f4de788058218";
 
 export default node;

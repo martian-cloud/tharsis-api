@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<130541be257967595d90f967ed8986f7>>
+ * @generated SignedSource<<722c3ab830be4905dac2df74e7b19f8f>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -105,32 +105,31 @@ v8 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "totalCount",
+  "name": "id",
   "storageKey": null
 },
 v9 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "id",
-  "storageKey": null
-},
-v10 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
   "name": "__typename",
   "storageKey": null
 },
-v11 = [
+v10 = [
   {
     "kind": "Literal",
     "name": "first",
     "value": 0
   }
 ],
-v12 = [
-  (v8/*: any*/)
+v11 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "totalCount",
+    "storageKey": null
+  }
 ];
 return {
   "fragment": {
@@ -183,7 +182,6 @@ return {
         "name": "groups",
         "plural": false,
         "selections": [
-          (v8/*: any*/),
           {
             "alias": null,
             "args": null,
@@ -200,8 +198,8 @@ return {
                 "name": "node",
                 "plural": false,
                 "selections": [
+                  (v8/*: any*/),
                   (v9/*: any*/),
-                  (v10/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -243,22 +241,22 @@ return {
                   },
                   {
                     "alias": null,
-                    "args": (v11/*: any*/),
+                    "args": (v10/*: any*/),
                     "concreteType": "GroupConnection",
                     "kind": "LinkedField",
                     "name": "descendentGroups",
                     "plural": false,
-                    "selections": (v12/*: any*/),
+                    "selections": (v11/*: any*/),
                     "storageKey": "descendentGroups(first:0)"
                   },
                   {
                     "alias": null,
-                    "args": (v11/*: any*/),
+                    "args": (v10/*: any*/),
                     "concreteType": "WorkspaceConnection",
                     "kind": "LinkedField",
                     "name": "workspaces",
                     "plural": false,
-                    "selections": (v12/*: any*/),
+                    "selections": (v11/*: any*/),
                     "storageKey": "workspaces(first:0)"
                   }
                 ],
@@ -337,7 +335,7 @@ return {
         "name": "me",
         "plural": false,
         "selections": [
-          (v10/*: any*/),
+          (v9/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -355,7 +353,7 @@ return {
           {
             "kind": "InlineFragment",
             "selections": [
-              (v9/*: any*/)
+              (v8/*: any*/)
             ],
             "type": "Node",
             "abstractKey": "__isNode"
@@ -366,12 +364,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "5a8efcd2c5572eee18788f2d450fc6be",
+    "cacheID": "ba6076714949863cb332b3a0ba41e596",
     "id": null,
     "metadata": {},
     "name": "GroupTreeContainerQuery",
     "operationKind": "query",
-    "text": "query GroupTreeContainerQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $search: String\n  $parentPath: String\n  $sort: GroupSort\n) {\n  ...GroupTreeContainerFragment_groups\n  ...GroupTreeContainerFragment_me\n}\n\nfragment GroupTreeContainerFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, search: $search, parentPath: $parentPath, sort: $sort) {\n    totalCount\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...GroupTreeFragment_connection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment GroupTreeContainerFragment_me on Query {\n  me {\n    __typename\n    ... on User {\n      adminModeEnabled\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment GroupTreeFragment_connection on GroupConnection {\n  totalCount\n  edges {\n    node {\n      id\n      ...GroupTreeListItemFragment_group\n    }\n  }\n}\n\nfragment GroupTreeListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n"
+    "text": "query GroupTreeContainerQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $search: String\n  $parentPath: String\n  $sort: GroupSort\n) {\n  ...GroupTreeContainerFragment_groups\n  ...GroupTreeContainerFragment_me\n}\n\nfragment GroupTreeContainerFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, search: $search, parentPath: $parentPath, sort: $sort) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...GroupTreeFragment_connection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment GroupTreeContainerFragment_me on Query {\n  me {\n    __typename\n    ... on User {\n      adminModeEnabled\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment GroupTreeFragment_connection on GroupConnection {\n  edges {\n    node {\n      id\n      ...GroupTreeListItemFragment_group\n    }\n  }\n}\n\nfragment GroupTreeListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n"
   }
 };
 })();

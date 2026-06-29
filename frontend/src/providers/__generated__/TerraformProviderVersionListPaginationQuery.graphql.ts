@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7fb3840ed7a818a50863cfce088610be>>
+ * @generated SignedSource<<b7c4c89c6faef7cea627c5fe28820afd>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -142,13 +142,6 @@ return {
                 "name": "versions",
                 "plural": false,
                 "selections": [
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "totalCount",
-                    "storageKey": null
-                  },
                   {
                     "alias": null,
                     "args": null,
@@ -309,16 +302,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "5daf890c8bf5293ef7c849567b6f448e",
+    "cacheID": "cd6927a97b6adfd4d5142cd1f3c7530c",
     "id": null,
     "metadata": {},
     "name": "TerraformProviderVersionListPaginationQuery",
     "operationKind": "query",
-    "text": "query TerraformProviderVersionListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $providerId: String!\n) {\n  ...TerraformProviderVersionListFragment_versions\n}\n\nfragment TerraformProviderVersionListFragment_versions on Query {\n  node(id: $providerId) {\n    __typename\n    ... on TerraformProvider {\n      versions(after: $after, before: $before, first: $first, last: $last, sort: CREATED_AT_DESC) {\n        totalCount\n        edges {\n          node {\n            id\n            ...TerraformProviderVersionListItemFragment_version\n            __typename\n          }\n          cursor\n        }\n        pageInfo {\n          endCursor\n          hasNextPage\n          hasPreviousPage\n          startCursor\n        }\n      }\n    }\n    id\n  }\n}\n\nfragment TerraformProviderVersionListItemFragment_version on TerraformProviderVersion {\n  metadata {\n    createdAt\n  }\n  id\n  version\n  createdBy\n  latest\n  provider {\n    name\n    registryNamespace\n    id\n  }\n}\n"
+    "text": "query TerraformProviderVersionListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $providerId: String!\n) {\n  ...TerraformProviderVersionListFragment_versions\n}\n\nfragment TerraformProviderVersionListFragment_versions on Query {\n  node(id: $providerId) {\n    __typename\n    ... on TerraformProvider {\n      versions(after: $after, before: $before, first: $first, last: $last, sort: CREATED_AT_DESC) {\n        edges {\n          node {\n            id\n            ...TerraformProviderVersionListItemFragment_version\n            __typename\n          }\n          cursor\n        }\n        pageInfo {\n          endCursor\n          hasNextPage\n          hasPreviousPage\n          startCursor\n        }\n      }\n    }\n    id\n  }\n}\n\nfragment TerraformProviderVersionListItemFragment_version on TerraformProviderVersion {\n  metadata {\n    createdAt\n  }\n  id\n  version\n  createdBy\n  latest\n  provider {\n    name\n    registryNamespace\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "efd644663d240bdcf489ceedc0a67d99";
+(node as any).hash = "70c089ce1c450a2d7833b299af22bb97";
 
 export default node;

@@ -51,7 +51,6 @@ function WorkspaceRunList({ workspaceId, includeAssessmentRuns }: Props) {
             sort: CREATED_AT_DESC
             workspaceAssessment: $workspaceAssessment
         ) @connection(key: "WorkspaceRunList_runs") {
-            totalCount
             edges {
                 node {
                     id

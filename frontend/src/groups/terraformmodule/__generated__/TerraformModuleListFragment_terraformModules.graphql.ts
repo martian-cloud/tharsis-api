@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8a9119da36b2f4c5f922348980375d90>>
+ * @generated SignedSource<<3cfabe25025eacba7b35e3d446cd80ea>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -20,7 +20,6 @@ export type TerraformModuleListFragment_terraformModules$data = {
         readonly " $fragmentSpreads": FragmentRefs<"TerraformModuleListItemFragment_terraformModule">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
   };
   readonly " $fragmentType": "TerraformModuleListFragment_terraformModules";
 };
@@ -135,13 +134,6 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
           "concreteType": "TerraformModuleEdge",
           "kind": "LinkedField",
           "name": "edges",
@@ -237,6 +229,6 @@ return {
 };
 })();
 
-(node as any).hash = "009536d615010d75bdf79f3cf58ef9cb";
+(node as any).hash = "16c17f9c816e16c46e1b218ed602992e";
 
 export default node;

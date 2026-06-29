@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<eaeaa5363df74ca421103bf4abed083b>>
+ * @generated SignedSource<<607c502df0f19f4085835b4efd427d2b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,6 @@ export type GroupTreeContainerFragment_groups$data = {
         readonly id: string;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
     readonly " $fragmentSpreads": FragmentRefs<"GroupTreeFragment_connection">;
   };
   readonly " $fragmentType": "GroupTreeContainerFragment_groups";
@@ -119,13 +118,6 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
           "concreteType": "GroupEdge",
           "kind": "LinkedField",
           "name": "edges",
@@ -219,6 +211,6 @@ return {
 };
 })();
 
-(node as any).hash = "0e182ad85e2a571871b3807f22988048";
+(node as any).hash = "ab6bbb309282e0299057d696add60ace";
 
 export default node;

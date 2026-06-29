@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<0252323fb42af5906c719529f794938b>>
+ * @generated SignedSource<<dfdf4e03e1f2299b64e5eaf8dc68c5cd>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -94,22 +94,21 @@ v6 = [
     "value": "FULL_PATH_ASC"
   }
 ],
-v7 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "totalCount",
-  "storageKey": null
-},
-v8 = [
+v7 = [
   {
     "kind": "Literal",
     "name": "first",
     "value": 0
   }
 ],
-v9 = [
-  (v7/*: any*/)
+v8 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "totalCount",
+    "storageKey": null
+  }
 ];
 return {
   "fragment": {
@@ -155,7 +154,6 @@ return {
         "name": "groups",
         "plural": false,
         "selections": [
-          (v7/*: any*/),
           {
             "alias": null,
             "args": null,
@@ -220,22 +218,22 @@ return {
                   },
                   {
                     "alias": null,
-                    "args": (v8/*: any*/),
+                    "args": (v7/*: any*/),
                     "concreteType": "GroupConnection",
                     "kind": "LinkedField",
                     "name": "descendentGroups",
                     "plural": false,
-                    "selections": (v9/*: any*/),
+                    "selections": (v8/*: any*/),
                     "storageKey": "descendentGroups(first:0)"
                   },
                   {
                     "alias": null,
-                    "args": (v8/*: any*/),
+                    "args": (v7/*: any*/),
                     "concreteType": "WorkspaceConnection",
                     "kind": "LinkedField",
                     "name": "workspaces",
                     "plural": false,
-                    "selections": (v9/*: any*/),
+                    "selections": (v8/*: any*/),
                     "storageKey": "workspaces(first:0)"
                   },
                   {
@@ -316,12 +314,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "ab1090155dc91fea807af2b5dd44cee9",
+    "cacheID": "dbcbf2b1cab50f16ea788f65d34802d9",
     "id": null,
     "metadata": {},
     "name": "GroupListQuery",
     "operationKind": "query",
-    "text": "query GroupListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $parentPath: String\n  $search: String\n) {\n  ...GroupListFragment_groups\n}\n\nfragment GroupListFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, parentPath: $parentPath, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...GroupListItemFragment_group\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment GroupListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n"
+    "text": "query GroupListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $parentPath: String\n  $search: String\n) {\n  ...GroupListFragment_groups\n}\n\nfragment GroupListFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, parentPath: $parentPath, search: $search, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        ...GroupListItemFragment_group\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment GroupListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n"
   }
 };
 })();

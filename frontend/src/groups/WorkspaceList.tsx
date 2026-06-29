@@ -60,7 +60,6 @@ function WorkspaceList({ fragmentRef }: Props) {
                 search: $search
                 sort: FULL_PATH_ASC
             ) @connection(key: "WorkspaceList_workspaces") {
-                totalCount
                 edges {
                     node {
                         id

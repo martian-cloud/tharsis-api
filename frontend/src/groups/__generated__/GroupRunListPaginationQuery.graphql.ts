@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5b7f326a3b1485c8a6b4baf68e42a6fc>>
+ * @generated SignedSource<<7de5d71c198517f9a734fadaa9165b77>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -143,13 +143,6 @@ return {
             "name": "runs",
             "plural": false,
             "selections": [
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "totalCount",
-                "storageKey": null
-              },
               {
                 "alias": null,
                 "args": null,
@@ -320,16 +313,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "8781563049dcc07aacfff2ee6f1a4639",
+    "cacheID": "0eb10d02f5cfcc50268e4a77ffaba47d",
     "id": null,
     "metadata": {},
     "name": "GroupRunListPaginationQuery",
     "operationKind": "query",
-    "text": "query GroupRunListPaginationQuery(\n  $after: String\n  $first: Int\n  $groupPath: String!\n  $includeNestedRuns: Boolean\n  $workspaceAssessment: Boolean\n) {\n  ...GroupRunListFragment_group\n}\n\nfragment GroupRunListFragment_group on Query {\n  group(fullPath: $groupPath) {\n    id\n    runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment, includeNestedRuns: $includeNestedRuns) {\n      totalCount\n      edges {\n        node {\n          id\n          __typename\n        }\n        cursor\n      }\n      ...RunListFragment_runConnection\n      pageInfo {\n        endCursor\n        hasNextPage\n      }\n    }\n  }\n}\n\nfragment RunListFragment_runConnection on RunConnection {\n  totalCount\n  edges {\n    node {\n      id\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n"
+    "text": "query GroupRunListPaginationQuery(\n  $after: String\n  $first: Int\n  $groupPath: String!\n  $includeNestedRuns: Boolean\n  $workspaceAssessment: Boolean\n) {\n  ...GroupRunListFragment_group\n}\n\nfragment GroupRunListFragment_group on Query {\n  group(fullPath: $groupPath) {\n    id\n    runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment, includeNestedRuns: $includeNestedRuns) {\n      edges {\n        node {\n          id\n          __typename\n        }\n        cursor\n      }\n      ...RunListFragment_runConnection\n      pageInfo {\n        endCursor\n        hasNextPage\n      }\n    }\n  }\n}\n\nfragment RunListFragment_runConnection on RunConnection {\n  edges {\n    node {\n      id\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "b907b2e0a6b18fb24721d74c9f26681d";
+(node as any).hash = "fbf620376f1e597f03052f98f1abb759";
 
 export default node;

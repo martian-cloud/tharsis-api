@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<3305a751bc1d388483cb52c8fc496947>>
+ * @generated SignedSource<<533a2f862ab73a306e6cf7a7a7ce32d3>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -138,13 +138,6 @@ return {
         "name": "workspaces",
         "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "totalCount",
-            "storageKey": null
-          },
           {
             "alias": null,
             "args": null,
@@ -310,12 +303,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "d38e9a6762f7a976b50045c66bcb046f",
+    "cacheID": "7830bd50ec16833975f89747e4a06919",
     "id": null,
     "metadata": {},
     "name": "WorkspaceListQuery",
     "operationKind": "query",
-    "text": "query WorkspaceListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $groupId: String!\n  $search: String\n) {\n  ...WorkspaceListFragment_workspaces\n}\n\nfragment WorkspaceListFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, groupId: $groupId, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...WorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  labels {\n    key\n    value\n  }\n}\n"
+    "text": "query WorkspaceListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $groupId: String!\n  $search: String\n) {\n  ...WorkspaceListFragment_workspaces\n}\n\nfragment WorkspaceListFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, groupId: $groupId, search: $search, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        ...WorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  labels {\n    key\n    value\n  }\n}\n"
   }
 };
 })();

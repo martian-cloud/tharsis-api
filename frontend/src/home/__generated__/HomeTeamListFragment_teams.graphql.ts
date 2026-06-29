@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5b428a3d48513b110d5b82359de80e5d>>
+ * @generated SignedSource<<2b976136f43e75f309f0a1b38cecb67b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -19,7 +19,6 @@ export type HomeTeamListFragment_teams$data = {
         readonly " $fragmentSpreads": FragmentRefs<"HomeTeamListItemFragment_team">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
   };
   readonly " $fragmentType": "HomeTeamListFragment_teams";
 };
@@ -100,13 +99,6 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
           "concreteType": "TeamEdge",
           "kind": "LinkedField",
           "name": "edges",
@@ -181,6 +173,6 @@ return {
 };
 })();
 
-(node as any).hash = "3375f1e450b84df963a7955cdcd53bf7";
+(node as any).hash = "9f33e78effba0e45b00ed9f1eee71011";
 
 export default node;

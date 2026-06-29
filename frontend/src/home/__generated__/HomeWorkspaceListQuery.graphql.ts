@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<baf6c2d9b0a8be357a638df56c8bdafd>>
+ * @generated SignedSource<<752c281ba7486f9ef7df3eba66537f99>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -102,13 +102,6 @@ return {
           {
             "alias": null,
             "args": null,
-            "kind": "ScalarField",
-            "name": "totalCount",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
             "concreteType": "WorkspaceEdge",
             "kind": "LinkedField",
             "name": "edges",
@@ -206,12 +199,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "66173cab18dfa764cae25ea71ebced91",
+    "cacheID": "d88e8a4fe4fc28b4c52d0d42b5de459e",
     "id": null,
     "metadata": {},
     "name": "HomeWorkspaceListQuery",
     "operationKind": "query",
-    "text": "query HomeWorkspaceListQuery(\n  $first: Int!\n  $after: String\n  $search: String\n) {\n  ...HomeWorkspaceListFragment_workspaces\n}\n\nfragment HomeWorkspaceListFragment_workspaces on Query {\n  workspaces(first: $first, after: $after, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeWorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeWorkspaceListItemFragment_workspace on Workspace {\n  name\n  fullPath\n}\n"
+    "text": "query HomeWorkspaceListQuery(\n  $first: Int!\n  $after: String\n  $search: String\n) {\n  ...HomeWorkspaceListFragment_workspaces\n}\n\nfragment HomeWorkspaceListFragment_workspaces on Query {\n  workspaces(first: $first, after: $after, search: $search, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        ...HomeWorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeWorkspaceListItemFragment_workspace on Workspace {\n  name\n  fullPath\n}\n"
   }
 };
 })();
