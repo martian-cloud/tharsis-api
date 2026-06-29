@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<988e26854404cfbc32a761591b6b483b>>
+ * @generated SignedSource<<c0de6b6d57eb42984665292ce335607e>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,6 @@ export type WorkspaceRunListFragment_runs$data = {
         readonly id: string;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
     readonly " $fragmentSpreads": FragmentRefs<"RunListFragment_runConnection">;
   };
   readonly " $fragmentType": "WorkspaceRunListFragment_runs";
@@ -115,13 +114,6 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
           "concreteType": "RunEdge",
           "kind": "LinkedField",
           "name": "edges",
@@ -215,6 +207,6 @@ return {
 };
 })();
 
-(node as any).hash = "403a1d01ccfdb3d6a2b818d4d2505dea";
+(node as any).hash = "5c6e95f7488af91e23c15f23fc27c1de";
 
 export default node;

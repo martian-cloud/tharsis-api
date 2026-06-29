@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e0f675f5bffe82ff9ab1824bbd7652d5>>
+ * @generated SignedSource<<ef98f1809e0959382e03186ca5b2b6f8>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -152,13 +152,6 @@ return {
                   {
                     "alias": null,
                     "args": null,
-                    "kind": "ScalarField",
-                    "name": "totalCount",
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
                     "concreteType": "NamespaceVariableVersionEdge",
                     "kind": "LinkedField",
                     "name": "edges",
@@ -282,16 +275,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "98ed9885fcbd5cc187d7a12d08cdd9b1",
+    "cacheID": "9c95d4210a539054608af2b3f1e38f7f",
     "id": null,
     "metadata": {},
     "name": "VariableHistoryDialogPaginationQuery",
     "operationKind": "query",
-    "text": "query VariableHistoryDialogPaginationQuery(\n  $after: String\n  $first: Int\n  $includeValues: Boolean!\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...VariableHistoryDialogFragment_variable\n    id\n  }\n}\n\nfragment VariableHistoryDialogFragment_variable on NamespaceVariable {\n  versions(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    totalCount\n    edges {\n      node {\n        metadata {\n          createdAt\n        }\n        id\n        key\n        value @include(if: $includeValues)\n        hcl\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n"
+    "text": "query VariableHistoryDialogPaginationQuery(\n  $after: String\n  $first: Int\n  $includeValues: Boolean!\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...VariableHistoryDialogFragment_variable\n    id\n  }\n}\n\nfragment VariableHistoryDialogFragment_variable on NamespaceVariable {\n  versions(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        metadata {\n          createdAt\n        }\n        id\n        key\n        value @include(if: $includeValues)\n        hcl\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n"
   }
 };
 })();
 
-(node as any).hash = "30d73859dd9bb1b08bd84de3a2651b30";
+(node as any).hash = "fe30b62faa4e6680fdfd965ee7065f16";
 
 export default node;

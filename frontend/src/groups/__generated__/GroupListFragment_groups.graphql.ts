@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d91dab71291bc298941ac91d547d8801>>
+ * @generated SignedSource<<4c6d65139d0c667e5c2055496a999cb3>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,7 +18,6 @@ export type GroupListFragment_groups$data = {
         readonly " $fragmentSpreads": FragmentRefs<"GroupListItemFragment_group">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
   };
   readonly " $fragmentType": "GroupListFragment_groups";
 };
@@ -115,13 +114,6 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
           "concreteType": "GroupEdge",
           "kind": "LinkedField",
           "name": "edges",
@@ -215,6 +207,6 @@ return {
 };
 })();
 
-(node as any).hash = "6a070dcc9f07d92465b844b829f78f5a";
+(node as any).hash = "cbaf49207b745e57d363fee50c49adf5";
 
 export default node;

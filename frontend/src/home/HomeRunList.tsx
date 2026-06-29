@@ -51,7 +51,6 @@ function HomeRunList() {
                 sort: CREATED_AT_DESC
                 workspaceAssessment: false
                 ) @connection(key: "HomeRunList_runs") {
-                    totalCount
                     edges {
                         node {
                             id

@@ -46,7 +46,6 @@ function TerraformModuleVersionList(props: Props) {
                     last: $last
                     sort: CREATED_AT_DESC
                 ) @connection(key: "TerraformModuleVersionList_versions") {
-                    totalCount
                     edges {
                         node {
                             id

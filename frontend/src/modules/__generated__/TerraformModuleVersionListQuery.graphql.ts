@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e96a1bf81317c849d08e173acc578f3b>>
+ * @generated SignedSource<<46283f0b91d8f8d8f65876a82589b51c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -152,13 +152,6 @@ return {
                 "name": "versions",
                 "plural": false,
                 "selections": [
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "totalCount",
-                    "storageKey": null
-                  },
                   {
                     "alias": null,
                     "args": null,
@@ -326,12 +319,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "4a1f9904e4ea1190fde59a465ea47f5a",
+    "cacheID": "7be4478b32d817e6b68103bf8c7938c4",
     "id": null,
     "metadata": {},
     "name": "TerraformModuleVersionListQuery",
     "operationKind": "query",
-    "text": "query TerraformModuleVersionListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $moduleId: String!\n) {\n  ...TerraformModuleVersionListFragment_versions\n}\n\nfragment TerraformModuleVersionListFragment_versions on Query {\n  node(id: $moduleId) {\n    __typename\n    ... on TerraformModule {\n      versions(after: $after, before: $before, first: $first, last: $last, sort: CREATED_AT_DESC) {\n        totalCount\n        edges {\n          node {\n            id\n            ...TerraformModuleVersionListItemFragment_version\n            __typename\n          }\n          cursor\n        }\n        pageInfo {\n          endCursor\n          hasNextPage\n          hasPreviousPage\n          startCursor\n        }\n      }\n    }\n    id\n  }\n}\n\nfragment TerraformModuleVersionListItemFragment_version on TerraformModuleVersion {\n  metadata {\n    createdAt\n  }\n  id\n  version\n  createdBy\n  latest\n  module {\n    name\n    registryNamespace\n    system\n    id\n  }\n}\n"
+    "text": "query TerraformModuleVersionListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $moduleId: String!\n) {\n  ...TerraformModuleVersionListFragment_versions\n}\n\nfragment TerraformModuleVersionListFragment_versions on Query {\n  node(id: $moduleId) {\n    __typename\n    ... on TerraformModule {\n      versions(after: $after, before: $before, first: $first, last: $last, sort: CREATED_AT_DESC) {\n        edges {\n          node {\n            id\n            ...TerraformModuleVersionListItemFragment_version\n            __typename\n          }\n          cursor\n        }\n        pageInfo {\n          endCursor\n          hasNextPage\n          hasPreviousPage\n          startCursor\n        }\n      }\n    }\n    id\n  }\n}\n\nfragment TerraformModuleVersionListItemFragment_version on TerraformModuleVersion {\n  metadata {\n    createdAt\n  }\n  id\n  version\n  createdBy\n  latest\n  module {\n    name\n    registryNamespace\n    system\n    id\n  }\n}\n"
   }
 };
 })();

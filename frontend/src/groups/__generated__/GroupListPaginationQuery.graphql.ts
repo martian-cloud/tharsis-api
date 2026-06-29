@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<3d53a7800edc3417659433203480eecb>>
+ * @generated SignedSource<<9cf17764e2d55ac5d45d03157c76289c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -96,22 +96,21 @@ v1 = [
     "value": "FULL_PATH_ASC"
   }
 ],
-v2 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "totalCount",
-  "storageKey": null
-},
-v3 = [
+v2 = [
   {
     "kind": "Literal",
     "name": "first",
     "value": 0
   }
 ],
-v4 = [
-  (v2/*: any*/)
+v3 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "totalCount",
+    "storageKey": null
+  }
 ];
 return {
   "fragment": {
@@ -143,7 +142,6 @@ return {
         "name": "groups",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
           {
             "alias": null,
             "args": null,
@@ -208,22 +206,22 @@ return {
                   },
                   {
                     "alias": null,
-                    "args": (v3/*: any*/),
+                    "args": (v2/*: any*/),
                     "concreteType": "GroupConnection",
                     "kind": "LinkedField",
                     "name": "descendentGroups",
                     "plural": false,
-                    "selections": (v4/*: any*/),
+                    "selections": (v3/*: any*/),
                     "storageKey": "descendentGroups(first:0)"
                   },
                   {
                     "alias": null,
-                    "args": (v3/*: any*/),
+                    "args": (v2/*: any*/),
                     "concreteType": "WorkspaceConnection",
                     "kind": "LinkedField",
                     "name": "workspaces",
                     "plural": false,
-                    "selections": (v4/*: any*/),
+                    "selections": (v3/*: any*/),
                     "storageKey": "workspaces(first:0)"
                   },
                   {
@@ -304,16 +302,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "b9a3d5d20759f90f874d9cf3182e95f9",
+    "cacheID": "a3ee6e7089c12a455ac2b9f008ec94e1",
     "id": null,
     "metadata": {},
     "name": "GroupListPaginationQuery",
     "operationKind": "query",
-    "text": "query GroupListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $parentPath: String\n  $search: String\n) {\n  ...GroupListFragment_groups\n}\n\nfragment GroupListFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, parentPath: $parentPath, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...GroupListItemFragment_group\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment GroupListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n"
+    "text": "query GroupListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $parentPath: String\n  $search: String\n) {\n  ...GroupListFragment_groups\n}\n\nfragment GroupListFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, parentPath: $parentPath, search: $search, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        ...GroupListItemFragment_group\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment GroupListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "6a070dcc9f07d92465b844b829f78f5a";
+(node as any).hash = "cbaf49207b745e57d363fee50c49adf5";
 
 export default node;

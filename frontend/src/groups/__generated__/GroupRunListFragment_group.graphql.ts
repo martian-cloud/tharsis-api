@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9ab40f8052b1221589e738fac0579c51>>
+ * @generated SignedSource<<78a642b1218241937b4a1544e47fd6b9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -19,7 +19,6 @@ export type GroupRunListFragment_group$data = {
           readonly id: string;
         } | null | undefined;
       } | null | undefined> | null | undefined;
-      readonly totalCount: number;
       readonly " $fragmentSpreads": FragmentRefs<"RunListFragment_runConnection">;
     };
   } | null | undefined;
@@ -134,13 +133,6 @@ return {
             {
               "alias": null,
               "args": null,
-              "kind": "ScalarField",
-              "name": "totalCount",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
               "concreteType": "RunEdge",
               "kind": "LinkedField",
               "name": "edges",
@@ -217,6 +209,6 @@ return {
 };
 })();
 
-(node as any).hash = "b907b2e0a6b18fb24721d74c9f26681d";
+(node as any).hash = "fbf620376f1e597f03052f98f1abb759";
 
 export default node;

@@ -26,7 +26,6 @@ function RunList({ fragmentRef, hasNext, loadNext, displayWorkspacePath }: Props
     const data = useFragment<RunListFragment_runConnection$key>(
         graphql`
       fragment RunListFragment_runConnection on RunConnection {
-        totalCount
         edges {
             node {
                 id

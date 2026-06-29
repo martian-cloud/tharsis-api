@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f4359d7b8f072948aabd21a4bf241c64>>
+ * @generated SignedSource<<60241c944a2fe7f148b38f03e4dc2e21>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -215,13 +215,6 @@ return {
                   {
                     "alias": null,
                     "args": null,
-                    "kind": "ScalarField",
-                    "name": "totalCount",
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
                     "concreteType": "TerraformModuleEdge",
                     "kind": "LinkedField",
                     "name": "edges",
@@ -395,12 +388,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "8f526eb0beb137979d3a3bb1bfc60ece",
+    "cacheID": "bea86a9bb7bed5e808815ac5c1d84185",
     "id": null,
     "metadata": {},
     "name": "TerraformModuleListQuery",
     "operationKind": "query",
-    "text": "query TerraformModuleListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $groupId: String!\n  $search: String\n  $labelFilter: TerraformModuleLabelsFilter\n) {\n  node(id: $groupId) {\n    __typename\n    ... on Group {\n      ...TerraformModuleListFragment_terraformModules\n    }\n    id\n  }\n}\n\nfragment TerraformModuleListFragment_terraformModules on Group {\n  terraformModules(after: $after, before: $before, first: $first, last: $last, search: $search, sort: GROUP_LEVEL_DESC, includeInherited: true, labelFilter: $labelFilter) {\n    totalCount\n    edges {\n      node {\n        id\n        groupPath\n        ...TerraformModuleListItemFragment_terraformModule\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n  id\n}\n\nfragment TerraformModuleListItemFragment_terraformModule on TerraformModule {\n  id\n  name\n  system\n  registryNamespace\n  private\n  groupPath\n  labels {\n    key\n    value\n  }\n  latestVersion {\n    version\n    id\n  }\n}\n"
+    "text": "query TerraformModuleListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $groupId: String!\n  $search: String\n  $labelFilter: TerraformModuleLabelsFilter\n) {\n  node(id: $groupId) {\n    __typename\n    ... on Group {\n      ...TerraformModuleListFragment_terraformModules\n    }\n    id\n  }\n}\n\nfragment TerraformModuleListFragment_terraformModules on Group {\n  terraformModules(after: $after, before: $before, first: $first, last: $last, search: $search, sort: GROUP_LEVEL_DESC, includeInherited: true, labelFilter: $labelFilter) {\n    edges {\n      node {\n        id\n        groupPath\n        ...TerraformModuleListItemFragment_terraformModule\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n  id\n}\n\nfragment TerraformModuleListItemFragment_terraformModule on TerraformModule {\n  id\n  name\n  system\n  registryNamespace\n  private\n  groupPath\n  labels {\n    key\n    value\n  }\n  latestVersion {\n    version\n    id\n  }\n}\n"
   }
 };
 })();

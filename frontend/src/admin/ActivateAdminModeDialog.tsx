@@ -1,9 +1,8 @@
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
-import { useState } from 'react';
 import graphql from 'babel-plugin-relay/macro';
-import { useMutation } from 'react-relay/hooks';
-import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
+import { useState } from 'react';
+import { useMutation } from 'react-relay/hooks';
 import { ActivateAdminModeDialogMutation } from './__generated__/ActivateAdminModeDialogMutation.graphql';
 
 interface Props {
@@ -14,7 +13,6 @@ interface Props {
 function ActivateAdminModeDialog({ open, onClose }: Props) {
     const [duration, setDuration] = useState(30);
     const [error, setError] = useState<string | null>(null);
-    const navigate = useNavigate();
     const { enqueueSnackbar } = useSnackbar();
 
     const [commit, isInFlight] = useMutation<ActivateAdminModeDialogMutation>(graphql`
@@ -45,7 +43,6 @@ function ActivateAdminModeDialog({ open, onClose }: Props) {
                 if (data.activateAdminMode.problems.length === 0) {
                     onClose();
                     enqueueSnackbar('Admin mode activated', { variant: 'success' });
-                    navigate('/admin');
                 } else {
                     setError(data.activateAdminMode.problems.map(p => p.message).join('; '));
                 }

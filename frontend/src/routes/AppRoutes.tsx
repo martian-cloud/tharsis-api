@@ -1,19 +1,19 @@
 import { Route, Routes } from 'react-router-dom';
+import AdminAreaEntryPoint from '../admin/AdminArea';
 import GraphiQLEditor from '../graphiql/GraphiQLEditor';
 import NewGroup from '../groups/NewGroup';
+import HomePage from '../home/HomePage';
 import NewWorkspace from '../workspace/NewWorkspace';
 import ExploreGroupsEntryPoint from './ExploreGroupsEntryPoint';
 import GroupOrWorkspaceDetailsEntryPoint from './GroupOrWorkspaceDetailsEntryPoint';
-import HomeEntryPoint from './HomeEntryPoint';
 import ScrollRestoration from './ScrollRestoration';
+import TeamDetailsEntryPoint from './TeamDetailsEntryPoint';
 import TerraformModuleSearchEntryPoint from './TerraformModuleSearchEntryPoint';
 import TerraformModuleVersionDetailsEntryPoint from './TerraformModuleVersionDetailsEntryPoint';
 import TerraformProviderSearchEntryPoint from './TerraformProviderSearchEntryPoint';
 import TerraformProviderVersionDetailsEntryPoint from './TerraformProviderVersionDetailsEntryPoint';
-import WorkspaceSearchEntryPoint from './WorkspaceSearchEntryPoint';
-import AdminAreaEntryPoint from '../admin/AdminArea';
 import UserPreferencesEntryPoint from './UserPreferencesEntryPoint';
-import TeamDetailsEntryPoint from './TeamDetailsEntryPoint';
+import WorkspaceSearchEntryPoint from './WorkspaceSearchEntryPoint';
 
 function AppRoutes() {
     return (
@@ -34,7 +34,7 @@ function AppRoutes() {
                 <Route path="/admin/*" element={<AdminAreaEntryPoint />} />
                 <Route path="/preferences" element={<UserPreferencesEntryPoint />} />
                 <Route path="/teams/:teamName" element={<TeamDetailsEntryPoint />} />
-                <Route path="/" element={<HomeEntryPoint />} />
+                <Route path="/" element={<HomePage />} />
             </Routes>
         </ScrollRestoration>
     );

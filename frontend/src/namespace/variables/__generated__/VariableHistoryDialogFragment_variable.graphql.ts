@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<0f4ec699275f882fcb83caa39a75e019>>
+ * @generated SignedSource<<97d89d12a75d3385c10d84ad4d61c165>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -24,7 +24,6 @@ export type VariableHistoryDialogFragment_variable$data = {
         readonly value?: string | null | undefined;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
   };
   readonly " $fragmentType": "VariableHistoryDialogFragment_variable";
 };
@@ -106,13 +105,6 @@ return {
       "name": "__VariableHistoryDialog_versions_connection",
       "plural": false,
       "selections": [
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
         {
           "alias": null,
           "args": null,
@@ -231,6 +223,6 @@ return {
 };
 })();
 
-(node as any).hash = "30d73859dd9bb1b08bd84de3a2651b30";
+(node as any).hash = "fe30b62faa4e6680fdfd965ee7065f16";
 
 export default node;

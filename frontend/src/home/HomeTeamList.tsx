@@ -31,7 +31,6 @@ function HomeTeamList() {
                 after: $after
                 sort: NAME_ASC
                 ) @connection(key: "HomeTeamList_teams") {
-                    totalCount
                     edges {
                         node {
                             id

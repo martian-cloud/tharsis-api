@@ -34,7 +34,6 @@ function HomeWorkspaceList() {
                 search: $search
                 sort: FULL_PATH_ASC
                 ) @connection(key: "HomeWorkspaceList_workspaces") {
-                    totalCount
                     edges {
                         node {
                             id

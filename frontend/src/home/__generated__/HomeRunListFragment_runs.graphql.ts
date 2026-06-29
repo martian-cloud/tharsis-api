@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d23758603a7e974df8c52cf14e467944>>
+ * @generated SignedSource<<d2cb8d022d1cba7d19f8bcd043124508>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,7 +18,6 @@ export type HomeRunListFragment_runs$data = {
         readonly " $fragmentSpreads": FragmentRefs<"HomeRunListItemFragment_run">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
   };
   readonly " $fragmentType": "HomeRunListFragment_runs";
 };
@@ -88,13 +87,6 @@ return {
       "name": "__HomeRunList_runs_connection",
       "plural": false,
       "selections": [
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
         {
           "alias": null,
           "args": null,
@@ -177,6 +169,6 @@ return {
 };
 })();
 
-(node as any).hash = "75c03ebdbca29479db14594ff29f174b";
+(node as any).hash = "3f6959bd8c42a5f36875dad77d168e8b";
 
 export default node;

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ac053d7d16694ec67d6ffb4607fd48de>>
+ * @generated SignedSource<<cb63d5b2767824cd46103d865d0fece1>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,6 @@ export type RunListFragment_runConnection$data = {
       readonly " $fragmentSpreads": FragmentRefs<"RunListItemFragment_run">;
     } | null | undefined;
   } | null | undefined> | null | undefined;
-  readonly totalCount: number;
   readonly " $fragmentType": "RunListFragment_runConnection";
 };
 export type RunListFragment_runConnection$key = {
@@ -31,13 +30,6 @@ const node: ReaderFragment = {
   "metadata": null,
   "name": "RunListFragment_runConnection",
   "selections": [
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "totalCount",
-      "storageKey": null
-    },
     {
       "alias": null,
       "args": null,
@@ -77,6 +69,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "93b2fc003e001cee10e2b8532f0fbcf7";
+(node as any).hash = "ff258d87883050cb395ecbf86607ce2d";
 
 export default node;

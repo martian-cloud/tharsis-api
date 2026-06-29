@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<1381a2694eeefed97fb99dac7971d128>>
+ * @generated SignedSource<<dae85debf9e74318b42ea4e3297a6910>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,7 +18,6 @@ export type WorkspaceListFragment_workspaces$data = {
         readonly " $fragmentSpreads": FragmentRefs<"WorkspaceListItemFragment_workspace">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
   };
   readonly " $fragmentType": "WorkspaceListFragment_workspaces";
 };
@@ -115,13 +114,6 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
           "concreteType": "WorkspaceEdge",
           "kind": "LinkedField",
           "name": "edges",
@@ -215,6 +207,6 @@ return {
 };
 })();
 
-(node as any).hash = "5b9184b7f0dc8e56181a14671fd850f9";
+(node as any).hash = "926f91c556efd89ff03b7ceaeb9ca6c2";
 
 export default node;

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7780c427e1349421d94d8d9d8996a7d1>>
+ * @generated SignedSource<<0843ee2157be50e73ad5a99220116701>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -126,13 +126,6 @@ return {
         "name": "workspaces",
         "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "totalCount",
-            "storageKey": null
-          },
           {
             "alias": null,
             "args": null,
@@ -298,16 +291,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "643c42c0e27b63d0f3e8879d8ba9b52a",
+    "cacheID": "850abe971abcd38608f4541f5985886c",
     "id": null,
     "metadata": {},
     "name": "WorkspaceListPaginationQuery",
     "operationKind": "query",
-    "text": "query WorkspaceListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $groupId: String\n  $last: Int\n  $search: String\n) {\n  ...WorkspaceListFragment_workspaces\n}\n\nfragment WorkspaceListFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, groupId: $groupId, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...WorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  labels {\n    key\n    value\n  }\n}\n"
+    "text": "query WorkspaceListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $groupId: String\n  $last: Int\n  $search: String\n) {\n  ...WorkspaceListFragment_workspaces\n}\n\nfragment WorkspaceListFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, groupId: $groupId, search: $search, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        ...WorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  labels {\n    key\n    value\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "5b9184b7f0dc8e56181a14671fd850f9";
+(node as any).hash = "926f91c556efd89ff03b7ceaeb9ca6c2";
 
 export default node;

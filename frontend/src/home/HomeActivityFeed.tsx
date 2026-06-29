@@ -1,24 +1,28 @@
-import { Box, Typography, useTheme } from '@mui/material';
+import { Box, ToggleButton, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
+import React, { useContext } from 'react';
 import { useLazyLoadQuery, usePaginationFragment } from 'react-relay';
+import { useSearchParams } from 'react-router';
 import ActivityEventList from '../activity/ActivityEventList';
-import { HomeActivityFeedQuery } from './__generated__/HomeActivityFeedQuery.graphql';
-import { HomeActivityFeedPaginationQuery } from './__generated__/HomeActivityFeedPaginationQuery.graphql';
+import { UserContext } from '../UserContext';
 import { HomeActivityFeedFragment_activity$key } from './__generated__/HomeActivityFeedFragment_activity.graphql';
+import { HomeActivityFeedPaginationQuery } from './__generated__/HomeActivityFeedPaginationQuery.graphql';
+import { HomeActivityFeedQuery } from './__generated__/HomeActivityFeedQuery.graphql';
 
 const INITIAL_ITEM_COUNT = 20;
 
-interface Props {
-    username: string | undefined;
-}
+function HomeActivityFeed() {
+    const user = useContext(UserContext);
+    const [searchParams, setSearchParams] = useSearchParams();
 
-function HomeActivityFeed({ username }: Props) {
-    const theme = useTheme();
+    // This filter will only show the current users activity when true
+    const showMyActivity = searchParams.get('filter') === 'myActivity';
+
     const queryData = useLazyLoadQuery<HomeActivityFeedQuery>(graphql`
         query HomeActivityFeedQuery($first: Int, $after: String, $username: String) {
            ...HomeActivityFeedFragment_activity
         }
-    `, { first: INITIAL_ITEM_COUNT, username }, { fetchPolicy: 'store-and-network' });
+    `, { first: INITIAL_ITEM_COUNT, username: showMyActivity ? user.username : undefined }, { fetchPolicy: 'store-and-network' });
 
     const { data, loadNext, hasNext } = usePaginationFragment<HomeActivityFeedPaginationQuery, HomeActivityFeedFragment_activity$key>(
         graphql`
@@ -43,33 +47,42 @@ function HomeActivityFeed({ username }: Props) {
     const eventCount = data.activityEvents?.edges?.length || 0;
 
     return (
-        <Box>
-            {eventCount > 0 &&
+        <React.Fragment>
+            {eventCount === 0 && <Box flex={1} mt={4} display="flex" justifyContent="center">
+                <Box
+                    sx={{
+                        p: 4,
+                        maxWidth: 600,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}>
+                    <Typography variant="h6">Welcome to Tharsis!</Typography>
+                    <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
+                        Get started using Tharsis to manage your Terraform deployments
+                    </Typography>
+                </Box>
+            </Box>}
+            {eventCount > 0 && <React.Fragment>
+                <Box display="flex" justifyContent="space-between" alignItems="center">
+                    <Typography variant="h6" fontWeight={600} mb={1}>Activity</Typography>
+                    <ToggleButton
+                        onChange={() => setSearchParams(!showMyActivity ? { filter: 'myActivity' } : {}, { replace: true })}
+                        color="secondary"
+                        selected={showMyActivity}
+                        size="small"
+                        value="myActivity">
+                        My Activity
+                    </ToggleButton>
+                </Box>
                 <ActivityEventList
                     loadNext={loadNext}
                     hasNext={hasNext}
                     fragmentRef={data.activityEvents}
                 />
-            }
-            {eventCount === 0 && <Box
-                border={`1px dashed ${theme.palette.divider}`}
-                borderRadius={2}
-                mt={4}
-                display="flex"
-                justifyContent="center"
-            >
-                <Box
-                    padding={4}
-                    display="flex"
-                    flexDirection="column"
-                    justifyContent="center"
-                    alignItems="center"
-                    sx={{ maxWidth: 600 }}
-                >
-                    <Typography variant="subtitle1" color="textSecondary">You do not have any activity events</Typography>
-                </Box>
-            </Box>}
-        </Box>
+            </React.Fragment>}
+        </React.Fragment>
     );
 }
 

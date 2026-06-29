@@ -69,7 +69,6 @@ function ManagedIdentityList(props: Props) {
                 includeInherited: true
                 sort: GROUP_LEVEL_DESC
             ) @connection(key: "ManagedIdentityList_managedIdentities") {
-                totalCount
                 edges {
                     node {
                         id

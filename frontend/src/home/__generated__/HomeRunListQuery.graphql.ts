@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6fafe1aa43e09f333d46f96d5b0d261c>>
+ * @generated SignedSource<<5ddf2d0e1686e86237b959389f27030b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -108,13 +108,6 @@ return {
         "name": "runs",
         "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "totalCount",
-            "storageKey": null
-          },
           {
             "alias": null,
             "args": null,
@@ -259,12 +252,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "32219cac4d620105397286e3713f75d3",
+    "cacheID": "2c9b08089cd692c260e94f6d58ff4bb5",
     "id": null,
     "metadata": {},
     "name": "HomeRunListQuery",
     "operationKind": "query",
-    "text": "query HomeRunListQuery(\n  $first: Int!\n  $after: String\n) {\n  ...HomeRunListFragment_runs\n}\n\nfragment HomeRunListFragment_runs on Query {\n  runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: false) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeRunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  metadata {\n    createdAt\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
+    "text": "query HomeRunListQuery(\n  $first: Int!\n  $after: String\n) {\n  ...HomeRunListFragment_runs\n}\n\nfragment HomeRunListFragment_runs on Query {\n  runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: false) {\n    edges {\n      node {\n        id\n        ...HomeRunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  metadata {\n    createdAt\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
   }
 };
 })();
