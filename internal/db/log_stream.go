@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -71,9 +72,16 @@ type LogStreams interface {
 	GetLogStreams(ctx context.Context, input *GetLogStreamsInput) (*LogStreamsResult, error)
 	CreateLogStream(ctx context.Context, logStream *models.LogStream) (*models.LogStream, error)
 	UpdateLogStream(ctx context.Context, logStream *models.LogStream) (*models.LogStream, error)
+	// ClaimLogStreamsForCompaction atomically claims up to limit completed, not-yet-compacted streams
+	// for compaction and returns them. A stream is claimable when its compaction has not been started
+	// (compaction_started_at IS NULL) or was started before claimableBefore (a stale/abandoned claim).
+	// Claiming stamps compaction_started_at and bumps the row version. Rows already locked by another
+	// instance's in-flight claim are skipped (SELECT ... FOR UPDATE SKIP LOCKED), so concurrent
+	// schedulers grab disjoint batches instead of contending on the same streams.
+	ClaimLogStreamsForCompaction(ctx context.Context, limit int, claimableBefore time.Time) ([]models.LogStream, error)
 }
 
-var logStreamFieldList = append(metadataFieldList, "size", "job_id", "runner_session_id", "completed")
+var logStreamFieldList = append(metadataFieldList, "size", "job_id", "runner_session_id", "completed", "truncated", "compacted", "compaction_started_at")
 
 type logStreams struct {
 	dbClient *Client
@@ -179,19 +187,24 @@ func (l *logStreams) CreateLogStream(ctx context.Context, logStream *models.LogS
 
 	timestamp := currentTime()
 
-	sql, args, err := toSQLWithTag("log_stream.CreateLogStream", dialect.Insert("log_streams").
+	record := goqu.Record{
+		"id":                    newResourceID(),
+		"version":               initialResourceVersion,
+		"created_at":            timestamp,
+		"updated_at":            timestamp,
+		"size":                  logStream.Size,
+		"job_id":                logStream.JobID,
+		"runner_session_id":     logStream.RunnerSessionID,
+		"completed":             logStream.Completed,
+		"truncated":             logStream.Truncated,
+		"compacted":             logStream.Compacted,
+		"compaction_started_at": logStream.CompactionStartedAt,
+	}
+
+	sql, args, err := dialect.Insert("log_streams").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":                newResourceID(),
-			"version":           initialResourceVersion,
-			"created_at":        timestamp,
-			"updated_at":        timestamp,
-			"size":              logStream.Size,
-			"job_id":            logStream.JobID,
-			"runner_session_id": logStream.RunnerSessionID,
-			"completed":         logStream.Completed,
-		}).
-		Returning(logStreamFieldList...))
+		Rows(record).
+		Returning(logStreamFieldList...).ToSQL()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -235,10 +248,13 @@ func (l *logStreams) UpdateLogStream(ctx context.Context, logStream *models.LogS
 		Prepared(true).
 		Set(
 			goqu.Record{
-				"version":    goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at": timestamp,
-				"size":       logStream.Size,
-				"completed":  logStream.Completed,
+				"version":               goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":            timestamp,
+				"size":                  logStream.Size,
+				"completed":             logStream.Completed,
+				"truncated":             logStream.Truncated,
+				"compacted":             logStream.Compacted,
+				"compaction_started_at": logStream.CompactionStartedAt,
 			},
 		).Where(goqu.Ex{"id": logStream.Metadata.ID, "version": logStream.Metadata.Version}).
 		Returning(logStreamFieldList...))
@@ -255,6 +271,70 @@ func (l *logStreams) UpdateLogStream(ctx context.Context, logStream *models.LogS
 	}
 
 	return updatedLogStream, nil
+}
+
+func (l *logStreams) ClaimLogStreamsForCompaction(ctx context.Context, limit int, claimableBefore time.Time) ([]models.LogStream, error) {
+	ctx, span := tracer.Start(ctx, "db.ClaimLogStreamsForCompaction")
+	defer span.End()
+
+	timestamp := currentTime()
+
+	// compaction_started_at is stored in UTC (via currentTime), and the column is a TIMESTAMP WITHOUT
+	// TIME ZONE, so the comparison value must be UTC too or a non-UTC caller's local time would be
+	// compared against a UTC wall clock and be off by the machine's offset.
+	claimableBefore = claimableBefore.UTC()
+
+	// Inner CTE: pick a batch of claimable streams and row-lock them with SKIP LOCKED so a concurrent
+	// scheduler on another instance skips these rows and selects a different batch rather than blocking.
+	claimable := dialect.From(goqu.T("log_streams")).
+		Select("id").
+		Where(
+			goqu.Ex{"completed": true, "compacted": false},
+			goqu.Or(
+				goqu.C("compaction_started_at").IsNull(),
+				goqu.C("compaction_started_at").Lt(claimableBefore),
+			),
+		).
+		Order(goqu.C("updated_at").Asc()).
+		Limit(uint(limit)).
+		ForUpdate(goqu.SkipLocked)
+
+	// Outer UPDATE: stamp the claim (compaction_started_at) and bump the version on exactly the locked
+	// rows, returning them. RETURNING columns are qualified to log_streams to avoid ambiguity with the
+	// claimable CTE's id.
+	query := dialect.Update("log_streams").
+		Prepared(true).
+		With("claimable", claimable).
+		Set(goqu.Record{
+			"version":               goqu.L("? + ?", goqu.C("version"), 1),
+			"updated_at":            timestamp,
+			"compaction_started_at": timestamp,
+		}).
+		From("claimable").
+		Where(goqu.I("log_streams.id").Eq(goqu.I("claimable.id"))).
+		Returning(l.getSelectFields()...)
+
+	sql, args, err := toSQLWithTag("log_stream.ClaimLogStreamsForCompaction", query)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	rows, err := l.dbClient.getConnection(ctx).Query(ctx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+	defer rows.Close()
+
+	results := []models.LogStream{}
+	for rows.Next() {
+		item, err := scanLogStream(rows)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
+		}
+		results = append(results, *item)
+	}
+
+	return results, nil
 }
 
 func (l *logStreams) getLogStream(ctx context.Context, exp exp.Expression) (*models.LogStream, error) {
@@ -307,6 +387,9 @@ func scanLogStream(row scanner) (*models.LogStream, error) {
 		&logStream.JobID,
 		&logStream.RunnerSessionID,
 		&logStream.Completed,
+		&logStream.Truncated,
+		&logStream.Compacted,
+		&logStream.CompactionStartedAt,
 	}
 
 	if err := row.Scan(fields...); err != nil {

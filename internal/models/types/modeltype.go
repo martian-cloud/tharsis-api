@@ -27,6 +27,7 @@ var (
 	GroupModelType                           = ModelType{trnType: trn.TypeGroup, gidCode: "G"}
 	JobModelType                             = ModelType{trnType: trn.TypeJob, gidCode: "J"}
 	LogStreamModelType                       = ModelType{trnType: trn.TypeLogStream, gidCode: "LS"}
+	LogStreamChunkModelType                  = ModelType{trnType: trn.TypeLogStreamChunk, gidCode: "LSC"}
 	MaintenanceModeModelType                 = ModelType{trnType: trn.TypeMaintenanceMode, gidCode: "MM"}
 	ManagedIdentityAccessRuleModelType       = ModelType{trnType: trn.TypeManagedIdentityAccessRule, gidCode: "MR"}
 	ManagedIdentityModelType                 = ModelType{trnType: trn.TypeManagedIdentity, gidCode: "M"}

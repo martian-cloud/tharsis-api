@@ -49,6 +49,7 @@ const (
 	TypeGroup                           Type = "group"
 	TypeJob                             Type = "job"
 	TypeLogStream                       Type = "log_stream"
+	TypeLogStreamChunk                  Type = "log_stream_chunk"
 	TypeMaintenanceMode                 Type = "maintenance_mode"
 	TypeManagedIdentity                 Type = "managed_identity"
 	TypeManagedIdentityAccessRule       Type = "managed_identity_access_rule"

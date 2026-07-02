@@ -162,7 +162,7 @@ func (r *runStateManager) UpdateJob(ctx context.Context, job *models.Job) (*mode
 	case models.JobRunning:
 		job.Timestamps.RunningTimestamp = &now
 		if job.Timestamps.PendingTimestamp != nil && job.RunnerPath != nil {
-			jobPendingDuration.Observe(now.Sub(*job.Timestamps.PendingTimestamp).Minutes())
+			jobPendingDuration.Observe(now.Sub(*job.Timestamps.PendingTimestamp).Seconds())
 		}
 	case models.JobFinished, models.JobFailed, models.JobCanceled:
 		job.Timestamps.FinishedTimestamp = &now
@@ -171,7 +171,7 @@ func (r *runStateManager) UpdateJob(ctx context.Context, job *models.Job) (*mode
 	// Difference between running and finished timestamp equates to execution time.
 	if job.Timestamps.RunningTimestamp != nil && job.Timestamps.FinishedTimestamp != nil {
 		difference := job.Timestamps.FinishedTimestamp.Sub(*job.Timestamps.RunningTimestamp)
-		planExecutionTime.Observe(float64(difference.Minutes()))
+		planExecutionTime.Observe(float64(difference.Seconds()))
 	}
 
 	updatedJob, err := r.dbClient.Jobs.UpdateJob(txContext, job)

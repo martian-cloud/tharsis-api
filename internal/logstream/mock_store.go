@@ -4,6 +4,7 @@ package logstream
 
 import (
 	context "context"
+	io "io"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -13,29 +14,29 @@ type MockStore struct {
 	mock.Mock
 }
 
-// ReadLogs provides a mock function with given fields: ctx, logStreamID, startOffset, limit
-func (_m *MockStore) ReadLogs(ctx context.Context, logStreamID string, startOffset int, limit int) ([]byte, error) {
-	ret := _m.Called(ctx, logStreamID, startOffset, limit)
+// ReadRange provides a mock function with given fields: ctx, key, offset, length
+func (_m *MockStore) ReadRange(ctx context.Context, key string, offset int, length int) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, key, offset, length)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ReadLogs")
+		panic("no return value specified for ReadRange")
 	}
 
-	var r0 []byte
+	var r0 io.ReadCloser
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) ([]byte, error)); ok {
-		return rf(ctx, logStreamID, startOffset, limit)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) (io.ReadCloser, error)); ok {
+		return rf(ctx, key, offset, length)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []byte); ok {
-		r0 = rf(ctx, logStreamID, startOffset, limit)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) io.ReadCloser); ok {
+		r0 = rf(ctx, key, offset, length)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(io.ReadCloser)
 		}
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) error); ok {
-		r1 = rf(ctx, logStreamID, startOffset, limit)
+		r1 = rf(ctx, key, offset, length)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -43,17 +44,35 @@ func (_m *MockStore) ReadLogs(ctx context.Context, logStreamID string, startOffs
 	return r0, r1
 }
 
-// WriteLogs provides a mock function with given fields: ctx, logStreamID, startOffset, buffer
-func (_m *MockStore) WriteLogs(ctx context.Context, logStreamID string, startOffset int, buffer []byte) error {
-	ret := _m.Called(ctx, logStreamID, startOffset, buffer)
+// WriteChunk provides a mock function with given fields: ctx, key, byteOffset, buffer
+func (_m *MockStore) WriteChunk(ctx context.Context, key string, byteOffset int, buffer []byte) error {
+	ret := _m.Called(ctx, key, byteOffset, buffer)
 
 	if len(ret) == 0 {
-		panic("no return value specified for WriteLogs")
+		panic("no return value specified for WriteChunk")
 	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, int, []byte) error); ok {
-		r0 = rf(ctx, logStreamID, startOffset, buffer)
+		r0 = rf(ctx, key, byteOffset, buffer)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// WriteObject provides a mock function with given fields: ctx, key, r
+func (_m *MockStore) WriteObject(ctx context.Context, key string, r io.Reader) error {
+	ret := _m.Called(ctx, key, r)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WriteObject")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader) error); ok {
+		r0 = rf(ctx, key, r)
 	} else {
 		r0 = ret.Error(0)
 	}

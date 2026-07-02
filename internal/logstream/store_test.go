@@ -1,6 +1,7 @@
 package logstream
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"strconv"
@@ -9,70 +10,54 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 )
 
-func TestReadLogsFromStore(t *testing.T) {
-	logStreamID := "logstream-1"
+func TestReadRange(t *testing.T) {
+	const content = "this is a test"
 
-	// Test cases
 	tests := []struct {
 		retErr       error
 		name         string
 		expectedLogs string
-		startOffset  int
-		logStream    *models.LogStream
+		offset       int
+		length       int
 		expectErr    bool
 	}{
 		{
-			name:         "get all logs",
-			expectedLogs: "this is a test",
-			expectErr:    false,
-			logStream: &models.LogStream{
-				Metadata: models.ResourceMetadata{
-					ID: logStreamID,
-				},
-			},
+			name:         "read all",
+			offset:       0,
+			length:       100,
+			expectedLogs: content,
 		},
 		{
-			name:         "get partial logs",
-			startOffset:  5,
+			name:         "read partial",
+			offset:       5,
+			length:       100,
 			expectedLogs: "is a test",
-			expectErr:    false,
-			logStream: &models.LogStream{
-				Metadata: models.ResourceMetadata{
-					ID: logStreamID,
-				},
-			},
 		},
 		{
-			name: "logs not found",
-			retErr: errors.New(
-				"Not Found",
-				errors.WithErrorCode(errors.ENotFound),
-			),
+			name:      "zero length returns empty without reading",
+			offset:    0,
+			length:    0,
 			expectErr: false,
-			logStream: &models.LogStream{
-				Metadata: models.ResourceMetadata{
-					ID: logStreamID,
-				},
-			},
 		},
 		{
-			name: "unexpected error",
-			retErr: errors.New(
-				"internal error",
-			),
+			name:      "not found error is propagated",
+			offset:    0,
+			length:    100,
+			retErr:    errors.New("Not Found", errors.WithErrorCode(errors.ENotFound)),
 			expectErr: true,
-			logStream: &models.LogStream{
-				Metadata: models.ResourceMetadata{
-					ID: logStreamID,
-				},
-			},
+		},
+		{
+			name:      "unexpected error is propagated",
+			offset:    0,
+			length:    100,
+			retErr:    errors.New("internal error"),
+			expectErr: true,
 		},
 	}
 
@@ -81,97 +66,95 @@ func TestReadLogsFromStore(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			mockResult := func(_ context.Context, _ string, w io.WriterAt, option *objectstore.DownloadOptions) error {
-				if test.retErr != nil {
-					return test.retErr
-				}
-
-				content := "this is a test"
-
-				if option != nil && option.ContentRange != nil {
-					selection := strings.Split(strings.Split(*option.ContentRange, "=")[1], "-")
-					start, _ := strconv.Atoi(selection[0])
-					end, _ := strconv.Atoi(selection[1])
-					if end > len(content) {
-						end = len(content)
-					}
-					content = content[start:end]
-				}
-				_, _ = w.WriteAt([]byte(content), 0)
-
-				return nil
-			}
-
 			mockObjectStore := objectstore.MockObjectStore{}
-			mockObjectStore.On("DownloadObject", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(mockResult)
 
-			mockLogStreams := db.NewMockLogStreams(t)
-			mockJobs := db.NewMockJobs(t)
+			if test.length > 0 {
+				mockObjectStore.On("GetObjectStream", mock.Anything, mock.Anything, mock.Anything).Return(
+					func(_ context.Context, _ string, option *objectstore.DownloadOptions) (*objectstore.GetObjectStreamOutput, error) {
+						if test.retErr != nil {
+							return nil, test.retErr
+						}
 
-			mockLogStreams.On("GetLogStreamByID", mock.Anything, test.logStream.Metadata.ID).Return(test.logStream, nil).Maybe()
-
-			mockDBClient := db.Client{
-				LogStreams: mockLogStreams,
-				Jobs:       mockJobs,
+						out := content
+						if option != nil && option.ContentRange != nil {
+							selection := strings.Split(strings.Split(*option.ContentRange, "=")[1], "-")
+							start, _ := strconv.Atoi(selection[0])
+							end, _ := strconv.Atoi(selection[1]) // inclusive
+							if start > len(out) {
+								start = len(out)
+							}
+							if end+1 > len(out) {
+								end = len(out) - 1
+							}
+							out = out[start : end+1]
+						}
+						return &objectstore.GetObjectStreamOutput{
+							Body:          io.NopCloser(strings.NewReader(out)),
+							ContentLength: int64(len(out)),
+						}, nil
+					},
+				)
 			}
 
-			logStore := NewLogStore(&mockObjectStore, &mockDBClient)
+			logStore := NewLogStore(&mockObjectStore)
 
-			logs, err := logStore.ReadLogs(ctx, test.logStream.Metadata.ID, test.startOffset, 100)
+			reader, err := logStore.ReadRange(ctx, "logstreams/stream-1/chunk-1.txt", test.offset, test.length)
 			if err != nil {
 				assert.True(t, test.expectErr, "Error was not expected: %v", err)
 				return
 			}
 
+			logs, err := io.ReadAll(reader)
+			require.NoError(t, err)
+			require.NoError(t, reader.Close())
+
 			assert.False(t, test.expectErr, "An error was expected")
-
 			mockObjectStore.AssertExpectations(t)
-
 			assert.Equal(t, test.expectedLogs, string(logs))
 		})
 	}
 }
 
-func TestWriteLogsToStore(t *testing.T) {
-	// Test cases
+func TestWriteChunk(t *testing.T) {
 	tests := []struct {
 		retErr         error
 		name           string
 		existingLogs   string
 		logsToUpload   string
 		expectedUpload string
-		startOffset    int
+		byteOffset     int
 		expectErr      bool
+		expectedCode   errors.CodeType
 	}{
 		{
-			name:           "upload new logs",
+			name:           "write new chunk object",
 			existingLogs:   "",
 			logsToUpload:   "this is a test",
 			expectedUpload: "this is a test",
-			expectErr:      false,
 		},
 		{
-			name:           "append to existing logs",
+			name:           "append to existing chunk",
 			existingLogs:   "this",
 			logsToUpload:   " is a test",
 			expectedUpload: "this is a test",
-			startOffset:    len("this"),
-			expectErr:      false,
+			byteOffset:     len("this"),
 		},
 		{
-			name:         "start offset past eof",
+			// byteOffset is the committed chunk size, so an object shorter than it is object-store data
+			// loss, not a client gap: it must surface as an internal error.
+			name:         "object shorter than committed size is an internal error",
 			existingLogs: "this",
 			logsToUpload: " is a test",
-			startOffset:  100,
+			byteOffset:   100,
 			expectErr:    true,
+			expectedCode: errors.EInternal,
 		},
 		{
-			name:           "truncate file",
+			name:           "overwrite truncates chunk",
 			existingLogs:   "this is a test that will be truncated",
 			logsToUpload:   " is a test",
 			expectedUpload: "this is a test",
-			startOffset:    len("this"),
-			expectErr:      false,
+			byteOffset:     len("this"),
 		},
 	}
 
@@ -180,41 +163,146 @@ func TestWriteLogsToStore(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			mockDownloadResult := func(_ context.Context, _ string, w io.WriterAt, _ *objectstore.DownloadOptions) error {
+			// WriteChunk reads the preserved prefix [0, byteOffset) via a ranged GetObjectStream. The
+			// store returns only the bytes that actually exist in the range, so a too-large offset yields
+			// a short read (or ENotFound for an empty/missing object).
+			mockGetResult := func(_ context.Context, _ string, opts *objectstore.DownloadOptions) (*objectstore.GetObjectStreamOutput, error) {
 				if test.existingLogs == "" {
-					return errors.New(
-						"Not Found",
-						errors.WithErrorCode(errors.ENotFound),
-					)
+					return nil, errors.New("Not Found", errors.WithErrorCode(errors.ENotFound))
 				}
-
-				_, _ = w.WriteAt([]byte(test.existingLogs), 0)
-
-				return nil
+				data := []byte(test.existingLogs)
+				if opts != nil && opts.ContentRange != nil {
+					selection := strings.Split(strings.Split(*opts.ContentRange, "=")[1], "-")
+					start, _ := strconv.Atoi(selection[0])
+					end, _ := strconv.Atoi(selection[1]) // inclusive
+					if start > len(data) {
+						start = len(data)
+					}
+					if end+1 > len(data) {
+						end = len(data) - 1
+					}
+					data = data[start : end+1]
+				}
+				return &objectstore.GetObjectStreamOutput{
+					Body:          io.NopCloser(bytes.NewReader(data)),
+					ContentLength: int64(len(data)),
+				}, nil
 			}
 
 			mockObjectStore := objectstore.MockObjectStore{}
-			mockObjectStore.On("DownloadObject", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(mockDownloadResult)
+			mockObjectStore.On("GetObjectStream", mock.Anything, mock.Anything, mock.Anything).Return(mockGetResult).Maybe()
 
 			bodyMatcher := mock.MatchedBy(func(r io.Reader) bool {
 				body, _ := io.ReadAll(r)
-				str := string(body)
-				return str == test.expectedUpload
+				return string(body) == test.expectedUpload
 			})
+			mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, bodyMatcher).Return(test.retErr).Maybe()
 
-			mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, bodyMatcher).Return(test.retErr)
+			logStore := NewLogStore(&mockObjectStore)
 
-			logStore := NewLogStore(&mockObjectStore, nil)
-
-			err := logStore.WriteLogs(ctx, "stream-123", test.startOffset, []byte(test.logsToUpload))
+			err := logStore.WriteChunk(ctx, "logstreams/stream-1/chunk-1.txt", test.byteOffset, []byte(test.logsToUpload))
 			if err != nil {
 				assert.True(t, test.expectErr, "Error was not expected %v", err)
+				if test.expectedCode != "" {
+					assert.Equal(t, test.expectedCode, errors.ErrorCode(err))
+				}
 				return
 			}
 
-			assert.False(t, test.expectErr, "An error was expected")
-
+			require.False(t, test.expectErr, "An error was expected")
 			mockObjectStore.AssertExpectations(t)
 		})
 	}
+}
+
+func TestWriteObject(t *testing.T) {
+	t.Run("streams the reader through to the object store", func(t *testing.T) {
+		ctx := context.Background()
+
+		mockObjectStore := objectstore.MockObjectStore{}
+		bodyMatcher := mock.MatchedBy(func(r io.Reader) bool {
+			body, _ := io.ReadAll(r)
+			return string(body) == "consolidated logs"
+		})
+		mockObjectStore.On("UploadObject", mock.Anything, "logstreams/stream-1.txt", bodyMatcher).Return(nil)
+
+		logStore := NewLogStore(&mockObjectStore)
+		err := logStore.WriteObject(ctx, "logstreams/stream-1.txt", strings.NewReader("consolidated logs"))
+		require.NoError(t, err)
+		mockObjectStore.AssertExpectations(t)
+	})
+
+	t.Run("propagates an upload error", func(t *testing.T) {
+		ctx := context.Background()
+
+		mockObjectStore := objectstore.MockObjectStore{}
+		mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, mock.Anything).
+			Return(errors.New("object store down"))
+
+		logStore := NewLogStore(&mockObjectStore)
+		err := logStore.WriteObject(ctx, "logstreams/stream-1.txt", strings.NewReader("data"))
+		require.Error(t, err)
+	})
+}
+
+func TestWriteChunkEdgeCases(t *testing.T) {
+	t.Run("a zero-length write at offset 0 uploads an empty object without reading a prefix", func(t *testing.T) {
+		ctx := context.Background()
+
+		mockObjectStore := objectstore.MockObjectStore{}
+		bodyMatcher := mock.MatchedBy(func(r io.Reader) bool {
+			body, _ := io.ReadAll(r)
+			return len(body) == 0
+		})
+		mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, bodyMatcher).Return(nil)
+
+		logStore := NewLogStore(&mockObjectStore)
+		err := logStore.WriteChunk(ctx, "logstreams/stream-1/c0.txt", 0, []byte{})
+		require.NoError(t, err)
+		// byteOffset 0 skips the prefix read entirely.
+		mockObjectStore.AssertNotCalled(t, "GetObjectStream", mock.Anything, mock.Anything, mock.Anything)
+		mockObjectStore.AssertExpectations(t)
+	})
+
+	t.Run("a write at offset 0 replaces the whole object without reading the existing content", func(t *testing.T) {
+		ctx := context.Background()
+
+		mockObjectStore := objectstore.MockObjectStore{}
+		// The replacement is exactly the new buffer — no prefix is preserved when byteOffset is 0.
+		bodyMatcher := mock.MatchedBy(func(r io.Reader) bool {
+			body, _ := io.ReadAll(r)
+			return string(body) == "fresh"
+		})
+		mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, bodyMatcher).Return(nil)
+
+		logStore := NewLogStore(&mockObjectStore)
+		err := logStore.WriteChunk(ctx, "logstreams/stream-1/c0.txt", 0, []byte("fresh"))
+		require.NoError(t, err)
+		mockObjectStore.AssertNotCalled(t, "GetObjectStream", mock.Anything, mock.Anything, mock.Anything)
+		mockObjectStore.AssertExpectations(t)
+	})
+}
+
+func TestReadRangeNegativeArgs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("negative offset is rejected without touching the object store", func(t *testing.T) {
+		mockObjectStore := objectstore.MockObjectStore{}
+		logStore := NewLogStore(&mockObjectStore)
+
+		_, err := logStore.ReadRange(ctx, "logstreams/stream-1/c0.txt", -1, 10)
+		require.Error(t, err)
+		assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+		mockObjectStore.AssertNotCalled(t, "GetObjectStream", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("negative length is rejected without touching the object store", func(t *testing.T) {
+		mockObjectStore := objectstore.MockObjectStore{}
+		logStore := NewLogStore(&mockObjectStore)
+
+		_, err := logStore.ReadRange(ctx, "logstreams/stream-1/c0.txt", 0, -1)
+		require.Error(t, err)
+		assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+		mockObjectStore.AssertNotCalled(t, "GetObjectStream", mock.Anything, mock.Anything, mock.Anything)
+	})
 }

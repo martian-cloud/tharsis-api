@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
@@ -11,9 +13,14 @@ var _ Model = (*LogStream)(nil)
 type LogStream struct {
 	JobID           *string
 	RunnerSessionID *string
-	Metadata        ResourceMetadata
-	Size            int
-	Completed       bool
+	// CompactionStartedAt is set when an instance begins compacting this stream. It gates compaction so
+	// multiple horizontally-scaled instances don't compact the same stream concurrently.
+	CompactionStartedAt *time.Time
+	Metadata            ResourceMetadata
+	Size                int
+	Completed           bool
+	Truncated           bool
+	Compacted           bool
 }
 
 // GetID returns the Metadata ID.

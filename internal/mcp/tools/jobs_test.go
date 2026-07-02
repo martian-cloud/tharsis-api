@@ -2,6 +2,8 @@ package tools
 
 import (
 	"context"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -114,7 +116,7 @@ func TestGetJobLogsHandler(t *testing.T) {
 				mockJobService.On("GetJobByID", mock.Anything, gid.FromGlobalID(jobID)).Return(&models.Job{
 					Metadata: models.ResourceMetadata{ID: gid.FromGlobalID(jobID)},
 				}, nil)
-				mockJobService.On("ReadLogs", mock.Anything, gid.FromGlobalID(jobID), 0, defaultLogLimit+1).Return([]byte(logs), nil)
+				mockJobService.On("ReadLogs", mock.Anything, gid.FromGlobalID(jobID), 0, defaultLogLimit+1).Return(io.NopCloser(strings.NewReader(logs)), nil)
 
 				catalog := &services.Catalog{JobService: mockJobService}
 				catalog.Init()
@@ -148,7 +150,7 @@ func TestGetJobLogsHandler(t *testing.T) {
 				mockJobService.On("GetJobByID", mock.Anything, gid.FromGlobalID(jobID)).Return(&models.Job{
 					Metadata: models.ResourceMetadata{ID: gid.FromGlobalID(jobID)},
 				}, nil)
-				mockJobService.On("ReadLogs", mock.Anything, gid.FromGlobalID(jobID), 100, 1001).Return([]byte(logs), nil)
+				mockJobService.On("ReadLogs", mock.Anything, gid.FromGlobalID(jobID), 100, 1001).Return(io.NopCloser(strings.NewReader(logs)), nil)
 
 				catalog := &services.Catalog{JobService: mockJobService}
 				catalog.Init()
@@ -181,7 +183,7 @@ func TestGetJobLogsHandler(t *testing.T) {
 				mockJobService.On("GetJobByID", mock.Anything, gid.FromGlobalID(jobID)).Return(&models.Job{
 					Metadata: models.ResourceMetadata{ID: gid.FromGlobalID(jobID)},
 				}, nil)
-				mockJobService.On("ReadLogs", mock.Anything, gid.FromGlobalID(jobID), 0, 11).Return([]byte("01234567890"), nil)
+				mockJobService.On("ReadLogs", mock.Anything, gid.FromGlobalID(jobID), 0, 11).Return(io.NopCloser(strings.NewReader("01234567890")), nil)
 
 				catalog := &services.Catalog{JobService: mockJobService}
 				catalog.Init()

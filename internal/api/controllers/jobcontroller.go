@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -69,15 +70,16 @@ func (c *jobController) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 	// offset defaults to 0 if not provided
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 
-	// TODO: Remove when log endpoint token authentication is added
-	logs, err := c.jobService.ReadLogs(auth.WithCaller(r.Context(), &auth.SystemCaller{}), jobID, offset, limit)
+	reader, err := c.jobService.ReadLogs(auth.WithCaller(r.Context(), &auth.SystemCaller{}), jobID, offset, limit)
 	if err != nil {
 		c.logger.WithContextFields(r.Context()).Infof("Failed to get logs: %v", err)
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
+	defer reader.Close()
 
-	if _, err := w.Write(logs); err != nil {
+	// Stream the logs straight to the response so the full range is never buffered in memory.
+	if _, err := io.Copy(w, reader); err != nil {
 		c.logger.WithContextFields(r.Context()).Infof("Failed to respond with log data: %v", err)
 		c.respWriter.RespondWithError(r.Context(), w, err)
 	}

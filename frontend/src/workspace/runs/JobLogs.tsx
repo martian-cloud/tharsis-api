@@ -49,6 +49,7 @@ function JobLogs(props: Props) {
     const [currentLogSize, setCurrentLogSize] = useState(bytes(data.logs));
     const [actualLogSize, setActualLogSize] = useState(data.logSize);
     const [autoScroll, setAutoScroll] = useState(props.enableAutoScrollByDefault);
+    const [completed, setCompleted] = useState(data.completed);
 
     const config = useMemo<GraphQLSubscriptionConfig<JobLogsSubscription>>(() => ({
         variables: { input: { jobId: data.id, lastSeenLogSize: bytes(data.logs) } },
@@ -59,6 +60,7 @@ function JobLogs(props: Props) {
             if (payload) {
                 setCurrentLogSize(payload.jobLogStreamEvents.size);
                 setActualLogSize(payload.jobLogStreamEvents.size);
+                setCompleted(payload.jobLogStreamEvents.completed);
                 if (payload.jobLogStreamEvents.data && payload.jobLogStreamEvents.data.logs) {
                     setLogs(prevLogs => {
                         return bytes(prevLogs) < payload.jobLogStreamEvents.size ? prevLogs + payload.jobLogStreamEvents.data?.logs : prevLogs;
@@ -115,10 +117,10 @@ function JobLogs(props: Props) {
                     </Tooltip>
                 </Box>
             </Paper>
-            {data.completed && loadedPercent < 100 && <LinearProgress variant="determinate" value={loadedPercent} />}
+            {completed && loadedPercent < 100 && <LinearProgress variant="determinate" value={loadedPercent} />}
             <LogViewer
                 logs={logs}
-                loading={!data.completed}
+                loading={!completed}
                 sx={{
                     backgroundColor: darken(theme.palette.background.default, 0.5),
                     paddingTop: 1,

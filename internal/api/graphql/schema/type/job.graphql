@@ -70,6 +70,7 @@ type Job implements Node {
   logLastUpdatedAt: Time
   maxJobDuration: Int!
   logSize: Int!
+  logTruncated: Boolean!
   logs(startOffset: Int!, limit: Int!): String!
   runner: Runner
   runnerPath: String
@@ -91,6 +92,7 @@ type JobLogStreamEventData {
 
 type JobLogStreamEvent {
   completed: Boolean!
+  truncated: Boolean!
   size: Int!
   data: JobLogStreamEventData
 }

@@ -51,7 +51,12 @@ import (
 	"sync"
 )
 
-const defaultBytesLimit = 4 * 1024 * 1024 // 4MiB
+// defaultBytesLimit is a generous local-disk safety valve for the file-backed buffer, NOT a
+// log-size policy: total log size is governed server-side (the server truncates and flags the
+// stream). This bound is only ever reached by a runaway job or a sustained server outage where
+// sends keep failing while the job keeps producing. Override via SetLimit. When reached, the
+// buffer drops further output with a notice (job execution continues).
+const defaultBytesLimit = 512 * 1024 * 1024 // 512MiB
 
 var errLogLimitExceeded = errors.New("log limit exceeded")
 

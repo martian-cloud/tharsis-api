@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"io"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
@@ -306,9 +307,27 @@ func (r *JobResolver) LogSize(ctx context.Context) (int32, error) {
 	return int32(logStream.Size), nil
 }
 
+// LogTruncated resolver reports whether the log stream hit the server-side maximum size and was truncated.
+func (r *JobResolver) LogTruncated(ctx context.Context) (bool, error) {
+	logStream, err := loadJobLogStream(ctx, r.job.Metadata.ID)
+	if err != nil {
+		return false, err
+	}
+
+	// Service layer guarantees logStream will not be nil.
+
+	return logStream.Truncated, nil
+}
+
 // Logs resolver
 func (r *JobResolver) Logs(ctx context.Context, args *JobLogsQueryArgs) (string, error) {
-	buffer, err := getServiceCatalog(ctx).JobService.ReadLogs(ctx, r.job.Metadata.ID, int(args.StartOffset), int(args.Limit))
+	reader, err := getServiceCatalog(ctx).JobService.ReadLogs(ctx, r.job.Metadata.ID, int(args.StartOffset), int(args.Limit))
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+
+	buffer, err := io.ReadAll(reader)
 	if err != nil {
 		return "", err
 	}
@@ -355,6 +374,11 @@ func (j *JobLogStreamEventResolver) Completed() bool {
 // Size resolver
 func (j *JobLogStreamEventResolver) Size() int32 {
 	return int32(j.event.Size)
+}
+
+// Truncated resolver reports whether the log stream was truncated at the server-side maximum size.
+func (j *JobLogStreamEventResolver) Truncated() bool {
+	return j.event.Truncated
 }
 
 // Data resolver

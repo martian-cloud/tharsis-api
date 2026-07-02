@@ -64,6 +64,15 @@ func TestBuildStatusError(t *testing.T) {
 			expectedMsg:  "bad input",
 		},
 		{
+			// ETooLarge maps to InvalidArgument like EInvalid; the runner distinguishes the log-size
+			// cap from a generic invalid-argument rejection via the preserved message (the marker is
+			// owned by internal/logstream, not this layer).
+			name:         "too large",
+			err:          errors.New("log size limit reached (1024 bytes)", errors.WithErrorCode(errors.ETooLarge)),
+			expectedCode: codes.InvalidArgument,
+			expectedMsg:  "log size limit reached (1024 bytes)",
+		},
+		{
 			name:         "forbidden",
 			err:          errors.New("access denied", errors.WithErrorCode(errors.EForbidden)),
 			expectedCode: codes.PermissionDenied,

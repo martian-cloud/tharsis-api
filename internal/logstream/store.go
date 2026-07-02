@@ -3,229 +3,121 @@ package logstream
 //go:generate go tool mockery --name Store --inpackage --case underscore
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"os"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 )
 
-// Store interface encapsulates the logic for saving and retrieving logs
+// Store interface encapsulates the object-store IO for a single log chunk object.
+// It is intentionally free of any database access; chunk metadata and transaction
+// boundaries are owned by the Manager.
 type Store interface {
-	WriteLogs(ctx context.Context, logStreamID string, startOffset int, buffer []byte) error
-	ReadLogs(ctx context.Context, logStreamID string, startOffset int, limit int) ([]byte, error)
+	// WriteChunk writes buffer into the object identified by key at byteOffset, truncating the
+	// object to byteOffset+len(buffer). The object's existing content up to byteOffset is preserved.
+	// This is bounded by the stream's max chunk size, so the download-modify-upload cost stays small.
+	WriteChunk(ctx context.Context, key string, byteOffset int, buffer []byte) error
+	// ReadRange returns a reader over up to length bytes starting at offset within the object
+	// identified by key. The data is streamed directly from object storage: it is never buffered
+	// in full nor written to local disk. The caller must Close the returned reader.
+	ReadRange(ctx context.Context, key string, offset int, length int) (io.ReadCloser, error)
+	// WriteObject writes the full contents of r to the object identified by key, replacing it. Used
+	// by compaction to stream all of a stream's chunks into a single consolidated object.
+	WriteObject(ctx context.Context, key string, r io.Reader) error
 }
 
 type store struct {
 	objectStore objectstore.ObjectStore
-	dbClient    *db.Client
 }
 
-// NewLogStore creates an instance of the LogStore interface
-func NewLogStore(objectStore objectstore.ObjectStore, dbClient *db.Client) Store {
-	return &store{objectStore: objectStore, dbClient: dbClient}
+// NewLogStore creates an instance of the Store interface
+func NewLogStore(objectStore objectstore.ObjectStore) Store {
+	return &store{objectStore: objectStore}
 }
 
-// WriteLogs saves a chunk of logs to the store
-func (ls *store) WriteLogs(ctx context.Context, logStreamID string, startOffset int, buffer []byte) error {
-	if startOffset < 0 {
+// WriteChunk writes buffer into the chunk object at byteOffset.
+//
+// byteOffset is always the chunk's committed size (the Manager appends at the chunk's current end),
+// so it is server-derived, not client-supplied. Object storage is written before the metadata commit,
+// so a committed chunk size is always backed by at least that many object bytes. If the existing
+// object is therefore missing or shorter than byteOffset, the object store has lost data relative to
+// the database — an internal inconsistency (EInternal), not a client gap.
+func (ls *store) WriteChunk(ctx context.Context, key string, byteOffset int, buffer []byte) error {
+	if byteOffset < 0 {
 		return errors.New("offset cannot be negative", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	// Create temp directory
-	tmpDir, err := os.MkdirTemp("", "log-stream")
-	if err != nil {
-		return errors.Wrap(
-			err,
-			"Failed to create temporary directory for run logs",
-		)
-	}
-	defer os.RemoveAll(tmpDir)
+	// Object stores have no in-place append, so writing a chunk means re-uploading the whole object as
+	// the preserved prefix [0, byteOffset) followed by buffer. We read that prefix into memory (bounded
+	// by the chunk fill size) and fully close the read stream before uploading, instead of
+	// staging it on local disk.
+	var prefix []byte
+	if byteOffset > 0 {
+		contentRange := fmt.Sprintf("bytes=0-%d", byteOffset-1)
+		out, err := ls.objectStore.GetObjectStream(ctx, key, &objectstore.DownloadOptions{ContentRange: &contentRange})
+		if err != nil {
+			if errors.ErrorCode(err) == errors.ENotFound {
+				// The object is missing or shorter than its committed size: object store data loss.
+				return errors.New("log chunk object %s is missing bytes before offset %d (object store data loss)", key, byteOffset, errors.WithErrorCode(errors.EInternal))
+			}
+			return errors.Wrap(err, "Failed to read existing log chunk from object storage")
+		}
 
-	filePath := fmt.Sprintf("%s/%s", tmpDir, logStreamID)
-	key := getObjectKey(logStreamID)
+		prefix, err = io.ReadAll(out.Body)
+		closeErr := out.Body.Close()
+		if err != nil {
+			return errors.Wrap(err, "Failed to read existing log chunk from object storage")
+		}
+		if closeErr != nil {
+			return errors.Wrap(closeErr, "Failed to close existing log chunk reader")
+		}
 
-	logFile, err := os.Create(filePath)
-	if err != nil {
-		return errors.Wrap(
-			err,
-			"Failed to create temporary file for run logs",
-		)
-	}
-
-	defer logFile.Close()
-
-	// Download logs
-	if err = ls.objectStore.DownloadObject(ctx, key, logFile, nil); err != nil && errors.ErrorCode(err) != errors.ENotFound {
-		return errors.Wrap(
-			err,
-			"Failed to download log file from object storage",
-		)
-	}
-
-	writer, err := os.OpenFile(filePath, os.O_RDWR, 0o600) // nosemgrep: gosec.G304-1
-	if err != nil {
-		return errors.Wrap(
-			err,
-			"Failed to open log file for writing",
-		)
-	}
-	defer writer.Close()
-
-	fileInfo, err := writer.Stat()
-	if err != nil {
-		return errors.Wrap(
-			err,
-			"Failed to get file stats for log file",
-		)
+		// The object held fewer bytes than its committed size: object store data loss.
+		if len(prefix) != byteOffset {
+			return errors.New("log chunk object %s is shorter (%d bytes) than its committed size %d (object store data loss)", key, len(prefix), byteOffset, errors.WithErrorCode(errors.EInternal))
+		}
 	}
 
-	if int64(startOffset) > fileInfo.Size() {
-		return errors.New(
-			"Start offset of %d is past the end of the file", startOffset, errors.WithErrorCode(errors.EInvalid),
-		)
-	}
-
-	if _, err = writer.WriteAt(buffer, int64(startOffset)); err != nil {
-		return errors.Wrap(
-			err,
-			"Failed to append logs to log file",
-		)
-	}
-
-	if err = writer.Truncate(int64(startOffset + len(buffer))); err != nil {
-		return errors.Wrap(
-			err,
-			"Failed to truncate log file",
-		)
-	}
-
-	if _, err = writer.Seek(0, io.SeekStart); err != nil {
-		return errors.Wrap(
-			err,
-			"Failed to seek to start of log file",
-		)
-	}
-
-	if err = ls.objectStore.UploadObject(ctx, key, writer); err != nil {
-		return errors.Wrap(
-			err,
-			"Failed to upload log file to object storage",
-		)
+	body := io.MultiReader(bytes.NewReader(prefix), bytes.NewReader(buffer))
+	if err := ls.objectStore.UploadObject(ctx, key, body); err != nil {
+		return errors.Wrap(err, "Failed to upload log chunk to object storage")
 	}
 
 	return nil
 }
 
-// ReadLogs returns a chunk of logs
-func (ls *store) ReadLogs(ctx context.Context, logStreamID string, startOffset int, limit int) ([]byte, error) {
-	if limit < 0 || startOffset < 0 {
-		return nil, errors.New("limit and offset cannot be negative", errors.WithErrorCode(errors.EInvalid))
+// WriteObject writes the full contents of r into the object identified by key, replacing any
+// existing object. Used by compaction to stream a stream's chunks into a single consolidated object.
+// The reader is passed straight through to the object store: compaction runs single-flight per
+// instance, so the multipart uploader's bounded part buffering is the only memory cost.
+func (ls *store) WriteObject(ctx context.Context, key string, r io.Reader) error {
+	if err := ls.objectStore.UploadObject(ctx, key, r); err != nil {
+		return errors.Wrap(err, "Failed to upload log object to object storage")
 	}
-
-	tmpDir, err := os.MkdirTemp("", "log-stream")
-	if err != nil {
-		return nil, errors.Wrap(
-			err,
-			"Failed to create temporary directory for run logs",
-		)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	filePath := fmt.Sprintf("%s/%s", tmpDir, logStreamID)
-	key := getObjectKey(logStreamID)
-
-	logFile, err := os.Create(filePath)
-	if err != nil {
-		return nil, errors.Wrap(
-			err,
-			"Failed to create temporary file for run logs",
-		)
-	}
-
-	defer logFile.Close()
-
-	// Download logs from object store
-	logs, err := ls.readLogs(ctx, key, logFile, startOffset, limit)
-	if err != nil {
-		if errors.ErrorCode(err) == errors.ENotFound {
-			// Check if this is a logstream using the legacy key format
-			logStream, glsErr := ls.dbClient.LogStreams.GetLogStreamByID(ctx, logStreamID)
-			if glsErr != nil {
-				return nil, glsErr
-			}
-			if logStream == nil {
-				return nil, errors.New("log stream with ID %s not found", logStreamID, errors.WithErrorCode(errors.ENotFound))
-			}
-
-			if logStream.JobID != nil {
-				return ls.attemptReadForLegacyFormat(ctx, *logStream.JobID, logFile, startOffset, limit)
-			}
-
-			// Return empty byte array
-			return []byte{}, nil
-		}
-		return nil, errors.Wrap(
-			err,
-			"Failed to download log file from object store",
-		)
-	}
-
-	return logs, nil
+	return nil
 }
 
-func (ls *store) attemptReadForLegacyFormat(ctx context.Context, jobID string, logFile *os.File, startOffset int, limit int) ([]byte, error) {
-	job, err := ls.dbClient.Jobs.GetJobByID(ctx, jobID)
-	if err != nil {
-		return nil, err
-	}
-	if job == nil {
-		return nil, errors.New("job with ID %s not found", jobID, errors.WithErrorCode(errors.ENotFound))
+// ReadRange returns a reader that streams up to length bytes from the chunk object starting at
+// offset, without buffering the data in full or using disk. The caller must Close the reader.
+func (ls *store) ReadRange(ctx context.Context, key string, offset int, length int) (io.ReadCloser, error) {
+	if offset < 0 || length < 0 {
+		return nil, errors.New("offset and length cannot be negative", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	legacyKey := getLegacyObjectKeyForJob(job)
-	logs, rlErr := ls.readLogs(ctx, legacyKey, logFile, startOffset, limit)
-	if rlErr != nil {
-		if errors.ErrorCode(rlErr) == errors.ENotFound {
-			// Return empty byte array
-			return []byte{}, nil
-		}
-		return nil, errors.Wrap(
-			rlErr,
-			"Failed to download log file from object store",
-		)
+	if length == 0 {
+		return io.NopCloser(bytes.NewReader(nil)), nil
 	}
-	return logs, nil
-}
 
-func (ls *store) readLogs(ctx context.Context, key string, logFile *os.File, startOffset int, limit int) ([]byte, error) {
-	contentRange := fmt.Sprintf("bytes=%d-%d", startOffset, startOffset+limit)
+	// Object-store byte ranges are inclusive on both ends.
+	contentRange := fmt.Sprintf("bytes=%d-%d", offset, offset+length-1)
 
-	// Download logs from object store
-	err := ls.objectStore.DownloadObject(
-		ctx,
-		key,
-		logFile,
-		&objectstore.DownloadOptions{
-			ContentRange: &contentRange,
-		},
-	)
-
+	out, err := ls.objectStore.GetObjectStream(ctx, key, &objectstore.DownloadOptions{ContentRange: &contentRange})
 	if err != nil {
 		return nil, err
 	}
 
-	return io.ReadAll(logFile)
-}
-
-func getObjectKey(streamID string) string {
-	return fmt.Sprintf("logstreams/%s.txt", streamID)
-}
-
-func getLegacyObjectKeyForJob(job *models.Job) string {
-	return fmt.Sprintf("workspaces/%s/runs/%s/logs/%s.txt", job.WorkspaceID, job.RunID, job.Metadata.ID)
+	return out.Body, nil
 }

@@ -87,33 +87,65 @@ func New(logger logger.Logger, apiURL string, pluginData map[string]string, subj
 	}, nil
 }
 
-// UploadObject uploads an object to the filesystem
+// UploadObject uploads an object to the filesystem.
+//
+// The write is atomic: the body is streamed to a temporary file in the same directory and then
+// renamed over the destination. This matches S3's PutObject semantics (a reader of the key sees
+// either the old object or the new one in full, never a partially written file) and, critically,
+// never truncates the destination in place. Compaction reads a stream's chunks and rewrites them
+// into the same consolidated key; an in-place O_TRUNC there would zero the object before the
+// streaming reader finished consuming it, corrupting the log.
 func (f *ObjectStore) UploadObject(ctx context.Context, key string, body io.Reader) error {
 	fullPath, err := f.sanitizeKey(key)
 	if err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0750); err != nil {
+	dir := filepath.Dir(fullPath)
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		f.logger.WithContextFields(ctx).Errorf("failed to create directory for key %s: %v", key, err)
 		return err
 	}
 
-	file, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
+	// Create the temp file in the same directory so the rename stays on one filesystem (and is
+	// therefore atomic). It is removed on any failure path; on success the rename consumes it.
+	tmp, err := os.CreateTemp(dir, ".upload-*.tmp")
 	if err != nil {
-		f.logger.WithContextFields(ctx).Errorf("failed to create file for key %s: %v", key, err)
+		f.logger.WithContextFields(ctx).Errorf("failed to create temp file for key %s: %v", key, err)
 		return err
 	}
+	tmpName := tmp.Name()
+	committed := false
 	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			f.logger.WithContextFields(ctx).Errorf("failed to close file for key %s: %v", key, closeErr)
+		if !committed {
+			if rmErr := os.Remove(tmpName); rmErr != nil && !os.IsNotExist(rmErr) {
+				f.logger.WithContextFields(ctx).Errorf("failed to remove temp file %s: %v", tmpName, rmErr)
+			}
 		}
 	}()
 
-	if _, err := io.Copy(file, body); err != nil {
+	if _, err := io.Copy(tmp, body); err != nil {
+		_ = tmp.Close()
 		f.logger.WithContextFields(ctx).Errorf("failed to write file for key %s: %v", key, err)
 		return err
 	}
+
+	if err := tmp.Close(); err != nil {
+		f.logger.WithContextFields(ctx).Errorf("failed to close temp file for key %s: %v", key, err)
+		return err
+	}
+
+	// CreateTemp makes the file 0600; match the permissions the in-place writer used.
+	if err := os.Chmod(tmpName, 0640); err != nil {
+		f.logger.WithContextFields(ctx).Errorf("failed to chmod temp file for key %s: %v", key, err)
+		return err
+	}
+
+	if err := os.Rename(tmpName, fullPath); err != nil {
+		f.logger.WithContextFields(ctx).Errorf("failed to commit file for key %s: %v", key, err)
+		return err
+	}
+	committed = true
 
 	return nil
 }
@@ -190,6 +222,29 @@ func (f *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 			file.Close()
 			return nil, te.New("invalid range %s for key %s", *options.ContentRange, key, te.WithErrorCode(te.EInvalid))
 		}
+
+		info, err := file.Stat()
+		if err != nil {
+			file.Close()
+			f.logger.WithContextFields(ctx).Errorf("failed to stat file for key %s: %v", key, err)
+			return nil, err
+		}
+
+		// A range whose start is at or past the end of the object is unsatisfiable. S3 returns
+		// InvalidRange (mapped to ENotFound) for this; match that here so callers that rely on
+		// ENotFound to fall back (e.g. the log reader's legacy-key fallback) behave identically on
+		// the filesystem store rather than receiving a silently empty reader.
+		if offset >= info.Size() {
+			file.Close()
+			return nil, te.New("range start %d is at or past the end of object %s (size %d)", offset, key, info.Size(), te.WithErrorCode(te.ENotFound))
+		}
+
+		// Clamp the length to the bytes actually available so ContentLength is accurate when the
+		// requested range runs past the end (SectionReader already stops at EOF).
+		if offset+length > info.Size() {
+			length = info.Size() - offset
+		}
+
 		return &objectstore.GetObjectStreamOutput{
 			Body:          &sectionReadCloser{io.NewSectionReader(file, offset, length), file},
 			ContentLength: length,

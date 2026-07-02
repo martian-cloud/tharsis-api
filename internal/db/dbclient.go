@@ -120,6 +120,7 @@ type Client struct {
 	TerraformProviderPlatformMirrors TerraformProviderPlatformMirrors
 	MaintenanceModes                 MaintenanceModes
 	LogStreams                       LogStreams
+	LogStreamChunks                  LogStreamChunks
 	RunnerSessions                   RunnerSessions
 	UserSessions                     UserSessions
 	SchemaMigrations                 SchemaMigrations
@@ -242,6 +243,7 @@ func NewClient(
 	dbClient.TerraformProviderPlatformMirrors = NewTerraformProviderPlatformMirrors(dbClient)
 	dbClient.MaintenanceModes = NewMaintenanceModes(dbClient)
 	dbClient.LogStreams = NewLogStreams(dbClient)
+	dbClient.LogStreamChunks = NewLogStreamChunks(dbClient)
 	dbClient.RunnerSessions = NewRunnerSessions(dbClient)
 	dbClient.UserSessions = NewUserSessions(dbClient)
 	dbClient.SchemaMigrations = NewSchemaMigrations(dbClient)
