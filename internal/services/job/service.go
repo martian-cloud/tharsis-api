@@ -6,6 +6,7 @@ package job
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -113,7 +114,7 @@ type Service interface {
 	SetJobStatus(ctx context.Context, jobID string, status models.JobStatus) (*models.Job, error)
 	SubscribeToCancellationEvent(ctx context.Context, options *CancellationSubscriptionsOptions) (<-chan *CancellationEvent, error)
 	WriteLogs(ctx context.Context, jobID string, startOffset int, logs []byte) (int, error)
-	ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error)
+	ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) (io.ReadCloser, error)
 	SubscribeToLogStreamEvents(ctx context.Context, options *LogStreamEventSubscriptionOptions) (<-chan *logstream.LogEvent, error)
 	GetLogStreamsByJobIDs(ctx context.Context, idList []string) ([]models.LogStream, error)
 	SubscribeToJobs(ctx context.Context, options *SubscribeToJobsInput) (<-chan *Event, error)
@@ -709,7 +710,7 @@ func (s *service) WriteLogs(ctx context.Context, jobID string, startOffset int, 
 	}
 
 	// Write logs to store
-	updatedStream, err := s.logStreamManager.WriteLogs(ctx, stream.Metadata.ID, startOffset, logs)
+	updatedStream, err := s.logStreamManager.WriteLogs(ctx, stream, startOffset, logs)
 	if err != nil {
 		return 0, err
 	}
@@ -717,7 +718,7 @@ func (s *service) WriteLogs(ctx context.Context, jobID string, startOffset int, 
 	return updatedStream.Size, nil
 }
 
-func (s *service) ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error) {
+func (s *service) ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) (io.ReadCloser, error) {
 	ctx, span := tracer.Start(ctx, "svc.ReadLogs")
 	span.SetAttributes(attribute.String("job_id", jobID))
 	defer span.End()
@@ -748,7 +749,7 @@ func (s *service) ReadLogs(ctx context.Context, jobID string, startOffset int, l
 		return nil, errors.New("log stream not found %s", jobID)
 	}
 
-	return s.logStreamManager.ReadLogs(ctx, stream.Metadata.ID, startOffset, limit)
+	return s.logStreamManager.ReadLogs(ctx, stream, startOffset, limit)
 }
 
 // GetRunnerAvailabilityForJob returns a job's runner status, whether there exists a runner with an active session,

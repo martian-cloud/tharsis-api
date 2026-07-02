@@ -3,6 +3,7 @@ package servers
 
 import (
 	"context"
+	"io"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -49,7 +50,13 @@ func (s *JobServer) GetJobLogs(ctx context.Context, req *pb.GetJobLogsRequest) (
 		return nil, err
 	}
 
-	logs, err := s.serviceCatalog.JobService.ReadLogs(ctx, jobID, int(req.StartOffset), int(req.Limit))
+	reader, err := s.serviceCatalog.JobService.ReadLogs(ctx, jobID, int(req.StartOffset), int(req.Limit))
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	logs, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}

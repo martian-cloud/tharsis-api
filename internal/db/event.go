@@ -48,6 +48,7 @@ type JobEventData struct {
 type LogStreamEventData struct {
 	Size      int  `json:"size"`
 	Completed bool `json:"completed"`
+	Truncated bool `json:"truncated"`
 }
 
 // RunEventData contains the event response data for a row from the runs table.

@@ -198,8 +198,8 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	cliStore := cli.NewCLIStore(pluginCatalog.ObjectStore)
 	mirrorStore := providermirror.NewProviderMirrorStore(pluginCatalog.ObjectStore)
 
-	logStreamStore := logstream.NewLogStore(pluginCatalog.ObjectStore, dbClient)
-	logStreamManager := logstream.New(logStreamStore, dbClient, eventManager, logger)
+	logStreamStore := logstream.NewLogStore(pluginCatalog.ObjectStore)
+	logStreamManager := logstream.New(logStreamStore, dbClient, eventManager, logger, cfg.MaxLogStreamSizeBytes)
 
 	managedIdentityDelegates, err := managedidentity.NewManagedIdentityDelegateMap(ctx, signingKeyManager)
 	if err != nil {
@@ -306,6 +306,14 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		maintenanceMonitor,
 		time.Duration(cfg.WorkspaceAssessmentIntervalHours)*time.Hour,
 		cfg.WorkspaceAssessmentRunLimit,
+	).Start(ctx)
+
+	// Start log stream compaction scheduler
+	logstream.NewCompactionScheduler(
+		dbClient,
+		logger,
+		logStreamManager,
+		maintenanceMonitor,
 	).Start(ctx)
 
 	// Start service account secret expiration scheduler

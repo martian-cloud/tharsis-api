@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 )
@@ -190,6 +191,61 @@ func TestGetObjectStream(t *testing.T) {
 		})
 		require.Error(t, err)
 	})
+
+	t.Run("range starting at or past the end returns ENotFound", func(t *testing.T) {
+		// content is 14 bytes; a range whose start is >= the object size is unsatisfiable and must
+		// surface as ENotFound (matching S3), not as a silently empty reader. The log reader's
+		// legacy-key fallback depends on this error code.
+		for _, r := range []string{"bytes=14-20", "bytes=100-200"} {
+			_, err := store.GetObjectStream(ctx, "stream.txt", &objectstore.DownloadOptions{
+				ContentRange: aws.String(r),
+			})
+			require.Error(t, err)
+			assert.Equal(t, te.ENotFound, te.ErrorCode(err))
+		}
+	})
+
+	t.Run("range extending past the end is clamped to the available bytes", func(t *testing.T) {
+		stream, err := store.GetObjectStream(ctx, "stream.txt", &objectstore.DownloadOptions{
+			ContentRange: aws.String("bytes=7-100"),
+		})
+		require.NoError(t, err)
+		defer stream.Body.Close()
+
+		assert.Equal(t, int64(len(content)-7), stream.ContentLength)
+		data, err := io.ReadAll(stream.Body)
+		require.NoError(t, err)
+		assert.Equal(t, content[7:], data)
+	})
+}
+
+// TestUploadObjectAtomicOverwrite locks in that an upload reading from the same key it overwrites
+// (as compaction does) is not corrupted: the destination is replaced atomically, so the reader that
+// streams the old object into the new one sees the original bytes in full rather than a truncated
+// file. This is the filesystem-store analogue of S3's atomic PutObject.
+func TestUploadObjectAtomicOverwrite(t *testing.T) {
+	testLogger, _ := logger.NewForTest()
+	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()}, testGetSubject)
+	require.NoError(t, err)
+	ctx := t.Context()
+
+	original := bytes.Repeat([]byte("abcdefghij"), 5000) // 50 KB
+	require.NoError(t, store.UploadObject(ctx, "consolidate.txt", bytes.NewReader(original)))
+
+	// Open a streaming reader of the object, then overwrite that same key while streaming from it.
+	src, err := store.GetObjectStream(ctx, "consolidate.txt", nil)
+	require.NoError(t, err)
+	defer src.Body.Close()
+
+	require.NoError(t, store.UploadObject(ctx, "consolidate.txt", src.Body))
+
+	// The overwrite consumed the original content, so the object now holds exactly the original bytes.
+	result, err := store.GetObjectStream(ctx, "consolidate.txt", nil)
+	require.NoError(t, err)
+	defer result.Body.Close()
+	data, err := io.ReadAll(result.Body)
+	require.NoError(t, err)
+	assert.Equal(t, original, data)
 }
 
 func TestDoesObjectExist(t *testing.T) {

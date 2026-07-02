@@ -4,6 +4,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -24,8 +25,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
-
-const runnerErrorLogsBytesLimit = 2 * 1024 * 1024 // 2MiB
 
 var runnerLogsTimestampColor = color.New(color.FgGreen)
 
@@ -105,7 +104,7 @@ type Service interface {
 	GetRunnerSessionByTRN(ctx context.Context, trn string) (*models.RunnerSession, error)
 	AcceptRunnerSessionHeartbeat(ctx context.Context, sessionID string) error
 	CreateRunnerSessionError(ctx context.Context, runnerSessionID string, message string) error
-	ReadRunnerSessionErrorLog(ctx context.Context, runnerSessionID string, startOffset int, limit int) ([]byte, error)
+	ReadRunnerSessionErrorLog(ctx context.Context, runnerSessionID string, startOffset int, limit int) (io.ReadCloser, error)
 	SubscribeToRunnerSessionErrorLog(ctx context.Context, options *SubscribeToRunnerSessionErrorLogInput) (<-chan *logstream.LogEvent, error)
 	GetLogStreamsByRunnerSessionIDs(ctx context.Context, idList []string) ([]models.LogStream, error)
 	SubscribeToRunnerSessions(ctx context.Context, options *SubscribeToRunnerSessionsInput) (<-chan *SessionEvent, error)
@@ -945,10 +944,9 @@ func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID 
 
 		buf := []byte(fmt.Sprintf("%s %s\n", timestamp, message))
 
-		// Check if the new logs will exceed the limit
-		if (stream.Size + len(buf)) > runnerErrorLogsBytesLimit {
-			return errors.New("runner session error log size limit exceeded", errors.WithErrorCode(errors.ETooLarge))
-		}
+		// The log stream manager enforces the server-authoritative maximum log stream size
+		// (MaxLogStreamSizeBytes) and returns ETooLarge once the cap is reached, so no separate
+		// runner-error-log limit is needed here.
 
 		txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 		if err != nil {
@@ -969,7 +967,7 @@ func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID 
 		}
 
 		// Write logs to store
-		_, err = s.logStreamManager.WriteLogs(txContext, stream.Metadata.ID, stream.Size, buf)
+		_, err = s.logStreamManager.WriteLogs(txContext, stream, stream.Size, buf)
 		if err != nil {
 			return err
 		}
@@ -978,7 +976,7 @@ func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID 
 	})
 }
 
-func (s *service) ReadRunnerSessionErrorLog(ctx context.Context, runnerSessionID string, startOffset int, limit int) ([]byte, error) {
+func (s *service) ReadRunnerSessionErrorLog(ctx context.Context, runnerSessionID string, startOffset int, limit int) (io.ReadCloser, error) {
 	ctx, span := tracer.Start(ctx, "svc.ReadRunnerSessionErrorLog")
 	span.SetAttributes(attribute.String("runner_session_id", runnerSessionID))
 	defer span.End()
@@ -1010,7 +1008,7 @@ func (s *service) ReadRunnerSessionErrorLog(ctx context.Context, runnerSessionID
 		return nil, errors.New("log stream not found for runner session: %s", runnerSessionID)
 	}
 
-	return s.logStreamManager.ReadLogs(ctx, stream.Metadata.ID, startOffset, limit)
+	return s.logStreamManager.ReadLogs(ctx, stream, startOffset, limit)
 }
 
 func (s *service) SubscribeToRunnerSessionErrorLog(ctx context.Context, options *SubscribeToRunnerSessionErrorLogInput) (<-chan *logstream.LogEvent, error) {

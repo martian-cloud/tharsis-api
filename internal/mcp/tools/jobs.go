@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -220,9 +221,15 @@ func GetJobLogs(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getJobLogsInput, 
 		}
 
 		// Request one extra byte to detect if there's more data
-		logs, err := tc.servicesCatalog.JobService.ReadLogs(ctx, j.Metadata.ID, start, limit+1)
+		reader, err := tc.servicesCatalog.JobService.ReadLogs(ctx, j.Metadata.ID, start, limit+1)
 		if err != nil {
 			return nil, getJobLogsOutput{}, WrapMCPToolError(err, "failed to get logs for job")
+		}
+		defer reader.Close()
+
+		logs, err := io.ReadAll(reader)
+		if err != nil {
+			return nil, getJobLogsOutput{}, WrapMCPToolError(err, "failed to read logs for job")
 		}
 
 		// If we got more than limit, there's more data available

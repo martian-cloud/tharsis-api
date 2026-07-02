@@ -4,8 +4,10 @@ package job
 
 import (
 	context "context"
+	io "io"
 
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+
 	logstream "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 
 	mock "github.com/stretchr/testify/mock"
@@ -259,23 +261,23 @@ func (_m *MockService) GetRunnerAvailabilityForJob(ctx context.Context, jobID st
 }
 
 // ReadLogs provides a mock function with given fields: ctx, jobID, startOffset, limit
-func (_m *MockService) ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error) {
+func (_m *MockService) ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) (io.ReadCloser, error) {
 	ret := _m.Called(ctx, jobID, startOffset, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ReadLogs")
 	}
 
-	var r0 []byte
+	var r0 io.ReadCloser
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) ([]byte, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) (io.ReadCloser, error)); ok {
 		return rf(ctx, jobID, startOffset, limit)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []byte); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) io.ReadCloser); ok {
 		r0 = rf(ctx, jobID, startOffset, limit)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(io.ReadCloser)
 		}
 	}
 

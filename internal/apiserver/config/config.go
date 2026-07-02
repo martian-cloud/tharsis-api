@@ -44,6 +44,7 @@ const (
 	defaultJWSProviderPluginType                       = "memory"
 	defaultOIDCInternalIdentityProviderClientID        = "tharsis"
 	defaultServiceAccountClientSecretMaxExpirationDays = 90
+	defaultMaxLogStreamSizeBytes                       = 1024 * 1024 * 10 // 10 MiB
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -184,6 +185,11 @@ type Config struct {
 	// VCS repository size limit
 	VCSRepositorySizeLimit int `yaml:"vcs_repository_size_limit" env:"VCS_REPOSITORY_SIZE_LIMIT"`
 
+	// MaxLogStreamSizeBytes is the server-authoritative maximum total size (bytes) of a log stream
+	// (job or runner-session). Writes past it are truncated and the stream is flagged truncated.
+	// <= 0 disables the cap.
+	MaxLogStreamSizeBytes int `yaml:"max_log_stream_size_bytes" env:"MAX_LOG_STREAM_SIZE_BYTES"`
+
 	// HTTP rate limit value
 	HTTPRateLimit int `yaml:"http_rate_limit" env:"HTTP_RATE_LIMIT"`
 
@@ -253,6 +259,7 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		MaxGraphQLRequestBodySize:                   defaultMaxGraphQLRequestBodySize,
 		ModuleRegistryMaxUploadSize:                 defaultModuleRegistryMaxUploadSize,
 		VCSRepositorySizeLimit:                      defaultVCSRepositorySizeLimit,
+		MaxLogStreamSizeBytes:                       defaultMaxLogStreamSizeBytes,
 		AsyncTaskTimeout:                            defaultAsyncTaskTimeout,
 		DBAutoMigrateEnabled:                        defaultDBAutoMigrateEnabled,
 		OtelTraceEnabled:                            defaultOtelTraceEnabled,

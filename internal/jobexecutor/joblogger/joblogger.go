@@ -6,8 +6,13 @@ package joblogger
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/avast/retry-go/v4"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/ansi"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
@@ -17,6 +22,24 @@ import (
 const (
 	defaultMaxBytesPerPatch = 1024 * 1024 // in bytes
 	defaultUpdateInterval   = 3 * time.Second
+
+	// Flush retries a transient send error up to flushMaxAttempts times with exponential backoff
+	// (capped at flushMaxBackoff). Bounded so a persistently unreachable server can't hang the
+	// executor indefinitely.
+	flushMaxAttempts = 5
+
+	// logSizeLimitReachedMarker is the substring the server embeds in the SaveJobLogs cap-rejection
+	// message (ETooLarge → gRPC InvalidArgument). handleTerminalSendError matches it to tell the cap
+	// apart from other InvalidArgument rejections. It is a wire-contract with the server; keep it in
+	// sync with logstream.LogSizeLimitReachedMsg.
+	logSizeLimitReachedMarker = "log size limit reached"
+)
+
+// Backoff bounds for sendPatchWithRetry. Vars rather than consts only so tests can shrink them to
+// keep the retry-exhaustion path fast; they are never reassigned at runtime.
+var (
+	flushInitialBackoff = 500 * time.Millisecond
+	flushMaxBackoff     = 5 * time.Second
 )
 
 // Logger is an interface for logging job output
@@ -35,7 +58,8 @@ type Logger interface {
 	Write(data []byte) (n int, err error)
 	// Start starts the logger
 	Start()
-	// Flush flushes the logger
+	// Flush sends all buffered logs to the server, retrying transient errors and logging if they
+	// ultimately can't be sent.
 	Flush()
 }
 
@@ -51,7 +75,10 @@ type jobLogger struct {
 	bytesSent        int
 	updateInterval   time.Duration
 	maxBytesPerPatch int
+	sendingStopped   bool
 	lock             sync.RWMutex
+	sendLock         sync.Mutex
+	closeOnce        sync.Once
 }
 
 // NewLogger creates a new Logger
@@ -72,8 +99,10 @@ func NewLogger(jobID string, client jobclient.Client, logger logger.Logger) (Log
 }
 
 // Close flushes the logger
+// Close stops the periodic sender, flushes all remaining logs, and closes the buffer. It is
+// idempotent (safe to call explicitly before reporting a terminal job status and again via defer).
 func (j *jobLogger) Close() {
-	j.finish()
+	j.closeOnce.Do(j.finish)
 }
 
 // Infof writes an info log to the job's log output
@@ -113,17 +142,57 @@ func (j *jobLogger) bytesize() int {
 }
 
 func (j *jobLogger) Start() {
-	j.finished = make(chan bool)
+	// Buffered so finish() never blocks signaling completion even if run() already returned early
+	// (e.g. after the server reported the log size limit was reached).
+	j.finished = make(chan bool, 1)
 	go j.run()
 }
 
+// Flush sends all buffered logs to the server, retrying transient send errors with bounded backoff.
+// It is best-effort: if a patch ultimately can't be sent it logs and stops rather than failing the
+// caller (a job shouldn't fail just because its logs couldn't be shipped). It returns once the
+// buffer is fully flushed or the server-side size limit was reached. Concurrent sends from the
+// periodic sender are safe: sendPatch ships each chunk at the offset it read it from, which the
+// server treats as an idempotent overlap.
 func (j *jobLogger) Flush() {
 	for j.anyLogsToSend() {
-		if err := j.sendPatch(); err != nil {
-			j.logger.Errorf("Failed to send logs %v", err)
-			// Return here if an error occurs to avoid potential infinite loop
+		if err := j.sendPatchWithRetry(); err != nil {
+			if j.handleTerminalSendError(err) {
+				// Size limit or conflict: stop trying (already warned), no further logs will ship.
+				return
+			}
+			j.logger.Errorf("Failed to flush job logs: %v", err)
 			return
 		}
+	}
+}
+
+// sendPatchWithRetry sends one patch, retrying only transient errors with bounded exponential
+// backoff. Non-retryable errors (including the size-limit cap and write conflicts) are returned
+// to the caller as-is for terminal handling.
+func (j *jobLogger) sendPatchWithRetry() error {
+	return retry.Do(
+		j.sendPatch,
+		retry.Attempts(flushMaxAttempts),
+		retry.DelayType(retry.BackOffDelay),
+		retry.Delay(flushInitialBackoff),
+		retry.MaxDelay(flushMaxBackoff),
+		retry.LastErrorOnly(true),
+		retry.RetryIf(isRetryableSendError),
+		retry.OnRetry(func(n uint, err error) {
+			j.logger.Warnf("Retrying log send after transient error (attempt %d/%d): %v", n+1, flushMaxAttempts, err)
+		}),
+	)
+}
+
+// isRetryableSendError reports whether a SaveJobLogs error is a transient server-availability
+// condition worth retrying, rather than a permanent rejection or a local error.
+func isRetryableSendError(err error) bool {
+	switch status.Code(err) {
+	case codes.Unavailable, codes.Aborted, codes.DeadlineExceeded:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -137,13 +206,59 @@ func (j *jobLogger) anyLogsToSend() bool {
 	j.lock.RLock()
 	defer j.lock.RUnlock()
 
+	if j.sendingStopped {
+		// A terminal rejection (size limit or conflict) stopped sending; don't attempt further sends.
+		return false
+	}
+
 	return j.buffer.Size() != j.bytesSent
 }
 
+// handleTerminalSendError reports whether err is a permanent rejection that resending cannot fix and,
+// if so, latches a flag that stops all further sends, warning once. Transient and one-off errors
+// return false so sending continues.
+//
+//   - Size limit (ETooLarge → gRPC InvalidArgument): matched by the size-limit message marker so it is
+//     not confused with a transient offset/gap rejection (EInvalid), which also maps to InvalidArgument.
+//   - Write conflict (EConflict → gRPC AlreadyExists): the resent bytes disagree with what the server
+//     already stored, so the runner's and server's views have diverged. Every subsequent append at this
+//     offset will be rejected the same way, so we stop cleanly instead of looping forever shipping
+//     nothing (and silently dropping the rest of the job's logs).
+func (j *jobLogger) handleTerminalSendError(err error) bool {
+	var reason string
+	switch {
+	case status.Code(err) == codes.InvalidArgument && strings.Contains(status.Convert(err).Message(), logSizeLimitReachedMarker):
+		reason = "reached its log size limit"
+	case status.Code(err) == codes.AlreadyExists:
+		reason = "hit an unrecoverable log write conflict"
+	default:
+		return false
+	}
+
+	j.lock.Lock()
+	already := j.sendingStopped
+	j.sendingStopped = true
+	j.lock.Unlock()
+
+	if !already {
+		j.logger.Warnf("Job %s %s; no further logs will be sent for this job", j.jobID, reason)
+	}
+
+	return true
+}
+
 func (j *jobLogger) sendPatch() error {
+	// Serialize sends so the periodic run() sender and an explicit Flush() never ship a patch at the
+	// same time. Without this they could both read the same offset and send the same chunk (duplicate
+	// work), or interleave and advance the offset out from under each other. sendLock is separate from
+	// the field lock (held only briefly below) so the in-flight SaveJobLogs call doesn't block readers
+	// like anyLogsToSend.
+	j.sendLock.Lock()
+	defer j.sendLock.Unlock()
+
 	j.lock.RLock()
-	content, err := j.buffer.Bytes(j.bytesSent, j.maxBytesPerPatch)
 	bytesSent := j.bytesSent
+	content, err := j.buffer.Bytes(bytesSent, j.maxBytesPerPatch)
 	j.lock.RUnlock()
 
 	if err != nil {
@@ -154,7 +269,10 @@ func (j *jobLogger) sendPatch() error {
 		return nil
 	}
 
-	if err := j.client.SaveJobLogs(context.Background(), j.jobID, j.bytesSent, content); err != nil {
+	// Use the offset captured under the lock — not a fresh read of j.bytesSent — so the upload offset
+	// always matches the content read for it. Otherwise a concurrent sender advancing j.bytesSent
+	// between the read and this call would ship this content at the wrong offset.
+	if err := j.client.SaveJobLogs(context.Background(), j.jobID, bytesSent, content); err != nil {
 		return err
 	}
 
@@ -171,7 +289,11 @@ func (j *jobLogger) run() {
 		select {
 		case <-time.After(j.updateInterval):
 			if err := j.sendPatch(); err != nil {
-				j.logger.Errorf("Failed to send log patch %v", err)
+				if j.handleTerminalSendError(err) {
+					// Size limit or conflict: resending is futile, so stop the periodic sender.
+					return
+				}
+				j.logger.Errorf("Failed to send log patch: %v", err)
 			}
 		case <-j.finished:
 			return

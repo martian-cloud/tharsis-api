@@ -4,8 +4,10 @@ package logstream
 
 import (
 	context "context"
+	io "io"
 
 	mock "github.com/stretchr/testify/mock"
+
 	models "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
@@ -14,29 +16,47 @@ type MockManager struct {
 	mock.Mock
 }
 
-// ReadLogs provides a mock function with given fields: ctx, logStreamID, startOffset, limit
-func (_m *MockManager) ReadLogs(ctx context.Context, logStreamID string, startOffset int, limit int) ([]byte, error) {
-	ret := _m.Called(ctx, logStreamID, startOffset, limit)
+// CompactStream provides a mock function with given fields: ctx, logStream
+func (_m *MockManager) CompactStream(ctx context.Context, logStream *models.LogStream) error {
+	ret := _m.Called(ctx, logStream)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CompactStream")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.LogStream) error); ok {
+		r0 = rf(ctx, logStream)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ReadLogs provides a mock function with given fields: ctx, logStream, startOffset, limit
+func (_m *MockManager) ReadLogs(ctx context.Context, logStream *models.LogStream, startOffset int, limit int) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, logStream, startOffset, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ReadLogs")
 	}
 
-	var r0 []byte
+	var r0 io.ReadCloser
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) ([]byte, error)); ok {
-		return rf(ctx, logStreamID, startOffset, limit)
+	if rf, ok := ret.Get(0).(func(context.Context, *models.LogStream, int, int) (io.ReadCloser, error)); ok {
+		return rf(ctx, logStream, startOffset, limit)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []byte); ok {
-		r0 = rf(ctx, logStreamID, startOffset, limit)
+	if rf, ok := ret.Get(0).(func(context.Context, *models.LogStream, int, int) io.ReadCloser); ok {
+		r0 = rf(ctx, logStream, startOffset, limit)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(io.ReadCloser)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) error); ok {
-		r1 = rf(ctx, logStreamID, startOffset, limit)
+	if rf, ok := ret.Get(1).(func(context.Context, *models.LogStream, int, int) error); ok {
+		r1 = rf(ctx, logStream, startOffset, limit)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -74,9 +94,9 @@ func (_m *MockManager) Subscribe(ctx context.Context, options *SubscriptionOptio
 	return r0, r1
 }
 
-// WriteLogs provides a mock function with given fields: ctx, logStreamID, startOffset, buffer
-func (_m *MockManager) WriteLogs(ctx context.Context, logStreamID string, startOffset int, buffer []byte) (*models.LogStream, error) {
-	ret := _m.Called(ctx, logStreamID, startOffset, buffer)
+// WriteLogs provides a mock function with given fields: ctx, logStream, startOffset, buffer
+func (_m *MockManager) WriteLogs(ctx context.Context, logStream *models.LogStream, startOffset int, buffer []byte) (*models.LogStream, error) {
+	ret := _m.Called(ctx, logStream, startOffset, buffer)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WriteLogs")
@@ -84,19 +104,19 @@ func (_m *MockManager) WriteLogs(ctx context.Context, logStreamID string, startO
 
 	var r0 *models.LogStream
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, []byte) (*models.LogStream, error)); ok {
-		return rf(ctx, logStreamID, startOffset, buffer)
+	if rf, ok := ret.Get(0).(func(context.Context, *models.LogStream, int, []byte) (*models.LogStream, error)); ok {
+		return rf(ctx, logStream, startOffset, buffer)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, []byte) *models.LogStream); ok {
-		r0 = rf(ctx, logStreamID, startOffset, buffer)
+	if rf, ok := ret.Get(0).(func(context.Context, *models.LogStream, int, []byte) *models.LogStream); ok {
+		r0 = rf(ctx, logStream, startOffset, buffer)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.LogStream)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, []byte) error); ok {
-		r1 = rf(ctx, logStreamID, startOffset, buffer)
+	if rf, ok := ret.Get(1).(func(context.Context, *models.LogStream, int, []byte) error); ok {
+		r1 = rf(ctx, logStream, startOffset, buffer)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"io"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
@@ -181,7 +182,13 @@ func (r *RunnerSessionErrorLogResolver) Size() (int32, error) {
 
 // Data resolver
 func (r *RunnerSessionErrorLogResolver) Data(ctx context.Context, args *JobLogsQueryArgs) (string, error) {
-	buffer, err := getServiceCatalog(ctx).RunnerService.ReadRunnerSessionErrorLog(ctx, *r.stream.RunnerSessionID, int(args.StartOffset), int(args.Limit))
+	reader, err := getServiceCatalog(ctx).RunnerService.ReadRunnerSessionErrorLog(ctx, *r.stream.RunnerSessionID, int(args.StartOffset), int(args.Limit))
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+
+	buffer, err := io.ReadAll(reader)
 	if err != nil {
 		return "", err
 	}

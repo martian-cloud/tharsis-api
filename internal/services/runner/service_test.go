@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -1649,6 +1650,7 @@ func TestCreateRunnerSessionError(t *testing.T) {
 	// Test cases
 	tests := []struct {
 		authError     error
+		writeLogsErr  error
 		name          string
 		expectErrCode errors.CodeType
 		logStreamSize int
@@ -1663,8 +1665,11 @@ func TestCreateRunnerSessionError(t *testing.T) {
 			expectErrCode: errors.EForbidden,
 		},
 		{
-			name:          "fail to create error because error log has exceeded the limit",
-			logStreamSize: runnerErrorLogsBytesLimit,
+			// The log stream manager enforces the max log stream size and returns ETooLarge once the
+			// cap is reached; CreateRunnerSessionError just propagates it.
+			name:          "fail to create error because log stream reached its size limit",
+			logStreamSize: 100,
+			writeLogsErr:  errors.New("log size limit reached", errors.WithErrorCode(errors.ETooLarge)),
 			expectErrCode: errors.ETooLarge,
 		},
 	}
@@ -1706,12 +1711,14 @@ func TestCreateRunnerSessionError(t *testing.T) {
 
 			mockLogStreamManager.On("WriteLogs",
 				mock.Anything,
-				logStreamID,
+				mock.MatchedBy(func(ls *models.LogStream) bool {
+					return ls.Metadata.ID == logStreamID
+				}),
 				test.logStreamSize,
 				mock.MatchedBy(func(buf []byte) bool {
 					return strings.Contains(string(buf), message)
 				}),
-			).Return(nil, nil).Maybe()
+			).Return(nil, test.writeLogsErr).Maybe()
 
 			if test.authError == nil && test.expectErrCode == "" {
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
@@ -1829,10 +1836,10 @@ func TestReadRunnerSessionErrorLog(t *testing.T) {
 
 			mockLogStreamManager.On("ReadLogs",
 				mock.Anything,
-				logStreamID,
+				mock.MatchedBy(func(ls *models.LogStream) bool { return ls != nil && ls.Metadata.ID == logStreamID }),
 				0,
 				100,
-			).Return([]byte("hello"), nil).Maybe()
+			).Return(io.NopCloser(strings.NewReader("hello")), nil).Maybe()
 
 			dbClient := db.Client{
 				Runners:        mockRunners,
