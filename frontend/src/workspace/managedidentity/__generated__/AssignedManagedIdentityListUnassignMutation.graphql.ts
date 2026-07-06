@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d290d4957b318c9f1c9ba1fab300e50c>>
+ * @generated SignedSource<<d2ffdc38bcc6477302b8cbaba08c43d1>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -168,7 +168,7 @@ return {
                   {
                     "kind": "Literal",
                     "name": "first",
-                    "value": 0
+                    "value": 1
                   },
                   {
                     "kind": "Literal",
@@ -184,12 +184,28 @@ return {
                   {
                     "alias": null,
                     "args": null,
-                    "kind": "ScalarField",
-                    "name": "totalCount",
+                    "concreteType": "ManagedIdentityEdge",
+                    "kind": "LinkedField",
+                    "name": "edges",
+                    "plural": true,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "ManagedIdentity",
+                        "kind": "LinkedField",
+                        "name": "node",
+                        "plural": false,
+                        "selections": [
+                          (v4/*: any*/)
+                        ],
+                        "storageKey": null
+                      }
+                    ],
                     "storageKey": null
                   }
                 ],
-                "storageKey": "managedIdentities(first:0,includeInherited:true)"
+                "storageKey": "managedIdentities(first:1,includeInherited:true)"
               },
               {
                 "alias": null,
@@ -253,12 +269,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "d634ca6ab5258fb916fe06e7799e328a",
+    "cacheID": "895b1600c635ee4e9d77c8644590dde7",
     "id": null,
     "metadata": {},
     "name": "AssignedManagedIdentityListUnassignMutation",
     "operationKind": "mutation",
-    "text": "mutation AssignedManagedIdentityListUnassignMutation(\n  $input: AssignManagedIdentityInput!\n) {\n  unassignManagedIdentity(input: $input) {\n    workspace {\n      ...AssignedManagedIdentityListFragment_assignedManagedIdentities\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment AssignedManagedIdentityListFragment_assignedManagedIdentities on Workspace {\n  id\n  fullPath\n  managedIdentities(includeInherited: true, first: 0) {\n    totalCount\n  }\n  assignedManagedIdentities {\n    id\n    ...AssignedManagedIdentityListItemFragment_managedIdentity\n  }\n}\n\nfragment AssignedManagedIdentityListItemFragment_managedIdentity on ManagedIdentity {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  type\n  resourcePath\n}\n"
+    "text": "mutation AssignedManagedIdentityListUnassignMutation(\n  $input: AssignManagedIdentityInput!\n) {\n  unassignManagedIdentity(input: $input) {\n    workspace {\n      ...AssignedManagedIdentityListFragment_assignedManagedIdentities\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment AssignedManagedIdentityListFragment_assignedManagedIdentities on Workspace {\n  id\n  fullPath\n  managedIdentities(includeInherited: true, first: 1) {\n    edges {\n      node {\n        id\n      }\n    }\n  }\n  assignedManagedIdentities {\n    id\n    ...AssignedManagedIdentityListItemFragment_managedIdentity\n  }\n}\n\nfragment AssignedManagedIdentityListItemFragment_managedIdentity on ManagedIdentity {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  type\n  resourcePath\n}\n"
   }
 };
 })();

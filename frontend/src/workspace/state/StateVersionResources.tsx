@@ -1,15 +1,10 @@
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import React, { useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
+import { ResponsiveTable } from '../../common/ResponsiveTable';
 import SearchInput from '../../common/SearchInput';
 import StateVersionResourceListItem from './StateVersionResourceListItem';
 import { StateVersionResourcesFragment_resources$key } from './__generated__/StateVersionResourcesFragment_resources.graphql';
@@ -63,32 +58,22 @@ function StateVersionResources(props: Props) {
                     </Typography>
                 </Box>
             </Paper>}
-            {filteredOutputs.length > 0 && <TableContainer>
-                <Table>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>
-                                <Typography color="textSecondary">Name</Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Typography color="textSecondary">Type</Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Typography color="textSecondary">Provider</Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Typography color="textSecondary">Module</Typography>
-                            </TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {filteredOutputs.map((r: any) => <StateVersionResourceListItem
-                            key={`${r.provider}::${r.type}::${r.name}`}
-                            fragmentRef={r}
-                        />)}
-                    </TableBody>
-                </Table>
-            </TableContainer>}
+            {filteredOutputs.length > 0 && <Box sx={{ mt: 2 }}>
+                <ResponsiveTable
+                    ariaLabel="resources"
+                    columns={[
+                        { label: 'Name' },
+                        { label: 'Type' },
+                        { label: 'Provider' },
+                        { label: 'Module' },
+                    ]}
+                >
+                    {filteredOutputs.map((r: any) => <StateVersionResourceListItem
+                        key={`${r.provider}::${r.type}::${r.name}`}
+                        fragmentRef={r}
+                    />)}
+                </ResponsiveTable>
+            </Box>}
         </Box>
     );
 }

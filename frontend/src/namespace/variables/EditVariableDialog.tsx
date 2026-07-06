@@ -1,18 +1,17 @@
-import { Alert, Checkbox, Chip, FormControlLabel, Typography } from '@mui/material';
+import { Alert, Checkbox, Chip, FormControlLabel, Typography, useMediaQuery } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
-import { useTheme } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
-import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
 import * as React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from 'react-relay';
 import { MutationError } from '../../common/error';
+import Timestamp from '../../common/Timestamp';
 import { EditVariableDialogCreateVariableMutation } from './__generated__/EditVariableDialogCreateVariableMutation.graphql';
 import { EditVariableDialogUpdateVariableMutation } from './__generated__/EditVariableDialogUpdateVariableMutation.graphql';
 
@@ -159,7 +158,7 @@ function EditVariableDialog(props: Props) {
                         {editMode ? 'Edit' : 'New'} {editedVariable.category === 'terraform' ? 'Terraform' : 'Environment'} Variable
                     </Typography>
                     {editedVariable.metadata && <Typography variant="body2" color="textSecondary">
-                        last updated {moment(editedVariable.metadata.updatedAt as moment.MomentInput).fromNow()}
+                        last updated <Timestamp timestamp={editedVariable.metadata.updatedAt as string} />
                     </Typography>}
                     {editedVariable.sensitive && editMode && <Chip color="warning" sx={{ mt: 0.5 }} size="xs" label="Sensitive" />}
                 </Box>

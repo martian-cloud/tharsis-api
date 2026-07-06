@@ -1,8 +1,8 @@
-import TableRow from '@mui/material/TableRow';
+import { Box } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import React from 'react';
 import { useFragment } from 'react-relay/hooks';
-import DataTableCell from '../../common/DataTableCell';
+import { MASKED_VALUE, monoFontFamily } from '../../common/DataTableCell';
+import { ResponsiveRow } from '../../common/ResponsiveTable';
 import { StateVersionOutputListItemFragment_output$key } from './__generated__/StateVersionOutputListItemFragment_output.graphql';
 
 interface Props {
@@ -24,18 +24,13 @@ function StateVersionOutputListItem(props: Props) {
       `, fragmentRef);
 
     const value = data.type === '"string"' ? data.value.slice(1, -1) : data.value;
+    const masked = !showValues && data.sensitive;
 
     return (
-        <TableRow
-            sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-        >
-            <DataTableCell sx={{ wordBreak: 'break-all' }}>
-                {data.name}
-            </DataTableCell>
-            <DataTableCell sx={{ wordBreak: 'break-all' }} mask={!showValues && data.sensitive} >
-                {value}
-            </DataTableCell>
-        </TableRow>
+        <ResponsiveRow cells={[
+            { primary: true, content: <Box sx={{ wordBreak: 'break-word', fontFamily: monoFontFamily }}>{data.name}</Box> },
+            { label: 'Value', content: <Box sx={{ wordBreak: 'break-word', fontFamily: masked ? undefined : monoFontFamily }}>{masked ? MASKED_VALUE : value}</Box> },
+        ]} />
     );
 }
 

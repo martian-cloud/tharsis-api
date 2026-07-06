@@ -1,10 +1,11 @@
-import { Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useTheme } from '@mui/material';
+import { Box, Paper, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { useLazyLoadQuery, usePaginationFragment, useSubscription } from 'react-relay/hooks';
 import { useParams } from 'react-router-dom';
 import { GraphQLSubscriptionConfig } from "relay-runtime";
+import { ResponsiveTable } from '../common/ResponsiveTable';
 import ListSkeleton from '../skeletons/ListSkeleton';
 import RunnerJobListItem from './RunnerJobListItem';
 import { RunnerJobListEventsSubscription } from './__generated__/RunnerJobListEventsSubscription.graphql';
@@ -48,7 +49,6 @@ function RunnerJobList() {
                     after: $after
                     sort: CREATED_AT_DESC
                 ) @connection(key: "RunnerJobList_jobs") {
-                    totalCount
                     edges {
                         node {
                             id
@@ -94,7 +94,7 @@ function RunnerJobList() {
                     <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
                         <Box padding={2}>
                             <Typography variant="subtitle1">
-                                {data?.jobs.totalCount} job{data?.jobs.totalCount !== 1 && 's'}
+                                {data?.jobs.edges?.length} job{data?.jobs.edges?.length !== 1 && 's'}
                             </Typography>
                         </Box>
                     </Paper>
@@ -104,37 +104,18 @@ function RunnerJobList() {
                         hasMore={hasNext}
                         loader={<ListSkeleton rowCount={3} />}
                     >
-                        <TableContainer sx={{
-                            borderLeft: `1px solid ${theme.palette.divider}`,
-                            borderRight: `1px solid ${theme.palette.divider}`,
-                            borderBottom: `1px solid ${theme.palette.divider}`,
-                            borderBottomLeftRadius: 4,
-                            borderBottomRightRadius: 4,
-                        }}>
-                            <Table
-                                sx={{ minWidth: 650, tableLayout: 'fixed' }}
-                                aria-label="runner jobs"
-                            >
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Status</TableCell>
-                                        <TableCell>ID</TableCell>
-                                        <TableCell>Stage</TableCell>
-                                        <TableCell>Workspace</TableCell>
-                                        <TableCell>Duration</TableCell>
-                                        <TableCell>Created</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {data.jobs.edges?.map((edge: any) => (
-                                        <RunnerJobListItem
-                                            key={edge.node.id}
-                                            fragmentRef={edge.node}
-                                        />
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                        <ResponsiveTable
+                            ariaLabel="runner jobs"
+                            minWidth={650}
+                            columns={[{ label: 'Status' }, { label: 'ID' }, { label: 'Stage' }, { label: 'Workspace' }, { label: 'Duration' }, { label: 'Created' }]}
+                        >
+                            {data.jobs.edges?.map((edge: any) => (
+                                <RunnerJobListItem
+                                    key={edge.node.id}
+                                    fragmentRef={edge.node}
+                                />
+                            ))}
+                        </ResponsiveTable>
                     </InfiniteScroll>
                 </Box>}
         </Box>

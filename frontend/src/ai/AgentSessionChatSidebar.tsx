@@ -6,10 +6,13 @@ import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import Popover from '@mui/material/Popover';
+import { useTheme } from '@mui/material/styles';
 import Toolbar from '@mui/material/Toolbar';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { useContext, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { UserContext } from '../UserContext';
+import { useAppHeaderHeight } from '../contexts/AppHeaderHeightProvider';
 import { useAgentCopilot } from './AgentCopilotProvider';
 import AgentSessionChat from './AgentSessionChat';
 import { AgentSessionRuntimeProvider } from './AgentSessionRuntimeProvider';
@@ -71,17 +74,24 @@ function SidebarToolbar({ onClose, showToolCalls, onToggleToolCalls }: { onClose
 function AgentSessionChatSidebar() {
     const { sidebarWidth, expanded, togglePanel } = useAgentCopilot();
     const [showToolCalls, setShowToolCalls] = useState(true);
+    const theme = useTheme();
+    const mobile = useMediaQuery(theme.breakpoints.down('md'));
+    const { headerHeight } = useAppHeaderHeight();
 
     if (!expanded) return null;
 
     return (
         <Box
-            sx={{
+            sx={(theme) => ({
                 position: 'fixed',
                 right: 0,
-                top: 0,
-                width: sidebarWidth,
-                height: '100vh',
+                // On mobile the panel is a full-width overlay positioned below the header
+                // (top: headerHeight) so the navbar stays visible/usable while the Copilot is open.
+                top: mobile ? `${headerHeight}px` : 0,
+                width: mobile ? '100%' : sidebarWidth,
+                height: mobile ? `calc(100vh - ${headerHeight}px)` : '100vh',
+                // Sit above the namespace navigation drawer so it isn't overlapped by it.
+                zIndex: theme.zIndex.drawer + 1,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 1,
@@ -89,7 +99,7 @@ function AgentSessionChatSidebar() {
                 borderLeft: 1,
                 borderColor: 'divider',
                 transition: 'width 0.2s ease',
-            }}
+            })}
         >
 
             <SidebarToolbar onClose={togglePanel} showToolCalls={showToolCalls} onToggleToolCalls={() => setShowToolCalls(v => !v)} />

@@ -55,7 +55,7 @@ function TerraformProviderVersionDetails(props: Props) {
 
   return (
     <Box display="flex">
-      <Box component="main" flexGrow={1}>
+      <Box component="main" flexGrow={1} minWidth={0}>
         <Suspense fallback={<Box
           sx={{
             width: '100%',
@@ -172,7 +172,7 @@ function TerraformProviderVersionDetailsIndex(props: IndexProps) {
             </Box>
           </Box>
           <Box sx={{ border: 1, borderColor: 'divider', marginBottom: 2 }}>
-            <Tabs value={tab} onChange={onTabChange}>
+            <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
               {data.readme !== "" && <Tab label="README" value="readme" />}
               <Tab label="How To Use" value="usage" />
               <Tab label="Versions" value="versions" />

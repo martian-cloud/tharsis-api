@@ -3,6 +3,7 @@ import graphql from 'babel-plugin-relay/macro';
 import React from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { TeamIcon } from '../../common/Icons';
+import ActivityEventLink from '../ActivityEventLink';
 import ActivityEventListItem from '../ActivityEventListItem';
 import { ActivityEventTeamTargetFragment_event$key } from './__generated__/ActivityEventTeamTargetFragment_event.graphql';
 
@@ -53,28 +54,28 @@ function ActivityEventTeamTarget({ fragmentRef }: Props) {
         case 'CREATE':
             primary = (
                 <React.Fragment>
-                    Team <Typography component="span" sx={{ fontWeight: 500 }}>{team.name}</Typography> created
+                    Team <ActivityEventLink to={`/teams/${encodeURIComponent(team.name)}`}>{team.name}</ActivityEventLink> created
                 </React.Fragment>
             );
             break;
         case 'ADD_MEMBER':
             primary = (
                 <React.Fragment>
-                    User <Typography component="span" sx={{ fontWeight: 500 }}>{payload.user?.username || 'unknown'}</Typography> added to team <Typography component="span" sx={{ fontWeight: 500 }}>{team.name}</Typography>
+                    User <Typography component="span" sx={{ fontWeight: 500 }}>{payload.user?.username || 'unknown'}</Typography> added to team <ActivityEventLink to={`/teams/${encodeURIComponent(team.name)}`}>{team.name}</ActivityEventLink>
                 </React.Fragment>
             );
             break;
         case 'REMOVE_MEMBER':
             primary = (
                 <React.Fragment>
-                    User <Typography component="span" sx={{ fontWeight: 500 }}>{payload.user?.username || 'unknown'}</Typography> removed from team <Typography component="span" sx={{ fontWeight: 500 }}>{team.name}</Typography> 
+                    User <Typography component="span" sx={{ fontWeight: 500 }}>{payload.user?.username || 'unknown'}</Typography> removed from team <ActivityEventLink to={`/teams/${encodeURIComponent(team.name)}`}>{team.name}</ActivityEventLink> 
                 </React.Fragment>
             );
             break;
         case 'UPDATE_MEMBER':
             primary = (
                 <React.Fragment>
-                    Team member <Typography component="span" sx={{ fontWeight: 500 }}>{payload.user?.username || 'unknown'}</Typography> maintainer status changed to {payload.maintainer ? 'true' : 'false'} for team <Typography component="span" sx={{ fontWeight: 500 }}>{team.name}</Typography>
+                    Team member <Typography component="span" sx={{ fontWeight: 500 }}>{payload.user?.username || 'unknown'}</Typography> maintainer status changed to {payload.maintainer ? 'true' : 'false'} for team <ActivityEventLink to={`/teams/${encodeURIComponent(team.name)}`}>{team.name}</ActivityEventLink>
                 </React.Fragment>
             );
             break;

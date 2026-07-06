@@ -1,8 +1,9 @@
-import { Box, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useTheme } from '@mui/material';
+import { Box, Button, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { LoadMoreFn, useFragment } from 'react-relay/hooks';
 import { Link as RouterLink } from 'react-router-dom';
+import { ResponsiveTable } from '../common/ResponsiveTable';
 import ListSkeleton from '../skeletons/ListSkeleton';
 import RunnerListItem from './RunnerListItem';
 import { RunnerListFragment_runners$key } from './__generated__/RunnerListFragment_runners.graphql';
@@ -71,25 +72,15 @@ function RunnerList({ fragmentRef, loadNext, hasNext, hideNewRunnerButton, group
                     hasMore={hasNext}
                     loader={<ListSkeleton rowCount={3} />}
                 >
-                    <TableContainer>
-                        <Table
-                            sx={{ minWidth: 650, tableLayout: 'fixed' }}
-                            aria-label="runners"
-                        >
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Name</TableCell>
-                                    <TableCell>Status</TableCell>
-                                    <TableCell>Created By</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {data.edges?.map((edge: any) => (
-                                    <RunnerListItem key={edge.node.id} fragmentRef={edge.node} inherited={!!groupPath && groupPath !== edge.node.groupPath} />
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <ResponsiveTable
+                        ariaLabel="runners"
+                        minWidth={650}
+                        columns={[{ label: 'Name' }, { label: 'Status' }, { label: 'Created' }, { label: 'Last Updated' }]}
+                    >
+                        {data.edges?.map((edge: any) => (
+                            <RunnerListItem key={edge.node.id} fragmentRef={edge.node} inherited={!!groupPath && groupPath !== edge.node.groupPath} />
+                        ))}
+                    </ResponsiveTable>
                 </InfiniteScroll>
             </Box> : <Box sx={{ mt: 4 }} display="flex" justifyContent="center">
                 <Box p={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>

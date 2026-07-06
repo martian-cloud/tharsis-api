@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6cf2f532ea886e27111e490c1f8d806e>>
+ * @generated SignedSource<<e4b1e2f5b60fc0f7217362fc4e7f350e>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -82,13 +82,6 @@ return {
         "name": "announcements",
         "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "totalCount",
-            "storageKey": null
-          },
           {
             "alias": null,
             "args": null,
@@ -223,16 +216,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "e38f853a17da784d6c828313807de3d7",
+    "cacheID": "4c5d5bcef491843f9a39ab5ff4e5f93d",
     "id": null,
     "metadata": {},
     "name": "AnnouncementPaginationQuery",
     "operationKind": "query",
-    "text": "query AnnouncementPaginationQuery(\n  $after: String\n  $first: Int\n) {\n  ...AdminAreaAnnouncementListFragment_announcements\n}\n\nfragment AdminAreaAnnouncementListFragment_announcements on Query {\n  announcements(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    totalCount\n    edges {\n      node {\n        id\n        message\n        type\n        dismissible\n        startTime\n        endTime\n        active\n        expired\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n"
+    "text": "query AnnouncementPaginationQuery(\n  $after: String\n  $first: Int\n) {\n  ...AdminAreaAnnouncementListFragment_announcements\n}\n\nfragment AdminAreaAnnouncementListFragment_announcements on Query {\n  announcements(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        message\n        type\n        dismissible\n        startTime\n        endTime\n        active\n        expired\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "01e164255084be87e6bcf1632f140939";
+(node as any).hash = "fb43ced1dfdae5a000a22ea03f4e56be";
 
 export default node;

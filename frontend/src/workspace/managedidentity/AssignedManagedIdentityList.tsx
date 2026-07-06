@@ -1,15 +1,10 @@
 import { Alert, Box, Button, Paper, Typography } from '@mui/material';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useFragment, useMutation } from "react-relay/hooks";
 import { MutationError } from '../../common/error';
+import { ResponsiveTable } from '../../common/ResponsiveTable';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import AssignedManagedIdentityListItem from './AssignedManagedIdentityListItem';
 import ManagedIdentityAutocomplete, { ManagedIdentityOption } from './ManagedIdentityAutocomplete';
@@ -30,8 +25,12 @@ function AssignedManagedIdentityList(props: Props) {
         fragment AssignedManagedIdentityListFragment_assignedManagedIdentities on Workspace {
             id
             fullPath
-            managedIdentities(includeInherited: true, first: 0) {
-                totalCount
+            managedIdentities(includeInherited: true, first: 1) {
+                edges {
+                    node {
+                        id
+                    }
+                }
             }
             assignedManagedIdentities {
                 id
@@ -144,38 +143,38 @@ function AssignedManagedIdentityList(props: Props) {
                 ]}
             />
             <Typography variant="h5" gutterBottom>Assigned Managed Identities</Typography>
-            {(data.managedIdentities.totalCount > 0) &&
-            <Paper variant="outlined" sx={{ marginTop: 4, marginBottom: 4 }}>
-                <Box padding={2}>
-                    <Typography gutterBottom>
-                        Assign Managed Identity
-                    </Typography>
-                    <Typography variant="body2">
-                        The managed identities assigned to this workspace will be automatically used by runs triggered against this workspace.
-                    </Typography>
-                    <Box display="flex" marginTop={2}>
-                        <ManagedIdentityAutocomplete
-                            value={selected}
-                            namespacePath={data.fullPath}
-                            assignedManagedIdentityIDs={assignedManagedIdentityIds}
-                            onSelected={onManagedIdentitySelected}
-                        />
-                        <Button
-                            loading={assignCommitInFlight}
-                            sx={{ marginLeft: 1 }}
-                            variant="outlined"
-                            disabled={!selected}
-                            onClick={assignManagedIdentity}
-                        >
-                            Assign
-                        </Button>
+            {(data.managedIdentities.edges?.length ?? 0) > 0 &&
+                <Paper variant="outlined" sx={{ marginTop: 4, marginBottom: 4 }}>
+                    <Box padding={2}>
+                        <Typography gutterBottom>
+                            Assign Managed Identity
+                        </Typography>
+                        <Typography variant="body2">
+                            The managed identities assigned to this workspace will be automatically used by runs triggered against this workspace.
+                        </Typography>
+                        <Box display="flex" marginTop={2}>
+                            <ManagedIdentityAutocomplete
+                                value={selected}
+                                namespacePath={data.fullPath}
+                                assignedManagedIdentityIDs={assignedManagedIdentityIds}
+                                onSelected={onManagedIdentitySelected}
+                            />
+                            <Button
+                                loading={assignCommitInFlight}
+                                sx={{ marginLeft: 1 }}
+                                variant="outlined"
+                                disabled={!selected}
+                                onClick={assignManagedIdentity}
+                            >
+                                Assign
+                            </Button>
+                        </Box>
+                        {error && <Alert sx={{ marginTop: 2 }} severity={error.severity}>
+                            {error.message}
+                        </Alert>}
                     </Box>
-                    {error && <Alert sx={{ marginTop: 2 }} severity={error.severity}>
-                        {error.message}
-                    </Alert>}
-                </Box>
-            </Paper>}
-            {data.managedIdentities.totalCount === 0 && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
+                </Paper>}
+            {(data.managedIdentities.edges?.length ?? 0) === 0 && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
                 <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
                     <Typography variant="h6" color="textSecondary" align="center">No managed identities have been created in any parent group</Typography>
                 </Box>
@@ -185,25 +184,21 @@ function AssignedManagedIdentityList(props: Props) {
                 <Typography variant="h6" gutterBottom>
                     {data.assignedManagedIdentities.length} Assigned Managed Identit{data.assignedManagedIdentities.length === 1 ? 'y' : 'ies'}
                 </Typography>
-                <TableContainer>
-                    <Table aria-label="assigned managed identities" sx={{ tableLayout: 'fixed' }}>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Name</TableCell>
-                                <TableCell>Group</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Actions</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {data.assignedManagedIdentities.map((identity: any) => <AssignedManagedIdentityListItem
-                                key={identity.id}
-                                managedIdentityKey={identity}
-                                onUnassign={onUnassign}
-                            />)}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                <ResponsiveTable
+                    ariaLabel="assigned managed identities"
+                    columns={[
+                        { label: 'Name' },
+                        { label: 'Group' },
+                        { label: 'Type' },
+                        { label: '', align: 'right' },
+                    ]}
+                >
+                    {data.assignedManagedIdentities.map((identity: any) => <AssignedManagedIdentityListItem
+                        key={identity.id}
+                        managedIdentityKey={identity}
+                        onUnassign={onUnassign}
+                    />)}
+                </ResponsiveTable>
             </Box>}
         </Box>
     )

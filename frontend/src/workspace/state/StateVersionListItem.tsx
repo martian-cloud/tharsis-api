@@ -1,9 +1,10 @@
-import { TableCell, TableRow, Typography } from '@mui/material'
+import { Typography } from '@mui/material'
 import Tooltip from '@mui/material/Tooltip'
 import Box from '@mui/material/Box'
-import React from 'react'
 import Link from '../../routes/Link'
 import Gravatar from '../../common/Gravatar'
+import { ResponsiveRow } from '../../common/ResponsiveTable'
+import Timestamp from '../../common/Timestamp'
 import { useFragment } from 'react-relay/hooks'
 import { StateVersionListItemFragment_stateVersion$key } from './__generated__/StateVersionListItemFragment_stateVersion.graphql'
 import graphql from 'babel-plugin-relay/macro'
@@ -33,26 +34,20 @@ function StateVersionListItem(props: Props) {
     const stateVersionValue = data.run ? data.run.createdBy : data.createdBy
 
     return (
-        <TableRow
-            sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-        >
-            <TableCell>
-                <Link color="inherit" to={`/groups/${workspacePath}/-/state_versions/${data.id}`}>{data.id.substring(0, 8)}...</Link>
-            </TableCell>
-            <TableCell>
-                {data.run ? <Link color="inherit" to={`/groups/${workspacePath}/-/runs/${data.run.id}`}>{data.run.id.substring(0, 8)}...</Link> : <Typography>created manually</Typography>}
-            </TableCell>
-            <TableCell>
-                <Typography>{data.metadata.createdAt}</Typography>
-            </TableCell>
-            <TableCell>
-                <Tooltip title={stateVersionValue}>
-                    <Box>
-                        <Gravatar width={24} height={24} email={stateVersionValue} />
-                    </Box>
-                </Tooltip>
-            </TableCell>
-        </TableRow>
+        <ResponsiveRow cells={[
+            { primary: true, content: <Link color="inherit" to={`/groups/${workspacePath}/-/state_versions/${data.id}`}>{data.id.substring(0, 8)}...</Link> },
+            { label: 'Run ID', content: data.run ? <Link color="inherit" to={`/groups/${workspacePath}/-/runs/${data.run.id}`}>{data.run.id.substring(0, 8)}...</Link> : <Typography variant="body2" color="textSecondary">created manually</Typography> },
+            { label: 'Created At', content: <Timestamp variant="body2" timestamp={data.metadata.createdAt} /> },
+            {
+                label: 'Created By', content: (
+                    <Tooltip title={stateVersionValue}>
+                        <Box sx={{ display: 'flex', width: 'fit-content' }}>
+                            <Gravatar width={24} height={24} email={stateVersionValue} />
+                        </Box>
+                    </Tooltip>
+                )
+            },
+        ]} />
     );
 }
 

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a3207e702aefb7b7deb1541f82808ac0>>
+ * @generated SignedSource<<eff6d5c3806389152ed8ae3353d57328>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -20,7 +20,6 @@ export type RunnerJobListFragment_jobs$data = {
         readonly " $fragmentSpreads": FragmentRefs<"RunnerJobListItemFragment">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
-    readonly totalCount: number;
   };
   readonly type: RunnerType;
   readonly " $fragmentType": "RunnerJobListFragment_jobs";
@@ -109,13 +108,6 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "totalCount",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
           "concreteType": "JobEdge",
           "kind": "LinkedField",
           "name": "edges",
@@ -190,6 +182,6 @@ return {
 };
 })();
 
-(node as any).hash = "861eef10350dcd844cb6cae9a0d38a70";
+(node as any).hash = "b93134680ea26d8a8edc3f57409f8d55";
 
 export default node;

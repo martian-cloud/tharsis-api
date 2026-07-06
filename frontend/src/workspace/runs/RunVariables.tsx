@@ -1,23 +1,17 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import React, { useMemo, useState } from 'react';
+import { ResponsiveTable } from '../../common/ResponsiveTable';
+import SearchInput from '../../common/SearchInput';
 import RunVariableListItem from './RunVariableListItem';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from 'react-relay/hooks';
 import { RunVariablesFragment_variables$key } from './__generated__/RunVariablesFragment_variables.graphql';
-import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Paper from '@mui/material/Paper';
-import Stack from '@mui/material/Stack';
-import { darken, useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material/styles';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { IconButton, Menu, MenuItem } from '@mui/material';
 
@@ -112,36 +106,19 @@ function RunVariables(props: Props) {
                     <ToggleButton value="terraform" size="small">Terraform</ToggleButton>
                     <ToggleButton value="environment" size="small">Environment</ToggleButton>
                 </ToggleButtonGroup>
-                <Box display="flex">
-                    <Stack direction="row" spacing={2}>
-                        <TextField
-                            size="small"
-                            margin='none'
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: { lg: 'center' }, gap: 1, width: { xs: '100%', lg: 'auto' } }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: '100%', lg: 'auto' } }}>
+                        <SearchInput
                             placeholder="search for variables"
-                            slotProps={{
-                                input: {
-                                    sx: { background: darken(theme.palette.background.default, 0.5) }
-                                }
-                            }}
-                            sx={{ width: 300, height: '100%' }}
+                            sx={{ flex: { xs: 1, lg: 'none' }, width: { lg: 300 } }}
                             onChange={onSearchChange}
-                            autoComplete="off"
                         />
-                        <Button
-                            size="small"
-                            color="info"
-                            sx={{ height: '100%' }}
-                            onClick={() => setShowValues(!showValues)}
-                        >
-                            {showValues ? 'Hide Values' : 'Show Values'}
-                        </Button>
-                    </Stack>
-                    <>
                         <IconButton
                             color="info"
                             size="small"
                             aria-label="more options menu"
                             aria-haspopup="menu"
+                            sx={{ flexShrink: 0 }}
                             onClick={onMenuOpen}
                         >
                             <MoreVertIcon />
@@ -160,7 +137,15 @@ function RunVariables(props: Props) {
                                 {showAllVariables ? 'Hide Unused Variables' : 'Show All Variables'}
                             </MenuItem>
                         </Menu>
-                    </>
+                    </Box>
+                    <Button
+                        size="small"
+                        color="info"
+                        sx={{ flexShrink: 0, whiteSpace: 'nowrap', alignSelf: { xs: 'center', lg: 'auto' } }}
+                        onClick={() => setShowValues(!showValues)}
+                    >
+                        {showValues ? 'Hide Values' : 'Show Values'}
+                    </Button>
                 </Box>
             </Box>
             {(filteredVariables.length === 0 && search !== '') && <Typography sx={{ padding: 2 }} align="center" color="textSecondary">
@@ -176,30 +161,22 @@ function RunVariables(props: Props) {
                     </Typography>}
                 </Box>
             </Paper>}
-            {filteredVariables.length > 0 && <TableContainer>
-                <Table sx={{ tableLayout: 'fixed' }}>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>
-                                <Typography color="textSecondary">Key</Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Typography color="textSecondary">Value</Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Typography color="textSecondary">Source</Typography>
-                            </TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {filteredVariables.map((v: any) => <RunVariableListItem
-                            key={v.key}
-                            fragmentRef={v}
-                            showValues={showValues}
-                        />)}
-                    </TableBody>
-                </Table>
-            </TableContainer>}
+            {filteredVariables.length > 0 && <Box sx={{ mt: 2 }}>
+                <ResponsiveTable
+                    ariaLabel="run variables"
+                    columns={[
+                        { label: 'Key' },
+                        { label: 'Value' },
+                        { label: 'Source' },
+                    ]}
+                >
+                    {filteredVariables.map((v: any) => <RunVariableListItem
+                        key={v.key}
+                        fragmentRef={v}
+                        showValues={showValues}
+                    />)}
+                </ResponsiveTable>
+            </Box>}
         </Box>
     );
 }

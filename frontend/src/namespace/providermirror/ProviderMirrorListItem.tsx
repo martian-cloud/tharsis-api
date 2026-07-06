@@ -37,10 +37,10 @@ function ProviderMirrorListItem({ fragmentRef }: Props) {
                 '&:last-child': { borderBottomLeftRadius: 4, borderBottomRightRadius: 4 }
             }}
         >
-            <Box sx={{ flex: 1, [theme.breakpoints.down('lg')]: { paddingRight: 15 } }}>
-                <Box display="flex" alignItems="center" gap={1}>
-                    <Typography>{data.providerAddress}</Typography>
-                    <Chip label={`v${data.version}`} size="small" />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box display="flex" alignItems="flex-start" gap={1}>
+                    <Typography sx={{ wordBreak: 'break-word', minWidth: 0 }}>{data.providerAddress}</Typography>
+                    <Chip label={`v${data.version}`} size="small" sx={{ flexShrink: 0 }} />
                 </Box>
                 <Box display="flex" alignItems="center" mt={0.5}>
                     <Typography variant="caption" color="textSecondary">

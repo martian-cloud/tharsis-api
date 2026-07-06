@@ -2,7 +2,6 @@ import { ArrowDropUp } from '@mui/icons-material';
 import { default as ArrowDropDown, default as ArrowDropDownIcon } from '@mui/icons-material/ArrowDropDown';
 import { Alert, Box, Button, ButtonGroup, Chip, Collapse, Link, Menu, MenuItem, Stack, Tab, Tabs, Typography, useTheme } from "@mui/material";
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
 import { useSnackbar } from 'notistack';
 import { useMemo, useState } from "react";
 import { useFragment, useMutation, useSubscription } from 'react-relay/hooks';
@@ -11,6 +10,7 @@ import { ConnectionHandler, ConnectionInterface, GraphQLSubscriptionConfig, Reco
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import { RunnerIcon } from "../common/Icons";
 import TabContent from "../common/TabContent";
+import Timestamp from "../common/Timestamp";
 import TRNButton from "../common/TRNButton";
 import AssignedServiceAccountList from "./AssignedServiceAccountList";
 import RunnerChip from "./RunnerChip";
@@ -214,7 +214,7 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
                         </Typography>
                         <Typography color="textSecondary">{runner.description}</Typography>
                         {lastContacted && <Typography variant="caption" color="textSecondary">
-                            {`last seen ${moment(lastContacted as moment.MomentInput).fromNow()}`}
+                            last seen <Timestamp timestamp={lastContacted as string} />
                         </Typography>}
                     </Box>
                 </Box>
@@ -254,8 +254,8 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
                     </Stack>
                 </Box>
             </Box>
-            <Box sx={{ display: "flex", border: 1, borderColor: 'divider', borderTopLeftRadius: 4, borderTopRightRadius: 4 }}>
-                <Tabs value={tab} onChange={onTabChange}>
+            <Box sx={{ border: 1, borderColor: 'divider', borderTopLeftRadius: 4, borderTopRightRadius: 4, maxWidth: '100%' }}>
+                <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
                     <Tab label="Details" value="details" />
                     <Tab label="Sessions" value="sessions" />
                     <Tab label="Jobs" value="jobs" />
@@ -292,7 +292,7 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
                         <Collapse in={showMore} timeout="auto" unmountOnExit>
                             <Box mt={2}>
                                 <Typography variant="body2">
-                                    Created {moment(runner.metadata.createdAt as moment.MomentInput).fromNow()} by {runner.createdBy}
+                                    Created <Timestamp timestamp={runner.metadata.createdAt as string} /> by {runner.createdBy}
                                 </Typography>
                             </Box>
                         </Collapse>

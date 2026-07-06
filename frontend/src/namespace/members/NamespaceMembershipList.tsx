@@ -1,15 +1,10 @@
 import { Box, Paper, Typography, useTheme } from '@mui/material';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useFragment, useMutation } from "react-relay/hooks";
 import ConfirmationDialog from '../../common/ConfirmationDialog';
+import { ResponsiveTable } from '../../common/ResponsiveTable';
 import NamespaceMembershipListItem from './NamespaceMembershipListItem';
 import { NamespaceMembershipListDeleteNamespaceMembershipMutation } from './__generated__/NamespaceMembershipListDeleteNamespaceMembershipMutation.graphql';
 import { NamespaceMembershipListFragment_memberships$key } from './__generated__/NamespaceMembershipListFragment_memberships.graphql';
@@ -140,58 +135,25 @@ function NamespaceMembershipList(props: Props) {
             <Typography variant="subtitle1">{filteredNamespaceMemberships.length} member{filteredNamespaceMemberships.length === 1 ? '' : 's'}</Typography>
           </Box>
         </Paper>
-        {filteredNamespaceMemberships.length > 0 && <TableContainer>
-          <Table
-            sx={{
-              minWidth: 650,
-              borderCollapse: 'separate',
-              borderSpacing: 0,
-              'td, th': {
-                borderBottom: `1px solid ${theme.palette.divider}`,
-              },
-              'td:first-of-type, th:first-of-type': {
-                borderLeft: `1px solid ${theme.palette.divider}`
-              },
-              'td:last-of-type, th:last-of-type': {
-                borderRight: `1px solid ${theme.palette.divider}`
-              },
-              'tr:last-of-type td:first-of-type': {
-                borderBottomLeftRadius: 4,
-              },
-              'tr:last-of-type td:last-of-type': {
-                borderBottomRightRadius: 4
-              }
-            }}
-            aria-label="memberships">
-            <colgroup>
-              <Box component="col" />
-              <Box component="col" />
-              <Box component="col" />
-              <Box component="col" />
-              <Box component="col" />
-              <Box component="col" sx={{ width: '150px' }} />
-            </colgroup>
-
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Role</TableCell>
-                <TableCell>Last Updated</TableCell>
-                <TableCell>Source</TableCell>
-                <TableCell></TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredNamespaceMemberships.map((membership: any) => <NamespaceMembershipListItem
-                key={membership.id}
-                fragmentRef={membership}
-                namespacePath={data.fullPath}
-                onDelete={onShowDeleteConfirmationDialog}
-              />)}
-            </TableBody>
-          </Table>
-        </TableContainer>}
+        {filteredNamespaceMemberships.length > 0 && <ResponsiveTable
+          ariaLabel="memberships"
+          minWidth={650}
+          columns={[
+            { label: 'Name' },
+            { label: 'Type' },
+            { label: 'Role' },
+            { label: 'Last Updated' },
+            { label: 'Source' },
+            { label: '' },
+          ]}
+        >
+          {filteredNamespaceMemberships.map((membership: any) => <NamespaceMembershipListItem
+            key={membership.id}
+            fragmentRef={membership}
+            namespacePath={data.fullPath}
+            onDelete={onShowDeleteConfirmationDialog}
+          />)}
+        </ResponsiveTable>}
       </Box>}
       {filteredNamespaceMemberships.length === 0 && <Typography color="textSecondary" align="center" sx={{
         padding: 4,

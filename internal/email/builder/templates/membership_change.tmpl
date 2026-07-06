@@ -4,7 +4,7 @@
 {{- $saPath := .this.ServiceAccountPath -}}
 {{- $saURL := printf "%s/groups/%s/-/service_accounts/%s" .common.FrontendURL .this.ServiceAccountGroupPath
 .this.ServiceAccountID -}}
-{{- $teamURL := printf "%s/teams/%s" .common.FrontendURL .this.TeamName -}}
+{{- $teamURL := printf "%s/teams/%s" .common.FrontendURL (pathEscape .this.TeamName) -}}
 
 {{if eq .this.Action "created"}}
 <h6 class="text">{{$nsType}} Access Granted</h6>
@@ -59,7 +59,8 @@
         {{- else -}}
         Your access to
         {{- end}}
-        <strong>{{.this.NamespacePath}}</strong> has been revoked.
+        <strong>{{.this.NamespacePath}}</strong> has been revoked{{if .this.TeamName}} (via team <strong><a
+                href="{{$teamURL}}" class="link" target="_blank">{{.this.TeamName}}</a></strong>){{end}}.
     </p>
 </div>
 {{end}}

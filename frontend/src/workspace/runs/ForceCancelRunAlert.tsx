@@ -1,6 +1,7 @@
 import React from 'react'
 import { Alert, Stack, Typography } from '@mui/material'
 import moment from 'moment';
+import Timestamp from '../../common/Timestamp';
 import ForceCancelRunButton from './ForceCancelRunButton';
 import { useFragment } from 'react-relay';
 import graphql from 'babel-plugin-relay/macro';
@@ -28,8 +29,8 @@ function ForceCancelRunAlert(props: Props) {
         <Alert severity='warning' sx={{ mb: 2 }}>
             <Stack direction="column" spacing={1}>
                 <Typography>Cancellation is in progress...</Typography>
-                {!forceCancelAvailable && <Typography variant="caption">If the graceful cancellation fails, this run can be force cancelled in {moment(data.forceCancelAvailableAt as moment.MomentInput).fromNow(true)}.</Typography>}
-                {forceCancelAvailable && <ForceCancelRunButton fragmentRef={data}/>}
+                {!forceCancelAvailable && <Typography variant="caption">If the graceful cancellation fails, this run can be force cancelled <Timestamp timestamp={data.forceCancelAvailableAt as string} />.</Typography>}
+                {forceCancelAvailable && <ForceCancelRunButton fragmentRef={data} />}
             </Stack>
         </Alert>
     )

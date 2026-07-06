@@ -1,17 +1,11 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
-import Stack from '@mui/material/Stack';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import React, { useMemo, useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
+import { ResponsiveTable } from '../../common/ResponsiveTable';
 import SearchInput from '../../common/SearchInput';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { IconButton, Menu, MenuItem } from '@mui/material';
@@ -76,23 +70,13 @@ function StateVersionInputVariables(props: Props) {
 
     return (
         <Box>
-            {variables.length > 0 && <Box display="flex">
-                <Stack direction="row" spacing={2} sx={{ flex: 1 }}>
+            {variables.length > 0 && <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { sm: 'center' }, gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
                     <SearchInput
                         fullWidth
                         placeholder="search for variables"
                         onChange={onSearchChange}
                     />
-                    <Button
-                        size="small"
-                        color="info"
-                        sx={{ width: 150 }}
-                        onClick={() => setShowValues(!showValues)}
-                    >
-                        {showValues ? 'Hide Values' : 'Show Values'}
-                    </Button>
-                </Stack>
-                <>
                     <IconButton
                         color="info"
                         aria-label="more options menu"
@@ -115,7 +99,15 @@ function StateVersionInputVariables(props: Props) {
                             {showAllVariables ? 'Hide Unused Variables' : 'Show All Variables'}
                         </MenuItem>
                     </Menu>
-                </>
+                </Box>
+                <Button
+                    size="small"
+                    color="info"
+                    sx={{ flexShrink: 0, width: 150, alignSelf: { xs: 'center', sm: 'auto' } }}
+                    onClick={() => setShowValues(!showValues)}
+                >
+                    {showValues ? 'Hide Values' : 'Show Values'}
+                </Button>
             </Box>}
             {(filteredVariables.length === 0 && search !== '') && <Typography sx={{ padding: 2, marginTop: 4 }} align="center" color="textSecondary">
                 No variables matching search <strong>{search}</strong>
@@ -127,30 +119,22 @@ function StateVersionInputVariables(props: Props) {
                     </Typography>
                 </Box>
             </Paper>}
-            {filteredVariables.length > 0 && <TableContainer>
-                <Table sx={{ tableLayout: 'fixed' }}>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>
-                                <Typography color="textSecondary">Key</Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Typography color="textSecondary">Value</Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Typography color="textSecondary">Source</Typography>
-                            </TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {filteredVariables.map((v: any) => <StateVersionInputVariableListItem
-                            key={v.key}
-                            fragmentRef={v}
-                            showValues={showValues}
-                        />)}
-                    </TableBody>
-                </Table>
-            </TableContainer>}
+            {filteredVariables.length > 0 && <Box sx={{ mt: 2 }}>
+                <ResponsiveTable
+                    ariaLabel="input variables"
+                    columns={[
+                        { label: 'Key' },
+                        { label: 'Value' },
+                        { label: 'Source' },
+                    ]}
+                >
+                    {filteredVariables.map((v: any) => <StateVersionInputVariableListItem
+                        key={v.key}
+                        fragmentRef={v}
+                        showValues={showValues}
+                    />)}
+                </ResponsiveTable>
+            </Box>}
         </Box>
     );
 }

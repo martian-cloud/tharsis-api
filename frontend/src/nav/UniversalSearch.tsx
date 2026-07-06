@@ -158,7 +158,7 @@ const PATH_GENERATORS = {
     Workspace: (result: WorkspaceResult): string => `/groups/${result.fullPath}`,
     TerraformModule: (result: TerraformModuleResult): string => `/module-registry/${result.registryNamespace}/${result.name}/${result.system}`,
     TerraformProvider: (result: TerraformProviderResult): string => `/provider-registry/${result.registryNamespace}/${result.name}`,
-    Team: (result: TeamResult): string => `/teams/${result.name}`,
+    Team: (result: TeamResult): string => `/teams/${encodeURIComponent(result.name)}`,
 } as const;
 
 const CATEGORIES = {

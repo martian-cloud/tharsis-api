@@ -1,5 +1,5 @@
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import { ButtonGroup, Chip, Menu, MenuItem, Paper, Stack, styled, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { ButtonGroup, Chip, Menu, MenuItem, Paper, Stack, styled } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Tab from '@mui/material/Tab';
@@ -74,6 +74,7 @@ const FieldValue = styled(
 )(({ theme }) => ({
     color: theme.palette.text.secondary,
     marginBottom: '16px',
+    wordBreak: 'break-word',
     '&:last-child': {
         marginBottom: 0
     }
@@ -286,17 +287,17 @@ function ManagedIdentityDetails(props: Props) {
                         { title: data.managedIdentity.name, path: id }
                     ]}
                 />
-                <Box display="flex" justifyContent="space-between" marginBottom={2}>
-                    <Box>
-                        <Box display="flex" alignItems="center">
-                            <Typography variant="h5" sx={{ marginRight: 1 }}>{data.managedIdentity.name}</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, marginBottom: 2 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Box display="flex" alignItems="center" flexWrap="wrap">
+                            <Typography variant="h5" sx={{ marginRight: 1, wordBreak: 'break-word' }}>{data.managedIdentity.name}</Typography>
                             <ManagedIdentityTypeChip mr={1} type={data.managedIdentity.type} />
                             {data.managedIdentity.isAlias && <Chip label="alias" color="secondary" size="small" />}
 
                         </Box>
                         <Typography color="textSecondary">{data.managedIdentity.description}</Typography>
                     </Box>
-                    {!data.managedIdentity.isAlias && <Box>
+                    {!data.managedIdentity.isAlias && <Box sx={{ flexShrink: 0 }}>
                         <Stack direction="row" spacing={1}>
                             <TRNButton trn={data.managedIdentity.metadata.trn} />
                             <ButtonGroup variant="outlined" color="primary">
@@ -335,7 +336,7 @@ function ManagedIdentityDetails(props: Props) {
                         </Stack>
                     </Box>}
 
-                    {data.managedIdentity.isAlias && <Box>
+                    {data.managedIdentity.isAlias && <Box sx={{ flexShrink: 0 }}>
                         <Stack direction="row" spacing={1}>
                             <TRNButton trn={data.managedIdentity.metadata.trn} />
                             <Button
@@ -346,8 +347,8 @@ function ManagedIdentityDetails(props: Props) {
                         </Stack>
                     </Box>}
                 </Box>
-                <Box sx={{ display: "flex", justifyContent: "space-between", border: 1, borderTopLeftRadius: 4, borderTopRightRadius: 4, borderColor: 'divider' }}>
-                    <Tabs value={tab} onChange={onTabChange}>
+                <Box sx={{ border: 1, borderTopLeftRadius: 4, borderTopRightRadius: 4, borderColor: 'divider', maxWidth: '100%' }}>
+                    <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
                         <Tab label="Details" value="details" />
                         <Tab label="Rules" value="rules" />
                         <Tab label="Workspaces" value="workspaces" />
@@ -363,7 +364,9 @@ function ManagedIdentityDetails(props: Props) {
                             <FieldValue>aws</FieldValue>
                             <FieldLabel>IAM Trust Policy</FieldLabel>
                             <Typography color="textSecondary">Add the trust policy below to the IAM role in order to allow this managed identity to assume it.</Typography>
-                            <SyntaxHighlighter wrapLongLines customStyle={{ fontSize: 14 }} language="json" style={prismTheme} children={buildPolicy(payload.role, payload.subject)} />
+                            <Box sx={{ overflowX: 'auto', maxWidth: '100%' }}>
+                                <SyntaxHighlighter wrapLongLines customStyle={{ fontSize: 14 }} language="json" style={prismTheme} children={buildPolicy(payload.role, payload.subject)} />
+                            </Box>
                         </Box>}
                         {data.managedIdentity.type === 'azure_federated' && <Box>
                             <FieldLabel>Issuer</FieldLabel>
@@ -386,31 +389,25 @@ function ManagedIdentityDetails(props: Props) {
                             <Typography color="textSecondary">
                                 Add the identity provider settings below to your service account to allow this managed identity to use it
                             </Typography>
-                            <Paper sx={{ marginTop: 2, padding: 1 }}>
-                                <Table>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>Issuer URL</TableCell>
-                                            <TableCell>Bound Claims</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        <TableRow
-                                            sx={{ '&:last-child td, &:last-child th': { border: 0 }, height: 64 }}>
-                                            <TableCell>{ISSUER}</TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    size="small"
-                                                    variant="outlined"
-                                                    label={<React.Fragment>
-                                                        <Typography variant="body2" component="span" sx={{ fontWeight: 'bold' }}>sub:</Typography>
-                                                        <Typography variant="body2" component="span">{' ' + payload.subject}</Typography>
-                                                    </React.Fragment>}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    </TableBody>
-                                </Table>
+                            <Paper sx={{ marginTop: 2, padding: 2 }}>
+                                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 3 }}>
+                                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                                        <Typography variant="subtitle2" gutterBottom>Issuer URL</Typography>
+                                        <Typography variant="body2" color="textSecondary" sx={{ wordBreak: 'break-all' }}>{ISSUER}</Typography>
+                                    </Box>
+                                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                                        <Typography variant="subtitle2" gutterBottom>Bound Claims</Typography>
+                                        <Chip
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ height: 'auto', maxWidth: '100%', '& .MuiChip-label': { whiteSpace: 'normal', overflowWrap: 'anywhere', py: 0.5 } }}
+                                            label={<React.Fragment>
+                                                <Typography variant="body2" component="span" sx={{ fontWeight: 'bold' }}>sub:</Typography>
+                                                <Typography variant="body2" component="span">{' ' + payload.subject}</Typography>
+                                            </React.Fragment>}
+                                        />
+                                    </Box>
+                                </Box>
                             </Paper>
                         </Box>}
                         {data.managedIdentity.type === 'kubernetes_federated' && <Box>
@@ -422,7 +419,9 @@ function ManagedIdentityDetails(props: Props) {
                             <Typography color="textSecondary">
                                 Use the Terraform configuration below to configure your EKS cluster OIDC identity provider and allow this managed identity access.
                             </Typography>
-                            <SyntaxHighlighter wrapLongLines customStyle={{ fontSize: 14 }} language="hcl" style={prismTheme} children={buildTerraformHCLTemplate(config.apiUrl, data.managedIdentity.id, payload.audience)} />
+                            <Box sx={{ overflowX: 'auto', maxWidth: '100%' }}>
+                                <SyntaxHighlighter wrapLongLines customStyle={{ fontSize: 14 }} language="hcl" style={prismTheme} children={buildTerraformHCLTemplate(config.apiUrl, data.managedIdentity.id, payload.audience)} />
+                            </Box>
                         </Box>}
                     </Box>}
                     {tab === 'rules' && <Box>

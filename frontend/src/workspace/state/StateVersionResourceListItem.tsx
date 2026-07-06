@@ -1,7 +1,5 @@
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
-import TableCell from '@mui/material/TableCell';
-import TableRow from '@mui/material/TableRow';
 import graphql from 'babel-plugin-relay/macro';
 import React, { useMemo } from 'react';
 import { useFragment } from 'react-relay/hooks';
@@ -12,6 +10,7 @@ import TerraformPlainIcon from 'react-devicons/terraform/plain';
 import AzurePlainIcon from 'react-devicons/azure/plain';
 import { TharsisIcon } from '../../common/Icons';
 import { SvgIconProps } from '@mui/material/SvgIcon';
+import { ResponsiveRow } from '../../common/ResponsiveTable';
 import { StateVersionResourceListItemFragment_resource$key } from './__generated__/StateVersionResourceListItemFragment_resource.graphql';
 
 // Adapts TharsisIcon to accept the `size` prop used by react-devicons icons
@@ -55,26 +54,22 @@ function StateVersionResourceListItem(props: Props) {
     const ProviderIcon = useMemo(() => getProviderIcon(data.provider), [data.provider]);
 
     return (
-        <TableRow
-            sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-        >
-            <TableCell sx={{ wordBreak: 'break-all' }}>
-                {data.name}
-            </TableCell>
-            <TableCell sx={{ wordBreak: 'break-all' }}>
-                {data.type}
-                {data.mode === 'data' && <Chip size="small" label='datasource' sx={{ marginLeft: 1}} />}
-            </TableCell>
-            <TableCell sx={{ wordBreak: 'break-all' }}>
-                <Box display="flex" alignItems="center" gap={1}>
+        <ResponsiveRow cells={[
+            { primary: true, content: <Box sx={{ wordBreak: 'break-word' }}>{data.name}</Box> },
+            {
+                label: 'Type', content: <Box sx={{ wordBreak: 'break-word' }}>
+                    {data.type}
+                    {data.mode === 'data' && <Chip size="small" label='datasource' sx={{ marginLeft: 1 }} />}
+                </Box>
+            },
+            {
+                label: 'Provider', content: <Box display="flex" alignItems="center" gap={1} sx={{ wordBreak: 'break-word' }}>
                     <ProviderIcon size={20} color="currentColor" />
                     {data.provider}
                 </Box>
-            </TableCell>
-            <TableCell sx={{ wordBreak: 'break-all' }}>
-                {data.module}
-            </TableCell>
-        </TableRow>
+            },
+            { label: 'Module', content: <Box sx={{ wordBreak: 'break-word' }}>{data.module}</Box> },
+        ]} />
     );
 }
 

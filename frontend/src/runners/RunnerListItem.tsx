@@ -1,7 +1,8 @@
-import { Box, TableCell, TableRow, Tooltip, Typography } from '@mui/material';
+import { Box, Tooltip, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from 'react-relay/hooks';
 import Gravatar from '../common/Gravatar';
+import { ResponsiveRow } from '../common/ResponsiveTable';
 import Timestamp from '../common/Timestamp';
 import Link from '../routes/Link';
 import RunnerChip from './RunnerChip';
@@ -18,6 +19,7 @@ function RunnerListItem({ fragmentRef, inherited }: Props) {
         fragment RunnerListItemFragment_runner on Runner {
             metadata {
                 createdAt
+                updatedAt
             }
             id
             name
@@ -27,30 +29,34 @@ function RunnerListItem({ fragmentRef, inherited }: Props) {
         }
     `, fragmentRef);
 
-    return (
-        <TableRow sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-            <TableCell>
-                <Typography fontWeight={500}>
-                    <Link color="inherit" to={data.id}>{data.name}</Link>
-                </Typography>
-                {inherited && <Typography mt={0.5} color="textSecondary" variant="caption">Inherited from group <strong>{data.groupPath}</strong></Typography>}
-            </TableCell>
-            <TableCell>
-                <RunnerChip disabled={data.disabled} />
-            </TableCell>
-            <TableCell>
-                <Box display="flex" alignItems="center">
-                    <Tooltip title={data.createdBy}>
-                        <Box>
-                            <Gravatar width={24} height={24} email={data.createdBy} />
-                        </Box>
-                    </Tooltip>
-                    <Box ml={1}>
-                        <Timestamp variant="body2" timestamp={data.metadata.createdAt} />
-                    </Box>
+    const name = (
+        <>
+            <Typography fontWeight={500}>
+                <Link color="inherit" to={data.id}>{data.name}</Link>
+            </Typography>
+            {inherited && <Typography mt={0.5} color="textSecondary" variant="caption">Inherited from group <strong>{data.groupPath}</strong></Typography>}
+        </>
+    );
+
+    const created = (
+        <Box display="flex" alignItems="center" gap={0.5}>
+            <Timestamp variant="body2" timestamp={data.metadata.createdAt} />
+            <Typography variant="body2">by</Typography>
+            <Tooltip title={data.createdBy}>
+                <Box display="flex">
+                    <Gravatar width={20} height={20} email={data.createdBy} />
                 </Box>
-            </TableCell>
-        </TableRow>
+            </Tooltip>
+        </Box>
+    );
+
+    return (
+        <ResponsiveRow cells={[
+            { primary: true, content: name },
+            { label: 'Status', content: <RunnerChip disabled={data.disabled} /> },
+            { label: 'Created', content: created },
+            { label: 'Last Updated', content: <Timestamp variant="body2" timestamp={data.metadata.updatedAt} /> },
+        ]} />
     );
 }
 

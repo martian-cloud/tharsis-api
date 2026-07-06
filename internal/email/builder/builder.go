@@ -8,6 +8,7 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
+	"net/url"
 
 	"github.com/vanng822/go-premailer/premailer"
 )
@@ -67,7 +68,7 @@ func registerTemplate(filename string, templates map[string]*template.Template) 
 	if err != nil {
 		panic(fmt.Errorf("failed to read email template from embedded file %s: %w", filename, err))
 	}
-	t, err := template.New(filename).Parse(string(html))
+	t, err := template.New(filename).Funcs(template.FuncMap{"pathEscape": url.PathEscape}).Parse(string(html))
 	if err != nil {
 		panic(fmt.Errorf("failed to parse email template from embedded file %s: %w", filename, err))
 	}

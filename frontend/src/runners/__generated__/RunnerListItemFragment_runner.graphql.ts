@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<1dff414bc36d5e03027b04c1cdfe9a19>>
+ * @generated SignedSource<<0f3295185d126ad957f95e902e624a70>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,6 +17,7 @@ export type RunnerListItemFragment_runner$data = {
   readonly id: string;
   readonly metadata: {
     readonly createdAt: any;
+    readonly updatedAt: any;
   };
   readonly name: string;
   readonly " $fragmentType": "RunnerListItemFragment_runner";
@@ -45,6 +46,13 @@ const node: ReaderFragment = {
           "args": null,
           "kind": "ScalarField",
           "name": "createdAt",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "updatedAt",
           "storageKey": null
         }
       ],
@@ -90,6 +98,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "fda0c7e4bb2e45ddcd77b05ddb8f7887";
+(node as any).hash = "38f1bb36691c48e6d5a53bf27e719f07";
 
 export default node;

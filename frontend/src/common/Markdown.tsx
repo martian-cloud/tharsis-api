@@ -228,7 +228,7 @@ export default function Markdown(props: { children: string | null | undefined; }
     return (
         <Box
             sx={{
-                '&>:first-child': {
+                '&>:first-of-type': {
                     marginTop: 0
                 },
                 '&>:last-child': {

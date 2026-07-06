@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<175432e12c5e65c43fac349d3e9e113c>>
+ * @generated SignedSource<<193efaa8e94a5fb43fed5e16894acf59>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -143,13 +143,6 @@ return {
                 "name": "jobs",
                 "plural": false,
                 "selections": [
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "totalCount",
-                    "storageKey": null
-                  },
                   {
                     "alias": null,
                     "args": null,
@@ -340,16 +333,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "2e9251f371f01138c945c21a737bed38",
+    "cacheID": "3e3da1237da856d6cbab0d460a97f127",
     "id": null,
     "metadata": {},
     "name": "RunnerJobListPaginationQuery",
     "operationKind": "query",
-    "text": "query RunnerJobListPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...RunnerJobListFragment_jobs\n    id\n  }\n}\n\nfragment RunnerJobListFragment_jobs on Runner {\n  type\n  jobs(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...RunnerJobListItemFragment\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n\nfragment RunnerJobListItemFragment on Job {\n  id\n  status\n  type\n  run {\n    id\n  }\n  timestamps {\n    queuedAt\n    pendingAt\n    runningAt\n    finishedAt\n  }\n  workspace {\n    name\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    updatedAt\n  }\n}\n"
+    "text": "query RunnerJobListPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...RunnerJobListFragment_jobs\n    id\n  }\n}\n\nfragment RunnerJobListFragment_jobs on Runner {\n  type\n  jobs(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...RunnerJobListItemFragment\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n\nfragment RunnerJobListItemFragment on Job {\n  id\n  status\n  type\n  run {\n    id\n  }\n  timestamps {\n    queuedAt\n    pendingAt\n    runningAt\n    finishedAt\n  }\n  workspace {\n    name\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    updatedAt\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "861eef10350dcd844cb6cae9a0d38a70";
+(node as any).hash = "b93134680ea26d8a8edc3f57409f8d55";
 
 export default node;

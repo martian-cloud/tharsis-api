@@ -1,8 +1,8 @@
 import DeleteIcon from '@mui/icons-material/CloseOutlined';
-import { Avatar, Button, ListItem, ListItemText, Typography, useTheme } from '@mui/material';
+import { Avatar, Box, Button, ListItem, ListItemText, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
 import { useFragment } from 'react-relay/hooks';
+import Timestamp from '../common/Timestamp';
 import Link from '../routes/Link';
 import { AssignedServiceAccountListItemFragment_assignedServiceAccount$key } from './__generated__/AssignedServiceAccountListItemFragment_assignedServiceAccount.graphql';
 
@@ -33,39 +33,45 @@ function AssignedServiceAccountListItem({ fragmentRef, onDelete }: Props) {
         <ListItem
             dense
             sx={{
-                paddingY: data.description ? 0 : 1.5,
+                paddingY: 1.5,
                 borderBottom: `1px solid ${theme.palette.divider}`,
                 borderLeft: `1px solid ${theme.palette.divider}`,
                 borderRight: `1px solid ${theme.palette.divider}`,
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'stretch', sm: 'center' },
+                gap: { xs: 1, sm: 0 },
                 '&:last-child': {
                     borderBottomLeftRadius: 4,
                     borderBottomRightRadius: 4
                 }
             }}>
-            <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: 'avatar.serviceAccount', marginRight: 2 }}>
-                {data.name[0].toUpperCase()}
-            </Avatar>
-            <ListItemText
-                primary={
-                    <Link
-                        to={route}
-                        color='inherit'
-                        sx={{ fontSize: '16px', textDecoration: 'none' }}
-                    >
-                        {data.name}
-                    </Link>}
-                secondary={data.description} />
-            <Typography variant="body2" color="textSecondary">
-                {moment(data.metadata.updatedAt as moment.MomentInput).fromNow()}
-            </Typography>
-            <Button
-                onClick={() => onDelete(data.resourcePath)}
-                sx={{ ml: 2, minWidth: 40, padding: '2px' }}
-                size="small"
-                color="info"
-                variant="outlined">
-                <DeleteIcon />
-            </Button>
+            <Box display="flex" alignItems="center" sx={{ minWidth: 0, flexGrow: 1, width: { xs: '100%', sm: 'auto' } }}>
+                <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: 'avatar.serviceAccount', marginRight: 2, flexShrink: 0 }}>
+                    {data.name[0].toUpperCase()}
+                </Avatar>
+                <ListItemText
+                    sx={{ minWidth: 0, my: 0 }}
+                    primary={
+                        <Link
+                            to={route}
+                            color='inherit'
+                            sx={{ fontSize: '16px', textDecoration: 'none', wordBreak: 'break-word' }}
+                        >
+                            {data.name}
+                        </Link>}
+                    secondary={data.description} />
+            </Box>
+            <Box display="flex" alignItems="center" gap={1} sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'space-between', sm: 'flex-end' }, flexShrink: 0 }}>
+                <Timestamp variant="body2" color="textSecondary" timestamp={data.metadata.updatedAt as string} />
+                <Button
+                    onClick={() => onDelete(data.resourcePath)}
+                    sx={{ minWidth: 40, padding: '2px' }}
+                    size="small"
+                    color="info"
+                    variant="outlined">
+                    <DeleteIcon />
+                </Button>
+            </Box>
         </ListItem>
     );
 }

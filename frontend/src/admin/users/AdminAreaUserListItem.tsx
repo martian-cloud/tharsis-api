@@ -1,7 +1,8 @@
-import { Box, TableCell, TableRow, Typography, Chip, Menu, MenuItem, IconButton } from '@mui/material';
+import { Box, Typography, Chip, Menu, MenuItem, IconButton } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import Gravatar from '../../common/Gravatar';
+import { ResponsiveRow, useCardMode } from '../../common/ResponsiveTable';
 import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
 import { AdminAreaUserListItemFragment_user$key } from './__generated__/AdminAreaUserListItemFragment_user.graphql';
@@ -97,57 +98,59 @@ function AdminAreaUserListItem({ fragmentRef }: Props) {
 
     const showDropdownMenuButton = useMemo(() => { return user.email !== data.email && (data.admin || data.active); }, [data])
 
+    const cardMode = useCardMode();
+
+    const name = (
+        <Box display="flex" alignItems="center">
+            <Gravatar width={24} height={24} email={data.email} />
+            <Box ml={2} sx={{ minWidth: 0 }}>
+                <Box display="flex" alignItems="center">
+                    <Typography fontWeight={500} noWrap sx={{ minWidth: 0, flexShrink: 1 }}>{data.username}</Typography>
+                    {data.admin && <Chip sx={{ ml: 1, flexShrink: 0 }} color="secondary" size="xs" label="Admin" />}
+                    {!data.active && <Chip sx={{ ml: 1, flexShrink: 0 }} color="warning" size="xs" label="Inactive" />}
+                </Box>
+                <Typography color="textSecondary" variant="body2" noWrap title={data.email}>{data.email}</Typography>
+            </Box>
+        </Box>
+    );
+
+    const actions = (
+        <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
+            <TRNButton trn={data.metadata.trn} size="small" />
+            {showDropdownMenuButton && <>
+                <IconButton
+                    color="inherit"
+                    size="small"
+                    onClick={onMenuOpen}
+                >
+                    <MoreVertIcon />
+                </IconButton>
+                <Menu
+                    id="admin-users-list-more-options-menu"
+                    anchorEl={menuAnchorEl}
+                    open={Boolean(menuAnchorEl)}
+                    onClose={onMenuClose}
+                >
+                    <MenuItem
+                        onClick={() => onMenuAction(() => {
+                            setShowUpdateUserAdminStatusConfirmation(true);
+                        })}>
+                        {data.admin ? 'Revoke' : 'Grant'} Admin Permissions
+                    </MenuItem>
+                </Menu>
+            </>}
+            {!showDropdownMenuButton && !cardMode && <IconButton size="small" sx={{ visibility: 'hidden' }}><MoreVertIcon /></IconButton>}
+        </Box>
+    );
+
     return (
         <React.Fragment>
-            <TableRow sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                <TableCell>
-                    <Box display="flex" alignItems="center">
-                        <Gravatar width={24} height={24} email={data.email} />
-                        <Box ml={2}>
-                            <Box display="flex" alignItems="center">
-                                <Typography fontWeight={500}>{data.username}</Typography>
-                                {data.admin && <Box><Chip sx={{ ml: 1 }} color="secondary" size="xs" label="Admin" /></Box>}
-                                {!data.active && <Box><Chip sx={{ ml: 1 }} color="warning" size="xs" label="Inactive" /></Box>}
-                            </Box>
-                            <Typography color="textSecondary" variant="body2">{data.email}</Typography>
-                        </Box>
-                    </Box>
-                </TableCell>
-                <TableCell>
-                    {data.scimExternalId ? 'Yes' : 'No'}
-                </TableCell>
-                <TableCell>
-                    <Timestamp variant="body2" timestamp={data.metadata.createdAt} />
-                </TableCell>
-                <TableCell align="right">
-                    <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
-                        <TRNButton trn={data.metadata.trn} size="small"/>
-                        {showDropdownMenuButton && <>
-                            <IconButton
-                                color="inherit"
-                                size="small"
-                                onClick={onMenuOpen}
-                            >
-                                <MoreVertIcon />
-                            </IconButton>
-                            <Menu
-                                id="admin-users-list-more-options-menu"
-                                anchorEl={menuAnchorEl}
-                                open={Boolean(menuAnchorEl)}
-                                onClose={onMenuClose}
-                            >
-                                <MenuItem
-                                    onClick={() => onMenuAction(() => {
-                                        setShowUpdateUserAdminStatusConfirmation(true);
-                                    })}>
-                                    {data.admin ? 'Revoke' : 'Grant'} Admin Permissions
-                                </MenuItem>
-                            </Menu>
-                        </>}
-                        {!showDropdownMenuButton && <IconButton size="small" sx={{ visibility: 'hidden' }}><MoreVertIcon /></IconButton>}
-                    </Box>
-                </TableCell>
-            </TableRow>
+            <ResponsiveRow cells={[
+                { primary: true, content: name },
+                { label: 'SCIM', content: data.scimExternalId ? 'Yes' : 'No' },
+                { label: 'Created', content: <Timestamp variant="body2" timestamp={data.metadata.createdAt} /> },
+                { align: 'right', content: actions },
+            ]} />
             {showUpdateUserAdminStatusConfirmation && (
                 <ConfirmationDialog
                     title={data.admin ? 'Revoke Admin Permissions' : 'Grant Admin Permissions'}

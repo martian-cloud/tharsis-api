@@ -231,7 +231,7 @@ function RunDetailsApplyStage(props: Props) {
                 </Paper>}
                 {data.apply.currentJob && data.apply.status !== 'pending' && <Box>
                     <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                        <Tabs value={tab} onChange={onTabChange}>
+                        <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
                             <Tab label="Logs" value="logs" />
                             <Tab label="Variables" value="variables" />
                         </Tabs>

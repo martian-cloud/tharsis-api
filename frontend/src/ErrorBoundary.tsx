@@ -9,6 +9,7 @@ const NOT_IMPLEMENTED_ERROR = 'NOT_IMPLEMENTED';
 
 interface Props {
     children?: ReactNode;
+    resetKey?: string;
 }
 
 interface State {
@@ -29,6 +30,14 @@ class ErrorBoundary extends React.Component<Props, State> {
 
     componentDidCatch(error: any, errorInfo: any) {
         console.log(`Unexpected error: ${error}: ${errorInfo}`);
+    }
+
+    componentDidUpdate(prevProps: Props) {
+        // Clear the error once the user navigates to a different route so the new
+        // page can render instead of the fallback persisting until a hard refresh.
+        if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+            this.setState({ hasError: false, errorCodes: [] });
+        }
     }
 
     render() {

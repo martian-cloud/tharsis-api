@@ -1,7 +1,7 @@
 import { Box, Chip, ListItem, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
 import { useFragment } from 'react-relay/hooks';
+import Timestamp from '../common/Timestamp';
 import { RunnerSessionListItemFragment$key } from './__generated__/RunnerSessionListItemFragment.graphql';
 
 interface Props {
@@ -37,7 +37,7 @@ function RunnerSessionListItem({ fragmentRef, onClick }: Props) {
                     borderBottomRightRadius: 4
                 }
             }}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" flex={1} padding={1}>
+            <Box display="flex" alignItems="flex-start" justifyContent="space-between" flex={1} padding={1}>
                 <Box display="flex" alignItems="center">
                     <Box sx={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: data.active ? 'success.main' : 'runStatus.unknown', mr: 2 }} />
                     <Box>
@@ -48,7 +48,7 @@ function RunnerSessionListItem({ fragmentRef, onClick }: Props) {
                             {data.internal && <Chip sx={{ fontSize: 12, ml: 1 }} variant="outlined" label="internal" size="small" />}
                         </Box>
                         <Typography variant="body2" color="textSecondary">
-                            {`last seen ${moment(data.lastContacted as moment.MomentInput).fromNow()}`}
+                            last seen <Timestamp timestamp={data.lastContacted as string} />
                         </Typography>
                     </Box>
                 </Box>

@@ -20,7 +20,7 @@ function Timestamp({ timestamp, format, tooltip, ...other }: Props & TypographyP
     return (
         <Tooltip title={tooltip || (format === 'absolute' ? relativeTimestamp : formattedTimestamp)}>
             <Box component="span" display="inline-block">
-                <Typography variant="inherit" color="inherit" {...other}>
+                <Typography variant="inherit" color="inherit" {...other} component="span">
                     {format === 'absolute' ? formattedTimestamp : relativeTimestamp}
                 </Typography>
             </Box>

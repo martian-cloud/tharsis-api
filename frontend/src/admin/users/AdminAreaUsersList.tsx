@@ -1,10 +1,11 @@
-import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useTheme } from '@mui/material';
+import { Paper, Typography, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import graphql from 'babel-plugin-relay/macro';
 import throttle from 'lodash.throttle';
 import React, { useMemo, useState } from 'react';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { fetchQuery, useLazyLoadQuery, usePaginationFragment, useRelayEnvironment } from 'react-relay/hooks';
+import { ResponsiveTable } from '../../common/ResponsiveTable';
 import SearchInput from '../../common/SearchInput';
 import ListSkeleton from '../../skeletons/ListSkeleton';
 import AdminAreaBreadcrumbs from '../AdminAreaBreadcrumbs';
@@ -138,23 +139,16 @@ function AdminAreaUsersList() {
                         hasMore={hasNext}
                         loader={<ListSkeleton rowCount={3} />}
                     >
-                        <TableContainer>
-                            <Table sx={isRefreshing ? { opacity: 0.5 } : null}>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Name</TableCell>
-                                        <TableCell>SCIM</TableCell>
-                                        <TableCell>Created</TableCell>
-                                        <TableCell></TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {data?.users?.edges?.map((edge: any) => (
-                                        <AdminAreaUserListItem key={edge.node.id} fragmentRef={edge.node} />
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                        <Box sx={isRefreshing ? { opacity: 0.5 } : undefined}>
+                            <ResponsiveTable
+                                ariaLabel="users"
+                                columns={[{ label: 'Name' }, { label: 'SCIM' }, { label: 'Created' }, { label: '' }]}
+                            >
+                                {data?.users?.edges?.map((edge: any) => (
+                                    <AdminAreaUserListItem key={edge.node.id} fragmentRef={edge.node} />
+                                ))}
+                            </ResponsiveTable>
+                        </Box>
                     </InfiniteScroll>}
                 </Box>
             </React.Fragment>}

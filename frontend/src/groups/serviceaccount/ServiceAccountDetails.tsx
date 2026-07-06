@@ -1,5 +1,5 @@
 import { default as ArrowDropDownIcon } from '@mui/icons-material/ArrowDropDown';
-import { Alert, Avatar, ButtonGroup, Chip, Menu, MenuItem, Paper, Stack, Tab, Tabs, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { Alert, Avatar, ButtonGroup, Chip, Menu, MenuItem, Paper, Stack, Tab, Tabs } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -13,6 +13,7 @@ import { useAgentCopilot } from '../../ai/AgentCopilotProvider';
 import { ApiConfigContext } from '../../ApiConfigContext';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import CopyButton from '../../common/CopyButton';
+import { ResponsiveRow, ResponsiveTable } from '../../common/ResponsiveTable';
 import Timestamp from '../../common/Timestamp';
 import cfg from '../../common/config';
 import ExpirationDateTimePicker, { isExpirationInvalid } from './ExpirationDateTimePicker';
@@ -222,22 +223,22 @@ function ServiceAccountDetails(props: Props) {
                 />
                 {secretExpiresSoon && (
                     <Alert severity="warning" variant="outlined" sx={{ mt: 2, mb: 2 }}>
-                        Client secret expires {moment(data.serviceAccount.clientSecretExpiresAt as moment.MomentInput).fromNow()}. Reset the credentials to avoid authentication failures.
+                        Client secret expires <Timestamp timestamp={data.serviceAccount.clientSecretExpiresAt as string} />. Reset the credentials to avoid authentication failures.
                     </Alert>
                 )}
-                <Box display="flex" justifyContent="space-between" marginBottom={2}>
-                    <Box display="flex" alignItems="center">
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, marginBottom: 2 }}>
+                    <Box display="flex" alignItems="center" sx={{ minWidth: 0 }}>
                         <Avatar variant="rounded" sx={{ width: 32, height: 32, marginRight: 1, bgcolor: 'avatar.default' }}>
                             {data.serviceAccount.name[0].toUpperCase()}
                         </Avatar>
-                        <Box>
+                        <Box sx={{ minWidth: 0 }}>
                             <Box display="flex" alignItems="center">
-                                <Typography variant="h5" sx={{ marginRight: 1 }}>{data.serviceAccount.name}</Typography>
+                                <Typography variant="h5" sx={{ marginRight: 1, wordBreak: 'break-word' }}>{data.serviceAccount.name}</Typography>
                             </Box>
                             <Typography color="textSecondary">{data.serviceAccount.description}</Typography>
                         </Box>
                     </Box>
-                    <Box>
+                    <Box sx={{ flexShrink: 0 }}>
                         <Stack direction="row" spacing={1}>
                             <TRNButton trn={data.serviceAccount.metadata.trn} />
                             <ButtonGroup variant="outlined" color="primary">
@@ -278,8 +279,8 @@ function ServiceAccountDetails(props: Props) {
                         </Stack>
                     </Box>
                 </Box>
-                <Box sx={{ display: "flex", justifyContent: "space-between", border: 1, borderTopLeftRadius: 4, borderTopRightRadius: 4, borderColor: 'divider' }}>
-                    <Tabs value={tab} onChange={onTabChange} aria-label="authentication methods">
+                <Box sx={{ border: 1, borderTopLeftRadius: 4, borderTopRightRadius: 4, borderColor: 'divider', maxWidth: '100%' }}>
+                    <Tabs value={tab} onChange={onTabChange} aria-label="authentication methods" variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
                         <Tab label="OIDC Federation" value="oidc" />
                         <Tab label="Client Credentials" value="clientCredentials" />
                         <Tab label="Namespace Memberships" value="namespaceMemberships" />
@@ -291,51 +292,47 @@ function ServiceAccountDetails(props: Props) {
                             Tokens issued by trusted identity providers can authenticate to this service account if the bound claims match the token claims.
                         </Typography>
                         {data.serviceAccount.oidcTrustPolicies.length > 0 ? (
-                            <Paper sx={{ padding: 1 }}>
-                                <Table>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>Issuer URL</TableCell>
-                                            <TableCell>Bound Claims</TableCell>
-                                            <TableCell>Wildcard Match Enabled</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {data.serviceAccount.oidcTrustPolicies.map((trustPolicy, index) => (<TableRow
-                                            key={index}
-                                            sx={{ '&:last-child td, &:last-child th': { border: 0 }, height: 64 }}>
-                                            <TableCell>{trustPolicy.issuer}</TableCell>
-                                            <TableCell>
-                                                <Box
-                                                    display="flex"
-                                                    flexWrap="wrap"
-                                                    sx={{
-                                                        margin: '0 -4px',
-                                                        '& > *': {
-                                                            margin: '4px'
-                                                        },
-                                                    }}
-                                                >
-                                                    {trustPolicy.boundClaims.map(claim => (
-                                                        <Chip
-                                                            size="small"
-                                                            key={claim.name}
-                                                            variant="outlined"
-                                                            label={<React.Fragment>
-                                                                <Typography variant="body2" component="span" sx={{ fontWeight: 'bold' }}>{claim.name}:</Typography>
-                                                                <Typography variant="body2" component="span">{' ' + claim.value}</Typography>
-                                                            </React.Fragment>}
-                                                        />
-                                                    ))}
-                                                </Box>
-                                            </TableCell>
-                                            <TableCell>{trustPolicy.boundClaimsType === 'GLOB' ? 'Yes' : 'No'}</TableCell>
-                                        </TableRow>))}
-                                    </TableBody>
-                                </Table>
-                            </Paper>
+                                <ResponsiveTable
+                                    ariaLabel="oidc trust policies"
+                                    minWidth={650}
+                                    columns={[{ label: 'Issuer URL' }, { label: 'Bound Claims' }, { label: 'Wildcard Match Enabled' }]}
+                                >
+                                    {data.serviceAccount.oidcTrustPolicies.map((trustPolicy, index) => (
+                                        <ResponsiveRow key={index} cells={[
+                                            { primary: true, content: <Typography sx={{ wordBreak: 'break-all' }}>{trustPolicy.issuer}</Typography> },
+                                            {
+                                                label: 'Bound Claims', content: (
+                                                    <Box
+                                                        display="flex"
+                                                        flexWrap="wrap"
+                                                        sx={{
+                                                            margin: '0 -4px',
+                                                            '& > *': {
+                                                                margin: '4px'
+                                                            },
+                                                        }}
+                                                    >
+                                                        {trustPolicy.boundClaims.map(claim => (
+                                                            <Chip
+                                                                size="small"
+                                                                key={claim.name}
+                                                                variant="outlined"
+                                                                sx={{ height: 'auto', maxWidth: '100%', '& .MuiChip-label': { whiteSpace: 'normal', overflowWrap: 'anywhere', py: 0.5 } }}
+                                                                label={<React.Fragment>
+                                                                    <Typography variant="body2" component="span" sx={{ fontWeight: 'bold' }}>{claim.name}:</Typography>
+                                                                    <Typography variant="body2" component="span">{' ' + claim.value}</Typography>
+                                                                </React.Fragment>}
+                                                            />
+                                                        ))}
+                                                    </Box>
+                                                )
+                                            },
+                                            { label: 'Wildcard Match Enabled', content: <Typography variant="body2">{trustPolicy.boundClaimsType === 'GLOB' ? 'Yes' : 'No'}</Typography> },
+                                        ]} />
+                                    ))}
+                                </ResponsiveTable>
                         ) : (
-                            <Paper sx={{ padding: 2 }}>
+                            <Paper variant="outlined" sx={{ padding: 2 }}>
                                 <Typography variant="body2" color="textSecondary">
                                     No identity providers configured. Edit the service account to add OIDC trust policies.
                                 </Typography>
@@ -350,12 +347,12 @@ function ServiceAccountDetails(props: Props) {
                             <Paper sx={{ padding: 2 }}>
                                 <Typography variant="body2" fontWeight="medium">Client ID</Typography>
                                 <Box display="flex" alignItems="center" gap={0.5} mb={2}>
-                                    <Typography variant="body2" color="textSecondary">{data.serviceAccount.id}</Typography>
+                                    <Typography variant="body2" color="textSecondary" sx={{ wordBreak: 'break-all', minWidth: 0 }}>{data.serviceAccount.id}</Typography>
                                     <CopyButton data={data.serviceAccount.id} toolTip="Click to copy" />
                                 </Box>
                                 <Typography variant="body2" fontWeight="medium">Token Endpoint (POST)</Typography>
                                 <Box display="flex" alignItems="center" gap={0.5} mb={2}>
-                                    <Typography variant="body2" color="textSecondary">{cfg.apiUrl}/v1/serviceaccounts/token</Typography>
+                                    <Typography variant="body2" color="textSecondary" sx={{ wordBreak: 'break-all', minWidth: 0 }}>{cfg.apiUrl}/v1/serviceaccounts/token</Typography>
                                     <CopyButton data={`${cfg.apiUrl}/v1/serviceaccounts/token`} toolTip="Click to copy" />
                                 </Box>
                                 <Typography variant="body2" fontWeight="medium">Secret Expires</Typography>

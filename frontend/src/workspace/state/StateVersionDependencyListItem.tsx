@@ -2,10 +2,10 @@ import { Chip, Tooltip } from '@mui/material';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
 import React from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { Link as LinkRouter } from 'react-router-dom';
+import Timestamp from '../../common/Timestamp';
 import { StateVersionDependencyListItemFragment_dependency$key } from './__generated__/StateVersionDependencyListItemFragment_dependency.graphql';
 
 const statusMap = {
@@ -50,7 +50,7 @@ function StateVersionDependencyListItem(props: Props) {
         <ListItemButton divider component={LinkRouter} to={`/groups/${data.workspacePath}`}>
             <ListItemText
                 primary={data.workspacePath}
-                secondary={data.stateVersion ? `updated ${moment(data.stateVersion.metadata.updatedAt as moment.MomentInput).fromNow()}` : ''}
+                secondary={data.stateVersion ? <>updated <Timestamp timestamp={data.stateVersion.metadata.updatedAt as string} /></> : ''}
             />
             {status !== 'latest' && <Tooltip title={statusMap[status].tooltip}>
                 <Chip label={status} color={statusMap[status].color} />
