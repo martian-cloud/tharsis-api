@@ -65,7 +65,7 @@ function AdminArea({ queryRef }: Props) {
         data.me?.adminModeEnabled ?
             <Box display="flex">
                 <AdminDetailsDrawer />
-                <Box component="main" sx={{ flexGrow: 1 }}>
+                <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
                     <Suspense fallback={<Box
                         sx={{
                             width: '100%',

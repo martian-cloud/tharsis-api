@@ -4,9 +4,9 @@ import IconButton from '@mui/material/IconButton';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
-import { Suspense, useEffect, useState } from "react";
-import { fetchQuery, useLazyLoadQuery, useRelayEnvironment } from 'react-relay/hooks';
+import { useEffect, useState } from "react";
+import { fetchQuery, useRelayEnvironment } from 'react-relay/hooks';
+import Timestamp from '../common/Timestamp';
 import LogViewer from '../workspace/runs/LogViewer';
 import { RunnerSessionErrorLogDialogQuery } from "./__generated__/RunnerSessionErrorLogDialogQuery.graphql";
 
@@ -61,21 +61,7 @@ function RunnerSessionErrorLogDialog(props: Props) {
                 </IconButton>
             </DialogTitle>
             <DialogContent dividers sx={{ flex: 1, padding: 0, minHeight: 600, display: 'flex', flexDirection: 'column' }}>
-                <Suspense fallback={<Box
-                    sx={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        minHeight: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                    }}>
-                    <CircularProgress />
-                </Box>}>
-                    <ErrorLogDialogContent sessionId={sessionId} />
-                </Suspense>
+                <ErrorLogDialogContent sessionId={sessionId} />
             </DialogContent>
             {!fullScreen && <DialogActions>
                 <Button color="inherit" onClick={() => onClose()}>
@@ -91,54 +77,74 @@ interface ErrorLogDialogContentProps {
 }
 
 function ErrorLogDialogContent(props: ErrorLogDialogContentProps) {
-    const queryData = useLazyLoadQuery<RunnerSessionErrorLogDialogQuery>(query, { id: props.sessionId, startOffset: 0, limit: 51200 }, { fetchPolicy: 'network-only' });
-
     const theme = useTheme();
+    const environment = useRelayEnvironment();
+
     const [errorCount, setErrorCount] = useState(0);
-    const [logs, setLogs] = useState('');
+    const [logs, setLogs] = useState<string | null>(null);
     const [currentLogSize, setCurrentLogSize] = useState(0);
     const [actualLogSize, setActualLogSize] = useState(0);
     const [lastUpdatedAt, setLastUpdatedAt] = useState('');
-    const [loading, setLoading] = useState<boolean>(false);
-    const environment = useRelayEnvironment();
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        const errorLog = queryData.node?.errorLog;
-        if (errorLog) {
-            const data = errorLog.data || '';
-            setLogs(data);
-            setCurrentLogSize(bytes(data));
-            setActualLogSize(errorLog.size);
-            setLastUpdatedAt(errorLog.lastUpdatedAt);
-        }
-
-        setErrorCount(queryData.node?.errorCount || 0);
-    }, [props.sessionId]);
-
-    useEffect(() => {
-        if (loading || currentLogSize >= actualLogSize) {
+        if (logs !== null && (loading || currentLogSize >= actualLogSize)) {
             return;
         }
 
-        setLoading(true);
+        const isInitial = logs === null;
+        const startOffset = isInitial ? 0 : currentLogSize;
+        const limit = isInitial ? 51200 : LOG_CHUNK_SIZE_BYTES;
 
+        if (!isInitial) setLoading(true);
+
+        let cancelled = false;
         fetchQuery<RunnerSessionErrorLogDialogQuery>(
             environment,
             query,
-            { id: props.sessionId, startOffset: currentLogSize, limit: LOG_CHUNK_SIZE_BYTES },
+            { id: props.sessionId, startOffset, limit },
             { fetchPolicy: 'network-only' }
-        ).toPromise().then(async response => {
-            setLoading(false);
+        ).toPromise().then(response => {
+            if (cancelled) return;
             const errorLog = response?.node?.errorLog;
-            if (errorLog) {
-                setLogs(logs + errorLog.data);
-                setActualLogSize(errorLog.size);
-                setCurrentLogSize(prev => prev + bytes(errorLog.data));
-                setLastUpdatedAt(errorLog.lastUpdatedAt);
+            if (isInitial) {
+                const data = errorLog?.data ?? '';
+                setLogs(data);
+                setCurrentLogSize(bytes(data));
+                setActualLogSize(errorLog?.size ?? 0);
+                setLastUpdatedAt(errorLog?.lastUpdatedAt ?? '');
+            } else {
+                setLoading(false);
+                if (errorLog) {
+                    setLogs(prev => (prev ?? '') + errorLog.data);
+                    setActualLogSize(errorLog.size);
+                    setCurrentLogSize(prev => prev + bytes(errorLog.data));
+                    setLastUpdatedAt(errorLog.lastUpdatedAt);
+                }
             }
-            setErrorCount(response?.node?.errorCount || 0);
+            setErrorCount(response?.node?.errorCount ?? 0);
         });
-    }, [props.sessionId, actualLogSize, currentLogSize, logs, loading, environment]);
+        return () => { cancelled = true; };
+    }, [props.sessionId, environment, logs, currentLogSize, actualLogSize, loading]);
+
+    if (logs === null) {
+        return (
+            <Box
+                sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    minHeight: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}
+            >
+                <CircularProgress />
+            </Box>
+        );
+    }
 
     return (
         <Box display="flex" flexDirection="column" flex={1}>
@@ -156,7 +162,7 @@ function ErrorLogDialogContent(props: ErrorLogDialogContentProps) {
                         {errorCount} error{errorCount === 1 ? '' : 's'}
                     </Typography>
                     {lastUpdatedAt && <Typography color="textSecondary">
-                        last updated {moment(lastUpdatedAt as moment.MomentInput).fromNow()}
+                        last updated <Timestamp timestamp={lastUpdatedAt} />
                     </Typography>}
                 </Box>
             </Paper>
@@ -164,6 +170,8 @@ function ErrorLogDialogContent(props: ErrorLogDialogContentProps) {
                 <Box position="absolute" top={0} left={0} width="100%" height="100%">
                     <LogViewer
                         logs={logs}
+                        scrollMode="container"
+                        disableDeepLink
                         sx={{
                             backgroundColor: darken(theme.palette.background.default, 0.5),
                             paddingTop: 1,

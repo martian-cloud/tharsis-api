@@ -1,7 +1,8 @@
-import { Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
+import { Box, Paper, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { useFragment, useLazyLoadQuery, usePaginationFragment } from 'react-relay';
+import { ResponsiveTable } from '../../common/ResponsiveTable';
 import ListSkeleton from '../../skeletons/ListSkeleton';
 import StateVersionListItem from './StateVersionListItem';
 import { StateVersionListFragment_workspace$key } from './__generated__/StateVersionListFragment_workspace.graphql';
@@ -65,23 +66,20 @@ function StateVersionList({ fragmentRef }: Props) {
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
             >
-                <TableContainer>
-                    <Table sx={{ minWidth: 650 }} aria-label="workspace state versions">
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>State Version ID</TableCell>
-                                <TableCell>Run ID</TableCell>
-                                <TableCell>Created At</TableCell>
-                                <TableCell>Created By</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {data.stateVersions.edges.map((edge: any) => (
-                                <StateVersionListItem key={edge.node.id} stateVersionKey={edge.node} workspacePath={workspace.fullPath} />
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                <ResponsiveTable
+                    ariaLabel="workspace state versions"
+                    minWidth={650}
+                    columns={[
+                        { label: 'State Version ID' },
+                        { label: 'Run ID' },
+                        { label: 'Created At' },
+                        { label: 'Created By' },
+                    ]}
+                >
+                    {data.stateVersions.edges.map((edge: any) => (
+                        <StateVersionListItem key={edge.node.id} stateVersionKey={edge.node} workspacePath={workspace.fullPath} />
+                    ))}
+                </ResponsiveTable>
             </InfiniteScroll>}
             {data?.stateVersions.edges?.length === 0 && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
                 <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">

@@ -141,8 +141,8 @@ function LabelFilter({
                         <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
                             Add Label Filter:
                         </Typography>
-                        <Stack direction="row" spacing={2} alignItems="flex-start">
-                            <Box sx={{ minWidth: 200 }}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-start">
+                            <Box sx={{ flex: 1, width: '100%', minWidth: { sm: 200 } }}>
                                 <TextField
                                     size="small"
                                     label="Label Key"
@@ -152,7 +152,7 @@ function LabelFilter({
                                     sx={{ width: '100%' }}
                                 />
                             </Box>
-                            <Box sx={{ minWidth: 200 }}>
+                            <Box sx={{ flex: 1, width: '100%', minWidth: { sm: 200 } }}>
                                 <TextField
                                     size="small"
                                     label="Label Value"
@@ -168,7 +168,7 @@ function LabelFilter({
                                 startIcon={<AddIcon />}
                                 onClick={handleAddFilter}
                                 disabled={!canAddFilter}
-                                sx={{ mt: 0.5 }}
+                                sx={{ mt: { sm: 0.5 }, width: { xs: '100%', sm: 'auto' }, flexShrink: 0 }}
                             >
                                 Add
                             </Button>

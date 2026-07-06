@@ -2,16 +2,11 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack'
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import React, { useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
+import { ResponsiveTable } from '../../common/ResponsiveTable';
 import SearchInput from '../../common/SearchInput';
 import StateVersionOutputListItem from './StateVersionOutputListItem';
 import { StateVersionOutputsFragment_outputs$key } from './__generated__/StateVersionOutputsFragment_outputs.graphql';
@@ -49,7 +44,7 @@ function StateVersionOutputs(props: Props) {
 
     return (
         <Box>
-            {data.outputs.length > 0 && <Stack direction="row" spacing={2}>
+            {data.outputs.length > 0 && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <SearchInput
                     fullWidth
                     placeholder="search for outputs"
@@ -58,7 +53,7 @@ function StateVersionOutputs(props: Props) {
                 <Button
                     size="small"
                     color="info"
-                    sx={{ minWidth: 200 }}
+                    sx={{ flexShrink: 0, minWidth: 200 }}
                     onClick={() => setShowValues(!showValues)}
                 >
                     {showValues ? 'Hide Sensitive Values' : 'Show Sensitive Values'}
@@ -74,28 +69,21 @@ function StateVersionOutputs(props: Props) {
                     </Typography>
                 </Box>
             </Paper>}
-            {filteredOutputs.length > 0 && <TableContainer>
-                <Table  sx={{ tableLayout: 'fixed' }}>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>
-                                <Typography color="textSecondary">Name</Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Typography color="textSecondary">Value</Typography>
-                            </TableCell>
-                        </TableRow>
-                    </TableHead>
-
-                    <TableBody>
-                        {filteredOutputs.map((o: any) => <StateVersionOutputListItem
-                            key={o.name}
-                            fragmentRef={o}
-                            showValues={showValues}
-                        />)}
-                    </TableBody>
-                </Table>
-            </TableContainer>}
+            {filteredOutputs.length > 0 && <Box sx={{ mt: 2 }}>
+                <ResponsiveTable
+                    ariaLabel="outputs"
+                    columns={[
+                        { label: 'Name' },
+                        { label: 'Value' },
+                    ]}
+                >
+                    {filteredOutputs.map((o: any) => <StateVersionOutputListItem
+                        key={o.name}
+                        fragmentRef={o}
+                        showValues={showValues}
+                    />)}
+                </ResponsiveTable>
+            </Box>}
         </Box>
     );
 }

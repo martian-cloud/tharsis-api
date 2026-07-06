@@ -1,9 +1,9 @@
 import { Box, Tooltip, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
 import { useFragment, useLazyLoadQuery } from 'react-relay';
 import { useParams } from 'react-router-dom';
 import Gravatar from '../../common/Gravatar';
+import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import StateVersionFile from './StateVersionFile';
@@ -57,20 +57,16 @@ function StateVersionDetails(props: Props) {
                     { title: `${stateVersionId.substring(0, 8)}...`, path: stateVersionId }
                 ]}
             />
-            <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Box display="flex" alignItems="center">
-                    <Typography component="div" sx={{ paddingRight: '6px' }}>State version created{' '}
-                        <Tooltip sx={{ display: 'inline-block' }} title={queryData.node?.metadata?.createdAt as string}>
-                            <Box display="flex" alignItems="center">{moment(queryData.node?.metadata?.createdAt as moment.MomentInput).fromNow()}</Box>
-                        </Tooltip>
-                        {' '}by
-                    </Typography>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1 }}>
+                <Typography component="div" sx={{ paddingRight: '6px' }}>State version created{' '}
+                    <Timestamp timestamp={queryData.node?.metadata?.createdAt as string} />
+                    {' '}by
                     <Tooltip title={createdBy}>
-                        <Box>
+                        <Box sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 1 }}>
                             <Gravatar width={20} height={20} email={createdBy} />
                         </Box>
                     </Tooltip>
-                </Box>
+                </Typography>
                 <TRNButton trn={queryData.node?.metadata?.trn || ''} size="small" />
             </Box>
             <StateVersionFile fragmentRef={queryData.node} />

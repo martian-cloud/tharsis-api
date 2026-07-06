@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import graphql from 'babel-plugin-relay/macro';
 import React, { Suspense, useEffect } from 'react';
 import { PreloadedQuery, usePreloadedQuery, useQueryLoader } from 'react-relay/hooks';
+import { useLocation } from 'react-router-dom';
 import { RootQuery } from './__generated__/RootQuery.graphql';
 import { useAgentCopilot } from './ai/AgentCopilotProvider';
 import AgentSessionChatSidebar from './ai/AgentSessionChatSidebar';
@@ -68,12 +69,13 @@ function Root({ queryRef }: Props) {
 function RootContent({ fragmentRef }: { fragmentRef: RootQuery['response'] }) {
     const { headerHeight } = useAppHeaderHeight();
     const { sidebarWidth: agentCopilotSidebarWidth } = useAgentCopilot();
+    const location = useLocation();
 
     return (
         <>
             <AppHeader fragmentRef={fragmentRef} />
             <Box sx={{ paddingTop: `${headerHeight}px`, marginRight: `${agentCopilotSidebarWidth}px`, transition: 'margin-right 0.2s ease' }}>
-                <ErrorBoundary>
+                <ErrorBoundary resetKey={location.pathname}>
                     <Suspense fallback={<Box
                         sx={{
                             position: 'absolute',

@@ -3,6 +3,7 @@ import { AdapterMoment } from '@mui/x-date-pickers/AdapterMoment';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import moment, { Moment } from 'moment';
+import Timestamp from '../../common/Timestamp';
 
 const MIN_EXPIRATION_DAYS = 1;
 
@@ -43,7 +44,7 @@ function ExpirationDateTimePicker({ value, onChange, maxExpirationDays, disabled
             </LocalizationProvider>
             <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>
                 {value?.isValid()
-                    ? `Secret will expire ${value.fromNow()}`
+                    ? <>Secret will expire <Timestamp timestamp={value.toISOString()} /></>
                     : `Min: ${MIN_EXPIRATION_DAYS} day, max and default: ${maxExpirationDays} days`}
             </Typography>
         </Box>

@@ -200,7 +200,7 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
                         </Stack>
                     </Box>
                     <Box sx={{ border: 1, borderColor: 'divider', marginBottom: 2 }}>
-                        <Tabs value={tab} onChange={onTabChange}>
+                        <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
                             <Tab label="Docs" value="docs" />
                             <Tab label="How To Use" value="usage" />
                             <Tab label="Files" value="files" />
@@ -213,10 +213,12 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
                             <TerraformModuleVersionDocs fragmentRef={data.configurationDetails} />
                         </Box>}
                         {tab === 'usage' && <Box marginTop={2} position="relative">
-                            <IconButton sx={{ padding: 2, position: 'absolute', top: 0, right: 0 }} onClick={() => navigator.clipboard.writeText(usageInfo)}>
+                            <IconButton sx={{ padding: 2, position: 'absolute', top: 0, right: 0, zIndex: 1 }} onClick={() => navigator.clipboard.writeText(usageInfo)}>
                                 <CopyIcon sx={{ width: 16, height: 16 }} />
                             </IconButton>
-                            <SyntaxHighlighter wrapLines customStyle={{ fontSize: 14 }} language="hcl" style={prismTheme} children={usageInfo} />
+                            <Box sx={{ overflowX: 'auto', maxWidth: '100%' }}>
+                                <SyntaxHighlighter wrapLongLines customStyle={{ fontSize: 14, paddingRight: 48 }} language="hcl" style={prismTheme} children={usageInfo} />
+                            </Box>
                         </Box>}
                         {tab === 'files' && <Box mt={2}>
                             {filesAvailable

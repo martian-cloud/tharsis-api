@@ -152,10 +152,9 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
                                 </Link>
                             </Box>
                         </Tooltip>}
-                        <Box display="flex">
-                            <Typography variant="body2" color="textSecondary">created</Typography>
-                            <Timestamp ml={0.5} variant="body2" color="textSecondary" timestamp={data.metadata.createdAt} />
-                        </Box>
+                        <Typography variant="body2" color="textSecondary">
+                            created <Timestamp variant="inherit" color="inherit" timestamp={data.metadata.createdAt} />
+                        </Typography>
                     </Stack>
                 }
             />

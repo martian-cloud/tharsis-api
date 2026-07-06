@@ -85,7 +85,7 @@ function GroupDetails(props: Props) {
     return (
         <Box display="flex">
             <GroupDetailsDrawer groupName={data.name} groupPath={groupPath} route={route} />
-            <Box component="main" flexGrow={1}>
+            <Box component="main" flexGrow={1} minWidth={0}>
                 <Suspense fallback={
                     <Box
                         sx={{
@@ -249,16 +249,20 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                         </Stack>
                     </Box>
                     <Box>
-                        <Stack direction="row" spacing={1}>
-                            <NamespaceFavoriteButton
-                                namespacePath={data.fullPath}
-                                namespaceType="GROUP"
-                            />
-                            <GroupNotificationPreference fragmentRef={data} />
-                            <TRNButton trn={data.metadata.trn} size="small" />
-                            <Button size="small" variant="outlined" color="info" onClick={() => (navigate(`/workspaces/-/new?parent=${data.fullPath}`))}>New Workspace</Button>
-                            <Button size="small" variant="outlined" color="info" onClick={() => (navigate(`/groups/-/new?parent=${data.fullPath}`))}>New Subgroup</Button>
-                        </Stack>
+                        <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'stretch', md: 'center' } }}>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                <NamespaceFavoriteButton
+                                    namespacePath={data.fullPath}
+                                    namespaceType="GROUP"
+                                />
+                                <GroupNotificationPreference fragmentRef={data} />
+                                <TRNButton trn={data.metadata.trn} size="small" />
+                            </Stack>
+                            <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'column', md: 'row' } }}>
+                                <Button sx={{ width: { xs: '100%', md: 'auto' } }} size="small" variant="outlined" color="info" onClick={() => (navigate(`/workspaces/-/new?parent=${data.fullPath}`))}>New Workspace</Button>
+                                <Button sx={{ width: { xs: '100%', md: 'auto' } }} size="small" variant="outlined" color="info" onClick={() => (navigate(`/groups/-/new?parent=${data.fullPath}`))}>New Subgroup</Button>
+                            </Box>
+                        </Box>
                     </Box>
                 </Box>
                 {tab && <TabContext value={tab}>

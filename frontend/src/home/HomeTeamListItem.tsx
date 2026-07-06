@@ -22,7 +22,7 @@ function HomeTeamListItem({ fragmentRef, last }: Props) {
         <ListItemButton
             dense
             component={Link}
-            to={`/teams/${data.name}`}
+            to={`/teams/${encodeURIComponent(data.name)}`}
             divider={!last}
         >
             <Avatar

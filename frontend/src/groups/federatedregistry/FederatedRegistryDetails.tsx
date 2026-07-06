@@ -26,6 +26,7 @@ const FieldValue = styled(
 )(({ theme }) => ({
     color: theme.palette.text.secondary,
     marginBottom: '16px',
+    wordBreak: 'break-word',
     '&:last-child': {
         marginBottom: 0
     }
@@ -144,16 +145,16 @@ function FederatedRegistryDetails({ fragmentRef }: Props) {
                     ]}
                 />
                 <Paper variant="outlined" sx={{ mt: 3, padding: CARD_PADDING }}>
-                    <Box display="flex" justifyContent="space-between">
-                        <Box display="flex" alignItems="center">
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+                        <Box display="flex" alignItems="center" sx={{ minWidth: 0 }}>
                             <FederatedRegistryIcon />
-                            <Box marginLeft={1}>
+                            <Box marginLeft={1} sx={{ minWidth: 0 }}>
                                 <Box display="flex" alignItems="center">
-                                    <Typography variant="h5" sx={{ mr: 1 }}>{federatedRegistry.hostname}</Typography>
+                                    <Typography variant="h5" sx={{ mr: 1, wordBreak: 'break-word' }}>{federatedRegistry.hostname}</Typography>
                                 </Box>
                             </Box>
                         </Box>
-                        <Box>
+                        <Box sx={{ flexShrink: 0 }}>
                             <Stack direction="row" spacing={1}>
                                 <TRNButton trn={federatedRegistry.metadata?.trn || ''} />
                                 <ButtonGroup variant="outlined" color="primary">
@@ -231,7 +232,7 @@ function FederatedRegistryDetails({ fragmentRef }: Props) {
             </Box>
         );
     }
-     else {
+    else {
         return <Box display="flex" justifyContent="center" sx={{ mt: 4 }}>
             <Typography color="textSecondary">Federated registry with ID {federatedRegistryId} not found</Typography>
         </Box>;

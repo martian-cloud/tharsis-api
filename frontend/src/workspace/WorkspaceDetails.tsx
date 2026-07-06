@@ -134,7 +134,7 @@ function WorkspaceDetails(props: Props) {
   return (
     <Box display="flex">
       <WorkspaceDetailsDrawer workspaceName={data.name} workspacePath={workspacePath} route={route} />
-      <Box component="main" flexGrow={1}>
+      <Box component="main" flexGrow={1} minWidth={0}>
         <Suspense fallback={<Box
           sx={{
             width: '100%',

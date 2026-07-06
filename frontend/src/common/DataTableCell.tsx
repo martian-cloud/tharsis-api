@@ -1,7 +1,10 @@
 import * as React from 'react';
 import TableCell, { TableCellProps } from '@mui/material/TableCell';
 
-const monoFontFamily = 'ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,Liberation Mono,monospace !important';
+export const monoFontFamily = 'ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,Liberation Mono,monospace !important';
+
+// Placeholder shown in place of hidden/sensitive values across the variable and output tables.
+export const MASKED_VALUE = '************';
 
 interface DataTableCellProps extends TableCellProps {
     mask?: boolean;
@@ -12,7 +15,7 @@ function DataTableCell(props: DataTableCellProps) {
 
     return (
         <TableCell  {...other} sx={{ ...sx, fontFamily: mask ? undefined : monoFontFamily }}>
-            {mask ? '************' : props.children}
+            {mask ? MASKED_VALUE : props.children}
         </TableCell>
     );
 }

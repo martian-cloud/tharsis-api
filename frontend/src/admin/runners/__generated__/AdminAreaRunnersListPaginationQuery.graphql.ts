@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f20d309c207f51c5b99fd4b0e7d22f3e>>
+ * @generated SignedSource<<4009bbcb8ce6a4199b02defd693e42d8>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -128,6 +128,13 @@ return {
                         "kind": "ScalarField",
                         "name": "createdAt",
                         "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "updatedAt",
+                        "storageKey": null
                       }
                     ],
                     "storageKey": null
@@ -206,12 +213,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "34ad43bbc33df03fe2f27556ba6b370b",
+    "cacheID": "5cfe13cf02b71b38b68940c1682fe89a",
     "id": null,
     "metadata": {},
     "name": "AdminAreaRunnersListPaginationQuery",
     "operationKind": "query",
-    "text": "query AdminAreaRunnersListPaginationQuery(\n  $after: String\n  $first: Int\n) {\n  ...AdminAreaRunnersListFragment_sharedRunners\n}\n\nfragment AdminAreaRunnersListFragment_sharedRunners on Query {\n  sharedRunners(first: $first, after: $after) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...RunnerListFragment_runners\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment RunnerListFragment_runners on RunnerConnection {\n  edges {\n    node {\n      id\n      groupPath\n      ...RunnerListItemFragment_runner\n    }\n  }\n}\n\nfragment RunnerListItemFragment_runner on Runner {\n  metadata {\n    createdAt\n  }\n  id\n  name\n  disabled\n  createdBy\n  groupPath\n}\n"
+    "text": "query AdminAreaRunnersListPaginationQuery(\n  $after: String\n  $first: Int\n) {\n  ...AdminAreaRunnersListFragment_sharedRunners\n}\n\nfragment AdminAreaRunnersListFragment_sharedRunners on Query {\n  sharedRunners(first: $first, after: $after) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...RunnerListFragment_runners\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment RunnerListFragment_runners on RunnerConnection {\n  edges {\n    node {\n      id\n      groupPath\n      ...RunnerListItemFragment_runner\n    }\n  }\n}\n\nfragment RunnerListItemFragment_runner on Runner {\n  metadata {\n    createdAt\n    updatedAt\n  }\n  id\n  name\n  disabled\n  createdBy\n  groupPath\n}\n"
   }
 };
 })();

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ce52b6911756c3bf7e634cc9ecf3331e>>
+ * @generated SignedSource<<ad204e77b1ecefbd442d2111d435df9f>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -165,6 +165,13 @@ return {
                     "kind": "ScalarField",
                     "name": "createdAt",
                     "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "updatedAt",
+                    "storageKey": null
                   }
                 ],
                 "storageKey": null
@@ -214,12 +221,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "7c93d7ef685ea763bbd625606db296f0",
+    "cacheID": "984c118322f3b584375569119a49983c",
     "id": null,
     "metadata": {},
     "name": "EditGroupRunnerMutation",
     "operationKind": "mutation",
-    "text": "mutation EditGroupRunnerMutation(\n  $input: UpdateRunnerInput!\n) {\n  updateRunner(input: $input) {\n    runner {\n      ...RunnerListItemFragment_runner\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment RunnerListItemFragment_runner on Runner {\n  metadata {\n    createdAt\n  }\n  id\n  name\n  disabled\n  createdBy\n  groupPath\n}\n"
+    "text": "mutation EditGroupRunnerMutation(\n  $input: UpdateRunnerInput!\n) {\n  updateRunner(input: $input) {\n    runner {\n      ...RunnerListItemFragment_runner\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment RunnerListItemFragment_runner on Runner {\n  metadata {\n    createdAt\n    updatedAt\n  }\n  id\n  name\n  disabled\n  createdBy\n  groupPath\n}\n"
   }
 };
 })();

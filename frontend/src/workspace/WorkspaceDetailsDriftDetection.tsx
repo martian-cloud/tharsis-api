@@ -37,7 +37,7 @@ const StatusMessage = ({
     runId?: string,
     workspacePath: string
 }) => (
-    <Box display="flex">
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
         <Typography color="textSecondary" mr={1}>
             {isInProgress ? 'Drift detection started' : 'Drift last checked'}{' '}
             <Timestamp
@@ -148,7 +148,7 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
             )}
 
             {data.assessment && (
-                <Box sx={{ mb: 2 }} display="flex" justifyContent="space-between">
+                <Box sx={{ mb: 2, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 2 }}>
                     <Stack direction="row" spacing={2}>
                         <CompareArrowsIcon />
                         <StatusMessage
@@ -159,7 +159,7 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
                         />
                     </Stack>
                     {!isAssessmentInProgress && (
-                        <Box>
+                        <Box sx={{ alignSelf: { xs: 'center', sm: 'auto' } }}>
                             <DriftDetectionButton
                                 onClick={() => setShowConfirmationDialog(true)}
                             />

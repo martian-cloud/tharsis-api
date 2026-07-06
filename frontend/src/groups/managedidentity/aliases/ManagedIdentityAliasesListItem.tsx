@@ -1,8 +1,8 @@
 import { Box, ListItemButton, ListItemText, useTheme, Typography } from "@mui/material";
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
 import { useFragment } from "react-relay/hooks";
 import { Link as RouterLink } from 'react-router-dom';
+import Timestamp from "../../../common/Timestamp";
 import ManagedIdentityTypeChip from "../ManagedIdentityTypeChip";
 import { ManagedIdentityAliasesListItemFragment_managedIdentity$key } from "./__generated__/ManagedIdentityAliasesListItemFragment_managedIdentity.graphql";
 
@@ -52,9 +52,7 @@ function ManagedIdentityAliasesListItem({ fragmentRef }: Props) {
                 </Box>}
                 secondary={data.groupPath}
             />
-            <Typography variant="body2" color="textSecondary">
-                {moment(data.metadata.updatedAt as moment.MomentInput).fromNow()}
-            </Typography>
+            <Timestamp variant="body2" color="textSecondary" timestamp={data.metadata.updatedAt as string} />
         </ListItemButton>
     );
 }

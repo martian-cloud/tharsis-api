@@ -267,34 +267,35 @@ function WorkspaceDetailsIndex(props: Props) {
                         )}
                     </Stack>
                 </Box>
-                <Stack direction="row" spacing={1}>
-                    <NamespaceFavoriteButton
-                        namespacePath={data.fullPath}
-                        namespaceType="WORKSPACE"
-                    />
-                    <WorkspaceNotificationPreference fragmentRef={data} />
-                    <TRNButton trn={data.metadata.trn} size="small" />
+                <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'stretch', md: 'center' } }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <NamespaceFavoriteButton
+                            namespacePath={data.fullPath}
+                            namespaceType="WORKSPACE"
+                        />
+                        <WorkspaceNotificationPreference fragmentRef={data} />
+                        <TRNButton trn={data.metadata.trn} size="small" />
+                    </Stack>
                     {(data.currentStateVersion && data.currentStateVersion.run) && (
-                        <Box>
-                            <Tooltip
-                                title={data.preventDestroyPlan ? "Prevent Destroy Run is enabled for this workspace." : "Create a destroy run, which destroys all resources in this workspace."}
-                                placement="top"
-                            >
-                                <span>
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        color="error"
-                                        disabled={data.preventDestroyPlan}
-                                        onClick={() => setShowDestroyRunConfirmationDialog(true)}
-                                    >
-                                        Destroy Workspace
-                                    </Button>
-                                </span>
-                            </Tooltip>
-                        </Box>
+                        <Tooltip
+                            title={data.preventDestroyPlan ? "Prevent Destroy Run is enabled for this workspace." : "Create a destroy run, which destroys all resources in this workspace."}
+                            placement="top"
+                        >
+                            <Box component="span" sx={{ width: { xs: '100%', md: 'auto' } }}>
+                                <Button
+                                    fullWidth
+                                    size="small"
+                                    variant="outlined"
+                                    color="error"
+                                    disabled={data.preventDestroyPlan}
+                                    onClick={() => setShowDestroyRunConfirmationDialog(true)}
+                                >
+                                    Destroy Workspace
+                                </Button>
+                            </Box>
+                        </Tooltip>
                     )}
-                </Stack>
+                </Box>
             </Box>
 
             {data.assessment?.hasDrift &&
@@ -395,7 +396,7 @@ function WorkspaceDetailsIndex(props: Props) {
 
             {data.currentStateVersion && <React.Fragment>
                 <Box sx={{ borderBottom: 1, borderColor: 'divider', marginBottom: 2 }}>
-                    <Tabs value={tab} onChange={onTabChange}>
+                    <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
                         <Tab label="Resources" value="resources" />
                         <Tab label="Input Variables" value="inputs" />
                         <Tab label="Outputs" value="outputs" />

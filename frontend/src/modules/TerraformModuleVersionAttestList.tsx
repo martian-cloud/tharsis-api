@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import graphql from 'babel-plugin-relay/macro'
 import { ConnectionHandler, useMutation, usePaginationFragment } from "react-relay/hooks";
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useTheme } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Typography, useTheme } from "@mui/material";
+import { ResponsiveTable } from '../common/ResponsiveTable';
 import ListSkeleton from '../skeletons/ListSkeleton';
 import { useSnackbar } from 'notistack';
 import SyntaxHighlighter from 'react-syntax-highlighter';
@@ -140,44 +141,24 @@ function TerraformModuleVersionAttestList({ fragmentRef }: Props) {
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
             >
-                <TableContainer>
-                    <Table sx={{ tableLayout: 'fixed' }}>
-                        <colgroup>
-                            <Box component="col" />
-                            <Box component="col" />
-                            <Box component="col" />
-                            <Box component="col" />
-                            <Box component="col" sx={{ width: '175px' }} />
-                        </colgroup>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>
-                                    <Typography color="textSecondary">ID</Typography>
-                                </TableCell>
-                                <TableCell>
-                                    <Typography color="textSecondary">Description</Typography>
-                                </TableCell>
-                                <TableCell>
-                                    <Typography color="textSecondary">Predicate Type</Typography>
-                                </TableCell>
-                                <TableCell>
-                                    <Typography color="textSecondary">Created</Typography>
-                                </TableCell>
-                                <TableCell>
-                                    <Typography color="textSecondary">Actions</Typography>
-                                </TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {data.attestations.edges?.map((edge: any) => <TerraformModuleVersionAttestListItem
-                                key={edge.node.id}
-                                fragmentRef={edge.node}
-                                onOpenDataDialog={() => setAttestationDataToDisplay(edge.node.data)}
-                                onOpenDeleteDialog={() => setAttestToDelete(edge.node.id)}
-                            />)}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                <ResponsiveTable
+                    ariaLabel="attestations"
+                    minWidth={800}
+                    columns={[
+                        { label: 'ID' },
+                        { label: 'Description' },
+                        { label: 'Predicate Type' },
+                        { label: 'Created' },
+                        { label: '' },
+                    ]}
+                >
+                    {data.attestations.edges?.map((edge: any) => <TerraformModuleVersionAttestListItem
+                        key={edge.node.id}
+                        fragmentRef={edge.node}
+                        onOpenDataDialog={() => setAttestationDataToDisplay(edge.node.data)}
+                        onOpenDeleteDialog={() => setAttestToDelete(edge.node.id)}
+                    />)}
+                </ResponsiveTable>
             </InfiniteScroll>
             <DataDialog
                 encodedData={attestationDataToDisplay}

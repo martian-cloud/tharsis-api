@@ -1,9 +1,10 @@
-import { Box, Button, Stack, TableCell, TableRow, Tooltip, Typography } from "@mui/material"
+import { Box, Button, Stack, Tooltip, Typography } from "@mui/material"
 import DeleteIcon from '@mui/icons-material/CloseOutlined';
 import { useFragment } from "react-relay"
-import moment from 'moment';
 import graphql from 'babel-plugin-relay/macro'
 import Gravatar from '../common/Gravatar'
+import { ResponsiveRow } from '../common/ResponsiveTable'
+import Timestamp from '../common/Timestamp'
 import { TerraformModuleVersionAttestListItemFragment_module$key } from "./__generated__/TerraformModuleVersionAttestListItemFragment_module.graphql"
 
 interface Props {
@@ -29,41 +30,44 @@ function TerraformModuleVersionAttestListItem({ fragmentRef, onOpenDataDialog, o
         }
     `, fragmentRef);
 
-    return (
-        <TableRow sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-            <TableCell>{data.id.substring(0, 8)}...</TableCell>
-            <TableCell sx={{ wordWrap: "break-word" }}>{data.description}</TableCell>
-            <TableCell>
-                <Typography sx={{ wordWrap: "break-word" }} variant="body2">{data.predicateType}</Typography>
-            </TableCell>
-            <TableCell>
-                <Box display="flex" alignItems="center">
-                    {moment(data.metadata.createdAt as moment.MomentInput).fromNow()} by
-                    <Tooltip sx={{ ml: 1 }} title={data.createdBy}>
-                        <Box>
-                            <Gravatar width={20} height={20} email={data.createdBy} />
-                        </Box>
-                    </Tooltip>
+    const created = (
+        <Box display="flex" alignItems="center" gap={0.5}>
+            <Timestamp variant="body2" timestamp={data.metadata.createdAt as string} />
+            <Typography variant="body2">by</Typography>
+            <Tooltip title={data.createdBy}>
+                <Box display="flex">
+                    <Gravatar width={20} height={20} email={data.createdBy} />
                 </Box>
-            </TableCell>
-            <TableCell>
-                <Stack direction="row" spacing={1}>
-                    <Button
-                        size="small"
-                        color="info"
-                        variant="outlined"
-                        onClick={onOpenDataDialog}>View Data
-                    </Button>
-                    <Button
-                        sx={{ minWidth: 40, padding: '2px' }}
-                        size="small"
-                        color="info"
-                        variant="outlined"
-                        onClick={onOpenDeleteDialog}><DeleteIcon />
-                    </Button>
-                </Stack>
-            </TableCell>
-        </TableRow>
+            </Tooltip>
+        </Box>
+    );
+
+    const actions = (
+        <Stack direction="row" spacing={1}>
+            <Button
+                size="small"
+                color="info"
+                variant="outlined"
+                onClick={onOpenDataDialog}>View Data
+            </Button>
+            <Button
+                sx={{ minWidth: 40, padding: '2px' }}
+                size="small"
+                color="info"
+                variant="outlined"
+                onClick={onOpenDeleteDialog}><DeleteIcon />
+            </Button>
+        </Stack>
+    );
+
+    return (
+        <ResponsiveRow cells={[
+            { primary: true, content: <Typography fontWeight={500}>{data.id.substring(0, 8)}...</Typography> },
+            { label: 'Description', content: <Typography variant="body2">{data.description}</Typography> },
+            { label: 'Predicate Type', content: <Typography variant="body2">{data.predicateType}</Typography> },
+            { label: 'Created', content: created },
+            { align: 'right', content: actions },
+        ]} />
     );
 }
 

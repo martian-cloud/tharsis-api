@@ -1,10 +1,10 @@
 import AutoScrollIcon from '@mui/icons-material/ArrowCircleDown';
 import { Box, darken, LinearProgress, Paper, ToggleButton, Tooltip, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useFragment, useSubscription } from 'react-relay/hooks';
 import { GraphQLSubscriptionConfig, RecordSourceProxy } from 'relay-runtime';
+import Timestamp from '../../common/Timestamp';
 import LogViewer from './LogViewer';
 import { JobLogsFragment_logs$key } from './__generated__/JobLogsFragment_logs.graphql';
 import { JobLogsSubscription, JobLogsSubscription$data } from './__generated__/JobLogsSubscription.graphql';
@@ -50,6 +50,9 @@ function JobLogs(props: Props) {
     const [actualLogSize, setActualLogSize] = useState(data.logSize);
     const [autoScroll, setAutoScroll] = useState(props.enableAutoScrollByDefault);
     const [completed, setCompleted] = useState(data.completed);
+    // Tracks the byte size already appended so we can dedupe events without re-measuring
+    // the whole accumulated buffer on every event.
+    const loadedSizeRef = useRef(bytes(data.logs));
 
     const config = useMemo<GraphQLSubscriptionConfig<JobLogsSubscription>>(() => ({
         variables: { input: { jobId: data.id, lastSeenLogSize: bytes(data.logs) } },
@@ -58,37 +61,22 @@ function JobLogs(props: Props) {
         onError: () => console.warn("Subscription error"),
         updater: (store: RecordSourceProxy, payload: JobLogsSubscription$data | null | undefined) => {
             if (payload) {
-                setCurrentLogSize(payload.jobLogStreamEvents.size);
-                setActualLogSize(payload.jobLogStreamEvents.size);
-                setCompleted(payload.jobLogStreamEvents.completed);
-                if (payload.jobLogStreamEvents.data && payload.jobLogStreamEvents.data.logs) {
-                    setLogs(prevLogs => {
-                        return bytes(prevLogs) < payload.jobLogStreamEvents.size ? prevLogs + payload.jobLogStreamEvents.data?.logs : prevLogs;
-                    });
+                const event = payload.jobLogStreamEvents;
+                setCompleted(event.completed);
+                // Ignore stale/replayed events so the size (and progress bar) never moves backward.
+                if (event.data && event.data.logs && event.size > loadedSizeRef.current) {
+                    const newLogs = event.data.logs;
+                    loadedSizeRef.current = event.size;
+                    setCurrentLogSize(event.size);
+                    setActualLogSize(event.size);
+                    setLogs(prevLogs => prevLogs + newLogs);
                 }
             }
         }
     }), [data.id]);
     useSubscription<JobLogsSubscription>(config);
 
-    useEffect(() => {
-        if (autoScroll) {
-            // Use timeout here to account for any dom updates when a status change occurs
-            // to ensure that the scroll is done after the dom is updated
-            const timeoutId = setTimeout(() => {
-                scrollToBottom();
-            }, 200);
-
-            // Cleanup function
-            return () => clearTimeout(timeoutId);
-        }
-    }, [logs, autoScroll]);
-
     const loadedPercent = useMemo(() => (currentLogSize / actualLogSize) * 100, [currentLogSize, actualLogSize]);
-
-    const scrollToBottom = () => {
-        window.scrollTo(0, document.body.scrollHeight);
-    };
 
     return (
         <Box>
@@ -103,7 +91,7 @@ function JobLogs(props: Props) {
                     paddingBottom={1}
                 >
                     {data.logLastUpdatedAt && <Typography color="textSecondary">
-                        last updated {moment(data.logLastUpdatedAt as moment.MomentInput).fromNow()}
+                        last updated <Timestamp timestamp={data.logLastUpdatedAt as string} />
                     </Typography>}
                     <Tooltip title={autoScroll ? 'Disable auto scroll' : 'Enable auto scroll'}>
                         <ToggleButton
@@ -121,6 +109,7 @@ function JobLogs(props: Props) {
             <LogViewer
                 logs={logs}
                 loading={!completed}
+                followOutput={autoScroll}
                 sx={{
                     backgroundColor: darken(theme.palette.background.default, 0.5),
                     paddingTop: 1,

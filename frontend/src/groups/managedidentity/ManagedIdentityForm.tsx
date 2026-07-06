@@ -58,7 +58,7 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
                 default:
                     payload = { clientId: '', tenantId: '' };
             }
-            
+
             onChange({
                 ...data,
                 type,
@@ -69,7 +69,7 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
 
     const onPayloadFieldChange = (field: string, val: string | boolean) => {
         const newPayload = { ...data.payload, [field]: val };
-        
+
         onChange({
             ...data,
             payload: newPayload
@@ -120,7 +120,7 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
             <Box marginTop={4} marginBottom={4}>
                 <Typography variant="subtitle1" gutterBottom>Select Type</Typography>
                 <Divider light />
-                <Stack marginTop={2} direction="row" spacing={2}>
+                <Stack marginTop={2} direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
                     {ManagedIdentityTypes.map(type => <PanelButton
                         key={type.name}
                         disabled={editMode}
@@ -206,8 +206,8 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
 
                     />
                     <Typography color="textSecondary" variant="caption" mt={1} display="block">
-                        Specify the audience for this Kubernetes managed identity. This determines which EKS clusters 
-                        can accept tokens from this managed identity. The audience should match the client_id configured 
+                        Specify the audience for this Kubernetes managed identity. This determines which EKS clusters
+                        can accept tokens from this managed identity. The audience should match the client_id configured
                         in your EKS OIDC identity provider. If not provided, the default value is <strong>"kubernetes"</strong>.
                     </Typography>
                 </Box>}

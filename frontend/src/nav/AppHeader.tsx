@@ -1,9 +1,10 @@
-import { Box, Button, Stack } from '@mui/material';
+import { Box, Button, IconButton, Menu, MenuItem, Stack } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 import AppBar, { AppBarProps } from '@mui/material/AppBar';
 import { styled } from "@mui/material/styles";
 import Toolbar from '@mui/material/Toolbar';
 import graphql from 'babel-plugin-relay/macro';
-import { useContext, useEffect, useRef } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { Link as RouterLink } from 'react-router-dom';
 import { useAgentCopilot } from '../ai/AgentCopilotProvider';
@@ -47,6 +48,63 @@ function AppHeader(props: Props) {
     const theme = useTheme();
     const isMdOrSmaller = useMediaQuery(theme.breakpoints.down('lg'));
     const hideSearch = copilotExpanded && isMdOrSmaller;
+    const compactNav = useMediaQuery(theme.breakpoints.down('md'));
+    const [navMenuAnchorEl, setNavMenuAnchorEl] = useState<null | HTMLElement>(null);
+    const closeNavMenu = () => setNavMenuAnchorEl(null);
+
+    const copilotButton = aiEnabled && !copilotExpanded ? (
+        <Button
+            color="primary"
+            variant="outlined"
+            startIcon={<MartianAgentIcon />}
+            onClick={() => togglePanel()}
+            sx={{ textTransform: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}
+        >
+            Copilot
+        </Button>
+    ) : null;
+
+    const navMenu = (
+        <>
+            <IconButton
+                color="inherit"
+                aria-label="navigation menu"
+                onClick={(e) => setNavMenuAnchorEl(e.currentTarget)}
+            >
+                <MenuIcon />
+            </IconButton>
+            <Menu
+                anchorEl={navMenuAnchorEl}
+                open={Boolean(navMenuAnchorEl)}
+                onClose={closeNavMenu}
+            >
+                <MenuItem component={RouterLink} to="/" onClick={closeNavMenu}>Home</MenuItem>
+                <MenuItem component={RouterLink} to="/teams" onClick={closeNavMenu}>Teams</MenuItem>
+                <MenuItem component={RouterLink} to="/groups" onClick={closeNavMenu}>Groups</MenuItem>
+                <MenuItem component={RouterLink} to="/workspaces" onClick={closeNavMenu}>Workspaces</MenuItem>
+                <MenuItem component={RouterLink} to="/module-registry" onClick={closeNavMenu}>Modules</MenuItem>
+                <MenuItem component={RouterLink} to="/provider-registry" onClick={closeNavMenu}>Providers</MenuItem>
+            </Menu>
+        </>
+    );
+
+    const navButtons = (
+        <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+                color="inherit"
+                sx={{ textTransform: "none", fontWeight: 600 }}
+                component={RouterLink} to="/groups">
+                Groups
+            </Button>
+            <Button
+                color="inherit"
+                sx={{ textTransform: "none", fontWeight: 600 }}
+                component={RouterLink} to="/workspaces">
+                Workspaces
+            </Button>
+            <RegistryMenu />
+        </Stack>
+    );
 
     useEffect(() => {
         const updateHeaderHeight = () => {
@@ -83,39 +141,22 @@ function AppHeader(props: Props) {
             >
                 <StyledAppBar position="static" color="inherit">
                     <Toolbar>
-                        <Box marginRight={4}>
-                            <Link underline="none" color="primary" variant="h5" sx={{ fontWeight: "bold" }} to="/">Tharsis</Link>
-                        </Box>
-                        <Box display="flex" flex="1" alignItems="center" justifyContent="center">
+                        {compactNav ? (
+                            <Box sx={{ mr: 1 }}>{navMenu}</Box>
+                        ) : (
+                            <Box marginRight={4}>
+                                <Link underline="none" color="primary" variant="h5" sx={{ fontWeight: "bold" }} to="/">Tharsis</Link>
+                            </Box>
+                        )}
+                        <Box display="flex" flex="1" alignItems="center" justifyContent="center" sx={{ gap: 2 }}>
                             {!hideSearch && <UniversalSearch />}
-                            {aiEnabled && !copilotExpanded && <Button
-                                color="primary"
-                                variant="outlined"
-                                startIcon={<MartianAgentIcon />}
-                                onClick={() => togglePanel()}
-                                sx={{ textTransform: 'none', fontWeight: 600, ml: 2, whiteSpace: 'nowrap' }}
-                            >
-                                Copilot
-                            </Button>}
+                            {!compactNav && copilotButton}
                         </Box>
-                        <Box display="flex" justifyContent="flex-end" alignItems="center">
-                            <Stack direction="row" spacing={1} alignItems="center" marginRight={3}>
-                                <Button
-                                    color="inherit"
-                                    sx={{ textTransform: "none", fontWeight: 600 }}
-                                    component={RouterLink} to="/groups">
-                                    Groups
-                                </Button>
-                                <Button
-                                    color="inherit"
-                                    sx={{ textTransform: "none", fontWeight: 600 }}
-                                    component={RouterLink} to="/workspaces">
-                                    Workspaces
-                                </Button>
-                                <RegistryMenu />
-                            </Stack>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            {compactNav && copilotButton}
+                            {!compactNav && navButtons}
                             <AccountMenu fragmentRef={data} />
-                        </Box>
+                        </Stack>
                     </Toolbar>
                 </StyledAppBar>
                 <AnnouncementBanner />

@@ -151,10 +151,10 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
                 ]}
             />
 
-            <Box mb={3} display="flex" justifyContent="space-between" alignItems="flex-start">
-                <Box>
-                    <Box display="flex" alignItems="center" gap={1} mb={1}>
-                        <Typography variant="h5">{mirror.providerAddress}</Typography>
+            <Box mb={3} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+                <Box sx={{ minWidth: 0 }}>
+                    <Box display="flex" alignItems="center" gap={1} mb={1} flexWrap="wrap">
+                        <Typography variant="h5" sx={{ wordBreak: 'break-word' }}>{mirror.providerAddress}</Typography>
                         <Chip label={`v${mirror.version}`} size="small" />
                     </Box>
                     <Box display="flex" alignItems="center">
@@ -172,7 +172,7 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
                         )}
                     </Box>
                 </Box>
-                <Box display="flex" gap={1}>
+                <Box display="flex" gap={1} sx={{ flexShrink: 0 }}>
                     <TRNButton trn={mirror.metadata.trn} />
                     {!isInherited && (
                         <Button variant="outlined" color="error" onClick={() => setShowDeleteVersion(true)}>

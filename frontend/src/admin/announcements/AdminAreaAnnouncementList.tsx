@@ -1,4 +1,4 @@
-import { Box, Button, Chip, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useTheme } from '@mui/material';
+import { Box, Button, Chip, Paper, Stack, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import graphql from 'babel-plugin-relay/macro';
 import InfiniteScroll from 'react-infinite-scroll-component';
@@ -12,6 +12,7 @@ import ConfirmationDialog from '../../common/ConfirmationDialog';
 import Timestamp from '../../common/Timestamp';
 import ListSkeleton from '../../skeletons/ListSkeleton';
 import AnnouncementAlert from '../../common/AnnouncementAlert';
+import { ResponsiveRow, ResponsiveTable } from '../../common/ResponsiveTable';
 import { AdminAreaAnnouncementListQuery } from './__generated__/AdminAreaAnnouncementListQuery.graphql';
 import { AdminAreaAnnouncementListFragment_announcements$key } from './__generated__/AdminAreaAnnouncementListFragment_announcements.graphql';
 import { AnnouncementPaginationQuery } from './__generated__/AnnouncementPaginationQuery.graphql';
@@ -47,6 +48,9 @@ const query = graphql`
 
 function AdminAreaAnnouncementList() {
     const theme = useTheme();
+    // ResponsiveTable switches to cards below 'md'; show a compact message preview there instead
+    // of the full alert.
+    const mobile = useMediaQuery(theme.breakpoints.down('md'));
     const { enqueueSnackbar } = useSnackbar();
     const [announcementToDelete, setAnnouncementToDelete] = useState<{ id: string; message: string } | null>(null);
 
@@ -65,7 +69,6 @@ function AdminAreaAnnouncementList() {
                 after: $after
                 sort: CREATED_AT_DESC
             ) @connection(key: "AdminAreaAnnouncementList_announcements") {
-                totalCount
                 edges {
                     node {
                         id
@@ -203,7 +206,7 @@ function AdminAreaAnnouncementList() {
                 <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
                     <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
                         <Typography variant="subtitle1">
-                            {data.announcements.totalCount} announcement{data.announcements.totalCount === 1 ? '' : 's'}
+                            {announcements.length} announcement{announcements.length === 1 ? '' : 's'}
                         </Typography>
                     </Box>
                 </Paper>
@@ -213,126 +216,102 @@ function AdminAreaAnnouncementList() {
                     hasMore={hasNext}
                     loader={<ListSkeleton rowCount={3} />}
                 >
-                    <TableContainer>
-                        <Table
-                            sx={{
-                                minWidth: 650,
-                                borderCollapse: 'separate',
-                                borderSpacing: 0,
-                                'td, th': {
-                                    borderBottom: `1px solid ${theme.palette.divider}`,
-                                },
-                                'td:first-of-type, th:first-of-type': {
-                                    borderLeft: `1px solid ${theme.palette.divider}`
-                                },
-                                'td:last-of-type, th:last-of-type': {
-                                    borderRight: `1px solid ${theme.palette.divider}`
-                                },
-                                'tr:last-of-type td:first-of-type': {
-                                    borderBottomLeftRadius: 4,
-                                },
-                                'tr:last-of-type td:last-of-type': {
-                                    borderBottomRightRadius: 4
-                                }
-                            }}
-                            aria-label="announcements"
-                        >
-                            <colgroup>
-                                <Box component="col" />
-                                <Box component="col" sx={{ width: "120px" }} />
-                                <Box component="col" sx={{ width: "150px" }} />
-                                <Box component="col" sx={{ width: "150px" }} />
-                                <Box component="col" sx={{ width: "120px" }} />
-                            </colgroup>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Preview</TableCell>
-                                    <TableCell>Status</TableCell>
-                                    <TableCell>Start Time</TableCell>
-                                    <TableCell>End Time</TableCell>
-                                    <TableCell></TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {announcements.map((edge: any) => {
-                                    const announcement = edge.node;
-                                    const statusInfo = getStatusInfo(announcement.active, announcement.expired);
+                    <ResponsiveTable
+                        ariaLabel="announcements"
+                        columns={[
+                            { label: 'Preview' },
+                            { label: 'Status' },
+                            { label: 'Start Time' },
+                            { label: 'End Time' },
+                            { label: '', align: 'right' },
+                        ]}
+                    >
+                        {announcements.map((edge: any) => {
+                            const announcement = edge.node;
+                            const statusInfo = getStatusInfo(announcement.active, announcement.expired);
 
-                                    return (
-                                        <TableRow key={announcement.id}>
-                                            <TableCell>
+                            return (
+                                <ResponsiveRow key={announcement.id} cells={[
+                                    {
+                                        primary: true, content: mobile
+                                            ? <Box sx={{
+                                                width: '100%',
+                                                '& .MuiAlert-message': { minWidth: 0, overflow: 'hidden' },
+                                                '& .MuiAlert-message p': { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }
+                                            }}>
                                                 <AnnouncementAlert
                                                     id={announcement.id}
-                                                    message={announcement.message}
+                                                    message={announcement.message.split('\n')[0]}
                                                     type={announcement.type}
-                                                    dismissible={announcement.dismissible}
-                                                    onDismiss={() => { /* Preview only - no action */ }}
+                                                    dismissible={false}
                                                 />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={statusInfo.label}
-                                                    color={statusInfo.color as any}
-                                                    size="small"
-                                                    variant={statusInfo.variant as any}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Timestamp
-                                                    timestamp={announcement.startTime}
-                                                    format="absolute"
-                                                    variant="body2"
-                                                    color="textSecondary"
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                {announcement.endTime ? (
-                                                    <Timestamp
-                                                        timestamp={announcement.endTime}
-                                                        format="absolute"
-                                                        variant="body2"
-                                                        color="textSecondary"
-                                                    />
-                                                ) : (
-                                                    <Typography variant="body2" color="textSecondary">
-                                                        --
-                                                    </Typography>
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Stack direction="row" spacing={1} display="flex" justifyContent="center">
-                                                    <Button
-                                                        component={RouterLink}
-                                                        to={`${announcement.id}/edit`}
-                                                        sx={{ minWidth: 40, padding: '2px' }}
-                                                        size="small"
-                                                        color="info"
-                                                        variant="outlined"
-                                                        disabled={deleteInFlight}
-                                                    >
-                                                        <EditIcon />
-                                                    </Button>
-                                                    <Button
-                                                        onClick={() => onShowDeleteConfirmationDialog({
-                                                            id: announcement.id,
-                                                            message: announcement.message
-                                                        })}
-                                                        sx={{ minWidth: 40, padding: '2px' }}
-                                                        size="small"
-                                                        color="info"
-                                                        variant="outlined"
-                                                        disabled={deleteInFlight}
-                                                    >
-                                                        <DeleteIcon />
-                                                    </Button>
-                                                </Stack>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                                            </Box>
+                                            : <AnnouncementAlert
+                                                id={announcement.id}
+                                                message={announcement.message}
+                                                type={announcement.type}
+                                                dismissible={announcement.dismissible}
+                                                onDismiss={() => { /* Preview only - no action */ }}
+                                            />
+                                    },
+                                    {
+                                        label: 'Status', content: <Chip
+                                            label={statusInfo.label}
+                                            color={statusInfo.color as any}
+                                            size="small"
+                                            variant={statusInfo.variant as any}
+                                        />
+                                    },
+                                    {
+                                        label: 'Start Time', content: <Timestamp
+                                            timestamp={announcement.startTime}
+                                            format="absolute"
+                                            variant="body2"
+                                            color="textSecondary"
+                                        />
+                                    },
+                                    {
+                                        label: 'End Time', content: announcement.endTime
+                                            ? <Timestamp
+                                                timestamp={announcement.endTime}
+                                                format="absolute"
+                                                variant="body2"
+                                                color="textSecondary"
+                                            />
+                                            : <Typography variant="body2" color="textSecondary">--</Typography>
+                                    },
+                                    {
+                                        align: 'right', content: <Stack direction="row" spacing={1}>
+                                            <Button
+                                                component={RouterLink}
+                                                to={`${announcement.id}/edit`}
+                                                sx={{ minWidth: 40, padding: '2px' }}
+                                                size="small"
+                                                color="info"
+                                                variant="outlined"
+                                                disabled={deleteInFlight}
+                                            >
+                                                <EditIcon />
+                                            </Button>
+                                            <Button
+                                                onClick={() => onShowDeleteConfirmationDialog({
+                                                    id: announcement.id,
+                                                    message: announcement.message
+                                                })}
+                                                sx={{ minWidth: 40, padding: '2px' }}
+                                                size="small"
+                                                color="info"
+                                                variant="outlined"
+                                                disabled={deleteInFlight}
+                                            >
+                                                <DeleteIcon />
+                                            </Button>
+                                        </Stack>
+                                    },
+                                ]} />
+                            );
+                        })}
+                    </ResponsiveTable>
                 </InfiniteScroll>
             </Box>
 

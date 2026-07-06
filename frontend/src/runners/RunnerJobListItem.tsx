@@ -1,8 +1,9 @@
-import { Box, TableCell, TableRow, Tooltip } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import humanizeDuration from 'humanize-duration';
 import moment from 'moment';
 import { useFragment } from 'react-relay/hooks';
+import { ResponsiveRow } from '../common/ResponsiveTable';
+import Timestamp from '../common/Timestamp';
 import Link from '../routes/Link';
 import { RunnerJobListItemFragment$key } from './__generated__/RunnerJobListItemFragment.graphql';
 import JobStatusChip from '../workspace/runs/JobStatusChip';
@@ -44,28 +45,14 @@ function RunnerJobListItem({ fragmentRef }: Props) {
     const jobLink = `/groups/${data.workspace.fullPath}/-/runs/${data.run.id}/${data.type}`;
 
     return (
-        <TableRow sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-            <TableCell>
-                <JobStatusChip status={data.status} to={jobLink} />
-            </TableCell>
-            <TableCell>
-                <Link color="inherit" to={jobLink}>{data.id.substring(0, 8)}...</Link>
-            </TableCell>
-            <TableCell>
-                {data.type}
-            </TableCell>
-            <TableCell>
-                <Link color="inherit" to={`/groups/${data.workspace.fullPath}`}>{data.workspace.name}</Link>
-            </TableCell>
-            <TableCell>
-                {duration ? humanizeDuration(duration.asMilliseconds()) : '--'}
-            </TableCell>
-            <TableCell>
-                <Tooltip title={data.metadata.createdAt}>
-                    <Box>{moment(data.metadata.createdAt as moment.MomentInput).fromNow()}</Box>
-                </Tooltip>
-            </TableCell>
-        </TableRow >
+        <ResponsiveRow cells={[
+            { label: 'Status', content: <JobStatusChip status={data.status} to={jobLink} /> },
+            { primary: true, content: <Link color="inherit" to={jobLink}>{data.id.substring(0, 8)}...</Link> },
+            { label: 'Stage', content: data.type },
+            { label: 'Workspace', content: <Link color="inherit" to={`/groups/${data.workspace.fullPath}`}>{data.workspace.name}</Link> },
+            { label: 'Duration', content: duration ? humanizeDuration(duration.asMilliseconds()) : '--' },
+            { label: 'Created', content: <Timestamp timestamp={data.metadata.createdAt as string} /> },
+        ]} />
     );
 }
 

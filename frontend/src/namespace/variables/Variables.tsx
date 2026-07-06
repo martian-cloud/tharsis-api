@@ -156,7 +156,7 @@ function Variables(props: Props) {
                             <ToggleButton value="terraform" size="small">Terraform</ToggleButton>
                             <ToggleButton value="environment" size="small">Environment</ToggleButton>
                         </ToggleButtonGroup>
-                        <Stack direction="row" spacing={2}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ width: { xs: '100%', lg: 'auto' } }}>
                             <TextField
                                 size="small"
                                 margin='none'
@@ -164,14 +164,14 @@ function Variables(props: Props) {
                                 InputProps={{
                                     sx: { background: darken(theme.palette.background.default, 0.5) }
                                 }}
-                                sx={{ width: 300 }}
+                                sx={{ width: { xs: '100%', sm: 300 } }}
                                 onChange={onSearchChange}
                                 autoComplete="off"
                             />
                             <Button
                                 size="small"
                                 color="info"
-                                sx={{ height: '100%' }}
+                                sx={{ height: { sm: '100%' }, width: { xs: '100%', sm: 'auto' } }}
                                 onClick={() => setShowValues(!showValues)}
                             >
                                 {showValues ? 'Hide Values' : 'Show Values'}

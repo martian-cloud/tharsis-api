@@ -67,16 +67,14 @@ function TerraformModuleSearchListItem(props: Props) {
                         {data.registryNamespace}/{data.name}/{data.system}
                     </Link>
                     <Box>
-                        {data.latestVersion && <Box display="flex" alignItems="center">
-                            <Typography variant="body2" color="textSecondary">
-                                {data.latestVersion.version} published <Timestamp component="span" timestamp={data.latestVersion.metadata.createdAt} /> by
-                            </Typography>
+                        {data.latestVersion && <Typography component="div" variant="body2" color="textSecondary">
+                            {data.latestVersion.version} published <Timestamp component="span" timestamp={data.latestVersion.metadata.createdAt} /> by
                             <Tooltip title={data.latestVersion.createdBy}>
-                                <Box>
-                                    <Gravatar width={16} height={16} sx={{ marginLeft: 1, marginRight: 1 }} email={data.latestVersion.createdBy} />
+                                <Box sx={{ display: 'inline-flex', verticalAlign: 'middle', mx: 1 }}>
+                                    <Gravatar width={16} height={16} email={data.latestVersion.createdBy} />
                                 </Box>
                             </Tooltip>
-                        </Box>}
+                        </Typography>}
                         {!data.latestVersion && <Typography variant="body2" color="textSecondary">
                             0 versions
                         </Typography>}

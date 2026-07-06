@@ -173,11 +173,12 @@ function PrincipalAutocomplete(props: Props) {
             filterOptions={filterOptions}
             isOptionEqualToValue={(option: Option, value: Option) => option.id === value.id}
             getOptionLabel={(option: Option) => option.label}
-            renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: Option, { inputValue }) => {
+            renderOption={(props: React.HTMLAttributes<HTMLLIElement> & { key?: React.Key }, option: Option, { inputValue }) => {
+                const { key, ...optionProps } = props;
                 const matches = match(option.label, inputValue);
                 const parts = parse(option.label, matches);
                 return (
-                    <ListItem dense {...props}>
+                    <ListItem dense key={key} {...optionProps}>
                         <Box marginRight={1}>
                             {option.type === 'user' && <Gravatar width={24} height={24} email={option.avatarLabel} />}
                             {(option.type === 'team' || option.type === 'serviceaccount') && <StyledAvatar>{option.avatarLabel}</StyledAvatar>}

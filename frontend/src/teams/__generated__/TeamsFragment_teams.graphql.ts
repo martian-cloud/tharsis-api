@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9eca5b6e237b6b7fefbd42a6ed9deefe>>
+ * @generated SignedSource<<19b6fd3a91896930a5e597ed4ef2e5f8>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,35 +9,29 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type AnnouncementType = "ERROR" | "INFO" | "SUCCESS" | "WARNING" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
-export type AdminAreaAnnouncementListFragment_announcements$data = {
-  readonly announcements: {
+export type TeamsFragment_teams$data = {
+  readonly teams: {
     readonly edges: ReadonlyArray<{
       readonly node: {
-        readonly active: boolean;
-        readonly dismissible: boolean;
-        readonly endTime: any | null | undefined;
-        readonly expired: boolean;
         readonly id: string;
-        readonly message: string;
-        readonly startTime: any;
-        readonly type: AnnouncementType;
+        readonly " $fragmentSpreads": FragmentRefs<"TeamListItemFragment_team">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
+    readonly totalCount: number;
   };
-  readonly " $fragmentType": "AdminAreaAnnouncementListFragment_announcements";
+  readonly " $fragmentType": "TeamsFragment_teams";
 };
-export type AdminAreaAnnouncementListFragment_announcements$key = {
-  readonly " $data"?: AdminAreaAnnouncementListFragment_announcements$data;
-  readonly " $fragmentSpreads": FragmentRefs<"AdminAreaAnnouncementListFragment_announcements">;
+export type TeamsFragment_teams$key = {
+  readonly " $data"?: TeamsFragment_teams$data;
+  readonly " $fragmentSpreads": FragmentRefs<"TeamsFragment_teams">;
 };
 
-import AnnouncementPaginationQuery_graphql from './AnnouncementPaginationQuery.graphql';
+import TeamsPaginationQuery_graphql from './TeamsPaginationQuery.graphql';
 
 const node: ReaderFragment = (function(){
 var v0 = [
-  "announcements"
+  "teams"
 ];
 return {
   "argumentDefinitions": [
@@ -48,6 +42,10 @@ return {
     {
       "kind": "RootArgument",
       "name": "first"
+    },
+    {
+      "kind": "RootArgument",
+      "name": "search"
     }
   ],
   "kind": "Fragment",
@@ -70,29 +68,41 @@ return {
         "path": (v0/*: any*/)
       },
       "fragmentPathInResult": [],
-      "operation": AnnouncementPaginationQuery_graphql
+      "operation": TeamsPaginationQuery_graphql
     }
   },
-  "name": "AdminAreaAnnouncementListFragment_announcements",
+  "name": "TeamsFragment_teams",
   "selections": [
     {
-      "alias": "announcements",
+      "alias": "teams",
       "args": [
+        {
+          "kind": "Variable",
+          "name": "search",
+          "variableName": "search"
+        },
         {
           "kind": "Literal",
           "name": "sort",
-          "value": "CREATED_AT_DESC"
+          "value": "NAME_ASC"
         }
       ],
-      "concreteType": "AnnouncementConnection",
+      "concreteType": "TeamConnection",
       "kind": "LinkedField",
-      "name": "__AdminAreaAnnouncementList_announcements_connection",
+      "name": "__TeamList_teams_connection",
       "plural": false,
       "selections": [
         {
           "alias": null,
           "args": null,
-          "concreteType": "AnnouncementEdge",
+          "kind": "ScalarField",
+          "name": "totalCount",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": "TeamEdge",
           "kind": "LinkedField",
           "name": "edges",
           "plural": true,
@@ -100,7 +110,7 @@ return {
             {
               "alias": null,
               "args": null,
-              "concreteType": "Announcement",
+              "concreteType": "Team",
               "kind": "LinkedField",
               "name": "node",
               "plural": false,
@@ -113,53 +123,9 @@ return {
                   "storageKey": null
                 },
                 {
-                  "alias": null,
                   "args": null,
-                  "kind": "ScalarField",
-                  "name": "message",
-                  "storageKey": null
-                },
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "type",
-                  "storageKey": null
-                },
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "dismissible",
-                  "storageKey": null
-                },
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "startTime",
-                  "storageKey": null
-                },
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "endTime",
-                  "storageKey": null
-                },
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "active",
-                  "storageKey": null
-                },
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "expired",
-                  "storageKey": null
+                  "kind": "FragmentSpread",
+                  "name": "TeamListItemFragment_team"
                 },
                 {
                   "alias": null,
@@ -207,7 +173,7 @@ return {
           "storageKey": null
         }
       ],
-      "storageKey": "__AdminAreaAnnouncementList_announcements_connection(sort:\"CREATED_AT_DESC\")"
+      "storageKey": null
     }
   ],
   "type": "Query",
@@ -215,6 +181,6 @@ return {
 };
 })();
 
-(node as any).hash = "fb43ced1dfdae5a000a22ea03f4e56be";
+(node as any).hash = "2b7f3864c0496b1e0c80c23660fb5a68";
 
 export default node;

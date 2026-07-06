@@ -5,12 +5,12 @@ import { LoadingButton } from '@mui/lab';
 import { Avatar, Alert, Box, Button, ButtonGroup, Collapse, Dialog, DialogActions, DialogTitle, DialogContent, Divider, Menu, MenuItem, Link, Paper, Stack, styled, Typography } from '@mui/material'
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
+import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
 import { MutationError } from '../../common/error';
 import { useFragment, useLazyLoadQuery, useMutation } from 'react-relay'
 import { useNavigate, useParams } from 'react-router-dom';
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
 import { useSnackbar } from 'notistack';
 import { GetConnections } from './VCSProviderList';
 import { VCSProviderDetailsFragment_group$key } from './__generated__/VCSProviderDetailsFragment_group.graphql'
@@ -241,19 +241,19 @@ function VCSProviderDetails(props: Props) {
                     ]}
                 />
                 <Paper variant="outlined" sx={{ marginTop: 3, padding: CARD_PADDING }}>
-                    <Box display="flex" justifyContent="space-between">
-                        <Box display="flex" alignItems="center">
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+                        <Box display="flex" alignItems="center" sx={{ minWidth: 0 }}>
                             <Avatar variant="rounded" sx={{ width: 32, height: 32, marginRight: 1, bgcolor: 'avatar.default' }}>
                                 {vcsProvider.name[0].toUpperCase()}
                             </Avatar>
-                            <Box marginLeft={1}>
+                            <Box marginLeft={1} sx={{ minWidth: 0 }}>
                                 <Box display="flex" alignItems="center">
                                     <Typography variant="h5" sx={{ marginRight: 1 }}>{vcsProvider.name}</Typography>
                                 </Box>
                                 <Typography color="textSecondary">{vcsProvider.description}</Typography>
                             </Box>
                         </Box>
-                        <Box>
+                        <Box sx={{ flexShrink: 0 }}>
                             <Stack direction="row" spacing={1} >
                                 <TRNButton trn={vcsProvider.metadata.trn} />
                                 <ButtonGroup variant="outlined" color="primary">
@@ -319,7 +319,7 @@ function VCSProviderDetails(props: Props) {
                             <Collapse in={showMore} timeout="auto" unmountOnExit>
                                 <Box marginTop={2}>
                                     <Typography variant="body2">
-                                        Created {moment(vcsProvider.metadata.createdAt as moment.MomentInput).fromNow()} by {vcsProvider.createdBy}
+                                        Created <Timestamp timestamp={vcsProvider.metadata.createdAt as string} /> by {vcsProvider.createdBy}
                                     </Typography>
                                 </Box>
                             </Collapse>
