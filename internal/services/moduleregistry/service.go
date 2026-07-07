@@ -21,13 +21,13 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -155,13 +155,12 @@ type dsseSignature struct {
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	limitChecker    limits.LimitChecker
-	registryStore   RegistryStore
-	activityService activityevent.Service
-	taskManager     asynctask.Manager
-	handleCaller    handleCallerFunc
+	logger        logger.Logger
+	dbClient      *db.Client
+	limitChecker  limits.LimitChecker
+	registryStore RegistryStore
+	taskManager   asynctask.Manager
+	handleCaller  handleCallerFunc
 }
 
 // NewService creates an instance of Service
@@ -170,7 +169,6 @@ func NewService(
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
 	registryStore RegistryStore,
-	activityService activityevent.Service,
 	taskManager asynctask.Manager,
 ) Service {
 	return newService(
@@ -178,7 +176,6 @@ func NewService(
 		dbClient,
 		limitChecker,
 		registryStore,
-		activityService,
 		taskManager,
 		auth.HandleCaller,
 	)
@@ -189,7 +186,6 @@ func newService(
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
 	registryStore RegistryStore,
-	activityService activityevent.Service,
 	taskManager asynctask.Manager,
 	handleCaller handleCallerFunc,
 ) Service {
@@ -198,7 +194,6 @@ func newService(
 		dbClient,
 		limitChecker,
 		registryStore,
-		activityService,
 		taskManager,
 		handleCaller,
 	}
@@ -390,7 +385,7 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 
 	groupPath := updatedModule.GetGroupPath()
 
-	activityEventInput := &activityevent.CreateActivityEventInput{
+	activityEventInput := &activity.CreateActivityEventInput{
 		NamespacePath: &groupPath,
 		Action:        models.ActionUpdate,
 		TargetType:    models.TargetTerraformModule,
@@ -403,7 +398,7 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 		}
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext, activityEventInput); err != nil {
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient, activityEventInput); err != nil {
 		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
@@ -413,6 +408,10 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 		return nil, err
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Updated a module.",
+		"moduleID", updatedModule.Metadata.ID,
+		"moduleName", updatedModule.Name,
+	)
 	return updatedModule, nil
 }
 
@@ -903,8 +902,8 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetTerraformModule,
@@ -922,6 +921,10 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 		return nil, err
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Created a module.",
+		"moduleID", createdModule.Metadata.ID,
+		"moduleName", createdModule.Name,
+	)
 	return createdModule, nil
 }
 
@@ -962,8 +965,8 @@ func (s *service) DeleteModule(ctx context.Context, module *models.TerraformModu
 
 	groupPath := module.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,
@@ -978,7 +981,16 @@ func (s *service) DeleteModule(ctx context.Context, module *models.TerraformModu
 		return err
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Deleted a module.",
+		"moduleID", module.Metadata.ID,
+		"moduleName", module.Name,
+	)
+	return nil
 }
 
 func (s *service) GetModulesByIDs(ctx context.Context, ids []string) ([]models.TerraformModule, error) {
@@ -1324,8 +1336,8 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetTerraformModuleVersion,

@@ -17,7 +17,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -232,10 +231,20 @@ func TestCreateTopLevelGroup(t *testing.T) {
 			mockNamespaceMemberships := namespacemembership.NewMockService(t)
 			mockGroups := db.NewMockGroups(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockActivityEvents := activityevent.NewMockService(t)
+			mockActivityEventsDB := db.NewMockActivityEvents(t)
 			mockUsers := db.NewMockUsers(t)
 
+			// IsAdminModeActivated fetches the latest user from the DB.
 			mockUsers.On("GetUserByID", mock.Anything, test.user.Metadata.ID).Return(test.user, nil).Maybe()
+
+			dbClient := &db.Client{
+				Groups:         mockGroups,
+				Transactions:   mockTransactions,
+				ActivityEvents: mockActivityEventsDB,
+				Users:          mockUsers,
+			}
+
+			caller := auth.NewUserCaller(test.user, nil, dbClient, nil, nil)
 
 			createNamespaceMembershipInput := &namespacemembership.CreateNamespaceMembershipInput{
 				NamespacePath: test.input.FullPath,
@@ -248,25 +257,17 @@ func TestCreateTopLevelGroup(t *testing.T) {
 
 				mockNamespaceMemberships.On("CreateNamespaceMembership", mock.Anything, createNamespaceMembershipInput).Return(nil, nil)
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, caller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-			}
-
-			dbClient := &db.Client{
-				Groups:       mockGroups,
-				Transactions: mockTransactions,
-				Users:        mockUsers,
+				mockActivityEventsDB.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			}
 
 			limiter := limits.NewLimitChecker(dbClient)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, limiter, mockNamespaceMemberships, mockActivityEvents, nil)
-
-			caller := auth.NewUserCaller(test.user, nil, dbClient, nil, nil)
+			service := NewService(logger, dbClient, limiter, mockNamespaceMemberships, nil)
 
 			group, err := service.CreateGroup(auth.WithCaller(ctx, caller), &test.input)
 			if test.expectErrorCode != "" {
@@ -366,19 +367,16 @@ func TestCreateNestedGroup(t *testing.T) {
 
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateGroupPermission, mock.Anything).Return(test.authError)
 
-			mockActivityEvents := activityevent.NewMockService(t)
-
 			if test.authError == nil {
 				mockCaller.On("GetSubject").Return("testsubject")
 
 				mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 
 				if test.expectErrorCode == "" {
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-					mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 				}
 
 				// called from inside checkParentSubgroupLimit
@@ -399,7 +397,7 @@ func TestCreateNestedGroup(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, limiter, nil, mockActivityEvents, nil)
+			service := NewService(logger, &dbClient, limiter, nil, nil)
 
 			group, err := service.CreateGroup(auth.WithCaller(ctx, mockCaller), &test.input)
 			if test.expectErrorCode != "" {
@@ -912,7 +910,6 @@ func TestGetGroups(t *testing.T) {
 				)
 
 			logger, _ := logger.NewForTest()
-			activityService := activityevent.NewService(dbClient.Client, logger)
 			mockEmailClient := email.MockClient{}
 			mockEmailClient.Test(t)
 			mockNotifMgr := namespace.MockNotificationManager{}
@@ -920,8 +917,8 @@ func TestGetGroups(t *testing.T) {
 			mockTaskManager := asynctask.MockManager{}
 			mockTaskManager.Test(t)
 			mockTaskManager.On("StartTask", mock.Anything).Maybe()
-			namespaceMembershipService := namespacemembership.NewService(logger, dbClient.Client, activityService, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
-			service := NewService(logger, dbClient.Client, limiter, namespaceMembershipService, activityService, nil)
+			namespaceMembershipService := namespacemembership.NewService(logger, dbClient.Client, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
+			service := NewService(logger, dbClient.Client, limiter, namespaceMembershipService, nil)
 
 			// Call the service function.
 			actualOutput, actualError := service.GetGroups(auth.WithCaller(ctx, testCaller), test.svcInput)
@@ -997,7 +994,6 @@ func TestUpdateGroup(t *testing.T) {
 
 			mockGroups := db.NewMockGroups(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateGroupPermission, mock.Anything).
 				Return(test.authError)
@@ -1005,7 +1001,7 @@ func TestUpdateGroup(t *testing.T) {
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
 
 			mockTransactions.On("BeginTx", mock.Anything).
-				Return(ctx, nil).Maybe()
+				Return(auth.WithCaller(ctx, mockCaller), nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).
 				Return(nil).Maybe()
 			mockTransactions.On("CommitTx", mock.Anything).
@@ -1014,15 +1010,6 @@ func TestUpdateGroup(t *testing.T) {
 			mockGroups.On("UpdateGroup", mock.Anything, updatedGroup).
 				Return(updatedGroup, test.updateError).Maybe()
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything,
-				&activityevent.CreateActivityEventInput{
-					NamespacePath: &originalGroup.FullPath,
-					Action:        models.ActionUpdate,
-					TargetType:    models.TargetGroup,
-					TargetID:      originalGroup.Metadata.ID,
-				},
-			).Return(&models.ActivityEvent{}, nil).Maybe()
-
 			dbClient := &db.Client{
 				Groups:       mockGroups,
 				Transactions: mockTransactions,
@@ -1030,9 +1017,8 @@ func TestUpdateGroup(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 			service := &service{
-				dbClient:        dbClient,
-				logger:          logger,
-				activityService: mockActivityEvents,
+				dbClient: dbClient,
+				logger:   logger,
 			}
 
 			actualUpdated, err := service.UpdateGroup(auth.WithCaller(ctx, mockCaller), updatedGroup)
@@ -1297,14 +1283,12 @@ func TestMigrateGroup(t *testing.T) {
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
+			mockActivityEventsDB := db.NewMockActivityEvents(t)
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+			mockActivityEventsDB.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil).Maybe()
 
 			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
 
@@ -1334,6 +1318,7 @@ func TestMigrateGroup(t *testing.T) {
 				Transactions:   &mockTransactions,
 				ResourceLimits: mockResourceLimits,
 				Users:          mockUsers,
+				ActivityEvents: mockActivityEventsDB,
 			}
 
 			limiter := limits.NewLimitChecker(&dbClient)
@@ -1346,8 +1331,10 @@ func TestMigrateGroup(t *testing.T) {
 				nil,
 			)
 
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, testCaller), nil)
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, limiter, nil, &mockActivityEvents, nil)
+			service := NewService(logger, &dbClient, limiter, nil, nil)
 
 			migrated, err := service.MigrateGroup(auth.WithCaller(ctx, testCaller),
 				test.inputGroup.Metadata.ID, test.newParentID)
@@ -1398,7 +1385,7 @@ func TestGetDriftDetectionEnabledSetting(t *testing.T) {
 
 			mockInheritedSettingsResolver.On("GetDriftDetectionEnabled", mock.Anything, &group).Return(test.expectSetting, nil).Maybe()
 
-			service := NewService(testLogger, nil, nil, nil, nil, mockInheritedSettingsResolver)
+			service := NewService(testLogger, nil, nil, nil, mockInheritedSettingsResolver)
 
 			setting, err := service.GetDriftDetectionEnabledSetting(auth.WithCaller(ctx, mockCaller), &group)
 
@@ -1450,7 +1437,7 @@ func TestGetProviderMirrorEnabledSetting(t *testing.T) {
 
 			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, &group).Return(test.expectSetting, nil).Maybe()
 
-			service := NewService(testLogger, nil, nil, nil, nil, mockInheritedSettingsResolver)
+			service := NewService(testLogger, nil, nil, nil, mockInheritedSettingsResolver)
 
 			setting, err := service.GetProviderMirrorEnabledSetting(auth.WithCaller(ctx, mockCaller), &group)
 
@@ -1462,6 +1449,73 @@ func TestGetProviderMirrorEnabledSetting(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, test.expectSetting, setting)
+		})
+	}
+}
+
+func TestDeleteGroup(t *testing.T) {
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject is not authorized",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// Root-level group (no ParentID) deleted with force so the subgroup/workspace
+			// checks are skipped and no activity event is created for a parent.
+			group := &models.Group{
+				Metadata: models.ResourceMetadata{ID: "group-1"},
+				FullPath: "group-1",
+			}
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteGroupPermission, mock.Anything).Return(test.authError)
+
+			mockTransactions := db.NewMockTransactions(t)
+			mockGroups := db.NewMockGroups(t)
+
+			if test.authError == nil {
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockGroups.On("DeleteGroup", mock.Anything, group).Return(nil)
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient: &db.Client{
+					Transactions: mockTransactions,
+					Groups:       mockGroups,
+				},
+				logger: logger,
+			}
+
+			err := service.DeleteGroup(auth.WithCaller(ctx, mockCaller), &DeleteGroupInput{
+				Group: group,
+				Force: true,
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }

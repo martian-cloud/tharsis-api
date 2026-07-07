@@ -323,7 +323,7 @@ func (s *WorkspaceServer) SubscribeToWorkspaceEvents(req *pb.SubscribeToWorkspac
 
 	for event := range eventChan {
 		pbEvent := &pb.WorkspaceEvent{
-			Action:    event.Action,
+			Type:      string(event.Type),
 			Workspace: toPBWorkspace(&event.Workspace),
 		}
 
@@ -337,11 +337,6 @@ func (s *WorkspaceServer) SubscribeToWorkspaceEvents(req *pb.SubscribeToWorkspac
 
 // toPBWorkspace converts from Workspace model to ProtoBuf model.
 func toPBWorkspace(w *models.Workspace) *pb.Workspace {
-	var currentJobID string
-	if w.CurrentJobID != "" {
-		currentJobID = gid.ToGlobalID(types.JobModelType, w.CurrentJobID)
-	}
-
 	var currentStateVersionID string
 	if w.CurrentStateVersionID != "" {
 		currentStateVersionID = gid.ToGlobalID(types.StateVersionModelType, w.CurrentStateVersionID)
@@ -356,7 +351,6 @@ func toPBWorkspace(w *models.Workspace) *pb.Workspace {
 		CreatedBy:             w.CreatedBy,
 		Locked:                w.Locked,
 		DirtyState:            w.DirtyState,
-		CurrentJobId:          currentJobID,
 		CurrentStateVersionId: currentStateVersionID,
 		Labels:                w.Labels,
 	}

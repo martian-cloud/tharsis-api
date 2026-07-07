@@ -11,12 +11,12 @@ import (
 	"github.com/hashicorp/go-version"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -119,11 +119,10 @@ type Service interface {
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	limitChecker    limits.LimitChecker
-	registryStore   RegistryStore
-	activityService activityevent.Service
+	logger        logger.Logger
+	dbClient      *db.Client
+	limitChecker  limits.LimitChecker
+	registryStore RegistryStore
 }
 
 // NewService creates an instance of Service
@@ -132,14 +131,12 @@ func NewService(
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
 	registryStore RegistryStore,
-	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger,
 		dbClient,
 		limitChecker,
 		registryStore,
-		activityService,
 	}
 }
 
@@ -334,8 +331,8 @@ func (s *service) UpdateProvider(ctx context.Context, provider *models.Terraform
 
 	groupPath := updatedProvider.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionUpdate,
 			TargetType:    models.TargetTerraformProvider,
@@ -349,6 +346,11 @@ func (s *service) UpdateProvider(ctx context.Context, provider *models.Terraform
 		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Updated a provider.",
+		"providerID", updatedProvider.Metadata.ID,
+		"name", updatedProvider.Name,
+	)
 
 	return updatedProvider, nil
 }
@@ -447,8 +449,8 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetTerraformProvider,
@@ -462,6 +464,11 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Created a provider.",
+		"providerID", createdProvider.Metadata.ID,
+		"name", createdProvider.Name,
+	)
 
 	return createdProvider, nil
 }
@@ -503,8 +510,8 @@ func (s *service) DeleteProvider(ctx context.Context, provider *models.Terraform
 
 	groupPath := provider.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,
@@ -519,7 +526,17 @@ func (s *service) DeleteProvider(ctx context.Context, provider *models.Terraform
 		return err
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Deleted a provider.",
+		"providerID", provider.Metadata.ID,
+		"name", provider.Name,
+	)
+
+	return nil
 }
 
 func (s *service) GetProvidersByIDs(ctx context.Context, ids []string) ([]models.TerraformProvider, error) {
@@ -863,8 +880,8 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetTerraformProviderVersion,
@@ -1226,6 +1243,11 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 		return nil, err
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Created a provider platform.",
+		"providerPlatformID", createdPlatform.Metadata.ID,
+		"providerVersionID", createdPlatform.ProviderVersionID,
+	)
+
 	return createdPlatform, nil
 }
 
@@ -1258,7 +1280,17 @@ func (s *service) DeleteProviderPlatform(ctx context.Context, providerPlatform *
 		return err
 	}
 
-	return s.dbClient.TerraformProviderPlatforms.DeleteProviderPlatform(ctx, providerPlatform)
+	if err := s.dbClient.TerraformProviderPlatforms.DeleteProviderPlatform(ctx, providerPlatform); err != nil {
+		tracing.RecordError(span, err, "failed to delete provider platform")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Deleted a provider platform.",
+		"providerPlatformID", providerPlatform.Metadata.ID,
+		"providerVersionID", providerPlatform.ProviderVersionID,
+	)
+
+	return nil
 }
 
 func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlatformID string, reader io.Reader) error {
@@ -1324,7 +1356,17 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 		return err
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Uploaded a provider platform binary.",
+		"providerPlatformID", providerPlatform.Metadata.ID,
+		"providerVersionID", providerVersion.Metadata.ID,
+	)
+
+	return nil
 }
 
 func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersionID string, reader io.Reader) error {
@@ -1384,7 +1426,17 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 		return err
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Uploaded a provider version README.",
+		"providerVersionID", providerVersion.Metadata.ID,
+		"providerID", providerVersion.ProviderID,
+	)
+
+	return nil
 }
 
 func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerVersionID string, reader io.Reader) error {
@@ -1444,7 +1496,17 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 		return err
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Uploaded provider version SHA256 sums.",
+		"providerVersionID", providerVersion.Metadata.ID,
+		"providerID", providerVersion.ProviderID,
+	)
+
+	return nil
 }
 
 func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, providerVersionID string, reader io.Reader) error {
@@ -1552,7 +1614,17 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 		return err
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Uploaded provider version SHA256 sums signature.",
+		"providerVersionID", providerVersion.Metadata.ID,
+		"providerID", providerVersion.ProviderID,
+	)
+
+	return nil
 }
 
 func (s *service) GetProviderPlatformDownloadURLs(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) (*ProviderPlatformDownloadURLs, error) {

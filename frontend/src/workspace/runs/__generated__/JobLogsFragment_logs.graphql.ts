@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<4ceea3e0b0c6cb8ceabbca5bafecd0ec>>
+ * @generated SignedSource<<0ba51f0b421788f350aae34dc30576a3>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -26,7 +26,16 @@ export type JobLogsFragment_logs$key = {
 };
 
 const node: ReaderFragment = {
-  "argumentDefinitions": [],
+  "argumentDefinitions": [
+    {
+      "kind": "RootArgument",
+      "name": "limit"
+    },
+    {
+      "kind": "RootArgument",
+      "name": "startOffset"
+    }
+  ],
   "kind": "Fragment",
   "metadata": null,
   "name": "JobLogsFragment_logs",
@@ -70,25 +79,25 @@ const node: ReaderFragment = {
       "alias": null,
       "args": [
         {
-          "kind": "Literal",
+          "kind": "Variable",
           "name": "limit",
-          "value": 51200
+          "variableName": "limit"
         },
         {
-          "kind": "Literal",
+          "kind": "Variable",
           "name": "startOffset",
-          "value": 0
+          "variableName": "startOffset"
         }
       ],
       "kind": "ScalarField",
       "name": "logs",
-      "storageKey": "logs(limit:51200,startOffset:0)"
+      "storageKey": null
     }
   ],
   "type": "Job",
   "abstractKey": null
 };
 
-(node as any).hash = "090e1292e76cd3824800e0949a8c365c";
+(node as any).hash = "756a5cfe3456820b806dceff6c6260f8";
 
 export default node;

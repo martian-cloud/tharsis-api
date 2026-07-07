@@ -49,12 +49,11 @@ func TestLogStreams_CreateLogStream(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-	job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	job, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		RunID:       run.Metadata.ID,
 		WorkspaceID: workspace.Metadata.ID,
 		Type:        models.JobPlanType,
-		Status:      models.JobQueued,
-	})
+	}, models.JobQueued))
 	require.Nil(t, err)
 
 	type testCase struct {
@@ -130,12 +129,11 @@ func TestLogStreams_UpdateLogStream(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-	job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	job, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		RunID:       run.Metadata.ID,
 		WorkspaceID: workspace.Metadata.ID,
 		Type:        models.JobPlanType,
-		Status:      models.JobQueued,
-	})
+	}, models.JobQueued))
 	require.Nil(t, err)
 
 	createdLogStream, err := testClient.client.LogStreams.CreateLogStream(ctx, &models.LogStream{
@@ -218,12 +216,11 @@ func TestLogStreams_GetLogStreamByID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a job for the log stream
-	job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	job, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		WorkspaceID: workspace.Metadata.ID,
 		RunID:       run.Metadata.ID,
 		Type:        models.JobPlanType,
-		Status:      models.JobQueued,
-	})
+	}, models.JobQueued))
 	require.NoError(t, err)
 
 	// Create a log stream for testing
@@ -307,20 +304,18 @@ func TestLogStreams_GetLogStreams(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create jobs for the log streams
-	job1, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	job1, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		WorkspaceID: workspace.Metadata.ID,
 		RunID:       run.Metadata.ID,
 		Type:        models.JobPlanType,
-		Status:      models.JobQueued,
-	})
+	}, models.JobQueued))
 	require.NoError(t, err)
 
-	job2, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	job2, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		WorkspaceID: workspace.Metadata.ID,
 		RunID:       run.Metadata.ID,
 		Type:        models.JobApplyType,
-		Status:      models.JobQueued,
-	})
+	}, models.JobQueued))
 	require.NoError(t, err)
 
 	// Create test log streams
@@ -412,12 +407,11 @@ func TestLogStreams_GetLogStreamsWithPaginationAndSorting(t *testing.T) {
 
 	resourceCount := 10
 	for i := 0; i < resourceCount; i++ {
-		job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+		job, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 			WorkspaceID: workspace.Metadata.ID,
 			RunID:       run.Metadata.ID,
 			Type:        models.JobPlanType,
-			Status:      models.JobQueued,
-		})
+		}, models.JobQueued))
 		require.NoError(t, err)
 
 		_, err = testClient.client.LogStreams.CreateLogStream(ctx, &models.LogStream{
@@ -484,12 +478,11 @@ func TestLogStreams_GetLogStreamByJobID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a job for the log stream
-	job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	job, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		WorkspaceID: workspace.Metadata.ID,
 		RunID:       run.Metadata.ID,
 		Type:        models.JobPlanType,
-		Status:      models.JobQueued,
-	})
+	}, models.JobQueued))
 	require.NoError(t, err)
 
 	// Create a log stream for testing

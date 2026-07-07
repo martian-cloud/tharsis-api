@@ -6,10 +6,6 @@ import (
 
 // Metadata on all available toolsets
 var (
-	ToolsetMetadataApplies = tools.ToolsetMetadata{
-		Name:        "apply",
-		Description: "Tools for retrieving apply status and execution details.",
-	}
 	ToolsetMetadataDocumentation = tools.ToolsetMetadata{
 		Name:        "documentation",
 		Description: "Tools for searching and retrieving Tharsis documentation.",
@@ -40,7 +36,6 @@ var (
 // This is used as the default when no specific toolsets are configured.
 func AllToolsets() []string {
 	return []string{
-		ToolsetMetadataApplies.Name,
 		ToolsetMetadataDocumentation.Name,
 		ToolsetMetadataGroups.Name,
 		ToolsetMetadataJobs.Name,
@@ -53,12 +48,6 @@ func AllToolsets() []string {
 // BuildToolsetGroup creates and configures all toolsets for the API MCP server.
 func BuildToolsetGroup(readOnly bool, tc *ToolContext) *tools.ToolsetGroup {
 	group := tools.NewToolsetGroup(readOnly)
-
-	// Apply tools
-	applies := tools.NewToolset(ToolsetMetadataApplies).
-		AddReadTools(
-			tools.NewServerTool(GetApply(tc)),
-		)
 
 	// Documentation tools
 	docService := tools.NewDocumentSearchService(tc.httpClient)
@@ -81,14 +70,12 @@ func BuildToolsetGroup(readOnly bool, tc *ToolContext) *tools.ToolsetGroup {
 	jobs := tools.NewToolset(ToolsetMetadataJobs).
 		AddReadTools(
 			tools.NewServerTool(GetJob(tc)),
-			tools.NewServerTool(GetLatestJob(tc)),
 			tools.NewServerTool(GetJobLogs(tc)),
 		)
 
 	// Plan tools
 	plans := tools.NewToolset(ToolsetMetadataPlans).
 		AddReadTools(
-			tools.NewServerTool(GetPlan(tc)),
 			tools.NewServerTool(GetPlanDiff(tc)),
 		)
 
@@ -105,7 +92,6 @@ func BuildToolsetGroup(readOnly bool, tc *ToolContext) *tools.ToolsetGroup {
 			tools.NewServerTool(GetWorkspaces(tc)),
 		)
 
-	group.AddToolset(applies)
 	group.AddToolset(documentation)
 	group.AddToolset(groups)
 	group.AddToolset(jobs)

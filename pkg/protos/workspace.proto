@@ -134,6 +134,6 @@ message GetWorkspacesResponse {
 
 // WorkspaceEvent represents a workspace event.
 message WorkspaceEvent {
-  string    action    = 1;
+  string    type      = 1;
   Workspace workspace = 2;
 }

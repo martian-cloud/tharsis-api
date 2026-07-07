@@ -69,13 +69,14 @@ type JobTagFilter struct {
 
 // JobFilter contains the supported fields for filtering Job resources
 type JobFilter struct {
-	RunID       *string
-	WorkspaceID *string
-	RunnerID    *string
-	JobType     *models.JobType
-	JobStatus   *models.JobStatus
-	TagFilter   *JobTagFilter
-	JobIDs      []string
+	RunID               *string
+	WorkspaceID         *string
+	RunnerID            *string
+	JobType             *models.JobType
+	JobStatus           *models.JobStatus
+	TagFilter           *JobTagFilter
+	JobIDs              []string
+	NamespacePathPrefix *string
 }
 
 // GetJobsInput is the input for listing jobs
@@ -205,8 +206,15 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 				}
 				// This filter condition will only return jobs where the job tags are a subset of the tag
 				// superset list specified in the filter
-				ex = ex.Append(goqu.L(fmt.Sprintf("jobs.tags <@ '%s'", json)))
+				ex = ex.Append(goqu.L("jobs.tags <@ ?::jsonb", string(json)))
 			}
+		}
+
+		if input.Filter.NamespacePathPrefix != nil {
+			ex = ex.Append(goqu.Or(
+				goqu.I("namespaces.path").Eq(*input.Filter.NamespacePathPrefix),
+				goqu.I("namespaces.path").Like(*input.Filter.NamespacePathPrefix+"/%"),
+			))
 		}
 	}
 
@@ -288,7 +296,7 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 					goqu.Record{
 						"version":             goqu.L("? + ?", goqu.C("version"), 1),
 						"updated_at":          timestamp,
-						"status":              job.Status,
+						"status":              job.GetStatus(),
 						"type":                job.Type,
 						"workspace_id":        job.WorkspaceID,
 						"run_id":              job.RunID,
@@ -352,7 +360,7 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 					"version":             initialResourceVersion,
 					"created_at":          timestamp,
 					"updated_at":          timestamp,
-					"status":              job.Status,
+					"status":              job.GetStatus(),
 					"type":                job.Type,
 					"workspace_id":        job.WorkspaceID,
 					"run_id":              job.RunID,
@@ -466,6 +474,7 @@ func scanJob(row scanner) (*models.Job, error) {
 	var runningAt sql.NullTime
 	var finishedAt sql.NullTime
 	var workspacePath string
+	var status models.JobStatus
 
 	job := &models.Job{}
 
@@ -474,7 +483,7 @@ func scanJob(row scanner) (*models.Job, error) {
 		&job.Metadata.CreationTimestamp,
 		&job.Metadata.LastUpdatedTimestamp,
 		&job.Metadata.Version,
-		&job.Status,
+		&status,
 		&job.Type,
 		&job.WorkspaceID,
 		&job.RunID,
@@ -495,6 +504,11 @@ func scanJob(row scanner) (*models.Job, error) {
 	err := row.Scan(fields...)
 
 	if err != nil {
+		return nil, err
+	}
+
+	// Hydrate the status from the persisted value (allowed from the job's zero value).
+	if err := job.SetStatus(status); err != nil {
 		return nil, err
 	}
 

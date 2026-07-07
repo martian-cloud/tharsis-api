@@ -166,12 +166,15 @@ func WithRunnerID(id string) func(*constraints) {
 	}
 }
 
+// System is the subject identifier for internal system calls.
+const System = "system"
+
 // SystemCaller is the caller subject for internal system calls
 type SystemCaller struct{}
 
 // GetSubject returns the subject identifier for this caller
 func (s *SystemCaller) GetSubject() string {
-	return "system"
+	return System
 }
 
 // IsAdminModeActivated returns true if the caller is an admin

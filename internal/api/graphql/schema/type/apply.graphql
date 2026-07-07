@@ -6,28 +6,24 @@ enum ApplyStatus {
   pending
   queued
   running
+  skipped
 }
 
-type UpdateApplyPayload {
-  clientMutationId: String
-  apply: Apply
-  problems: [Problem!]!
-}
-
-type Apply implements Node {
+type Apply {
   id: ID!
-  metadata: ResourceMetadata!
+  metadata: ResourceMetadata! @deprecated(
+      reason: "use run metadata instead"
+  )
   status: ApplyStatus!
   currentJob: Job
+  jobs(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: JobSort
+  ): JobConnection!
   triggeredBy: String
   comment: String!
-  errorMessage: String
-}
-
-input UpdateApplyInput {
-  clientMutationId: String
-  id: ID!
-  metadata: ResourceMetadataInput
-  status: ApplyStatus!
   errorMessage: String
 }

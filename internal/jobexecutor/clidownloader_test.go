@@ -3,6 +3,7 @@ package jobexecutor
 import (
 	"bytes"
 	"crypto"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -290,9 +291,12 @@ func TestFetchSigningKeys_MultipleKeys_ShortCircuit(t *testing.T) {
 	t.Log("Verification succeeded with the matching key (short-circuit behavior confirmed)")
 }
 
-// TestFetchSigningKeys_ExpiredKey verifies that when the only key returned
-// by the well-known endpoint is expired, fetchSigningKeys returns the
-// expected error.
+// TestFetchSigningKeys_ExpiredKey documents that fetchSigningKeys no longer rejects
+// expired keys with a dedicated pre-check (that heuristic was removed because it
+// produced false rejections during rotation). Key validity is enforced downstream:
+// the OpenPGP library refuses to produce a signature from an expired key, and
+// signature verification rejects signatures outside a key's validity window — so an
+// expired key cannot validate the checksum file regardless.
 func TestFetchSigningKeys_ExpiredKey(t *testing.T) {
 	// Create a key "created" 2 years ago with a 1-year lifetime -> already expired.
 	twoYearsAgo := time.Now().Add(-2 * 365 * 24 * time.Hour)
@@ -308,14 +312,45 @@ func TestFetchSigningKeys_ExpiredKey(t *testing.T) {
 
 	downloader := newTestDownloaderWithURL(t, server.URL)
 
-	_, err := downloader.fetchSigningKeys()
+	keyRing, err := downloader.fetchSigningKeys()
+	if err != nil {
+		t.Fatalf("fetchSigningKeys should return the parsed key without a pre-check; got error: %v", err)
+	}
+	if len(keyRing) != 1 {
+		t.Fatalf("expected the fetched key to be returned, got %d", len(keyRing))
+	}
+}
+
+// TestVerifySumsSignature_RejectsExpiredKey is a regression guard for removing the
+// explicit expiry pre-check from fetchSigningKeys. It pins the property the production
+// code now relies on: signature verification itself rejects a signing key that has
+// expired by the time of verification. verifySumsSignature delegates to
+// openpgp.CheckDetachedSignature with a nil config (i.e. time.Now()); since a key can't
+// sign while expired, we sign with a short-lived key while it is valid and then verify
+// with the clock advanced past its lifetime via packet.Config.Time. If a future
+// go-crypto upgrade stopped enforcing key expiry at verification, this test would fail
+// and signal that the pre-check (or an equivalent) must be reinstated.
+func TestVerifySumsSignature_RejectsExpiredKey(t *testing.T) {
+	// Key valid now with a 1-hour lifetime, so signing (at time.Now()) succeeds.
+	key := generateTestKey(t, "short-lived", time.Time{}, 3600)
+	content := []byte("abc123  terraform_1.12.0_linux_amd64.zip\n")
+	signature := signContent(t, key, content)
+	keyRing := openpgp.EntityList{key}
+
+	// Sanity: it verifies through the production path while the key is valid (nil config = now).
+	if err := verifySumsSignature(bytes.NewReader(content), bytes.NewReader(signature), keyRing); err != nil {
+		t.Fatalf("expected signature to verify while the key is valid, got: %v", err)
+	}
+
+	// With the clock advanced past the key's lifetime, verification must reject it.
+	future := &packet.Config{Time: func() time.Time { return time.Now().Add(2 * time.Hour) }}
+	_, err := openpgp.CheckDetachedSignature(keyRing, bytes.NewReader(content), bytes.NewReader(signature), future)
 	if err == nil {
-		t.Fatal("expected error for expired key, got nil")
+		t.Fatal("expected signature verification to reject a signing key expired at verification time")
 	}
-	if !strings.Contains(err.Error(), "signing key expired") {
-		t.Errorf("unexpected error message: %v", err)
+	if !strings.Contains(err.Error(), "expired") {
+		t.Fatalf("expected an expiry error, got: %v", err)
 	}
-	t.Logf("Got expected error: %v", err)
 }
 
 // TestFetchSigningKeys_NilSelfSignature verifies that a key with a nil
@@ -413,5 +448,103 @@ func TestSplitArmoredBlocks(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// downloaderServingKey starts a mock well-known endpoint serving the given armored
+// key and returns a downloader pointed at it with the supplied trusted fingerprints.
+func downloaderServingKey(t *testing.T, armoredKey []byte, trusted map[string]struct{}) *cliDownloader {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(armoredKey)
+	}))
+	t.Cleanup(server.Close)
+	return &cliDownloader{
+		httpClient:          &http.Client{Transport: &rewriteTransport{target: server.URL}},
+		trustedFingerprints: trusted,
+	}
+}
+
+// TestFetchSigningKeys_RejectsUnpinnedFingerprint verifies that a fetched key whose
+// primary-key fingerprint is not in the pinned allowlist is rejected, even though it
+// parses successfully — this is the protection against a compromised well-known endpoint.
+func TestFetchSigningKeys_RejectsUnpinnedFingerprint(t *testing.T) {
+	key := generateTestKey(t, "attacker", time.Time{}, 0)
+	armored := armorEntities(t, key)
+
+	downloader := downloaderServingKey(t, armored, map[string]struct{}{
+		// A fingerprint that does not match the served key.
+		"0000000000000000000000000000000000000000": {},
+	})
+
+	if _, err := downloader.fetchSigningKeys(); err == nil {
+		t.Fatal("expected fetchSigningKeys to reject a key not on the pinned allowlist")
+	}
+}
+
+// TestFetchSigningKeys_AcceptsPinnedFingerprint verifies that a fetched key whose
+// primary-key fingerprint is pinned is accepted.
+func TestFetchSigningKeys_AcceptsPinnedFingerprint(t *testing.T) {
+	key := generateTestKey(t, "trusted", time.Time{}, 0)
+	armored := armorEntities(t, key)
+	fp := strings.ToLower(hex.EncodeToString(key.PrimaryKey.Fingerprint))
+
+	downloader := downloaderServingKey(t, armored, map[string]struct{}{fp: {}})
+
+	keyRing, err := downloader.fetchSigningKeys()
+	if err != nil {
+		t.Fatalf("expected pinned key to be accepted, got error: %v", err)
+	}
+	if len(keyRing) != 1 {
+		t.Fatalf("expected exactly the pinned key, got %d", len(keyRing))
+	}
+}
+
+// TestFetchSigningKeys_MixedFingerprints verifies that when the endpoint returns
+// several keys and only a subset is pinned, exactly the pinned keys are retained and
+// the others are dropped. This exercises the in-place keyRing[:0] partial filter where
+// a kept key is not the first entity.
+func TestFetchSigningKeys_MixedFingerprints(t *testing.T) {
+	keyA := generateTestKey(t, "keyA", time.Time{}, 0)
+	keyB := generateTestKey(t, "keyB", time.Time{}, 0)
+	keyC := generateTestKey(t, "keyC", time.Time{}, 0)
+	armored := armorEntities(t, keyA, keyB, keyC)
+
+	// Pin only the middle key.
+	fpB := strings.ToLower(hex.EncodeToString(keyB.PrimaryKey.Fingerprint))
+	downloader := downloaderServingKey(t, armored, map[string]struct{}{fpB: {}})
+
+	keyRing, err := downloader.fetchSigningKeys()
+	if err != nil {
+		t.Fatalf("expected the pinned key to be retained, got error: %v", err)
+	}
+	if len(keyRing) != 1 {
+		t.Fatalf("expected only the pinned key to be retained, got %d", len(keyRing))
+	}
+	gotFP := strings.ToLower(hex.EncodeToString(keyRing[0].PrimaryKey.Fingerprint))
+	if gotFP != fpB {
+		t.Fatalf("retained key fingerprint = %s, want pinned %s", gotFP, fpB)
+	}
+}
+
+// TestHashicorpTrustedGPGFingerprints_WellFormed guards the pinned production allowlist
+// against typos: each entry must be lowercase hex of a 20-byte v4 fingerprint.
+func TestHashicorpTrustedGPGFingerprints_WellFormed(t *testing.T) {
+	if len(hashicorpTrustedGPGFingerprints) == 0 {
+		t.Fatal("production GPG fingerprint allowlist must not be empty")
+	}
+	for fp := range hashicorpTrustedGPGFingerprints {
+		if fp != strings.ToLower(fp) {
+			t.Errorf("fingerprint %q must be lowercase", fp)
+		}
+		raw, err := hex.DecodeString(fp)
+		if err != nil {
+			t.Errorf("fingerprint %q is not valid hex: %v", fp, err)
+			continue
+		}
+		if len(raw) != 20 {
+			t.Errorf("fingerprint %q decodes to %d bytes, want 20 (v4 fingerprint)", fp, len(raw))
+		}
 	}
 }

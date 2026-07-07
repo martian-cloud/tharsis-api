@@ -36,7 +36,7 @@ func TestGetRunHandler(t *testing.T) {
 				Status:           models.RunApplied,
 				CreatedBy:        "user@example.com",
 				TerraformVersion: "1.5.0",
-				HasChanges:       true,
+				Plan:             models.Plan{HasChanges: true},
 			},
 			validate: func(t *testing.T, output getRunOutput) {
 				assert.Equal(t, models.RunApplied, output.Run.Status)

@@ -266,6 +266,16 @@ func (r RootResolver) ApplyRun(ctx context.Context, args *struct{ Input ApplyRun
 	return response, nil
 }
 
+// SetRunAutoApply mutation changes a run's auto-apply setting
+func (r RootResolver) SetRunAutoApply(ctx context.Context, args *struct{ Input SetRunAutoApplyInput }) (*RunMutationPayloadResolver, error) {
+	response, err := setRunAutoApplyMutation(ctx, &args.Input)
+	if err != nil {
+		return handleRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 // CancelRun mutation cancels a run
 func (r RootResolver) CancelRun(ctx context.Context, args *struct{ Input CancelRunInput }) (*RunMutationPayloadResolver, error) {
 	response, err := cancelRunMutation(ctx, &args.Input)
@@ -276,29 +286,37 @@ func (r RootResolver) CancelRun(ctx context.Context, args *struct{ Input CancelR
 	return response, nil
 }
 
+// RetryRunNode mutation retries a failed or canceled plan/apply node by resetting it to pending
+func (r RootResolver) RetryRunNode(ctx context.Context, args *struct{ Input RetryRunNodeInput }) (*RunMutationPayloadResolver, error) {
+	response, err := retryRunNodeMutation(ctx, &args.Input)
+	if err != nil {
+		return handleRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DiscardRun mutation discards a planned run, moving it to the terminal discarded status
+func (r RootResolver) DiscardRun(ctx context.Context, args *struct{ Input DiscardRunInput }) (*RunMutationPayloadResolver, error) {
+	response, err := discardRunMutation(ctx, &args.Input)
+	if err != nil {
+		return handleRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UndiscardRun mutation reverses a discard, moving a run from the discarded status back to planned
+func (r RootResolver) UndiscardRun(ctx context.Context, args *struct{ Input UndiscardRunInput }) (*RunMutationPayloadResolver, error) {
+	response, err := undiscardRunMutation(ctx, &args.Input)
+	if err != nil {
+		return handleRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* Plan Queries and Mutations */
-
-// UpdatePlan updates an existing plan
-func (r RootResolver) UpdatePlan(ctx context.Context, args *struct{ Input UpdatePlanInput }) (*PlanMutationPayloadResolver, error) {
-	response, err := updatePlanMutation(ctx, &args.Input)
-	if err != nil {
-		return handlePlanMutationProblem(err, args.Input.ClientMutationID)
-	}
-
-	return response, nil
-}
-
-/* Apply Queries and Mutations */
-
-// UpdateApply updates an existing apply
-func (r RootResolver) UpdateApply(ctx context.Context, args *struct{ Input UpdateApplyInput }) (*ApplyMutationPayloadResolver, error) {
-	response, err := updateApplyMutation(ctx, &args.Input)
-	if err != nil {
-		return handleApplyMutationProblem(err, args.Input.ClientMutationID)
-	}
-
-	return response, nil
-}
 
 // SetVariablesIncludedInTFConfig sets the variables that are included in the Terraform config.
 func (r RootResolver) SetVariablesIncludedInTFConfig(ctx context.Context, args *struct {

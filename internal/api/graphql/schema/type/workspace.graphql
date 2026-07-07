@@ -65,8 +65,15 @@ type AssessWorkspacePayload {
 }
 
 type WorkspaceEvent {
-  action: String!
+  type: WorkspaceEventType!
   workspace: Workspace!
+}
+
+enum WorkspaceEventType {
+  WORKSPACE_CREATED
+  WORKSPACE_UPDATED
+  WORKSPACE_ASSESSMENT_CREATED
+  WORKSPACE_ASSESSMENT_UPDATED
 }
 
 input WorkspaceSubscriptionInput {
@@ -92,6 +99,7 @@ type Workspace implements Node, Namespace {
   fullPath: String!
   group: Group!
   dirtyState: Boolean!
+  destroyed: Boolean!
   locked: Boolean!
   assignedManagedIdentities: [ManagedIdentity!]!
   labels: [WorkspaceLabel!]!
@@ -124,6 +132,10 @@ type Workspace implements Node, Namespace {
   variables: [NamespaceVariable!]!
   currentStateVersion: StateVersion
   currentJob: Job
+    @deprecated(
+      reason: "The workspace no longer tracks a current job after the run refactor; this is always null. Use currentApplyRun instead."
+    )
+  currentApplyRun: Run
   maxJobDuration: Int!
   createdBy: String!
   terraformVersion: String!

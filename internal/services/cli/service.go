@@ -8,13 +8,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/hashicorp/go-version"
-	"github.com/hashicorp/hc-install/product"
-	"github.com/hashicorp/hc-install/releases"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/terraform"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -36,24 +33,10 @@ type TerraformCLIVersionsInput struct {
 	Architecture string
 }
 
-// TerraformCLIVersions represents Terraform CLI versions.
-type TerraformCLIVersions []string
-
-// Latest returns the latest version from the slice i.e. the last element.
-func (v TerraformCLIVersions) Latest() string {
-	return v[len(v)-1]
-}
-
-// Supported returns a Tharsis error if the supplied version is not supported.
-func (v TerraformCLIVersions) Supported(wantVersion string) error {
-	for _, supportedVersion := range v {
-		if wantVersion == supportedVersion {
-			return nil
-		}
-	}
-
-	return errors.New("Unsupported Terraform version", errors.WithErrorCode(errors.EInvalid))
-}
+// TerraformCLIVersions is an alias to terraform.CLIVersions. The type and the version-fetching
+// logic now live in core/terraform; this alias keeps the Service interface and its callers
+// (GraphQL/gRPC) unchanged.
+type TerraformCLIVersions = terraform.CLIVersions
 
 // Service encapsulates the logic for interacting with the CLI service.
 type Service interface {
@@ -97,42 +80,13 @@ func (s *service) GetTerraformCLIVersions(ctx context.Context) (TerraformCLIVers
 		return nil, err
 	}
 
-	// Returned versions should adhere to terraformCLIVersionConstraints.
-	constraints, err := version.NewConstraint(s.terraformCLIVersionConstraint)
+	versions, err := terraform.GetCLIVersions(ctx, s.terraformCLIVersionConstraint)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate a Terraform CLI version constraint")
+		tracing.RecordError(span, err, "failed to get Terraform CLI versions")
 		return nil, err
 	}
 
-	versions := &releases.Versions{
-		Product:     product.Terraform,
-		Constraints: constraints,
-	}
-
-	// List all the versions that meet constraints above.
-	versionSources, err := versions.List(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to list the versions that meet the specified constraints")
-		return nil, err
-	}
-
-	// If the length here is zero, then the retrieval failed.
-	if len(versionSources) == 0 {
-		tracing.RecordError(span, nil, "failed to get a list of Terraform CLI versions")
-		return nil, errors.New(
-			"failed to get a list of Terraform CLI versions",
-			errors.WithErrorCode(errors.EInternal))
-	}
-
-	var stringVersions TerraformCLIVersions
-
-	// Convert version sources to their raw string version.
-	for _, src := range versionSources {
-		source := src.(*releases.ExactVersion)
-		stringVersions = append(stringVersions, source.Version.String())
-	}
-
-	return stringVersions, nil
+	return versions, nil
 }
 
 // CreateTerraformCLIDownloadURL

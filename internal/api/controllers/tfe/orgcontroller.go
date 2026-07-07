@@ -88,8 +88,7 @@ func (c *orgController) GetRunQueue(w http.ResponseWriter, r *http.Request) {
 	var tfeRuns []*Run
 	for _, run := range result.Runs {
 		if run.Status == models.RunPlanQueued || run.Status == models.RunApplyQueued {
-			r := run
-			tfeRuns = append(tfeRuns, TharsisRunToRun(&r))
+			tfeRuns = append(tfeRuns, TharsisRunToRun(run))
 		}
 	}
 

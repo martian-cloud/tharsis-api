@@ -2,17 +2,39 @@ package resolver
 
 import (
 	"context"
-	"strconv"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
-	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 )
+
+// jobConnectionForRunNode resolves the connection of jobs associated with a run's
+// plan or apply node (matched by run ID and job type). Shared by the Plan and
+// Apply resolvers. The WorkspaceID gates the query on workspace view permission.
+func jobConnectionForRunNode(ctx context.Context, run *models.Run, jobType models.JobType, args *ConnectionQueryArgs) (*JobConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := job.GetJobsInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		WorkspaceID:       &run.WorkspaceID,
+		RunID:             &run.Metadata.ID,
+		Type:              &jobType,
+	}
+
+	if args.Sort != nil {
+		sort := db.JobSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewJobConnectionResolver(ctx, &input)
+}
 
 /* Plan Query Resolvers */
 
@@ -33,74 +55,83 @@ func (r *PlanChangesResolver) Outputs() []*plan.OutputDiff {
 
 // PlanResolver resolves a plan resource
 type PlanResolver struct {
-	plan *models.Plan
+	run *models.Run
 }
 
 // ID resolver
 func (r *PlanResolver) ID() graphql.ID {
-	return graphql.ID(r.plan.GetGlobalID())
+	return graphql.ID(r.run.Plan.GetGlobalID())
 }
 
 // Status resolver
 func (r *PlanResolver) Status() string {
-	return string(r.plan.Status)
+	return string(r.run.Plan.Status)
 }
 
 // ErrorMessage resolver
 func (r *PlanResolver) ErrorMessage() *string {
-	return r.plan.ErrorMessage
+	return r.run.Plan.ErrorMessage
 }
 
 // HasChanges resolver
 func (r *PlanResolver) HasChanges() bool {
-	return bool(r.plan.HasChanges)
+	return r.run.Plan.HasChanges
 }
 
 // Summary resolver
 func (r *PlanResolver) Summary() models.PlanSummary {
-	return r.plan.Summary
+	return r.run.Plan.Summary
 }
 
 // DiffSize resolver
 func (r *PlanResolver) DiffSize() int32 {
-	return int32(r.plan.PlanDiffSize)
+	return int32(r.run.Plan.DiffSize)
 }
 
 // ResourceAdditions resolver
 func (r *PlanResolver) ResourceAdditions() int32 {
-	return r.plan.Summary.ResourceAdditions
+	return r.run.Plan.Summary.ResourceAdditions
 }
 
 // ResourceChanges resolver
 func (r *PlanResolver) ResourceChanges() int32 {
-	return r.plan.Summary.ResourceChanges
+	return r.run.Plan.Summary.ResourceChanges
 }
 
 // ResourceDestructions resolver
 func (r *PlanResolver) ResourceDestructions() int32 {
-	return r.plan.Summary.ResourceDestructions
+	return r.run.Plan.Summary.ResourceDestructions
 }
 
 // Metadata resolver
-func (r *PlanResolver) Metadata() *MetadataResolver {
-	return &MetadataResolver{metadata: &r.plan.Metadata}
+func (r *PlanResolver) Metadata() (*MetadataResolver, error) {
+	plan := &r.run.Plan
+	return &MetadataResolver{metadata: plan.Metadata(r.run)}, nil
+}
+
+// Jobs returns the connection of jobs associated with the plan.
+func (r *PlanResolver) Jobs(ctx context.Context, args *ConnectionQueryArgs) (*JobConnectionResolver, error) {
+	return jobConnectionForRunNode(ctx, r.run, models.JobPlanType, args)
 }
 
 // CurrentJob returns the current job for the plan resource
 func (r *PlanResolver) CurrentJob(ctx context.Context) (*JobResolver, error) {
-	job, err := getServiceCatalog(ctx).RunService.GetLatestJobForPlan(ctx, r.plan.Metadata.ID)
+	plan := &r.run.Plan
+	if plan.LatestJobID == nil {
+		return nil, nil
+	}
+
+	job, err := loadJob(ctx, *plan.LatestJobID)
 	if err != nil {
-		if errors.ErrorCode(err) == errors.ENotFound {
-			return nil, nil
-		}
 		return nil, err
 	}
+
 	return &JobResolver{job: job}, nil
 }
 
 // Changes resolver
 func (r *PlanResolver) Changes(ctx context.Context) (*PlanChangesResolver, error) {
-	diff, err := getServiceCatalog(ctx).RunService.GetPlanDiff(ctx, r.plan.Metadata.ID)
+	diff, err := getServiceCatalog(ctx).RunService.GetPlanDiff(ctx, r.run.Plan.ID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -109,122 +140,4 @@ func (r *PlanResolver) Changes(ctx context.Context) (*PlanChangesResolver, error
 	}
 
 	return &PlanChangesResolver{planDiff: diff}, nil
-}
-
-/* Plan Mutation Resolvers */
-
-// PlanMutationPayload is the response payload for plan mutation
-type PlanMutationPayload struct {
-	ClientMutationID *string
-	Plan             *models.Plan
-	Problems         []Problem
-}
-
-// PlanMutationPayloadResolver resolves a PlanMutationPayload
-type PlanMutationPayloadResolver struct {
-	PlanMutationPayload
-}
-
-// Plan field resolver
-func (r *PlanMutationPayloadResolver) Plan() *PlanResolver {
-	if r.PlanMutationPayload.Plan == nil {
-		return nil
-	}
-	return &PlanResolver{plan: r.PlanMutationPayload.Plan}
-}
-
-// UpdatePlanInput contains the input for updating a plan
-type UpdatePlanInput struct {
-	ClientMutationID *string
-	ID               string
-	Metadata         *MetadataInput
-	Status           models.PlanStatus
-	HasChanges       bool
-	ErrorMessage     *string
-}
-
-func handlePlanMutationProblem(e error, clientMutationID *string) (*PlanMutationPayloadResolver, error) {
-	problem, err := buildProblem(e)
-	if err != nil {
-		return nil, err
-	}
-	payload := PlanMutationPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}
-	return &PlanMutationPayloadResolver{PlanMutationPayload: payload}, nil
-}
-
-// Deprecated: Use the gRPC API instead.
-func updatePlanMutation(ctx context.Context, input *UpdatePlanInput) (*PlanMutationPayloadResolver, error) {
-	serviceCatalog := getServiceCatalog(ctx)
-
-	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	planInput := &run.UpdatePlanInput{
-		PlanID:       id,
-		Status:       input.Status,
-		HasChanges:   input.HasChanges,
-		ErrorMessage: input.ErrorMessage,
-	}
-
-	if input.Metadata != nil {
-		v, cErr := strconv.Atoi(input.Metadata.Version)
-		if cErr != nil {
-			return nil, cErr
-		}
-
-		planInput.MetadataVersion = &v
-	}
-
-	plan, err := serviceCatalog.RunService.UpdatePlan(ctx, planInput)
-	if err != nil {
-		return nil, err
-	}
-
-	payload := PlanMutationPayload{ClientMutationID: input.ClientMutationID, Plan: plan, Problems: []Problem{}}
-	return &PlanMutationPayloadResolver{PlanMutationPayload: payload}, nil
-}
-
-/* Plan loader */
-
-const planLoaderKey = "plan"
-
-// RegisterPlanLoader registers a plan loader function
-func RegisterPlanLoader(collection *loader.Collection) {
-	collection.Register(planLoaderKey, planBatchFunc)
-}
-
-func loadPlan(ctx context.Context, id string) (*models.Plan, error) {
-	ldr, err := loader.Extract(ctx, planLoaderKey)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := ldr.Load(ctx, dataloader.StringKey(id))()
-	if err != nil {
-		return nil, err
-	}
-
-	ws, ok := data.(models.Plan)
-	if !ok {
-		return nil, errors.New("Wrong type")
-	}
-
-	return &ws, nil
-}
-
-func planBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	plans, err := getServiceCatalog(ctx).RunService.GetPlansByIDs(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-
-	// Build map of results
-	batch := loader.DataBatch{}
-	for _, result := range plans {
-		batch[result.Metadata.ID] = result
-	}
-
-	return batch, nil
 }

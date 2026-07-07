@@ -15,9 +15,15 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	jobservice "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
-	runservice "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+// jobWithStatus sets the initial status on a freshly constructed test job. It is
+// valid from the job's zero value, so the error is intentionally ignored.
+func jobWithStatus(j *models.Job, status models.JobStatus) *models.Job {
+	_ = j.SetStatus(status)
+	return j
+}
 
 func TestGetJobHandler(t *testing.T) {
 	jobID := gid.ToGlobalID(types.JobModelType, "550e8400-e29b-41d4-a716-446655440005")
@@ -35,9 +41,8 @@ func TestGetJobHandler(t *testing.T) {
 	tests := []testCase{
 		{
 			name: "successful job retrieval",
-			jobModel: &models.Job{
+			jobModel: jobWithStatus(&models.Job{
 				Metadata:    models.ResourceMetadata{ID: gid.FromGlobalID(jobID)},
-				Status:      models.JobRunning,
 				Type:        models.JobPlanType,
 				WorkspaceID: "ws-123",
 				RunID:       "run-123",
@@ -46,7 +51,7 @@ func TestGetJobHandler(t *testing.T) {
 					QueuedTimestamp:  &now,
 					RunningTimestamp: &now,
 				},
-			},
+			}, models.JobRunning),
 			validate: func(t *testing.T, output getJobOutput) {
 				assert.Equal(t, models.JobRunning, output.Job.Status)
 				assert.Equal(t, models.JobPlanType, output.Job.Type)
@@ -60,11 +65,10 @@ func TestGetJobHandler(t *testing.T) {
 		},
 		{
 			name: "job with cancel requested",
-			jobModel: &models.Job{
+			jobModel: jobWithStatus(&models.Job{
 				Metadata: models.ResourceMetadata{ID: gid.FromGlobalID(jobID)},
-				Status:   models.JobCanceling,
 				Type:     models.JobApplyType,
-			},
+			}, models.JobCanceling),
 			validate: func(t *testing.T, output getJobOutput) {
 				assert.Equal(t, models.JobCanceling, output.Job.Status)
 				assert.Equal(t, models.JobApplyType, output.Job.Type)
@@ -199,98 +203,6 @@ func TestGetJobLogsHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, handler := GetJobLogs(&ToolContext{servicesCatalog: tt.setup(t)})
-			_, output, err := handler(context.Background(), nil, tt.input)
-
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				if tt.validate != nil {
-					tt.validate(t, output)
-				}
-			}
-		})
-	}
-}
-
-func TestGetLatestJobHandler(t *testing.T) {
-	planID := gid.ToGlobalID(types.PlanModelType, "550e8400-e29b-41d4-a716-446655440007")
-	applyID := gid.ToGlobalID(types.ApplyModelType, "550e8400-e29b-41d4-a716-446655440008")
-	jobID := "job-123"
-
-	type testCase struct {
-		name        string
-		input       getLatestJobInput
-		setup       func(*testing.T) *services.Catalog
-		expectError bool
-		validate    func(*testing.T, getLatestJobOutput)
-	}
-
-	tests := []testCase{
-		{
-			name:  "successful plan job retrieval",
-			input: getLatestJobInput{ID: planID},
-			setup: func(t *testing.T) *services.Catalog {
-				mockRunService := runservice.NewMockService(t)
-				mockRunService.On("GetPlanByID", mock.Anything, gid.FromGlobalID(planID)).Return(&models.Plan{
-					Metadata: models.ResourceMetadata{ID: gid.FromGlobalID(planID)},
-				}, nil)
-				mockRunService.On("GetLatestJobForPlan", mock.Anything, gid.FromGlobalID(planID)).Return(&models.Job{
-					Metadata: models.ResourceMetadata{ID: jobID},
-					Status:   models.JobFinished,
-					Type:     models.JobPlanType,
-				}, nil)
-
-				catalog := &services.Catalog{RunService: mockRunService}
-				catalog.Init()
-				return catalog
-			},
-			validate: func(t *testing.T, output getLatestJobOutput) {
-				assert.Equal(t, models.JobPlanType, output.Job.Type)
-				assert.Equal(t, models.JobFinished, output.Job.Status)
-			},
-		},
-		{
-			name:  "successful apply job retrieval",
-			input: getLatestJobInput{ID: applyID},
-			setup: func(t *testing.T) *services.Catalog {
-				mockRunService := runservice.NewMockService(t)
-				mockRunService.On("GetApplyByID", mock.Anything, gid.FromGlobalID(applyID)).Return(&models.Apply{
-					Metadata: models.ResourceMetadata{ID: gid.FromGlobalID(applyID)},
-				}, nil)
-				mockRunService.On("GetLatestJobForApply", mock.Anything, gid.FromGlobalID(applyID)).Return(&models.Job{
-					Metadata: models.ResourceMetadata{ID: jobID},
-					Status:   models.JobRunning,
-					Type:     models.JobApplyType,
-				}, nil)
-
-				catalog := &services.Catalog{RunService: mockRunService}
-				catalog.Init()
-				return catalog
-			},
-			validate: func(t *testing.T, output getLatestJobOutput) {
-				assert.Equal(t, models.JobApplyType, output.Job.Type)
-				assert.Equal(t, models.JobRunning, output.Job.Status)
-			},
-		},
-		{
-			name:  "plan not found",
-			input: getLatestJobInput{ID: planID},
-			setup: func(t *testing.T) *services.Catalog {
-				mockRunService := runservice.NewMockService(t)
-				mockRunService.On("GetPlanByID", mock.Anything, gid.FromGlobalID(planID)).Return(nil, errors.New("not found"))
-
-				catalog := &services.Catalog{RunService: mockRunService}
-				catalog.Init()
-				return catalog
-			},
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, handler := GetLatestJob(&ToolContext{servicesCatalog: tt.setup(t)})
 			_, output, err := handler(context.Background(), nil, tt.input)
 
 			if tt.expectError {

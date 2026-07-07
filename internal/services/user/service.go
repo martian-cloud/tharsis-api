@@ -279,7 +279,17 @@ func (s *service) SetNotificationPreference(ctx context.Context, input *SetNotif
 		}
 	}
 
-	return s.inheritedSettingsResolver.GetNotificationPreference(ctx, userCaller.User.Metadata.ID, input.NamespacePath)
+	result, err := s.inheritedSettingsResolver.GetNotificationPreference(ctx, userCaller.User.Metadata.ID, input.NamespacePath)
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Set a notification preference.",
+		"userID", userCaller.User.Metadata.ID,
+		"namespacePath", input.NamespacePath,
+	)
+
+	return result, nil
 }
 
 func (s *service) GetNotificationPreference(ctx context.Context, input *GetNotificationPreferenceInput) (*namespace.NotificationPreferenceSetting, error) {
@@ -923,6 +933,12 @@ func (s *service) CreateNamespaceFavorite(ctx context.Context, input *CreateName
 		return nil, errors.Wrap(err, "failed to create namespace favorite", errors.WithSpan(span))
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Created a namespace favorite.",
+		"userID", userCaller.User.Metadata.ID,
+		"namespacePath", input.NamespacePath,
+		"namespaceType", input.NamespaceType,
+	)
+
 	return createdFavorite, nil
 }
 
@@ -1005,6 +1021,13 @@ func (s *service) DeleteNamespaceFavorite(ctx context.Context, input *DeleteName
 		}
 		return errors.Wrap(err, "failed to delete namespace favorite", errors.WithSpan(span))
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Deleted a namespace favorite.",
+		"userID", userCaller.User.Metadata.ID,
+		"namespacePath", input.NamespacePath,
+		"namespaceType", input.NamespaceType,
+	)
+
 	return nil
 }
 

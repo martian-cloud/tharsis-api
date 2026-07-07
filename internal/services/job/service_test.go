@@ -11,16 +11,24 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/commands"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
+
+// jobWithStatus sets the initial status on a freshly constructed test job. It is
+// valid from the job's zero value, so the error is intentionally ignored.
+func jobWithStatus(j *models.Job, status models.JobStatus) *models.Job {
+	_ = j.SetStatus(status)
+	return j
+}
 
 func TestClaimJob(t *testing.T) {
 	jobID := "job-1"
@@ -29,13 +37,12 @@ func TestClaimJob(t *testing.T) {
 	groupID := "group-1"
 	token := "job-token"
 
-	sampleQueuedJob := models.Job{
+	sampleQueuedJob := *jobWithStatus(&models.Job{
 		Metadata: models.ResourceMetadata{
 			ID: jobID,
 		},
-		Status:      models.JobQueued,
 		WorkspaceID: workspaceID,
-	}
+	}, models.JobQueued)
 
 	type testCase struct {
 		existingRunner  *models.Runner
@@ -109,17 +116,8 @@ func TestClaimJob(t *testing.T) {
 			}
 
 			if test.expectErrorCode == "" {
-				// Mock jobs
-				sortBy := db.JobSortableFieldCreatedAtAsc
-				jobQueued := models.JobQueued
-				jobsInput := &db.GetJobsInput{
-					Sort: &sortBy,
-					Filter: &db.JobFilter{
-						JobStatus: &jobQueued,
-						TagFilter: &db.JobTagFilter{TagSuperset: []string{}, ExcludeUntaggedJobs: ptr.Bool(true)},
-					},
-				}
-				mockJobs.On("GetJobs", mock.Anything, jobsInput).Return(&db.JobsResult{Jobs: []models.Job{sampleQueuedJob}}, nil)
+				// Mock jobs (the exact GetJobsInput differs by runner type, so match any).
+				mockJobs.On("GetJobs", mock.Anything, mock.Anything).Return(&db.JobsResult{Jobs: []models.Job{sampleQueuedJob}}, nil)
 
 				mockJobs.On("GetJobCountForRunner", mock.Anything, runnerID).Return(1, nil)
 
@@ -129,15 +127,11 @@ func TestClaimJob(t *testing.T) {
 					Return(&models.Workspace{
 						Locked:   false,
 						FullPath: "group-1/workspace-1",
-					}, nil)
+					}, nil).Maybe()
 
-				// These are for the transaction opened by RunStateManager.
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-
-				mockJobs.On("GetJobByID", mock.Anything, mock.Anything).
-					Return(&sampleQueuedJob, nil)
 
 				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
@@ -157,7 +151,6 @@ func TestClaimJob(t *testing.T) {
 				logger:            logger,
 				signingKeyManager: mockSigningKeyManager,
 				eventManager:      events.NewEventManager(dbClient, logger),
-				runStateManager:   state.NewRunStateManager(dbClient, logger),
 			}
 
 			actualResponse, err := service.ClaimJob(auth.WithCaller(ctx, mockCaller), runnerID)
@@ -187,6 +180,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 		queuedJobs            []models.Job
 		disallowQueuedJobs    bool
 		currentRunnerJobCount int
+		expectLimitReached    bool
 	}{
 		{
 			name: "shared runner should get next job because no group runner exists",
@@ -232,7 +226,8 @@ func TestGetNextAvailableJob(t *testing.T) {
 			queuedJobs: []models.Job{
 				{Metadata: models.ResourceMetadata{ID: "job1"}, WorkspaceID: "ws1"},
 			},
-			runners: []models.Runner{},
+			disallowQueuedJobs: true, // the db query excludes jobs in locked workspaces
+			runners:            []models.Runner{},
 			workspaceMap: map[string]models.Workspace{
 				"ws1": {
 					Locked: true,
@@ -249,6 +244,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 			},
 			runners:               []models.Runner{},
 			currentRunnerJobCount: runnerJobsLimit,
+			expectLimitReached:    true,
 			workspaceMap: map[string]models.Workspace{
 				"ws1": {
 					Locked:   false,
@@ -347,7 +343,8 @@ func TestGetNextAvailableJob(t *testing.T) {
 			queuedJobs: []models.Job{
 				{Metadata: models.ResourceMetadata{ID: "job1"}, WorkspaceID: "ws1"},
 			},
-			runners: []models.Runner{},
+			disallowQueuedJobs: true, // the db namespace-prefix filter excludes jobs outside the runner's group
+			runners:            []models.Runner{},
 			workspaceMap: map[string]models.Workspace{
 				"ws1": {
 					Locked:   false,
@@ -413,7 +410,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 			}
 			mockJobs.On("GetJobs", ctx, mock.Anything).Return(&db.JobsResult{
 				Jobs: returnJobs,
-			}, nil)
+			}, nil).Maybe()
 
 			for _, j := range test.queuedJobs {
 				ws, ok := test.workspaceMap[j.WorkspaceID]
@@ -440,6 +437,11 @@ func TestGetNextAvailableJob(t *testing.T) {
 			}
 
 			job, err := jobService.getNextAvailableJob(ctx, test.runner.Metadata.ID)
+			if test.expectLimitReached {
+				assert.ErrorIs(t, err, errRunnerJobLimitReached)
+				require.Nil(t, job)
+				return
+			}
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -450,6 +452,129 @@ func TestGetNextAvailableJob(t *testing.T) {
 				require.NotNil(t, job)
 				assert.Equal(t, test.expectJobID, job.Metadata.ID)
 			}
+		})
+	}
+}
+
+func TestClaimableJobEventFilter(t *testing.T) {
+	sharedRunner := &models.Runner{
+		Type:            models.SharedRunnerType,
+		Tags:            []string{"linux", "fast"},
+		RunUntaggedJobs: true,
+	}
+	taggedOnlyRunner := &models.Runner{
+		Type:            models.GroupRunnerType,
+		Tags:            []string{"linux"},
+		RunUntaggedJobs: false,
+	}
+
+	tests := []struct {
+		runner  *models.Runner
+		name    string
+		event   db.JobEventData
+		rawData string // overrides the marshalled event; used to exercise malformed payloads
+		passes  bool
+	}{
+		// Queued/unassigned gating.
+		{
+			runner: sharedRunner,
+			name:   "non-queued job is filtered out",
+			event:  db.JobEventData{Status: string(models.JobRunning)},
+		},
+		{
+			runner: sharedRunner,
+			name:   "already-assigned job is filtered out",
+			event:  db.JobEventData{Status: string(models.JobQueued), RunnerID: ptr.String("r1")},
+		},
+		{
+			runner:  sharedRunner,
+			name:    "malformed payload is filtered out",
+			rawData: "not json",
+		},
+		// Tag eligibility. Namespace scoping is enforced by the getNextAvailableJob
+		// query rather than this filter, so it is not exercised here.
+		{
+			runner: sharedRunner,
+			name:   "runner runs an untagged job when configured to",
+			event:  db.JobEventData{Status: string(models.JobQueued)},
+			passes: true,
+		},
+		{
+			runner: sharedRunner,
+			name:   "runner runs a subset-tagged job",
+			event:  db.JobEventData{Status: string(models.JobQueued), Tags: []string{"linux"}},
+			passes: true,
+		},
+		{
+			runner: sharedRunner,
+			name:   "job tag not in runner tags is filtered out",
+			event:  db.JobEventData{Status: string(models.JobQueued), Tags: []string{"windows"}},
+		},
+		{
+			runner: taggedOnlyRunner,
+			name:   "runner that excludes untagged jobs filters them out",
+			event:  db.JobEventData{Status: string(models.JobQueued)},
+		},
+		{
+			runner: taggedOnlyRunner,
+			name:   "runner that excludes untagged jobs still runs a tagged job",
+			event:  db.JobEventData{Status: string(models.JobQueued), Tags: []string{"linux"}},
+			passes: true,
+		},
+	}
+	svc := &service{}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data := []byte(test.rawData)
+			if test.rawData == "" {
+				var err error
+				data, err = json.Marshal(test.event)
+				require.NoError(t, err)
+			}
+
+			filter := svc.claimableJobEventFilter(test.runner)
+			assert.Equal(t, test.passes, filter(json.RawMessage(data)))
+		})
+	}
+}
+
+func TestRunnerJobFinishedFilter(t *testing.T) {
+	filter := runnerJobFinishedFilter("r1")
+
+	tests := []struct {
+		name   string
+		data   string
+		passes bool
+	}{
+		{
+			name:   "this runner's finished job frees a slot",
+			data:   `{"runner_id":"r1","status":"finished"}`,
+			passes: true,
+		},
+		{
+			name:   "this runner's canceled job frees a slot",
+			data:   `{"runner_id":"r1","status":"canceled"}`,
+			passes: true,
+		},
+		{
+			name:   "this runner's still-running job does not free a slot",
+			data:   `{"runner_id":"r1","status":"running"}`,
+			passes: false,
+		},
+		{
+			name:   "another runner's finished job is ignored",
+			data:   `{"runner_id":"r2","status":"finished"}`,
+			passes: false,
+		},
+		{
+			name:   "unassigned job is ignored",
+			data:   `{"runner_id":null,"status":"finished"}`,
+			passes: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.passes, filter(json.RawMessage(test.data)))
 		})
 	}
 }
@@ -1010,12 +1135,11 @@ func TestSubscribeToCancellationEvent(t *testing.T) {
 			},
 			expectedEvents: []CancellationEvent{
 				{
-					Job: models.Job{
+					Job: *jobWithStatus(&models.Job{
 						Metadata: models.ResourceMetadata{
 							ID: "job1",
 						},
-						Status: models.JobCanceling,
-					},
+					}, models.JobCanceling),
 				},
 			},
 		},
@@ -1047,22 +1171,20 @@ func TestSubscribeToCancellationEvent(t *testing.T) {
 
 			// For the call to GetJob outside the wait-for loop.
 			mockJobs.On("GetJobByID", mock.Anything, "job1").
-				Return(&models.Job{
+				Return(jobWithStatus(&models.Job{
 					Metadata: models.ResourceMetadata{
 						ID: "job1",
 					},
-					Status: models.JobCanceling,
-				}, nil).Maybe()
+				}, models.JobCanceling), nil).Maybe()
 
 			// For the calls to GetJob inside the wait-for loop.
 			for _, e := range test.sendEvents {
 				mockJobs.On("GetJobByID", mock.Anything, e.Job.Metadata.ID).
-					Return(&models.Job{
+					Return(jobWithStatus(&models.Job{
 						Metadata: models.ResourceMetadata{
 							ID: e.Job.Metadata.ID,
 						},
-						Status: models.JobCanceling,
-					}, nil).Maybe()
+					}, models.JobCanceling), nil).Maybe()
 			}
 
 			dbClient := db.Client{
@@ -1142,28 +1264,26 @@ func TestSetJobStatus(t *testing.T) {
 	testCases := []testCase{
 		{
 			name: "successfully set job status to running",
-			existingJob: &models.Job{
+			existingJob: jobWithStatus(&models.Job{
 				Metadata:    models.ResourceMetadata{ID: jobID},
-				Status:      models.JobPending,
 				WorkspaceID: workspaceID,
 				RunnerPath:  &runnerPath,
 				Timestamps: models.JobTimestamps{
 					QueuedTimestamp:  &now,
 					PendingTimestamp: &now,
 				},
-			},
+			}, models.JobPending),
 			inputStatus: models.JobRunning,
 		},
 		{
 			name: "successfully set job status to finished",
-			existingJob: &models.Job{
+			existingJob: jobWithStatus(&models.Job{
 				Metadata:    models.ResourceMetadata{ID: jobID},
-				Status:      models.JobRunning,
 				WorkspaceID: workspaceID,
 				Timestamps: models.JobTimestamps{
 					RunningTimestamp: &now,
 				},
-			},
+			}, models.JobRunning),
 			inputStatus: models.JobFinished,
 		},
 		{
@@ -1174,11 +1294,10 @@ func TestSetJobStatus(t *testing.T) {
 		},
 		{
 			name: "subject does not have permission to update job",
-			existingJob: &models.Job{
+			existingJob: jobWithStatus(&models.Job{
 				Metadata:    models.ResourceMetadata{ID: jobID},
-				Status:      models.JobPending,
 				WorkspaceID: workspaceID,
-			},
+			}, models.JobPending),
 			inputStatus:     models.JobRunning,
 			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
@@ -1191,7 +1310,10 @@ func TestSetJobStatus(t *testing.T) {
 
 			mockJobs := db.NewMockJobs(t)
 			mockCaller := auth.NewMockCaller(t)
-			mockRunStateManager := state.NewMockRunStateManager(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockLogStreams := db.NewMockLogStreams(t)
+			mockCmdProcessor := engine.NewMockCmdProcessor(t)
+			testLogger, _ := logger.NewForTest()
 
 			mockJobs.On("GetJobByID", mock.Anything, jobID).Return(test.existingJob, nil)
 
@@ -1201,17 +1323,35 @@ func TestSetJobStatus(t *testing.T) {
 			}
 
 			if test.existingJob != nil && test.authError == nil {
-				mockRunStateManager.On("UpdateJob", mock.Anything, mock.Anything).
-					Return(test.existingJob, nil)
+				mockJobs.On("UpdateJob", mock.Anything, mock.Anything).Return(test.existingJob, nil)
+
+				// Only reached when the new status is final; harmless otherwise.
+				mockLogStreams.On("GetLogStreamByJobID", mock.Anything, jobID).Return(nil, nil).Maybe()
+
+				// The real command processor owns the transaction and runs the
+				// command (which invokes the PersistJob hook that writes the job and
+				// completes the log stream) before committing. Simulate that here so
+				// the job-persistence path is exercised.
+				mockCmdProcessor.On("ProcessCommand", mock.Anything, mock.Anything).
+					Run(func(args mock.Arguments) {
+						cmd, ok := args.Get(1).(*commands.SyncJobStatus)
+						require.True(t, ok)
+						require.NotNil(t, cmd.PersistJob)
+						require.NoError(t, cmd.PersistJob(ctx))
+					}).Return(nil)
 			}
 
 			dbClient := &db.Client{
-				Jobs: mockJobs,
+				Jobs:         mockJobs,
+				Transactions: mockTransactions,
+				LogStreams:   mockLogStreams,
 			}
 
 			svc := &service{
-				dbClient:        dbClient,
-				runStateManager: mockRunStateManager,
+				logger:       testLogger,
+				dbClient:     dbClient,
+				cmdProcessor: mockCmdProcessor,
+				cmdFactory:   &commands.Factory{},
 			}
 
 			result, err := svc.SetJobStatus(auth.WithCaller(ctx, mockCaller), jobID, test.inputStatus)
@@ -1546,6 +1686,65 @@ func TestGetRunnerAvailabilityForJob(t *testing.T) {
 			if test.expectResponse != "" {
 				assert.Equal(t, &test.expectResponse, actualResponse)
 			}
+		})
+	}
+}
+
+func TestGetLogStreamsByJobIDs(t *testing.T) {
+	sampleJob := models.Job{
+		Metadata:    models.ResourceMetadata{ID: "job-id-1"},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	sampleLogStream := models.LogStream{
+		Metadata: models.ResourceMetadata{ID: "log-stream-1"},
+		JobID:    &sampleJob.Metadata.ID,
+	}
+
+	testCases := []testCase{
+		{
+			name: "subject is authorized",
+		},
+		{
+			name:            "subject is not authorized",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockJobs := db.NewMockJobs(t)
+			mockLogStreams := db.NewMockLogStreams(t)
+
+			mockJobs.On("GetJobs", mock.Anything, mock.Anything).Return(&db.JobsResult{Jobs: []models.Job{sampleJob}}, nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewJobPermission, mock.Anything, mock.Anything).Return(test.authError)
+
+			if test.authError == nil {
+				mockLogStreams.On("GetLogStreams", mock.Anything, mock.Anything).
+					Return(&db.LogStreamsResult{LogStreams: []models.LogStream{sampleLogStream}}, nil)
+			}
+
+			service := &service{
+				dbClient: &db.Client{Jobs: mockJobs, LogStreams: mockLogStreams},
+			}
+
+			actual, err := service.GetLogStreamsByJobIDs(auth.WithCaller(context.Background(), mockCaller), []string{"job-id-1"})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, []models.LogStream{sampleLogStream}, actual)
 		})
 	}
 }

@@ -3,6 +3,7 @@ package jobexecutor
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
@@ -30,9 +30,32 @@ const (
 	maxSigningKeysResponseSize = 1024 * 1024 // 1 MB
 )
 
+// hashicorpTrustedGPGFingerprints pins the PRIMARY-key fingerprints that HashiCorp's
+// release-signing key must match. The key material is still fetched at runtime (so key
+// rotation and expiry are handled by HashiCorp), but a fetched key whose primary-key
+// fingerprint is not in this set is rejected — preventing a compromised or MITM'd
+// well-known endpoint from injecting an attacker key that would otherwise defeat the
+// checksum-signature verification entirely.
+//
+// Pin the PRIMARY key: signing subkeys rotate underneath it transparently, so only a rare
+// primary-key rotation requires updating this set. To rotate, add the new primary's
+// fingerprint here (alongside the current one) ahead of the cutover, ship it, then remove
+// the old one afterward.
+//
+// Fingerprints are lowercase hex of the 20-byte v4 fingerprint. VERIFY OUT-OF-BAND against
+// multiple independent sources before trusting (HashiCorp Security key,
+// security@hashicorp.com) — the entire trust chain rests on these values being correct.
+var hashicorpTrustedGPGFingerprints = map[string]struct{}{
+	"c874011f0ab405110d02105534365d9472d7468f": {},
+}
+
 type cliDownloader struct {
 	httpClient *http.Client
 	client     jobclient.Client
+	// trustedFingerprints pins the acceptable signing-key primary fingerprints (see
+	// hashicorpTrustedGPGFingerprints). When empty, fingerprint pinning is disabled
+	// (used only in tests); the production constructor always populates it.
+	trustedFingerprints map[string]struct{}
 }
 
 func newCLIDownloader(
@@ -40,8 +63,9 @@ func newCLIDownloader(
 	client jobclient.Client,
 ) *cliDownloader {
 	return &cliDownloader{
-		httpClient: httpClient,
-		client:     client,
+		httpClient:          httpClient,
+		client:              client,
+		trustedFingerprints: hashicorpTrustedGPGFingerprints,
 	}
 }
 
@@ -227,24 +251,26 @@ func (c *cliDownloader) fetchSigningKeys() (openpgp.EntityList, error) {
 		return nil, fmt.Errorf("no valid signing keys returned")
 	}
 
-	// Check if all keys are expired.
-	now := time.Now()
-	allExpired := true
-	for _, entity := range keyRing {
-		if entity.PrimaryKey != nil {
-			identity := entity.PrimaryIdentity()
-			if identity == nil || identity.SelfSignature == nil {
+	// Reject any fetched key whose primary-key fingerprint is not pinned. This is the
+	// trust anchor that keeps a compromised/MITM'd endpoint from injecting its own key.
+	// Key expiry is not checked here: the signature verification step rejects signatures
+	// made outside a key's validity window, so an expired key cannot validate a signature
+	// anyway, and an explicit expiry pre-check only risks false rejections during rotation.
+	if len(c.trustedFingerprints) > 0 {
+		trusted := keyRing[:0]
+		for _, entity := range keyRing {
+			if entity.PrimaryKey == nil {
 				continue
 			}
-			lifetime := identity.SelfSignature.KeyLifetimeSecs
-			if lifetime == nil || entity.PrimaryKey.CreationTime.Add(time.Duration(*lifetime)*time.Second).After(now) {
-				allExpired = false
-				break
+			fp := strings.ToLower(hex.EncodeToString(entity.PrimaryKey.Fingerprint))
+			if _, ok := c.trustedFingerprints[fp]; ok {
+				trusted = append(trusted, entity)
 			}
 		}
-	}
-	if allExpired {
-		return nil, fmt.Errorf("signing key expired")
+		if len(trusted) == 0 {
+			return nil, fmt.Errorf("no fetched signing key matched a pinned fingerprint")
+		}
+		keyRing = trusted
 	}
 
 	return keyRing, nil

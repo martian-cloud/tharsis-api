@@ -23,6 +23,7 @@ function GroupTree(props: Props) {
 
     const data = useFragment<GroupTreeFragment_connection$key>(graphql`
         fragment GroupTreeFragment_connection on GroupConnection {
+            totalCount
             edges {
                 node {
                     id
@@ -35,7 +36,7 @@ function GroupTree(props: Props) {
     return (
         <Box>
             <List disablePadding sx={isRefreshing ? { opacity: 0.5 } : null}>
-                {data.edges?.map((edge: any, index: number) => <GroupTreeListItem key={edge.node.id} groupKey={edge.node} nested={nested} last={index === (data.edges?.length ?? 0) - 1} />)}
+                {data.edges?.map((edge: any, index: number) => <GroupTreeListItem key={edge.node.id} groupKey={edge.node} nested={nested} last={index === (data.totalCount - 1)} />)}
                 {hasNext && <NestableTreeItem nested={nested} last={true}>
                     <Paper
                         variant="outlined"

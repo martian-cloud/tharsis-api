@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/aws/smithy-go/ptr"
+	runvariables "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/variables"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -95,7 +96,7 @@ func (s *RunServer) GetRuns(ctx context.Context, req *pb.GetRunsRequest) (*pb.Ge
 
 	pbRuns := make([]*pb.Run, len(runs))
 	for ix := range runs {
-		pbRuns[ix] = toPBRun(&runs[ix])
+		pbRuns[ix] = toPBRun(runs[ix])
 	}
 
 	totalCount, err := result.PageInfo.TotalCount(ctx)
@@ -110,12 +111,12 @@ func (s *RunServer) GetRuns(ctx context.Context, req *pb.GetRunsRequest) (*pb.Ge
 	}
 
 	if len(runs) > 0 {
-		pageInfo.StartCursor, err = result.PageInfo.Cursor(&runs[0])
+		pageInfo.StartCursor, err = result.PageInfo.Cursor(runs[0])
 		if err != nil {
 			return nil, err
 		}
 
-		pageInfo.EndCursor, err = result.PageInfo.Cursor(&runs[len(runs)-1])
+		pageInfo.EndCursor, err = result.PageInfo.Cursor(runs[len(runs)-1])
 		if err != nil {
 			return nil, err
 		}
@@ -143,9 +144,9 @@ func (s *RunServer) CreateRun(ctx context.Context, req *pb.CreateRunRequest) (*p
 		cvID = &id
 	}
 
-	variables := make([]run.Variable, len(req.Variables))
+	variables := make([]runvariables.Variable, len(req.Variables))
 	for i, v := range req.Variables {
-		variables[i] = run.Variable{
+		variables[i] = runvariables.Variable{
 			Category: models.VariableCategory(v.Category),
 			Key:      v.Key,
 			Value:    v.Value,
@@ -153,18 +154,21 @@ func (s *RunServer) CreateRun(ctx context.Context, req *pb.CreateRunRequest) (*p
 	}
 
 	toCreate := &run.CreateRunInput{
-		WorkspaceID:              workspaceID,
-		ConfigurationVersionID:   cvID,
-		IsDestroy:                req.IsDestroy,
-		TerraformVersion:         req.GetTerraformVersion(),
-		Speculative:              req.Speculative,
-		TargetAddresses:          req.TargetAddresses,
-		Refresh:                  req.Refresh,
+		WorkspaceID:            workspaceID,
+		ConfigurationVersionID: cvID,
+		IsDestroy:              req.IsDestroy,
+		TerraformVersion:       req.GetTerraformVersion(),
+		Speculative:            req.Speculative,
+		TargetAddresses:        req.TargetAddresses,
+		// proto3 bool can't express "unset"; always pass an explicit value (gRPC
+		// keeps its current behavior — omitted refresh stays false).
+		Refresh:                  ptr.Bool(req.Refresh),
 		RefreshOnly:              req.RefreshOnly,
 		Variables:                variables,
 		ModuleSource:             req.ModuleSource,
 		ModuleVersion:            req.ModuleVersion,
 		IncludeModulePrereleases: req.GetIncludeModulePrereleases(),
+		AutoApply:                req.GetAutoApply(),
 	}
 
 	createdRun, err := s.serviceCatalog.RunService.CreateRun(ctx, toCreate)
@@ -269,12 +273,12 @@ func (s *RunServer) GetPlanByID(ctx context.Context, req *pb.GetPlanByIDRequest)
 		return nil, err
 	}
 
-	plan, ok := model.(*models.Plan)
+	run, ok := model.(*models.Run)
 	if !ok {
 		return nil, errors.New("plan with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	return toPBPlan(plan), nil
+	return toPBPlan(run), nil
 }
 
 // GetApplyByID returns an Apply by an ID.
@@ -284,12 +288,16 @@ func (s *RunServer) GetApplyByID(ctx context.Context, req *pb.GetApplyByIDReques
 		return nil, err
 	}
 
-	apply, ok := model.(*models.Apply)
+	run, ok := model.(*models.Run)
 	if !ok {
 		return nil, errors.New("apply with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	return toPBApply(apply), nil
+	if run.Apply == nil {
+		return nil, errors.New("apply with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	return toPBApply(run), nil
 }
 
 // UpdatePlan updates a Plan.
@@ -301,7 +309,6 @@ func (s *RunServer) UpdatePlan(ctx context.Context, req *pb.UpdatePlanRequest) (
 
 	input := &run.UpdatePlanInput{
 		PlanID:     planID,
-		Status:     models.PlanStatus(strings.ToLower(req.Status.String())),
 		HasChanges: req.HasChanges,
 	}
 
@@ -318,7 +325,12 @@ func (s *RunServer) UpdatePlan(ctx context.Context, req *pb.UpdatePlanRequest) (
 		return nil, err
 	}
 
-	return toPBPlan(updatedPlan), nil
+	run, err := s.serviceCatalog.RunService.GetRunByNodeID(ctx, updatedPlan.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBPlan(run), nil
 }
 
 // UpdateApply updates an Apply.
@@ -330,7 +342,6 @@ func (s *RunServer) UpdateApply(ctx context.Context, req *pb.UpdateApplyRequest)
 
 	input := &run.UpdateApplyInput{
 		ApplyID: applyID,
-		Status:  models.ApplyStatus(strings.ToLower(req.Status.String())),
 	}
 
 	if req.Version != nil {
@@ -346,37 +357,16 @@ func (s *RunServer) UpdateApply(ctx context.Context, req *pb.UpdateApplyRequest)
 		return nil, err
 	}
 
-	return toPBApply(updatedApply), nil
-}
-
-// GetLatestJobForPlan returns the latest job for a Plan.
-func (s *RunServer) GetLatestJobForPlan(ctx context.Context, req *pb.GetLatestJobForPlanRequest) (*pb.Job, error) {
-	planID, err := s.serviceCatalog.FetchModelID(ctx, req.PlanId)
+	run, err := s.serviceCatalog.RunService.GetRunByNodeID(ctx, updatedApply.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	job, err := s.serviceCatalog.RunService.GetLatestJobForPlan(ctx, planID)
-	if err != nil {
-		return nil, err
+	if run.Apply == nil {
+		return nil, errors.New("apply with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	return toPBJob(job), nil
-}
-
-// GetLatestJobForApply returns the latest job for an Apply.
-func (s *RunServer) GetLatestJobForApply(ctx context.Context, req *pb.GetLatestJobForApplyRequest) (*pb.Job, error) {
-	applyID, err := s.serviceCatalog.FetchModelID(ctx, req.ApplyId)
-	if err != nil {
-		return nil, err
-	}
-
-	job, err := s.serviceCatalog.RunService.GetLatestJobForApply(ctx, applyID)
-	if err != nil {
-		return nil, err
-	}
-
-	return toPBJob(job), nil
+	return toPBApply(run), nil
 }
 
 // SetVariablesIncludedInTFConfig updates which variables are included in the Terraform config.
@@ -438,7 +428,7 @@ func (s *RunServer) SubscribeToRunEvents(req *pb.SubscribeToRunEventsRequest, st
 	for event := range eventChan {
 		pbEvent := &pb.RunEvent{
 			Action: event.Action,
-			Run:    toPBRun(&event.Run),
+			Run:    toPBRun(event.Run),
 		}
 
 		if err := stream.Send(pbEvent); err != nil {
@@ -449,26 +439,51 @@ func (s *RunServer) SubscribeToRunEvents(req *pb.SubscribeToRunEventsRequest, st
 	return nil
 }
 
+// toPBRunStatus maps a model RunStatus to its protobuf enum value. Model status
+// strings are the lowercase form of the proto enum names, so an unknown value
+// falls back to the zero value (UNSPECIFIED).
+func toPBRunStatus(s models.RunStatus) pb.RunStatus {
+	return pb.RunStatus(pb.RunStatus_value[strings.ToUpper(string(s))])
+}
+
+// toPBPlanStatus maps a model PlanStatus to its protobuf enum value.
+func toPBPlanStatus(s models.PlanStatus) pb.PlanStatus {
+	return pb.PlanStatus(pb.PlanStatus_value[strings.ToUpper(string(s))])
+}
+
+// toPBApplyStatus maps a model ApplyStatus to its protobuf enum value.
+func toPBApplyStatus(s models.ApplyStatus) pb.ApplyStatus {
+	return pb.ApplyStatus(pb.ApplyStatus_value[strings.ToUpper(string(s))])
+}
+
 // toPBRun converts from Run model to ProtoBuf model.
 func toPBRun(r *models.Run) *pb.Run {
 	pbRun := &pb.Run{
 		Metadata:         toPBMetadata(&r.Metadata, types.RunModelType),
-		ApplyId:          gid.ToGlobalID(types.ApplyModelType, r.ApplyID),
 		CreatedBy:        r.CreatedBy,
 		ForceCanceled:    r.ForceCanceled,
 		ForceCanceledBy:  r.ForceCanceledBy,
-		HasChanges:       r.HasChanges,
+		HasChanges:       r.HasChanges(),
 		IsDestroy:        r.IsDestroy,
 		Speculative:      r.Speculative(),
+		AutoApply:        r.AutoApply,
 		ModuleSource:     r.ModuleSource,
 		ModuleVersion:    r.ModuleVersion,
-		PlanId:           gid.ToGlobalID(types.PlanModelType, r.PlanID),
 		Refresh:          r.Refresh,
 		RefreshOnly:      r.RefreshOnly,
-		Status:           string(r.Status),
+		DeprecatedStatus: string(r.Status),
+		Status:           toPBRunStatus(r.Status),
 		TargetAddresses:  r.TargetAddresses,
 		TerraformVersion: r.TerraformVersion,
 		WorkspaceId:      gid.ToGlobalID(types.WorkspaceModelType, r.WorkspaceID),
+		Plan:             toPBPlan(r),
+		Apply:            toPBApply(r),
+	}
+
+	pbRun.PlanId = r.Plan.GetGlobalID()
+
+	if applyNode := r.Apply; applyNode != nil {
+		pbRun.ApplyId = applyNode.GetGlobalID()
 	}
 
 	if r.ModuleDigest != nil {
@@ -488,26 +503,44 @@ func toPBRun(r *models.Run) *pb.Run {
 }
 
 // toPBPlan converts from Plan model to ProtoBuf model.
-func toPBPlan(p *models.Plan) *pb.Plan {
-	return &pb.Plan{
-		Metadata:     toPBMetadata(&p.Metadata, types.PlanModelType),
-		Status:       string(p.Status),
-		HasChanges:   p.HasChanges,
-		ErrorMessage: p.ErrorMessage,
+func toPBPlan(run *models.Run) *pb.Plan {
+	p := run.Plan
+	pbPlan := &pb.Plan{
+		Metadata:         toPBMetadata(p.Metadata(run), types.PlanModelType),
+		DeprecatedStatus: string(p.Status),
+		Status:           toPBPlanStatus(p.Status),
+		HasChanges:       p.HasChanges,
+		ErrorMessage:     p.ErrorMessage,
 		Summary: &pb.PlanSummary{
 			ResourceAdditions:    p.Summary.ResourceAdditions,
 			ResourceChanges:      p.Summary.ResourceChanges,
 			ResourceDestructions: p.Summary.ResourceDestructions,
 		},
 	}
+	if p.LatestJobID != nil {
+		jobID := gid.ToGlobalID(types.JobModelType, *p.LatestJobID)
+		pbPlan.LatestJobId = &jobID
+	}
+	return pbPlan
 }
 
-// toPBApply converts from Apply model to ProtoBuf model.
-func toPBApply(a *models.Apply) *pb.Apply {
-	return &pb.Apply{
-		Metadata:     toPBMetadata(&a.Metadata, types.ApplyModelType),
-		Status:       string(a.Status),
-		TriggeredBy:  a.TriggeredBy,
-		ErrorMessage: a.ErrorMessage,
+// toPBApply converts from Apply model to ProtoBuf model. It returns nil for a
+// speculative run, which has no apply node.
+func toPBApply(run *models.Run) *pb.Apply {
+	a := run.Apply
+	if a == nil {
+		return nil
 	}
+	pbApply := &pb.Apply{
+		Metadata:         toPBMetadata(a.Metadata(run), types.ApplyModelType),
+		DeprecatedStatus: string(a.Status),
+		Status:           toPBApplyStatus(a.Status),
+		TriggeredBy:      a.TriggeredBy,
+		ErrorMessage:     a.ErrorMessage,
+	}
+	if a.LatestJobID != nil {
+		jobID := gid.ToGlobalID(types.JobModelType, *a.LatestJobID)
+		pbApply.LatestJobId = &jobID
+	}
+	return pbApply
 }

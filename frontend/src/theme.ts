@@ -25,16 +25,20 @@ declare module '@mui/material/styles' {
             apply_queued: string;
             applying: string;
             canceled: string;
+            discarded: string;
             errored: string;
             pending: string;
             plan_queued: string;
             planned: string;
             planned_and_finished: string;
             planning: string;
+            queuing: string;
+            queuing_apply: string;
             created: string;
             finished: string;
             running: string;
             queued: string;
+            skipped: string;
             destroy: string;
             unknown: string;
         };
@@ -108,16 +112,20 @@ export default createTheme({
             apply_queued: '#fbbf24',
             applying: '#60a5fa',
             canceled: '#f87171',
+            discarded: '#cbd5e1',
             errored: '#f87171',
             pending: '#fbbf24',
             plan_queued: '#fbbf24',
-            planned: '#60a5fa',
+            planned: '#c084fc',
             planned_and_finished: '#34d399',
             planning: '#60a5fa',
+            queuing: '#fbbf24',
+            queuing_apply: '#fbbf24',
             created: '#94a3b8',
             finished: '#34d399',
             running: '#60a5fa',
             queued: '#fbbf24',
+            skipped: '#B3D966',
             destroy: '#f87171',
             unknown: '#94a3b8',
         },

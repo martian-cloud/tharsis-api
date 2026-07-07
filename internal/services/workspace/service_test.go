@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	coreworkspace "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
@@ -23,8 +24,6 @@ import (
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -162,11 +161,8 @@ func TestCreateWorkspace(t *testing.T) {
 			mockWorkspaces := db.NewMockWorkspaces(t)
 			mockResourceLimits := db.NewMockResourceLimits(t)
 
-			mockCLIStore := cli.NewMockTerraformCLIStore(t)
-			// Apparently, it is not necessary to mock anything out, just have the interface instantiated.
-
 			if test.authError == nil {
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				if !test.exceedsLimit {
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
@@ -182,12 +178,6 @@ func TestCreateWorkspace(t *testing.T) {
 				Transactions:   mockTransactions,
 				Workspaces:     mockWorkspaces,
 				ResourceLimits: mockResourceLimits,
-			}
-
-			mockActivityEvents := activityevent.NewMockService(t)
-
-			if test.authError == nil && !test.exceedsLimit {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			}
 
 			// Called inside transaction to check resource limits.
@@ -215,9 +205,8 @@ func TestCreateWorkspace(t *testing.T) {
 			}
 
 			testLogger, _ := logger.NewForTest()
-			mockCLIService := cli.NewService(testLogger, nil, nil, mockCLIStore, ">= 1.0.0")
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, nil, mockCLIService, mockActivityEvents, nil)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, nil, ">= 1.0.0", nil)
 
 			workspace, err := service.CreateWorkspace(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -341,7 +330,6 @@ func TestUpdateWorkspace(t *testing.T) {
 
 			mockWorkspaces := db.NewMockWorkspaces(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).
 				Return(test.authError)
@@ -349,7 +337,7 @@ func TestUpdateWorkspace(t *testing.T) {
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
 
 			mockTransactions.On("BeginTx", mock.Anything).
-				Return(ctx, nil).Maybe()
+				Return(auth.WithCaller(ctx, mockCaller), nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).
 				Return(nil).Maybe()
 			mockTransactions.On("CommitTx", mock.Anything).
@@ -373,57 +361,6 @@ func TestUpdateWorkspace(t *testing.T) {
 					Return(nil, test.updateError).Maybe()
 			}
 
-			// Verify activity event with label changes if expected
-			if test.expectLabelChanges != nil {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything,
-					mock.MatchedBy(func(input *activityevent.CreateActivityEventInput) bool {
-						if input.Action != models.ActionUpdate || input.TargetType != models.TargetWorkspace {
-							return false
-						}
-
-						payload, ok := input.Payload.(*models.ActivityEventUpdateWorkspacePayload)
-						if !ok || payload.LabelChanges == nil {
-							return false
-						}
-
-						// Check that label changes match expected
-						changes := payload.LabelChanges
-						if len(changes.Added) != len(test.expectLabelChanges.Added) ||
-							len(changes.Updated) != len(test.expectLabelChanges.Updated) ||
-							len(changes.Removed) != len(test.expectLabelChanges.Removed) {
-							return false
-						}
-
-						for k, v := range test.expectLabelChanges.Added {
-							if changes.Added[k] != v {
-								return false
-							}
-						}
-
-						for k, v := range test.expectLabelChanges.Updated {
-							if changes.Updated[k] != v {
-								return false
-							}
-						}
-
-						for i, key := range test.expectLabelChanges.Removed {
-							if changes.Removed[i] != key {
-								return false
-							}
-						}
-
-						return true
-					}),
-				).Return(&models.ActivityEvent{}, nil).Maybe()
-			} else {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
-					Return(&models.ActivityEvent{}, nil).Maybe()
-			}
-
-			testLogger, _ := logger.NewForTest()
-			mockCLIStore := cli.NewMockTerraformCLIStore(t)
-			mockCLIService := cli.NewService(testLogger, nil, nil, mockCLIStore, ">= 1.0.0")
-
 			dbClient := &db.Client{
 				Workspaces:   mockWorkspaces,
 				Transactions: mockTransactions,
@@ -431,10 +368,9 @@ func TestUpdateWorkspace(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 			service := &service{
-				dbClient:        dbClient,
-				logger:          logger,
-				activityService: mockActivityEvents,
-				cliService:      mockCLIService,
+				dbClient:                      dbClient,
+				logger:                        logger,
+				terraformCLIVersionConstraint: ">= 1.0.0",
 			}
 
 			workspaceToUpdate := updatedWorkspace
@@ -940,7 +876,7 @@ func TestCV_UploadConfigurationVersion(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockConfigVersions := db.NewMockConfigurationVersions(t)
-			mockArtifactStore := NewMockArtifactStore(t)
+			mockArtifactStore := coreworkspace.NewMockArtifactStore(t)
 
 			cv := &models.ConfigurationVersion{
 				Metadata:    models.ResourceMetadata{ID: configVersionID},
@@ -961,7 +897,10 @@ func TestCV_UploadConfigurationVersion(t *testing.T) {
 				ConfigurationVersions: mockConfigVersions,
 			}
 
+			testLogger, _ := logger.NewForTest()
+
 			service := &service{
+				logger:        testLogger,
 				dbClient:      dbClient,
 				artifactStore: mockArtifactStore,
 			}
@@ -1372,7 +1311,7 @@ func TestGetWorkspaces(t *testing.T) {
 				test.handleCaller = auth.HandleCaller
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, test.handleCaller)
+			service := newService(nil, dbClient, nil, nil, nil, "", nil, test.handleCaller)
 
 			result, err := service.GetWorkspaces(ctx, test.input)
 
@@ -1422,7 +1361,7 @@ func TestGetStateVersionDependencies(t *testing.T) {
 
 	// setupService creates a service with the given artifact store reader.
 	setupService := func(t *testing.T, reader io.ReadCloser, readErr error) *service {
-		mockArtifactStore := NewMockArtifactStore(t)
+		mockArtifactStore := coreworkspace.NewMockArtifactStore(t)
 		mockArtifactStore.On("GetStateVersion", mock.Anything, mock.Anything).
 			Return(reader, readErr)
 		return &service{dbClient: &db.Client{}, artifactStore: mockArtifactStore}
@@ -1732,7 +1671,7 @@ func TestCreateStateVersion(t *testing.T) {
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.NewMockTransactions(t)
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
@@ -1764,16 +1703,11 @@ func TestCreateStateVersion(t *testing.T) {
 					},
 				}, nil).Maybe()
 
-			mockArtifactStore := MockArtifactStore{}
+			mockArtifactStore := coreworkspace.MockArtifactStore{}
 			mockArtifactStore.Test(t)
 
 			mockArtifactStore.On("UploadStateVersion", mock.Anything, mock.Anything, mock.Anything).
 				Return(test.uploadError)
-
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
-				Return(&models.ActivityEvent{}, nil)
 
 			testLogger, _ := logger.NewForTest()
 			dbClient := &db.Client{
@@ -1783,7 +1717,7 @@ func TestCreateStateVersion(t *testing.T) {
 				Workspaces:     mockWorkspaces,
 			}
 
-			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), &mockArtifactStore, nil, nil, &mockActivityEvents, nil)
+			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), &mockArtifactStore, nil, "", nil)
 
 			if !test.authFail {
 				ctx = auth.WithCaller(ctx, &mockCaller)
@@ -1913,7 +1847,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.NewMockTransactions(t)
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
@@ -1936,11 +1870,6 @@ func TestCreateConfigurationVersion(t *testing.T) {
 			mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
 				Return(&models.ResourceLimit{Value: test.limit}, nil).Maybe()
 
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
-				Return(&models.ActivityEvent{}, nil)
-
 			testLogger, _ := logger.NewForTest()
 			dbClient := &db.Client{
 				Transactions:          mockTransactions,
@@ -1948,7 +1877,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 				ResourceLimits:        mockResourceLimits,
 			}
 
-			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, nil, &mockActivityEvents, nil)
+			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, "", nil)
 
 			if !test.authFail {
 				ctx = auth.WithCaller(ctx, &mockCaller)
@@ -2131,14 +2060,11 @@ func TestMigrateWorkspace(t *testing.T) {
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+			mockActivityEventsDB := db.NewMockActivityEvents(t)
+			mockActivityEventsDB.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil).Maybe()
 
 			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
 
@@ -2149,6 +2075,7 @@ func TestMigrateWorkspace(t *testing.T) {
 				Workspaces:     &mockWorkspaces,
 				Transactions:   &mockTransactions,
 				ResourceLimits: mockResourceLimits,
+				ActivityEvents: mockActivityEventsDB,
 			}
 
 			limiter := limits.NewLimitChecker(&dbClient)
@@ -2167,8 +2094,10 @@ func TestMigrateWorkspace(t *testing.T) {
 				nil,
 			)
 
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, testCaller), nil)
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, limiter, nil, nil, nil, &mockActivityEvents, nil)
+			service := NewService(logger, &dbClient, limiter, nil, nil, "", nil)
 
 			migrated, err := service.MigrateWorkspace(auth.WithCaller(ctx, testCaller),
 				test.inputWorkspace.Metadata.ID, test.newParentID)
@@ -2220,7 +2149,40 @@ func TestSubscribeToWorkspaceEvents(t *testing.T) {
 							ID: "workspace1",
 						},
 					},
+					Type: WorkspaceEventUpdated,
+				},
+			},
+		},
+		{
+			name: "subscribe also fires on workspace assessment create/update events",
+			input: &EventSubscriptionOptions{
+				WorkspaceID: "workspace1",
+			},
+			sendEvents: []*db.Event{
+				{
+					// Assessment for this workspace fires (keyed on the assessment ID, scoped
+					// by workspace_id in the event data).
+					Table:  "workspace_assessments",
+					Action: "INSERT",
+					ID:     "assessment1",
+					Data:   json.RawMessage(`{"workspace_id":"workspace1"}`),
+				},
+				{
+					// Assessment for a different workspace is filtered out.
+					Table:  "workspace_assessments",
 					Action: "UPDATE",
+					ID:     "assessment2",
+					Data:   json.RawMessage(`{"workspace_id":"workspace2"}`),
+				},
+			},
+			expectedEvents: []Event{
+				{
+					Workspace: models.Workspace{
+						Metadata: models.ResourceMetadata{
+							ID: "workspace1",
+						},
+					},
+					Type: WorkspaceEventAssessmentCreated,
 				},
 			},
 		},
@@ -2253,13 +2215,12 @@ func TestSubscribeToWorkspaceEvents(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).
 				Return(test.authError)
 
-			for _, d := range test.sendEvents {
-				dCopy := d
-
-				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, dCopy.ID).
+			// Every delivered event resolves the workspace by the subscription's workspace ID.
+			if test.input != nil {
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, test.input.WorkspaceID).
 					Return(&models.Workspace{
 						Metadata: models.ResourceMetadata{
-							ID: dCopy.ID,
+							ID: test.input.WorkspaceID,
 						},
 					}, nil).Maybe()
 			}
@@ -2310,14 +2271,28 @@ func TestSubscribeToWorkspaceEvents(t *testing.T) {
 
 			go func() {
 				for _, d := range test.sendEvents {
-					encoded, err := json.Marshal(d)
-					require.Nil(t, err)
+					// Default to a workspace UPDATE event; cases that exercise other tables
+					// (e.g. workspace_assessments) set Table/Action/Data explicitly.
+					table := d.Table
+					if table == "" {
+						table = "workspaces"
+					}
+					action := d.Action
+					if action == "" {
+						action = "UPDATE"
+					}
+					data := d.Data
+					if data == nil {
+						encoded, err := json.Marshal(d)
+						require.Nil(t, err)
+						data = encoded
+					}
 
 					mockEventChannel <- db.Event{
-						Table:  "workspaces",
-						Action: "UPDATE",
+						Table:  table,
+						Action: action,
 						ID:     d.ID,
-						Data:   encoded,
+						Data:   data,
 					}
 				}
 			}()
@@ -2588,6 +2563,196 @@ func TestGetProviderMirrorEnabledSetting(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, test.expectSetting, setting)
+		})
+	}
+}
+
+func TestDeleteWorkspace(t *testing.T) {
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject is not authorized",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			workspace := &models.Workspace{
+				Metadata: models.ResourceMetadata{ID: "workspace-1"},
+				FullPath: "group-1/workspace-1",
+				GroupID:  "group-1",
+			}
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteWorkspacePermission, mock.Anything).Return(test.authError)
+
+			mockTransactions := db.NewMockTransactions(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+
+			if test.authError == nil {
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockWorkspaces.On("DeleteWorkspace", mock.Anything, workspace).Return(nil)
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient: &db.Client{
+					Transactions: mockTransactions,
+					Workspaces:   mockWorkspaces,
+				},
+				logger: logger,
+			}
+
+			err := service.DeleteWorkspace(auth.WithCaller(ctx, mockCaller), workspace, false)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestLockWorkspace(t *testing.T) {
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject is not authorized",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			workspace := &models.Workspace{
+				Metadata: models.ResourceMetadata{ID: "workspace-1"},
+			}
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(test.authError)
+
+			mockTransactions := db.NewMockTransactions(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+
+			if test.authError == nil {
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockWorkspaces.On("UpdateWorkspace", mock.Anything, mock.Anything).Return(workspace, nil)
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient: &db.Client{
+					Transactions: mockTransactions,
+					Workspaces:   mockWorkspaces,
+				},
+				logger: logger,
+			}
+
+			_, err := service.LockWorkspace(auth.WithCaller(ctx, mockCaller), workspace)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestUnlockWorkspace(t *testing.T) {
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject is not authorized",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// Must be locked so UnlockWorkspace proceeds past the already-unlocked check.
+			workspace := &models.Workspace{
+				Metadata: models.ResourceMetadata{ID: "workspace-1"},
+				Locked:   true,
+			}
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(test.authError)
+
+			mockTransactions := db.NewMockTransactions(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockWorkItemsQueue := db.NewMockWorkItemsQueue(t)
+
+			if test.authError == nil {
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockWorkspaces.On("UpdateWorkspace", mock.Anything, mock.Anything).Return(workspace, nil)
+				mockWorkItemsQueue.On("AddWorkItemToQueue", mock.Anything, mock.Anything).Return(&db.WorkItem{}, nil)
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient: &db.Client{
+					Transactions:   mockTransactions,
+					Workspaces:     mockWorkspaces,
+					WorkItemsQueue: mockWorkItemsQueue,
+				},
+				logger: logger,
+			}
+
+			_, err := service.UnlockWorkspace(auth.WithCaller(ctx, mockCaller), workspace)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }

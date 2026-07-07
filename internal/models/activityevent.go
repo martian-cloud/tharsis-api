@@ -13,10 +13,13 @@ type ActivityEventAction string
 
 // ActivityEventAction Types
 const (
-	ActionAdd                 ActivityEventAction = "ADD"
-	ActionAddMember           ActivityEventAction = "ADD_MEMBER"
-	ActionCreateMembership    ActivityEventAction = "CREATE_MEMBERSHIP"
-	ActionApply               ActivityEventAction = "APPLY"
+	ActionAdd              ActivityEventAction = "ADD"
+	ActionAddMember        ActivityEventAction = "ADD_MEMBER"
+	ActionCreateMembership ActivityEventAction = "CREATE_MEMBERSHIP"
+	ActionApply            ActivityEventAction = "APPLY"
+	// ActionCancel is retained for historical run-cancel activity events; new run
+	// state changes (cancel, discard) are recorded as ActionUpdate with an
+	// ActivityEventUpdateRunPayload.
 	ActionCancel              ActivityEventAction = "CANCEL"
 	ActionCreate              ActivityEventAction = "CREATE"
 	ActionDeleteChildResource ActivityEventAction = "DELETE_CHILD_RESOURCE"
@@ -72,6 +75,30 @@ type ActivityEventCreateNamespaceMembershipPayload struct {
 type ActivityEventUpdateNamespaceMembershipPayload struct {
 	PrevRole string `json:"prevRole"`
 	NewRole  string `json:"newRole"`
+}
+
+// ActivityEventRunUpdateType enumerates the kinds of update recorded in an
+// ActivityEventUpdateRunPayload. Status deltas aren't used because some updates
+// (e.g. a graceful cancel of a running job) don't change the run status right away.
+type ActivityEventRunUpdateType string
+
+// ActivityEventRunUpdateType values.
+const (
+	RunUpdateTypeCancel           ActivityEventRunUpdateType = "cancel"
+	RunUpdateTypeDiscard          ActivityEventRunUpdateType = "discard"
+	RunUpdateTypeUndiscard        ActivityEventRunUpdateType = "undiscard"
+	RunUpdateTypeEnableAutoApply  ActivityEventRunUpdateType = "enable_auto_apply"
+	RunUpdateTypeDisableAutoApply ActivityEventRunUpdateType = "disable_auto_apply"
+	RunUpdateTypeRetry            ActivityEventRunUpdateType = "retry"
+)
+
+// ActivityEventUpdateRunPayload is the custom payload for a run update activity
+// event, recording which kind of update occurred (e.g. cancel or discard). NodePath
+// identifies the run node the update applies to (e.g. "plan" or "apply") for updates
+// that target a specific node, such as a retry; it is omitted for run-level updates.
+type ActivityEventUpdateRunPayload struct {
+	Type     string  `json:"type"`
+	NodePath *string `json:"nodePath,omitempty"`
 }
 
 // ActivityEventRemoveNamespaceMembershipPayload helps with custom

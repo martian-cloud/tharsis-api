@@ -21,7 +21,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -94,7 +93,7 @@ func TestGetRunnerByID(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil)
 
 			runner, err := service.GetRunnerByID(auth.WithCaller(ctx, mockCaller), runnerID)
 
@@ -278,7 +277,7 @@ func TestGetRunnersByIDs(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil)
 
 			runners, err := service.GetRunnersByIDs(auth.WithCaller(ctx, mockCaller), []string{runnerID})
 
@@ -428,7 +427,7 @@ func TestGetRunners(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil)
 
 			resp, err := service.GetRunners(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -540,7 +539,7 @@ func TestCreateRunner(t *testing.T) {
 			mockResourceLimits := db.NewMockResourceLimits(t)
 
 			if test.authError == nil {
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil).Maybe()
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 				if !test.exceedsLimit {
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
@@ -556,13 +555,6 @@ func TestCreateRunner(t *testing.T) {
 				Transactions:   mockTransactions,
 				Runners:        mockRunners,
 				ResourceLimits: mockResourceLimits,
-			}
-
-			mockActivityEvents := activityevent.NewMockService(t)
-
-			if test.authError == nil && !test.exceedsLimit {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
-					Return(&models.ActivityEvent{}, nil).Maybe()
 			}
 
 			// Called inside transaction to check resource limits.
@@ -591,7 +583,7 @@ func TestCreateRunner(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockActivityEvents, nil, nil)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, nil)
 
 			runner, err := service.CreateRunner(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -667,7 +659,7 @@ func TestUpdateRunner(t *testing.T) {
 			mockRunners := db.NewMockRunners(t)
 
 			if test.authError == nil {
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
@@ -680,15 +672,9 @@ func TestUpdateRunner(t *testing.T) {
 				Runners:      mockRunners,
 			}
 
-			mockActivityEvents := activityevent.NewMockService(t)
-
-			if test.authError == nil {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil).Maybe()
-			}
-
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, mockActivityEvents, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil)
 
 			runner, err := service.UpdateRunner(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -760,7 +746,7 @@ func TestDeleteRunner(t *testing.T) {
 			mockRunners := db.NewMockRunners(t)
 
 			if test.authError == nil {
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
@@ -773,15 +759,9 @@ func TestDeleteRunner(t *testing.T) {
 				Runners:      mockRunners,
 			}
 
-			mockActivityEvents := activityevent.NewMockService(t)
-
-			if test.authError == nil {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil).Maybe()
-			}
-
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, mockActivityEvents, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil)
 
 			err := service.DeleteRunner(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -1000,7 +980,10 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 				ServiceAccounts: mockServiceAccounts,
 			}
 
+			testLogger, _ := logger.NewForTest()
+
 			service := &service{
+				logger:   testLogger,
 				dbClient: dbClient,
 			}
 
@@ -1095,7 +1078,10 @@ func TestUnassignServiceAccountFromRunner(t *testing.T) {
 				ServiceAccounts: mockServiceAccounts,
 			}
 
+			testLogger, _ := logger.NewForTest()
+
 			service := &service{
+				logger:   testLogger,
 				dbClient: dbClient,
 			}
 
@@ -1622,7 +1608,10 @@ func TestAcceptRunnerSessionHeartbeat(t *testing.T) {
 				RunnerSessions: mockRunnerSessions,
 			}
 
+			testLogger, _ := logger.NewForTest()
+
 			service := &service{
+				logger:   testLogger,
 				dbClient: dbClient,
 			}
 

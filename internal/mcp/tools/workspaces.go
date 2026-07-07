@@ -21,7 +21,6 @@ type workspace struct {
 	GroupID               string            `json:"group_id" jsonschema:"ID of the parent group containing this workspace"`
 	TerraformVersion      string            `json:"terraform_version" jsonschema:"Terraform CLI version used for runs (e.g. 1.5.0)"`
 	MaxJobDuration        *int32            `json:"max_job_duration,omitempty" jsonschema:"Maximum minutes a job can run before timing out (null means no limit)"`
-	CurrentJobID          string            `json:"current_job_id" jsonschema:"ID of the currently executing job (empty if no job running)"`
 	CurrentStateVersionID string            `json:"current_state_version_id" jsonschema:"ID of the current Terraform state"`
 	CreatedBy             string            `json:"created_by" jsonschema:"Email address of the user who created this workspace"`
 	DirtyState            bool              `json:"dirty_state" jsonschema:"True if state is out of sync with configuration (drift detected)"`
@@ -75,7 +74,6 @@ func GetWorkspace(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getWorkspaceInp
 				GroupID:               gid.ToGlobalID(types.GroupModelType, ws.GroupID),
 				TerraformVersion:      ws.TerraformVersion,
 				MaxJobDuration:        ws.MaxJobDuration,
-				CurrentJobID:          gid.ToGlobalID(types.JobModelType, ws.CurrentJobID),
 				CurrentStateVersionID: gid.ToGlobalID(types.StateVersionModelType, ws.CurrentStateVersionID),
 				CreatedBy:             ws.CreatedBy,
 				DirtyState:            ws.DirtyState,
@@ -147,7 +145,6 @@ func GetWorkspaces(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getWorkspacesI
 				GroupID:               gid.ToGlobalID(types.GroupModelType, ws.GroupID),
 				TerraformVersion:      ws.TerraformVersion,
 				MaxJobDuration:        ws.MaxJobDuration,
-				CurrentJobID:          gid.ToGlobalID(types.JobModelType, ws.CurrentJobID),
 				CurrentStateVersionID: gid.ToGlobalID(types.StateVersionModelType, ws.CurrentStateVersionID),
 				CreatedBy:             ws.CreatedBy,
 				DirtyState:            ws.DirtyState,

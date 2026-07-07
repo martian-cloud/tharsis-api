@@ -68,12 +68,21 @@ func (s *JobServer) GetJobLogs(ctx context.Context, req *pb.GetJobLogsRequest) (
 
 // GetLatestJobForPlan retrieves the latest job for a plan ID.
 func (s *JobServer) GetLatestJobForPlan(ctx context.Context, req *pb.GetLatestJobForPlanRequest) (*pb.Job, error) {
-	planID, err := s.serviceCatalog.FetchModelID(ctx, req.PlanId)
+	model, err := s.serviceCatalog.FetchModel(ctx, req.PlanId)
 	if err != nil {
 		return nil, err
 	}
 
-	job, err := s.serviceCatalog.RunService.GetLatestJobForPlan(ctx, planID)
+	run, ok := model.(*models.Run)
+	if !ok {
+		return nil, errors.New("expected run model, got %T", model)
+	}
+
+	if run.Plan.LatestJobID == nil {
+		return nil, errors.New("plan with id %s does not have a latest job", req.PlanId, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	job, err := s.serviceCatalog.JobService.GetJobByID(ctx, *run.Plan.LatestJobID)
 	if err != nil {
 		return nil, err
 	}
@@ -83,12 +92,26 @@ func (s *JobServer) GetLatestJobForPlan(ctx context.Context, req *pb.GetLatestJo
 
 // GetLatestJobForApply retrieves the latest job for an apply ID.
 func (s *JobServer) GetLatestJobForApply(ctx context.Context, req *pb.GetLatestJobForApplyRequest) (*pb.Job, error) {
-	applyID, err := s.serviceCatalog.FetchModelID(ctx, req.ApplyId)
+	model, err := s.serviceCatalog.FetchModel(ctx, req.ApplyId)
 	if err != nil {
 		return nil, err
 	}
 
-	job, err := s.serviceCatalog.RunService.GetLatestJobForApply(ctx, applyID)
+	run, ok := model.(*models.Run)
+	if !ok {
+		return nil, errors.New("expected run model, got %T", model)
+	}
+
+	apply := run.Apply
+	if apply == nil {
+		return nil, errors.New("apply with id %s not found", req.ApplyId, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if apply.LatestJobID == nil {
+		return nil, errors.New("apply with id %s does not have a latest job", req.ApplyId, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	job, err := s.serviceCatalog.JobService.GetJobByID(ctx, *apply.LatestJobID)
 	if err != nil {
 		return nil, err
 	}
@@ -265,10 +288,10 @@ func toPBJob(j *models.Job) *pb.Job {
 		WorkspaceId:     gid.ToGlobalID(types.WorkspaceModelType, j.WorkspaceID),
 		RunId:           gid.ToGlobalID(types.RunModelType, j.RunID),
 		Type:            string(j.Type),
-		Status:          pb.JobStatus(pb.JobStatus_value[string(j.Status)]),
+		Status:          pb.JobStatus(pb.JobStatus_value[string(j.GetStatus())]),
 		MaxJobDuration:  j.MaxJobDuration,
 		Properties:      j.Properties,
-		CancelRequested: j.Status == models.JobCanceling,
+		CancelRequested: j.GetStatus() == models.JobCanceling,
 		ForceCanceled:   j.ForceCanceled,
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -56,7 +55,7 @@ func TestGetTeamByID(t *testing.T) {
 				Teams: mockTeams,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := NewService(nil, dbClient)
 
 			actualTeam, err := service.GetTeamByID(auth.WithCaller(ctx, mockCaller), teamID)
 
@@ -178,7 +177,7 @@ func TestGetTeamsByIDs(t *testing.T) {
 				Teams: mockTeams,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := NewService(nil, dbClient)
 
 			result, err := service.GetTeamsByIDs(auth.WithCaller(ctx, mockCaller), []string{teamID})
 
@@ -230,7 +229,7 @@ func TestGetTeams(t *testing.T) {
 				Teams: mockTeams,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := NewService(nil, dbClient)
 
 			result, err := service.GetTeams(auth.WithCaller(ctx, mockCaller), &GetTeamsInput{TeamNamePrefix: &teamName})
 
@@ -289,23 +288,17 @@ func TestCreateTeam(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockTeams := db.NewMockTeams(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateTeamPermission).Return(test.authError)
 
 			if test.expectTeam != nil {
 				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
 				mockTeams.On("CreateTeam", mock.Anything, test.expectTeam).Return(test.expectTeam, nil)
-
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-					Action:     models.ActionCreate,
-					TargetType: models.TargetTeam,
-				}).Return(nil, nil)
 			}
 
 			dbClient := &db.Client{
@@ -314,7 +307,7 @@ func TestCreateTeam(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, mockActivityEvents)
+			service := NewService(logger, dbClient)
 
 			created, err := service.CreateTeam(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -401,7 +394,6 @@ func TestUpdateTeam(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockTeams := db.NewMockTeams(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 
 			mockTeams.On("GetTeamByID", mock.Anything, test.input.ID).Return(test.existingTeam, nil)
 
@@ -412,17 +404,11 @@ func TestUpdateTeam(t *testing.T) {
 			if test.expectTeam != nil {
 				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
 				mockTeams.On("UpdateTeam", mock.Anything, test.expectTeam).Return(test.expectTeam, nil)
-
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-					Action:     models.ActionUpdate,
-					TargetType: models.TargetTeam,
-					TargetID:   sampleTeam.Metadata.ID,
-				}).Return(nil, nil)
 			}
 
 			dbClient := &db.Client{
@@ -431,7 +417,7 @@ func TestUpdateTeam(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, mockActivityEvents)
+			service := NewService(logger, dbClient)
 
 			created, err := service.UpdateTeam(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -488,7 +474,7 @@ func TestDeleteTeam(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil)
+			service := NewService(logger, dbClient)
 
 			err := service.DeleteTeam(auth.WithCaller(ctx, mockCaller), &DeleteTeamInput{Team: &models.Team{}})
 
@@ -582,7 +568,7 @@ func TestGetTeamMember(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil)
+			service := NewService(logger, dbClient)
 
 			actualMember, err := service.GetTeamMember(auth.WithCaller(ctx, mockCaller), sampleUser.Username, sampleTeam.Name)
 
@@ -640,7 +626,7 @@ func TestGetTeamMembers(t *testing.T) {
 				TeamMembers: mockTeamMembers,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := NewService(nil, dbClient)
 
 			result, err := service.GetTeamMembers(auth.WithCaller(ctx, mockCaller), input)
 
@@ -717,7 +703,6 @@ func TestAddUserToTeam(t *testing.T) {
 			mockUsers := db.NewMockUsers(t)
 			mockTeamMembers := db.NewMockTeamMembers(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 
 			mockTeams.On("GetTeamByTRN", mock.Anything, trn.TypeTeam.Build(sampleTeam.Name)).Return(test.existingTeam, nil)
 
@@ -732,21 +717,11 @@ func TestAddUserToTeam(t *testing.T) {
 			if test.expectAdded != nil {
 				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
 				mockTeamMembers.On("AddUserToTeam", mock.Anything, test.expectAdded).Return(test.expectAdded, nil)
-
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-					Action:     models.ActionAddMember,
-					TargetType: models.TargetTeam,
-					TargetID:   sampleTeam.Metadata.ID,
-					Payload: &models.ActivityEventAddTeamMemberPayload{
-						UserID:     &sampleUser.Metadata.ID,
-						Maintainer: true,
-					},
-				}).Return(nil, nil)
 			}
 
 			dbClient := &db.Client{
@@ -757,7 +732,7 @@ func TestAddUserToTeam(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, mockActivityEvents)
+			service := NewService(logger, dbClient)
 
 			input := &AddUserToTeamInput{
 				TeamName:     sampleTeam.Name,
@@ -857,7 +832,6 @@ func TestUpdateTeamMember(t *testing.T) {
 			mockUsers := db.NewMockUsers(t)
 			mockTeamMembers := db.NewMockTeamMembers(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 
 			mockTeams.On("GetTeamByTRN", mock.Anything, trn.TypeTeam.Build(sampleTeam.Name)).Return(test.existingTeam, nil)
 
@@ -876,21 +850,11 @@ func TestUpdateTeamMember(t *testing.T) {
 			if test.expectUpdated != nil {
 				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
 				mockTeamMembers.On("UpdateTeamMember", mock.Anything, test.expectUpdated).Return(test.expectUpdated, nil)
-
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-					Action:     models.ActionUpdateMember,
-					TargetType: models.TargetTeam,
-					TargetID:   sampleTeam.Metadata.ID,
-					Payload: &models.ActivityEventUpdateTeamMemberPayload{
-						UserID:     &sampleUser.Metadata.ID,
-						Maintainer: true,
-					},
-				}).Return(nil, nil)
 			}
 
 			dbClient := &db.Client{
@@ -901,7 +865,7 @@ func TestUpdateTeamMember(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, mockActivityEvents)
+			service := NewService(logger, dbClient)
 
 			input := &UpdateTeamMemberInput{
 				TeamName:     sampleTeam.Name,
@@ -951,14 +915,13 @@ func TestDeleteTeamMember(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockTeamMembers := db.NewMockTeamMembers(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTeamPermission, mock.Anything).Return(test.authError)
 
 			if test.expectErrorCode == "" {
 				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
@@ -966,15 +929,6 @@ func TestDeleteTeamMember(t *testing.T) {
 					UserID: "user-1",
 					TeamID: "team-1",
 				}).Return(nil)
-
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-					Action:     models.ActionRemoveMember,
-					TargetType: models.TargetTeam,
-					TargetID:   "team-1",
-					Payload: &models.ActivityEventRemoveTeamMemberPayload{
-						UserID: ptr.String("user-1"),
-					},
-				}).Return(nil, nil)
 			}
 
 			dbClient := &db.Client{
@@ -983,7 +937,7 @@ func TestDeleteTeamMember(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, mockActivityEvents)
+			service := NewService(logger, dbClient)
 
 			input := &RemoveUserFromTeamInput{TeamMember: &models.TeamMember{
 				UserID: "user-1",

@@ -263,6 +263,10 @@ func (s *service) CreateAgentSession(ctx context.Context) (*models.AgentSession,
 		return nil, errors.Wrap(err, "failed to commit transaction")
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Created a new agent session.",
+		"agentSessionID", session.Metadata.ID,
+	)
+
 	return session, nil
 }
 
@@ -346,6 +350,11 @@ func (s *service) CreateAgentRun(ctx context.Context, input *CreateAgentRunInput
 		return nil, errors.Wrap(err, "failed to create agent run")
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Created a new agent run.",
+		"agentSessionID", session.Metadata.ID,
+		"agentRunID", run.Metadata.ID,
+	)
+
 	s.taskManager.StartTask(func(ctx context.Context) {
 		// Add caller to context
 		ctx = auth.WithCaller(ctx, userCaller)
@@ -402,6 +411,11 @@ func (s *service) CancelAgentRun(ctx context.Context, input *CancelAgentRunInput
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to update agent run")
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Requested cancellation of an agent run.",
+		"agentSessionID", run.SessionID,
+		"agentRunID", updated.Metadata.ID,
+	)
 
 	return updated, nil
 }

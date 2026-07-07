@@ -1,3 +1,4 @@
+// Package workspace provides the workspace service.
 package workspace
 
 //go:generate go tool mockery --name Service --inpackage --case underscore
@@ -14,14 +15,15 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/terraform"
+	coreworkspace "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -52,12 +54,49 @@ var (
 
 	// Error returned when a workspace unlock is attempted but it's locked by a run.
 	ErrWorkspaceLockedByRun = errors.New("cannot unlock workspace locked by run", errors.WithErrorCode(errors.EConflict))
+
+	// Error returned when a workspace lock is attempted but it has an apply run in progress.
+	ErrWorkspaceHasCurrentApplyRun = errors.New("cannot lock workspace with an apply run in progress", errors.WithErrorCode(errors.EConflict))
+)
+
+// EventType identifies the kind of workspace event, encoding both the resource
+// that changed and the action. Mirrors the semantic event-type pattern used by agent.EventType.
+type EventType string
+
+// EventType values.
+const (
+	WorkspaceEventCreated           EventType = "WORKSPACE_CREATED"
+	WorkspaceEventUpdated           EventType = "WORKSPACE_UPDATED"
+	WorkspaceEventAssessmentCreated EventType = "WORKSPACE_ASSESSMENT_CREATED"
+	WorkspaceEventAssessmentUpdated EventType = "WORKSPACE_ASSESSMENT_UPDATED"
 )
 
 // Event represents a workspace event
 type Event struct {
-	Action    string
+	Type      EventType
 	Workspace models.Workspace
+}
+
+// workspaceEventType maps a database event's table and action to the semantic workspace
+// event type. The second return is false for any combination the subscription does not emit.
+func workspaceEventType(table, action string) (EventType, bool) {
+	switch events.SubscriptionType(table) {
+	case events.WorkspaceSubscription:
+		switch events.SubscriptionAction(action) {
+		case events.CreateAction:
+			return WorkspaceEventCreated, true
+		case events.UpdateAction:
+			return WorkspaceEventUpdated, true
+		}
+	case events.WorkspaceAssessmentSubscription:
+		switch events.SubscriptionAction(action) {
+		case events.CreateAction:
+			return WorkspaceEventAssessmentCreated, true
+		case events.UpdateAction:
+			return WorkspaceEventAssessmentUpdated, true
+		}
+	}
+	return "", false
 }
 
 // EventSubscriptionOptions provides options for subscribing to workspace events
@@ -170,15 +209,14 @@ type handleCallerFunc func(
 ) error
 
 type service struct {
-	logger                    logger.Logger
-	dbClient                  *db.Client
-	limitChecker              limits.LimitChecker
-	artifactStore             ArtifactStore
-	eventManager              *events.EventManager
-	cliService                cli.Service
-	activityService           activityevent.Service
-	inheritedSettingsResolver namespace.InheritedSettingResolver
-	handleCaller              handleCallerFunc
+	logger                        logger.Logger
+	dbClient                      *db.Client
+	limitChecker                  limits.LimitChecker
+	artifactStore                 coreworkspace.ArtifactStore
+	eventManager                  *events.EventManager
+	terraformCLIVersionConstraint string
+	inheritedSettingsResolver     namespace.InheritedSettingResolver
+	handleCaller                  handleCallerFunc
 }
 
 // NewService creates an instance of Service
@@ -186,10 +224,9 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	artifactStore ArtifactStore,
+	artifactStore coreworkspace.ArtifactStore,
 	eventManager *events.EventManager,
-	cliService cli.Service,
-	activityService activityevent.Service,
+	terraformCLIVersionConstraint string,
 	inheritedSettingsResolver namespace.InheritedSettingResolver,
 ) Service {
 	return newService(
@@ -198,8 +235,7 @@ func NewService(
 		limitChecker,
 		artifactStore,
 		eventManager,
-		cliService,
-		activityService,
+		terraformCLIVersionConstraint,
 		inheritedSettingsResolver,
 		auth.HandleCaller,
 	)
@@ -209,10 +245,9 @@ func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	artifactStore ArtifactStore,
+	artifactStore coreworkspace.ArtifactStore,
 	eventManager *events.EventManager,
-	cliService cli.Service,
-	activityService activityevent.Service,
+	terraformCLIVersionConstraint string,
 	inheritedSettingsResolver namespace.InheritedSettingResolver,
 	handleCaller handleCallerFunc,
 ) Service {
@@ -222,8 +257,7 @@ func newService(
 		limitChecker,
 		artifactStore,
 		eventManager,
-		cliService,
-		activityService,
+		terraformCLIVersionConstraint,
 		inheritedSettingsResolver,
 		handleCaller,
 	}
@@ -246,15 +280,31 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 		return nil, err
 	}
 
-	subscription := events.Subscription{
-		Type: events.WorkspaceSubscription,
-		ID:   options.WorkspaceID, // Subscribe to specific workspace ID
-		Actions: []events.SubscriptionAction{
-			events.CreateAction,
-			events.UpdateAction,
+	subscriptions := []events.Subscription{
+		{
+			Type: events.WorkspaceSubscription,
+			ID:   options.WorkspaceID, // Subscribe to specific workspace ID
+			Actions: []events.SubscriptionAction{
+				events.CreateAction,
+				events.UpdateAction,
+			},
+		},
+		{
+			// Also fire when the workspace's assessment is created or updated. Assessment
+			// events key on the assessment ID, not the workspace ID, so scope by the
+			// workspace_id carried in the event data instead of the subscription ID.
+			Type: events.WorkspaceAssessmentSubscription,
+			Actions: []events.SubscriptionAction{
+				events.CreateAction,
+				events.UpdateAction,
+			},
+			Filter: func(data json.RawMessage) bool {
+				var d db.WorkspaceAssessmentEventData
+				return json.Unmarshal(data, &d) == nil && d.WorkspaceID == options.WorkspaceID
+			},
 		},
 	}
-	subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
+	subscriber := s.eventManager.Subscribe(subscriptions)
 
 	outgoing := make(chan *Event)
 	go func() {
@@ -272,7 +322,19 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 				return
 			}
 
-			ws, err := s.getWorkspaceByID(ctx, event.ID)
+			// Both subscriptions are scoped to this workspace (the workspace event by ID,
+			// the assessment event by the workspace_id filter), so every delivered event
+			// pertains to options.WorkspaceID — resolve by it rather than event.ID, which
+			// for an assessment event is the assessment ID.
+			eventType, ok := workspaceEventType(event.Table, event.Action)
+			if !ok {
+				// Defensive: the subscriptions only register create/update on the workspace and
+				// workspace_assessment tables, so any other combination is unexpected.
+				s.logger.WithContextFields(ctx).Errorf("received unexpected workspace event for table %q action %q", event.Table, event.Action)
+				continue
+			}
+
+			ws, err := s.getWorkspaceByID(ctx, options.WorkspaceID)
 			if err != nil {
 				if errors.IsContextCanceledError(err) || errors.IsDeadlineExceededError(err) {
 					return
@@ -284,7 +346,7 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 			select {
 			case <-ctx.Done():
 				return
-			case outgoing <- &Event{Action: event.Action, Workspace: *ws}:
+			case outgoing <- &Event{Type: eventType, Workspace: *ws}:
 			}
 		}
 	}()
@@ -517,8 +579,8 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 	}
 
 	parentGroupPath := workspace.GetGroupPath()
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &parentGroupPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,
@@ -575,7 +637,7 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 	}
 
 	// Get a list of all the supported Terraform versions.
-	versions, err := s.cliService.GetTerraformCLIVersions(ctx)
+	versions, err := terraform.GetCLIVersions(ctx, s.terraformCLIVersionConstraint)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get Terraform CLI versions")
 		return nil, err
@@ -635,7 +697,7 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 	}
 
 	// Create activity event with label information if labels exist
-	activityEventInput := &activityevent.CreateActivityEventInput{
+	activityEventInput := &activity.CreateActivityEventInput{
 		NamespacePath: &createdWorkspace.FullPath,
 		Action:        models.ActionCreate,
 		TargetType:    models.TargetWorkspace,
@@ -645,7 +707,7 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 		},
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext, activityEventInput); err != nil {
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient, activityEventInput); err != nil {
 		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
@@ -687,7 +749,7 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 	}
 
 	// Get a list of all the supported versions.
-	versions, err := s.cliService.GetTerraformCLIVersions(ctx)
+	versions, err := terraform.GetCLIVersions(ctx, s.terraformCLIVersionConstraint)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get list of supported Terraform CLI versions")
 		return nil, err
@@ -738,7 +800,7 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 	}
 
 	// Create activity event with label change information if there are changes
-	activityEventInput := &activityevent.CreateActivityEventInput{
+	activityEventInput := &activity.CreateActivityEventInput{
 		NamespacePath: &updatedWorkspace.FullPath,
 		Action:        models.ActionUpdate,
 		TargetType:    models.TargetWorkspace,
@@ -752,7 +814,7 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 		}
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext, activityEventInput); err != nil {
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient, activityEventInput); err != nil {
 		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
@@ -788,6 +850,12 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 		return nil, ErrWorkspaceLocked
 	}
 
+	// Cannot lock a workspace that has an apply run in progress.
+	if workspace.CurrentApplyRunID != nil {
+		tracing.RecordError(span, nil, "workspace has an apply run in progress")
+		return nil, ErrWorkspaceHasCurrentApplyRun
+	}
+
 	// Update the field.
 	workspace.Locked = true
 
@@ -814,8 +882,8 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &updatedWorkspace.FullPath,
 			Action:        models.ActionLock,
 			TargetType:    models.TargetWorkspace,
@@ -856,12 +924,6 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, ErrWorkspaceUnlocked
 	}
 
-	// Check if workspace is locked by a run.
-	if workspace.CurrentJobID != "" {
-		tracing.RecordError(span, nil, "workspace is locked by a run")
-		return nil, ErrWorkspaceLockedByRun
-	}
-
 	// Update the field.
 	workspace.Locked = false
 
@@ -888,8 +950,19 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	// Now that the workspace is unlocked, ask the run work item consumer to re-evaluate it
+	// so any runs that were waiting on the lock get queued (the work item consumer runs the
+	// QueueRun command for the workspace's pending runs).
+	if _, err = s.dbClient.WorkItemsQueue.AddWorkItemToQueue(txContext, &db.AddWorkItemToQueueInput{
+		Type:    db.QueuePendingRunsForWorkspaceType,
+		Payload: &db.QueuePendingRunsForWorkspacePayload{WorkspaceID: updatedWorkspace.Metadata.ID},
+	}); err != nil {
+		tracing.RecordError(span, err, "failed to enqueue pending runs work item")
+		return nil, err
+	}
+
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &updatedWorkspace.FullPath,
 			Action:        models.ActionUnlock,
 			TargetType:    models.TargetWorkspace,
@@ -1221,8 +1294,8 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		)
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &workspace.FullPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetStateVersion,
@@ -1762,6 +1835,10 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 		)
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Uploaded a configuration version.",
+		"workspaceID", cv.WorkspaceID,
+		"configurationVersionID", cv.Metadata.ID,
+	)
 	return nil
 }
 
@@ -2053,8 +2130,8 @@ func (s *service) MigrateWorkspace(ctx context.Context, workspaceID string, newG
 	}
 
 	// Generate an activity event on the workspace that was migrated.
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &migratedWorkspace.FullPath,
 			Action:        models.ActionMigrate,
 			TargetType:    models.TargetWorkspace,

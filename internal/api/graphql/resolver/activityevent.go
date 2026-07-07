@@ -229,6 +229,12 @@ func (r *ActivityEventPayloadResolver) ToActivityEventUpdateNamespaceMembershipP
 	return res, ok
 }
 
+// ToActivityEventUpdateRunPayload resolves the custom payload for a run update.
+func (r *ActivityEventPayloadResolver) ToActivityEventUpdateRunPayload() (*models.ActivityEventUpdateRunPayload, bool) {
+	res, ok := r.result.(*models.ActivityEventUpdateRunPayload)
+	return res, ok
+}
+
 // ToActivityEventRemoveNamespaceMembershipPayload resolves the custom payload for removing a namespace membership.
 func (r *ActivityEventPayloadResolver) ToActivityEventRemoveNamespaceMembershipPayload() (*ActivityEventRemoveNamespaceMembershipPayloadResolver, bool) {
 	res, ok := r.result.(*ActivityEventRemoveNamespaceMembershipPayloadResolver)
@@ -514,6 +520,14 @@ func (r *ActivityEventResolver) Payload() (*ActivityEventPayloadResolver, error)
 		case (r.activityEvent.Action == models.ActionUpdate) &&
 			(r.activityEvent.TargetType == models.TargetNamespaceMembership):
 			var payload models.ActivityEventUpdateNamespaceMembershipPayload
+			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return &ActivityEventPayloadResolver{result: &payload}, nil
+
+		case (r.activityEvent.Action == models.ActionUpdate) &&
+			(r.activityEvent.TargetType == models.TargetRun):
+			var payload models.ActivityEventUpdateRunPayload
 			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
 				return nil, err
 			}

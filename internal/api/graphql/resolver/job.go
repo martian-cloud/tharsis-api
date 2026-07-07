@@ -183,12 +183,12 @@ func (r *JobResolver) ID() graphql.ID {
 
 // Status resolver
 func (r *JobResolver) Status() models.JobStatus {
-	return r.job.Status
+	return r.job.GetStatus()
 }
 
 // Completed resolver
 func (r *JobResolver) Completed() bool {
-	return r.job.Status.IsFinal()
+	return r.job.GetStatus().IsFinal()
 }
 
 // Type resolver
@@ -260,7 +260,7 @@ func (r *JobResolver) Workspace(ctx context.Context) (*WorkspaceResolver, error)
 
 // CancelRequested resolver
 func (r *JobResolver) CancelRequested() bool {
-	return r.job.Status == models.JobCanceling
+	return r.job.GetStatus() == models.JobCanceling
 }
 
 // ForceCanceled resolver

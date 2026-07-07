@@ -7,9 +7,9 @@ import (
 	"context"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -57,21 +57,18 @@ type Service interface {
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	activityService activityevent.Service
+	logger   logger.Logger
+	dbClient *db.Client
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	activityService activityevent.Service,
 ) Service {
 	return &service{
-		logger:          logger,
-		dbClient:        dbClient,
-		activityService: activityService,
+		logger:   logger,
+		dbClient: dbClient,
 	}
 }
 
@@ -225,8 +222,8 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			Action:     models.ActionCreate,
 			TargetType: models.TargetRole,
 			TargetID:   createdRole.Metadata.ID,
@@ -296,8 +293,8 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			Action:     models.ActionUpdate,
 			TargetType: models.TargetRole,
 			TargetID:   updatedRole.Metadata.ID,

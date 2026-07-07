@@ -8,16 +8,21 @@ const STATUS_MAP: Record<string, { label: string }> = {
   apply_queued: { label: 'Apply Queued' },
   applying: { label: 'Applying' },
   canceled: { label: 'Canceled' },
+  discarded: { label: 'Discarded' },
   errored: { label: 'Errored' },
-  pending: { label: 'Pending' },
+  pending: { label: 'Waiting' },
   plan_queued: { label: 'Plan Queued' },
   planned: { label: 'Plan Created' },
   planned_and_finished: { label: 'Complete' },
   planning: { label: 'Planning' },
+  queuing: { label: 'Queuing' },
+  queuing_apply: { label: 'Apply Queuing' },
 };
 
 interface Props {
-  to: string
+  // When set, the chip renders as a link to this path; otherwise it is a plain
+  // (non-clickable) status indicator.
+  to?: string
   status: string
 }
 
@@ -28,6 +33,11 @@ function RunStatusChip(props: Props) {
     ? theme.palette.runStatus[props.status as keyof typeof theme.palette.runStatus]
     : theme.palette.runStatus.unknown;
   const label = entry?.label ?? 'unknown';
+  const sx = { color, borderColor: color, fontWeight: 500 };
+
+  if (!props.to) {
+    return <Chip size="small" variant="outlined" label={label} sx={sx} />;
+  }
 
   return (
     <Chip
@@ -37,7 +47,7 @@ function RunStatusChip(props: Props) {
       size="small"
       variant="outlined"
       label={label}
-      sx={{ color, borderColor: color, fontWeight: 500 }}
+      sx={sx}
     />
   );
 }

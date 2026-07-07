@@ -445,6 +445,10 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 		return nil, err
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Created a SCIM user.",
+		"userID", createdUser.Metadata.ID,
+	)
+
 	return createdUser, nil
 }
 
@@ -524,6 +528,10 @@ func (s *service) UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput
 		return nil, errors.Wrap(err, "failed to commit transaction", errors.WithSpan(span))
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Updated a SCIM user.",
+		"userID", updatedUser.Metadata.ID,
+	)
+
 	return updatedUser, nil
 }
 
@@ -556,7 +564,16 @@ func (s *service) DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceI
 			errors.WithErrorCode(errors.ENotFound))
 	}
 
-	return s.dbClient.Users.DeleteUser(ctx, user)
+	if err := s.dbClient.Users.DeleteUser(ctx, user); err != nil {
+		tracing.RecordError(span, err, "failed to delete user")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Deleted a SCIM user.",
+		"userID", user.Metadata.ID,
+	)
+
+	return nil
 }
 
 func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMGroupsInput) ([]models.Team, error) {
@@ -653,6 +670,10 @@ func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInp
 		}
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Created a SCIM group.",
+		"teamID", createdTeam.Metadata.ID,
+	)
+
 	return createdTeam, nil
 }
 
@@ -678,6 +699,10 @@ func (s *service) UpdateSCIMGroup(ctx context.Context, input *UpdateResourceInpu
 		tracing.RecordError(span, err, "failes to process SCIM group operations")
 		return nil, err
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Updated a SCIM group.",
+		"teamID", updatedTeam.Metadata.ID,
+	)
 
 	return updatedTeam, nil
 }
@@ -711,7 +736,16 @@ func (s *service) DeleteSCIMGroup(ctx context.Context, input *DeleteSCIMResource
 			errors.WithErrorCode(errors.ENotFound))
 	}
 
-	return s.dbClient.Teams.DeleteTeam(ctx, team)
+	if err := s.dbClient.Teams.DeleteTeam(ctx, team); err != nil {
+		tracing.RecordError(span, err, "failed to delete team")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Deleted a SCIM group.",
+		"teamID", team.Metadata.ID,
+	)
+
+	return nil
 }
 
 // processSCIMUserOperations processes the SCIM PATCH operations,

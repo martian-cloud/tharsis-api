@@ -113,8 +113,8 @@ var workspaceFieldList = append(
 	"name",
 	"group_id",
 	"description",
-	"current_job_id",
 	"current_state_version_id",
+	"current_apply_run_id",
 	"dirty_state",
 	"locked",
 	"max_job_duration",
@@ -236,10 +236,17 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		query = query.LeftJoin(goqu.T("workspace_assessments"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("workspace_assessments.workspace_id")}))
 
 		maxTime := time.Now().Add(-(*input.Filter.MinDurationSinceLastAssessment))
+		staleTime := time.Now().Add(-models.AssessmentStaleTimeout)
 
 		ex = ex.Append(goqu.Or(
 			goqu.I("workspace_assessments.id").IsNull(),
 			goqu.I("workspace_assessments.completed_at").Lte(maxTime.UTC()),
+			// An in-progress assessment that hasn't been updated within the stale
+			// timeout was abandoned; treat the workspace as eligible to reassess.
+			goqu.And(
+				goqu.I("workspace_assessments.completed_at").IsNull(),
+				goqu.I("workspace_assessments.updated_at").Lte(staleTime.UTC()),
+			),
 		))
 	}
 
@@ -332,8 +339,8 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 						"version":                  goqu.L("? + ?", goqu.C("version"), 1),
 						"updated_at":               timestamp,
 						"description":              nullableString(workspace.Description),
-						"current_job_id":           nullableString(workspace.CurrentJobID),
 						"current_state_version_id": nullableString(workspace.CurrentStateVersionID),
+						"current_apply_run_id":     workspace.CurrentApplyRunID,
 						"dirty_state":              workspace.DirtyState,
 						"locked":                   workspace.Locked,
 						"max_job_duration":         workspace.MaxJobDuration,
@@ -417,8 +424,8 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"name":                     workspace.Name,
 			"group_id":                 workspace.GroupID,
 			"description":              nullableString(workspace.Description),
-			"current_job_id":           nullableString(workspace.CurrentJobID),
 			"current_state_version_id": nullableString(workspace.CurrentStateVersionID),
+			"current_apply_run_id":     workspace.CurrentApplyRunID,
 			"dirty_state":              workspace.DirtyState,
 			"locked":                   workspace.Locked,
 			"max_job_duration":         workspace.MaxJobDuration,
@@ -746,7 +753,6 @@ func (w *workspaces) getSelectFields() []interface{} {
 
 func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 	var description sql.NullString
-	var currentJobID sql.NullString
 	var currentStateVersionID sql.NullString
 	var labelsJSON []byte
 
@@ -760,8 +766,8 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 		&ws.Name,
 		&ws.GroupID,
 		&description,
-		&currentJobID,
 		&currentStateVersionID,
+		&ws.CurrentApplyRunID,
 		&ws.DirtyState,
 		&ws.Locked,
 		&ws.MaxJobDuration,
@@ -785,10 +791,6 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 
 	if description.Valid {
 		ws.Description = description.String
-	}
-
-	if currentJobID.Valid {
-		ws.CurrentJobID = currentJobID.String
 	}
 
 	if currentStateVersionID.Valid {

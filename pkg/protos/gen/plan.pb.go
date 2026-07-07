@@ -25,31 +25,37 @@ const (
 type PlanStatus int32
 
 const (
-	PlanStatus_CANCELED PlanStatus = 0
-	PlanStatus_QUEUED   PlanStatus = 1
-	PlanStatus_ERRORED  PlanStatus = 2
-	PlanStatus_FINISHED PlanStatus = 3
-	PlanStatus_PENDING  PlanStatus = 4
-	PlanStatus_RUNNING  PlanStatus = 5
+	PlanStatus_UNSPECIFIED PlanStatus = 0
+	PlanStatus_CREATED     PlanStatus = 1
+	PlanStatus_PENDING     PlanStatus = 2
+	PlanStatus_QUEUED      PlanStatus = 3
+	PlanStatus_RUNNING     PlanStatus = 4
+	PlanStatus_FINISHED    PlanStatus = 5
+	PlanStatus_ERRORED     PlanStatus = 6
+	PlanStatus_CANCELED    PlanStatus = 7
 )
 
 // Enum value maps for PlanStatus.
 var (
 	PlanStatus_name = map[int32]string{
-		0: "CANCELED",
-		1: "QUEUED",
-		2: "ERRORED",
-		3: "FINISHED",
-		4: "PENDING",
-		5: "RUNNING",
+		0: "UNSPECIFIED",
+		1: "CREATED",
+		2: "PENDING",
+		3: "QUEUED",
+		4: "RUNNING",
+		5: "FINISHED",
+		6: "ERRORED",
+		7: "CANCELED",
 	}
 	PlanStatus_value = map[string]int32{
-		"CANCELED": 0,
-		"QUEUED":   1,
-		"ERRORED":  2,
-		"FINISHED": 3,
-		"PENDING":  4,
-		"RUNNING":  5,
+		"UNSPECIFIED": 0,
+		"CREATED":     1,
+		"PENDING":     2,
+		"QUEUED":      3,
+		"RUNNING":     4,
+		"FINISHED":    5,
+		"ERRORED":     6,
+		"CANCELED":    7,
 	}
 )
 
@@ -130,7 +136,6 @@ type UpdatePlanRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Version       *int64                 `protobuf:"varint,2,opt,name=version,proto3,oneof" json:"version,omitempty"`
-	Status        PlanStatus             `protobuf:"varint,3,opt,name=status,proto3,enum=martiancloud.tharsis.api.plan.PlanStatus" json:"status,omitempty"`
 	HasChanges    bool                   `protobuf:"varint,4,opt,name=has_changes,json=hasChanges,proto3" json:"has_changes,omitempty"`
 	ErrorMessage  *string                `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -179,13 +184,6 @@ func (x *UpdatePlanRequest) GetVersion() int64 {
 		return *x.Version
 	}
 	return 0
-}
-
-func (x *UpdatePlanRequest) GetStatus() PlanStatus {
-	if x != nil {
-		return x.Status
-	}
-	return PlanStatus_CANCELED
 }
 
 func (x *UpdatePlanRequest) GetHasChanges() bool {
@@ -265,14 +263,17 @@ func (x *PlanSummary) GetResourceDestructions() int32 {
 
 // Plan represents a Terraform plan.
 type Plan struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	ErrorMessage  *string                `protobuf:"bytes,3,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
-	HasChanges    bool                   `protobuf:"varint,4,opt,name=has_changes,json=hasChanges,proto3" json:"has_changes,omitempty"`
-	Summary       *PlanSummary           `protobuf:"bytes,5,opt,name=summary,proto3" json:"summary,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	// Deprecated: Marked as deprecated in plan.proto.
+	DeprecatedStatus string       `protobuf:"bytes,2,opt,name=deprecated_status,json=deprecatedStatus,proto3" json:"deprecated_status,omitempty"`
+	ErrorMessage     *string      `protobuf:"bytes,3,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
+	HasChanges       bool         `protobuf:"varint,4,opt,name=has_changes,json=hasChanges,proto3" json:"has_changes,omitempty"`
+	Summary          *PlanSummary `protobuf:"bytes,5,opt,name=summary,proto3" json:"summary,omitempty"`
+	LatestJobId      *string      `protobuf:"bytes,6,opt,name=latest_job_id,json=latestJobId,proto3,oneof" json:"latest_job_id,omitempty"`
+	Status           PlanStatus   `protobuf:"varint,7,opt,name=status,proto3,enum=martiancloud.tharsis.api.plan.PlanStatus" json:"status,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Plan) Reset() {
@@ -312,9 +313,10 @@ func (x *Plan) GetMetadata() *ResourceMetadata {
 	return nil
 }
 
-func (x *Plan) GetStatus() string {
+// Deprecated: Marked as deprecated in plan.proto.
+func (x *Plan) GetDeprecatedStatus() string {
 	if x != nil {
-		return x.Status
+		return x.DeprecatedStatus
 	}
 	return ""
 }
@@ -340,6 +342,20 @@ func (x *Plan) GetSummary() *PlanSummary {
 	return nil
 }
 
+func (x *Plan) GetLatestJobId() string {
+	if x != nil && x.LatestJobId != nil {
+		return *x.LatestJobId
+	}
+	return ""
+}
+
+func (x *Plan) GetStatus() PlanStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PlanStatus_UNSPECIFIED
+}
+
 var File_plan_proto protoreflect.FileDescriptor
 
 const file_plan_proto_rawDesc = "" +
@@ -347,38 +363,42 @@ const file_plan_proto_rawDesc = "" +
 	"\n" +
 	"plan.proto\x12\x1dmartiancloud.tharsis.api.plan\x1a\x0emetadata.proto\"$\n" +
 	"\x12GetPlanByIDRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xee\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xb1\x01\n" +
 	"\x11UpdatePlanRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
-	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01\x12A\n" +
-	"\x06status\x18\x03 \x01(\x0e2).martiancloud.tharsis.api.plan.PlanStatusR\x06status\x12\x1f\n" +
+	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01\x12\x1f\n" +
 	"\vhas_changes\x18\x04 \x01(\bR\n" +
 	"hasChanges\x12(\n" +
 	"\rerror_message\x18\x05 \x01(\tH\x01R\ferrorMessage\x88\x01\x01B\n" +
 	"\n" +
 	"\b_versionB\x10\n" +
-	"\x0e_error_message\"\x9c\x01\n" +
+	"\x0e_error_messageJ\x04\b\x03\x10\x04\"\x9c\x01\n" +
 	"\vPlanSummary\x12-\n" +
 	"\x12resource_additions\x18\x01 \x01(\x05R\x11resourceAdditions\x12)\n" +
 	"\x10resource_changes\x18\x02 \x01(\x05R\x0fresourceChanges\x123\n" +
-	"\x15resource_destructions\x18\x03 \x01(\x05R\x14resourceDestructions\"\x92\x02\n" +
+	"\x15resource_destructions\x18\x03 \x01(\x05R\x14resourceDestructions\"\xa9\x03\n" +
 	"\x04Plan\x12O\n" +
-	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\x12(\n" +
+	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12/\n" +
+	"\x11deprecated_status\x18\x02 \x01(\tB\x02\x18\x01R\x10deprecatedStatus\x12(\n" +
 	"\rerror_message\x18\x03 \x01(\tH\x00R\ferrorMessage\x88\x01\x01\x12\x1f\n" +
 	"\vhas_changes\x18\x04 \x01(\bR\n" +
 	"hasChanges\x12D\n" +
-	"\asummary\x18\x05 \x01(\v2*.martiancloud.tharsis.api.plan.PlanSummaryR\asummaryB\x10\n" +
-	"\x0e_error_message*[\n" +
+	"\asummary\x18\x05 \x01(\v2*.martiancloud.tharsis.api.plan.PlanSummaryR\asummary\x12'\n" +
+	"\rlatest_job_id\x18\x06 \x01(\tH\x01R\vlatestJobId\x88\x01\x01\x12A\n" +
+	"\x06status\x18\a \x01(\x0e2).martiancloud.tharsis.api.plan.PlanStatusR\x06statusB\x10\n" +
+	"\x0e_error_messageB\x10\n" +
+	"\x0e_latest_job_id*y\n" +
 	"\n" +
-	"PlanStatus\x12\f\n" +
-	"\bCANCELED\x10\x00\x12\n" +
+	"PlanStatus\x12\x0f\n" +
+	"\vUNSPECIFIED\x10\x00\x12\v\n" +
+	"\aCREATED\x10\x01\x12\v\n" +
+	"\aPENDING\x10\x02\x12\n" +
 	"\n" +
-	"\x06QUEUED\x10\x01\x12\v\n" +
-	"\aERRORED\x10\x02\x12\f\n" +
-	"\bFINISHED\x10\x03\x12\v\n" +
-	"\aPENDING\x10\x04\x12\v\n" +
-	"\aRUNNING\x10\x05BIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
+	"\x06QUEUED\x10\x03\x12\v\n" +
+	"\aRUNNING\x10\x04\x12\f\n" +
+	"\bFINISHED\x10\x05\x12\v\n" +
+	"\aERRORED\x10\x06\x12\f\n" +
+	"\bCANCELED\x10\aBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var (
 	file_plan_proto_rawDescOnce sync.Once
@@ -403,9 +423,9 @@ var file_plan_proto_goTypes = []any{
 	(*ResourceMetadata)(nil),   // 5: martiancloud.tharsis.api.metadata.ResourceMetadata
 }
 var file_plan_proto_depIdxs = []int32{
-	0, // 0: martiancloud.tharsis.api.plan.UpdatePlanRequest.status:type_name -> martiancloud.tharsis.api.plan.PlanStatus
-	5, // 1: martiancloud.tharsis.api.plan.Plan.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	3, // 2: martiancloud.tharsis.api.plan.Plan.summary:type_name -> martiancloud.tharsis.api.plan.PlanSummary
+	5, // 0: martiancloud.tharsis.api.plan.Plan.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	3, // 1: martiancloud.tharsis.api.plan.Plan.summary:type_name -> martiancloud.tharsis.api.plan.PlanSummary
+	0, // 2: martiancloud.tharsis.api.plan.Plan.status:type_name -> martiancloud.tharsis.api.plan.PlanStatus
 	3, // [3:3] is the sub-list for method output_type
 	3, // [3:3] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name

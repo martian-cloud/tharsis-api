@@ -488,6 +488,72 @@ func TestGetWorkspaceAssessments(t *testing.T) {
 	}
 }
 
+func TestGetWorkspaceAssessmentsInProgressExcludesStale(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.Nil(t, err)
+
+	freshWorkspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "fresh-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.Nil(t, err)
+
+	staleWorkspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "stale-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.Nil(t, err)
+
+	currentTime := time.Now().UTC()
+
+	// Fresh in-progress assessment: no completed_at, updated_at defaults to now.
+	_, err = testClient.client.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, &models.WorkspaceAssessment{
+		WorkspaceID:        freshWorkspace.Metadata.ID,
+		StartedAtTimestamp: currentTime,
+	})
+	require.Nil(t, err)
+
+	staleAssessment, err := testClient.client.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, &models.WorkspaceAssessment{
+		WorkspaceID:        staleWorkspace.Metadata.ID,
+		StartedAtTimestamp: currentTime,
+	})
+	require.Nil(t, err)
+
+	// Backdate the stale assessment's updated_at beyond the stale timeout, simulating a
+	// run that was abandoned before completing.
+	staleTimestamp := currentTime.Add(-2 * models.AssessmentStaleTimeout)
+	_, err = testClient.client.getConnection(ctx).Exec(ctx,
+		"UPDATE workspace_assessments SET updated_at = $1 WHERE id = $2",
+		staleTimestamp, staleAssessment.Metadata.ID)
+	require.Nil(t, err)
+
+	t.Run("in progress excludes the stale assessment", func(t *testing.T) {
+		result, err := testClient.client.WorkspaceAssessments.GetWorkspaceAssessments(ctx, &GetWorkspaceAssessmentsInput{
+			Filter: &WorkspaceAssessmentFilter{InProgress: ptr.Bool(true)},
+		})
+		require.Nil(t, err)
+		require.Len(t, result.WorkspaceAssessments, 1)
+		assert.Equal(t, freshWorkspace.Metadata.ID, result.WorkspaceAssessments[0].WorkspaceID)
+	})
+
+	t.Run("not in progress includes the stale assessment", func(t *testing.T) {
+		result, err := testClient.client.WorkspaceAssessments.GetWorkspaceAssessments(ctx, &GetWorkspaceAssessmentsInput{
+			Filter: &WorkspaceAssessmentFilter{InProgress: ptr.Bool(false)},
+		})
+		require.Nil(t, err)
+		require.Len(t, result.WorkspaceAssessments, 1)
+		assert.Equal(t, staleWorkspace.Metadata.ID, result.WorkspaceAssessments[0].WorkspaceID)
+	})
+}
+
 func TestGetWorkspaceAssessmentsWithPaginationAndSorting(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)

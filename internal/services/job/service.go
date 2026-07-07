@@ -5,20 +5,24 @@ package job
 
 import (
 	"context"
+	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"io"
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/commands"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -30,7 +34,17 @@ import (
 const (
 	// Number of concurrent jobs a given runner can execute.
 	runnerJobsLimit int = 100
+	// pollInterval is the fallback poll interval used while blocking on a
+	// wake-up event (a claimable job appearing, or one of the runner's jobs finishing),
+	// in case that event is missed. On each interval the surrounding loop re-queries the
+	// authoritative DB state instead of waiting indefinitely.
+	pollInterval = 5 * time.Minute
 )
+
+// errRunnerJobLimitReached signals the runner is at its concurrent-job limit. It is
+// internal control flow: getNextAvailableQueuedJob catches it and waits for one of
+// the runner's jobs to finish; it is never returned to the caller.
+var errRunnerJobLimitReached = errors.New("runner has reached its concurrent job limit")
 
 // RunnerAvailabilityStatusType describes a job's runner availability status
 type RunnerAvailabilityStatusType string
@@ -44,6 +58,13 @@ const (
 	RunnerAvailabilityStatusAvailableType RunnerAvailabilityStatusType = "AVAILABLE"
 	// RunnerAvailabilityStatusAssignedType indicates the job has been assigned to a runner
 	RunnerAvailabilityStatusAssignedType RunnerAvailabilityStatusType = "ASSIGNED"
+)
+
+// Prometheus Metrics
+var (
+	jobPendingDuration = metric.NewHistogram("job_pending_duration", "Amount of time a job spent in pending state.", 1, 2, 10)
+	jobsClaimedCount   = metric.NewCounterVec("jobs_claimed_count", "Number of jobs claimed per runner.", []string{"runner_trn"})
+	runnerJobsGauge    = metric.NewGaugeVec("runner_jobs_count", "Number of active jobs per runner.", []string{"runner_trn"})
 )
 
 // GetJobsInput includes options for getting jobs
@@ -60,6 +81,8 @@ type GetJobsInput struct {
 	WorkspaceID *string
 	// RunnerID filters the jobs by the specified runner ID
 	RunnerID *string
+	// RunID filters the jobs by the specified run ID
+	RunID *string
 }
 
 // ClaimJobResponse is returned when a runner claims a Job
@@ -124,22 +147,24 @@ type Service interface {
 type service struct {
 	logger            logger.Logger
 	dbClient          *db.Client
+	cmdProcessor      engine.CmdProcessor
+	cmdFactory        *commands.Factory
 	signingKeyManager auth.SigningKeyManager
 	logStreamManager  logstream.Manager
 	eventManager      *events.EventManager
-	runStateManager   state.RunStateManager
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	cmdProcessor engine.CmdProcessor,
+	cmdFactory *commands.Factory,
 	signingKeyManager auth.SigningKeyManager,
 	logStreamManager logstream.Manager,
 	eventManager *events.EventManager,
-	runStateManager state.RunStateManager,
 ) Service {
-	return &service{logger, dbClient, signingKeyManager, logStreamManager, eventManager, runStateManager}
+	return &service{logger, dbClient, cmdProcessor, cmdFactory, signingKeyManager, logStreamManager, eventManager}
 }
 
 func (s *service) GetJobByID(ctx context.Context, jobID string) (*models.Job, error) {
@@ -276,6 +301,7 @@ func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsRes
 			JobType:     input.Type,
 			WorkspaceID: input.WorkspaceID,
 			RunnerID:    input.RunnerID,
+			RunID:       input.RunID,
 		},
 	}
 
@@ -350,13 +376,91 @@ func (s *service) SetJobStatus(ctx context.Context, jobID string, status models.
 		return nil, err
 	}
 
-	job.Status = status
+	// Check if job status already equals the desired status
+	if job.GetStatus() == status {
+		return job, nil
+	}
 
-	updatedJob, err := s.runStateManager.UpdateJob(ctx, job)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to update job status")
+	oldStatus := job.GetStatus()
+
+	// Persist the job status change, complete the log stream when the job reaches a
+	// final state, and sync the run node together. The command processor owns the
+	// transaction, so these commit atomically and its post-commit handlers (failure
+	// email, run metrics) only fire after a durable commit. The hook re-reads the
+	// job inside the transaction so it stays correct if the command is retried on an
+	// optimistic-lock conflict (e.g. a concurrent cancellation advancing the job row).
+	var updatedJob *models.Job
+	cmd := s.cmdFactory.NewSyncJobStatus(job.RunID, job.Type, jobID, status, func(txCtx context.Context) error {
+		current, err := s.dbClient.Jobs.GetJobByID(txCtx, jobID)
+		if err != nil {
+			return err
+		}
+		if current == nil {
+			return errors.New("job with ID %s not found", jobID, errors.WithErrorCode(errors.ENotFound))
+		}
+
+		if err := current.SetStatus(status); err != nil {
+			tracing.RecordError(span, err, "invalid job status transition")
+			return errors.Wrap(err, "cannot set job status", errors.WithErrorCode(errors.EConflict))
+		}
+
+		now := time.Now()
+		switch status {
+		case models.JobRunning:
+			current.Timestamps.RunningTimestamp = &now
+		case models.JobFinished, models.JobFailed, models.JobCanceled:
+			current.Timestamps.FinishedTimestamp = &now
+		}
+
+		updatedJob, err = s.dbClient.Jobs.UpdateJob(txCtx, current)
+		if err != nil {
+			return err
+		}
+
+		// If job is completed, mark log stream as completed
+		if current.GetStatus().IsFinal() {
+			logStream, err := s.dbClient.LogStreams.GetLogStreamByJobID(txCtx, current.Metadata.ID)
+			if err != nil {
+				return err
+			}
+			if logStream != nil {
+				logStream.Completed = true
+				if _, err = s.dbClient.LogStreams.UpdateLogStream(txCtx, logStream); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
+		tracing.RecordError(span, err, "failed to sync job status to run")
 		return nil, err
 	}
+
+	// A successful ProcessCommand always ran the PersistJob hook (which sets
+	// updatedJob); guard defensively so a future change that returns nil without
+	// running the hook can't panic here.
+	if updatedJob == nil {
+		return nil, errors.New("job status update did not persist the job")
+	}
+
+	// Record the pending-state duration only after the transition has durably
+	// committed (and using the committed timestamps, so an OLE retry can't double-count).
+	if status == models.JobRunning &&
+		updatedJob.Timestamps.PendingTimestamp != nil &&
+		updatedJob.Timestamps.RunningTimestamp != nil &&
+		updatedJob.RunnerPath != nil {
+		jobPendingDuration.Observe(updatedJob.Timestamps.RunningTimestamp.Sub(*updatedJob.Timestamps.PendingTimestamp).Seconds())
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Updated a job.",
+		"workspaceID", job.WorkspaceID,
+		"oldJobStatus", oldStatus,
+		"newJobStatus", updatedJob.GetStatus(),
+		"jobID", updatedJob.Metadata.ID,
+	)
 
 	return updatedJob, nil
 }
@@ -507,7 +611,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 			return
 		}
 
-		if job.Status == models.JobCanceling || job.Status == models.JobCanceled {
+		if job.GetStatus() == models.JobCanceling || job.GetStatus() == models.JobCanceled {
 			select {
 			case <-innerCtx.Done():
 			case outgoing <- &CancellationEvent{Job: *job}:
@@ -591,7 +695,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobRespo
 	}
 
 	for {
-		job, err := s.getNextAvailableQueuedJob(ctx, runner.Metadata.ID)
+		job, err := s.getNextAvailableQueuedJob(ctx, runner)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to get next available queued job")
 			return nil, err
@@ -600,13 +704,16 @@ func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobRespo
 		// Attempt to claim job
 		now := time.Now()
 		job.Timestamps.PendingTimestamp = &now
-		job.Status = models.JobPending
+		if err := job.SetStatus(models.JobPending); err != nil {
+			tracing.RecordError(span, err, "failed to set job status to pending")
+			return nil, err
+		}
 		job.RunnerID = &runner.Metadata.ID
 		job.RunnerPath = ptr.String(runner.GetResourcePath())
 
-		job, err = s.runStateManager.UpdateJob(ctx, job)
+		job, err = s.dbClient.Jobs.UpdateJob(ctx, job)
 		if err != nil {
-			if err == db.ErrOptimisticLockError {
+			if goerrors.Is(err, db.ErrOptimisticLockError) {
 				continue
 			}
 			tracing.RecordError(span, err, "failed to update job")
@@ -632,6 +739,8 @@ func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobRespo
 				tracing.RecordError(span, err, "failed to generate token")
 				return nil, err
 			}
+
+			jobsClaimedCount.WithLabelValues(runner.Metadata.TRN).Inc()
 
 			s.logger.WithContextFields(ctx).Infow("Claimed a job.",
 				"workspaceID", job.WorkspaceID,
@@ -715,6 +824,11 @@ func (s *service) WriteLogs(ctx context.Context, jobID string, startOffset int, 
 		return 0, err
 	}
 
+	s.logger.WithContextFields(ctx).Debugw("Wrote job logs.",
+		"jobID", jobID,
+		"startOffset", startOffset,
+		"size", updatedStream.Size,
+	)
 	return updatedStream.Size, nil
 }
 
@@ -949,42 +1063,154 @@ func (s *service) GetLogStreamsByJobIDs(ctx context.Context, idList []string) ([
 	return []models.LogStream{}, nil
 }
 
-func (s *service) getNextAvailableQueuedJob(ctx context.Context, runnerID string) (*models.Job, error) {
-	// Subscribe to job create and update events
-	jobSubscription := events.Subscription{
-		Type:    events.JobSubscription,
-		Actions: []events.SubscriptionAction{events.CreateAction, events.UpdateAction},
-	}
-	// Subscribe to runner events because a runner may become available
-	runnerSubscription := events.Subscription{
-		Type:    events.RunnerSubscription,
-		Actions: []events.SubscriptionAction{},
-	}
-	// Subscribe to workspace delete events because deleting a workspace may cause a job in a different workspace to become available
-	workspaceSubscription := events.Subscription{
-		Type:    events.WorkspaceSubscription,
-		Actions: []events.SubscriptionAction{events.UpdateAction, events.DeleteAction},
-	}
+func (s *service) getNextAvailableQueuedJob(ctx context.Context, runner *models.Runner) (*models.Job, error) {
+	runnerID := runner.Metadata.ID
 
-	// Subscribe to job and run events
-	subscriber := s.eventManager.Subscribe([]events.Subscription{jobSubscription, runnerSubscription, workspaceSubscription})
+	// Wake on job-create events for unassigned, queued jobs this runner could claim
+	// (filtered by tags and namespace from the event payload, so ineligible creations
+	// never trigger a query) and on this runner's own events, since a tag change alters
+	// which jobs it can claim. Either way the loop re-queries getNextAvailableJob, which
+	// is authoritative (it re-reads the runner and applies the tag/namespace filter).
+	subscriber := s.eventManager.Subscribe([]events.Subscription{
+		{
+			Type:    events.JobSubscription,
+			Actions: []events.SubscriptionAction{events.CreateAction},
+			Filter:  s.claimableJobEventFilter(runner),
+		},
+		{
+			Type: events.RunnerSubscription,
+			ID:   runnerID,
+		},
+	})
 	defer s.eventManager.Unsubscribe(subscriber)
 
-	// Wait for next available run
 	for {
 		job, err := s.getNextAvailableJob(ctx, runnerID)
-		if err != nil {
+		switch {
+		case goerrors.Is(err, errRunnerJobLimitReached):
+			// At capacity: wait for one of the runner's jobs to finish, then re-query.
+			if err := s.waitForRunnerJobSlot(ctx, runnerID); err != nil {
+				return nil, err
+			}
+		case err != nil:
 			return nil, err
-		}
-
-		if job != nil {
+		case job != nil:
 			return job, nil
+		default:
+			// No claimable job right now: wait for a job-create or runner event,
+			// falling back to a poll if no event arrives within the interval (in case
+			// an event was missed), then re-query getNextAvailableJob.
+			waitCtx, cancel := context.WithTimeout(ctx, pollInterval)
+			_, err := subscriber.GetEvent(waitCtx)
+			cancel()
+
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			if err != nil && !errors.IsDeadlineExceededError(err) {
+				return nil, err
+			}
+		}
+	}
+}
+
+// waitForRunnerJobSlot blocks until the runner drops below its concurrent-job
+// limit. It is driven by update events for the runner's own finishing jobs, with a
+// polling safety net in case an event is missed.
+func (s *service) waitForRunnerJobSlot(ctx context.Context, runnerID string) error {
+	subscriber := s.eventManager.Subscribe([]events.Subscription{
+		{
+			Type:    events.JobSubscription,
+			Actions: []events.SubscriptionAction{events.UpdateAction},
+			Filter:  runnerJobFinishedFilter(runnerID),
+		},
+	})
+	defer s.eventManager.Unsubscribe(subscriber)
+
+	for {
+		count, err := s.dbClient.Jobs.GetJobCountForRunner(ctx, runnerID)
+		if err != nil {
+			return err
+		}
+		if count < runnerJobsLimit {
+			return nil
 		}
 
-		_, err = subscriber.GetEvent(ctx)
-		if err != nil {
-			return nil, err
+		// Wait for one of the runner's jobs to finish, falling back to a poll if no
+		// event arrives within the interval.
+		waitCtx, cancel := context.WithTimeout(ctx, pollInterval)
+		_, err = subscriber.GetEvent(waitCtx)
+		cancel()
+
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
+		if err != nil && !errors.IsDeadlineExceededError(err) {
+			return err
+		}
+	}
+}
+
+// claimableJobEventFilter returns an event filter that passes only job-create events
+// the given runner could plausibly claim, evaluated entirely from the event payload so
+// that obviously-ineligible job creations never wake the claim loop. A job qualifies
+// when it is unassigned, queued, and its tags are compatible with the runner. Namespace
+// scoping (a group runner only claiming jobs in its subtree) is left to the
+// authoritative getNextAvailableJob query, which already filters by namespace path; a
+// group runner woken by a tag-compatible job outside its subtree simply gets nil back
+// and waits again.
+//
+// The runner's tags are captured when the subscription is created; a later change is not
+// reflected here. That is safe because the claim loop re-reads the runner authoritatively
+// on each getNextAvailableJob call and wakes on the runner's own events, with a poll
+// fallback — so at worst a job made newly eligible by a runner change is picked up one
+// poll interval late rather than missed.
+func (s *service) claimableJobEventFilter(runner *models.Runner) func(json.RawMessage) bool {
+	return func(data json.RawMessage) bool {
+		var d db.JobEventData
+		if err := json.Unmarshal(data, &d); err != nil {
+			return false
+		}
+
+		// Only unassigned, queued jobs are claimable.
+		if d.RunnerID != nil || d.Status != string(models.JobQueued) {
+			return false
+		}
+
+		// Tag eligibility mirrors getNextAvailableJob's tag-superset filter.
+		return runnerCanRunJobTags(runner, d.Tags)
+	}
+}
+
+// runnerCanRunJobTags reports whether the runner is allowed to run a job with the given
+// tags, mirroring getNextAvailableJob's tag-superset filter: a job is eligible only if
+// its tags are a subset of the runner's tags, and untagged jobs only when the runner is
+// configured to run them.
+func runnerCanRunJobTags(runner *models.Runner, jobTags []string) bool {
+	if len(jobTags) == 0 {
+		return runner.RunUntaggedJobs
+	}
+	for _, tag := range jobTags {
+		if !slices.Contains(runner.Tags, tag) {
+			return false
+		}
+	}
+	return true
+}
+
+// runnerJobFinishedFilter returns an event filter that passes only job-update
+// events for the given runner whose job has reached a final state (which frees a
+// concurrency slot).
+func runnerJobFinishedFilter(runnerID string) func(data json.RawMessage) bool {
+	return func(data json.RawMessage) bool {
+		var d struct {
+			RunnerID *string `json:"runner_id"`
+			Status   string  `json:"status"`
+		}
+		if err := json.Unmarshal(data, &d); err != nil {
+			return false
+		}
+		return d.RunnerID != nil && *d.RunnerID == runnerID && models.JobStatus(d.Status).IsFinal()
 	}
 }
 
@@ -994,11 +1220,13 @@ func (s *service) isRunnerBelowJobsLimit(ctx context.Context, runner *models.Run
 	if err != nil {
 		return false, err
 	}
+	runnerJobsGauge.WithLabelValues(runner.Metadata.TRN).Set(float64(runnerJobsCount))
 	return runnerJobsCount < runnerJobsLimit, nil
 }
 
-// getNextAvailableJob returns a new job when workspace doesn't have an active job
-// and the runner is not full.
+// getNextAvailableJob returns the next queued job the runner can claim, or nil if
+// none is available. It returns errRunnerJobLimitReached when the runner is already
+// at its concurrent-job limit.
 func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*models.Job, error) {
 	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, runnerID)
 	if err != nil {
@@ -1014,6 +1242,16 @@ func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*mo
 		return nil, nil
 	}
 
+	// The job limit is runner-global, so check it before querying: a full runner
+	// can't claim anything until one of its jobs finishes.
+	below, err := s.isRunnerBelowJobsLimit(ctx, runner)
+	if err != nil {
+		return nil, err
+	}
+	if !below {
+		return nil, errRunnerJobLimitReached
+	}
+
 	runnerTags := runner.Tags
 	if runnerTags == nil {
 		runnerTags = []string{}
@@ -1027,52 +1265,34 @@ func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*mo
 		tagFilter.ExcludeUntaggedJobs = ptr.Bool(true)
 	}
 
+	var namespacePathFilter *string
+	if runner.Type == models.GroupRunnerType {
+		// Check if this group runner is in an ancestor group of the job's workspace to claim this job
+		namespacePathFilter = new(runner.GetGroupPath())
+	}
+
 	// Request next available Job
 	queuedStatus := models.JobQueued
 	sortBy := db.JobSortableFieldCreatedAtAsc
+	limit := int32(1)
 	jobsResult, err := s.dbClient.Jobs.GetJobs(ctx, &db.GetJobsInput{
 		Sort: &sortBy,
 		Filter: &db.JobFilter{
-			JobStatus: &queuedStatus,
-			TagFilter: tagFilter,
+			JobStatus:           &queuedStatus,
+			TagFilter:           tagFilter,
+			NamespacePathPrefix: namespacePathFilter,
+		},
+		PaginationOptions: &pagination.Options{
+			First: &limit,
 		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to request next job %v", err)
 	}
 
-	for _, job := range jobsResult.Jobs {
-		ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, job.WorkspaceID)
-		if err != nil {
-			return nil, err
-		}
-
-		if ws == nil {
-			// This will only occur if the workspace is deleted after the job is queried
-			continue
-		}
-
-		if ws.Locked {
-			continue
-		}
-
-		if runner.Type == models.GroupRunnerType {
-			// Check if this group runner is in an ancestor group of the job's workspace to claim this job
-			runnerGroupPath := runner.GetGroupPath()
-			if runnerGroupPath != ws.GetGroupPath() {
-				if !strings.HasPrefix(ws.GetGroupPath(), fmt.Sprintf("%s/", runnerGroupPath)) {
-					continue
-				}
-			}
-		}
-
-		below, err := s.isRunnerBelowJobsLimit(ctx, runner)
-		if err != nil {
-			return nil, err
-		}
-		if below {
-			return &job, nil
-		}
+	if len(jobsResult.Jobs) > 0 {
+		return &jobsResult.Jobs[0], nil
 	}
+
 	return nil, nil
 }

@@ -310,8 +310,7 @@ func (c *oidcController) Token(w http.ResponseWriter, r *http.Request) {
 			AccessToken: createSessionResponse.AccessToken,
 			ExpiresIn:   createSessionResponse.ExpiresIn,
 		}, http.StatusOK)
-	default:
-		// authorization_code grant type
+	case "authorization_code":
 		redirectURI := r.Form.Get("redirect_uri")
 		code := r.Form.Get("code")
 		codeVerifier := r.Form.Get("code_verifier")
@@ -330,6 +329,10 @@ func (c *oidcController) Token(w http.ResponseWriter, r *http.Request) {
 			AccessToken: response.AccessToken,
 			ExpiresIn:   response.ExpiresIn,
 		}, http.StatusOK)
+	default:
+		// Reject unsupported grant types explicitly rather than silently falling
+		// through to the authorization_code flow.
+		c.respWriter.RespondWithError(ctx, w, errors.New("unsupported grant_type %q", grantType, errors.WithErrorCode(errors.EInvalid)))
 	}
 }
 

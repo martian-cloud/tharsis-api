@@ -1,4 +1,4 @@
-import { Avatar, Box, Stack, Typography } from '@mui/material';
+import { Avatar, Box, Chip, Stack, Typography } from '@mui/material';
 import Link from '@mui/material/Link';
 import ListItemButton from '@mui/material/ListItemButton';
 import { useTheme } from '@mui/material/styles';
@@ -27,6 +27,7 @@ function WorkspaceListItem(props: Props) {
             name
             description
             fullPath
+            destroyed
             labels {
                 key
                 value
@@ -56,15 +57,18 @@ function WorkspaceListItem(props: Props) {
                 }
             }}>
                 <Box sx={{ flex: 1 }}>
-                    <Link
-                        component="div"
-                        underline="hover"
-                        variant="body1"
-                        color="textPrimary"
-                        sx={{ fontWeight: "500" }}
-                    >
-                        {data.name}
-                    </Link>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <Link
+                            component="div"
+                            underline="hover"
+                            variant="body1"
+                            color="textPrimary"
+                            sx={{ fontWeight: "500" }}
+                        >
+                            {data.name}
+                        </Link>
+                        {data.destroyed && <Chip size="small" label="Destroyed" sx={{ color: 'runStatus.destroy' }} />}
+                    </Stack>
                     <Typography variant="body2" color="textSecondary">{data.description}</Typography>
                     {data.labels.length > 0 && (
                         <Box sx={{ mt: 0.5 }}>

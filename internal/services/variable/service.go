@@ -9,11 +9,11 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -90,7 +90,6 @@ type service struct {
 	logger                          logger.Logger
 	dbClient                        *db.Client
 	limitChecker                    limits.LimitChecker
-	activityService                 activityevent.Service
 	secretManager                   secret.Manager
 	disableSensitiveVariableFeature bool
 }
@@ -100,7 +99,6 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	activityService activityevent.Service,
 	secretManager secret.Manager,
 	disableSensitiveVariableFeature bool,
 ) Service {
@@ -108,7 +106,6 @@ func NewService(
 		logger:                          logger,
 		dbClient:                        dbClient,
 		limitChecker:                    limitChecker,
-		activityService:                 activityService,
 		secretManager:                   secretManager,
 		disableSensitiveVariableFeature: disableSensitiveVariableFeature,
 	}
@@ -571,8 +568,8 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 		return errors.Wrap(err, "failed to get target type ID", errors.WithSpan(span))
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &input.NamespacePath,
 			Action:        models.ActionSetVariables,
 			TargetType:    targetType,
@@ -581,7 +578,16 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Set variables for namespace.",
+		"namespacePath", input.NamespacePath,
+		"category", input.Category,
+	)
+
+	return nil
 }
 
 func (s *service) CreateVariable(ctx context.Context, input *CreateVariableInput) (*models.Variable, error) {
@@ -683,8 +689,8 @@ func (s *service) CreateVariable(ctx context.Context, input *CreateVariableInput
 		return nil, errors.Wrap(err, "failed to check limit for variables per namespace", errors.WithSpan(span))
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &input.NamespacePath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetVariable,
@@ -797,8 +803,8 @@ func (s *service) UpdateVariable(ctx context.Context, input *UpdateVariableInput
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &updatedVariable.NamespacePath,
 			Action:        models.ActionUpdate,
 			TargetType:    models.TargetVariable,
@@ -876,8 +882,8 @@ func (s *service) DeleteVariable(ctx context.Context, input *DeleteVariableInput
 	}
 
 	// Record a DeleteChildResource activity event whether the variable was group-level or workspace-level.
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &variable.NamespacePath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    targetType,
@@ -892,7 +898,17 @@ func (s *service) DeleteVariable(ctx context.Context, input *DeleteVariableInput
 		return err
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Deleted a variable.",
+		"namespacePath", variable.NamespacePath,
+		"variableID", variable.Metadata.ID,
+	)
+
+	return nil
 }
 
 // getTargetTypeID returns the target type and the target ID, whether the target is a group or a workspace.

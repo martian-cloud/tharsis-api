@@ -98,13 +98,17 @@ func TestListen(t *testing.T) {
 				runID = &run1.Metadata.ID
 				workspaceIDForRuns = &run1.WorkspaceID
 
-				var cErr error
-				createdJob, cErr = testClient.client.Jobs.CreateJob(ctx, &models.Job{
+				newJob := &models.Job{
 					WorkspaceID: workspace1.Metadata.ID,
 					RunID:       run1.Metadata.ID,
 					RunnerID:    &runner1.Metadata.ID,
-					Status:      models.JobQueued,
-				})
+				}
+				if sErr := newJob.SetStatus(models.JobQueued); sErr != nil {
+					return fmt.Errorf("failed to set job status: %w", sErr)
+				}
+
+				var cErr error
+				createdJob, cErr = testClient.client.Jobs.CreateJob(ctx, newJob)
 				if cErr != nil {
 					return fmt.Errorf("failed to create job: %w", cErr)
 				}
@@ -114,7 +118,9 @@ func TestListen(t *testing.T) {
 				jobID = &createdJob.Metadata.ID
 
 				toUpdate := createdJob
-				toUpdate.Status = models.JobFinished
+				if sErr := toUpdate.SetStatus(models.JobCanceled); sErr != nil {
+					return fmt.Errorf("failed to set job status: %w", sErr)
+				}
 				_, uErr := testClient.client.Jobs.UpdateJob(ctx, toUpdate)
 				if uErr != nil {
 					return fmt.Errorf("failed to update job: %w", uErr)
@@ -149,11 +155,12 @@ func TestListen(t *testing.T) {
 					// IDs will be filled in later.
 					WorkspaceID: workspace1.Metadata.ID,
 					Status:      string(models.JobQueued),
+					// Tags is nil: an untagged job marshals to a JSON null, not [].
 				},
 				&JobEventData{
 					// IDs will be filled in later.
 					WorkspaceID: workspace1.Metadata.ID,
-					Status:      string(models.JobFinished),
+					Status:      string(models.JobCanceled),
 				},
 			},
 		},
@@ -283,6 +290,9 @@ func TestListen(t *testing.T) {
 					return fmt.Errorf("failed to update runner session: %w", uErr)
 				}
 
+				// Delete the runner session. The runner_sessions notify trigger does
+				// not fire on DELETE (no subscriber consumes runner-session deletes),
+				// so no delete event is expected below.
 				dErr := testClient.client.RunnerSessions.DeleteRunnerSession(ctx, updatedRunnerSession)
 				if dErr != nil {
 					return fmt.Errorf("failed to delete runner session: %w", dErr)
@@ -303,17 +313,9 @@ func TestListen(t *testing.T) {
 					Table:  "runner_sessions",
 					Action: "UPDATE",
 				},
-				{
-					Table:  "runner_sessions",
-					Action: "DELETE",
-				},
 			},
 			expectedEventData: []any{
 				struct{}{}, // no need to check the runner
-				&RunnerSessionEventData{
-					// ID will be filled in later.
-					RunnerID: runnerIDForRunnerSessions,
-				},
 				&RunnerSessionEventData{
 					// ID will be filled in later.
 					RunnerID: runnerIDForRunnerSessions,

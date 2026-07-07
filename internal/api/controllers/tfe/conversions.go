@@ -69,7 +69,7 @@ func TharsisRunToRun(run *models.Run) *Run {
 		ID:         run.GetGlobalID(),
 		Status:     RunStatus(run.Status),
 		IsDestroy:  run.IsDestroy,
-		HasChanges: run.HasChanges,
+		HasChanges: run.HasChanges(),
 		Actions: &RunActions{
 			IsCancelable:      true,
 			IsConfirmable:     true,
@@ -90,12 +90,10 @@ func TharsisRunToRun(run *models.Run) *Run {
 		resp.ConfigurationVersion = &gotfe.ConfigurationVersion{ID: gid.ToGlobalID(types.ConfigurationVersionModelType, *run.ConfigurationVersionID)}
 	}
 
-	if run.PlanID != "" {
-		resp.Plan = &gotfe.Plan{ID: gid.ToGlobalID(types.PlanModelType, run.PlanID)}
-	}
+	resp.Plan = &gotfe.Plan{ID: run.Plan.GetGlobalID()}
 
-	if run.ApplyID != "" {
-		resp.Apply = &gotfe.Apply{ID: gid.ToGlobalID(types.ApplyModelType, run.ApplyID)}
+	if applyNode := run.Apply; applyNode != nil {
+		resp.Apply = &gotfe.Apply{ID: applyNode.GetGlobalID()}
 	}
 
 	return resp

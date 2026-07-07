@@ -5,7 +5,7 @@ import graphql from 'babel-plugin-relay/macro';
 import { CubeOutline as ModuleIcon } from 'mdi-material-ui';
 import React, { useEffect, useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import Timestamp from '../common/Timestamp';
 import TabContent from '../common/TabContent';
@@ -13,7 +13,7 @@ import TRNButton from '../common/TRNButton';
 import { MutationError } from '../common/error';
 import NamespaceBreadcrumbs from '../namespace/NamespaceBreadcrumbs';
 import Link from '../routes/Link';
-import WorkspaceDetailsCurrentJob from './WorkspaceDetailsCurrentJob';
+import WorkspaceDetailsCurrentApplyRun from './WorkspaceDetailsCurrentApplyRun';
 import WorkspaceDetailsEmpty from './WorkspaceDetailsEmpty';
 import { WorkspaceDetailsIndexFragment_workspace$key } from './__generated__/WorkspaceDetailsIndexFragment_workspace.graphql';
 import { WorkspaceDetailsIndex_DestroyWorkspaceMutation } from './__generated__/WorkspaceDetailsIndex_DestroyWorkspaceMutation.graphql';
@@ -56,6 +56,8 @@ function WorkspaceDetailsIndex(props: Props) {
         name
         description
         fullPath
+        locked
+        destroyed
         preventDestroyPlan
         labels {
             key
@@ -68,9 +70,9 @@ function WorkspaceDetailsIndex(props: Props) {
             hasDrift
         }
         ...WorkspaceDetailsEmptyFragment_workspace
-        ...WorkspaceDetailsCurrentJobFragment_workspace
+        ...WorkspaceDetailsCurrentApplyRunFragment_workspace
         ...WorkspaceNotificationPreferenceFragment_workspace
-        currentJob {
+        currentApplyRun {
             id
         }
         currentStateVersion {
@@ -118,6 +120,8 @@ function WorkspaceDetailsIndex(props: Props) {
         ...WorkspaceDetailsDriftDetectionFragment_workspace
       }
     `, fragmentRef);
+
+    const workspaceDestroyed = data.destroyed;
 
     const [commitDestroyWorkspace, destroyWorkspaceIsInFlight] = useMutation<WorkspaceDetailsIndex_DestroyWorkspaceMutation>(graphql`
         mutation WorkspaceDetailsIndex_DestroyWorkspaceMutation($input: DestroyWorkspaceInput!) {
@@ -254,7 +258,10 @@ function WorkspaceDetailsIndex(props: Props) {
                 <Box display="flex" alignItems="center">
                     <Avatar sx={{ width: 56, height: 56, marginRight: 2, bgcolor: 'avatar.default' }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
                     <Stack>
-                        <Typography variant="h5" sx={{ fontWeight: "bold" }}>{data.name}</Typography>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="h5" sx={{ fontWeight: "bold" }}>{data.name}</Typography>
+                            {workspaceDestroyed && <Chip size="small" label="Destroyed" sx={{ color: 'runStatus.destroy' }} />}
+                        </Stack>
                         <Typography color="textSecondary" variant="subtitle2">{data.description}</Typography>
                         {data.labels && data.labels.length > 0 && (
                             <Box sx={{ mt: 1, display: "flex", justifyContent: "flex-end" }}>
@@ -298,6 +305,27 @@ function WorkspaceDetailsIndex(props: Props) {
                 </Box>
             </Box>
 
+            {data.locked &&
+                <Alert
+                    sx={{ mb: 2 }}
+                    variant="outlined"
+                    severity='warning'>
+                    <AlertTitle>Workspace locked</AlertTitle>
+                    This workspace is locked. New runs are prevented from starting and the state version cannot be modified. A lock is often used while manually updating the state version.
+                    <Box sx={{ mt: 1, display: "flex", justifyContent: "flex-start" }}>
+                        <Button
+                            variant="outlined"
+                            color="warning"
+                            size="small"
+                            component={RouterLink}
+                            to={`/groups/${data.fullPath}/-/settings`}
+                        >
+                            Manage Workspace Lock
+                        </Button>
+                    </Box>
+                </Alert>
+            }
+
             {data.assessment?.hasDrift &&
                 <Alert
                     sx={{ mb: 2 }}
@@ -323,8 +351,8 @@ function WorkspaceDetailsIndex(props: Props) {
                 </Alert>
             }
 
-            {data.currentJob && <Box marginBottom={2}>
-                <WorkspaceDetailsCurrentJob fragmentRef={data} />
+            {data.currentApplyRun && <Box marginBottom={2}>
+                <WorkspaceDetailsCurrentApplyRun fragmentRef={data} />
             </Box>}
 
             {!data.currentStateVersion && <WorkspaceDetailsEmpty fragmentRef={data} />}
@@ -405,7 +433,7 @@ function WorkspaceDetailsIndex(props: Props) {
                         <Tab label="State File" value="stateFile" />
                     </Tabs>
                 </Box>
-                {tab === 'resources' && <StateVersionResources fragmentRef={data.currentStateVersion} />}
+                {tab === 'resources' && <StateVersionResources fragmentRef={data.currentStateVersion} destroyed={workspaceDestroyed} />}
                 {tab === 'inputs' && <React.Fragment>
                     {data.currentStateVersion.run && <StateVersionInputVariables fragmentRef={data.currentStateVersion.run} />}
                     {!data.currentStateVersion.run && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>

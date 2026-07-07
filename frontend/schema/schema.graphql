@@ -81,7 +81,7 @@ type ActivityEventMoveManagedIdentityPayload {
   previousGroupPath: String!
 }
 
-union ActivityEventPayload = ActivityEventAddTeamMemberPayload | ActivityEventCreateNamespaceMembershipPayload | ActivityEventCreateTerraformModulePayload | ActivityEventCreateWorkspacePayload | ActivityEventDeleteChildResourcePayload | ActivityEventMigrateGroupPayload | ActivityEventMigrateWorkspacePayload | ActivityEventMoveManagedIdentityPayload | ActivityEventRemoveNamespaceMembershipPayload | ActivityEventRemoveTeamMemberPayload | ActivityEventUpdateNamespaceMembershipPayload | ActivityEventUpdateTeamMemberPayload | ActivityEventUpdateTerraformModulePayload | ActivityEventUpdateWorkspacePayload
+union ActivityEventPayload = ActivityEventAddTeamMemberPayload | ActivityEventCreateNamespaceMembershipPayload | ActivityEventCreateTerraformModulePayload | ActivityEventCreateWorkspacePayload | ActivityEventDeleteChildResourcePayload | ActivityEventMigrateGroupPayload | ActivityEventMigrateWorkspacePayload | ActivityEventMoveManagedIdentityPayload | ActivityEventRemoveNamespaceMembershipPayload | ActivityEventRemoveTeamMemberPayload | ActivityEventUpdateNamespaceMembershipPayload | ActivityEventUpdateRunPayload | ActivityEventUpdateTeamMemberPayload | ActivityEventUpdateTerraformModulePayload | ActivityEventUpdateWorkspacePayload
 
 type ActivityEventRemoveNamespaceMembershipPayload {
   member: Member
@@ -127,6 +127,11 @@ enum ActivityEventTargetType {
 type ActivityEventUpdateNamespaceMembershipPayload {
   newRole: String!
   prevRole: String!
+}
+
+type ActivityEventUpdateRunPayload {
+  type: String!
+  nodePath: String
 }
 
 type ActivityEventUpdateTeamMemberPayload {
@@ -395,12 +400,13 @@ enum AnnouncementType {
   WARNING
 }
 
-type Apply implements Node {
+type Apply {
   comment: String!
   currentJob: Job
   errorMessage: String
   id: ID!
-  metadata: ResourceMetadata!
+  jobs(after: String, before: String, first: Int, last: Int, sort: JobSort): JobConnection!
+  metadata: ResourceMetadata! @deprecated(reason: "use run metadata instead")
   status: ApplyStatus!
   triggeredBy: String
 }
@@ -408,6 +414,12 @@ type Apply implements Node {
 input ApplyRunInput {
   clientMutationId: String
   comment: String
+  runId: String!
+}
+
+input SetRunAutoApplyInput {
+  autoApply: Boolean!
+  clientMutationId: String
   runId: String!
 }
 
@@ -419,6 +431,7 @@ enum ApplyStatus {
   pending
   queued
   running
+  skipped
 }
 
 input AssessWorkspaceInput {
@@ -769,6 +782,7 @@ type CreateRolePayload {
 }
 
 input CreateRunInput {
+  autoApply: Boolean
   clientMutationId: String
   comment: String
   configurationVersionId: String
@@ -1383,6 +1397,16 @@ type DisableMaintenanceModePayload {
   problems: [Problem!]!
 }
 
+input DiscardRunInput {
+  clientMutationId: String
+  runId: String!
+}
+
+input UndiscardRunInput {
+  clientMutationId: String
+  runId: String!
+}
+
 input EnableMaintenanceModeInput {
   clientMutationId: String
 }
@@ -1876,6 +1900,8 @@ type Mutation {
   deleteWorkspaceVCSProviderLink(input: DeleteWorkspaceVCSProviderLinkInput!): DeleteWorkspaceVCSProviderLinkPayload!
   destroyWorkspace(input: DestroyWorkspaceInput!): DestroyWorkspacePayload!
   disableMaintenanceMode(input: DisableMaintenanceModeInput!): DisableMaintenanceModePayload!
+  discardRun(input: DiscardRunInput!): RunMutationPayload!
+  undiscardRun(input: UndiscardRunInput!): RunMutationPayload!
   enableMaintenanceMode(input: EnableMaintenanceModeInput!): EnableMaintenanceModePayload!
   favoriteNamespace(input: NamespaceFavoriteInput!): NamespaceFavoriteMutationPayload!
   lockWorkspace(input: LockWorkspaceInput!): LockWorkspacePayload!
@@ -1886,11 +1912,13 @@ type Mutation {
   removeUserFromTeam(input: RemoveUserFromTeamInput): RemoveUserFromTeamPayload!
   resetServiceAccountClientCredentials(input: ResetServiceAccountClientCredentialsInput!): ResetServiceAccountClientCredentialsPayload!
   resetVCSProviderOAuthToken(input: ResetVCSProviderOAuthTokenInput!): ResetVCSProviderOAuthTokenPayload!
+  retryRunNode(input: RetryRunNodeInput!): RunMutationPayload!
   revokeUserSession(input: RevokeUserSessionInput!): RevokeUserSessionPayload!
   runnerSessionHeartbeat(input: RunnerSessionHeartbeatInput!): RunnerSessionHeartbeatPayload!
   saveJobLogs(input: SaveJobLogsInput!): SaveJobLogsPayload! @deprecated(reason: "Use the gRPC API instead.")
   serviceAccountCreateToken(input: ServiceAccountCreateTokenInput!): ServiceAccountCreateTokenPayload!
   setNamespaceVariables(input: SetNamespaceVariablesInput!): NamespaceVariableMutationPayload!
+  setRunAutoApply(input: SetRunAutoApplyInput!): RunMutationPayload!
   setUserNotificationPreference(input: SetUserNotificationPreferenceInput!): SetUserNotificationPreferencePayload!
   setUserPassword(input: SetUserPasswordInput!): SetUserPasswordPayload!
   setVariablesIncludedInTFConfig(input: SetVariablesIncludedInTFConfigInput!): SetVariablesIncludedInTFConfigPayload! @deprecated(reason: "Use the gRPC API instead.")
@@ -1899,14 +1927,12 @@ type Mutation {
   unfavoriteNamespace(input: NamespaceFavoriteInput!): NamespaceUnfavoriteMutationPayload!
   unlockWorkspace(input: UnlockWorkspaceInput!): UnlockWorkspacePayload!
   updateAnnouncement(input: UpdateAnnouncementInput!): UpdateAnnouncementPayload!
-  updateApply(input: UpdateApplyInput!): UpdateApplyPayload! @deprecated(reason: "Use the gRPC API instead.")
   updateFederatedRegistry(input: UpdateFederatedRegistryInput!): FederatedRegistryMutationPayload!
   updateGroup(input: UpdateGroupInput!): UpdateGroupPayload!
   updateManagedIdentity(input: UpdateManagedIdentityInput!): UpdateManagedIdentityPayload!
   updateManagedIdentityAccessRule(input: UpdateManagedIdentityAccessRuleInput!): ManagedIdentityAccessRuleMutationPayload!
   updateNamespaceMembership(input: UpdateNamespaceMembershipInput!): NamespaceMembershipMutationPayload!
   updateNamespaceVariable(input: UpdateNamespaceVariableInput!): NamespaceVariableMutationPayload!
-  updatePlan(input: UpdatePlanInput!): UpdatePlanPayload! @deprecated(reason: "Use the gRPC API instead.")
   updateResourceLimit(input: UpdateResourceLimitInput!): UpdateResourceLimitPayload!
   updateRole(input: UpdateRoleInput!): UpdateRolePayload!
   updateRunner(input: UpdateRunnerInput!): UpdateRunnerPayload!
@@ -2122,14 +2148,15 @@ type PageInfo {
   startCursor: String
 }
 
-type Plan implements Node {
+type Plan {
   changes: PlanChanges
   currentJob: Job
   diffSize: Int!
   errorMessage: String
   hasChanges: Boolean!
   id: ID!
-  metadata: ResourceMetadata!
+  jobs(after: String, before: String, first: Int, last: Int, sort: JobSort): JobConnection!
+  metadata: ResourceMetadata! @deprecated(reason: "use run metadata instead")
   resourceAdditions: Int! @deprecated(reason: "Field has been moved to the PlanSummary type and will be removed in an upcoming release")
   resourceChanges: Int! @deprecated(reason: "Field has been moved to the PlanSummary type and will be removed in an upcoming release")
   resourceDestructions: Int! @deprecated(reason: "Field has been moved to the PlanSummary type and will be removed in an upcoming release")
@@ -2189,6 +2216,7 @@ type PlanResourceChange {
 
 enum PlanStatus {
   canceled
+  created
   errored
   finished
   pending
@@ -2334,6 +2362,12 @@ input ResourceMetadataInput {
   version: String!
 }
 
+input RetryRunNodeInput {
+  clientMutationId: String
+  nodePath: String!
+  runId: String!
+}
+
 input RevokeUserSessionInput {
   userSessionId: String!
 }
@@ -2373,6 +2407,7 @@ enum RoleSort {
 type Run implements Node {
   apply: Apply
   assessment: Boolean!
+  autoApply: Boolean!
   comment: String!
   configurationVersion: ConfigurationVersion
   createdBy: String!
@@ -2432,12 +2467,15 @@ enum RunStatus {
   apply_queued
   applying
   canceled
+  discarded
   errored
   pending
   plan_queued
   planned
   planned_and_finished
   planning
+  queuing
+  queuing_apply
 }
 
 input RunSubscriptionInput {
@@ -3154,20 +3192,6 @@ type UpdateAnnouncementPayload {
   problems: [Problem!]!
 }
 
-input UpdateApplyInput {
-  clientMutationId: String
-  errorMessage: String
-  id: ID!
-  metadata: ResourceMetadataInput
-  status: ApplyStatus!
-}
-
-type UpdateApplyPayload {
-  apply: Apply
-  clientMutationId: String
-  problems: [Problem!]!
-}
-
 input UpdateFederatedRegistryInput {
   audience: String
   clientMutationId: String
@@ -3233,21 +3257,6 @@ input UpdateNamespaceVariableInput {
   id: String!
   key: String!
   value: String!
-}
-
-input UpdatePlanInput {
-  clientMutationId: String
-  errorMessage: String
-  hasChanges: Boolean!
-  id: ID!
-  metadata: ResourceMetadataInput
-  status: PlanStatus!
-}
-
-type UpdatePlanPayload {
-  clientMutationId: String
-  plan: Plan
-  problems: [Problem!]!
 }
 
 input UpdateResourceLimitInput {
@@ -3646,9 +3655,11 @@ type Workspace implements Namespace & Node {
   assessment: WorkspaceAssessment
   assignedManagedIdentities: [ManagedIdentity!]!
   createdBy: String!
-  currentJob: Job
+  currentApplyRun: Run
+  currentJob: Job @deprecated(reason: "The workspace no longer tracks a current job after the run refactor; this is always null. Use currentApplyRun instead.")
   currentStateVersion: StateVersion
   description: String!
+  destroyed: Boolean!
   dirtyState: Boolean!
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
   fullPath: String!

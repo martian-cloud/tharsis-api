@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8e7ab016d29da6a0b730ce16df3c34e1>>
+ * @generated SignedSource<<84ffce160e3de7ae42dc44779105f233>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,15 +9,15 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type PlanStatus = "canceled" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "%future added value";
+export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
+export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
+export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "queuing" | "queuing_apply" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type WorkspaceDetailsIndexFragment_workspace$data = {
   readonly assessment: {
     readonly hasDrift: boolean;
   } | null | undefined;
-  readonly currentJob: {
+  readonly currentApplyRun: {
     readonly id: string;
   } | null | undefined;
   readonly currentStateVersion: {
@@ -60,18 +60,20 @@ export type WorkspaceDetailsIndexFragment_workspace$data = {
     readonly " $fragmentSpreads": FragmentRefs<"StateVersionDependenciesFragment_dependencies" | "StateVersionFileFragment_stateVersion" | "StateVersionOutputsFragment_outputs" | "StateVersionResourcesFragment_resources">;
   } | null | undefined;
   readonly description: string;
+  readonly destroyed: boolean;
   readonly fullPath: string;
   readonly id: string;
   readonly labels: ReadonlyArray<{
     readonly key: string;
     readonly value: string;
   }>;
+  readonly locked: boolean;
   readonly metadata: {
     readonly trn: string;
   };
   readonly name: string;
   readonly preventDestroyPlan: boolean;
-  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceDetailsCurrentJobFragment_workspace" | "WorkspaceDetailsDriftDetectionFragment_workspace" | "WorkspaceDetailsEmptyFragment_workspace" | "WorkspaceNotificationPreferenceFragment_workspace">;
+  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceDetailsCurrentApplyRunFragment_workspace" | "WorkspaceDetailsDriftDetectionFragment_workspace" | "WorkspaceDetailsEmptyFragment_workspace" | "WorkspaceNotificationPreferenceFragment_workspace">;
   readonly " $fragmentType": "WorkspaceDetailsIndexFragment_workspace";
 };
 export type WorkspaceDetailsIndexFragment_workspace$key = {
@@ -139,6 +141,20 @@ return {
       "args": null,
       "kind": "ScalarField",
       "name": "fullPath",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "locked",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "destroyed",
       "storageKey": null
     },
     {
@@ -217,7 +233,7 @@ return {
     {
       "args": null,
       "kind": "FragmentSpread",
-      "name": "WorkspaceDetailsCurrentJobFragment_workspace"
+      "name": "WorkspaceDetailsCurrentApplyRunFragment_workspace"
     },
     {
       "args": null,
@@ -227,9 +243,9 @@ return {
     {
       "alias": null,
       "args": null,
-      "concreteType": "Job",
+      "concreteType": "Run",
       "kind": "LinkedField",
-      "name": "currentJob",
+      "name": "currentApplyRun",
       "plural": false,
       "selections": [
         (v0/*: any*/)
@@ -402,6 +418,6 @@ return {
 };
 })();
 
-(node as any).hash = "64ce27c0258c0d1e2cacd4617c8936c1";
+(node as any).hash = "b6988a28815796efade3ebd6f715284c";
 
 export default node;

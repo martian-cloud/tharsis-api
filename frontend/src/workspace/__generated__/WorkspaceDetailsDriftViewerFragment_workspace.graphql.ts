@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b6c723e74bd1227652ae21ca72e22174>>
+ * @generated SignedSource<<5218f9ed52314aecd6615b594035278b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,7 +11,7 @@
 import { ReaderFragment } from 'relay-runtime';
 export type PlanChangeAction = "CREATE" | "CREATE_THEN_DELETE" | "DELETE" | "DELETE_THEN_CREATE" | "FORGET" | "NOOP" | "READ" | "UPDATE" | "%future added value";
 export type PlanChangeWarningType = "after" | "before" | "%future added value";
-export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "%future added value";
+export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "queuing" | "queuing_apply" | "%future added value";
 export type TerraformResourceMode = "data" | "managed" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type WorkspaceDetailsDriftViewerFragment_workspace$data = {

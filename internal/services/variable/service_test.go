@@ -14,7 +14,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -252,7 +251,6 @@ func TestGetVariableVersionByID(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockSecretManager := secret.NewMockManager(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockVariables := db.NewMockVariables(t)
 			mockVariableVersions := db.NewMockVariableVersions(t)
 
@@ -272,7 +270,7 @@ func TestGetVariableVersionByID(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockActivityEvents, mockSecretManager, false)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockSecretManager, false)
 
 			variableVersion, err := service.GetVariableVersionByID(auth.WithCaller(ctx, mockCaller), variableVersionID, test.includeSensitiveValue)
 			if test.expectErrCode != "" {
@@ -457,7 +455,6 @@ func TestGetVariableVersions(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockSecretManager := secret.NewMockManager(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockVariables := db.NewMockVariables(t)
 			mockVariableVersions := db.NewMockVariableVersions(t)
 
@@ -481,7 +478,7 @@ func TestGetVariableVersions(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockActivityEvents, mockSecretManager, false)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockSecretManager, false)
 
 			result, err := service.GetVariableVersions(auth.WithCaller(ctx, mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -639,14 +636,13 @@ func TestSetVariables(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockSecretManager := secret.NewMockManager(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockVariables := db.NewMockVariables(t)
 			mockGroups := db.NewMockGroups(t)
 			mockTransactions := db.NewMockTransactions(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateVariablePermission, mock.Anything).Return(test.authError)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 
 			if test.expectErrCode == "" {
@@ -690,8 +686,6 @@ func TestSetVariables(t *testing.T) {
 
 				mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(test.input.NamespacePath)).Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}}, nil)
 
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
 
@@ -703,7 +697,7 @@ func TestSetVariables(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockActivityEvents, mockSecretManager, false)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockSecretManager, false)
 
 			err := service.SetVariables(auth.WithCaller(ctx, mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -866,7 +860,7 @@ func TestCreateVariable(t *testing.T) {
 				}, nil).Once()
 			}
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 
 			if (test.expectCreatedVariable != nil) || test.exceedsLimit {
@@ -903,17 +897,13 @@ func TestCreateVariable(t *testing.T) {
 				ResourceLimits: mockResourceLimits,
 			}
 
-			mockActivityEvents := activityevent.NewMockService(t)
-
 			if test.expectErrCode == "" {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockActivityEvents, mockSecretManager, false)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockSecretManager, false)
 
 			variable, err := service.CreateVariable(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -1062,7 +1052,7 @@ func TestUpdateVariable(t *testing.T) {
 				}, nil).Maybe()
 			}
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 
 			if test.expectErrCode == "" {
@@ -1081,17 +1071,13 @@ func TestUpdateVariable(t *testing.T) {
 				Variables:    mockVariables,
 			}
 
-			mockActivityEvents := activityevent.NewMockService(t)
-
 			if test.expectErrCode == "" {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockActivityEvents, mockSecretManager, false)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockSecretManager, false)
 
 			variable, err := service.UpdateVariable(auth.WithCaller(ctx, mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -1168,7 +1154,7 @@ func TestDeleteVariable(t *testing.T) {
 			mockSecretManager := secret.NewMockManager(t)
 
 			mockVariables.On("GetVariableByID", mock.Anything, variableID).Return(test.existingVariable, nil)
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 
 			if test.expectErrCode == "" {
@@ -1182,17 +1168,13 @@ func TestDeleteVariable(t *testing.T) {
 				Groups:       mockGroups,
 			}
 
-			mockActivityEvents := activityevent.NewMockService(t)
-
 			if test.expectErrCode == "" {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockActivityEvents, mockSecretManager, false)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockSecretManager, false)
 
 			err := service.DeleteVariable(auth.WithCaller(ctx, mockCaller), test.input)
 			if test.expectErrCode != "" {

@@ -1,4 +1,5 @@
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { Alert, Box, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { Suspense, useMemo, useState } from 'react';
@@ -73,6 +74,7 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
                     completedAt
                     run {
                         id
+                        status
                     }
                 }
             }
@@ -139,6 +141,12 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
         return data.assessment?.startedAt && !data.assessment?.completedAt;
     }, [data.assessment]);
 
+    // When the assessment run errored, no valid drift result was produced (the backend clears
+    // the drift verdict), so surface the failure instead of showing a misleading "no drift" state.
+    const assessmentRunFailed = useMemo(() => {
+        return data.assessment?.run?.status === 'errored';
+    }, [data.assessment]);
+
     return (
         <Box>
             {error && (
@@ -179,7 +187,28 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
                 </Paper>
             )}
 
-            {data.assessment && !isAssessmentInProgress && data.assessment.hasDrift && (
+            {data.assessment && !isAssessmentInProgress && assessmentRunFailed && (
+                <Paper variant="outlined" sx={{ marginTop: 2, display: "flex", justifyContent: "center" }}>
+                    <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
+                        <ErrorOutlineIcon color="error" sx={{ mb: 1 }} />
+                        <Typography color="error" align="center">
+                            The most recent drift detection run failed, so drift status could not be determined
+                        </Typography>
+                        {data.assessment.run && (
+                            <Link
+                                to={`/groups/${data.fullPath}/-/runs/${data.assessment.run.id}`}
+                                color="textSecondary"
+                                underline="hover"
+                                sx={{ mt: 1 }}
+                            >
+                                View failed run
+                            </Link>
+                        )}
+                    </Box>
+                </Paper>
+            )}
+
+            {data.assessment && !isAssessmentInProgress && !assessmentRunFailed && data.assessment.hasDrift && (
                 <Suspense
                     fallback={
                         <Box
@@ -199,7 +228,7 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
                 </Suspense>
             )}
 
-            {data.assessment && !isAssessmentInProgress && !data.assessment.hasDrift && (
+            {data.assessment && !isAssessmentInProgress && !assessmentRunFailed && !data.assessment.hasDrift && (
                 <Paper variant="outlined" sx={{ marginTop: 2, display: "flex", justifyContent: "center" }}>
                     <Box padding={4} flexDirection="column" justifyContent="center" alignItems="center">
                         <Typography color="textSecondary">

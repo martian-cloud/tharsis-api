@@ -7,12 +7,12 @@ import (
 	"context"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -53,7 +53,6 @@ type service struct {
 	logger           logger.Logger
 	dbClient         *db.Client
 	limitChecker     limits.LimitChecker
-	activityService  activityevent.Service
 	identityProvider auth.SigningKeyManager
 }
 
@@ -62,14 +61,12 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	activityService activityevent.Service,
 	identityProvider auth.SigningKeyManager,
 ) Service {
 	return newService(
 		logger,
 		dbClient,
 		limitChecker,
-		activityService,
 		identityProvider,
 	)
 }
@@ -78,14 +75,12 @@ func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	activityService activityevent.Service,
 	identityProvider auth.SigningKeyManager,
 ) Service {
 	return &service{
 		logger,
 		dbClient,
 		limitChecker,
-		activityService,
 		identityProvider,
 	}
 }
@@ -358,8 +353,8 @@ func (s *service) CreateFederatedRegistry(ctx context.Context,
 		return nil, errors.Wrap(gErr, "failed to get group", errors.WithSpan(span))
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetFederatedRegistry,
@@ -431,8 +426,8 @@ func (s *service) UpdateFederatedRegistry(ctx context.Context,
 		return nil, errors.Wrap(gErr, "failed to get group", errors.WithSpan(span))
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
 			Action:        models.ActionUpdate,
 			TargetType:    models.TargetFederatedRegistry,
@@ -495,8 +490,8 @@ func (s *service) DeleteFederatedRegistry(ctx context.Context, federatedRegistry
 		return errors.Wrap(gErr, "failed to get group", errors.WithSpan(span))
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,

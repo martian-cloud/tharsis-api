@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9730c3072ff593251206f1a4ce5aaae5>>
+ * @generated SignedSource<<273a3834bc202f1eea67e60b527bf3b0>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,9 +9,10 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
+export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
 export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type PlanStatus = "canceled" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
+export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
+export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "queuing" | "queuing_apply" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunDetailsPlanStageFragment_plan$data = {
   readonly apply: {
@@ -30,24 +31,21 @@ export type RunDetailsPlanStageFragment_plan$data = {
         readonly queuedAt: any | null | undefined;
         readonly runningAt: any | null | undefined;
       };
-      readonly " $fragmentSpreads": FragmentRefs<"JobLogsFragment_logs" | "NoRunnerAlertFragment_job" | "RunJobDialog_currentJob">;
+      readonly " $fragmentSpreads": FragmentRefs<"NoRunnerAlertFragment_job">;
     } | null | undefined;
     readonly diffSize: number;
     readonly errorMessage: string | null | undefined;
     readonly hasChanges: boolean;
+    readonly jobs: {
+      readonly totalCount: number;
+    };
     readonly metadata: {
       readonly createdAt: any;
-      readonly trn: string;
     };
     readonly status: PlanStatus;
     readonly " $fragmentSpreads": FragmentRefs<"RunDetailsPlanSummaryFragment_plan">;
   };
-  readonly workspace: {
-    readonly locked: boolean;
-    readonly metadata: {
-      readonly updatedAt: any;
-    };
-  };
+  readonly status: RunStatus;
   readonly " $fragmentSpreads": FragmentRefs<"ForceCancelRunAlertFragment_run" | "RunVariablesFragment_variables">;
   readonly " $fragmentType": "RunDetailsPlanStageFragment_plan";
 };
@@ -78,47 +76,12 @@ return {
   "name": "RunDetailsPlanStageFragment_plan",
   "selections": [
     (v0/*: any*/),
+    (v1/*: any*/),
     {
       "alias": null,
       "args": null,
       "kind": "ScalarField",
       "name": "createdBy",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "Workspace",
-      "kind": "LinkedField",
-      "name": "workspace",
-      "plural": false,
-      "selections": [
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "locked",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
-          "concreteType": "ResourceMetadata",
-          "kind": "LinkedField",
-          "name": "metadata",
-          "plural": false,
-          "selections": [
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "updatedAt",
-              "storageKey": null
-            }
-          ],
-          "storageKey": null
-        }
-      ],
       "storageKey": null
     },
     {
@@ -142,13 +105,6 @@ return {
               "args": null,
               "kind": "ScalarField",
               "name": "createdAt",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "trn",
               "storageKey": null
             }
           ],
@@ -236,19 +192,33 @@ return {
               "args": null,
               "kind": "FragmentSpread",
               "name": "NoRunnerAlertFragment_job"
-            },
-            {
-              "args": null,
-              "kind": "FragmentSpread",
-              "name": "JobLogsFragment_logs"
-            },
-            {
-              "args": null,
-              "kind": "FragmentSpread",
-              "name": "RunJobDialog_currentJob"
             }
           ],
           "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": [
+            {
+              "kind": "Literal",
+              "name": "first",
+              "value": 0
+            }
+          ],
+          "concreteType": "JobConnection",
+          "kind": "LinkedField",
+          "name": "jobs",
+          "plural": false,
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "totalCount",
+              "storageKey": null
+            }
+          ],
+          "storageKey": "jobs(first:0)"
         },
         {
           "args": null,
@@ -286,6 +256,6 @@ return {
 };
 })();
 
-(node as any).hash = "c079de4ee265f34b65f58e059d8555dc";
+(node as any).hash = "277d053ff2ec019780bcd3d5f0037547";
 
 export default node;

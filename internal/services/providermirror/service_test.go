@@ -19,7 +19,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -731,7 +730,6 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockGroups := db.NewMockGroups(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockResourceLimits := db.NewMockResourceLimits(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
@@ -761,12 +759,6 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).Return(&models.ResourceLimit{Value: test.limit}, nil)
 
 				if test.injectMirrorsPerGroup <= int32(test.limit) {
-					mockActivityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-						NamespacePath: &namespace,
-						Action:        models.ActionCreate,
-						TargetType:    models.TargetTerraformProviderVersionMirror,
-					}).Return(nil, nil)
-
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 				}
 			}
@@ -792,11 +784,10 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 			logger, _ := logger.NewForTest()
 
 			service := &service{
-				logger:          logger,
-				dbClient:        dbClient,
-				registryClient:  mockResolver,
-				limitChecker:    limits.NewLimitChecker(dbClient),
-				activityService: mockActivityEvents,
+				logger:         logger,
+				dbClient:       dbClient,
+				registryClient: mockResolver,
+				limitChecker:   limits.NewLimitChecker(dbClient),
 			}
 
 			created, err := service.CreateProviderVersionMirror(auth.WithCaller(ctx, mockCaller), test.input)
@@ -875,7 +866,6 @@ func TestDeleteProviderVersionMirror(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockGroups := db.NewMockGroups(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockPlatformMirrors := db.NewMockTerraformProviderPlatformMirrors(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
@@ -896,31 +886,13 @@ func TestDeleteProviderVersionMirror(t *testing.T) {
 			if test.expectErrorCode == "" {
 				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
 				mockVersionMirrors.On("DeleteVersionMirror", mock.Anything, test.input.VersionMirror).Return(nil)
 
 				mockGroups.On("GetGroupByID", mock.Anything, groupID).Return(sampleGroup, nil)
-
-				provider := &provider.Provider{
-					Hostname:  test.input.VersionMirror.RegistryHostname,
-					Namespace: test.input.VersionMirror.RegistryNamespace,
-					Type:      test.input.VersionMirror.Type,
-				}
-				providerName := fmt.Sprintf("%s/%s", provider, test.input.VersionMirror.SemanticVersion)
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-					NamespacePath: &namespace,
-					Action:        models.ActionDeleteChildResource,
-					TargetType:    models.TargetGroup,
-					TargetID:      groupID,
-					Payload: &models.ActivityEventDeleteChildResourcePayload{
-						Name: providerName,
-						ID:   versionMirrorID,
-						Type: string(models.TargetTerraformProviderVersionMirror),
-					},
-				}).Return(nil, nil)
 			}
 
 			dbClient := &db.Client{
@@ -931,7 +903,7 @@ func TestDeleteProviderVersionMirror(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := &service{logger: logger, dbClient: dbClient, activityService: mockActivityEvents}
+			service := &service{logger: logger, dbClient: dbClient}
 
 			err := service.DeleteProviderVersionMirror(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1463,7 +1435,8 @@ func TestUploadInstallationPackage(t *testing.T) {
 				TerraformProviderPlatformMirrors: mockPlatformMirrors,
 			}
 
-			service := &service{dbClient: dbClient, mirrorStore: mockStore}
+			logger, _ := logger.NewForTest()
+			service := &service{logger: logger, dbClient: dbClient, mirrorStore: mockStore}
 
 			err := service.UploadInstallationPackage(auth.WithCaller(ctx, mockCaller), test.input)
 

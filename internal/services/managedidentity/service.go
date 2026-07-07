@@ -6,12 +6,12 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -112,7 +112,6 @@ type service struct {
 	delegateMap      map[models.ManagedIdentityType]Delegate
 	workspaceService workspace.Service
 	jobService       job.Service
-	activityService  activityevent.Service
 }
 
 // NewService creates an instance of Service
@@ -123,7 +122,6 @@ func NewService(
 	managedIdentityDelegateMap map[models.ManagedIdentityType]Delegate,
 	workspaceService workspace.Service,
 	jobService job.Service,
-	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger:           logger,
@@ -132,7 +130,6 @@ func NewService(
 		delegateMap:      managedIdentityDelegateMap,
 		workspaceService: workspaceService,
 		jobService:       jobService,
-		activityService:  activityService,
 	}
 }
 
@@ -265,8 +262,8 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 
 	groupPath := input.ManagedIdentity.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,
@@ -404,8 +401,8 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 		return errors.New("managed identity was moved while adding to workspace", errors.WithErrorCode(errors.EConflict))
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &workspace.FullPath,
 			Action:        models.ActionAdd,
 			TargetType:    models.TargetManagedIdentity,
@@ -477,8 +474,8 @@ func (s *service) RemoveManagedIdentityFromWorkspace(ctx context.Context, manage
 		return err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &workspace.FullPath,
 			Action:        models.ActionRemove,
 			TargetType:    models.TargetManagedIdentity,
@@ -690,8 +687,8 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetManagedIdentity,
@@ -788,8 +785,8 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 
 	groupPath := input.ManagedIdentity.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,
@@ -901,8 +898,8 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetManagedIdentity,
@@ -1067,8 +1064,8 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 
 	groupPath := updatedManagedIdentity.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionUpdate,
 			TargetType:    models.TargetManagedIdentity,
@@ -1311,8 +1308,8 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 
 	// Activity events for creating managed identity access
 	// rules point to the managed identity, not the rule.
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetManagedIdentityAccessRule,
@@ -1327,6 +1324,10 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, err
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Created a managed identity access rule.",
+		"managedIdentityID", rule.ManagedIdentityID,
+		"accessRuleID", rule.Metadata.ID,
+	)
 	return rule, nil
 }
 
@@ -1389,8 +1390,8 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 	groupPath := managedIdentity.GetGroupPath()
 
 	// Activity events for updating managed identity access rules point to the rule.
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionUpdate,
 			TargetType:    models.TargetManagedIdentityAccessRule,
@@ -1405,6 +1406,10 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, err
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Updated a managed identity access rule.",
+		"managedIdentityID", rule.ManagedIdentityID,
+		"accessRuleID", rule.Metadata.ID,
+	)
 	return rule, nil
 }
 
@@ -1456,8 +1461,8 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 
 	groupPath := managedIdentity.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetManagedIdentity,
@@ -1472,7 +1477,16 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 		return err
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Deleted a managed identity access rule.",
+		"managedIdentityID", rule.ManagedIdentityID,
+		"accessRuleID", rule.Metadata.ID,
+	)
+	return nil
 }
 
 func (s *service) CreateCredentials(ctx context.Context, identity *models.ManagedIdentity) ([]byte, error) {
@@ -1638,8 +1652,8 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &newGroup.FullPath,
 			Action:        models.ActionMigrate,
 			TargetType:    models.TargetManagedIdentity,

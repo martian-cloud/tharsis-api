@@ -15,7 +15,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -682,7 +681,7 @@ func TestCreateProvider(t *testing.T) {
 			mockResourceLimits := db.NewMockResourceLimits(t)
 
 			if test.authError == nil {
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				if !test.exceedsLimit {
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
@@ -735,15 +734,9 @@ func TestCreateProvider(t *testing.T) {
 					Return(&models.ResourceLimit{Value: test.limit}, nil)
 			}
 
-			mockActivityEvents := activityevent.NewMockService(t)
-
-			if (test.authError == nil) && !test.exceedsLimit {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-			}
-
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, mockActivityEvents)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil)
 
 			provider, err := service.CreateProvider(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -945,7 +938,7 @@ func TestCreateProviderVersion(t *testing.T) {
 
 			mockResourceLimits := db.NewMockResourceLimits(t)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
@@ -995,11 +988,6 @@ func TestCreateProviderVersion(t *testing.T) {
 				ResourceLimits:            mockResourceLimits,
 			}
 
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
 			// Called inside transaction to check resource limits.
 			if test.limit > 0 {
 				mockProviderVersions.On("GetProviderVersions", mock.Anything, mock.Anything).Return(&db.GetProviderVersionsInput{
@@ -1025,7 +1013,7 @@ func TestCreateProviderVersion(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, &mockActivityEvents)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil)
 
 			providerVersion, err := service.CreateProviderVersion(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrorCode != "" {
@@ -1185,7 +1173,7 @@ func TestDeleteProviderVersion(t *testing.T) {
 			mockProviderVersions := db.MockTerraformProviderVersions{}
 			mockProviderVersions.Test(t)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
@@ -1220,14 +1208,9 @@ func TestDeleteProviderVersion(t *testing.T) {
 				TerraformProviderVersions: &mockProviderVersions,
 			}
 
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, &mockActivityEvents)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil)
 
 			err := service.DeleteProviderVersion(auth.WithCaller(ctx, &mockCaller), &test.providerVersionToDelete)
 			if err != nil {
@@ -1341,15 +1324,13 @@ func TestCreateProviderPlatform(t *testing.T) {
 				ProviderID: providerID,
 			}, nil)
 
-			mockActivityEvents := activityevent.NewMockService(t)
-
 			if test.expectErrCode == "" || test.exceedsLimit {
 				mockProviderPlatforms.On("CreateProviderPlatform", mock.Anything, test.expectCreatedProviderPlatform).
 					Return(test.expectCreatedProviderPlatform, nil)
 			}
 
 			if test.shouldDoTx {
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				if !test.exceedsLimit {
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
@@ -1390,7 +1371,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, mockActivityEvents)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil)
 
 			providerPlatform, err := service.CreateProviderPlatform(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -1409,6 +1390,138 @@ func TestCreateProviderPlatform(t *testing.T) {
 			assert.Equal(t, test.expectCreatedProviderPlatform.Filename, providerPlatform.Filename)
 			assert.Equal(t, test.expectCreatedProviderPlatform.CreatedBy, providerPlatform.CreatedBy)
 			assert.Equal(t, test.expectCreatedProviderPlatform.BinaryUploaded, providerPlatform.BinaryUploaded)
+		})
+	}
+}
+
+func TestUpdateProvider(t *testing.T) {
+	type testCase struct {
+		authError     error
+		name          string
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:          "subject is not authorized",
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			provider := &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{
+					ID:  "provider-1",
+					TRN: trn.TypeTerraformProvider.Build("group-1/test-provider"),
+				},
+				Name:    "test-provider",
+				GroupID: "group-1",
+			}
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTerraformProviderPermission, mock.Anything).Return(test.authError)
+
+			mockTransactions := db.NewMockTransactions(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+
+			if test.authError == nil {
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockProviders.On("UpdateProvider", mock.Anything, provider).Return(provider, nil)
+			}
+
+			testLogger, _ := logger.NewForTest()
+			service := &service{
+				dbClient: &db.Client{
+					Transactions:       mockTransactions,
+					TerraformProviders: mockProviders,
+				},
+				logger: testLogger,
+			}
+
+			_, err := service.UpdateProvider(auth.WithCaller(ctx, mockCaller), provider)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestDeleteProvider(t *testing.T) {
+	type testCase struct {
+		authError     error
+		name          string
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:          "subject is not authorized",
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			provider := &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{
+					ID:  "provider-1",
+					TRN: trn.TypeTerraformProvider.Build("group-1/test-provider"),
+				},
+				Name:    "test-provider",
+				GroupID: "group-1",
+			}
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteTerraformProviderPermission, mock.Anything).Return(test.authError)
+
+			mockTransactions := db.NewMockTransactions(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+
+			if test.authError == nil {
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockProviders.On("DeleteProvider", mock.Anything, provider).Return(nil)
+			}
+
+			testLogger, _ := logger.NewForTest()
+			service := &service{
+				dbClient: &db.Client{
+					Transactions:       mockTransactions,
+					TerraformProviders: mockProviders,
+				},
+				logger: testLogger,
+			}
+
+			err := service.DeleteProvider(auth.WithCaller(ctx, mockCaller), provider)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }

@@ -195,7 +195,7 @@ func (t *terraformRunners) GetRunners(ctx context.Context, input *GetRunnersInpu
 				}
 				// This filter condition will only return runners where the runner tags are a superset of the tag
 				// subset list specified in the filter
-				ex = ex.Append(goqu.L(fmt.Sprintf("runners.tags @> '%s'", json)))
+				ex = ex.Append(goqu.L("runners.tags @> ?::jsonb", string(json)))
 			}
 		}
 	}

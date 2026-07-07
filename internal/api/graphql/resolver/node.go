@@ -56,18 +56,6 @@ func (r *NodeResolver) ToAgentSessionRun() (*AgentSessionRunResolver, bool) {
 	}
 }
 
-// ToApply resolver
-func (r *NodeResolver) ToApply() (*ApplyResolver, bool) {
-	switch res := r.result.(type) {
-	case *ApplyResolver:
-		return res, true
-	case *models.Apply:
-		return &ApplyResolver{apply: res}, true
-	default:
-		return nil, false
-	}
-}
-
 // ToConfigurationVersion resolver
 func (r *NodeResolver) ToConfigurationVersion() (*ConfigurationVersionResolver, bool) {
 	switch res := r.result.(type) {
@@ -147,18 +135,6 @@ func (r *NodeResolver) ToNamespaceMembership() (*NamespaceMembershipResolver, bo
 		return res, true
 	case *models.NamespaceMembership:
 		return &NamespaceMembershipResolver{namespaceMembership: res}, true
-	default:
-		return nil, false
-	}
-}
-
-// ToPlan resolver
-func (r *NodeResolver) ToPlan() (*PlanResolver, bool) {
-	switch res := r.result.(type) {
-	case *PlanResolver:
-		return res, true
-	case *models.Plan:
-		return &PlanResolver{plan: res}, true
 	default:
 		return nil, false
 	}

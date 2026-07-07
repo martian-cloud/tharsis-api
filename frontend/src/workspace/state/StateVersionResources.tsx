@@ -1,3 +1,4 @@
+import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -11,6 +12,7 @@ import { StateVersionResourcesFragment_resources$key } from './__generated__/Sta
 
 interface Props {
     fragmentRef: StateVersionResourcesFragment_resources$key
+    destroyed?: boolean
 }
 
 const searchFilter = (search: string) => (resource: any) => {
@@ -18,7 +20,7 @@ const searchFilter = (search: string) => (resource: any) => {
 };
 
 function StateVersionResources(props: Props) {
-    const { fragmentRef } = props;
+    const { fragmentRef, destroyed } = props;
 
     const data = useFragment<StateVersionResourcesFragment_resources$key>(
         graphql`
@@ -51,7 +53,18 @@ function StateVersionResources(props: Props) {
             {(filteredOutputs.length === 0 && search !== '') && <Typography sx={{ padding: 2, marginTop: 4 }} align="center" color="textSecondary">
                 No resources matching search <strong>{search}</strong>
             </Typography>}
-            {(filteredOutputs.length === 0 && search === '') && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
+            {(filteredOutputs.length === 0 && search === '' && destroyed) && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
+                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
+                    <DeleteForeverOutlinedIcon sx={{ fontSize: 48, color: 'runStatus.destroy', mb: 1 }} />
+                    <Typography align="center" gutterBottom>
+                        Workspace destroyed
+                    </Typography>
+                    <Typography color="textSecondary" align="center">
+                        All resources in this workspace have been destroyed, so the workspace is now empty. Create a new run to provision resources again.
+                    </Typography>
+                </Box>
+            </Paper>}
+            {(filteredOutputs.length === 0 && search === '' && !destroyed) && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
                 <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
                     <Typography color="textSecondary" align="center">
                         This workspace does not have any resources

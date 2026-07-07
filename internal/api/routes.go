@@ -278,6 +278,7 @@ func BuildRouter(
 			requireAuthenticatedCallerMiddleware,
 			signingKeyManager,
 			serviceCatalog.JobService,
+			serviceCatalog.RunService,
 		))
 		AddRoutes(r, controllers.NewServiceAccountController(
 			logger,

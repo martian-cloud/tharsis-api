@@ -4,6 +4,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import PendingIcon from '@mui/icons-material/PauseCircleOutline';
 import InProgressIcon from '@mui/icons-material/TimelapseOutlined';
 import WarningIcon from '@mui/icons-material/Warning';
+import SkippedIcon from 'mdi-material-ui/SkipForward';
 import { SxProps, Theme } from '@mui/material';
 
 interface IconProps {
@@ -36,10 +37,10 @@ export default {
         tooltip: 'has completed'
     },
     pending: {
-        label: 'Pending',
+        label: 'Waiting',
         color: 'runStatus.pending',
         icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.pending' }} />,
-        tooltip: 'is pending'
+        tooltip: 'is waiting to be queued'
     },
     queued: {
         label: 'Queued',
@@ -52,6 +53,12 @@ export default {
         color: 'runStatus.running',
         icon: ({sx}: IconProps) => <InProgressIcon sx={{ ...sx, color: 'runStatus.running' }} />,
         tooltip: 'is in progress'
+    },
+    skipped: {
+        label: 'Skipped',
+        color: 'runStatus.skipped',
+        icon: ({sx}: IconProps) => <SkippedIcon sx={{ ...sx, color: 'runStatus.skipped' }} />,
+        tooltip: 'was skipped'
     },
     applied: {
         label: 'Applied',
@@ -76,6 +83,18 @@ export default {
         color: 'runStatus.plan_queued',
         icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.plan_queued' }} />,
         tooltip: 'is queued'
+    },
+    queuing: {
+        label: 'Queuing',
+        color: 'runStatus.queuing',
+        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.queuing' }} />,
+        tooltip: 'is waiting to be queued'
+    },
+    queuing_apply: {
+        label: 'Apply Queuing',
+        color: 'runStatus.queuing_apply',
+        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.queuing_apply' }} />,
+        tooltip: 'is waiting to be queued'
     },
     planned: {
         label: 'Applying',

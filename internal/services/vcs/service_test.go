@@ -21,7 +21,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	types "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
@@ -103,7 +102,8 @@ func TestGetVCSProviderByID(t *testing.T) {
 				VCSProviders: &mockVCSProviders,
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			logger, _ := logger.NewForTest()
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			provider, err := service.GetVCSProviderByID(ctx, test.inputID)
 			if test.expectedErrorCode != "" {
@@ -265,7 +265,8 @@ func TestGetVCSProviders(t *testing.T) {
 				VCSProviders: &mockVCSProviders,
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			logger, _ := logger.NewForTest()
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			result, err := service.GetVCSProviders(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -338,7 +339,8 @@ func TestGetVCSProvidersByIDs(t *testing.T) {
 				VCSProviders: &mockVCSProviders,
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			logger, _ := logger.NewForTest()
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			providerList, err := service.GetVCSProvidersByIDs(ctx, test.inputIDList)
 			if test.expectedErrorCode != "" {
@@ -503,7 +505,6 @@ func TestCreateVCSProvider(t *testing.T) {
 		input                 *CreateVCSProviderInput
 		toCreate              *models.VCSProvider
 		buildAuthCodeURLInput *types.BuildOAuthAuthorizationURLInput
-		activityInput         *activityevent.CreateActivityEventInput
 		expectedProvider      *models.VCSProvider
 		name                  string
 		expectedErrorCode     errors.CodeType
@@ -542,12 +543,6 @@ func TestCreateVCSProvider(t *testing.T) {
 				URL:                sampleProviderURL,
 				CreatedBy:          "system",
 				AutoCreateWebhooks: false,
-			},
-			activityInput: &activityevent.CreateActivityEventInput{
-				NamespacePath: ptr.String("a/resource"),
-				Action:        models.ActionCreate,
-				TargetType:    models.TargetVCSProvider,
-				TargetID:      resourceUUID,
 			},
 			expectedProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
@@ -591,12 +586,6 @@ func TestCreateVCSProvider(t *testing.T) {
 				CreatedBy:          "system",
 				Type:               models.GitHubProviderType,
 				AutoCreateWebhooks: false,
-			},
-			activityInput: &activityevent.CreateActivityEventInput{
-				NamespacePath: ptr.String("a/resource"),
-				Action:        models.ActionCreate,
-				TargetType:    models.TargetVCSProvider,
-				TargetID:      resourceUUID,
 			},
 			buildAuthCodeURLInput: &types.BuildOAuthAuthorizationURLInput{
 				ProviderURL:        sampleProviderURL,
@@ -684,12 +673,6 @@ func TestCreateVCSProvider(t *testing.T) {
 				CreatedBy:          "system",
 				AutoCreateWebhooks: false,
 			},
-			activityInput: &activityevent.CreateActivityEventInput{
-				NamespacePath: ptr.String("a/resource"),
-				Action:        models.ActionCreate,
-				TargetType:    models.TargetVCSProvider,
-				TargetID:      resourceUUID,
-			},
 			expectedProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
 					ID:  resourceUUID,
@@ -720,12 +703,10 @@ func TestCreateVCSProvider(t *testing.T) {
 			mockProviders := MockProvider{}
 			mockVCSProviders := db.MockVCSProviders{}
 			mockTransactions := db.MockTransactions{}
-			mockActivityEventService := activityevent.MockService{}
 
 			mockProviders.Test(t)
 			mockVCSProviders.Test(t)
 			mockTransactions.Test(t)
-			mockActivityEventService.Test(t)
 			mockResourceLimits := db.NewMockResourceLimits(t)
 
 			mockProviders.On("DefaultURL").Return(sampleProviderURL)
@@ -738,8 +719,6 @@ func TestCreateVCSProvider(t *testing.T) {
 				mockVCSProviders.On("CreateProvider", mock.Anything, test.toCreate).Return(test.expectedProvider, nil)
 
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-				mockActivityEventService.On("CreateActivityEvent", mock.Anything, test.activityInput).Return(nil, nil)
 			}
 
 			// Called inside transaction to check resource limits.
@@ -784,7 +763,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				return sampleOAuthState, nil
 			}
 
-			service := newService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, providerMap, &mockActivityEventService, nil, nil, nil, stateGeneratorFunc, "", 0)
+			service := newService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, providerMap, nil, nil, nil, stateGeneratorFunc, "", 0)
 
 			response, err := service.CreateVCSProvider(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -803,7 +782,6 @@ func TestUpdateVCSProvider(t *testing.T) {
 	testCases := []struct {
 		caller            auth.Caller
 		input             *UpdateVCSProviderInput
-		activityInput     *activityevent.CreateActivityEventInput
 		name              string
 		expectedErrorCode errors.CodeType
 	}{
@@ -828,12 +806,6 @@ func TestUpdateVCSProvider(t *testing.T) {
 					AutoCreateWebhooks: true,
 				},
 			},
-			activityInput: &activityevent.CreateActivityEventInput{
-				NamespacePath: ptr.String("a/resource"),
-				Action:        models.ActionUpdate,
-				TargetType:    models.TargetVCSProvider,
-				TargetID:      resourceUUID,
-			},
 		},
 		{
 			name:              "negative: without caller; expect error EUnauthorized",
@@ -848,19 +820,15 @@ func TestUpdateVCSProvider(t *testing.T) {
 
 			mockVCSProviders := db.MockVCSProviders{}
 			mockTransactions := db.MockTransactions{}
-			mockActivityEventService := activityevent.MockService{}
 
 			mockVCSProviders.Test(t)
 			mockTransactions.Test(t)
-			mockActivityEventService.Test(t)
 
 			mockVCSProviders.On("UpdateProvider", mock.Anything, test.input.Provider).Return(test.input.Provider, nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-			mockActivityEventService.On("CreateActivityEvent", mock.Anything, test.activityInput).Return(nil, nil)
 
 			dbClient := &db.Client{
 				VCSProviders: &mockVCSProviders,
@@ -869,7 +837,7 @@ func TestUpdateVCSProvider(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 
-			service := newService(logger, dbClient, nil, nil, nil, &mockActivityEventService, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			provider, err := service.UpdateVCSProvider(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -925,7 +893,6 @@ func TestDeleteVCSProvider(t *testing.T) {
 	testCases := []struct {
 		caller             auth.Caller
 		input              *DeleteVCSProviderInput
-		activityInput      *activityevent.CreateActivityEventInput
 		deleteWebhookInput *types.DeleteWebhookInput
 		name               string
 		expectedErrorCode  errors.CodeType
@@ -938,17 +905,6 @@ func TestDeleteVCSProvider(t *testing.T) {
 				Provider: sampleAutomaticProvider,
 			},
 			links: []models.WorkspaceVCSProviderLink{},
-			activityInput: &activityevent.CreateActivityEventInput{
-				NamespacePath: &groupPath,
-				Action:        models.ActionDeleteChildResource,
-				TargetType:    models.TargetGroup,
-				TargetID:      "group-id",
-				Payload: &models.ActivityEventDeleteChildResourcePayload{
-					Name: sampleAutomaticProvider.Name,
-					ID:   sampleAutomaticProvider.Metadata.ID,
-					Type: string(models.TargetVCSProvider),
-				},
-			},
 		},
 		{
 			name:   "positive: provider is linked to workspaces(s), automatically configured, force option is used; expect no errors",
@@ -969,17 +925,6 @@ func TestDeleteVCSProvider(t *testing.T) {
 					WebhookID:      "webhook-id",
 				},
 			},
-			activityInput: &activityevent.CreateActivityEventInput{
-				NamespacePath: &groupPath,
-				Action:        models.ActionDeleteChildResource,
-				TargetType:    models.TargetGroup,
-				TargetID:      "group-id",
-				Payload: &models.ActivityEventDeleteChildResourcePayload{
-					Name: sampleAutomaticProvider.Name,
-					ID:   sampleAutomaticProvider.Metadata.ID,
-					Type: string(models.TargetVCSProvider),
-				},
-			},
 		},
 		{
 			name:   "positive: provider is linked to workspaces(s), manually configured and force option is used; expect no errors",
@@ -990,17 +935,6 @@ func TestDeleteVCSProvider(t *testing.T) {
 			},
 			links: []models.WorkspaceVCSProviderLink{
 				{},
-			},
-			activityInput: &activityevent.CreateActivityEventInput{
-				NamespacePath: &groupPath,
-				Action:        models.ActionDeleteChildResource,
-				TargetType:    models.TargetGroup,
-				TargetID:      "group-id",
-				Payload: &models.ActivityEventDeleteChildResourcePayload{
-					Name: sampleAutomaticProvider.Name,
-					ID:   sampleAutomaticProvider.Metadata.ID,
-					Type: string(models.TargetVCSProvider),
-				},
 			},
 		},
 		{
@@ -1031,13 +965,11 @@ func TestDeleteVCSProvider(t *testing.T) {
 			mockVCSProviders := db.MockVCSProviders{}
 			mockTransactions := db.MockTransactions{}
 			mockWorkspaceVCSProviderLinks := db.MockWorkspaceVCSProviderLinks{}
-			mockActivityEventService := activityevent.MockService{}
 
 			mockProviders.Test(t)
 			mockVCSProviders.Test(t)
 			mockTransactions.Test(t)
 			mockWorkspaceVCSProviderLinks.Test(t)
-			mockActivityEventService.Test(t)
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
 				ProviderURL:  test.input.Provider.URL,
@@ -1060,8 +992,6 @@ func TestDeleteVCSProvider(t *testing.T) {
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
-			mockActivityEventService.On("CreateActivityEvent", mock.Anything, test.activityInput).Return(nil, nil)
-
 			dbClient := &db.Client{
 				VCSProviders:              &mockVCSProviders,
 				WorkspaceVCSProviderLinks: &mockWorkspaceVCSProviderLinks,
@@ -1079,7 +1009,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, &mockActivityEventService, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
+			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
 
 			err := service.DeleteVCSProvider(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1138,7 +1068,8 @@ func TestGetVCSProviderLinkByWorkspaceID(t *testing.T) {
 				WorkspaceVCSProviderLinks: &mockWorkspaceVCSProviderLinks,
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			logger, _ := logger.NewForTest()
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			link, err := service.GetWorkspaceVCSProviderLinkByWorkspaceID(ctx, test.workspaceID)
 			if test.expectedErrorCode != "" {
@@ -1199,7 +1130,8 @@ func TestGetWorkspaceVCSProviderLinkByID(t *testing.T) {
 				WorkspaceVCSProviderLinks: &mockWorkspaceVCSProviderLinks,
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			logger, _ := logger.NewForTest()
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			link, err := service.GetWorkspaceVCSProviderLinkByID(ctx, test.inputID)
 			if test.expectedErrorCode != "" {
@@ -1600,7 +1532,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, mockSigningKeyManager, providerMap, nil, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
+			service := newService(logger, dbClient, nil, mockSigningKeyManager, providerMap, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
 
 			response, err := service.CreateWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1686,7 +1618,7 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			link, err := service.UpdateWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1812,7 +1744,7 @@ func TestDeleteWorkspaceVCSProviderLink(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, nil, oAuthStateGenerator, "", 0)
+			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, oAuthStateGenerator, "", 0)
 
 			err := service.DeleteWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1981,7 +1913,7 @@ func TestCreateVCSRun(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, &mockManager, oAuthStateGenerator, "", 5000)
+			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, &mockManager, oAuthStateGenerator, "", 5000)
 
 			err := service.CreateVCSRun(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -2268,7 +2200,7 @@ func TestProcessWebhookEvent(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, &mockWorkspaceService, &mockManager, oAuthStateGenerator, "", 5000)
+			service := newService(logger, dbClient, nil, nil, providerMap, nil, &mockWorkspaceService, &mockManager, oAuthStateGenerator, "", 5000)
 
 			err := service.ProcessWebhookEvent(auth.WithCaller(context.Background(), caller), test.input)
 			if test.expectedErrorCode != "" {
@@ -2352,7 +2284,7 @@ func TestResetVCSProviderOAuthToken(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, nil, oAuthStateGenerator, "", 5000)
+			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, oAuthStateGenerator, "", 5000)
 
 			response, err := service.ResetVCSProviderOAuthToken(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -2555,7 +2487,8 @@ func TestProcessOAuth(t *testing.T) {
 				models.GitHubProviderType: &mockProviders,
 			}
 
-			service := newService(nil, dbClient, nil, nil, providerMap, nil, nil, nil, nil, nil, tharsisURL, 5000)
+			logger, _ := logger.NewForTest()
+			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, nil, tharsisURL, 5000)
 
 			err := service.ProcessOAuth(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -2922,7 +2855,6 @@ func Test_handleEvent(t *testing.T) {
 				dbClient:            nil,
 				signingKeyManager:   nil,
 				vcsProviderMap:      nil,
-				activityService:     nil,
 				runService:          &mockRunService,
 				workspaceService:    &mockWorkspaceService,
 				taskManager:         nil,
