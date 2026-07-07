@@ -1,13 +1,24 @@
 import AutoScrollIcon from '@mui/icons-material/ArrowCircleDown';
-import { Box, darken, LinearProgress, Paper, ToggleButton, Tooltip, Typography, useTheme } from '@mui/material';
+import { Alert, Box, darken, LinearProgress, Paper, ToggleButton, Tooltip, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import { useMemo, useRef, useState } from 'react';
-import { useFragment, useSubscription } from 'react-relay/hooks';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFragment, useLazyLoadQuery, useSubscription } from 'react-relay/hooks';
 import { GraphQLSubscriptionConfig, RecordSourceProxy } from 'relay-runtime';
 import Timestamp from '../../common/Timestamp';
 import LogViewer from './LogViewer';
 import { JobLogsFragment_logs$key } from './__generated__/JobLogsFragment_logs.graphql';
+import { JobLogsQuery } from './__generated__/JobLogsQuery.graphql';
 import { JobLogsSubscription, JobLogsSubscription$data } from './__generated__/JobLogsSubscription.graphql';
+
+const query = graphql`
+    query JobLogsQuery($id: String!, $startOffset: Int!, $limit: Int!) {
+        node(id: $id) {
+            ...on Job {
+                ...JobLogsFragment_logs
+            }
+        }
+    }
+`;
 
 const subscription = graphql`subscription JobLogsSubscription($input: JobLogStreamSubscriptionInput!) {
     jobLogStreamEvents(input: $input) {
@@ -21,8 +32,7 @@ const subscription = graphql`subscription JobLogsSubscription($input: JobLogStre
   }`;
 
 interface Props {
-    fragmentRef: JobLogsFragment_logs$key
-    enableAutoScrollByDefault?: boolean
+    jobId: string
 }
 
 const bytes = (str: string) => {
@@ -30,7 +40,20 @@ const bytes = (str: string) => {
     return size;
 }
 
+const FINAL_JOB_STATES = ['finished', 'failed', 'canceled'];
+
+const LOG_LIMIT = 51200; // 50KB
+
 function JobLogs(props: Props) {
+    // store-or-network: render already-fetched logs from the store immediately (no extra
+    // suspense flash when switching tabs or revisiting a job) and only hit the network when
+    // the logs aren't cached yet. The jobLogStreamEvents subscription keeps the tail live.
+    const queryData = useLazyLoadQuery<JobLogsQuery>(query, { id: props.jobId, startOffset: 0, limit: LOG_LIMIT }, { fetchPolicy: 'store-or-network' });
+
+    return queryData.node ? <JobLogsContent fragmentRef={queryData.node} /> : <Alert severity="error">Job not found</Alert>;
+}
+
+function JobLogsContent(props: { fragmentRef: JobLogsFragment_logs$key }) {
     const theme = useTheme();
     const data = useFragment<JobLogsFragment_logs$key>(
         graphql`
@@ -41,15 +64,15 @@ function JobLogs(props: Props) {
             completed
             logLastUpdatedAt
             logSize
-            logs(startOffset:0, limit:51200)
+            logs(startOffset: $startOffset, limit: $limit)
         }
       `, props.fragmentRef)
 
     const [logs, setLogs] = useState(data.logs);
     const [currentLogSize, setCurrentLogSize] = useState(bytes(data.logs));
     const [actualLogSize, setActualLogSize] = useState(data.logSize);
-    const [autoScroll, setAutoScroll] = useState(props.enableAutoScrollByDefault);
     const [completed, setCompleted] = useState(data.completed);
+    const [autoScroll, setAutoScroll] = useState(!FINAL_JOB_STATES.includes(data.status));
     // Tracks the byte size already appended so we can dedupe events without re-measuring
     // the whole accumulated buffer on every event.
     const loadedSizeRef = useRef(bytes(data.logs));
@@ -75,6 +98,17 @@ function JobLogs(props: Props) {
         }
     }), [data.id]);
     useSubscription<JobLogsSubscription>(config);
+
+    // Reset log state when the job changes so switching jobs shows the new job's logs
+    // instead of the previously rendered job's cached logs.
+    useEffect(() => {
+        setLogs(data.logs);
+        setCurrentLogSize(bytes(data.logs));
+        setActualLogSize(data.logSize);
+        setCompleted(data.completed);
+        setAutoScroll(!FINAL_JOB_STATES.includes(data.status));
+    }, [data.id]);
+
 
     const loadedPercent = useMemo(() => (currentLogSize / actualLogSize) * 100, [currentLogSize, actualLogSize]);
 

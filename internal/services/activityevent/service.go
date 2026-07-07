@@ -5,7 +5,6 @@ package activityevent
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
@@ -30,20 +29,9 @@ type GetActivityEventsInput struct {
 	IncludeNested     bool
 }
 
-// CreateActivityEventInput specifies the inputs for creating an activity event
-// The method will assign the user or service account caller.
-type CreateActivityEventInput struct {
-	NamespacePath *string
-	Payload       interface{}
-	Action        models.ActivityEventAction
-	TargetType    models.ActivityEventTargetType
-	TargetID      string
-}
-
 // Service implements all activity event related functionality
 type Service interface {
 	GetActivityEvents(ctx context.Context, input *GetActivityEventsInput) (*db.ActivityEventsResult, error)
-	CreateActivityEvent(ctx context.Context, input *CreateActivityEventInput) (*models.ActivityEvent, error)
 }
 
 type service struct {
@@ -106,54 +94,4 @@ func (s *service) GetActivityEvents(ctx context.Context,
 	}
 
 	return activityEventsResult, nil
-}
-
-func (s *service) CreateActivityEvent(ctx context.Context, input *CreateActivityEventInput) (*models.ActivityEvent, error) {
-	ctx, span := tracer.Start(ctx, "svc.CreateActivityEvent")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	caller, err := auth.AuthorizeCaller(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to authorize caller")
-		return nil, err
-	}
-
-	var userID, serviceAccountID *string
-	switch c := caller.(type) {
-	case *auth.UserCaller:
-		userID = &c.User.Metadata.ID
-	case *auth.ServiceAccountCaller:
-		serviceAccountID = &c.ServiceAccountID
-	default:
-		// If caller is not a user or service account, do nothing.
-		return nil, nil
-	}
-
-	var payloadBuffer []byte
-	if input.Payload != nil {
-		payloadBuffer, err = json.Marshal(input.Payload)
-		if err != nil {
-			tracing.RecordError(span, err, "failed to marshal payload")
-			return nil, err
-		}
-	}
-
-	toCreate := models.ActivityEvent{
-		UserID:           userID,
-		ServiceAccountID: serviceAccountID,
-		NamespacePath:    input.NamespacePath,
-		Action:           input.Action,
-		TargetType:       input.TargetType,
-		TargetID:         input.TargetID,
-		Payload:          payloadBuffer,
-	}
-
-	activityEvent, err := s.dbClient.ActivityEvents.CreateActivityEvent(ctx, &toCreate)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
-	}
-
-	return activityEvent, nil
 }

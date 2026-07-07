@@ -11,13 +11,13 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/fatih/color"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -114,7 +114,6 @@ type service struct {
 	logger           logger.Logger
 	dbClient         *db.Client
 	limitChecker     limits.LimitChecker
-	activityService  activityevent.Service
 	logStreamManager logstream.Manager
 	eventManager     *events.EventManager
 }
@@ -124,7 +123,6 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	activityService activityevent.Service,
 	logStreamManager logstream.Manager,
 	eventManager *events.EventManager,
 ) Service {
@@ -135,7 +133,6 @@ func NewService(
 		logger:           logger,
 		dbClient:         dbClient,
 		limitChecker:     limitChecker,
-		activityService:  activityService,
 		logStreamManager: logStreamManager,
 		eventManager:     eventManager,
 	}
@@ -307,8 +304,8 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 	if runner.GroupID != nil {
 		groupPath := runner.GetGroupPath()
 
-		if _, err = s.activityService.CreateActivityEvent(txContext,
-			&activityevent.CreateActivityEventInput{
+		if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+			&activity.CreateActivityEventInput{
 				NamespacePath: &groupPath,
 				Action:        models.ActionDeleteChildResource,
 				TargetType:    models.TargetGroup,
@@ -451,6 +448,10 @@ func (s *service) AcceptRunnerSessionHeartbeat(ctx context.Context, sessionID st
 			return err
 		}
 
+		s.logger.WithContextFields(ctx).Debugw("Accepted runner session heartbeat.",
+			"runnerSessionID", session.Metadata.ID,
+		)
+
 		return nil
 	})
 }
@@ -551,6 +552,11 @@ func (s *service) CreateRunnerSession(ctx context.Context, input *CreateRunnerSe
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Created a runner session.",
+		"runnerID", input.RunnerID,
+		"runnerSessionID", session.Metadata.ID,
+	)
 
 	return session, nil
 }
@@ -715,8 +721,8 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetRunner,
@@ -802,8 +808,8 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 	if runner.GroupID != nil {
 		groupPath := updatedRunner.GetGroupPath()
 
-		if _, err = s.activityService.CreateActivityEvent(txContext,
-			&activityevent.CreateActivityEventInput{
+		if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+			&activity.CreateActivityEventInput{
 				NamespacePath: &groupPath,
 				Action:        models.ActionUpdate,
 				TargetType:    models.TargetRunner,
@@ -872,7 +878,17 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 		return errors.New("service account %s cannot be assigned to runner %s", sa.GetResourcePath(), runner.GetResourcePath(), errors.WithErrorCode(errors.EInvalid))
 	}
 
-	return s.dbClient.ServiceAccounts.AssignServiceAccountToRunner(ctx, serviceAccountID, runnerID)
+	if err := s.dbClient.ServiceAccounts.AssignServiceAccountToRunner(ctx, serviceAccountID, runnerID); err != nil {
+		tracing.RecordError(span, err, "failed to assign service account to runner")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Assigned a service account to a runner.",
+		"serviceAccountID", serviceAccountID,
+		"runnerID", runnerID,
+	)
+
+	return nil
 }
 
 func (s *service) UnassignServiceAccountFromRunner(ctx context.Context, serviceAccountID string, runnerID string) error {
@@ -907,7 +923,17 @@ func (s *service) UnassignServiceAccountFromRunner(ctx context.Context, serviceA
 		return err
 	}
 
-	return s.dbClient.ServiceAccounts.UnassignServiceAccountFromRunner(ctx, serviceAccountID, runnerID)
+	if err := s.dbClient.ServiceAccounts.UnassignServiceAccountFromRunner(ctx, serviceAccountID, runnerID); err != nil {
+		tracing.RecordError(span, err, "failed to unassign service account from runner")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Unassigned a service account from a runner.",
+		"serviceAccountID", serviceAccountID,
+		"runnerID", runnerID,
+	)
+
+	return nil
 }
 
 func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID string, message string) error {
@@ -972,7 +998,15 @@ func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID 
 			return err
 		}
 
-		return s.dbClient.Transactions.CommitTx(txContext)
+		if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+			return err
+		}
+
+		s.logger.WithContextFields(ctx).Infow("Recorded a runner session error.",
+			"runnerSessionID", runnerSessionID,
+		)
+
+		return nil
 	})
 }
 

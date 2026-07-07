@@ -80,11 +80,11 @@ type Mutation {
   ): NamespaceMembershipMutationPayload!
   createRun(input: CreateRunInput!): RunMutationPayload!
   applyRun(input: ApplyRunInput!): RunMutationPayload!
+  setRunAutoApply(input: SetRunAutoApplyInput!): RunMutationPayload!
   cancelRun(input: CancelRunInput!): RunMutationPayload!
-  updatePlan(input: UpdatePlanInput!): UpdatePlanPayload!
-    @deprecated(reason: "Use the gRPC API instead.")
-  updateApply(input: UpdateApplyInput!): UpdateApplyPayload!
-    @deprecated(reason: "Use the gRPC API instead.")
+  retryRunNode(input: RetryRunNodeInput!): RunMutationPayload!
+  discardRun(input: DiscardRunInput!): RunMutationPayload!
+  undiscardRun(input: UndiscardRunInput!): RunMutationPayload!
   setVariablesIncludedInTFConfig(
     input: SetVariablesIncludedInTFConfigInput!
   ): SetVariablesIncludedInTFConfigPayload!

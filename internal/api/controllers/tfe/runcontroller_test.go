@@ -6,8 +6,8 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	gotfe "github.com/hashicorp/go-tfe"
+	runvariables "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/variables"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 )
 
 func Test_parseRunVariables(t *testing.T) {
@@ -18,7 +18,7 @@ func Test_parseRunVariables(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []run.Variable
+		want    []runvariables.Variable
 		wantErr bool
 	}{
 		{
@@ -29,7 +29,7 @@ func Test_parseRunVariables(t *testing.T) {
 				},
 				body: []byte{},
 			},
-			want:    []run.Variable{},
+			want:    []runvariables.Variable{},
 			wantErr: false,
 		},
 		{
@@ -45,12 +45,11 @@ func Test_parseRunVariables(t *testing.T) {
 				},
 				body: []byte{},
 			},
-			want: []run.Variable{
+			want: []runvariables.Variable{
 				{
 					Key:      "foo",
 					Value:    ptr.String("\"bar\""),
 					Category: models.TerraformVariableCategory,
-					Hcl:      true,
 				},
 			},
 			wantErr: false,
@@ -69,12 +68,11 @@ func Test_parseRunVariables(t *testing.T) {
 				},
 				body: []byte(`{"data":{"attributes":{"variables":[{"Key":"foo","Value":"\"bar\""}]}}}`),
 			},
-			want: []run.Variable{
+			want: []runvariables.Variable{
 				{
 					Key:      "foo",
 					Value:    ptr.String("\"bar\""),
 					Category: models.TerraformVariableCategory,
-					Hcl:      true,
 				},
 			},
 			wantErr: false,
@@ -106,6 +104,62 @@ func Test_parseRunVariables(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseRunVariables() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_toTFEApplyStatus(t *testing.T) {
+	tests := []struct {
+		name   string
+		status models.ApplyStatus
+		want   gotfe.ApplyStatus
+	}{
+		{
+			name:   "skipped maps to created since the CLI has no skipped status",
+			status: models.ApplySkipped,
+			want:   gotfe.ApplyStatus(models.ApplyCreated),
+		},
+		{
+			name:   "created passes through",
+			status: models.ApplyCreated,
+			want:   gotfe.ApplyStatus(models.ApplyCreated),
+		},
+		{
+			name:   "pending passes through",
+			status: models.ApplyPending,
+			want:   gotfe.ApplyStatus(models.ApplyPending),
+		},
+		{
+			name:   "queued passes through",
+			status: models.ApplyQueued,
+			want:   gotfe.ApplyStatus(models.ApplyQueued),
+		},
+		{
+			name:   "running passes through",
+			status: models.ApplyRunning,
+			want:   gotfe.ApplyStatus(models.ApplyRunning),
+		},
+		{
+			name:   "finished passes through",
+			status: models.ApplyFinished,
+			want:   gotfe.ApplyStatus(models.ApplyFinished),
+		},
+		{
+			name:   "errored passes through",
+			status: models.ApplyErrored,
+			want:   gotfe.ApplyStatus(models.ApplyErrored),
+		},
+		{
+			name:   "canceled passes through",
+			status: models.ApplyCanceled,
+			want:   gotfe.ApplyStatus(models.ApplyCanceled),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := toTFEApplyStatus(tt.status); got != tt.want {
+				t.Errorf("toTFEApplyStatus(%q) = %q, want %q", tt.status, got, tt.want)
 			}
 		})
 	}

@@ -243,7 +243,12 @@ func (j *JobCaller) requirePlanWriteAccess(ctx context.Context, _ *models.Permis
 		return err
 	}
 
-	if run == nil || run.PlanID != *checks.planID {
+	if run == nil {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	// run.Plan is a value (always present); a mismatched ID fails closed.
+	if run.Plan.GetID() != *checks.planID {
 		return j.UnauthorizedError(ctx, false)
 	}
 
@@ -271,7 +276,12 @@ func (j *JobCaller) requireApplyWriteAccess(ctx context.Context, _ *models.Permi
 		return err
 	}
 
-	if run == nil || run.ApplyID != *checks.applyID {
+	if run == nil {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	applyNode := run.Apply
+	if applyNode == nil || applyNode.GetID() != *checks.applyID {
 		return j.UnauthorizedError(ctx, false)
 	}
 

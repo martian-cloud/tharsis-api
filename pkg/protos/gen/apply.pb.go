@@ -25,34 +25,40 @@ const (
 type ApplyStatus int32
 
 const (
-	ApplyStatus_CANCELED ApplyStatus = 0
-	ApplyStatus_CREATED  ApplyStatus = 1
-	ApplyStatus_ERRORED  ApplyStatus = 2
-	ApplyStatus_FINISHED ApplyStatus = 3
-	ApplyStatus_PENDING  ApplyStatus = 4
-	ApplyStatus_QUEUED   ApplyStatus = 5
-	ApplyStatus_RUNNING  ApplyStatus = 6
+	ApplyStatus_UNSPECIFIED ApplyStatus = 0
+	ApplyStatus_CREATED     ApplyStatus = 1
+	ApplyStatus_PENDING     ApplyStatus = 2
+	ApplyStatus_QUEUED      ApplyStatus = 3
+	ApplyStatus_RUNNING     ApplyStatus = 4
+	ApplyStatus_FINISHED    ApplyStatus = 5
+	ApplyStatus_ERRORED     ApplyStatus = 6
+	ApplyStatus_CANCELED    ApplyStatus = 7
+	ApplyStatus_SKIPPED     ApplyStatus = 8
 )
 
 // Enum value maps for ApplyStatus.
 var (
 	ApplyStatus_name = map[int32]string{
-		0: "CANCELED",
+		0: "UNSPECIFIED",
 		1: "CREATED",
-		2: "ERRORED",
-		3: "FINISHED",
-		4: "PENDING",
-		5: "QUEUED",
-		6: "RUNNING",
+		2: "PENDING",
+		3: "QUEUED",
+		4: "RUNNING",
+		5: "FINISHED",
+		6: "ERRORED",
+		7: "CANCELED",
+		8: "SKIPPED",
 	}
 	ApplyStatus_value = map[string]int32{
-		"CANCELED": 0,
-		"CREATED":  1,
-		"ERRORED":  2,
-		"FINISHED": 3,
-		"PENDING":  4,
-		"QUEUED":   5,
-		"RUNNING":  6,
+		"UNSPECIFIED": 0,
+		"CREATED":     1,
+		"PENDING":     2,
+		"QUEUED":      3,
+		"RUNNING":     4,
+		"FINISHED":    5,
+		"ERRORED":     6,
+		"CANCELED":    7,
+		"SKIPPED":     8,
 	}
 )
 
@@ -133,7 +139,6 @@ type UpdateApplyRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Version       *int64                 `protobuf:"varint,2,opt,name=version,proto3,oneof" json:"version,omitempty"`
-	Status        ApplyStatus            `protobuf:"varint,3,opt,name=status,proto3,enum=martiancloud.tharsis.api.apply.ApplyStatus" json:"status,omitempty"`
 	ErrorMessage  *string                `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -183,13 +188,6 @@ func (x *UpdateApplyRequest) GetVersion() int64 {
 	return 0
 }
 
-func (x *UpdateApplyRequest) GetStatus() ApplyStatus {
-	if x != nil {
-		return x.Status
-	}
-	return ApplyStatus_CANCELED
-}
-
 func (x *UpdateApplyRequest) GetErrorMessage() string {
 	if x != nil && x.ErrorMessage != nil {
 		return *x.ErrorMessage
@@ -199,13 +197,16 @@ func (x *UpdateApplyRequest) GetErrorMessage() string {
 
 // Apply represents a Terraform apply.
 type Apply struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	TriggeredBy   string                 `protobuf:"bytes,3,opt,name=triggered_by,json=triggeredBy,proto3" json:"triggered_by,omitempty"`
-	ErrorMessage  *string                `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	// Deprecated: Marked as deprecated in apply.proto.
+	DeprecatedStatus string      `protobuf:"bytes,2,opt,name=deprecated_status,json=deprecatedStatus,proto3" json:"deprecated_status,omitempty"`
+	TriggeredBy      string      `protobuf:"bytes,3,opt,name=triggered_by,json=triggeredBy,proto3" json:"triggered_by,omitempty"`
+	ErrorMessage     *string     `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
+	LatestJobId      *string     `protobuf:"bytes,5,opt,name=latest_job_id,json=latestJobId,proto3,oneof" json:"latest_job_id,omitempty"`
+	Status           ApplyStatus `protobuf:"varint,6,opt,name=status,proto3,enum=martiancloud.tharsis.api.apply.ApplyStatus" json:"status,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Apply) Reset() {
@@ -245,9 +246,10 @@ func (x *Apply) GetMetadata() *ResourceMetadata {
 	return nil
 }
 
-func (x *Apply) GetStatus() string {
+// Deprecated: Marked as deprecated in apply.proto.
+func (x *Apply) GetDeprecatedStatus() string {
 	if x != nil {
-		return x.Status
+		return x.DeprecatedStatus
 	}
 	return ""
 }
@@ -266,36 +268,54 @@ func (x *Apply) GetErrorMessage() string {
 	return ""
 }
 
+func (x *Apply) GetLatestJobId() string {
+	if x != nil && x.LatestJobId != nil {
+		return *x.LatestJobId
+	}
+	return ""
+}
+
+func (x *Apply) GetStatus() ApplyStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ApplyStatus_UNSPECIFIED
+}
+
 var File_apply_proto protoreflect.FileDescriptor
 
 const file_apply_proto_rawDesc = "" +
 	"\n" +
 	"\vapply.proto\x12\x1emartiancloud.tharsis.api.apply\x1a\x0emetadata.proto\"%\n" +
 	"\x13GetApplyByIDRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xd0\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x91\x01\n" +
 	"\x12UpdateApplyRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
-	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01\x12C\n" +
-	"\x06status\x18\x03 \x01(\x0e2+.martiancloud.tharsis.api.apply.ApplyStatusR\x06status\x12(\n" +
+	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01\x12(\n" +
 	"\rerror_message\x18\x04 \x01(\tH\x01R\ferrorMessage\x88\x01\x01B\n" +
 	"\n" +
 	"\b_versionB\x10\n" +
-	"\x0e_error_message\"\xcf\x01\n" +
+	"\x0e_error_messageJ\x04\b\x03\x10\x04\"\xe8\x02\n" +
 	"\x05Apply\x12O\n" +
-	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\x12!\n" +
+	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12/\n" +
+	"\x11deprecated_status\x18\x02 \x01(\tB\x02\x18\x01R\x10deprecatedStatus\x12!\n" +
 	"\ftriggered_by\x18\x03 \x01(\tR\vtriggeredBy\x12(\n" +
-	"\rerror_message\x18\x04 \x01(\tH\x00R\ferrorMessage\x88\x01\x01B\x10\n" +
-	"\x0e_error_message*i\n" +
-	"\vApplyStatus\x12\f\n" +
-	"\bCANCELED\x10\x00\x12\v\n" +
+	"\rerror_message\x18\x04 \x01(\tH\x00R\ferrorMessage\x88\x01\x01\x12'\n" +
+	"\rlatest_job_id\x18\x05 \x01(\tH\x01R\vlatestJobId\x88\x01\x01\x12C\n" +
+	"\x06status\x18\x06 \x01(\x0e2+.martiancloud.tharsis.api.apply.ApplyStatusR\x06statusB\x10\n" +
+	"\x0e_error_messageB\x10\n" +
+	"\x0e_latest_job_id*\x87\x01\n" +
+	"\vApplyStatus\x12\x0f\n" +
+	"\vUNSPECIFIED\x10\x00\x12\v\n" +
 	"\aCREATED\x10\x01\x12\v\n" +
-	"\aERRORED\x10\x02\x12\f\n" +
-	"\bFINISHED\x10\x03\x12\v\n" +
-	"\aPENDING\x10\x04\x12\n" +
+	"\aPENDING\x10\x02\x12\n" +
 	"\n" +
-	"\x06QUEUED\x10\x05\x12\v\n" +
-	"\aRUNNING\x10\x06BIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
+	"\x06QUEUED\x10\x03\x12\v\n" +
+	"\aRUNNING\x10\x04\x12\f\n" +
+	"\bFINISHED\x10\x05\x12\v\n" +
+	"\aERRORED\x10\x06\x12\f\n" +
+	"\bCANCELED\x10\a\x12\v\n" +
+	"\aSKIPPED\x10\bBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var (
 	file_apply_proto_rawDescOnce sync.Once
@@ -319,8 +339,8 @@ var file_apply_proto_goTypes = []any{
 	(*ResourceMetadata)(nil),    // 4: martiancloud.tharsis.api.metadata.ResourceMetadata
 }
 var file_apply_proto_depIdxs = []int32{
-	0, // 0: martiancloud.tharsis.api.apply.UpdateApplyRequest.status:type_name -> martiancloud.tharsis.api.apply.ApplyStatus
-	4, // 1: martiancloud.tharsis.api.apply.Apply.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	4, // 0: martiancloud.tharsis.api.apply.Apply.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	0, // 1: martiancloud.tharsis.api.apply.Apply.status:type_name -> martiancloud.tharsis.api.apply.ApplyStatus
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name

@@ -76,6 +76,89 @@ func (RunSortableField) EnumDescriptor() ([]byte, []int) {
 	return file_run_proto_rawDescGZIP(), []int{0}
 }
 
+// RunStatus defines the status of a Run.
+type RunStatus int32
+
+const (
+	RunStatus_UNSPECIFIED          RunStatus = 0
+	RunStatus_PENDING              RunStatus = 1
+	RunStatus_PLAN_QUEUED          RunStatus = 2
+	RunStatus_PLANNING             RunStatus = 3
+	RunStatus_PLANNED              RunStatus = 4
+	RunStatus_PLANNED_AND_FINISHED RunStatus = 5
+	RunStatus_QUEUING              RunStatus = 6
+	RunStatus_QUEUING_APPLY        RunStatus = 7
+	RunStatus_APPLY_QUEUED         RunStatus = 8
+	RunStatus_APPLYING             RunStatus = 9
+	RunStatus_APPLIED              RunStatus = 10
+	RunStatus_CANCELED             RunStatus = 11
+	RunStatus_DISCARDED            RunStatus = 12
+	RunStatus_ERRORED              RunStatus = 13
+)
+
+// Enum value maps for RunStatus.
+var (
+	RunStatus_name = map[int32]string{
+		0:  "UNSPECIFIED",
+		1:  "PENDING",
+		2:  "PLAN_QUEUED",
+		3:  "PLANNING",
+		4:  "PLANNED",
+		5:  "PLANNED_AND_FINISHED",
+		6:  "QUEUING",
+		7:  "QUEUING_APPLY",
+		8:  "APPLY_QUEUED",
+		9:  "APPLYING",
+		10: "APPLIED",
+		11: "CANCELED",
+		12: "DISCARDED",
+		13: "ERRORED",
+	}
+	RunStatus_value = map[string]int32{
+		"UNSPECIFIED":          0,
+		"PENDING":              1,
+		"PLAN_QUEUED":          2,
+		"PLANNING":             3,
+		"PLANNED":              4,
+		"PLANNED_AND_FINISHED": 5,
+		"QUEUING":              6,
+		"QUEUING_APPLY":        7,
+		"APPLY_QUEUED":         8,
+		"APPLYING":             9,
+		"APPLIED":              10,
+		"CANCELED":             11,
+		"DISCARDED":            12,
+		"ERRORED":              13,
+	}
+)
+
+func (x RunStatus) Enum() *RunStatus {
+	p := new(RunStatus)
+	*p = x
+	return p
+}
+
+func (x RunStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RunStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_run_proto_enumTypes[1].Descriptor()
+}
+
+func (RunStatus) Type() protoreflect.EnumType {
+	return &file_run_proto_enumTypes[1]
+}
+
+func (x RunStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RunStatus.Descriptor instead.
+func (RunStatus) EnumDescriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{1}
+}
+
 // GetRunByIDRequest is the input for retrieving a Run by its ID.
 type GetRunByIDRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -217,8 +300,12 @@ type CreateRunRequest struct {
 	// false. Has no effect when module_version is an exact match. Requires
 	// module_source to be set.
 	IncludeModulePrereleases *bool `protobuf:"varint,12,opt,name=include_module_prereleases,json=includeModulePrereleases,proto3,oneof" json:"include_module_prereleases,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// When true, the run's apply phase is started automatically once the plan
+	// finishes with changes, instead of waiting for a manual apply. Defaults to
+	// false when unset.
+	AutoApply     *bool `protobuf:"varint,13,opt,name=auto_apply,json=autoApply,proto3,oneof" json:"auto_apply,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateRunRequest) Reset() {
@@ -331,6 +418,13 @@ func (x *CreateRunRequest) GetModuleVersion() string {
 func (x *CreateRunRequest) GetIncludeModulePrereleases() bool {
 	if x != nil && x.IncludeModulePrereleases != nil {
 		return *x.IncludeModulePrereleases
+	}
+	return false
+}
+
+func (x *CreateRunRequest) GetAutoApply() bool {
+	if x != nil && x.AutoApply != nil {
+		return *x.AutoApply
 	}
 	return false
 }
@@ -724,13 +818,19 @@ type Run struct {
 	PlanId                 string                 `protobuf:"bytes,13,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
 	Refresh                bool                   `protobuf:"varint,14,opt,name=refresh,proto3" json:"refresh,omitempty"`
 	RefreshOnly            bool                   `protobuf:"varint,15,opt,name=refresh_only,json=refreshOnly,proto3" json:"refresh_only,omitempty"`
-	Status                 string                 `protobuf:"bytes,16,opt,name=status,proto3" json:"status,omitempty"`
-	TargetAddresses        []string               `protobuf:"bytes,17,rep,name=target_addresses,json=targetAddresses,proto3" json:"target_addresses,omitempty"`
-	TerraformVersion       string                 `protobuf:"bytes,18,opt,name=terraform_version,json=terraformVersion,proto3" json:"terraform_version,omitempty"`
-	WorkspaceId            string                 `protobuf:"bytes,19,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Speculative            bool                   `protobuf:"varint,20,opt,name=speculative,proto3" json:"speculative,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Deprecated: Marked as deprecated in run.proto.
+	DeprecatedStatus string   `protobuf:"bytes,16,opt,name=deprecated_status,json=deprecatedStatus,proto3" json:"deprecated_status,omitempty"`
+	TargetAddresses  []string `protobuf:"bytes,17,rep,name=target_addresses,json=targetAddresses,proto3" json:"target_addresses,omitempty"`
+	TerraformVersion string   `protobuf:"bytes,18,opt,name=terraform_version,json=terraformVersion,proto3" json:"terraform_version,omitempty"`
+	WorkspaceId      string   `protobuf:"bytes,19,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Speculative      bool     `protobuf:"varint,20,opt,name=speculative,proto3" json:"speculative,omitempty"`
+	AutoApply        bool     `protobuf:"varint,21,opt,name=auto_apply,json=autoApply,proto3" json:"auto_apply,omitempty"`
+	Plan             *Plan    `protobuf:"bytes,22,opt,name=plan,proto3" json:"plan,omitempty"`
+	// Not set for speculative runs, which have no apply stage.
+	Apply         *Apply    `protobuf:"bytes,23,opt,name=apply,proto3,oneof" json:"apply,omitempty"`
+	Status        RunStatus `protobuf:"varint,24,opt,name=status,proto3,enum=martiancloud.tharsis.api.run.RunStatus" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Run) Reset() {
@@ -868,9 +968,10 @@ func (x *Run) GetRefreshOnly() bool {
 	return false
 }
 
-func (x *Run) GetStatus() string {
+// Deprecated: Marked as deprecated in run.proto.
+func (x *Run) GetDeprecatedStatus() string {
 	if x != nil {
-		return x.Status
+		return x.DeprecatedStatus
 	}
 	return ""
 }
@@ -901,6 +1002,34 @@ func (x *Run) GetSpeculative() bool {
 		return x.Speculative
 	}
 	return false
+}
+
+func (x *Run) GetAutoApply() bool {
+	if x != nil {
+		return x.AutoApply
+	}
+	return false
+}
+
+func (x *Run) GetPlan() *Plan {
+	if x != nil {
+		return x.Plan
+	}
+	return nil
+}
+
+func (x *Run) GetApply() *Apply {
+	if x != nil {
+		return x.Apply
+	}
+	return nil
+}
+
+func (x *Run) GetStatus() RunStatus {
+	if x != nil {
+		return x.Status
+	}
+	return RunStatus_UNSPECIFIED
 }
 
 // RunVariable represents a variable used in a run.
@@ -1165,7 +1294,7 @@ const file_run_proto_rawDesc = "" +
 	"\x05_sortB\x0f\n" +
 	"\r_workspace_idB\v\n" +
 	"\t_group_idB\x16\n" +
-	"\x14_include_nested_runs\"\xc2\x05\n" +
+	"\x14_include_nested_runs\"\xf5\x05\n" +
 	"\x10CreateRunRequest\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12=\n" +
 	"\x18configuration_version_id\x18\x02 \x01(\tH\x00R\x16configurationVersionId\x88\x01\x01\x12\x1d\n" +
@@ -1180,13 +1309,16 @@ const file_run_proto_rawDesc = "" +
 	"\rmodule_source\x18\n" +
 	" \x01(\tH\x03R\fmoduleSource\x88\x01\x01\x12*\n" +
 	"\x0emodule_version\x18\v \x01(\tH\x04R\rmoduleVersion\x88\x01\x01\x12A\n" +
-	"\x1ainclude_module_prereleases\x18\f \x01(\bH\x05R\x18includeModulePrereleases\x88\x01\x01B\x1b\n" +
+	"\x1ainclude_module_prereleases\x18\f \x01(\bH\x05R\x18includeModulePrereleases\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"auto_apply\x18\r \x01(\bH\x06R\tautoApply\x88\x01\x01B\x1b\n" +
 	"\x19_configuration_version_idB\x14\n" +
 	"\x12_terraform_versionB\x0e\n" +
 	"\f_speculativeB\x10\n" +
 	"\x0e_module_sourceB\x11\n" +
 	"\x0f_module_versionB\x1d\n" +
-	"\x1b_include_module_prereleases\"(\n" +
+	"\x1b_include_module_prereleasesB\r\n" +
+	"\v_auto_apply\"(\n" +
 	"\x0fApplyRunRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\"G\n" +
 	"\x10CancelRunRequest\x12\x0e\n" +
@@ -1212,7 +1344,7 @@ const file_run_proto_rawDesc = "" +
 	"\x06_value\"c\n" +
 	"%SetVariablesIncludedInTFConfigRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12#\n" +
-	"\rvariable_keys\x18\x02 \x03(\tR\fvariableKeys\"\xd6\a\n" +
+	"\rvariable_keys\x18\x02 \x03(\tR\fvariableKeys\"\xd4\t\n" +
 	"\x03Run\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x19\n" +
 	"\bapply_id\x18\x02 \x01(\tR\aapplyId\x12=\n" +
@@ -1232,18 +1364,24 @@ const file_run_proto_rawDesc = "" +
 	"\x0emodule_version\x18\f \x01(\tH\x05R\rmoduleVersion\x88\x01\x01\x12\x17\n" +
 	"\aplan_id\x18\r \x01(\tR\x06planId\x12\x18\n" +
 	"\arefresh\x18\x0e \x01(\bR\arefresh\x12!\n" +
-	"\frefresh_only\x18\x0f \x01(\bR\vrefreshOnly\x12\x16\n" +
-	"\x06status\x18\x10 \x01(\tR\x06status\x12)\n" +
+	"\frefresh_only\x18\x0f \x01(\bR\vrefreshOnly\x12/\n" +
+	"\x11deprecated_status\x18\x10 \x01(\tB\x02\x18\x01R\x10deprecatedStatus\x12)\n" +
 	"\x10target_addresses\x18\x11 \x03(\tR\x0ftargetAddresses\x12+\n" +
 	"\x11terraform_version\x18\x12 \x01(\tR\x10terraformVersion\x12!\n" +
 	"\fworkspace_id\x18\x13 \x01(\tR\vworkspaceId\x12 \n" +
-	"\vspeculative\x18\x14 \x01(\bR\vspeculativeB\x1b\n" +
+	"\vspeculative\x18\x14 \x01(\bR\vspeculative\x12\x1d\n" +
+	"\n" +
+	"auto_apply\x18\x15 \x01(\bR\tautoApply\x127\n" +
+	"\x04plan\x18\x16 \x01(\v2#.martiancloud.tharsis.api.plan.PlanR\x04plan\x12@\n" +
+	"\x05apply\x18\x17 \x01(\v2%.martiancloud.tharsis.api.apply.ApplyH\x06R\x05apply\x88\x01\x01\x12?\n" +
+	"\x06status\x18\x18 \x01(\x0e2'.martiancloud.tharsis.api.run.RunStatusR\x06statusB\x1b\n" +
 	"\x19_configuration_version_idB\x1c\n" +
 	"\x1a_force_cancel_available_atB\x14\n" +
 	"\x12_force_canceled_byB\x10\n" +
 	"\x0e_module_digestB\x10\n" +
 	"\x0e_module_sourceB\x11\n" +
-	"\x0f_module_version\"\xa3\x02\n" +
+	"\x0f_module_versionB\b\n" +
+	"\x06_apply\"\xa3\x02\n" +
 	"\vRunVariable\x12*\n" +
 	"\x0enamespace_path\x18\x01 \x01(\tH\x00R\rnamespacePath\x88\x01\x01\x12\x1a\n" +
 	"\bcategory\x18\x02 \x01(\tR\bcategory\x12\x10\n" +
@@ -1268,7 +1406,23 @@ const file_run_proto_rawDesc = "" +
 	"\x0eCREATED_AT_ASC\x10\x00\x12\x13\n" +
 	"\x0fCREATED_AT_DESC\x10\x01\x12\x12\n" +
 	"\x0eUPDATED_AT_ASC\x10\x02\x12\x13\n" +
-	"\x0fUPDATED_AT_DESC\x10\x032\x93\v\n" +
+	"\x0fUPDATED_AT_DESC\x10\x03*\xe6\x01\n" +
+	"\tRunStatus\x12\x0f\n" +
+	"\vUNSPECIFIED\x10\x00\x12\v\n" +
+	"\aPENDING\x10\x01\x12\x0f\n" +
+	"\vPLAN_QUEUED\x10\x02\x12\f\n" +
+	"\bPLANNING\x10\x03\x12\v\n" +
+	"\aPLANNED\x10\x04\x12\x18\n" +
+	"\x14PLANNED_AND_FINISHED\x10\x05\x12\v\n" +
+	"\aQUEUING\x10\x06\x12\x11\n" +
+	"\rQUEUING_APPLY\x10\a\x12\x10\n" +
+	"\fAPPLY_QUEUED\x10\b\x12\f\n" +
+	"\bAPPLYING\x10\t\x12\v\n" +
+	"\aAPPLIED\x10\n" +
+	"\x12\f\n" +
+	"\bCANCELED\x10\v\x12\r\n" +
+	"\tDISCARDED\x10\f\x12\v\n" +
+	"\aERRORED\x10\r2\x93\v\n" +
 	"\x04Runs\x12`\n" +
 	"\n" +
 	"GetRunByID\x12/.martiancloud.tharsis.api.run.GetRunByIDRequest\x1a!.martiancloud.tharsis.api.run.Run\x12f\n" +
@@ -1298,78 +1452,82 @@ func file_run_proto_rawDescGZIP() []byte {
 	return file_run_proto_rawDescData
 }
 
-var file_run_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_run_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_run_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_run_proto_goTypes = []any{
 	(RunSortableField)(0),                         // 0: martiancloud.tharsis.api.run.RunSortableField
-	(*GetRunByIDRequest)(nil),                     // 1: martiancloud.tharsis.api.run.GetRunByIDRequest
-	(*GetRunsRequest)(nil),                        // 2: martiancloud.tharsis.api.run.GetRunsRequest
-	(*CreateRunRequest)(nil),                      // 3: martiancloud.tharsis.api.run.CreateRunRequest
-	(*ApplyRunRequest)(nil),                       // 4: martiancloud.tharsis.api.run.ApplyRunRequest
-	(*CancelRunRequest)(nil),                      // 5: martiancloud.tharsis.api.run.CancelRunRequest
-	(*CreateDestroyRunForWorkspaceRequest)(nil),   // 6: martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
-	(*GetRunVariablesRequest)(nil),                // 7: martiancloud.tharsis.api.run.GetRunVariablesRequest
-	(*SubscribeToRunEventsRequest)(nil),           // 8: martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
-	(*RunVariableInput)(nil),                      // 9: martiancloud.tharsis.api.run.RunVariableInput
-	(*SetVariablesIncludedInTFConfigRequest)(nil), // 10: martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
-	(*Run)(nil),                     // 11: martiancloud.tharsis.api.run.Run
-	(*RunVariable)(nil),             // 12: martiancloud.tharsis.api.run.RunVariable
-	(*RunEvent)(nil),                // 13: martiancloud.tharsis.api.run.RunEvent
-	(*GetRunsResponse)(nil),         // 14: martiancloud.tharsis.api.run.GetRunsResponse
-	(*GetRunVariablesResponse)(nil), // 15: martiancloud.tharsis.api.run.GetRunVariablesResponse
-	(*PaginationOptions)(nil),       // 16: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),        // 17: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*timestamppb.Timestamp)(nil),   // 18: google.protobuf.Timestamp
-	(*PageInfo)(nil),                // 19: martiancloud.tharsis.api.pagination.PageInfo
-	(*GetPlanByIDRequest)(nil),      // 20: martiancloud.tharsis.api.plan.GetPlanByIDRequest
-	(*GetApplyByIDRequest)(nil),     // 21: martiancloud.tharsis.api.apply.GetApplyByIDRequest
-	(*UpdatePlanRequest)(nil),       // 22: martiancloud.tharsis.api.plan.UpdatePlanRequest
-	(*UpdateApplyRequest)(nil),      // 23: martiancloud.tharsis.api.apply.UpdateApplyRequest
-	(*Plan)(nil),                    // 24: martiancloud.tharsis.api.plan.Plan
-	(*Apply)(nil),                   // 25: martiancloud.tharsis.api.apply.Apply
-	(*emptypb.Empty)(nil),           // 26: google.protobuf.Empty
+	(RunStatus)(0),                                // 1: martiancloud.tharsis.api.run.RunStatus
+	(*GetRunByIDRequest)(nil),                     // 2: martiancloud.tharsis.api.run.GetRunByIDRequest
+	(*GetRunsRequest)(nil),                        // 3: martiancloud.tharsis.api.run.GetRunsRequest
+	(*CreateRunRequest)(nil),                      // 4: martiancloud.tharsis.api.run.CreateRunRequest
+	(*ApplyRunRequest)(nil),                       // 5: martiancloud.tharsis.api.run.ApplyRunRequest
+	(*CancelRunRequest)(nil),                      // 6: martiancloud.tharsis.api.run.CancelRunRequest
+	(*CreateDestroyRunForWorkspaceRequest)(nil),   // 7: martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
+	(*GetRunVariablesRequest)(nil),                // 8: martiancloud.tharsis.api.run.GetRunVariablesRequest
+	(*SubscribeToRunEventsRequest)(nil),           // 9: martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
+	(*RunVariableInput)(nil),                      // 10: martiancloud.tharsis.api.run.RunVariableInput
+	(*SetVariablesIncludedInTFConfigRequest)(nil), // 11: martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
+	(*Run)(nil),                                   // 12: martiancloud.tharsis.api.run.Run
+	(*RunVariable)(nil),                           // 13: martiancloud.tharsis.api.run.RunVariable
+	(*RunEvent)(nil),                              // 14: martiancloud.tharsis.api.run.RunEvent
+	(*GetRunsResponse)(nil),                       // 15: martiancloud.tharsis.api.run.GetRunsResponse
+	(*GetRunVariablesResponse)(nil),               // 16: martiancloud.tharsis.api.run.GetRunVariablesResponse
+	(*PaginationOptions)(nil),                     // 17: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),                      // 18: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*timestamppb.Timestamp)(nil),                 // 19: google.protobuf.Timestamp
+	(*Plan)(nil),                                  // 20: martiancloud.tharsis.api.plan.Plan
+	(*Apply)(nil),                                 // 21: martiancloud.tharsis.api.apply.Apply
+	(*PageInfo)(nil),                              // 22: martiancloud.tharsis.api.pagination.PageInfo
+	(*GetPlanByIDRequest)(nil),                    // 23: martiancloud.tharsis.api.plan.GetPlanByIDRequest
+	(*GetApplyByIDRequest)(nil),                   // 24: martiancloud.tharsis.api.apply.GetApplyByIDRequest
+	(*UpdatePlanRequest)(nil),                     // 25: martiancloud.tharsis.api.plan.UpdatePlanRequest
+	(*UpdateApplyRequest)(nil),                    // 26: martiancloud.tharsis.api.apply.UpdateApplyRequest
+	(*emptypb.Empty)(nil),                         // 27: google.protobuf.Empty
 }
 var file_run_proto_depIdxs = []int32{
-	16, // 0: martiancloud.tharsis.api.run.GetRunsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	17, // 0: martiancloud.tharsis.api.run.GetRunsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.run.GetRunsRequest.sort:type_name -> martiancloud.tharsis.api.run.RunSortableField
-	9,  // 2: martiancloud.tharsis.api.run.CreateRunRequest.variables:type_name -> martiancloud.tharsis.api.run.RunVariableInput
-	17, // 3: martiancloud.tharsis.api.run.Run.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	18, // 4: martiancloud.tharsis.api.run.Run.force_cancel_available_at:type_name -> google.protobuf.Timestamp
-	11, // 5: martiancloud.tharsis.api.run.RunEvent.run:type_name -> martiancloud.tharsis.api.run.Run
-	11, // 6: martiancloud.tharsis.api.run.GetRunsResponse.runs:type_name -> martiancloud.tharsis.api.run.Run
-	19, // 7: martiancloud.tharsis.api.run.GetRunsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	12, // 8: martiancloud.tharsis.api.run.GetRunVariablesResponse.variables:type_name -> martiancloud.tharsis.api.run.RunVariable
-	1,  // 9: martiancloud.tharsis.api.run.Runs.GetRunByID:input_type -> martiancloud.tharsis.api.run.GetRunByIDRequest
-	2,  // 10: martiancloud.tharsis.api.run.Runs.GetRuns:input_type -> martiancloud.tharsis.api.run.GetRunsRequest
-	3,  // 11: martiancloud.tharsis.api.run.Runs.CreateRun:input_type -> martiancloud.tharsis.api.run.CreateRunRequest
-	4,  // 12: martiancloud.tharsis.api.run.Runs.ApplyRun:input_type -> martiancloud.tharsis.api.run.ApplyRunRequest
-	5,  // 13: martiancloud.tharsis.api.run.Runs.CancelRun:input_type -> martiancloud.tharsis.api.run.CancelRunRequest
-	7,  // 14: martiancloud.tharsis.api.run.Runs.GetRunVariables:input_type -> martiancloud.tharsis.api.run.GetRunVariablesRequest
-	20, // 15: martiancloud.tharsis.api.run.Runs.GetPlanByID:input_type -> martiancloud.tharsis.api.plan.GetPlanByIDRequest
-	21, // 16: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
-	22, // 17: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
-	23, // 18: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
-	10, // 19: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:input_type -> martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
-	8,  // 20: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
-	6,  // 21: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:input_type -> martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
-	11, // 22: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
-	14, // 23: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
-	11, // 24: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
-	11, // 25: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
-	11, // 26: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
-	15, // 27: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
-	24, // 28: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
-	25, // 29: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
-	24, // 30: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
-	25, // 31: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
-	26, // 32: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:output_type -> google.protobuf.Empty
-	13, // 33: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
-	11, // 34: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:output_type -> martiancloud.tharsis.api.run.Run
-	22, // [22:35] is the sub-list for method output_type
-	9,  // [9:22] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	10, // 2: martiancloud.tharsis.api.run.CreateRunRequest.variables:type_name -> martiancloud.tharsis.api.run.RunVariableInput
+	18, // 3: martiancloud.tharsis.api.run.Run.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	19, // 4: martiancloud.tharsis.api.run.Run.force_cancel_available_at:type_name -> google.protobuf.Timestamp
+	20, // 5: martiancloud.tharsis.api.run.Run.plan:type_name -> martiancloud.tharsis.api.plan.Plan
+	21, // 6: martiancloud.tharsis.api.run.Run.apply:type_name -> martiancloud.tharsis.api.apply.Apply
+	1,  // 7: martiancloud.tharsis.api.run.Run.status:type_name -> martiancloud.tharsis.api.run.RunStatus
+	12, // 8: martiancloud.tharsis.api.run.RunEvent.run:type_name -> martiancloud.tharsis.api.run.Run
+	12, // 9: martiancloud.tharsis.api.run.GetRunsResponse.runs:type_name -> martiancloud.tharsis.api.run.Run
+	22, // 10: martiancloud.tharsis.api.run.GetRunsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	13, // 11: martiancloud.tharsis.api.run.GetRunVariablesResponse.variables:type_name -> martiancloud.tharsis.api.run.RunVariable
+	2,  // 12: martiancloud.tharsis.api.run.Runs.GetRunByID:input_type -> martiancloud.tharsis.api.run.GetRunByIDRequest
+	3,  // 13: martiancloud.tharsis.api.run.Runs.GetRuns:input_type -> martiancloud.tharsis.api.run.GetRunsRequest
+	4,  // 14: martiancloud.tharsis.api.run.Runs.CreateRun:input_type -> martiancloud.tharsis.api.run.CreateRunRequest
+	5,  // 15: martiancloud.tharsis.api.run.Runs.ApplyRun:input_type -> martiancloud.tharsis.api.run.ApplyRunRequest
+	6,  // 16: martiancloud.tharsis.api.run.Runs.CancelRun:input_type -> martiancloud.tharsis.api.run.CancelRunRequest
+	8,  // 17: martiancloud.tharsis.api.run.Runs.GetRunVariables:input_type -> martiancloud.tharsis.api.run.GetRunVariablesRequest
+	23, // 18: martiancloud.tharsis.api.run.Runs.GetPlanByID:input_type -> martiancloud.tharsis.api.plan.GetPlanByIDRequest
+	24, // 19: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
+	25, // 20: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
+	26, // 21: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
+	11, // 22: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:input_type -> martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
+	9,  // 23: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
+	7,  // 24: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:input_type -> martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
+	12, // 25: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
+	15, // 26: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
+	12, // 27: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
+	12, // 28: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
+	12, // 29: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
+	16, // 30: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
+	20, // 31: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
+	21, // 32: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
+	20, // 33: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
+	21, // 34: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
+	27, // 35: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:output_type -> google.protobuf.Empty
+	14, // 36: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
+	12, // 37: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:output_type -> martiancloud.tharsis.api.run.Run
+	25, // [25:38] is the sub-list for method output_type
+	12, // [12:25] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_run_proto_init() }
@@ -1393,7 +1551,7 @@ func file_run_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_run_proto_rawDesc), len(file_run_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,

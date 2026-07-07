@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e1c9d0fe9d5901526fcf2628eba0e6ec>>
+ * @generated SignedSource<<fc77f51bc251b47f2e915c943f119c88>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,6 +14,15 @@ import { FragmentRefs } from "relay-runtime";
 export type ActivityEventRunTargetFragment_event$data = {
   readonly action: ActivityEventAction;
   readonly namespacePath: string | null | undefined;
+  readonly payload: {
+    readonly __typename: "ActivityEventUpdateRunPayload";
+    readonly nodePath: string | null | undefined;
+    readonly type: string;
+  } | {
+    // This will never be '%other', but we need some
+    // value in case none of the concrete values match.
+    readonly __typename: "%other";
+  } | null | undefined;
   readonly target: {
     readonly id?: string;
   };
@@ -71,6 +80,45 @@ const node: ReaderFragment = {
       "storageKey": null
     },
     {
+      "alias": null,
+      "args": null,
+      "concreteType": null,
+      "kind": "LinkedField",
+      "name": "payload",
+      "plural": false,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "__typename",
+          "storageKey": null
+        },
+        {
+          "kind": "InlineFragment",
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "type",
+              "storageKey": null
+            },
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "nodePath",
+              "storageKey": null
+            }
+          ],
+          "type": "ActivityEventUpdateRunPayload",
+          "abstractKey": null
+        }
+      ],
+      "storageKey": null
+    },
+    {
       "args": null,
       "kind": "FragmentSpread",
       "name": "ActivityEventListItemFragment_event"
@@ -80,6 +128,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "9cd0d6e7604bdf0070add7b96a151356";
+(node as any).hash = "b54a5ba08e984f5ccb205594f9d3db26";
 
 export default node;

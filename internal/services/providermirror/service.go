@@ -13,12 +13,12 @@ import (
 	"github.com/apparentlymart/go-versions/versions"
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -148,12 +148,11 @@ type Service interface {
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	registryClient  provider.RegistryProtocol
-	limitChecker    limits.LimitChecker
-	activityService activityevent.Service
-	mirrorStore     TerraformProviderMirrorStore
+	logger         logger.Logger
+	dbClient       *db.Client
+	registryClient provider.RegistryProtocol
+	limitChecker   limits.LimitChecker
+	mirrorStore    TerraformProviderMirrorStore
 }
 
 // NewService creates a new Service.
@@ -162,16 +161,14 @@ func NewService(
 	dbClient *db.Client,
 	registryClient provider.RegistryProtocol,
 	limitChecker limits.LimitChecker,
-	activityService activityevent.Service,
 	mirrorStore TerraformProviderMirrorStore,
 ) Service {
 	return &service{
-		logger:          logger,
-		dbClient:        dbClient,
-		registryClient:  registryClient,
-		limitChecker:    limitChecker,
-		activityService: activityService,
-		mirrorStore:     mirrorStore,
+		logger:         logger,
+		dbClient:       dbClient,
+		registryClient: registryClient,
+		limitChecker:   limitChecker,
+		mirrorStore:    mirrorStore,
 	}
 }
 
@@ -427,8 +424,8 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetTerraformProviderVersionMirror,
@@ -538,8 +535,8 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 	}
 
 	providerName := fmt.Sprintf("%s/%s", provider, input.VersionMirror.SemanticVersion)
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,
@@ -829,6 +826,14 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return err
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Uploaded a terraform provider installation package.",
+		"groupID", versionMirror.GroupID,
+		"versionMirrorID", versionMirror.Metadata.ID,
+		"platformMirrorID", platformMirror.Metadata.ID,
+		"os", input.OS,
+		"architecture", input.Architecture,
+	)
 
 	return nil
 }

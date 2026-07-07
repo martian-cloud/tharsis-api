@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b221ec7318d3229b03e490c502117211>>
+ * @generated SignedSource<<bfc2d61457fcd5a754496aa4447928e5>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,6 +12,7 @@ import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type WorkspaceListItemFragment_workspace$data = {
   readonly description: string;
+  readonly destroyed: boolean;
   readonly fullPath: string;
   readonly id: string;
   readonly labels: ReadonlyArray<{
@@ -84,6 +85,13 @@ const node: ReaderFragment = {
     {
       "alias": null,
       "args": null,
+      "kind": "ScalarField",
+      "name": "destroyed",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
       "concreteType": "WorkspaceLabel",
       "kind": "LinkedField",
       "name": "labels",
@@ -111,6 +119,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "0b930344388ff47fe4f8ce0252e7e32d";
+(node as any).hash = "51724d63d72b804dd0f4f88de1d58587";
 
 export default node;

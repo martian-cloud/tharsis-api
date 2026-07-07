@@ -160,10 +160,10 @@ func Test_addFetchers(t *testing.T) {
 
 	catalog.addModelFetchers(types.RunModelType,
 		func(ctx context.Context, value string) (models.Model, error) {
-			return mockRunService.GetApplyByID(ctx, value)
+			return mockRunService.GetRunByNodeID(ctx, value)
 		},
 		func(ctx context.Context, value string) (models.Model, error) {
-			return mockRunService.GetApplyByTRN(ctx, value)
+			return mockRunService.GetRunByTRN(ctx, value)
 		},
 	)
 
@@ -178,10 +178,10 @@ func Test_getModelFetcherByTRNType(t *testing.T) {
 
 	catalog.addModelFetchers(types.RunModelType,
 		func(ctx context.Context, value string) (models.Model, error) {
-			return mockRunService.GetApplyByID(ctx, value)
+			return mockRunService.GetRunByNodeID(ctx, value)
 		},
 		func(ctx context.Context, value string) (models.Model, error) {
-			return mockRunService.GetApplyByTRN(ctx, value)
+			return mockRunService.GetRunByTRN(ctx, value)
 		},
 	)
 
@@ -200,10 +200,10 @@ func Test_getModelFetcherByGIDCode(t *testing.T) {
 
 	catalog.addModelFetchers(types.RunModelType,
 		func(ctx context.Context, value string) (models.Model, error) {
-			return mockRunService.GetApplyByID(ctx, value)
+			return mockRunService.GetRunByNodeID(ctx, value)
 		},
 		func(ctx context.Context, value string) (models.Model, error) {
-			return mockRunService.GetApplyByTRN(ctx, value)
+			return mockRunService.GetRunByTRN(ctx, value)
 		},
 	)
 

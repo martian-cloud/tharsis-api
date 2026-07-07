@@ -14,7 +14,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -170,7 +169,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil, nil)
 
 			result, err := service.GetManagedIdentities(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -196,18 +195,6 @@ func TestDeleteManagedIdentity(t *testing.T) {
 		},
 		Name:    "a-managed-identity-to-delete",
 		GroupID: "some-group-id",
-	}
-
-	activityEventInput := &activityevent.CreateActivityEventInput{
-		NamespacePath: ptr.String("some/resource"),
-		Action:        models.ActionDeleteChildResource,
-		TargetType:    models.TargetGroup,
-		TargetID:      sampleManagedIdentity.GroupID,
-		Payload: &models.ActivityEventDeleteChildResourcePayload{
-			Name: sampleManagedIdentity.Name,
-			ID:   sampleManagedIdentity.Metadata.ID,
-			Type: string(models.TargetManagedIdentity),
-		},
 	}
 
 	type testCase struct {
@@ -270,7 +257,6 @@ func TestDeleteManagedIdentity(t *testing.T) {
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
@@ -285,9 +271,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 			if test.expectErrorCode == "" {
 				mockManagedIdentities.On("DeleteManagedIdentity", mock.Anything, test.input.ManagedIdentity).Return(nil)
 
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
-
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
@@ -299,7 +283,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, nil, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, nil, nil, nil, nil)
 
 			err := service.DeleteManagedIdentity(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -367,7 +351,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil, nil)
 
 			result, err := service.GetManagedIdentitiesForWorkspace(auth.WithCaller(ctx, mockCaller), test.workspaceID)
 
@@ -398,13 +382,6 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 
 	sampleWorkspace := &models.Workspace{
 		FullPath: "some/resource/path",
-	}
-
-	activityEventInput := &activityevent.CreateActivityEventInput{
-		NamespacePath: &sampleWorkspace.FullPath,
-		Action:        models.ActionAdd,
-		TargetType:    models.TargetManagedIdentity,
-		TargetID:      awsManagedIdentity.Metadata.ID,
 	}
 
 	type testCase struct {
@@ -515,7 +492,6 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockWorkspaces := workspace.NewMockService(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 			mockResourceLimits := db.NewMockResourceLimits(t)
@@ -557,10 +533,9 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			if (test.expectErrorCode == "") || test.exceedsLimit {
 				mockManagedIdentities.On("AddManagedIdentityToWorkspace", mock.Anything, test.managedIdentityID, test.workspaceID).Return(nil)
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				if !test.exceedsLimit {
-					mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 					mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 				}
@@ -581,7 +556,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, mockWorkspaces, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, mockWorkspaces, nil)
 
 			err := service.AddManagedIdentityToWorkspace(auth.WithCaller(ctx, mockCaller), test.managedIdentityID, test.workspaceID)
 
@@ -610,13 +585,6 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 
 	sampleWorkspace := &models.Workspace{
 		FullPath: "some/resource/path",
-	}
-
-	activityEventInput := &activityevent.CreateActivityEventInput{
-		NamespacePath: &sampleWorkspace.FullPath,
-		Action:        models.ActionRemove,
-		TargetType:    models.TargetManagedIdentity,
-		TargetID:      sampleManagedIdentity.Metadata.ID,
 	}
 
 	type testCase struct {
@@ -657,7 +625,6 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockWorkspaces := workspace.NewMockService(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
@@ -672,9 +639,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 
 				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, test.workspaceID).Return(sampleWorkspace, nil)
 
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
-
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
@@ -687,7 +652,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, mockWorkspaces, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, nil, nil, mockWorkspaces, nil)
 
 			err := service.RemoveManagedIdentityFromWorkspace(auth.WithCaller(ctx, mockCaller), test.managedIdentityID, test.workspaceID)
 
@@ -758,7 +723,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil, nil)
 
 			identity, err := service.GetManagedIdentityByID(auth.WithCaller(ctx, mockCaller), test.searchID)
 
@@ -876,13 +841,6 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			ID: "some-other-group-id",
 		},
 		FullPath: "some/sibling",
-	}
-
-	activityEventInput := &activityevent.CreateActivityEventInput{
-		NamespacePath: &sampleAliasGroup.FullPath,
-		Action:        models.ActionCreate,
-		TargetType:    models.TargetManagedIdentity,
-		TargetID:      "some-new-alias-id",
 	}
 
 	sampleAliasName := "some-managed-identity-alias"
@@ -1123,7 +1081,6 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockGroups := db.NewMockGroups(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 			mockResourceLimits := db.NewMockResourceLimits(t)
@@ -1140,10 +1097,9 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 
 				mockManagedIdentities.On("CreateManagedIdentity", mock.Anything, test.createInput).Return(test.expectCreatedAlias, nil)
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				if !test.exceedsLimit {
-					mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 				}
 			}
@@ -1206,7 +1162,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, nil)
 
 			alias, err := service.CreateManagedIdentityAlias(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1240,18 +1196,6 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 			ID: "some-source-managed-identity-id",
 		},
 		GroupID: "some-group-id",
-	}
-
-	activityEventInput := &activityevent.CreateActivityEventInput{
-		NamespacePath: ptr.String("some/resource"),
-		Action:        models.ActionDeleteChildResource,
-		TargetType:    models.TargetGroup,
-		TargetID:      sampleManagedIdentityAlias.GroupID,
-		Payload: &models.ActivityEventDeleteChildResourcePayload{
-			Name: sampleManagedIdentityAlias.Name,
-			ID:   sampleManagedIdentityAlias.Metadata.ID,
-			Type: string(models.TargetManagedIdentity),
-		},
 	}
 
 	type testCase struct {
@@ -1317,7 +1261,6 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
@@ -1326,11 +1269,10 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
 			if test.expectErrorCode == "" {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
 
 				mockManagedIdentities.On("DeleteManagedIdentity", mock.Anything, test.input.ManagedIdentity).Return(nil)
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
@@ -1352,7 +1294,7 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, nil, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, nil, nil, nil, nil)
 
 			err := service.DeleteManagedIdentityAlias(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1389,13 +1331,6 @@ func TestCreateManagedIdentity(t *testing.T) {
 			ID:  "some-service-account-id",
 			TRN: trn.TypeServiceAccount.Build("some/resource/service-account"),
 		},
-	}
-
-	activityEventInput := &activityevent.CreateActivityEventInput{
-		NamespacePath: ptr.String(sampleManagedIdentity.GetGroupPath()),
-		Action:        models.ActionCreate,
-		TargetType:    models.TargetManagedIdentity,
-		TargetID:      sampleManagedIdentity.Metadata.ID,
 	}
 
 	createIdentityInput := &models.ManagedIdentity{
@@ -1616,7 +1551,6 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockServiceAccounts := db.NewMockServiceAccounts(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockDelegate := NewMockDelegate(t)
 			mockCaller := auth.NewMockCaller(t)
@@ -1628,9 +1562,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, mock.Anything).Return(test.existingServiceAccount, nil).Maybe()
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil).Maybe()
-
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
@@ -1678,7 +1610,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), delegateMap, nil, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), delegateMap, nil, nil)
 
 			identity, err := service.CreateManagedIdentity(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1764,7 +1696,7 @@ func TestGetManagedIdentitiesByIDs(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil, nil)
 
 			result, err := service.GetManagedIdentitiesByIDs(auth.WithCaller(ctx, mockCaller), test.inputIDList)
 
@@ -1793,13 +1725,6 @@ func TestUpdateManagedIdentity(t *testing.T) {
 		GroupID:     "some-group-id",
 		Data:        []byte("this is old data"),
 		Type:        models.ManagedIdentityAWSFederated,
-	}
-
-	activityEventInput := &activityevent.CreateActivityEventInput{
-		NamespacePath: ptr.String(sampleManagedIdentity.GetGroupPath()),
-		Action:        models.ActionUpdate,
-		TargetType:    models.TargetManagedIdentity,
-		TargetID:      sampleManagedIdentity.Metadata.ID,
 	}
 
 	type testCase struct {
@@ -1900,7 +1825,6 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			defer cancel()
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockDelegate := NewMockDelegate(t)
 			mockCaller := auth.NewMockCaller(t)
@@ -1912,11 +1836,9 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			if test.expectErrorCode == "" {
 				mockManagedIdentities.On("UpdateManagedIdentity", mock.Anything, test.existingManagedIdentity).Return(test.expectManagedIdentity, nil)
 
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
-
 				mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
@@ -1939,7 +1861,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, delegateMap, nil, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, nil, delegateMap, nil, nil)
 
 			identity, err := service.UpdateManagedIdentity(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2041,7 +1963,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil, nil)
 
 			rules, err := service.GetManagedIdentityAccessRules(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2154,7 +2076,7 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil, nil)
 
 			rules, err := service.GetManagedIdentityAccessRulesByIDs(auth.WithCaller(ctx, mockCaller), test.inputIDList)
 
@@ -2236,7 +2158,7 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil, nil)
 
 			rule, err := service.GetManagedIdentityAccessRuleByID(auth.WithCaller(ctx, mockCaller), test.searchID)
 
@@ -2366,13 +2288,6 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 		},
 	}
 
-	activityEventInput := &activityevent.CreateActivityEventInput{
-		NamespacePath: ptr.String(sampleManagedIdentity.GetGroupPath()),
-		Action:        models.ActionCreate,
-		TargetType:    models.TargetManagedIdentityAccessRule,
-		TargetID:      sampleAccessRule.Metadata.ID,
-	}
-
 	type testCase struct {
 		authError               error
 		expectAccessRule        *models.ManagedIdentityAccessRule
@@ -2454,7 +2369,6 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockServiceAccounts := db.NewMockServiceAccounts(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 			mockResourceLimits := db.NewMockResourceLimits(t)
@@ -2462,11 +2376,10 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			if (test.expectErrorCode == "") || test.exceedsLimit {
 				mockManagedIdentities.On("CreateManagedIdentityAccessRule", mock.Anything, test.input).Return(test.expectAccessRule, nil)
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				if !test.exceedsLimit {
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-					mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
 				}
 			}
 
@@ -2510,7 +2423,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, nil)
 
 			accessRule, err := service.CreateManagedIdentityAccessRule(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2555,13 +2468,6 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 			ID:  "service-account-id-1",
 			TRN: trn.TypeServiceAccount.Build("some/resource/service-account"),
 		},
-	}
-
-	activityEventInput := &activityevent.CreateActivityEventInput{
-		NamespacePath: ptr.String(sampleManagedIdentity.GetGroupPath()),
-		Action:        models.ActionUpdate,
-		TargetType:    models.TargetManagedIdentityAccessRule,
-		TargetID:      sampleAccessRule.Metadata.ID,
 	}
 
 	type testCase struct {
@@ -2624,16 +2530,13 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockServiceAccounts := db.NewMockServiceAccounts(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectErrorCode == "" {
 				mockManagedIdentities.On("UpdateManagedIdentityAccessRule", mock.Anything, test.input).Return(test.expectAccessRule, nil)
 
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
-
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
@@ -2653,7 +2556,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, nil, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, nil, nil, nil, nil)
 
 			accessRule, err := service.UpdateManagedIdentityAccessRule(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2691,18 +2594,6 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 		AllowedUserIDs:           []string{"user-id-1"},
 		AllowedServiceAccountIDs: []string{"service-account-id-1"},
 		AllowedTeamIDs:           []string{"team-id-1"},
-	}
-
-	activityEventInput := &activityevent.CreateActivityEventInput{
-		NamespacePath: ptr.String(sampleManagedIdentity.GetGroupPath()),
-		Action:        models.ActionDeleteChildResource,
-		TargetType:    models.TargetManagedIdentity,
-		TargetID:      sampleManagedIdentity.Metadata.ID,
-		Payload: &models.ActivityEventDeleteChildResourcePayload{
-			ID:   sampleAccessRule.Metadata.ID,
-			Name: string(sampleAccessRule.RunStage),
-			Type: string(models.TargetManagedIdentityAccessRule),
-		},
 	}
 
 	type testCase struct {
@@ -2747,16 +2638,13 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 			defer cancel()
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectErrorCode == "" {
 				mockManagedIdentities.On("DeleteManagedIdentityAccessRule", mock.Anything, test.input).Return(nil)
 
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
-
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
@@ -2773,7 +2661,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, nil, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, nil, nil, nil, nil)
 
 			err := service.DeleteManagedIdentityAccessRule(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2876,7 +2764,7 @@ func TestCreateCredentials(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, delegateMap, nil, mockJobService, nil)
+			service := NewService(logger, dbClient, nil, delegateMap, nil, mockJobService)
 
 			credentials, err := service.CreateCredentials(ctx, test.input)
 
@@ -3161,7 +3049,6 @@ func TestMoveManagedIdentity(t *testing.T) {
 			mockLimitChecker := limits.NewMockLimitChecker(t)
 			mockGroups := db.NewMockGroups(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
-			mockActivityEvents := activityevent.NewMockService(t)
 
 			mockGroups.On("GetGroupByID", mock.Anything, test.targetGroupID).Return(test.targetGroup, nil).Maybe()
 
@@ -3175,7 +3062,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 				Return(test.authError).Maybe()
 
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, mock.Anything).
@@ -3200,9 +3087,6 @@ func TestMoveManagedIdentity(t *testing.T) {
 			mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitManagedIdentitiesPerGroup, mock.Anything).
 				Return(test.limitError).Maybe()
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
-				Return(&models.ActivityEvent{}, nil).Maybe()
-
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
 				Groups:            mockGroups,
@@ -3211,7 +3095,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, mockLimitChecker, nil, nil, nil, mockActivityEvents)
+			service := NewService(logger, dbClient, mockLimitChecker, nil, nil, nil)
 
 			_, err := service.MoveManagedIdentity(auth.WithCaller(ctx, mockCaller), &MoveManagedIdentityInput{
 				ManagedIdentityID: test.mover.Metadata.ID,

@@ -18,9 +18,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	runvariables "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/variables"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -121,9 +123,9 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 	if req.IsDestroy != nil {
 		options.IsDestroy = *req.IsDestroy
 	}
-	if req.Refresh != nil {
-		options.Refresh = *req.Refresh
-	}
+	// Pass the optional pointer through; run creation resolves nil to true (Terraform's
+	// default), matching the GraphQL behavior.
+	options.Refresh = req.Refresh
 	if req.RefreshOnly != nil {
 		options.RefreshOnly = *req.RefreshOnly
 	}
@@ -137,19 +139,18 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisRunToRun(run), http.StatusCreated)
 }
 
-func parseRunVariables(req gotfe.RunCreateOptions, body []byte) ([]run.Variable, error) {
-	variables := []run.Variable{}
+func parseRunVariables(req gotfe.RunCreateOptions, body []byte) ([]runvariables.Variable, error) {
+	variables := []runvariables.Variable{}
 
 	for _, v := range req.Variables {
 		if v == nil || v.Key == "" {
 			continue
 		}
 		val := v.Value
-		variables = append(variables, run.Variable{
+		variables = append(variables, runvariables.Variable{
 			Key:      v.Key,
 			Value:    &val,
 			Category: models.TerraformVariableCategory,
-			Hcl:      true,
 		})
 	}
 
@@ -177,11 +178,10 @@ func parseRunVariables(req gotfe.RunCreateOptions, body []byte) ([]run.Variable,
 			}
 
 			val := v.Value
-			variables = append(variables, run.Variable{
+			variables = append(variables, runvariables.Variable{
 				Key:      v.Key,
 				Value:    &val,
 				Category: models.TerraformVariableCategory,
-				Hcl:      true,
 			})
 		}
 	}
@@ -245,17 +245,13 @@ func (c *runController) GetRun(w http.ResponseWriter, r *http.Request) {
 func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 	planID := gid.FromGlobalID(chi.URLParam(r, "id"))
 
-	plan, err := c.runService.GetPlanByID(r.Context(), planID)
+	run, err := c.runService.GetRunByNodeID(r.Context(), planID)
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	job, err := c.runService.GetLatestJobForPlan(r.Context(), planID)
-	if err != nil {
-		c.respWriter.RespondWithError(r.Context(), w, err)
-		return
-	}
+	plan := &run.Plan
 
 	resp := &gotfe.Plan{
 		ID:                   plan.GetGlobalID(),
@@ -266,14 +262,17 @@ func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 		ResourceDestructions: int(plan.Summary.ResourceDestructions),
 	}
 
-	if job != nil && c.tharsisAPIURL != "" {
-		token, err := c.createJobLogToken(r.Context(), job)
+	// Always return a LogReadURL; the Terraform CLI requires one on every plan response,
+	// even before the plan's job has been created. The URL is scoped to the run node so
+	// the log endpoint can resolve the job lazily once it exists.
+	if c.tharsisAPIURL != "" {
+		token, err := c.createRunLogToken(r.Context(), run.GetGlobalID())
 		if err != nil {
 			c.respWriter.RespondWithError(r.Context(), w, err)
 			return
 		}
 
-		resp.LogReadURL = fmt.Sprintf("%s/v1/jobs/%s/logs/%s", c.tharsisAPIURL, job.GetGlobalID(), string(token))
+		resp.LogReadURL = fmt.Sprintf("%s/v1/runs/%s/%s/logs/%s", c.tharsisAPIURL, run.GetGlobalID(), models.PlanNodePath, string(token))
 	}
 
 	c.respWriter.RespondWithJSONAPI(r.Context(), w, resp, http.StatusOK)
@@ -282,39 +281,57 @@ func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 func (c *runController) GetApply(w http.ResponseWriter, r *http.Request) {
 	applyID := gid.FromGlobalID(chi.URLParam(r, "id"))
 
-	apply, err := c.runService.GetApplyByID(r.Context(), applyID)
+	run, err := c.runService.GetRunByNodeID(r.Context(), applyID)
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	job, err := c.runService.GetLatestJobForApply(r.Context(), applyID)
-	if err != nil {
-		c.respWriter.RespondWithError(r.Context(), w, err)
+	apply := run.Apply
+	if apply == nil {
+		c.respWriter.RespondWithError(r.Context(), w,
+			errors.New("apply with id %s not found", applyID, errors.WithErrorCode(errors.ENotFound)))
 		return
 	}
 
 	resp := &gotfe.Apply{
 		ID:     apply.GetGlobalID(),
-		Status: gotfe.ApplyStatus(apply.Status),
+		Status: toTFEApplyStatus(apply.Status),
 	}
 
-	if job != nil && c.tharsisAPIURL != "" {
-		token, err := c.createJobLogToken(r.Context(), job)
+	// Always return a LogReadURL; the Terraform CLI requires one on every apply response,
+	// even before the apply's job has been created. The URL is scoped to the run node so
+	// the log endpoint can resolve the job lazily once it exists.
+	if c.tharsisAPIURL != "" {
+		token, err := c.createRunLogToken(r.Context(), run.GetGlobalID())
 		if err != nil {
 			c.respWriter.RespondWithError(r.Context(), w, err)
 			return
 		}
 
-		resp.LogReadURL = fmt.Sprintf("%s/v1/jobs/%s/logs/%s", c.tharsisAPIURL, job.GetGlobalID(), string(token))
+		resp.LogReadURL = fmt.Sprintf("%s/v1/runs/%s/%s/logs/%s", c.tharsisAPIURL, run.GetGlobalID(), models.ApplyNodePath, string(token))
 	}
 
 	c.respWriter.RespondWithJSONAPI(r.Context(), w, resp, http.StatusOK)
 }
 
-func (c *runController) createJobLogToken(ctx context.Context, job *models.Job) ([]byte, error) {
+// toTFEApplyStatus converts an internal apply status to its TFE equivalent. The
+// Terraform CLI has no skipped status, so a skipped apply (one that never started
+// before the run ended) is reported as created, the status it held before being
+// skipped; all other statuses map one-to-one.
+func toTFEApplyStatus(status models.ApplyStatus) gotfe.ApplyStatus {
+	if status == models.ApplySkipped {
+		return gotfe.ApplyStatus(models.ApplyCreated)
+	}
+	return gotfe.ApplyStatus(status)
+}
+
+// createRunLogToken mints a short-lived token authorizing reads of a run's node logs.
+// The subject is the run ID so the log endpoint can verify the token before resolving the
+// run, without needing the node's job, which may not exist yet when the token is issued.
+func (c *runController) createRunLogToken(ctx context.Context, runID string) ([]byte, error) {
 	return c.signingKeyManager.GenerateToken(ctx, &auth.TokenInput{
-		Subject:    job.Metadata.ID,
+		Subject:    runID,
 		Expiration: ptr.Time(time.Now().Add(5 * time.Minute)),
 	})
 }

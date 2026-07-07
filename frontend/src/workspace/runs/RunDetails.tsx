@@ -4,7 +4,6 @@ import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import graphql from 'babel-plugin-relay/macro';
-import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { useFragment, useLazyLoadQuery } from 'react-relay/hooks';
 import { Route, Routes, useParams } from 'react-router-dom';
@@ -96,14 +95,10 @@ function RunDetails(props: Props) {
             if (!run) {
                 return false;
             }
-            if ((run.plan.status == 'queued' || run.apply?.status == 'queued') && run.workspace.locked) {
-                const duration = moment.duration(moment().diff(moment(run.workspace.metadata.updatedAt as moment.MomentInput)));
-                // Only display the warning if the workspace has been locked for at least 10 seconds
-                return duration.asSeconds() > 10;
-            }
-            return false;
+
+            return run.workspace.locked && (run.status === 'queuing' || run.status === 'queuing_apply')
         },
-        [queryData.run?.status, queryData.run?.workspace?.locked, queryData.run?.workspace?.metadata?.updatedAt]
+        [queryData.run?.status, queryData.run?.workspace?.locked]
     );
 
     return queryData.run ? (

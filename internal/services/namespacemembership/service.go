@@ -10,6 +10,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/builder"
@@ -18,7 +19,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -71,7 +71,6 @@ type Service interface {
 type service struct {
 	logger              logger.Logger
 	dbClient            *db.Client
-	activityService     activityevent.Service
 	emailClient         email.Client
 	notificationManager namespace.NotificationManager
 	asyncTaskManager    asynctask.Manager
@@ -81,7 +80,6 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	activityService activityevent.Service,
 	emailClient email.Client,
 	notificationManager namespace.NotificationManager,
 	asyncTaskManager asynctask.Manager,
@@ -89,7 +87,6 @@ func NewService(
 	return &service{
 		logger:              logger,
 		dbClient:            dbClient,
-		activityService:     activityService,
 		emailClient:         emailClient,
 		notificationManager: notificationManager,
 		asyncTaskManager:    asyncTaskManager,
@@ -399,8 +396,8 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 
 	eventTargetType, eventTargetID := getTargetTypeID(namespaceMembership)
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &input.NamespacePath,
 			Action:        models.ActionCreateMembership,
 			TargetType:    eventTargetType,
@@ -420,6 +417,11 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Created a namespace membership.",
+		"namespaceMembershipID", namespaceMembership.Metadata.ID,
+		"namespacePath", input.NamespacePath,
+	)
 
 	emailInput := &sendMembershipChangeEmailInput{
 		membership:   namespaceMembership,
@@ -512,8 +514,8 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &updatedNamespaceMembership.Namespace.Path,
 			Action:        models.ActionUpdate,
 			TargetType:    models.TargetNamespaceMembership,
@@ -531,6 +533,11 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Updated a namespace membership.",
+		"namespaceMembershipID", updatedNamespaceMembership.Metadata.ID,
+		"namespacePath", updatedNamespaceMembership.Namespace.Path,
+	)
 
 	input := &sendMembershipChangeEmailInput{
 		membership:       updatedNamespaceMembership,
@@ -594,8 +601,8 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 
 	eventTargetType, eventTargetID := getTargetTypeID(namespaceMembership)
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &namespaceMembership.Namespace.Path,
 			Action:        models.ActionRemoveMembership,
 			TargetType:    eventTargetType,
@@ -614,6 +621,11 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return err
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Deleted a namespace membership.",
+		"namespaceMembershipID", namespaceMembership.Metadata.ID,
+		"namespacePath", namespaceMembership.Namespace.Path,
+	)
 
 	input := &sendMembershipChangeEmailInput{
 		membership: namespaceMembership,

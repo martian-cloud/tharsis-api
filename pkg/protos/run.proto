@@ -49,6 +49,24 @@ enum RunSortableField {
   UPDATED_AT_DESC = 3;
 }
 
+// RunStatus defines the status of a Run.
+enum RunStatus {
+  UNSPECIFIED          = 0;
+  PENDING              = 1;
+  PLAN_QUEUED          = 2;
+  PLANNING             = 3;
+  PLANNED              = 4;
+  PLANNED_AND_FINISHED = 5;
+  QUEUING              = 6;
+  QUEUING_APPLY        = 7;
+  APPLY_QUEUED         = 8;
+  APPLYING             = 9;
+  APPLIED              = 10;
+  CANCELED             = 11;
+  DISCARDED            = 12;
+  ERRORED              = 13;
+}
+
 // GetRunByIDRequest is the input for retrieving a Run by its ID.
 message GetRunByIDRequest {
   string id = 1;
@@ -81,6 +99,10 @@ message CreateRunRequest {
   // false. Has no effect when module_version is an exact match. Requires
   // module_source to be set.
   optional bool include_module_prereleases = 12;
+  // When true, the run's apply phase is started automatically once the plan
+  // finishes with changes, instead of waiting for a manual apply. Defaults to
+  // false when unset.
+  optional bool auto_apply = 13;
 }
 
 // ApplyRunRequest is the input for applying a Run.
@@ -143,11 +165,16 @@ message Run {
   string                             plan_id                   = 13;
   bool                               refresh                   = 14;
   bool                               refresh_only              = 15;
-  string                             status                    = 16;
+  string                             deprecated_status         = 16 [deprecated = true];
   repeated string                    target_addresses          = 17;
   string                             terraform_version         = 18;
   string                             workspace_id              = 19;
   bool                               speculative               = 20;
+  bool                               auto_apply                = 21;
+  plan.Plan                          plan                      = 22;
+  // Not set for speculative runs, which have no apply stage.
+  optional apply.Apply               apply                     = 23;
+  RunStatus                          status                    = 24;
 }
 
 // RunVariable represents a variable used in a run.
@@ -177,4 +204,3 @@ message GetRunsResponse {
 message GetRunVariablesResponse {
   repeated RunVariable variables = 1;
 }
-

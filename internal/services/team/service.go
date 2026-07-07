@@ -5,9 +5,9 @@ import (
 	"context"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -95,21 +95,18 @@ type Service interface {
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	activityService activityevent.Service
+	logger   logger.Logger
+	dbClient *db.Client
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	activityService activityevent.Service,
 ) Service {
 	return &service{
-		logger:          logger,
-		dbClient:        dbClient,
-		activityService: activityService,
+		logger:   logger,
+		dbClient: dbClient,
 	}
 }
 
@@ -251,8 +248,8 @@ func (s *service) CreateTeam(ctx context.Context, input *CreateTeamInput) (*mode
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			Action:     models.ActionCreate,
 			TargetType: models.TargetTeam,
 			TargetID:   createdTeam.Metadata.ID,
@@ -331,8 +328,8 @@ func (s *service) UpdateTeam(ctx context.Context, input *UpdateTeamInput) (*mode
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			Action:     models.ActionUpdate,
 			TargetType: models.TargetTeam,
 			TargetID:   updatedTeam.Metadata.ID,
@@ -502,8 +499,8 @@ func (s *service) AddUserToTeam(ctx context.Context, input *AddUserToTeamInput) 
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			Action:     models.ActionAddMember,
 			TargetType: models.TargetTeam,
 			TargetID:   team.Metadata.ID,
@@ -591,8 +588,8 @@ func (s *service) UpdateTeamMember(ctx context.Context, input *UpdateTeamMemberI
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			Action:     models.ActionUpdateMember,
 			TargetType: models.TargetTeam,
 			TargetID:   team.Metadata.ID,
@@ -653,8 +650,8 @@ func (s *service) RemoveUserFromTeam(ctx context.Context, input *RemoveUserFromT
 		return err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			Action:     models.ActionRemoveMember,
 			TargetType: models.TargetTeam,
 			TargetID:   input.TeamMember.TeamID,

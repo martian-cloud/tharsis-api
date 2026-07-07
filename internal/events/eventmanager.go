@@ -26,15 +26,17 @@ type SubscriptionType string
 
 // SubscriptionType constants
 const (
-	AsymSigningKeySubscription  SubscriptionType = "asym_signing_keys"
-	JobSubscription             SubscriptionType = "jobs"
-	LogStreamSubscription       SubscriptionType = "log_streams"
-	RunSubscription             SubscriptionType = "runs"
-	WorkspaceSubscription       SubscriptionType = "workspaces"
-	RunnerSubscription          SubscriptionType = "runners"
-	MaintenanceModeSubscription SubscriptionType = "maintenance_mode"
-	RunnerSessionSubscription   SubscriptionType = "runner_sessions"
-	AgentSessionRunSubscription SubscriptionType = "agent_session_runs"
+	AsymSigningKeySubscription      SubscriptionType = "asym_signing_keys"
+	JobSubscription                 SubscriptionType = "jobs"
+	LogStreamSubscription           SubscriptionType = "log_streams"
+	RunSubscription                 SubscriptionType = "runs"
+	WorkspaceSubscription           SubscriptionType = "workspaces"
+	WorkspaceAssessmentSubscription SubscriptionType = "workspace_assessments"
+	RunnerSubscription              SubscriptionType = "runners"
+	MaintenanceModeSubscription     SubscriptionType = "maintenance_mode"
+	RunnerSessionSubscription       SubscriptionType = "runner_sessions"
+	AgentSessionRunSubscription     SubscriptionType = "agent_session_runs"
+	WorkItemQueueSubscription       SubscriptionType = "work_items_queue"
 )
 
 // SubscriptionAction type represents the available actions that can be subscribed type

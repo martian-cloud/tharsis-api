@@ -232,31 +232,64 @@ func (c *Catalog) Init() {
 		},
 	)
 
-	// Run Service
-	c.addModelFetchers(types.ApplyModelType,
-		func(ctx context.Context, value string) (models.Model, error) {
-			return c.RunService.GetApplyByID(ctx, value)
-		},
-		func(ctx context.Context, value string) (models.Model, error) {
-			return c.RunService.GetApplyByTRN(ctx, value)
-		},
-	)
-
-	c.addModelFetchers(types.PlanModelType,
-		func(ctx context.Context, value string) (models.Model, error) {
-			return c.RunService.GetPlanByID(ctx, value)
-		},
-		func(ctx context.Context, value string) (models.Model, error) {
-			return c.RunService.GetPlanByTRN(ctx, value)
-		},
-	)
-
 	c.addModelFetchers(types.RunModelType,
 		func(ctx context.Context, value string) (models.Model, error) {
 			return c.RunService.GetRunByID(ctx, value)
 		},
 		func(ctx context.Context, value string) (models.Model, error) {
 			return c.RunService.GetRunByTRN(ctx, value)
+		},
+	)
+
+	c.addModelFetchers(types.PlanModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.RunService.GetRunByNodeID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			// This is a temporary workaround to provide backward compatibility for the plan TRN query
+			// which is deprecated and will be removed in an upcoming release now that plan node is returned
+			// with the run
+			parsed, err := trn.ParseAny(value)
+			if err != nil {
+				return nil, err
+			}
+
+			parts := parsed.PathParts()
+			if len(parts) < 3 {
+				return nil, errors.New("invalid trn format for plan", errors.WithErrorCode(errors.EInvalid))
+			}
+
+			// TRN Format: trn:plan:workspace_path/run_id/plan
+			runID := parts[len(parts)-2]
+
+			// The run is returned instead of the plan type because the plan resolver references the run directly
+			return c.RunService.GetRunByID(ctx, gid.FromGlobalID(runID))
+		},
+	)
+
+	c.addModelFetchers(types.ApplyModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.RunService.GetRunByNodeID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			// This is a temporary workaround to provide backward compatibility for the apply TRN query
+			// which is deprecated and will be removed in an upcoming release now that apply node is returned
+			// with the run
+			parsed, err := trn.ParseAny(value)
+			if err != nil {
+				return nil, err
+			}
+
+			parts := parsed.PathParts()
+			if len(parts) < 3 {
+				return nil, errors.New("invalid trn format for apply", errors.WithErrorCode(errors.EInvalid))
+			}
+
+			// TRN Format: trn:apply:workspace_path/run_id/apply
+			runID := parts[len(parts)-2]
+
+			// The run is returned instead of the apply type because the apply resolver references the run directly
+			return c.RunService.GetRunByID(ctx, gid.FromGlobalID(runID))
 		},
 	)
 

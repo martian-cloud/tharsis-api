@@ -266,17 +266,26 @@ func (r *WorkspaceResolver) Labels() ([]*WorkspaceLabelResolver, error) {
 }
 
 // CurrentJob resolver
-func (r *WorkspaceResolver) CurrentJob(ctx context.Context) (*JobResolver, error) {
-	if r.workspace.CurrentJobID == "" {
+//
+// Deprecated: the workspace no longer tracks a current job after the run
+// refactor; this always returns nil. Use CurrentApplyRun instead.
+func (r *WorkspaceResolver) CurrentJob(_ context.Context) (*JobResolver, error) {
+	return nil, nil
+}
+
+// CurrentApplyRun resolver returns the non-speculative run currently holding the
+// workspace (its apply is in progress or awaiting approval), or nil if none.
+func (r *WorkspaceResolver) CurrentApplyRun(ctx context.Context) (*RunResolver, error) {
+	if r.workspace.CurrentApplyRunID == nil {
 		return nil, nil
 	}
 
-	job, err := loadJob(ctx, r.workspace.CurrentJobID)
+	run, err := loadRun(ctx, *r.workspace.CurrentApplyRunID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &JobResolver{job: job}, nil
+	return &RunResolver{run: run}, nil
 }
 
 // DirtyState resolver
@@ -287,6 +296,51 @@ func (r *WorkspaceResolver) DirtyState() bool {
 // Locked resolver
 func (r *WorkspaceResolver) Locked() bool {
 	return r.workspace.Locked
+}
+
+// Destroyed resolver returns true when the workspace's current state version was produced by
+// a destroy run that left no resources, i.e. the workspace has been destroyed and is now
+// empty. A workspace that never had any state (no current state version) or whose state was
+// last updated manually or by a non-destroy run is not considered destroyed.
+func (r *WorkspaceResolver) Destroyed(ctx context.Context) (bool, error) {
+	if r.workspace.CurrentStateVersionID == "" {
+		return false, nil
+	}
+
+	stateVersion, err := loadStateVersion(ctx, r.workspace.CurrentStateVersionID)
+	if err != nil {
+		return false, err
+	}
+
+	if stateVersion.RunID == nil {
+		return false, nil
+	}
+
+	run, err := loadRun(ctx, *stateVersion.RunID)
+	if err != nil {
+		return false, err
+	}
+
+	// Only a destroy run that applied successfully can have emptied the workspace. The
+	// current state version is written even by a failed/partial apply, so a destroy that
+	// errored partway could still be the current run with resources remaining.
+	if !run.IsDestroy || run.Status != models.RunApplied {
+		return false, nil
+	}
+
+	// A full (non-targeted) destroy that applied successfully removes every resource, so the
+	// workspace is empty without reading the state file. A targeted destroy only removes the
+	// targeted resources, so there we must confirm no resources remain.
+	if len(run.TargetAddresses) == 0 {
+		return true, nil
+	}
+
+	resources, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionResources(ctx, stateVersion)
+	if err != nil {
+		return false, err
+	}
+
+	return len(resources) == 0, nil
 }
 
 // ServiceAccounts resolver
@@ -1029,9 +1083,9 @@ type WorkspaceEventResolver struct {
 	event *workspace.Event
 }
 
-// Action resolves the event action
-func (r *WorkspaceEventResolver) Action() string {
-	return r.event.Action
+// Type resolves the semantic workspace event type
+func (r *WorkspaceEventResolver) Type() string {
+	return string(r.event.Type)
 }
 
 // Workspace resolver

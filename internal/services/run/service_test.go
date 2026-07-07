@@ -17,21 +17,16 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/commands"
+	runvariables "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/variables"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -48,8 +43,6 @@ type mockDBClient struct {
 	MockVariableVersions      *db.MockVariableVersions
 	MockRuns                  *db.MockRuns
 	MockConfigurationVersions *db.MockConfigurationVersions
-	MockApplies               *db.MockApplies
-	MockPlans                 *db.MockPlans
 	MockJobs                  *db.MockJobs
 	MockTeams                 *db.MockTeams
 	MockTeamMembers           *db.MockTeamMembers
@@ -85,12 +78,6 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 	mockConfigurationVersions := db.MockConfigurationVersions{}
 	mockConfigurationVersions.Test(t)
 
-	mockPlans := db.MockPlans{}
-	mockPlans.Test(t)
-
-	mockApplies := db.MockApplies{}
-	mockApplies.Test(t)
-
 	mockJobs := db.MockJobs{}
 	mockJobs.Test(t)
 
@@ -122,8 +109,6 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 			VariableVersions:      &mockVariableVersions,
 			Runs:                  &mockRuns,
 			ConfigurationVersions: &mockConfigurationVersions,
-			Applies:               &mockApplies,
-			Plans:                 &mockPlans,
 			Jobs:                  &mockJobs,
 			Teams:                 &mockTeams,
 			TeamMembers:           &mockTeamMembers,
@@ -140,8 +125,6 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 		MockVariableVersions:      &mockVariableVersions,
 		MockRuns:                  &mockRuns,
 		MockConfigurationVersions: &mockConfigurationVersions,
-		MockApplies:               &mockApplies,
-		MockPlans:                 &mockPlans,
 		MockJobs:                  &mockJobs,
 		MockTeams:                 &mockTeams,
 		MockTeamMembers:           &mockTeamMembers,
@@ -287,308 +270,6 @@ func TestGetRunByID(t *testing.T) {
 	}
 }
 
-func TestGetPlanByID(t *testing.T) {
-	samplePlan := &models.Plan{
-		Metadata: models.ResourceMetadata{
-			ID: "plan-id-1",
-		},
-		WorkspaceID: "workspace-1",
-	}
-
-	type testCase struct {
-		name            string
-		authError       error
-		plan            *models.Plan
-		expectErrorCode errors.CodeType
-	}
-
-	testCases := []testCase{
-		{
-			name: "successfully get plan by id",
-			plan: samplePlan,
-		},
-		{
-			name:            "plan not found",
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:            "subject is not authorized to view plan",
-			plan:            samplePlan,
-			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode: errors.EForbidden,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
-
-			mockCaller := auth.NewMockCaller(t)
-			mockRuns := db.NewMockRuns(t)
-			mockPlans := db.NewMockPlans(t)
-
-			mockPlans.On("GetPlanByID", mock.Anything, samplePlan.Metadata.ID).Return(test.plan, nil)
-
-			if test.plan != nil {
-				mockRuns.On("GetRunByPlanID", mock.Anything, samplePlan.Metadata.ID).Return(&models.Run{
-					Metadata: models.ResourceMetadata{
-						ID: "run-id-1",
-					},
-					WorkspaceID: samplePlan.WorkspaceID,
-				}, nil)
-
-				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
-			}
-
-			dbClient := &db.Client{
-				Plans: mockPlans,
-				Runs:  mockRuns,
-			}
-
-			service := &service{
-				dbClient: dbClient,
-			}
-
-			actualPlan, err := service.GetPlanByID(auth.WithCaller(ctx, mockCaller), samplePlan.Metadata.ID)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, test.plan, actualPlan)
-		})
-	}
-}
-
-func TestGetPlanByTRN(t *testing.T) {
-	samplePlan := &models.Plan{
-		Metadata: models.ResourceMetadata{
-			ID:  "plan-id-1",
-			TRN: trn.TypePlan.Build("plan-gid-1"),
-		},
-		WorkspaceID: "workspace-1",
-	}
-
-	type testCase struct {
-		name            string
-		authError       error
-		plan            *models.Plan
-		expectErrorCode errors.CodeType
-	}
-
-	testCases := []testCase{
-		{
-			name: "successfully get plan by trn",
-			plan: samplePlan,
-		},
-		{
-			name:            "plan not found",
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:            "subject is not authorized to view plan",
-			plan:            samplePlan,
-			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode: errors.EForbidden,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
-
-			mockCaller := auth.NewMockCaller(t)
-			mockPlans := db.NewMockPlans(t)
-			mockRuns := db.NewMockRuns(t)
-
-			mockPlans.On("GetPlanByTRN", mock.Anything, samplePlan.Metadata.TRN).Return(test.plan, nil)
-
-			if test.plan != nil {
-				mockRuns.On("GetRunByPlanID", mock.Anything, samplePlan.Metadata.ID).Return(&models.Run{
-					Metadata: models.ResourceMetadata{
-						ID: "run-id-1",
-					},
-					WorkspaceID: samplePlan.WorkspaceID,
-				}, nil)
-
-				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
-			}
-
-			dbClient := &db.Client{
-				Plans: mockPlans,
-				Runs:  mockRuns,
-			}
-
-			service := &service{
-				dbClient: dbClient,
-			}
-
-			actualPlan, err := service.GetPlanByTRN(auth.WithCaller(ctx, mockCaller), samplePlan.Metadata.TRN)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, test.plan, actualPlan)
-		})
-	}
-}
-
-func TestGetApplyByID(t *testing.T) {
-	sampleApply := &models.Apply{
-		Metadata: models.ResourceMetadata{
-			ID: "apply-id-1",
-		},
-		WorkspaceID: "workspace-1",
-	}
-
-	type testCase struct {
-		name            string
-		authError       error
-		apply           *models.Apply
-		expectErrorCode errors.CodeType
-	}
-
-	testCases := []testCase{
-		{
-			name:  "successfully get apply by id",
-			apply: sampleApply,
-		},
-		{
-			name:            "apply not found",
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:            "subject is not authorized to view apply",
-			apply:           sampleApply,
-			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode: errors.EForbidden,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
-
-			mockCaller := auth.NewMockCaller(t)
-			mockApplies := db.NewMockApplies(t)
-			mockRuns := db.NewMockRuns(t)
-
-			mockApplies.On("GetApplyByID", mock.Anything, sampleApply.Metadata.ID).Return(test.apply, nil)
-
-			if test.apply != nil {
-				mockRuns.On("GetRunByApplyID", mock.Anything, sampleApply.Metadata.ID).Return(&models.Run{
-					Metadata: models.ResourceMetadata{
-						ID: "run-id-1",
-					},
-					WorkspaceID: sampleApply.WorkspaceID,
-				}, nil)
-
-				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
-			}
-
-			dbClient := &db.Client{
-				Runs:    mockRuns,
-				Applies: mockApplies,
-			}
-
-			service := &service{
-				dbClient: dbClient,
-			}
-
-			actualApply, err := service.GetApplyByID(auth.WithCaller(ctx, mockCaller), sampleApply.Metadata.ID)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, test.apply, actualApply)
-		})
-	}
-}
-
-func TestGetApplyByTRN(t *testing.T) {
-	sampleApply := &models.Apply{
-		Metadata: models.ResourceMetadata{
-			ID:  "apply-id-1",
-			TRN: trn.TypeApply.Build("apply-gid-1"),
-		},
-		WorkspaceID: "workspace-1",
-	}
-
-	type testCase struct {
-		name            string
-		authError       error
-		apply           *models.Apply
-		expectErrorCode errors.CodeType
-	}
-
-	testCases := []testCase{
-		{
-			name:  "successfully get apply by trn",
-			apply: sampleApply,
-		},
-		{
-			name:            "apply not found",
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:            "subject is not authorized to view apply",
-			apply:           sampleApply,
-			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode: errors.EForbidden,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
-
-			mockCaller := auth.NewMockCaller(t)
-			mockApplies := db.NewMockApplies(t)
-			mockRuns := db.NewMockRuns(t)
-
-			mockApplies.On("GetApplyByTRN", mock.Anything, sampleApply.Metadata.TRN).Return(test.apply, nil)
-
-			if test.apply != nil {
-				mockRuns.On("GetRunByApplyID", mock.Anything, sampleApply.Metadata.ID).Return(&models.Run{
-					Metadata: models.ResourceMetadata{
-						ID: "run-id-1",
-					},
-					WorkspaceID: sampleApply.WorkspaceID,
-				}, nil)
-
-				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
-			}
-
-			dbClient := &db.Client{
-				Runs:    mockRuns,
-				Applies: mockApplies,
-			}
-
-			service := &service{
-				dbClient: dbClient,
-			}
-
-			actualApply, err := service.GetApplyByTRN(auth.WithCaller(ctx, mockCaller), sampleApply.Metadata.TRN)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, test.apply, actualApply)
-		})
-	}
-}
-
 func TestGetRunVariables(t *testing.T) {
 	ctx := context.Background()
 
@@ -600,7 +281,7 @@ func TestGetRunVariables(t *testing.T) {
 		WorkspaceID: "ws1",
 	}
 
-	runVariables := []Variable{
+	runVariables := []runvariables.Variable{
 		{
 			Key:       "var1",
 			Value:     ptr.String("value1"),
@@ -636,7 +317,7 @@ func TestGetRunVariables(t *testing.T) {
 	tests := []struct {
 		name                            string
 		includeSensitiveValues          bool
-		expectedVariables               []Variable
+		expectedVariables               []runvariables.Variable
 		hasViewVariableValuePermissions bool
 		authError                       error
 		expectedErrorCode               errors.CodeType
@@ -645,7 +326,7 @@ func TestGetRunVariables(t *testing.T) {
 			name:                            "include sensitive values for caller with view variable value permission",
 			includeSensitiveValues:          true,
 			hasViewVariableValuePermissions: true,
-			expectedVariables: []Variable{
+			expectedVariables: []runvariables.Variable{
 				{
 					Key:       "var1",
 					Value:     ptr.String("value1"),
@@ -665,7 +346,7 @@ func TestGetRunVariables(t *testing.T) {
 			name:                            "don't include sensitive values for caller with view variable value permission",
 			includeSensitiveValues:          false,
 			hasViewVariableValuePermissions: true,
-			expectedVariables: []Variable{
+			expectedVariables: []runvariables.Variable{
 				{
 					Key:       "var1",
 					Value:     ptr.String("value1"),
@@ -684,7 +365,7 @@ func TestGetRunVariables(t *testing.T) {
 			name:                            "don't include any values for caller without view variable value permission",
 			includeSensitiveValues:          false,
 			hasViewVariableValuePermissions: false,
-			expectedVariables: []Variable{
+			expectedVariables: []runvariables.Variable{
 				{
 					Key:       "var1",
 					Category:  models.TerraformVariableCategory,
@@ -720,9 +401,9 @@ func TestGetRunVariables(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			service := &service{
-				dbClient:      mockDBClient.Client,
-				artifactStore: mockArtifactStore,
-				secretManager: mockSecretManager,
+				dbClient:         mockDBClient.Client,
+				artifactStore:    mockArtifactStore,
+				variablesBuilder: runvariables.NewBuilder(mockDBClient.Client, mockSecretManager, mockArtifactStore),
 			}
 
 			if test.hasViewVariableValuePermissions {
@@ -758,1898 +439,6 @@ func TestGetRunVariables(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, test.expectedVariables, vars)
 			}
-		})
-	}
-}
-
-func TestCreateRunWithSensitiveVariables(t *testing.T) {
-	configurationVersionID := "cv1"
-
-	ws := &models.Workspace{
-		Metadata: models.ResourceMetadata{
-			ID: "ws1",
-		},
-		FullPath:       "groupA/ws1",
-		MaxJobDuration: ptr.Int32(60),
-	}
-	groupName := "groupA"
-
-	run := models.Run{
-		Metadata: models.ResourceMetadata{
-			ID: "run1",
-		},
-		WorkspaceID:            ws.Metadata.ID,
-		ConfigurationVersionID: &configurationVersionID,
-		Status:                 models.RunPending,
-	}
-
-	dbClient := buildDBClientWithMocks(t)
-
-	mockSecretManager := secret.NewMockManager(t)
-
-	mockCaller := auth.NewMockCaller(t)
-	mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
-	mockCaller.On("GetSubject").Return("mock-caller").Maybe()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-	dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-	dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-	dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).Return([]models.ManagedIdentity{}, nil)
-
-	dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
-
-	sortBy := db.VariableSortableFieldNamespacePathDesc
-	dbClient.MockVariables.On("GetVariables", mock.Anything, &db.GetVariablesInput{
-		Filter: &db.VariableFilter{
-			NamespacePaths: ws.ExpandPath(),
-		},
-		Sort: &sortBy,
-	}).Return(&db.VariableResult{
-		Variables: []models.Variable{
-			{
-				Key:             "v1",
-				Value:           ptr.String("v1-value"),
-				Category:        models.TerraformVariableCategory,
-				NamespacePath:   ws.FullPath,
-				Sensitive:       true,
-				SecretData:      []byte("v1-encrypted"),
-				LatestVersionID: "1",
-			},
-			{
-				Key:             "v2",
-				Value:           ptr.String("v2-value"),
-				Category:        models.TerraformVariableCategory,
-				NamespacePath:   ws.FullPath,
-				LatestVersionID: "2",
-			},
-			{
-				Key:             "v3",
-				Value:           ptr.String("v3-value"),
-				Category:        models.EnvironmentVariableCategory,
-				NamespacePath:   ws.FullPath,
-				LatestVersionID: "3",
-			},
-		},
-	}, nil)
-
-	// Mock for secret manager plugin since the v1 variable is sensitive
-	mockSecretManager.On("Get", mock.Anything, "v1", []byte("v1-encrypted")).Return("v1-value", nil)
-
-	dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
-		Return(func(_ context.Context, run *models.Run) (*models.Run, error) {
-			run.Metadata.CreationTimestamp = ptr.Time(time.Now().UTC())
-			return run, nil
-		})
-	dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
-		Return(&db.RunsResult{
-			PageInfo: &pagination.PageInfo{
-				TotalCount: pagination.StaticCount(1),
-			},
-		}, nil)
-	dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(&run, nil)
-
-	dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
-		Return(&models.ResourceLimit{Value: 100}, nil)
-
-	dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
-		Speculative: false,
-	}, nil)
-
-	dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
-		Metadata: models.ResourceMetadata{
-			ID: "plan1",
-		},
-	}, nil)
-
-	dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
-		Metadata: models.ResourceMetadata{
-			ID: "apply1",
-		},
-	}, nil)
-	dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(&models.Job{
-		Metadata: models.ResourceMetadata{
-			ID: "job1",
-		},
-		WorkspaceID: ws.Metadata.ID,
-		RunID:       run.Metadata.ID,
-	}, nil)
-
-	dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
-		Groups: []models.Group{
-			{
-				Metadata: models.ResourceMetadata{
-					ID: groupName,
-				},
-				Name: groupName,
-			},
-		},
-	}, nil)
-
-	dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
-
-	mockArtifactStore := workspace.MockArtifactStore{}
-	mockArtifactStore.Test(t)
-
-	readerMatcher := mock.MatchedBy(func(r io.Reader) bool {
-		body, _ := io.ReadAll(r)
-
-		var decodedVariables []Variable
-		if err := json.Unmarshal(body, &decodedVariables); err != nil {
-			t.Fatal(err)
-		}
-
-		// Verify that value is nill for sensitive variables
-		for _, v := range decodedVariables {
-			if v.Sensitive && v.Value != nil {
-				return false
-			}
-			if !v.Sensitive && v.Value == nil {
-				return false
-			}
-		}
-
-		return true
-	})
-	mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, readerMatcher).Return(nil)
-
-	mockActivityEvents := activityevent.MockService{}
-	mockActivityEvents.Test(t)
-
-	mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
-	mockModuleResolver := registry.NewMockModuleResolver(t)
-	ruleEnforcer := rules.NewMockRuleEnforcer(t)
-
-	mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
-	mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil)
-
-	logger, _ := logger.NewForTest()
-
-	testService := service{
-		logger:                    logger,
-		dbClient:                  dbClient.Client,
-		artifactStore:             &mockArtifactStore,
-		activityService:           &mockActivityEvents,
-		moduleResolver:            mockModuleResolver,
-		limitChecker:              limits.NewLimitChecker(dbClient.Client),
-		secretManager:             mockSecretManager,
-		ruleEnforcer:              ruleEnforcer,
-		inheritedSettingsResolver: mockInheritedSettingsResolver,
-	}
-
-	_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
-		WorkspaceID:            ws.Metadata.ID,
-		ConfigurationVersionID: &configurationVersionID,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
-	configurationVersionID := "cv1"
-	currentTime := time.Now().UTC()
-
-	ws := &models.Workspace{
-		Metadata: models.ResourceMetadata{
-			ID: "ws1",
-		},
-		FullPath:       "groupA/ws1",
-		MaxJobDuration: ptr.Int32(60),
-	}
-	groupName := "groupA"
-
-	run := models.Run{
-		Metadata: models.ResourceMetadata{
-			ID: "run1",
-		},
-		WorkspaceID:            ws.Metadata.ID,
-		ConfigurationVersionID: &configurationVersionID,
-		Status:                 models.RunPending,
-	}
-
-	injectJob := models.Job{
-		Metadata: models.ResourceMetadata{
-			ID: "job1",
-		},
-		WorkspaceID: ws.Metadata.ID,
-		RunID:       run.Metadata.ID,
-	}
-
-	// Test cases
-	tests := []struct {
-		name                   string
-		injectJob              *models.Job
-		expectErrorCode        errors.CodeType
-		enforceRulesResponse   error
-		managedIdentities      []models.ManagedIdentity
-		limit                  int
-		injectRunsPerWorkspace int32
-	}{
-		{
-			name:      "run is created because all managed identity rules are satisfied",
-			injectJob: &injectJob,
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-				},
-			},
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-		{
-			name:                   "run is created because there are no managed identities",
-			injectJob:              &injectJob,
-			managedIdentities:      []models.ManagedIdentity{},
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-		{
-			name: "run is not created because a managed identity rule is not satisfied",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-				},
-			},
-			enforceRulesResponse: errors.New("rule not satisfied", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode:      errors.EForbidden,
-		},
-		{
-			name:                   "resource limit exceeded",
-			injectJob:              &injectJob,
-			managedIdentities:      []models.ManagedIdentity{},
-			limit:                  4,
-			injectRunsPerWorkspace: 5,
-			expectErrorCode:        errors.EInvalid,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			dbClient := buildDBClientWithMocks(t)
-
-			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("mock-caller").Maybe()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).Return(test.managedIdentities, nil)
-
-			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
-
-			dbClient.MockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
-				Variables: []models.Variable{},
-			}, nil)
-
-			dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
-				Return(func(ctx context.Context, run *models.Run) (*models.Run, error) {
-					_ = ctx
-
-					if run != nil {
-						// Must inject creation timestamp so limit check won't hit a nil pointer.
-						runWithTimestamp := *run
-						runWithTimestamp.Metadata.CreationTimestamp = &currentTime
-						return &runWithTimestamp, nil
-					}
-					return nil, nil
-				})
-			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
-				Return(&db.RunsResult{
-					PageInfo: &pagination.PageInfo{
-						TotalCount: pagination.StaticCount(test.injectRunsPerWorkspace),
-					},
-				}, nil)
-			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(&run, nil)
-
-			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
-				Return(&models.ResourceLimit{Value: test.limit}, nil)
-
-			dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
-				Speculative: false,
-			}, nil)
-
-			dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
-				Metadata: models.ResourceMetadata{
-					ID: "plan1",
-				},
-			}, nil)
-
-			dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
-				Metadata: models.ResourceMetadata{
-					ID: "apply1",
-				},
-			}, nil)
-			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(test.injectJob, nil)
-
-			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
-				Groups: []models.Group{
-					{
-						Metadata: models.ResourceMetadata{
-							ID: groupName,
-						},
-						Name: groupName,
-					},
-				},
-			}, nil)
-
-			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
-
-			mockArtifactStore := workspace.MockArtifactStore{}
-			mockArtifactStore.Test(t)
-
-			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-			mockSecretManager := secret.NewMockManager(t)
-
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
-			mockModuleResolver := registry.NewMockModuleResolver(t)
-			ruleEnforcer := rules.NewMockRuleEnforcer(t)
-
-			for _, mi := range test.managedIdentities {
-				miCopy := mi
-				ruleEnforcer.On("EnforceRules", mock.Anything, &miCopy, mock.Anything).Return(test.enforceRulesResponse)
-			}
-
-			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
-			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
-
-			logger, _ := logger.NewForTest()
-
-			testService := service{
-				logger:                    logger,
-				dbClient:                  dbClient.Client,
-				artifactStore:             &mockArtifactStore,
-				activityService:           &mockActivityEvents,
-				moduleResolver:            mockModuleResolver,
-				limitChecker:              limits.NewLimitChecker(dbClient.Client),
-				secretManager:             mockSecretManager,
-				ruleEnforcer:              ruleEnforcer,
-				inheritedSettingsResolver: mockInheritedSettingsResolver,
-			}
-
-			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-			})
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-			} else if err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
-func TestCreateRunWithPreventDestroy(t *testing.T) {
-	configurationVersionID := "cv1"
-	var duration int32 = 720
-	currentTime := time.Now().UTC()
-
-	groupName := "groupA"
-
-	injectJob := models.Job{
-		Metadata: models.ResourceMetadata{
-			ID: "job1",
-		},
-	}
-
-	// Test cases
-	type testCase struct {
-		workspace              *models.Workspace
-		runInput               *CreateRunInput
-		injectJob              *models.Job
-		name                   string
-		expectErrorCode        errors.CodeType
-		limit                  int
-		injectRunsPerWorkspace int32
-	}
-
-	/*
-		Test case template.
-		name            string
-		workspace       *models.Workspace
-		runInput        *CreateRunInput
-		expectErrorCode errors.CodeType
-		injectJob       *models.Job
-	*/
-
-	tests := []testCase{
-
-		{
-			name: "non-destroy plan is allowed independent of PreventDestroyPlan",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "test-workspace-metadata-id-1",
-				},
-				FullPath:           groupName + "/ws1",
-				MaxJobDuration:     &duration,
-				PreventDestroyPlan: false,
-			},
-			runInput: &CreateRunInput{
-				WorkspaceID:            "test-workspace-metadata-id-1",
-				ConfigurationVersionID: &configurationVersionID,
-				IsDestroy:              false,
-			},
-			injectJob:              &injectJob,
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-
-		{
-			name: "destroy plan is allowed, because PreventDestroyPlan is false",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "test-workspace-metadata-id-2",
-				},
-				FullPath:           groupName + "/ws1",
-				MaxJobDuration:     &duration,
-				PreventDestroyPlan: false,
-			},
-			runInput: &CreateRunInput{
-				WorkspaceID:            "test-workspace-metadata-id-2",
-				ConfigurationVersionID: &configurationVersionID,
-				IsDestroy:              true,
-			},
-			injectJob:              &injectJob,
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-
-		{
-			name: "non-destroy plan is allowed even when PreventDestroyPlan is true",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "test-workspace-metadata-id-3",
-				},
-				FullPath:           groupName + "/ws1",
-				MaxJobDuration:     &duration,
-				PreventDestroyPlan: true,
-			},
-			runInput: &CreateRunInput{
-				WorkspaceID:            "test-workspace-metadata-id-3",
-				ConfigurationVersionID: &configurationVersionID,
-				IsDestroy:              false,
-			},
-			injectJob:              &injectJob,
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-
-		{
-			name: "destroy plan is NOT allowed, because PreventDestroyPlan is true",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "test-workspace-metadata-id-4",
-				},
-				FullPath:           groupName + "/ws1",
-				MaxJobDuration:     &duration,
-				PreventDestroyPlan: true,
-			},
-			runInput: &CreateRunInput{
-				WorkspaceID:            "test-workspace-metadata-id-4",
-				ConfigurationVersionID: &configurationVersionID,
-				IsDestroy:              true,
-			},
-			expectErrorCode: errors.EForbidden,
-		},
-
-		{
-			name: "exceeds resource limit",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "test-workspace-metadata-id-1",
-				},
-				FullPath:           groupName + "/ws1",
-				MaxJobDuration:     &duration,
-				PreventDestroyPlan: false,
-			},
-			runInput: &CreateRunInput{
-				WorkspaceID:            "test-workspace-metadata-id-1",
-				ConfigurationVersionID: &configurationVersionID,
-				IsDestroy:              false,
-			},
-			injectJob:              &injectJob,
-			limit:                  4,
-			injectRunsPerWorkspace: 5,
-			expectErrorCode:        errors.EInvalid,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			dbClient := buildDBClientWithMocks(t)
-
-			mockCaller := auth.NewMockCaller(t)
-
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("testsubject").Maybe()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace",
-				mock.Anything, test.workspace.Metadata.ID).Return([]models.ManagedIdentity{}, nil)
-
-			dbClient.MockWorkspaces.On("GetWorkspaceByID",
-				mock.Anything, test.workspace.Metadata.ID).Return(test.workspace, nil)
-
-			dbClient.MockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
-				Variables: []models.Variable{},
-			}, nil)
-
-			dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
-				Return(func(ctx context.Context, run *models.Run) (*models.Run, error) {
-					_ = ctx
-
-					if run != nil {
-						// Must inject creation timestamp so limit check won't hit a nil pointer.
-						runWithTimestamp := *run
-						runWithTimestamp.Metadata.CreationTimestamp = &currentTime
-						return &runWithTimestamp, nil
-					}
-					return nil, nil
-				})
-			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
-				Return(&db.RunsResult{
-					PageInfo: &pagination.PageInfo{
-						TotalCount: pagination.StaticCount(test.injectRunsPerWorkspace),
-					},
-				}, nil)
-
-			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
-				Return(&models.ResourceLimit{Value: test.limit}, nil)
-
-			dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
-				Speculative: false,
-			}, nil)
-
-			dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
-				Metadata: models.ResourceMetadata{
-					ID: "plan1",
-				},
-			}, nil)
-
-			dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
-				Metadata: models.ResourceMetadata{
-					ID: "apply1",
-				},
-			}, nil)
-
-			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
-				Groups: []models.Group{
-					{
-						Metadata: models.ResourceMetadata{
-							ID: groupName,
-						},
-						Name: groupName,
-					},
-				},
-			}, nil)
-
-			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(test.injectJob, nil)
-
-			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
-
-			mockArtifactStore := workspace.MockArtifactStore{}
-			mockArtifactStore.Test(t)
-
-			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-			mockSecretManager := secret.NewMockManager(t)
-
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
-			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
-			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
-
-			logger, _ := logger.NewForTest()
-
-			testService := service{
-				logger:                    logger,
-				dbClient:                  dbClient.Client,
-				artifactStore:             &mockArtifactStore,
-				activityService:           &mockActivityEvents,
-				limitChecker:              limits.NewLimitChecker(dbClient.Client),
-				secretManager:             mockSecretManager,
-				inheritedSettingsResolver: mockInheritedSettingsResolver,
-			}
-
-			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.runInput)
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-			} else if err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
-func TestCreateRunWithSpeculativeOption(t *testing.T) {
-	configurationVersionID := "configuration-version-id-1"
-	moduleSource := "module-source-1"
-	createdBySubject := "mock-caller"
-	groupName := "groupA"
-	planID := "plan1"
-	applyID := "apply1"
-	isTrue := true
-	isFalse := false
-	currentTime := time.Now().UTC()
-
-	ws := &models.Workspace{
-		Metadata: models.ResourceMetadata{
-			ID: "ws1",
-		},
-		FullPath:       "groupA/ws1",
-		MaxJobDuration: ptr.Int32(60),
-	}
-
-	// Test cases
-	tests := []struct {
-		input                   *CreateRunInput
-		expectCreateRun         *models.Run
-		name                    string
-		expectErrorCode         errors.CodeType
-		injectConfigVersionSpec bool
-		limit                   int
-		injectRunsPerWorkspace  int32
-	}{
-		{
-			name: "module source, speculative not specified; expect false",
-			input: &CreateRunInput{
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-				Speculative:  nil,
-			},
-			expectCreateRun: &models.Run{
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-				CreatedBy:    createdBySubject,
-				PlanID:       planID,
-				ApplyID:      applyID,
-				Status:       models.RunPlanQueued,
-			},
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-		{
-			name: "module source, speculative specified true; expect true",
-			input: &CreateRunInput{
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-				Speculative:  &isTrue,
-			},
-			expectCreateRun: &models.Run{
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-				CreatedBy:    createdBySubject,
-				PlanID:       planID,
-				ApplyID:      "",
-				Status:       models.RunPlanQueued,
-			},
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-		{
-			name: "module source, speculative specified false; expect false",
-			input: &CreateRunInput{
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-				Speculative:  &isFalse,
-			},
-			expectCreateRun: &models.Run{
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-				CreatedBy:    createdBySubject,
-				PlanID:       planID,
-				ApplyID:      applyID,
-				Status:       models.RunPlanQueued,
-			},
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-		{
-			name: "configuration version spec=false, options spec=nil; expect false",
-			input: &CreateRunInput{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				Speculative:            nil,
-			},
-			injectConfigVersionSpec: false,
-			expectCreateRun: &models.Run{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				CreatedBy:              createdBySubject,
-				PlanID:                 planID,
-				ApplyID:                applyID,
-				Status:                 models.RunPlanQueued,
-			},
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-		{
-			name: "configuration version spec=false, options spec=true; expect true",
-			input: &CreateRunInput{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				Speculative:            &isTrue,
-			},
-			injectConfigVersionSpec: false,
-			expectCreateRun: &models.Run{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				CreatedBy:              createdBySubject,
-				PlanID:                 planID,
-				ApplyID:                "",
-				Status:                 models.RunPlanQueued,
-			},
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-		{
-			name: "configuration version spec=false, options spec=false; expect false",
-			input: &CreateRunInput{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				Speculative:            &isFalse,
-			},
-			injectConfigVersionSpec: false,
-			expectCreateRun: &models.Run{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				CreatedBy:              createdBySubject,
-				PlanID:                 planID,
-				ApplyID:                applyID,
-				Status:                 models.RunPlanQueued,
-			},
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-		{
-			name: "configuration version spec=true, options spec=nil; expect true",
-			input: &CreateRunInput{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				Speculative:            nil,
-			},
-			injectConfigVersionSpec: true,
-			expectCreateRun: &models.Run{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				CreatedBy:              createdBySubject,
-				PlanID:                 planID,
-				ApplyID:                "",
-				Status:                 models.RunPlanQueued,
-			},
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-		{
-			name: "configuration version spec=true, options spec=true; expect true",
-			input: &CreateRunInput{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				Speculative:            &isTrue,
-			},
-			injectConfigVersionSpec: true,
-			expectCreateRun: &models.Run{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				CreatedBy:              createdBySubject,
-				PlanID:                 planID,
-				ApplyID:                "",
-				Status:                 models.RunPlanQueued,
-			},
-			limit:                  4,
-			injectRunsPerWorkspace: 4,
-		},
-		{
-			name: "configuration version spec=true, options spec=false; expect error",
-			input: &CreateRunInput{
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				Speculative:            &isFalse,
-			},
-			injectConfigVersionSpec: true,
-			expectErrorCode:         errors.EInvalid,
-		},
-		{
-			name: "exceeds limit",
-			input: &CreateRunInput{
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-				Speculative:  nil,
-			},
-			expectCreateRun: &models.Run{
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-				CreatedBy:    createdBySubject,
-				PlanID:       planID,
-				ApplyID:      applyID,
-				Status:       models.RunPlanQueued,
-			},
-			limit:                  4,
-			injectRunsPerWorkspace: 5,
-			expectErrorCode:        errors.EInvalid,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			dbClient := buildDBClientWithMocks(t)
-
-			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return(createdBySubject).Maybe()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).
-				Return([]models.ManagedIdentity{}, nil)
-
-			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
-
-			dbClient.MockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
-				Variables: []models.Variable{},
-			}, nil)
-
-			dbClient.MockRuns.On("CreateRun", mock.Anything, test.expectCreateRun).
-				Return(func(ctx context.Context, run *models.Run) (*models.Run, error) {
-					_ = ctx
-
-					if run != nil {
-						// Must inject creation timestamp so limit check won't hit a nil pointer.
-						runWithTimestamp := *run
-						runWithTimestamp.Metadata.CreationTimestamp = &currentTime
-						return &runWithTimestamp, nil
-					}
-					return nil, nil
-				})
-			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
-				Return(&db.RunsResult{
-					PageInfo: &pagination.PageInfo{
-						TotalCount: pagination.StaticCount(test.injectRunsPerWorkspace),
-					},
-				}, nil)
-			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
-
-			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
-				Return(&models.ResourceLimit{Value: test.limit}, nil)
-
-			dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).
-				Return(&models.ConfigurationVersion{
-					Speculative: test.injectConfigVersionSpec,
-				}, nil)
-
-			dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
-				Metadata: models.ResourceMetadata{
-					ID: planID,
-				},
-			}, nil)
-
-			dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
-				Metadata: models.ResourceMetadata{
-					ID: applyID,
-				},
-			}, nil)
-
-			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
-				Groups: []models.Group{
-					{
-						Metadata: models.ResourceMetadata{
-							ID: groupName,
-						},
-						Name: groupName,
-					},
-				},
-			}, nil)
-
-			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).
-				Return(func(_ context.Context, _ *models.Job) (*models.Job, error) {
-					return &models.Job{
-						Metadata: models.ResourceMetadata{
-							ID: "job1",
-						},
-						WorkspaceID: ws.Metadata.ID,
-					}, nil
-				}, nil)
-
-			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
-
-			mockArtifactStore := workspace.MockArtifactStore{}
-			mockArtifactStore.Test(t)
-
-			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-			mockModuleResolver := registry.NewMockModuleResolver(t)
-
-			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, ptr.ToString(test.input.ModuleSource), mock.Anything, mock.Anything).
-				Return(nil, registry.ErrRemoteModuleSource).Maybe()
-
-			mockSecretManager := secret.NewMockManager(t)
-
-			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
-			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
-
-			logger, _ := logger.NewForTest()
-
-			testService := service{
-				logger:                    logger,
-				dbClient:                  dbClient.Client,
-				artifactStore:             &mockArtifactStore,
-				activityService:           &mockActivityEvents,
-				moduleResolver:            mockModuleResolver,
-				limitChecker:              limits.NewLimitChecker(dbClient.Client),
-				secretManager:             mockSecretManager,
-				inheritedSettingsResolver: mockInheritedSettingsResolver,
-			}
-
-			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-			} else if err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
-func TestCreateRunWithTharsisModule(t *testing.T) {
-	moduleSource := "module-source-1"
-	moduleVersion := "1.0.0"
-	moduleDigest := []byte("digest")
-	createdBySubject := "mock-caller"
-	groupName := "groupA"
-	planID := "plan1"
-	applyID := "apply1"
-	currentTime := time.Now().UTC()
-
-	ws := &models.Workspace{
-		Metadata: models.ResourceMetadata{
-			ID: "ws1",
-		},
-		FullPath:       "groupA/ws1",
-		MaxJobDuration: ptr.Int32(60),
-	}
-
-	// Test cases
-	tests := []struct {
-		input                  *CreateRunInput
-		expectCreateRun        *models.Run
-		name                   string
-		moduleAuthError        error
-		expectErrorCode        errors.CodeType
-		expectWantVersion      *string
-		expectIncludeModulePre bool
-		resolvedVersion        string
-	}{
-		{
-			name: "create run with tharsis module source",
-			input: &CreateRunInput{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-			},
-			expectCreateRun: &models.Run{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				CreatedBy:     createdBySubject,
-				PlanID:        planID,
-				ApplyID:       applyID,
-				Status:        models.RunPlanQueued,
-				ModuleVersion: &moduleVersion,
-				ModuleDigest:  moduleDigest,
-			},
-			expectWantVersion: &moduleVersion,
-			resolvedVersion:   moduleVersion,
-		},
-		{
-			name: "return unauthorized error when caller is not authorized to use module",
-			input: &CreateRunInput{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-			},
-			moduleAuthError:   errors.New("unauthorized", errors.WithErrorCode(errors.EUnauthorized)),
-			expectErrorCode:   errors.EUnauthorized,
-			expectWantVersion: &moduleVersion,
-			resolvedVersion:   moduleVersion,
-		},
-		{
-			name: "create run with no version and includeModulePrereleases selects prerelease",
-			input: &CreateRunInput{
-				WorkspaceID:              ws.Metadata.ID,
-				ModuleSource:             &moduleSource,
-				IncludeModulePrereleases: true,
-			},
-			expectCreateRun: &models.Run{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				CreatedBy:     createdBySubject,
-				PlanID:        planID,
-				ApplyID:       applyID,
-				Status:        models.RunPlanQueued,
-				ModuleVersion: ptr.String("2.0.0-rc.1"),
-				ModuleDigest:  moduleDigest,
-			},
-			expectWantVersion:      nil,
-			expectIncludeModulePre: true,
-			resolvedVersion:        "2.0.0-rc.1",
-		},
-		{
-			name: "create run with v-prefixed module version normalizes to semver",
-			input: &CreateRunInput{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: ptr.String("v1.0.0"),
-			},
-			expectCreateRun: &models.Run{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				CreatedBy:     createdBySubject,
-				PlanID:        planID,
-				ApplyID:       applyID,
-				Status:        models.RunPlanQueued,
-				ModuleVersion: &moduleVersion, // normalized to "1.0.0"
-				ModuleDigest:  moduleDigest,
-			},
-			expectWantVersion: &moduleVersion, // resolver receives normalized "1.0.0"
-			resolvedVersion:   moduleVersion,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			dbClient := buildDBClientWithMocks(t)
-
-			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return(createdBySubject).Maybe()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).
-				Return([]models.ManagedIdentity{}, nil)
-
-			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
-
-			dbClient.MockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
-				Variables: []models.Variable{},
-			}, nil)
-
-			dbClient.MockRuns.On("CreateRun", mock.Anything, test.expectCreateRun).
-				Return(func(ctx context.Context, run *models.Run) (*models.Run, error) {
-					_ = ctx
-
-					if run != nil {
-						// Must inject creation timestamp so limit check won't hit a nil pointer.
-						runWithTimestamp := *run
-						runWithTimestamp.Metadata.CreationTimestamp = &currentTime
-						return &runWithTimestamp, nil
-					}
-					return nil, nil
-				})
-			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
-				Return(&db.RunsResult{
-					PageInfo: &pagination.PageInfo{
-						TotalCount: pagination.StaticCount(1),
-					},
-				}, nil)
-			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
-
-			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
-				Return(&models.ResourceLimit{Value: 10}, nil)
-
-			dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
-				Metadata: models.ResourceMetadata{
-					ID: planID,
-				},
-			}, nil)
-
-			dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
-				Metadata: models.ResourceMetadata{
-					ID: applyID,
-				},
-			}, nil)
-
-			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
-				Groups: []models.Group{
-					{
-						Metadata: models.ResourceMetadata{
-							ID: groupName,
-						},
-						Name: groupName,
-					},
-				},
-			}, nil)
-
-			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).
-				Return(func(_ context.Context, _ *models.Job) (*models.Job, error) {
-					return &models.Job{
-						Metadata: models.ResourceMetadata{
-							ID: "job1",
-						},
-						WorkspaceID: ws.Metadata.ID,
-					}, nil
-				}, nil)
-
-			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
-
-			mockArtifactStore := workspace.MockArtifactStore{}
-			mockArtifactStore.Test(t)
-
-			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-			mockModuleResolver := registry.NewMockModuleResolver(t)
-
-			mockModuleRegistrySource := registry.NewMockModuleRegistrySource(t)
-			mockModuleRegistrySource.On("LocalRegistryModule", mock.Anything).Return(&models.TerraformModule{
-				GroupID: "test-group-id",
-				Private: true,
-			}, nil)
-
-			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformModuleModelType, mock.Anything).Return(test.moduleAuthError)
-
-			if test.moduleAuthError == nil {
-				mockModuleRegistrySource.On("ResolveSemanticVersion", mock.Anything, test.expectWantVersion, test.expectIncludeModulePre).Return(test.resolvedVersion, nil)
-
-				mockModuleRegistrySource.On("ResolveDigest", mock.Anything, test.resolvedVersion).Return(moduleDigest, nil)
-			}
-
-			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, ptr.ToString(test.input.ModuleSource), mock.Anything, mock.Anything).
-				Return(mockModuleRegistrySource, nil)
-
-			mockSecretManager := secret.NewMockManager(t)
-
-			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
-			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
-
-			logger, _ := logger.NewForTest()
-
-			testService := service{
-				logger:                    logger,
-				dbClient:                  dbClient.Client,
-				artifactStore:             &mockArtifactStore,
-				activityService:           &mockActivityEvents,
-				moduleResolver:            mockModuleResolver,
-				limitChecker:              limits.NewLimitChecker(dbClient.Client),
-				secretManager:             mockSecretManager,
-				inheritedSettingsResolver: mockInheritedSettingsResolver,
-			}
-
-			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-			} else if err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
-func TestCreateRunWithJobTags(t *testing.T) {
-	configVersionID := "cv1"
-	createdBySubject := "mock-caller"
-	planID := "plan1"
-	applyID := "apply1"
-	currentTime := time.Now().UTC()
-	runnerTags := []string{
-		"tag1",
-		"tag2",
-	}
-
-	tests := []struct {
-		name             string
-		workspace        *models.Workspace
-		parentGroup      *models.Group
-		grandparentGroup *models.Group
-		createRunInputs  *CreateRunInput
-		expectTags       []string
-		// No errors expected for this test function.
-	}{
-		{
-			name: "tags set by workspace",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "ws1",
-				},
-				FullPath:       "groupB/ws1",
-				MaxJobDuration: ptr.Int32(60),
-				RunnerTags:     runnerTags,
-			},
-			parentGroup: &models.Group{
-				Metadata: models.ResourceMetadata{
-					ID: "groupB",
-				},
-				Name:     "groupB",
-				FullPath: "groupB",
-			},
-			createRunInputs: &CreateRunInput{
-				WorkspaceID:            "ws1",
-				ConfigurationVersionID: &configVersionID,
-			},
-			expectTags: runnerTags,
-		},
-		{
-			name: "tags set by parent group",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "ws1",
-				},
-				FullPath:       "groupB/ws1",
-				MaxJobDuration: ptr.Int32(60),
-				GroupID:        "groupB",
-			},
-			parentGroup: &models.Group{
-				Metadata: models.ResourceMetadata{
-					ID: "groupB",
-				},
-				Name:       "groupB",
-				FullPath:   "groupB",
-				RunnerTags: runnerTags,
-			},
-			createRunInputs: &CreateRunInput{
-				WorkspaceID:            "ws1",
-				ConfigurationVersionID: &configVersionID,
-			},
-			expectTags: runnerTags,
-		},
-		{
-			name: "tags set by grandparent group",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "ws1",
-				},
-				FullPath:       "groupA/groupB/ws1",
-				MaxJobDuration: ptr.Int32(60),
-				GroupID:        "groupB",
-			},
-			parentGroup: &models.Group{
-				Metadata: models.ResourceMetadata{
-					ID: "groupB",
-				},
-				Name:     "groupB",
-				FullPath: "groupA/groupB",
-				ParentID: "groupA",
-			},
-			grandparentGroup: &models.Group{
-				Metadata: models.ResourceMetadata{
-					ID: "groupA",
-				},
-				Name:       "groupA",
-				FullPath:   "groupA",
-				RunnerTags: runnerTags,
-			},
-			createRunInputs: &CreateRunInput{
-				WorkspaceID:            "ws1",
-				ConfigurationVersionID: &configVersionID,
-			},
-			expectTags: runnerTags,
-		},
-		{
-			name: "tags not set by any group",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "ws1",
-				},
-				FullPath:       "groupA/groupB/ws1",
-				MaxJobDuration: ptr.Int32(60),
-				GroupID:        "groupB",
-			},
-			parentGroup: &models.Group{
-				Metadata: models.ResourceMetadata{
-					ID: "groupB",
-				},
-				Name:     "groupB",
-				FullPath: "groupA/groupB",
-				ParentID: "groupA",
-			},
-			grandparentGroup: &models.Group{
-				Metadata: models.ResourceMetadata{
-					ID: "groupA",
-				},
-				Name:     "groupA",
-				FullPath: "groupA",
-			},
-			createRunInputs: &CreateRunInput{
-				WorkspaceID:            "ws1",
-				ConfigurationVersionID: &configVersionID,
-			},
-			expectTags: []string{},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			dbClient := buildDBClientWithMocks(t)
-
-			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return(createdBySubject).Maybe()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, test.workspace.Metadata.ID).
-				Return(test.workspace, nil)
-
-			dbClient.MockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
-				Variables: []models.Variable{},
-			}, nil)
-
-			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, test.workspace.Metadata.ID).
-				Return([]models.ManagedIdentity{}, nil)
-
-			dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
-				Metadata: models.ResourceMetadata{
-					ID: planID,
-				},
-			}, nil)
-
-			dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configVersionID).
-				Return(&models.ConfigurationVersion{}, nil)
-
-			dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
-				Metadata: models.ResourceMetadata{
-					ID: applyID,
-				},
-			}, nil)
-
-			dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
-				Return(func(ctx context.Context, run *models.Run) (*models.Run, error) {
-					_ = ctx
-
-					if run != nil {
-						// Must inject creation timestamp so limit check won't hit a nil pointer.
-						runWithTimestamp := *run
-						runWithTimestamp.Metadata.CreationTimestamp = &currentTime
-						return &runWithTimestamp, nil
-					}
-					return nil, nil
-				})
-			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
-				Return(&db.RunsResult{
-					PageInfo: &pagination.PageInfo{
-						TotalCount: pagination.StaticCount(1),
-					},
-				}, nil)
-
-			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
-				Return(&models.ResourceLimit{Value: 1}, nil)
-
-			dbClient.MockJobs.On("CreateJob", mock.Anything,
-				mock.MatchedBy(func(input *models.Job) bool {
-					return assert.ElementsMatch(t, input.Tags, test.expectTags) && assert.NotNil(t, input.Tags, "Should never be nil")
-				})).
-				Return(&models.Job{
-					Metadata: models.ResourceMetadata{
-						ID: "job1",
-					},
-					WorkspaceID: test.workspace.Metadata.ID,
-				}, nil)
-
-			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
-
-			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).
-				Return(func(_ context.Context, input *db.GetGroupsInput) (*db.GroupsResult, error) {
-					groups := []models.Group{}
-					if test.parentGroup != nil {
-						groups = append(groups, *test.parentGroup)
-					}
-					if test.grandparentGroup != nil {
-						groups = append(groups, *test.grandparentGroup)
-					}
-
-					// Make sure we're returning the correct number of groups.
-					assert.Equal(t, len(input.Filter.GroupPaths), len(groups))
-
-					return &db.GroupsResult{
-						Groups: groups,
-					}, nil
-				})
-
-			mockArtifactStore := workspace.MockArtifactStore{}
-			mockArtifactStore.Test(t)
-
-			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
-				Return(&models.ActivityEvent{}, nil)
-
-			mockModuleResolver := registry.NewMockModuleResolver(t)
-
-			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-				Return(nil, registry.ErrRemoteModuleSource).Maybe()
-
-			mockSecretManager := secret.NewMockManager(t)
-
-			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
-			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
-
-			logger, _ := logger.NewForTest()
-
-			testService := service{
-				logger:                    logger,
-				dbClient:                  dbClient.Client,
-				artifactStore:             &mockArtifactStore,
-				activityService:           &mockActivityEvents,
-				moduleResolver:            mockModuleResolver,
-				limitChecker:              limits.NewLimitChecker(dbClient.Client),
-				secretManager:             mockSecretManager,
-				inheritedSettingsResolver: mockInheritedSettingsResolver,
-			}
-
-			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.createRunInputs)
-			assert.Nil(t, err)
-
-			// The expected job tags are checked by the inputs to CreateJob.
-		})
-	}
-}
-
-func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
-	var duration int32 = 1
-	groupName := "groupA"
-	ws := &models.Workspace{
-		Metadata: models.ResourceMetadata{
-			ID: "ws1",
-		},
-		FullPath:       "groupA/ws1",
-		MaxJobDuration: &duration,
-	}
-
-	run := models.Run{
-		Metadata: models.ResourceMetadata{
-			ID: "run1",
-		},
-		WorkspaceID: ws.Metadata.ID,
-	}
-
-	apply := models.Apply{
-		Metadata: models.ResourceMetadata{
-			ID: "apply1",
-		},
-	}
-
-	injectJob := models.Job{
-		Metadata: models.ResourceMetadata{
-			ID: "job1",
-		},
-		WorkspaceID: ws.Metadata.ID,
-		RunID:       run.Metadata.ID,
-	}
-
-	// Test cases
-	tests := []struct {
-		enforceRulesResponse error
-		injectJob            *models.Job
-		name                 string
-		expectErrorCode      errors.CodeType
-		managedIdentities    []models.ManagedIdentity
-	}{
-		{
-			name: "apply is created because all managed identity rules are satisfied",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-				},
-			},
-			injectJob: &injectJob,
-		},
-		{
-			name:              "apply is created because there are no managed identities",
-			managedIdentities: []models.ManagedIdentity{},
-			injectJob:         &injectJob,
-		},
-		{
-			name: "apply is not created because a managed identity rule is not satisfied",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-				},
-			},
-			enforceRulesResponse: errors.New("rule not satisfied", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode:      errors.EForbidden,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			dbClient := buildDBClientWithMocks(t)
-
-			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("mock-caller").Maybe()
-
-			ctx, cancel := context.WithCancel(auth.WithCaller(context.Background(), mockCaller))
-			defer cancel()
-
-			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).Return(test.managedIdentities, nil)
-
-			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
-
-			apply.Status = models.ApplyCreated // to avoid tripping the state transition checks in UpdateApply, etc.
-
-			dbClient.MockRuns.On("GetRunByID", mock.Anything, run.Metadata.ID).Return(&run, nil)
-			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(&run, nil)
-
-			dbClient.MockApplies.On("GetApplyByID", mock.Anything, mock.Anything).Return(&apply, nil)
-			dbClient.MockApplies.On("UpdateApply", mock.Anything, mock.Anything).Return(&apply, nil)
-
-			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
-				Groups: []models.Group{
-					{
-						Metadata: models.ResourceMetadata{
-							ID: groupName,
-						},
-						Name: groupName,
-					},
-				},
-			}, nil)
-
-			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(test.injectJob, nil)
-			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
-			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, run.WorkspaceID).Return(ws, nil)
-
-			mockSecretManager := secret.NewMockManager(t)
-
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
-			mockModuleResolver := registry.NewMockModuleResolver(t)
-			ruleEnforcer := rules.NewMockRuleEnforcer(t)
-
-			for _, mi := range test.managedIdentities {
-				miCopy := mi
-				ruleEnforcer.On("EnforceRules", mock.Anything, &miCopy, mock.Anything).Return(test.enforceRulesResponse)
-			}
-
-			logger, _ := logger.NewForTest()
-
-			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
-			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
-
-			testService := service{
-				logger:                    logger,
-				dbClient:                  dbClient.Client,
-				activityService:           &mockActivityEvents,
-				moduleResolver:            mockModuleResolver,
-				limitChecker:              limits.NewLimitChecker(dbClient.Client),
-				secretManager:             mockSecretManager,
-				ruleEnforcer:              ruleEnforcer,
-				runStateManager:           state.NewRunStateManager(dbClient.Client, logger),
-				inheritedSettingsResolver: mockInheritedSettingsResolver,
-			}
-
-			_, err := testService.ApplyRun(ctx, run.Metadata.ID, nil)
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-			} else if err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
-func TestCreateDestroyRunForWorkspace(t *testing.T) {
-	testSubject := "tester"
-	currentTime := time.Now()
-
-	stateVersionID := "sv1"
-	planID := "plan1"
-	applyID := "apply1"
-
-	moduleSource := "mymodule"
-	moduleVersion := "1.0.0"
-	configurationVersionID := "cv1"
-
-	ws := &models.Workspace{
-		Metadata: models.ResourceMetadata{
-			ID: "ws1",
-		},
-		FullPath:              "groupA/ws1",
-		CurrentStateVersionID: stateVersionID,
-		MaxJobDuration:        ptr.Int32(60),
-		RunnerTags:            []string{},
-	}
-
-	// Test cases
-	tests := []struct {
-		input           *CreateDestroyRunForWorkspaceInput
-		stateVersion    *models.StateVersion
-		currentRun      *models.Run
-		expectCreateRun *models.Run
-		name            string
-		authError       error
-		expectErrorCode errors.CodeType
-	}{
-		{
-			name: "create workspace destroy run for workspace with module applied",
-			input: &CreateDestroyRunForWorkspaceInput{
-				WorkspaceID: ws.Metadata.ID,
-			},
-			stateVersion: &models.StateVersion{
-				Metadata: models.ResourceMetadata{
-					ID: stateVersionID,
-				},
-				WorkspaceID: ws.Metadata.ID,
-				RunID:       ptr.String("run1"),
-			},
-			currentRun: &models.Run{
-				Metadata: models.ResourceMetadata{
-					ID: "run1",
-				},
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-			},
-			expectCreateRun: &models.Run{
-				Metadata: models.ResourceMetadata{
-					ID:                "run2",
-					CreationTimestamp: &currentTime,
-				},
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-				IsDestroy:     true,
-			},
-		},
-		{
-			name: "create workspace destroy run for workspace with configuration version",
-			input: &CreateDestroyRunForWorkspaceInput{
-				WorkspaceID: ws.Metadata.ID,
-			},
-			stateVersion: &models.StateVersion{
-				Metadata: models.ResourceMetadata{
-					ID: stateVersionID,
-				},
-				WorkspaceID: ws.Metadata.ID,
-				RunID:       ptr.String("run1"),
-			},
-			currentRun: &models.Run{
-				Metadata: models.ResourceMetadata{
-					ID: "run1",
-				},
-				WorkspaceID:            ws.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-			},
-			expectCreateRun: &models.Run{
-				Metadata: models.ResourceMetadata{
-					ID:                "run2",
-					CreationTimestamp: &currentTime,
-				},
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-				IsDestroy:     true,
-			},
-		},
-		{
-			name: "cannot create destroy run if state version was created manually",
-			input: &CreateDestroyRunForWorkspaceInput{
-				WorkspaceID: ws.Metadata.ID,
-			},
-			stateVersion: &models.StateVersion{
-				Metadata: models.ResourceMetadata{
-					ID: stateVersionID,
-				},
-				WorkspaceID: ws.Metadata.ID,
-			},
-			expectErrorCode: errors.EConflict,
-		},
-		{
-			name: "expect authorization error",
-			input: &CreateDestroyRunForWorkspaceInput{
-				WorkspaceID: ws.Metadata.ID,
-			},
-			authError:       errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode: errors.EForbidden,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			// Setup mocks
-			dbClient := buildDBClientWithMocks(t)
-			mockArtifactStore := workspace.NewMockArtifactStore(t)
-			mockModuleResolver := registry.NewMockModuleResolver(t)
-			mockActivityEvents := activityevent.NewMockService(t)
-			mockCaller := auth.NewMockCaller(t)
-
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return(testSubject).Maybe()
-
-			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-
-			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil).Maybe()
-			dbClient.MockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(test.stateVersion, nil).Maybe()
-
-			if test.expectErrorCode == "" {
-
-				dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-				dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).
-					Return([]models.ManagedIdentity{}, nil)
-
-				if test.stateVersion.RunID != nil {
-					dbClient.MockRuns.On("GetRunByID", mock.Anything, *test.stateVersion.RunID).Return(test.currentRun, nil)
-				}
-
-				dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
-					Return(test.expectCreateRun, nil)
-				dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
-					Return(&db.RunsResult{
-						PageInfo: &pagination.PageInfo{
-							TotalCount: pagination.StaticCount(1),
-						},
-					}, nil)
-				dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
-
-				dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
-					Return(&models.ResourceLimit{Value: 10}, nil)
-
-				if test.currentRun.ConfigurationVersionID != nil {
-					dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).
-						Return(&models.ConfigurationVersion{
-							Speculative: false,
-						}, nil)
-				}
-
-				dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
-					Metadata: models.ResourceMetadata{
-						ID: planID,
-					},
-				}, nil)
-
-				dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
-					Metadata: models.ResourceMetadata{
-						ID: applyID,
-					},
-				}, nil)
-
-				dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).
-					Return(func(_ context.Context, _ *models.Job) (*models.Job, error) {
-						return &models.Job{
-							Metadata: models.ResourceMetadata{
-								ID: "job1",
-							},
-							WorkspaceID: ws.Metadata.ID,
-						}, nil
-					}, nil)
-
-				dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
-
-				data, err := json.Marshal([]Variable{
-					{Key: "k1", Value: ptr.String("v1"), Category: models.TerraformVariableCategory},
-				})
-				require.NoError(t, err)
-
-				mockArtifactStore.On("GetRunVariables", mock.Anything, test.currentRun).Return(io.NopCloser(bytes.NewReader(data)), nil)
-
-				matcher := mock.MatchedBy(func(run *models.Run) bool {
-					return run.Metadata.ID == test.expectCreateRun.Metadata.ID
-				})
-				mockArtifactStore.On("UploadRunVariables", mock.Anything, matcher, bytes.NewReader(data)).Return(nil)
-
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
-				mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(nil, registry.ErrRemoteModuleSource).Maybe()
-			}
-
-			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
-			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
-
-			// Create test fixture
-			logger, _ := logger.NewForTest()
-			testService := service{
-				logger:                    logger,
-				dbClient:                  dbClient.Client,
-				artifactStore:             mockArtifactStore,
-				activityService:           mockActivityEvents,
-				moduleResolver:            mockModuleResolver,
-				limitChecker:              limits.NewLimitChecker(dbClient.Client),
-				inheritedSettingsResolver: mockInheritedSettingsResolver,
-			}
-
-			// Invoke test method
-			run, err := testService.CreateDestroyRunForWorkspace(auth.WithCaller(ctx, mockCaller), test.input)
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
-
-			// Assertions
-			require.NoError(t, err)
-
-			assert.True(t, run.IsDestroy)
-			assert.Equal(t, test.expectCreateRun.WorkspaceID, run.WorkspaceID)
-			assert.Equal(t, test.expectCreateRun.ModuleSource, run.ModuleSource)
-			assert.Equal(t, test.expectCreateRun.ModuleVersion, run.ModuleVersion)
-			assert.Equal(t, test.expectCreateRun.ConfigurationVersionID, run.ConfigurationVersionID)
 		})
 	}
 }
@@ -2697,9 +486,9 @@ func TestGetStateVersionsByRunIDs(t *testing.T) {
 				},
 			}).Return(func(_ context.Context, _ *db.GetRunsInput) (*db.RunsResult, error) {
 				// Create runs
-				runs := make([]models.Run, runsCount)
+				runs := make([]*models.Run, runsCount)
 				for i := 0; i < runsCount; i++ {
-					runs[i] = models.Run{
+					runs[i] = &models.Run{
 						Metadata: models.ResourceMetadata{
 							ID: test.runIDs[i],
 						},
@@ -2924,8 +713,10 @@ func TestGetPlanDiff(t *testing.T) {
 			ID: runID,
 		},
 		WorkspaceID: workspaceID,
-		PlanID:      "plan-1",
+		Plan:        models.Plan{ID: "plan-1"},
 	}
+
+	planID := run.Plan.GetID()
 
 	type testCase struct {
 		authError       error
@@ -2955,7 +746,7 @@ func TestGetPlanDiff(t *testing.T) {
 			mockRuns := db.NewMockRuns(t)
 			mockArtifactStore := workspace.NewMockArtifactStore(t)
 
-			mockRuns.On("GetRunByPlanID", mock.Anything, run.PlanID).Return(run, nil)
+			mockRuns.On("GetRunByNodeID", mock.Anything, planID).Return(run, nil)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
 
@@ -2973,7 +764,7 @@ func TestGetPlanDiff(t *testing.T) {
 				artifactStore: mockArtifactStore,
 			}
 
-			actualDiff, err := service.GetPlanDiff(auth.WithCaller(ctx, mockCaller), run.PlanID)
+			actualDiff, err := service.GetPlanDiff(auth.WithCaller(ctx, mockCaller), planID)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -2990,15 +781,16 @@ func TestGetPlanDiff(t *testing.T) {
 func TestUploadPlanBinary(t *testing.T) {
 	workspaceID := "ws1"
 	runID := "run1"
-	planID := "plan-1"
 
 	run := &models.Run{
 		Metadata: models.ResourceMetadata{
 			ID: runID,
 		},
 		WorkspaceID: workspaceID,
-		PlanID:      planID,
+		Plan:        models.Plan{ID: "plan-1"},
 	}
+
+	planID := run.Plan.GetID()
 
 	type testCase struct {
 		authError       error
@@ -3032,7 +824,7 @@ func TestUploadPlanBinary(t *testing.T) {
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(test.authError)
 
-			mockRuns.On("GetRunByPlanID", mock.Anything, run.PlanID).Return(run, nil).Maybe()
+			mockRuns.On("GetRunByNodeID", mock.Anything, planID).Return(run, nil).Maybe()
 
 			if test.authError == nil {
 				matcher := mock.MatchedBy(func(reader io.Reader) bool {
@@ -3053,7 +845,7 @@ func TestUploadPlanBinary(t *testing.T) {
 				artifactStore: mockArtifactStore,
 			}
 
-			err := service.UploadPlanBinary(auth.WithCaller(ctx, mockCaller), run.PlanID, strings.NewReader(test.expectData))
+			err := service.UploadPlanBinary(auth.WithCaller(ctx, mockCaller), planID, strings.NewReader(test.expectData))
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -3068,15 +860,16 @@ func TestUploadPlanBinary(t *testing.T) {
 func TestProcessPlanData(t *testing.T) {
 	workspaceID := "ws1"
 	runID := "run1"
-	planID := "plan-1"
 
 	run := &models.Run{
 		Metadata: models.ResourceMetadata{
 			ID: runID,
 		},
 		WorkspaceID: workspaceID,
-		PlanID:      planID,
+		Plan:        models.Plan{ID: "plan-1"},
 	}
+
+	planID := run.Plan.GetID()
 
 	type testCase struct {
 		authError         error
@@ -3084,8 +877,6 @@ func TestProcessPlanData(t *testing.T) {
 		expectErrorCode   errors.CodeType
 		tfPlan            *tfjson.Plan
 		tfProviderSchemas *tfjson.ProviderSchemas
-		expectedPlan      *models.Plan
-		expectDiff        *plan.Diff
 	}
 
 	testCases := []testCase{
@@ -3107,24 +898,6 @@ func TestProcessPlanData(t *testing.T) {
 			tfProviderSchemas: &tfjson.ProviderSchemas{
 				FormatVersion: "0.1",
 			},
-			expectedPlan: &models.Plan{
-				Metadata: models.ResourceMetadata{
-					ID: planID,
-				},
-				WorkspaceID: workspaceID,
-				Summary: models.PlanSummary{
-					OutputAdditions: 1,
-				},
-				PlanDiffSize: 126,
-			},
-			expectDiff: &plan.Diff{
-				Outputs: []*plan.OutputDiff{
-					{
-						OutputName: "test",
-						Action:     action.Create,
-					},
-				},
-			},
 		},
 	}
 
@@ -3136,74 +909,28 @@ func TestProcessPlanData(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			mockRuns := db.NewMockRuns(t)
-			mockPlans := db.NewMockPlans(t)
-			mockTransactions := db.NewMockTransactions(t)
-
-			mockArtifactStore := workspace.NewMockArtifactStore(t)
-
-			mockParser := plan.NewMockParser(t)
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(test.authError)
 
-			mockRuns.On("GetRunByPlanID", mock.Anything, run.PlanID).Return(run, nil).Maybe()
-
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-
-			if test.authError == nil {
-				mockParser.On("Parse", test.tfPlan, test.tfProviderSchemas).Return(test.expectDiff, nil)
-
-				mockPlans.On("GetPlanByID", mock.Anything, run.PlanID).Return(&models.Plan{
-					Metadata: models.ResourceMetadata{
-						ID: planID,
-					},
-					WorkspaceID: workspaceID,
-				}, nil)
-				mockPlans.On("UpdatePlan", mock.Anything, test.expectedPlan).Return(test.expectedPlan, nil)
-
-				planDiffMatcher := mock.MatchedBy(func(reader io.Reader) bool {
-					actual, err := io.ReadAll(reader)
-					require.NoError(t, err)
-
-					expected, err := json.Marshal(test.expectDiff)
-					require.NoError(t, err)
-
-					return string(actual) == string(expected)
-				})
-				mockArtifactStore.On("UploadPlanDiff", mock.Anything, run, planDiffMatcher).Return(nil)
-
-				planJSONMatcher := mock.MatchedBy(func(reader io.Reader) bool {
-					actual, err := io.ReadAll(reader)
-					require.NoError(t, err)
-
-					expected, err := json.Marshal(test.tfPlan)
-					require.NoError(t, err)
-
-					return string(actual) == string(expected)
-				})
-				mockArtifactStore.On("UploadPlanJSON", mock.Anything, run, planJSONMatcher).Return(nil)
-
-				mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
-			}
-
 			dbClient := &db.Client{
-				Runs:         mockRuns,
-				Plans:        mockPlans,
-				Transactions: mockTransactions,
+				Runs: mockRuns,
 			}
 
-			logger, _ := logger.NewForTest()
+			mockCmdProcessor := engine.NewMockCmdProcessor(t)
+			mockCmdProcessor.On("ProcessCommand", mock.Anything, mock.Anything).Return(nil).Maybe()
+
+			testLogger, _ := logger.NewForTest()
 
 			service := &service{
-				dbClient:        dbClient,
-				artifactStore:   mockArtifactStore,
-				runStateManager: state.NewRunStateManager(dbClient, logger),
-				planParser:      mockParser,
+				logger:       testLogger,
+				dbClient:     dbClient,
+				cmdProcessor: mockCmdProcessor,
+				cmdFactory:   &commands.Factory{},
 			}
 
-			err := service.ProcessPlanData(auth.WithCaller(ctx, mockCaller), run.PlanID, test.tfPlan, test.tfProviderSchemas)
+			err := service.ProcessPlanData(auth.WithCaller(ctx, mockCaller), planID, test.tfPlan, test.tfProviderSchemas)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -3254,7 +981,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 			},
 			expectedEvents: []Event{
 				{
-					Run: models.Run{
+					Run: &models.Run{
 						Metadata: models.ResourceMetadata{
 							ID: "run1",
 						},
@@ -3262,7 +989,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 					Action: "UPDATE",
 				},
 				{
-					Run: models.Run{
+					Run: &models.Run{
 						Metadata: models.ResourceMetadata{
 							ID: "run2",
 						},
@@ -3296,7 +1023,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 			},
 			expectedEvents: []Event{
 				{
-					Run: models.Run{
+					Run: &models.Run{
 						Metadata: models.ResourceMetadata{
 							ID: "run1",
 						},
@@ -3340,7 +1067,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 			nilWorkspaceID: true,
 			expectedEvents: []Event{
 				{
-					Run: models.Run{
+					Run: &models.Run{
 						Metadata: models.ResourceMetadata{
 							ID: "run1",
 						},
@@ -3348,7 +1075,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 					Action: "UPDATE",
 				},
 				{
-					Run: models.Run{
+					Run: &models.Run{
 						Metadata: models.ResourceMetadata{
 							ID: "run2",
 						},
@@ -3385,7 +1112,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 			},
 			expectedEvents: []Event{
 				{
-					Run: models.Run{
+					Run: &models.Run{
 						Metadata: models.ResourceMetadata{
 							ID: "run1",
 						},
@@ -3631,7 +1358,6 @@ func TestCallerHasRootNamespaceAccess(t *testing.T) {
 
 func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 	runID := "run-1"
-	planID := "plan-1"
 
 	type testCase struct {
 		name            string
@@ -3647,7 +1373,7 @@ func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: runID,
 				},
-				PlanID: planID,
+				Plan: models.Plan{ID: "plan-1"},
 			},
 		},
 		{
@@ -3656,7 +1382,7 @@ func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: runID,
 				},
-				PlanID: planID,
+				Plan: models.Plan{ID: "plan-1"},
 			},
 			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
@@ -3676,7 +1402,7 @@ func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockArtifactStore := workspace.NewMockArtifactStore(t)
 
-			sampleVariables := []Variable{
+			sampleVariables := []runvariables.Variable{
 				{
 					Key:           "my_var",
 					Value:         ptr.String("my value"),
@@ -3741,346 +1467,12 @@ func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 	}
 }
 
-func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
-	testSubject := "tester"
-	currentTime := time.Now()
-
-	stateVersionID := "sv1"
-	planID := "plan1"
-
-	moduleSource := "mymodule"
-	configurationVersionID := "cv1"
-
-	ws := &models.Workspace{
-		Metadata: models.ResourceMetadata{
-			ID: "ws1",
-		},
-		FullPath:              "groupA/ws1",
-		CurrentStateVersionID: stateVersionID,
-		MaxJobDuration:        ptr.Int32(60),
-		RunnerTags:            []string{},
-	}
-
-	// Test cases
-	tests := []struct {
-		input              *CreateAssessmentRunForWorkspaceInput
-		stateVersion       *models.StateVersion
-		currentRun         *models.Run
-		existingAssessment *models.WorkspaceAssessment
-		expectCreateRun    *models.Run
-		name               string
-		authError          error
-		expectErrorCode    errors.CodeType
-	}{
-		{
-			name: "create assessment run for workspace with no existing assessment",
-			input: &CreateAssessmentRunForWorkspaceInput{
-				WorkspaceID: ws.Metadata.ID,
-			},
-			stateVersion: &models.StateVersion{
-				Metadata: models.ResourceMetadata{
-					ID: stateVersionID,
-				},
-				WorkspaceID: ws.Metadata.ID,
-				RunID:       ptr.String("run1"),
-			},
-			currentRun: &models.Run{
-				Metadata: models.ResourceMetadata{
-					ID: "run1",
-				},
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-			},
-			expectCreateRun: &models.Run{
-				Metadata: models.ResourceMetadata{
-					ID:                "run2",
-					CreationTimestamp: &currentTime,
-				},
-				WorkspaceID:     ws.Metadata.ID,
-				ModuleSource:    &moduleSource,
-				IsAssessmentRun: true,
-			},
-		},
-		{
-			name: "create assessment run for workspace with existing assessment",
-			input: &CreateAssessmentRunForWorkspaceInput{
-				WorkspaceID:             ws.Metadata.ID,
-				LatestAssessmentVersion: ptr.Int(1),
-			},
-			stateVersion: &models.StateVersion{
-				Metadata: models.ResourceMetadata{
-					ID: stateVersionID,
-				},
-				WorkspaceID: ws.Metadata.ID,
-				RunID:       ptr.String("run1"),
-			},
-			currentRun: &models.Run{
-				Metadata: models.ResourceMetadata{
-					ID: "run1",
-				},
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-			},
-			existingAssessment: &models.WorkspaceAssessment{
-				Metadata: models.ResourceMetadata{
-					ID:      "assessment1",
-					Version: 1,
-				},
-				WorkspaceID:          ws.Metadata.ID,
-				StartedAtTimestamp:   currentTime,
-				CompletedAtTimestamp: &currentTime,
-			},
-			expectCreateRun: &models.Run{
-				Metadata: models.ResourceMetadata{
-					ID:                "run2",
-					CreationTimestamp: &currentTime,
-				},
-				WorkspaceID:     ws.Metadata.ID,
-				ModuleSource:    &moduleSource,
-				IsAssessmentRun: true,
-			},
-		},
-		{
-			name: "assessment version does not match version specified in the input",
-			input: &CreateAssessmentRunForWorkspaceInput{
-				WorkspaceID:             ws.Metadata.ID,
-				LatestAssessmentVersion: ptr.Int(1),
-			},
-			stateVersion: &models.StateVersion{
-				Metadata: models.ResourceMetadata{
-					ID: stateVersionID,
-				},
-				WorkspaceID: ws.Metadata.ID,
-				RunID:       ptr.String("run1"),
-			},
-			currentRun: &models.Run{
-				Metadata: models.ResourceMetadata{
-					ID: "run1",
-				},
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-			},
-			existingAssessment: &models.WorkspaceAssessment{
-				Metadata: models.ResourceMetadata{
-					ID:      "assessment1",
-					Version: 2,
-				},
-				WorkspaceID:          ws.Metadata.ID,
-				StartedAtTimestamp:   currentTime,
-				CompletedAtTimestamp: &currentTime,
-			},
-			expectErrorCode: errors.EConflict,
-		},
-		{
-			name: "assessment run is already in progress",
-			input: &CreateAssessmentRunForWorkspaceInput{
-				WorkspaceID:             ws.Metadata.ID,
-				LatestAssessmentVersion: ptr.Int(1),
-			},
-			stateVersion: &models.StateVersion{
-				Metadata: models.ResourceMetadata{
-					ID: stateVersionID,
-				},
-				WorkspaceID: ws.Metadata.ID,
-				RunID:       ptr.String("run1"),
-			},
-			currentRun: &models.Run{
-				Metadata: models.ResourceMetadata{
-					ID: "run1",
-				},
-				WorkspaceID:  ws.Metadata.ID,
-				ModuleSource: &moduleSource,
-			},
-			existingAssessment: &models.WorkspaceAssessment{
-				Metadata: models.ResourceMetadata{
-					ID:      "assessment1",
-					Version: 1,
-				},
-				WorkspaceID:        ws.Metadata.ID,
-				StartedAtTimestamp: currentTime,
-			},
-			expectErrorCode: errors.EConflict,
-		},
-		{
-			name: "cannot create assessment run if state version was created manually",
-			input: &CreateAssessmentRunForWorkspaceInput{
-				WorkspaceID: ws.Metadata.ID,
-			},
-			stateVersion: &models.StateVersion{
-				Metadata: models.ResourceMetadata{
-					ID: stateVersionID,
-				},
-				WorkspaceID: ws.Metadata.ID,
-			},
-			expectErrorCode: errors.EConflict,
-		},
-		{
-			name: "expect authorization error",
-			input: &CreateAssessmentRunForWorkspaceInput{
-				WorkspaceID: ws.Metadata.ID,
-			},
-			authError:       errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode: errors.EForbidden,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			// Setup mocks
-			dbClient := buildDBClientWithMocks(t)
-			mockArtifactStore := workspace.NewMockArtifactStore(t)
-			mockModuleResolver := registry.NewMockModuleResolver(t)
-			mockActivityEvents := activityevent.NewMockService(t)
-			mockCaller := auth.NewMockCaller(t)
-
-			ctx = auth.WithCaller(ctx, mockCaller)
-
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return(testSubject).Maybe()
-
-			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-
-			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil).Maybe()
-			dbClient.MockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(test.stateVersion, nil).Maybe()
-
-			if test.stateVersion != nil && test.stateVersion.RunID != nil {
-				dbClient.MockRuns.On("GetRunByID", mock.Anything, *test.stateVersion.RunID).Return(test.currentRun, nil).Maybe()
-			}
-
-			runVariablesJSON, err := json.Marshal([]Variable{
-				{Key: "k1", Value: ptr.String("v1"), Category: models.TerraformVariableCategory},
-			})
-
-			if test.currentRun != nil {
-				require.NoError(t, err)
-				mockArtifactStore.On("GetRunVariables", mock.Anything, test.currentRun).Return(io.NopCloser(bytes.NewReader(runVariablesJSON)), nil).Maybe()
-			}
-
-			dbClient.MockWorkspaceAssessments.On("GetWorkspaceAssessmentByWorkspaceID", mock.Anything, test.input.WorkspaceID).Return(test.existingAssessment, nil).Maybe()
-
-			if test.existingAssessment == nil {
-				dbClient.MockWorkspaceAssessments.On("CreateWorkspaceAssessment", mock.Anything, mock.Anything).Return(nil, nil)
-			} else {
-				matcher := mock.MatchedBy(func(assessment *models.WorkspaceAssessment) bool {
-					return assessment.CompletedAtTimestamp == nil
-				})
-				dbClient.MockWorkspaceAssessments.On("UpdateWorkspaceAssessment", mock.Anything, matcher).Return(nil, nil).Maybe()
-			}
-
-			if test.expectErrorCode == "" {
-				dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-				dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).
-					Return([]models.ManagedIdentity{}, nil)
-
-				dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
-					Return(func(_ context.Context, run *models.Run) (*models.Run, error) {
-						run.Metadata.CreationTimestamp = &currentTime
-						run.Metadata.ID = test.expectCreateRun.Metadata.ID
-						return run, nil
-					}, nil)
-				dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
-					Return(&db.RunsResult{
-						PageInfo: &pagination.PageInfo{
-							TotalCount: pagination.StaticCount(1),
-						},
-					}, nil)
-				dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
-
-				dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
-					Return(&models.ResourceLimit{Value: 10}, nil)
-
-				if test.currentRun.ConfigurationVersionID != nil {
-					dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).
-						Return(&models.ConfigurationVersion{
-							Speculative: false,
-						}, nil)
-				}
-
-				dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
-					Metadata: models.ResourceMetadata{
-						ID: planID,
-					},
-				}, nil)
-
-				dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).
-					Return(func(_ context.Context, _ *models.Job) (*models.Job, error) {
-						return &models.Job{
-							Metadata: models.ResourceMetadata{
-								ID: "job1",
-							},
-							WorkspaceID: ws.Metadata.ID,
-						}, nil
-					}, nil)
-
-				dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
-
-				matcher := mock.MatchedBy(func(run *models.Run) bool {
-					return run.Metadata.ID == test.expectCreateRun.Metadata.ID
-				})
-				mockArtifactStore.On("UploadRunVariables", mock.Anything, matcher, bytes.NewReader(runVariablesJSON)).Return(nil)
-
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
-				mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(nil, registry.ErrRemoteModuleSource).Maybe()
-			}
-
-			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
-			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
-
-			// Create test fixture
-			logger, _ := logger.NewForTest()
-			testService := service{
-				logger:                    logger,
-				dbClient:                  dbClient.Client,
-				artifactStore:             mockArtifactStore,
-				activityService:           mockActivityEvents,
-				moduleResolver:            mockModuleResolver,
-				limitChecker:              limits.NewLimitChecker(dbClient.Client),
-				inheritedSettingsResolver: mockInheritedSettingsResolver,
-			}
-
-			// Invoke test method
-			run, err := testService.CreateAssessmentRunForWorkspace(ctx, test.input)
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
-
-			// Assertions
-			require.NoError(t, err)
-
-			assert.True(t, run.IsAssessmentRun)
-			assert.True(t, run.Speculative())
-			assert.Equal(t, test.expectCreateRun.WorkspaceID, run.WorkspaceID)
-			assert.Equal(t, test.expectCreateRun.ModuleSource, run.ModuleSource)
-			assert.Equal(t, test.expectCreateRun.ModuleVersion, run.ModuleVersion)
-			assert.Equal(t, test.expectCreateRun.ConfigurationVersionID, run.ConfigurationVersionID)
-		})
-	}
-}
-
 func TestUpdateApply(t *testing.T) {
 	applyID := "apply-1"
-	workspaceID := "ws-1"
-
-	sampleApply := &models.Apply{
-		Metadata: models.ResourceMetadata{
-			ID: applyID,
-		},
-		WorkspaceID: workspaceID,
-		Status:      models.ApplyPending,
-	}
 
 	testCases := []struct {
 		name            string
 		input           *UpdateApplyInput
-		expectApply     *models.Apply
 		authError       error
 		expectErrorCode errors.CodeType
 	}{
@@ -4088,13 +1480,6 @@ func TestUpdateApply(t *testing.T) {
 			name: "update apply with valid UTF-8 error message",
 			input: &UpdateApplyInput{
 				ApplyID:      applyID,
-				Status:       models.ApplyErrored,
-				ErrorMessage: ptr.String("Valid UTF-8 error message"),
-			},
-			expectApply: &models.Apply{
-				Metadata:     sampleApply.Metadata,
-				WorkspaceID:  sampleApply.WorkspaceID,
-				Status:       models.ApplyErrored,
 				ErrorMessage: ptr.String("Valid UTF-8 error message"),
 			},
 		},
@@ -4102,35 +1487,20 @@ func TestUpdateApply(t *testing.T) {
 			name: "update apply with invalid UTF-8 error message gets sanitized",
 			input: &UpdateApplyInput{
 				ApplyID:      applyID,
-				Status:       models.ApplyErrored,
 				ErrorMessage: ptr.String("Invalid UTF-8: \xff\xfe\xfd"),
-			},
-			expectApply: &models.Apply{
-				Metadata:     sampleApply.Metadata,
-				WorkspaceID:  sampleApply.WorkspaceID,
-				Status:       models.ApplyErrored,
-				ErrorMessage: ptr.String("Invalid UTF-8: �"),
 			},
 		},
 		{
 			name: "update apply with mixed valid and invalid UTF-8",
 			input: &UpdateApplyInput{
 				ApplyID:      applyID,
-				Status:       models.ApplyErrored,
 				ErrorMessage: ptr.String("Valid text \xff invalid \xfe more valid text"),
-			},
-			expectApply: &models.Apply{
-				Metadata:     sampleApply.Metadata,
-				WorkspaceID:  sampleApply.WorkspaceID,
-				Status:       models.ApplyErrored,
-				ErrorMessage: ptr.String("Valid text � invalid � more valid text"),
 			},
 		},
 		{
 			name: "update apply without permission",
 			input: &UpdateApplyInput{
 				ApplyID:      applyID,
-				Status:       models.ApplyErrored,
 				ErrorMessage: ptr.String("Error message"),
 			},
 			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
@@ -4143,31 +1513,30 @@ func TestUpdateApply(t *testing.T) {
 			ctx := t.Context()
 
 			mockCaller := auth.NewMockCaller(t)
-			mockApplies := db.NewMockApplies(t)
-			mockRunStateManager := state.NewMockRunStateManager(t)
+			mockRuns := db.NewMockRuns(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateApplyPermission, mock.Anything).Return(test.authError)
 
-			if test.authError == nil {
-				mockApplies.On("GetApplyByID", mock.Anything, test.input.ApplyID).Return(sampleApply, nil)
-			}
-
-			if test.expectErrorCode == "" {
-				mockRunStateManager.On("UpdateApply", mock.Anything, mock.Anything).
-					Return(func(_ context.Context, apply *models.Apply) (*models.Apply, error) {
-						return apply, nil
-					})
-			}
-
 			dbClient := &db.Client{
-				Applies: mockApplies,
+				Runs: mockRuns,
+			}
+
+			mockCmdProcessor := engine.NewMockCmdProcessor(t)
+			if test.authError == nil {
+				// Simulate the processor executing the command and populating its result.
+				mockCmdProcessor.On("ProcessCommand", mock.Anything, mock.Anything).
+					Run(func(args mock.Arguments) {
+						cmd := args.Get(1).(*commands.UpdateApply)
+						cmd.Updated = &models.Apply{ID: cmd.ApplyID, Status: models.ApplyErrored}
+					}).Return(nil)
 			}
 
 			logger, _ := logger.NewForTest()
 			service := &service{
-				dbClient:        dbClient,
-				logger:          logger,
-				runStateManager: mockRunStateManager,
+				dbClient:     dbClient,
+				cmdProcessor: mockCmdProcessor,
+				cmdFactory:   &commands.Factory{},
+				logger:       logger,
 			}
 
 			result, err := service.UpdateApply(auth.WithCaller(ctx, mockCaller), test.input)
@@ -4185,20 +1554,10 @@ func TestUpdateApply(t *testing.T) {
 
 func TestUpdatePlan(t *testing.T) {
 	planID := "plan-1"
-	workspaceID := "ws-1"
-
-	samplePlan := &models.Plan{
-		Metadata: models.ResourceMetadata{
-			ID: planID,
-		},
-		WorkspaceID: workspaceID,
-		Status:      models.PlanPending,
-	}
 
 	testCases := []struct {
 		name            string
 		input           *UpdatePlanInput
-		expectPlan      *models.Plan
 		authError       error
 		expectErrorCode errors.CodeType
 	}{
@@ -4206,14 +1565,6 @@ func TestUpdatePlan(t *testing.T) {
 			name: "update plan with valid UTF-8 error message",
 			input: &UpdatePlanInput{
 				PlanID:       planID,
-				Status:       models.PlanErrored,
-				HasChanges:   true,
-				ErrorMessage: ptr.String("Valid UTF-8 error message"),
-			},
-			expectPlan: &models.Plan{
-				Metadata:     samplePlan.Metadata,
-				WorkspaceID:  samplePlan.WorkspaceID,
-				Status:       models.PlanErrored,
 				HasChanges:   true,
 				ErrorMessage: ptr.String("Valid UTF-8 error message"),
 			},
@@ -4222,39 +1573,22 @@ func TestUpdatePlan(t *testing.T) {
 			name: "update plan with invalid UTF-8 error message gets sanitized",
 			input: &UpdatePlanInput{
 				PlanID:       planID,
-				Status:       models.PlanErrored,
 				HasChanges:   false,
 				ErrorMessage: ptr.String("Invalid UTF-8: \xff\xfe\xfd"),
-			},
-			expectPlan: &models.Plan{
-				Metadata:     samplePlan.Metadata,
-				WorkspaceID:  samplePlan.WorkspaceID,
-				Status:       models.PlanErrored,
-				HasChanges:   true,
-				ErrorMessage: ptr.String("Invalid UTF-8: �"),
 			},
 		},
 		{
 			name: "update plan with mixed valid and invalid UTF-8",
 			input: &UpdatePlanInput{
 				PlanID:       planID,
-				Status:       models.PlanErrored,
 				HasChanges:   false,
 				ErrorMessage: ptr.String("Valid text \xff invalid \xfe more valid text"),
-			},
-			expectPlan: &models.Plan{
-				Metadata:     samplePlan.Metadata,
-				WorkspaceID:  samplePlan.WorkspaceID,
-				Status:       models.PlanErrored,
-				HasChanges:   true,
-				ErrorMessage: ptr.String("Valid text � invalid � more valid text"),
 			},
 		},
 		{
 			name: "update plan without permission",
 			input: &UpdatePlanInput{
 				PlanID:       planID,
-				Status:       models.PlanErrored,
 				HasChanges:   false,
 				ErrorMessage: ptr.String("Error message"),
 			},
@@ -4268,31 +1602,30 @@ func TestUpdatePlan(t *testing.T) {
 			ctx := t.Context()
 
 			mockCaller := auth.NewMockCaller(t)
-			mockPlans := db.NewMockPlans(t)
-			mockRunStateManager := state.NewMockRunStateManager(t)
+			mockRuns := db.NewMockRuns(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(test.authError)
 
-			if test.authError == nil {
-				mockPlans.On("GetPlanByID", mock.Anything, test.input.PlanID).Return(samplePlan, nil)
-			}
-
-			if test.expectErrorCode == "" {
-				mockRunStateManager.On("UpdatePlan", mock.Anything, mock.Anything).
-					Return(func(_ context.Context, plan *models.Plan) (*models.Plan, error) {
-						return plan, nil
-					})
-			}
-
 			dbClient := &db.Client{
-				Plans: mockPlans,
+				Runs: mockRuns,
+			}
+
+			mockCmdProcessor := engine.NewMockCmdProcessor(t)
+			if test.authError == nil {
+				// Simulate the processor executing the command and populating its result.
+				mockCmdProcessor.On("ProcessCommand", mock.Anything, mock.Anything).
+					Run(func(args mock.Arguments) {
+						cmd := args.Get(1).(*commands.UpdatePlan)
+						cmd.Updated = &models.Plan{ID: cmd.PlanID, Status: models.PlanErrored, HasChanges: cmd.HasChanges}
+					}).Return(nil)
 			}
 
 			logger, _ := logger.NewForTest()
 			service := &service{
-				dbClient:        dbClient,
-				logger:          logger,
-				runStateManager: mockRunStateManager,
+				dbClient:     dbClient,
+				cmdProcessor: mockCmdProcessor,
+				cmdFactory:   &commands.Factory{},
+				logger:       logger,
 			}
 
 			result, err := service.UpdatePlan(auth.WithCaller(ctx, mockCaller), test.input)
@@ -4405,6 +1738,448 @@ func TestCreateRunInputValidate(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+// TestRunCreationAuthorization verifies that the run-creation methods all deny
+// callers that lack CreateRunPermission. Each case exercises a single method via
+// its call closure.
+func TestRunCreationAuthorization(t *testing.T) {
+	type testCase struct {
+		call            func(context.Context, *service) error
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "CreateRun: subject is not authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.CreateRun(ctx, &CreateRunInput{WorkspaceID: "workspace-1"})
+				return err
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "CreateAssessmentRunForWorkspace: subject is not authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.CreateAssessmentRunForWorkspace(ctx, &CreateAssessmentRunForWorkspaceInput{WorkspaceID: "workspace-1"})
+				return err
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "CreateDestroyRunForWorkspace: subject is not authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.CreateDestroyRunForWorkspace(ctx, &CreateDestroyRunForWorkspaceInput{WorkspaceID: "workspace-1"})
+				return err
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "CreateReconcileRunForWorkspace: subject is not authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.CreateReconcileRunForWorkspace(ctx, &CreateReconcileRunForWorkspaceInput{WorkspaceID: "workspace-1"})
+				return err
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "CreateRun: subject is authorized",
+			call: func(ctx context.Context, s *service) error {
+				// A valid input needs exactly one of configuration version / module source.
+				_, err := s.CreateRun(ctx, &CreateRunInput{WorkspaceID: "workspace-1", ConfigurationVersionID: ptr.String("cv-1")})
+				return err
+			},
+		},
+		{
+			name: "CreateAssessmentRunForWorkspace: subject is authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.CreateAssessmentRunForWorkspace(ctx, &CreateAssessmentRunForWorkspaceInput{WorkspaceID: "workspace-1"})
+				return err
+			},
+		},
+		{
+			name: "CreateDestroyRunForWorkspace: subject is authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.CreateDestroyRunForWorkspace(ctx, &CreateDestroyRunForWorkspaceInput{WorkspaceID: "workspace-1"})
+				return err
+			},
+		},
+		{
+			name: "CreateReconcileRunForWorkspace: subject is authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.CreateReconcileRunForWorkspace(ctx, &CreateReconcileRunForWorkspaceInput{WorkspaceID: "workspace-1"})
+				return err
+			},
+		},
+	}
+
+	sampleRun := &models.Run{Metadata: models.ResourceMetadata{ID: "run-1"}, WorkspaceID: "workspace-1"}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(test.authError)
+			// Some run-creation methods stamp the run with the caller's subject.
+			mockCaller.On("GetSubject").Return("user@example.com").Maybe()
+
+			testLogger, _ := logger.NewForTest()
+			mockProcessor := engine.NewMockCmdProcessor(t)
+			if test.authError == nil {
+				// On the authorized path the command is dispatched; populate the
+				// command's result the way the real processor would so the method
+				// can read/log the created run.
+				mockProcessor.On("ProcessCommand", mock.Anything, mock.Anything).
+					Run(func(args mock.Arguments) {
+						switch c := args.Get(1).(type) {
+						case *commands.CreateRun:
+							c.Created = sampleRun
+						case *commands.CreateAssessmentRun:
+							c.Created = sampleRun
+						case *commands.CreateDestroyRun:
+							c.Created = sampleRun
+						case *commands.CreateReconcileRun:
+							c.Created = sampleRun
+						}
+					}).Return(nil)
+			}
+
+			service := &service{
+				logger:       testLogger,
+				dbClient:     &db.Client{},
+				cmdProcessor: mockProcessor,
+				cmdFactory:   commands.NewFactory(testLogger, &db.Client{}, nil, nil, nil, "", nil, nil),
+			}
+
+			err := test.call(auth.WithCaller(context.Background(), mockCaller), service)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestRunMutationAuthorization(t *testing.T) {
+	// Every run-mutation entrypoint authorizes through authorizeRunMutation, which
+	// fetches the run and then requires CreateRunPermission on its workspace. A denied
+	// caller must short-circuit before any command is processed.
+	type testCase struct {
+		call            func(context.Context, *service) error
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "ApplyRun: subject is not authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.ApplyRun(ctx, "run-1", nil)
+				return err
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "SetRunAutoApply: subject is not authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.SetRunAutoApply(ctx, "run-1", true)
+				return err
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "CancelRun: subject is not authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.CancelRun(ctx, &CancelRunInput{RunID: "run-1"})
+				return err
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "RetryRunNode: subject is not authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.RetryRunNode(ctx, &RetryRunNodeInput{RunID: "run-1"})
+				return err
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "DiscardRun: subject is not authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.DiscardRun(ctx, &DiscardRunInput{RunID: "run-1"})
+				return err
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "UndiscardRun: subject is not authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.UndiscardRun(ctx, &UndiscardRunInput{RunID: "run-1"})
+				return err
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "ApplyRun: subject is authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.ApplyRun(ctx, "run-1", nil)
+				return err
+			},
+		},
+		{
+			name: "SetRunAutoApply: subject is authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.SetRunAutoApply(ctx, "run-1", true)
+				return err
+			},
+		},
+		{
+			name: "CancelRun: subject is authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.CancelRun(ctx, &CancelRunInput{RunID: "run-1"})
+				return err
+			},
+		},
+		{
+			name: "RetryRunNode: subject is authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.RetryRunNode(ctx, &RetryRunNodeInput{RunID: "run-1"})
+				return err
+			},
+		},
+		{
+			name: "DiscardRun: subject is authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.DiscardRun(ctx, &DiscardRunInput{RunID: "run-1"})
+				return err
+			},
+		},
+		{
+			name: "UndiscardRun: subject is authorized",
+			call: func(ctx context.Context, s *service) error {
+				_, err := s.UndiscardRun(ctx, &UndiscardRunInput{RunID: "run-1"})
+				return err
+			},
+		},
+	}
+
+	sampleRun := &models.Run{Metadata: models.ResourceMetadata{ID: "run-1"}, WorkspaceID: "workspace-1", Status: models.RunApplied}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockRuns := db.NewMockRuns(t)
+			// authorizeRunMutation fetches the run before checking the permission.
+			mockRuns.On("GetRunByID", mock.Anything, "run-1").Return(sampleRun, nil)
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(test.authError)
+			// Some run-mutation methods stamp the command with the caller's subject.
+			mockCaller.On("GetSubject").Return("user@example.com").Maybe()
+
+			testLogger, _ := logger.NewForTest()
+			mockProcessor := engine.NewMockCmdProcessor(t)
+			if test.authError == nil {
+				// On the authorized path the mutation command is dispatched; populate
+				// its Updated result the way the real processor would.
+				mockProcessor.On("ProcessCommand", mock.Anything, mock.Anything).
+					Run(func(args mock.Arguments) {
+						switch c := args.Get(1).(type) {
+						case *commands.StartApply:
+							c.Updated = sampleRun
+						case *commands.SetRunAutoApply:
+							c.Updated = sampleRun
+						case *commands.CancelRun:
+							c.Updated = sampleRun
+						case *commands.RetryRunNode:
+							c.Updated = sampleRun
+						case *commands.DiscardRun:
+							c.Updated = sampleRun
+						case *commands.UndiscardRun:
+							c.Updated = sampleRun
+						}
+					}).Return(nil)
+			}
+
+			service := &service{
+				logger:       testLogger,
+				dbClient:     &db.Client{Runs: mockRuns},
+				cmdProcessor: mockProcessor,
+				cmdFactory:   commands.NewFactory(testLogger, &db.Client{}, nil, nil, nil, "", nil, nil),
+			}
+
+			err := test.call(auth.WithCaller(context.Background(), mockCaller), service)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestGetRunByNodeID(t *testing.T) {
+	sampleRun := &models.Run{
+		Metadata:    models.ResourceMetadata{ID: "run-id-1"},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject is not authorized",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockRuns.On("GetRunByNodeID", mock.Anything, "node-1").Return(sampleRun, nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+
+			service := &service{
+				dbClient: &db.Client{Runs: mockRuns},
+			}
+
+			_, err := service.GetRunByNodeID(auth.WithCaller(context.Background(), mockCaller), "node-1")
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestGetRunsByIDs(t *testing.T) {
+	sampleRun := &models.Run{
+		Metadata:    models.ResourceMetadata{ID: "run-id-1"},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject is not authorized",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockRuns.On("GetRuns", mock.Anything, mock.Anything).Return(&db.RunsResult{Runs: []*models.Run{sampleRun}}, nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+
+			service := &service{
+				dbClient: &db.Client{Runs: mockRuns},
+			}
+
+			_, err := service.GetRunsByIDs(auth.WithCaller(context.Background(), mockCaller), []string{"run-id-1"})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestDownloadPlan(t *testing.T) {
+	sampleRun := &models.Run{
+		Metadata:    models.ResourceMetadata{ID: "run-id-1"},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject is not authorized",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+
+			mockRuns.On("GetRunByNodeID", mock.Anything, "plan-1").Return(sampleRun, nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			if test.expectErrorCode == "" {
+				// On the authorized path the plan cache is streamed from the artifact store.
+				mockArtifactStore.On("GetPlanCache", mock.Anything, sampleRun).
+					Return(io.NopCloser(strings.NewReader("plan-data")), nil)
+			}
+
+			service := &service{
+				dbClient:      &db.Client{Runs: mockRuns},
+				artifactStore: mockArtifactStore,
+			}
+
+			_, err := service.DownloadPlan(auth.WithCaller(context.Background(), mockCaller), "plan-1")
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }

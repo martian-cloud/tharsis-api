@@ -269,7 +269,8 @@ func TestGetSCIMUsers(t *testing.T) {
 				Users: &mockUsers,
 			}
 
-			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
 			users, err := service.GetSCIMUsers(ctx, test.input)
 			if test.expectedError != "" {
@@ -374,7 +375,8 @@ func TestCreateSCIMUser(t *testing.T) {
 
 			scimCaller := auth.NewSCIMCaller(dbClient, mockMaintenanceMonitor, "https://example.com/scim")
 
-			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
 			user, err := service.CreateSCIMUser(auth.WithCaller(ctx, scimCaller), test.input)
 			if err != nil {
@@ -525,7 +527,8 @@ func TestUpdateSCIMUser(t *testing.T) {
 
 			scimCaller := auth.NewSCIMCaller(dbClient, mockMaintenanceMonitor, "https://example.com/scim")
 
-			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
 			user, err := service.UpdateSCIMUser(auth.WithCaller(ctx, scimCaller), test.input)
 			if test.expectedErrorCode != "" {
@@ -598,7 +601,8 @@ func TestDeleteSCIMUser(t *testing.T) {
 				Users: &mockUsers,
 			}
 
-			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
 			err := service.DeleteSCIMUser(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -676,7 +680,8 @@ func TestGetSCIMGroups(t *testing.T) {
 				Teams: &mockTeams,
 			}
 
-			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
 			groups, err := service.GetSCIMGroups(ctx, test.input)
 			if test.expectedError != "" {
@@ -745,7 +750,8 @@ func TestCreateSCIMGroup(t *testing.T) {
 				Teams: &mockTeams,
 			}
 
-			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
 			group, err := service.CreateSCIMGroup(auth.WithCaller(ctx, &mockCaller), test.input)
 			if err != nil {
@@ -982,7 +988,8 @@ func TestUpdateSCIMGroup(t *testing.T) {
 				Transactions: &mockTransactions,
 			}
 
-			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
 			input := &UpdateResourceInput{
 				ID:         test.inputID,
@@ -1058,7 +1065,8 @@ func TestDeleteSCIMGroup(t *testing.T) {
 				Teams: &mockTeams,
 			}
 
-			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
 			err := service.DeleteSCIMGroup(ctx, test.input)
 			if test.expectedErrorCode != "" {

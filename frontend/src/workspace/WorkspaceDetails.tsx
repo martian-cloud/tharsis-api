@@ -36,7 +36,6 @@ const runSubscription = graphql`subscription WorkspaceDetailsRunSubscription($in
 
 const workspaceSubscription = graphql`subscription WorkspaceDetailsWorkspaceEventSubscription($input: WorkspaceSubscriptionInput!) {
   workspaceEvents(input: $input) {
-      action
       workspace {
           id
           ...WorkspaceDetailsIndexFragment_workspace

@@ -14,6 +14,13 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
+// jobWithStatus sets the initial status on a freshly constructed test job. It is
+// valid from the job's zero value, so the error is intentionally ignored.
+func jobWithStatus(j *models.Job, status models.JobStatus) *models.Job {
+	_ = j.SetStatus(status)
+	return j
+}
+
 // getValue implements the sortableField interface for JobSortableField
 func (j JobSortableField) getValue() string {
 	return string(j)
@@ -75,12 +82,11 @@ func TestJobs_CreateJob(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+			job, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 				WorkspaceID: workspace.Metadata.ID,
 				RunID:       test.runID,
 				Type:        test.jobType,
-				Status:      test.status,
-			})
+			}, test.status))
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -92,7 +98,7 @@ func TestJobs_CreateJob(t *testing.T) {
 
 			assert.Equal(t, test.runID, job.RunID)
 			assert.Equal(t, test.jobType, job.Type)
-			assert.Equal(t, test.status, job.Status)
+			assert.Equal(t, test.status, job.GetStatus())
 			assert.NotEmpty(t, job.Metadata.ID)
 		})
 	}
@@ -128,12 +134,11 @@ func TestJobs_UpdateJob(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-	createdJob, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	createdJob, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		WorkspaceID: workspace.Metadata.ID,
 		RunID:       run.Metadata.ID,
 		Type:        models.JobPlanType,
-		Status:      models.JobQueued,
-	})
+	}, models.JobQueued))
 	require.Nil(t, err)
 
 	type testCase struct {
@@ -147,13 +152,14 @@ func TestJobs_UpdateJob(t *testing.T) {
 		{
 			name:    "update job",
 			version: createdJob.Metadata.Version,
-			status:  models.JobRunning,
+			// queued -> pending is the valid next transition (queued -> running is not).
+			status: models.JobPending,
 		},
 		{
 			name:            "update will fail because resource version doesn't match",
 			expectErrorCode: errors.EOptimisticLock,
 			version:         -1,
-			status:          models.JobFinished,
+			status:          models.JobCanceled,
 		},
 	}
 
@@ -161,7 +167,7 @@ func TestJobs_UpdateJob(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			jobToUpdate := *createdJob
 			jobToUpdate.Metadata.Version = test.version
-			jobToUpdate.Status = test.status
+			_ = jobToUpdate.SetStatus(test.status)
 
 			updatedJob, err := testClient.client.Jobs.UpdateJob(ctx, &jobToUpdate)
 
@@ -173,7 +179,7 @@ func TestJobs_UpdateJob(t *testing.T) {
 			require.Nil(t, err)
 			require.NotNil(t, updatedJob)
 
-			assert.Equal(t, test.status, updatedJob.Status)
+			assert.Equal(t, test.status, updatedJob.GetStatus())
 			assert.Equal(t, createdJob.Metadata.Version+1, updatedJob.Metadata.Version)
 		})
 	}
@@ -210,12 +216,11 @@ func TestJobs_GetJobByID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a job for testing
-	createdJob, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	createdJob, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		WorkspaceID: workspace.Metadata.ID,
 		RunID:       run.Metadata.ID,
 		Type:        models.JobPlanType,
-		Status:      models.JobQueued,
-	})
+	}, models.JobQueued))
 	require.NoError(t, err)
 
 	type testCase struct {
@@ -293,18 +298,16 @@ func TestJobs_GetJobs(t *testing.T) {
 
 	// Create test jobs
 	jobs := []models.Job{
-		{
+		*jobWithStatus(&models.Job{
 			WorkspaceID: workspace.Metadata.ID,
 			RunID:       run.Metadata.ID,
 			Type:        models.JobPlanType,
-			Status:      models.JobQueued,
-		},
-		{
+		}, models.JobQueued),
+		*jobWithStatus(&models.Job{
 			WorkspaceID: workspace.Metadata.ID,
 			RunID:       run.Metadata.ID,
 			Type:        models.JobApplyType,
-			Status:      models.JobRunning,
-		},
+		}, models.JobRunning),
 	}
 
 	createdJobs := []models.Job{}
@@ -313,6 +316,8 @@ func TestJobs_GetJobs(t *testing.T) {
 		require.NoError(t, err)
 		createdJobs = append(createdJobs, *created)
 	}
+
+	firstJobStatus := createdJobs[0].GetStatus()
 
 	type testCase struct {
 		name            string
@@ -358,7 +363,7 @@ func TestJobs_GetJobs(t *testing.T) {
 			name: "filter by job status",
 			input: &GetJobsInput{
 				Filter: &JobFilter{
-					JobStatus: &createdJobs[0].Status,
+					JobStatus: &firstJobStatus,
 				},
 			},
 			expectCount: 1,
@@ -382,6 +387,133 @@ func TestJobs_GetJobs(t *testing.T) {
 				return
 			}
 
+			require.NoError(t, err)
+			assert.Len(t, result.Jobs, test.expectCount)
+		})
+	}
+}
+
+func TestJobs_GetJobs_TagFilter(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-jobs-tag-filter",
+		FullPath:  "test-group-jobs-tag-filter",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-jobs-tag-filter",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Two tagged jobs plus one untagged job. The TagSuperset filter matches jobs
+	// whose tags are a subset of the superset, so the untagged job (empty set)
+	// matches any superset unless explicitly excluded.
+	jobs := []models.Job{
+		*jobWithStatus(&models.Job{
+			WorkspaceID: workspace.Metadata.ID,
+			RunID:       run.Metadata.ID,
+			Type:        models.JobPlanType,
+			Tags:        []string{"linux", "arm64"},
+		}, models.JobQueued),
+		*jobWithStatus(&models.Job{
+			WorkspaceID: workspace.Metadata.ID,
+			RunID:       run.Metadata.ID,
+			Type:        models.JobApplyType,
+			Tags:        []string{"linux"},
+		}, models.JobQueued),
+		*jobWithStatus(&models.Job{
+			WorkspaceID: workspace.Metadata.ID,
+			RunID:       run.Metadata.ID,
+			Type:        models.JobPlanType,
+			Tags:        []string{},
+		}, models.JobQueued),
+	}
+
+	for i := range jobs {
+		_, err := testClient.client.Jobs.CreateJob(ctx, &jobs[i])
+		require.NoError(t, err)
+	}
+
+	type testCase struct {
+		name        string
+		input       *GetJobsInput
+		expectCount int
+	}
+
+	testCases := []testCase{
+		{
+			name: "superset containing all job tags returns every job",
+			input: &GetJobsInput{
+				Filter: &JobFilter{
+					WorkspaceID: &workspace.Metadata.ID,
+					TagFilter: &JobTagFilter{
+						TagSuperset: []string{"linux", "arm64"},
+					},
+				},
+			},
+			expectCount: 3,
+		},
+		{
+			name: "narrower superset only matches jobs whose tags are a subset",
+			input: &GetJobsInput{
+				Filter: &JobFilter{
+					WorkspaceID: &workspace.Metadata.ID,
+					TagFilter: &JobTagFilter{
+						TagSuperset: []string{"linux"},
+					},
+				},
+			},
+			// "linux" job and the untagged job, but not the "linux"+"arm64" job.
+			expectCount: 2,
+		},
+		{
+			name: "excluding untagged jobs drops the empty-tag job",
+			input: &GetJobsInput{
+				Filter: &JobFilter{
+					WorkspaceID: &workspace.Metadata.ID,
+					TagFilter: &JobTagFilter{
+						ExcludeUntaggedJobs: ptr.Bool(true),
+						TagSuperset:         []string{"linux"},
+					},
+				},
+			},
+			expectCount: 1,
+		},
+		{
+			// A single-quote-laden value must be bound as data, not interpolated
+			// into the SQL string. The query should run cleanly and simply match
+			// nothing rather than erroring or executing injected SQL.
+			name: "malicious tag value is treated as a literal",
+			input: &GetJobsInput{
+				Filter: &JobFilter{
+					WorkspaceID: &workspace.Metadata.ID,
+					TagFilter: &JobTagFilter{
+						ExcludeUntaggedJobs: ptr.Bool(true),
+						TagSuperset:         []string{"x'); DROP TABLE jobs; --"},
+					},
+				},
+			},
+			expectCount: 0,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := testClient.client.Jobs.GetJobs(ctx, test.input)
 			require.NoError(t, err)
 			assert.Len(t, result.Jobs, test.expectCount)
 		})
@@ -420,12 +552,11 @@ func TestJobs_GetJobsWithPaginationAndSorting(t *testing.T) {
 
 	resourceCount := 10
 	for i := 0; i < resourceCount; i++ {
-		_, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+		_, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 			WorkspaceID: workspace.Metadata.ID,
 			RunID:       run.Metadata.ID,
 			Type:        models.JobPlanType,
-			Status:      models.JobQueued,
-		})
+		}, models.JobQueued))
 		require.NoError(t, err)
 	}
 
@@ -488,12 +619,11 @@ func TestJobs_GetJobByTRN(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a job for testing
-	createdJob, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	createdJob, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		WorkspaceID: workspace.Metadata.ID,
 		RunID:       run.Metadata.ID,
 		Type:        models.JobPlanType,
-		Status:      models.JobQueued,
-	})
+	}, models.JobQueued))
 	require.NoError(t, err)
 
 	type testCase struct {
@@ -570,20 +700,18 @@ func TestJobs_GetLatestJobByType(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create multiple jobs of the same type
-	_, err = testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	_, err = testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		WorkspaceID: workspace.Metadata.ID,
 		RunID:       run.Metadata.ID,
 		Type:        models.JobPlanType,
-		Status:      models.JobQueued,
-	})
+	}, models.JobQueued))
 	require.NoError(t, err)
 
-	job2, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+	job2, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
 		WorkspaceID: workspace.Metadata.ID,
 		RunID:       run.Metadata.ID,
 		Type:        models.JobPlanType,
-		Status:      models.JobRunning,
-	})
+	}, models.JobRunning))
 	require.NoError(t, err)
 
 	type testCase struct {

@@ -67,18 +67,16 @@ func (a *ApplyHandler) OnError(ctx context.Context, applyErr error) {
 
 	if a.cancellableCtx.Err() != nil {
 		a.jobLogger.Errorf("Apply canceled while in progress %s", failureIcon)
-		input.Status = pb.ApplyStatus_CANCELED
 	} else {
 		a.jobLogger.Errorf("Error occurred while executing apply %s", failureIcon)
-		input.Status = pb.ApplyStatus_ERRORED
 		input.ErrorMessage = parseTfExecError(applyErr)
 	}
 
-	// Flush all logs before updating apply state
+	// Flush all logs before recording the apply error. The apply node's status is
+	// derived from the job status, which is reported separately.
 	a.jobLogger.Flush()
 
-	_, err := a.client.UpdateApply(ctx, input)
-	if err != nil {
+	if _, err := a.client.UpdateApply(ctx, input); err != nil {
 		a.logger.Errorf("failed to update apply in database %v", err)
 	}
 }
@@ -87,14 +85,6 @@ func (a *ApplyHandler) OnError(ctx context.Context, applyErr error) {
 func (a *ApplyHandler) Execute(ctx context.Context) error {
 	if a.run.ApplyId == "" {
 		return errors.New("cannot run apply stage because Apply is undefined")
-	}
-
-	apply, err := a.client.UpdateApply(ctx, &jobclient.UpdateApplyInput{
-		ID:     a.run.ApplyId,
-		Status: pb.ApplyStatus_RUNNING,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to update apply %v", err)
 	}
 
 	tf, err := a.terraformWorkspace.init(ctx)
@@ -166,28 +156,19 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 		a.jobLogger.Infof("No state version was created because state file is empty")
 	}
 
-	// Update apply and run status
+	// The apply node's status is derived from the job status (reported separately),
+	// so the runner only needs to surface an execution error here.
 	if a.cancellableCtx.Err() != nil || isCancellationError(cmdErr) {
 		a.jobLogger.Infof("Terraform apply command gracefully exited due to job cancellation")
-		apply.Status = pb.ApplyStatus_CANCELED.String()
 	} else if cmdErr != nil {
-		a.OnError(ctx, cmdErr)
-		return nil
-	} else {
-		apply.Status = pb.ApplyStatus_FINISHED.String()
+		// Return the error so the executor marks the job (and thus the apply node)
+		// failed; it also invokes OnError to record the error message. Returning
+		// nil here would let the job finish successfully despite the apply failing.
+		// The state version is still created above so partial applies are recorded.
+		return cmdErr
 	}
 
-	// Flush all logs before updating apply state
 	a.jobLogger.Flush()
-
-	_, err = a.client.UpdateApply(ctx, &jobclient.UpdateApplyInput{
-		ID:     apply.Metadata.Id,
-		Status: pb.ApplyStatus(pb.ApplyStatus_value[apply.Status]),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to update apply %v", err)
-	}
-
 	return nil
 }
 

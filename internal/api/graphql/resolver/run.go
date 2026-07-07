@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
+	runvariables "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/variables"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -44,22 +45,22 @@ type RunEdgeResolver struct {
 
 // Cursor returns an opaque cursor
 func (r *RunEdgeResolver) Cursor() (string, error) {
-	run, ok := r.edge.Node.(models.Run)
+	run, ok := r.edge.Node.(*models.Run)
 	if !ok {
 		return "", errors.New("Failed to convert node type")
 	}
-	cursor, err := r.edge.CursorFunc(&run)
+	cursor, err := r.edge.CursorFunc(run)
 	return *cursor, err
 }
 
 // Node returns a run node
 func (r *RunEdgeResolver) Node() (*RunResolver, error) {
-	run, ok := r.edge.Node.(models.Run)
+	run, ok := r.edge.Node.(*models.Run)
 	if !ok {
 		return nil, errors.New("Failed to convert node type")
 	}
 
-	return &RunResolver{run: &run}, nil
+	return &RunResolver{run: run}, nil
 }
 
 // RunConnectionResolver resolves a run connection
@@ -91,12 +92,12 @@ func NewRunConnectionResolver(ctx context.Context, input *run.GetRunsInput) (*Ru
 
 	if len(runs) > 0 {
 		var err error
-		pageInfo.StartCursor, err = result.PageInfo.Cursor(&runs[0])
+		pageInfo.StartCursor, err = result.PageInfo.Cursor(runs[0])
 		if err != nil {
 			return nil, err
 		}
 
-		pageInfo.EndCursor, err = result.PageInfo.Cursor(&runs[len(edges)-1])
+		pageInfo.EndCursor, err = result.PageInfo.Cursor(runs[len(edges)-1])
 		if err != nil {
 			return nil, err
 		}
@@ -176,6 +177,11 @@ func (r *RunResolver) Speculative() bool {
 	return r.run.Speculative()
 }
 
+// AutoApply resolver
+func (r *RunResolver) AutoApply() bool {
+	return r.run.AutoApply
+}
+
 // Assessment resolver
 func (r *RunResolver) Assessment() bool {
 	return r.run.IsAssessmentRun
@@ -216,27 +222,19 @@ func (r *RunResolver) ConfigurationVersion(ctx context.Context) (*ConfigurationV
 }
 
 // Apply resolver
-func (r *RunResolver) Apply(ctx context.Context) (*ApplyResolver, error) {
-	if r.run.ApplyID == "" {
+func (r *RunResolver) Apply() (*ApplyResolver, error) {
+	applyNode := r.run.Apply
+	if applyNode == nil {
 		return nil, nil
 	}
 
-	apply, err := loadApply(ctx, r.run.ApplyID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ApplyResolver{apply: apply}, nil
+	return &ApplyResolver{run: r.run}, nil
 }
 
 // Plan resolver
-func (r *RunResolver) Plan(ctx context.Context) (*PlanResolver, error) {
-	plan, err := loadPlan(ctx, r.run.PlanID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &PlanResolver{plan: plan}, nil
+func (r *RunResolver) Plan() (*PlanResolver, error) {
+	// A run always has a plan node, so this never returns nil.
+	return &PlanResolver{run: r.run}, nil
 }
 
 // Variables resolver
@@ -345,17 +343,12 @@ func (r *RunResolver) StateVersion(ctx context.Context) (*StateVersionResolver, 
 
 // RunVariableResolver resolves a variable resource
 type RunVariableResolver struct {
-	variable *run.Variable
+	variable *runvariables.Variable
 }
 
 // Category resolver
 func (r *RunVariableResolver) Category() string {
 	return string(r.variable.Category)
-}
-
-// Hcl resolver
-func (r *RunVariableResolver) Hcl() *bool {
-	return &r.variable.Hcl
 }
 
 // NamespacePath resolver
@@ -500,6 +493,7 @@ type CreateRunInput struct {
 	Refresh                  *bool
 	RefreshOnly              *bool
 	Speculative              *bool
+	AutoApply                *bool
 	IncludeModulePrereleases *bool
 	WorkspaceID              *string
 	WorkspacePath            *string // DEPRECATED: use workspaceID instead with a TRN
@@ -512,11 +506,38 @@ type ApplyRunInput struct {
 	RunID            string
 }
 
+// SetRunAutoApplyInput is the input for changing a run's auto-apply setting
+type SetRunAutoApplyInput struct {
+	ClientMutationID *string
+	RunID            string
+	AutoApply        bool
+}
+
 // CancelRunInput is the input for cancelling a run
 type CancelRunInput struct {
 	ClientMutationID *string
 	Comment          *string
 	Force            *bool
+	RunID            string
+}
+
+// RetryRunNodeInput is the input for retrying a run's plan or apply node, identified
+// by RunID and NodePath ("plan"/"apply").
+type RetryRunNodeInput struct {
+	ClientMutationID *string
+	RunID            string
+	NodePath         string
+}
+
+// DiscardRunInput is the input for discarding a planned run.
+type DiscardRunInput struct {
+	ClientMutationID *string
+	RunID            string
+}
+
+// UndiscardRunInput is the input for undiscarding a discarded run.
+type UndiscardRunInput struct {
+	ClientMutationID *string
 	RunID            string
 }
 
@@ -568,17 +589,17 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 		Comment:                input.Comment,
 		TerraformVersion:       terraformVersion,
 		Speculative:            input.Speculative,
+		AutoApply:              ptr.ToBool(input.AutoApply),
 	}
 
 	if input.Variables != nil {
-		variables := []run.Variable{}
+		variables := []runvariables.Variable{}
 
 		for _, v := range *input.Variables {
 			vCopy := v
-			variables = append(variables, run.Variable{
+			variables = append(variables, runvariables.Variable{
 				Key:      v.Key,
 				Value:    &vCopy.Value,
-				Hcl:      ptr.ToBool(vCopy.Hcl),
 				Category: models.VariableCategory(v.Category),
 			})
 		}
@@ -594,10 +615,8 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 		runOptions.TargetAddresses = *input.TargetAddresses
 	}
 
-	runOptions.Refresh = true // default to true unless the option was set
-	if input.Refresh != nil {
-		runOptions.Refresh = *input.Refresh
-	}
+	// Pass the optional pointer through; run creation resolves nil to true (Terraform's default).
+	runOptions.Refresh = input.Refresh
 
 	runOptions.RefreshOnly = false // default to false unless the option was set
 	if input.RefreshOnly != nil {
@@ -634,6 +653,23 @@ func applyRunMutation(ctx context.Context, input *ApplyRunInput) (*RunMutationPa
 	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
 }
 
+func setRunAutoApplyMutation(ctx context.Context, input *SetRunAutoApplyInput) (*RunMutationPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	runID, err := serviceCatalog.FetchModelID(ctx, input.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	run, err := serviceCatalog.RunService.SetRunAutoApply(ctx, runID, input.AutoApply)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := RunMutationPayload{ClientMutationID: input.ClientMutationID, Run: run, Problems: []Problem{}}
+	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
+}
+
 func cancelRunMutation(ctx context.Context, input *CancelRunInput) (*RunMutationPayloadResolver, error) {
 	serviceCatalog := getServiceCatalog(ctx)
 
@@ -656,6 +692,64 @@ func cancelRunMutation(ctx context.Context, input *CancelRunInput) (*RunMutation
 	}
 
 	payload := RunMutationPayload{ClientMutationID: input.ClientMutationID, Run: run, Problems: []Problem{}}
+	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
+}
+
+func retryRunNodeMutation(ctx context.Context, input *RetryRunNodeInput) (*RunMutationPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	runID, err := serviceCatalog.FetchModelID(ctx, input.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	retried, err := serviceCatalog.RunService.RetryRunNode(ctx, &run.RetryRunNodeInput{
+		RunID:    runID,
+		NodePath: input.NodePath,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := RunMutationPayload{ClientMutationID: input.ClientMutationID, Run: retried, Problems: []Problem{}}
+	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
+}
+
+func discardRunMutation(ctx context.Context, input *DiscardRunInput) (*RunMutationPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	runID, err := serviceCatalog.FetchModelID(ctx, input.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	discarded, err := serviceCatalog.RunService.DiscardRun(ctx, &run.DiscardRunInput{
+		RunID: runID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := RunMutationPayload{ClientMutationID: input.ClientMutationID, Run: discarded, Problems: []Problem{}}
+	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
+}
+
+func undiscardRunMutation(ctx context.Context, input *UndiscardRunInput) (*RunMutationPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	runID, err := serviceCatalog.FetchModelID(ctx, input.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	undiscarded, err := serviceCatalog.RunService.UndiscardRun(ctx, &run.UndiscardRunInput{
+		RunID: runID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := RunMutationPayload{ClientMutationID: input.ClientMutationID, Run: undiscarded, Problems: []Problem{}}
 	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
 }
 
@@ -699,7 +793,7 @@ func (r *RunEventResolver) Action() string {
 
 // Run resolves the run
 func (r *RunEventResolver) Run() *RunResolver {
-	return &RunResolver{run: &r.event.Run}
+	return &RunResolver{run: r.event.Run}
 }
 
 // RunSubscriptionInput is the input for subscribing to run events
@@ -792,12 +886,12 @@ func loadRun(ctx context.Context, id string) (*models.Run, error) {
 		return nil, err
 	}
 
-	sv, ok := data.(models.Run)
+	run, ok := data.(*models.Run)
 	if !ok {
 		return nil, errors.New("Wrong type")
 	}
 
-	return &sv, nil
+	return run, nil
 }
 
 func runBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {

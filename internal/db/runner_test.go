@@ -395,6 +395,111 @@ func TestRunners_GetRunners(t *testing.T) {
 	}
 }
 
+func TestRunners_GetRunners_TagFilter(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-runners-tag-filter",
+		FullPath:  "test-group-runners-tag-filter",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// The TagSubset filter matches runners whose tags are a superset of the
+	// subset, i.e. runners that carry every tag in the subset.
+	runners := []models.Runner{
+		{
+			Name:      "test-runner-tags-1",
+			GroupID:   &group.Metadata.ID,
+			Type:      models.GroupRunnerType,
+			Tags:      []string{"linux", "arm64"},
+			CreatedBy: "db-integration-tests",
+		},
+		{
+			Name:      "test-runner-tags-2",
+			GroupID:   &group.Metadata.ID,
+			Type:      models.GroupRunnerType,
+			Tags:      []string{"linux"},
+			CreatedBy: "db-integration-tests",
+		},
+	}
+
+	for i := range runners {
+		_, err := testClient.client.Runners.CreateRunner(ctx, &runners[i])
+		require.NoError(t, err)
+	}
+
+	type testCase struct {
+		name        string
+		input       *GetRunnersInput
+		expectCount int
+	}
+
+	testCases := []testCase{
+		{
+			name: "subset present on both runners matches both",
+			input: &GetRunnersInput{
+				Filter: &RunnerFilter{
+					GroupID: &group.Metadata.ID,
+					TagFilter: &RunnerTagFilter{
+						TagSubset: []string{"linux"},
+					},
+				},
+			},
+			expectCount: 2,
+		},
+		{
+			name: "narrower subset only matches runners carrying all tags",
+			input: &GetRunnersInput{
+				Filter: &RunnerFilter{
+					GroupID: &group.Metadata.ID,
+					TagFilter: &RunnerTagFilter{
+						TagSubset: []string{"linux", "arm64"},
+					},
+				},
+			},
+			expectCount: 1,
+		},
+		{
+			name: "subset with no matching runner returns none",
+			input: &GetRunnersInput{
+				Filter: &RunnerFilter{
+					GroupID: &group.Metadata.ID,
+					TagFilter: &RunnerTagFilter{
+						TagSubset: []string{"windows"},
+					},
+				},
+			},
+			expectCount: 0,
+		},
+		{
+			// A single-quote-laden value must be bound as data, not interpolated
+			// into the SQL string. The query should run cleanly and match nothing
+			// rather than erroring or executing injected SQL.
+			name: "malicious tag value is treated as a literal",
+			input: &GetRunnersInput{
+				Filter: &RunnerFilter{
+					GroupID: &group.Metadata.ID,
+					TagFilter: &RunnerTagFilter{
+						TagSubset: []string{"x'; DROP TABLE runners; --"},
+					},
+				},
+			},
+			expectCount: 0,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := testClient.client.Runners.GetRunners(ctx, test.input)
+			require.NoError(t, err)
+			assert.Len(t, result.Runners, test.expectCount)
+		})
+	}
+}
+
 func TestRunners_GetRunnersWithPaginationAndSorting(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)

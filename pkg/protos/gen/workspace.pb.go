@@ -877,7 +877,7 @@ func (x *GetWorkspacesResponse) GetPageInfo() *PageInfo {
 // WorkspaceEvent represents a workspace event.
 type WorkspaceEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Action        string                 `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
 	Workspace     *Workspace             `protobuf:"bytes,2,opt,name=workspace,proto3" json:"workspace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -913,9 +913,9 @@ func (*WorkspaceEvent) Descriptor() ([]byte, []int) {
 	return file_workspace_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *WorkspaceEvent) GetAction() string {
+func (x *WorkspaceEvent) GetType() string {
 	if x != nil {
-		return x.Action
+		return x.Type
 	}
 	return ""
 }
@@ -1035,9 +1035,9 @@ const file_workspace_proto_rawDesc = "" +
 	"\n" +
 	"workspaces\x18\x01 \x03(\v2-.martiancloud.tharsis.api.workspace.WorkspaceR\n" +
 	"workspaces\x12J\n" +
-	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo\"u\n" +
-	"\x0eWorkspaceEvent\x12\x16\n" +
-	"\x06action\x18\x01 \x01(\tR\x06action\x12K\n" +
+	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo\"q\n" +
+	"\x0eWorkspaceEvent\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12K\n" +
 	"\tworkspace\x18\x02 \x01(\v2-.martiancloud.tharsis.api.workspace.WorkspaceR\tworkspace*h\n" +
 	"\x16WorkspaceSortableField\x12\x11\n" +
 	"\rFULL_PATH_ASC\x10\x00\x12\x12\n" +

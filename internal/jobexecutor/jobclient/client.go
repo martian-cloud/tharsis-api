@@ -26,14 +26,12 @@ var _ Client = (*jobClient)(nil)
 // UpdateApplyInput is the input for updating an apply.
 type UpdateApplyInput struct {
 	ID           string
-	Status       pb.ApplyStatus
 	ErrorMessage *string
 }
 
 // UpdatePlanInput is the input for updating a plan.
 type UpdatePlanInput struct {
 	ID           string
-	Status       pb.PlanStatus
 	HasChanges   bool
 	ErrorMessage *string
 }
@@ -208,7 +206,6 @@ func (c *jobClient) GetWorkspace(ctx context.Context, id string) (*pb.Workspace,
 func (c *jobClient) UpdateApply(ctx context.Context, input *UpdateApplyInput) (*pb.Apply, error) {
 	return c.grpcClient.RunsClient.UpdateApply(ctx, &pb.UpdateApplyRequest{
 		Id:           input.ID,
-		Status:       input.Status,
 		ErrorMessage: input.ErrorMessage,
 	})
 }
@@ -217,7 +214,6 @@ func (c *jobClient) UpdateApply(ctx context.Context, input *UpdateApplyInput) (*
 func (c *jobClient) UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*pb.Plan, error) {
 	return c.grpcClient.RunsClient.UpdatePlan(ctx, &pb.UpdatePlanRequest{
 		Id:           input.ID,
-		Status:       input.Status,
 		HasChanges:   input.HasChanges,
 		ErrorMessage: input.ErrorMessage,
 	})

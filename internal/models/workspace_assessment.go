@@ -10,6 +10,13 @@ import (
 
 var _ Model = (*WorkspaceAssessment)(nil)
 
+// AssessmentStaleTimeout is how long an in-progress assessment (CompletedAtTimestamp
+// nil) may go without an update before it is treated as abandoned and eligible to be
+// restarted. Completion is event-driven (set when the run reaches a terminal state);
+// a run orphaned before reaching one would otherwise leave the assessment in progress
+// forever, permanently blocking the workspace from being reassessed.
+const AssessmentStaleTimeout = time.Hour
+
 // WorkspaceAssessment represents a workspace assessment to check for drift
 type WorkspaceAssessment struct {
 	Metadata             ResourceMetadata
@@ -19,6 +26,14 @@ type WorkspaceAssessment struct {
 	RunID                *string
 	WorkspaceID          string
 	RequiresNotification bool
+}
+
+// IsStaleInProgress reports whether the assessment is in progress but has not been
+// updated within AssessmentStaleTimeout, indicating its run was abandoned.
+func (w *WorkspaceAssessment) IsStaleInProgress() bool {
+	return w.CompletedAtTimestamp == nil &&
+		w.Metadata.LastUpdatedTimestamp != nil &&
+		time.Since(*w.Metadata.LastUpdatedTimestamp) >= AssessmentStaleTimeout
 }
 
 // GetID returns the Metadata ID.

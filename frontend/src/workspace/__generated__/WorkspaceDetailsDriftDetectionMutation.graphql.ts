@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<de59aa86d7bdc711de7099313535a0dd>>
+ * @generated SignedSource<<35ee726e7765586cc079005a29494147>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -223,7 +223,14 @@ return {
                         "name": "run",
                         "plural": false,
                         "selections": [
-                          (v2/*: any*/)
+                          (v2/*: any*/),
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "status",
+                            "storageKey": null
+                          }
                         ],
                         "storageKey": null
                       },
@@ -244,12 +251,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "eaf213df747f7e0223d522487d67e984",
+    "cacheID": "816761db6407e83fee4aebe4b4d962ba",
     "id": null,
     "metadata": {},
     "name": "WorkspaceDetailsDriftDetectionMutation",
     "operationKind": "mutation",
-    "text": "mutation WorkspaceDetailsDriftDetectionMutation(\n  $input: AssessWorkspaceInput!\n) {\n  assessWorkspace(input: $input) {\n    run {\n      id\n      workspace {\n        fullPath\n        ...WorkspaceDetailsDriftDetectionFragment_workspace\n        id\n      }\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment WorkspaceDetailsDriftDetectionFragment_workspace on Workspace {\n  id\n  fullPath\n  assessment {\n    hasDrift\n    startedAt\n    completedAt\n    run {\n      id\n    }\n    id\n  }\n}\n"
+    "text": "mutation WorkspaceDetailsDriftDetectionMutation(\n  $input: AssessWorkspaceInput!\n) {\n  assessWorkspace(input: $input) {\n    run {\n      id\n      workspace {\n        fullPath\n        ...WorkspaceDetailsDriftDetectionFragment_workspace\n        id\n      }\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment WorkspaceDetailsDriftDetectionFragment_workspace on Workspace {\n  id\n  fullPath\n  assessment {\n    hasDrift\n    startedAt\n    completedAt\n    run {\n      id\n      status\n    }\n    id\n  }\n}\n"
   }
 };
 })();

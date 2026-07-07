@@ -39,3 +39,11 @@ func NewCounterVec(name string, help string, labels []string) *prometheus.Counte
 		Help: help,
 	}, labels)
 }
+
+// NewGaugeVec returns a new Prometheus GaugeVec with labels.
+func NewGaugeVec(name string, help string, labels []string) *prometheus.GaugeVec {
+	return promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: name,
+		Help: help,
+	}, labels)
+}

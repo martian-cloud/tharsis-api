@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<0a718d292552ebb23cf9148dee3b6aa0>>
+ * @generated SignedSource<<77d81579e38e587496f75107e70b56fb>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -72,34 +72,39 @@ v4 = {
 v5 = {
   "alias": null,
   "args": null,
-  "concreteType": "ResourceMetadata",
-  "kind": "LinkedField",
-  "name": "metadata",
-  "plural": false,
-  "selections": [
-    (v4/*: any*/),
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "trn",
-      "storageKey": null
-    }
-  ],
+  "kind": "ScalarField",
+  "name": "status",
   "storageKey": null
 },
 v6 = {
   "alias": null,
   "args": null,
-  "kind": "ScalarField",
-  "name": "status",
+  "concreteType": "Workspace",
+  "kind": "LinkedField",
+  "name": "workspace",
+  "plural": false,
+  "selections": [
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "fullPath",
+      "storageKey": null
+    },
+    (v3/*: any*/)
+  ],
   "storageKey": null
 },
 v7 = {
   "alias": null,
   "args": null,
-  "kind": "ScalarField",
-  "name": "fullPath",
+  "concreteType": "ResourceMetadata",
+  "kind": "LinkedField",
+  "name": "metadata",
+  "plural": false,
+  "selections": [
+    (v4/*: any*/)
+  ],
   "storageKey": null
 },
 v8 = {
@@ -125,7 +130,7 @@ v8 = {
       "storageKey": null
     },
     (v3/*: any*/),
-    (v6/*: any*/),
+    (v5/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -172,110 +177,7 @@ v8 = {
       "name": "runnerAvailabilityStatus",
       "storageKey": null
     },
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "Workspace",
-      "kind": "LinkedField",
-      "name": "workspace",
-      "plural": false,
-      "selections": [
-        (v7/*: any*/),
-        (v3/*: any*/)
-      ],
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "completed",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "logLastUpdatedAt",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "logSize",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": [
-        {
-          "kind": "Literal",
-          "name": "limit",
-          "value": 51200
-        },
-        {
-          "kind": "Literal",
-          "name": "startOffset",
-          "value": 0
-        }
-      ],
-      "kind": "ScalarField",
-      "name": "logs",
-      "storageKey": "logs(limit:51200,startOffset:0)"
-    },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "tags",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "Runner",
-      "kind": "LinkedField",
-      "name": "runner",
-      "plural": false,
-      "selections": [
-        (v3/*: any*/),
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "name",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "type",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "groupPath",
-          "storageKey": null
-        }
-      ],
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "ResourceMetadata",
-      "kind": "LinkedField",
-      "name": "metadata",
-      "plural": false,
-      "selections": [
-        (v4/*: any*/)
-      ],
-      "storageKey": null
-    }
+    (v6/*: any*/)
   ],
   "storageKey": null
 },
@@ -285,6 +187,30 @@ v9 = {
   "kind": "ScalarField",
   "name": "errorMessage",
   "storageKey": null
+},
+v10 = {
+  "alias": null,
+  "args": [
+    {
+      "kind": "Literal",
+      "name": "first",
+      "value": 0
+    }
+  ],
+  "concreteType": "JobConnection",
+  "kind": "LinkedField",
+  "name": "jobs",
+  "plural": false,
+  "selections": [
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "totalCount",
+      "storageKey": null
+    }
+  ],
+  "storageKey": "jobs(first:0)"
 };
 return {
   "fragment": {
@@ -365,7 +291,25 @@ return {
             "plural": false,
             "selections": [
               (v3/*: any*/),
-              (v5/*: any*/),
+              {
+                "alias": null,
+                "args": null,
+                "concreteType": "ResourceMetadata",
+                "kind": "LinkedField",
+                "name": "metadata",
+                "plural": false,
+                "selections": [
+                  (v4/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "trn",
+                    "storageKey": null
+                  }
+                ],
+                "storageKey": null
+              },
               {
                 "alias": null,
                 "args": null,
@@ -373,7 +317,7 @@ return {
                 "name": "createdBy",
                 "storageKey": null
               },
-              (v6/*: any*/),
+              (v5/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -388,44 +332,7 @@ return {
                 "name": "assessment",
                 "storageKey": null
               },
-              {
-                "alias": null,
-                "args": null,
-                "concreteType": "Workspace",
-                "kind": "LinkedField",
-                "name": "workspace",
-                "plural": false,
-                "selections": [
-                  (v7/*: any*/),
-                  (v3/*: any*/),
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "locked",
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "concreteType": "ResourceMetadata",
-                    "kind": "LinkedField",
-                    "name": "metadata",
-                    "plural": false,
-                    "selections": [
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "updatedAt",
-                        "storageKey": null
-                      }
-                    ],
-                    "storageKey": null
-                  }
-                ],
-                "storageKey": null
-              },
+              (v6/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -434,9 +341,9 @@ return {
                 "name": "plan",
                 "plural": false,
                 "selections": [
-                  (v6/*: any*/),
-                  (v3/*: any*/),
                   (v5/*: any*/),
+                  (v3/*: any*/),
+                  (v7/*: any*/),
                   (v8/*: any*/),
                   (v9/*: any*/),
                   {
@@ -453,6 +360,7 @@ return {
                     "name": "diffSize",
                     "storageKey": null
                   },
+                  (v10/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -531,9 +439,9 @@ return {
                 "name": "apply",
                 "plural": false,
                 "selections": [
-                  (v6/*: any*/),
-                  (v3/*: any*/),
                   (v5/*: any*/),
+                  (v3/*: any*/),
+                  (v7/*: any*/),
                   (v8/*: any*/),
                   (v9/*: any*/),
                   {
@@ -542,8 +450,16 @@ return {
                     "kind": "ScalarField",
                     "name": "triggeredBy",
                     "storageKey": null
-                  }
+                  },
+                  (v10/*: any*/)
                 ],
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "autoApply",
                 "storageKey": null
               },
               {
@@ -648,12 +564,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "42e45775310ddd0b39cdffbf9b241b71",
+    "cacheID": "c3ea04ab143034f4d1fe5d95412a47e1",
     "id": null,
     "metadata": {},
     "name": "WorkspaceDetailsRunSubscription",
     "operationKind": "subscription",
-    "text": "subscription WorkspaceDetailsRunSubscription(\n  $input: RunSubscriptionInput!\n) {\n  workspaceRunEvents(input: $input) {\n    action\n    run {\n      id\n      ...RunListItemFragment_run\n      ...RunDetailsSidebarFragment_details\n      ...RunDetailsPlanStageFragment_plan\n      ...RunDetailsApplyStageFragment_apply\n    }\n  }\n}\n\nfragment ForceCancelRunAlertFragment_run on Run {\n  forceCancelAvailableAt\n  ...ForceCancelRunButtonFragment_run\n}\n\nfragment ForceCancelRunButtonFragment_run on Run {\n  id\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment JobLogsFragment_logs on Job {\n  id\n  status\n  completed\n  logLastUpdatedAt\n  logSize\n  logs(startOffset: 0, limit: 51200)\n}\n\nfragment NoRunnerAlertFragment_job on Job {\n  runnerAvailabilityStatus\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment RunDetailsApplyStageFragment_apply on Run {\n  id\n  status\n  plan {\n    summary {\n      resourceAdditions\n      resourceChanges\n      resourceDestructions\n    }\n    status\n    ...RunDetailsPlanSummaryFragment_plan\n    id\n  }\n  apply {\n    metadata {\n      createdAt\n      trn\n    }\n    status\n    errorMessage\n    triggeredBy\n    currentJob {\n      id\n      status\n      cancelRequested\n      timestamps {\n        queuedAt\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...NoRunnerAlertFragment_job\n      ...JobLogsFragment_logs\n      ...RunJobDialog_currentJob\n    }\n    id\n  }\n  ...RunVariablesFragment_variables\n  ...ForceCancelRunAlertFragment_run\n}\n\nfragment RunDetailsPlanStageFragment_plan on Run {\n  id\n  createdBy\n  workspace {\n    locked\n    metadata {\n      updatedAt\n    }\n    id\n  }\n  plan {\n    metadata {\n      createdAt\n      trn\n    }\n    status\n    errorMessage\n    hasChanges\n    diffSize\n    currentJob {\n      id\n      status\n      cancelRequested\n      timestamps {\n        queuedAt\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...NoRunnerAlertFragment_job\n      ...JobLogsFragment_logs\n      ...RunJobDialog_currentJob\n    }\n    ...RunDetailsPlanSummaryFragment_plan\n    id\n  }\n  apply {\n    status\n    id\n  }\n  ...RunVariablesFragment_variables\n  ...ForceCancelRunAlertFragment_run\n}\n\nfragment RunDetailsPlanSummaryFragment_plan on Plan {\n  summary {\n    resourceAdditions\n    resourceChanges\n    resourceDestructions\n    resourceImports\n    resourceDrift\n    outputAdditions\n    outputChanges\n    outputDestructions\n  }\n}\n\nfragment RunDetailsSidebarFragment_details on Run {\n  id\n  status\n  createdBy\n  isDestroy\n  assessment\n  moduleSource\n  moduleVersion\n  workspace {\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n  }\n  configurationVersion {\n    id\n  }\n  plan {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n  apply {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n}\n\nfragment RunJobDialog_currentJob on Job {\n  id\n  status\n  tags\n  runner {\n    id\n    name\n    type\n    groupPath\n  }\n  runnerPath\n  metadata {\n    createdAt\n  }\n  timestamps {\n    pendingAt\n    runningAt\n    finishedAt\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n\nfragment RunVariableListItemFragment_variable on RunVariable {\n  key\n  category\n  value\n  namespacePath\n  sensitive\n  versionId\n  includedInTfConfig\n}\n\nfragment RunVariablesFragment_variables on Run {\n  variables {\n    key\n    category\n    namespacePath\n    includedInTfConfig\n    ...RunVariableListItemFragment_variable\n  }\n}\n"
+    "text": "subscription WorkspaceDetailsRunSubscription(\n  $input: RunSubscriptionInput!\n) {\n  workspaceRunEvents(input: $input) {\n    action\n    run {\n      id\n      ...RunListItemFragment_run\n      ...RunDetailsSidebarFragment_details\n      ...RunDetailsPlanStageFragment_plan\n      ...RunDetailsApplyStageFragment_apply\n    }\n  }\n}\n\nfragment ForceCancelRunAlertFragment_run on Run {\n  forceCancelAvailableAt\n  ...ForceCancelRunButtonFragment_run\n}\n\nfragment ForceCancelRunButtonFragment_run on Run {\n  id\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment NoRunnerAlertFragment_job on Job {\n  runnerAvailabilityStatus\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment RunDetailsApplyStageFragment_apply on Run {\n  id\n  status\n  plan {\n    status\n    ...RunDetailsPlanSummaryFragment_plan\n    id\n  }\n  apply {\n    metadata {\n      createdAt\n    }\n    status\n    errorMessage\n    triggeredBy\n    currentJob {\n      id\n      status\n      cancelRequested\n      timestamps {\n        queuedAt\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...NoRunnerAlertFragment_job\n    }\n    jobs(first: 0) {\n      totalCount\n    }\n    id\n  }\n  ...RunVariablesFragment_variables\n  ...ForceCancelRunAlertFragment_run\n}\n\nfragment RunDetailsPlanStageFragment_plan on Run {\n  id\n  status\n  createdBy\n  plan {\n    metadata {\n      createdAt\n    }\n    status\n    errorMessage\n    hasChanges\n    diffSize\n    currentJob {\n      id\n      status\n      cancelRequested\n      timestamps {\n        queuedAt\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...NoRunnerAlertFragment_job\n    }\n    jobs(first: 0) {\n      totalCount\n    }\n    ...RunDetailsPlanSummaryFragment_plan\n    id\n  }\n  apply {\n    status\n    id\n  }\n  ...RunVariablesFragment_variables\n  ...ForceCancelRunAlertFragment_run\n}\n\nfragment RunDetailsPlanSummaryFragment_plan on Plan {\n  summary {\n    resourceAdditions\n    resourceChanges\n    resourceDestructions\n    resourceImports\n    resourceDrift\n    outputAdditions\n    outputChanges\n    outputDestructions\n  }\n}\n\nfragment RunDetailsSidebarFragment_details on Run {\n  id\n  status\n  createdBy\n  isDestroy\n  assessment\n  autoApply\n  moduleSource\n  moduleVersion\n  workspace {\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    trn\n  }\n  configurationVersion {\n    id\n  }\n  plan {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n  apply {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n\nfragment RunVariableListItemFragment_variable on RunVariable {\n  key\n  category\n  value\n  namespacePath\n  sensitive\n  versionId\n  includedInTfConfig\n}\n\nfragment RunVariablesFragment_variables on Run {\n  variables {\n    key\n    category\n    namespacePath\n    includedInTfConfig\n    ...RunVariableListItemFragment_variable\n  }\n}\n"
   }
 };
 })();

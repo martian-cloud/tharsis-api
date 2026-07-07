@@ -67,7 +67,7 @@ function CreateRun({ fragmentRef }: Props) {
         }
     `, fragmentRef);
 
-    const [formData, setFormData] = useState<RunFormData>({ source: '', runType: '', refreshOnly: false, options: null });
+    const [formData, setFormData] = useState<RunFormData>({ source: '', runType: '', refreshOnly: false, autoApply: false, options: null });
 
     const [commitVCSRun, vcsRunIsInFlight] = useMutation<CreateRun_VCSRunMutation>(VCSRunMutation);
     const [commitModuleRun, moduleRunIsInFlight] = useMutation<CreateRun_RunMutation>(CreateRunMutation);
@@ -142,6 +142,7 @@ function CreateRun({ fragmentRef }: Props) {
                     workspacePath: workspace.fullPath,
                     configurationVersionId: configVersionId,
                     refreshOnly: formData.refreshOnly,
+                    autoApply: formData.autoApply,
                 }
             },
             onCompleted: data => {
@@ -210,7 +211,8 @@ function CreateRun({ fragmentRef }: Props) {
                     moduleSource: options.moduleSource,
                     moduleVersion: options.moduleVersion === '' ? null : options.moduleVersion?.trim(),
                     speculative: formData.runType === 'plan',
-                    refreshOnly: formData.refreshOnly
+                    refreshOnly: formData.refreshOnly,
+                    autoApply: formData.autoApply
                 }
             },
             onCompleted: data => {

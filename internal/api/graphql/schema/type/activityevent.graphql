@@ -132,6 +132,11 @@ type ActivityEventUpdateTerraformModulePayload {
   labelChanges: LabelChangePayload
 }
 
+type ActivityEventUpdateRunPayload {
+  type: String!
+  nodePath: String
+}
+
 union ActivityEventPayload =
     ActivityEventCreateNamespaceMembershipPayload
   | ActivityEventUpdateNamespaceMembershipPayload
@@ -147,6 +152,7 @@ union ActivityEventPayload =
   | ActivityEventUpdateWorkspacePayload
   | ActivityEventCreateTerraformModulePayload
   | ActivityEventUpdateTerraformModulePayload
+  | ActivityEventUpdateRunPayload
 
 type ActivityEvent implements Node {
   id: ID!

@@ -10,7 +10,7 @@ import (
 )
 
 type getPlanDiffInput struct {
-	PlanID string `json:"plan_id" jsonschema:"required,Plan ID or TRN (e.g. trn:plan:workspace-path/plan-id)"`
+	RunID string `json:"run_id" jsonschema:"required,Run ID or TRN (e.g. trn:run:workspace-path/run-id)"`
 }
 
 type getPlanDiffOutput struct {
@@ -44,19 +44,19 @@ func GetPlanDiff(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getPlanDiffInput
 	}
 
 	handler := func(ctx context.Context, _ *mcp.CallToolRequest, input getPlanDiffInput) (*mcp.CallToolResult, getPlanDiffOutput, error) {
-		fetchedModel, err := tc.servicesCatalog.FetchModel(ctx, input.PlanID)
+		fetchedModel, err := tc.servicesCatalog.FetchModel(ctx, input.RunID)
 		if err != nil {
-			return nil, getPlanDiffOutput{}, WrapMCPToolError(err, "failed to get plan %q", input.PlanID)
+			return nil, getPlanDiffOutput{}, WrapMCPToolError(err, "failed to get run %q", input.RunID)
 		}
 
-		plan, ok := fetchedModel.(*models.Plan)
+		run, ok := fetchedModel.(*models.Run)
 		if !ok {
-			return nil, getPlanDiffOutput{}, NewMCPToolError("plan with id %s not found", input.PlanID)
+			return nil, getPlanDiffOutput{}, NewMCPToolError("run with id %s not found", input.RunID)
 		}
 
-		diff, err := tc.servicesCatalog.RunService.GetPlanDiff(ctx, plan.Metadata.ID)
+		diff, err := tc.servicesCatalog.RunService.GetPlanDiff(ctx, run.Plan.ID)
 		if err != nil {
-			return nil, getPlanDiffOutput{}, WrapMCPToolError(err, "failed to get plan diff for %q", input.PlanID)
+			return nil, getPlanDiffOutput{}, WrapMCPToolError(err, "failed to get plan diff for run %q", input.RunID)
 		}
 
 		return nil, toPlanDiffOutput(diff), nil

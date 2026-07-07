@@ -14,12 +14,12 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -186,7 +186,6 @@ type service struct {
 	limitChecker            limits.LimitChecker
 	signingKeyManager       auth.SigningKeyManager
 	openIDConfigFetcher     auth.OpenIDConfigFetcher
-	activityService         activityevent.Service
 	buildOIDCTokenVerifier  func(ctx context.Context, issuers []string, oidcConfigFetcher auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier
 	secretMaxExpirationDays int
 }
@@ -198,7 +197,6 @@ func NewService(
 	limitChecker limits.LimitChecker,
 	signingKeyManager auth.SigningKeyManager,
 	openIDConfigFetcher auth.OpenIDConfigFetcher,
-	activityService activityevent.Service,
 	secretMaxExpirationDays int,
 ) Service {
 	return newService(
@@ -207,7 +205,6 @@ func NewService(
 		limitChecker,
 		signingKeyManager,
 		openIDConfigFetcher,
-		activityService,
 		buildOIDCTokenVerifier,
 		secretMaxExpirationDays,
 	)
@@ -219,7 +216,6 @@ func newService(
 	limitChecker limits.LimitChecker,
 	signingKeyManager auth.SigningKeyManager,
 	openIDConfigFetcher auth.OpenIDConfigFetcher,
-	activityService activityevent.Service,
 	buildOIDCTokenVerifier func(ctx context.Context, issuers []string, oidcConfigFetcher auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier,
 	secretMaxExpirationDays int,
 ) Service {
@@ -229,7 +225,6 @@ func newService(
 		limitChecker:            limitChecker,
 		signingKeyManager:       signingKeyManager,
 		openIDConfigFetcher:     openIDConfigFetcher,
-		activityService:         activityService,
 		buildOIDCTokenVerifier:  buildOIDCTokenVerifier,
 		secretMaxExpirationDays: secretMaxExpirationDays,
 	}
@@ -363,8 +358,8 @@ func (s *service) DeleteServiceAccount(ctx context.Context, input *DeleteService
 
 	groupPath := serviceAccount.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,
@@ -516,8 +511,8 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *CreateService
 		return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetServiceAccount,
@@ -612,8 +607,8 @@ func (s *service) UpdateServiceAccount(ctx context.Context, input *UpdateService
 
 	groupPath := updatedServiceAccount.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionUpdate,
 			TargetType:    models.TargetServiceAccount,

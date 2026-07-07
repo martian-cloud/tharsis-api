@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -138,10 +139,19 @@ func (r *workspaceAssessments) GetWorkspaceAssessments(ctx context.Context, inpu
 			ex = ex.Append(goqu.I("workspace_assessments.workspace_id").In(input.Filter.WorkspaceIDs))
 		}
 		if input.Filter.InProgress != nil {
+			// A stale in-progress assessment (no completed_at but not updated within the
+			// stale timeout) had its run abandoned, so it no longer counts as in progress.
+			staleTime := time.Now().Add(-models.AssessmentStaleTimeout).UTC()
 			if *input.Filter.InProgress {
-				ex = ex.Append(goqu.I("workspace_assessments.completed_at").IsNull())
+				ex = ex.Append(goqu.And(
+					goqu.I("workspace_assessments.completed_at").IsNull(),
+					goqu.I("workspace_assessments.updated_at").Gt(staleTime),
+				))
 			} else {
-				ex = ex.Append(goqu.I("workspace_assessments.completed_at").IsNotNull())
+				ex = ex.Append(goqu.Or(
+					goqu.I("workspace_assessments.completed_at").IsNotNull(),
+					goqu.I("workspace_assessments.updated_at").Lte(staleTime),
+				))
 			}
 		}
 	}

@@ -6,11 +6,11 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -74,7 +74,6 @@ type service struct {
 	dbClient                   *db.Client
 	limitChecker               limits.LimitChecker
 	namespaceMembershipService namespacemembership.Service
-	activityService            activityevent.Service
 	inheritedSettingsResolver  namespace.InheritedSettingResolver
 }
 
@@ -84,7 +83,6 @@ func NewService(
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
 	namespaceMembershipService namespacemembership.Service,
-	activityService activityevent.Service,
 	inheritedSettingsResolver namespace.InheritedSettingResolver,
 ) Service {
 	return &service{
@@ -92,7 +90,6 @@ func NewService(
 		dbClient:                   dbClient,
 		limitChecker:               limitChecker,
 		namespaceMembershipService: namespaceMembershipService,
-		activityService:            activityService,
 		inheritedSettingsResolver:  inheritedSettingsResolver,
 	}
 }
@@ -344,8 +341,8 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 	// If this group is nested, create an activity event for removal of this group from its parent.
 	if input.Group.ParentID != "" {
 		parentPath := input.Group.GetParentPath()
-		if _, err = s.activityService.CreateActivityEvent(txContext,
-			&activityevent.CreateActivityEventInput{
+		if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+			&activity.CreateActivityEventInput{
 				NamespacePath: &parentPath,
 				Action:        models.ActionDeleteChildResource,
 				TargetType:    models.TargetGroup,
@@ -437,8 +434,8 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 		}
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetGroup,
@@ -523,8 +520,8 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &updatedGroup.FullPath,
 			Action:        models.ActionUpdate,
 			TargetType:    models.TargetGroup,
@@ -697,8 +694,8 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 
 	// For now, generate an activity event on the group that was migrated--but without a custom payload.
 	// The old parent (if any) and the new parent (if any) might have (also) wanted an activity event.
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &migratedGroup.FullPath,
 			Action:        models.ActionMigrate,
 			TargetType:    models.TargetGroup,

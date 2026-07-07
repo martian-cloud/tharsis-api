@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5d5ac53b8ac8e5e60719b49378b14b47>>
+ * @generated SignedSource<<278408e1afc8c2ebdfb029af66932f96>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,10 +9,10 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
+export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
 export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type PlanStatus = "canceled" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "%future added value";
+export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
+export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "queuing" | "queuing_apply" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunDetailsApplyStageFragment_apply$data = {
   readonly apply: {
@@ -26,12 +26,14 @@ export type RunDetailsApplyStageFragment_apply$data = {
         readonly queuedAt: any | null | undefined;
         readonly runningAt: any | null | undefined;
       };
-      readonly " $fragmentSpreads": FragmentRefs<"JobLogsFragment_logs" | "NoRunnerAlertFragment_job" | "RunJobDialog_currentJob">;
+      readonly " $fragmentSpreads": FragmentRefs<"NoRunnerAlertFragment_job">;
     } | null | undefined;
     readonly errorMessage: string | null | undefined;
+    readonly jobs: {
+      readonly totalCount: number;
+    };
     readonly metadata: {
       readonly createdAt: any;
-      readonly trn: string;
     };
     readonly status: ApplyStatus;
     readonly triggeredBy: string | null | undefined;
@@ -39,11 +41,6 @@ export type RunDetailsApplyStageFragment_apply$data = {
   readonly id: string;
   readonly plan: {
     readonly status: PlanStatus;
-    readonly summary: {
-      readonly resourceAdditions: number;
-      readonly resourceChanges: number;
-      readonly resourceDestructions: number;
-    };
     readonly " $fragmentSpreads": FragmentRefs<"RunDetailsPlanSummaryFragment_plan">;
   };
   readonly status: RunStatus;
@@ -86,38 +83,6 @@ return {
       "name": "plan",
       "plural": false,
       "selections": [
-        {
-          "alias": null,
-          "args": null,
-          "concreteType": "PlanSummary",
-          "kind": "LinkedField",
-          "name": "summary",
-          "plural": false,
-          "selections": [
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "resourceAdditions",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "resourceChanges",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "resourceDestructions",
-              "storageKey": null
-            }
-          ],
-          "storageKey": null
-        },
         (v1/*: any*/),
         {
           "args": null,
@@ -148,13 +113,6 @@ return {
               "args": null,
               "kind": "ScalarField",
               "name": "createdAt",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "trn",
               "storageKey": null
             }
           ],
@@ -235,19 +193,33 @@ return {
               "args": null,
               "kind": "FragmentSpread",
               "name": "NoRunnerAlertFragment_job"
-            },
-            {
-              "args": null,
-              "kind": "FragmentSpread",
-              "name": "JobLogsFragment_logs"
-            },
-            {
-              "args": null,
-              "kind": "FragmentSpread",
-              "name": "RunJobDialog_currentJob"
             }
           ],
           "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": [
+            {
+              "kind": "Literal",
+              "name": "first",
+              "value": 0
+            }
+          ],
+          "concreteType": "JobConnection",
+          "kind": "LinkedField",
+          "name": "jobs",
+          "plural": false,
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "totalCount",
+              "storageKey": null
+            }
+          ],
+          "storageKey": "jobs(first:0)"
         }
       ],
       "storageKey": null
@@ -268,6 +240,6 @@ return {
 };
 })();
 
-(node as any).hash = "43d3ce9156542afe57a3d7129ae382cc";
+(node as any).hash = "265e9f4b6aea922a7c26bd108c0b58e4";
 
 export default node;

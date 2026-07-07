@@ -48,7 +48,6 @@ func TestToolsetMetadata(t *testing.T) {
 	}
 
 	tests := []testCase{
-		{"applies", ToolsetMetadataApplies.Name, ToolsetMetadataApplies.Description},
 		{"documentation", ToolsetMetadataDocumentation.Name, ToolsetMetadataDocumentation.Description},
 		{"jobs", ToolsetMetadataJobs.Name, ToolsetMetadataJobs.Description},
 		{"plans", ToolsetMetadataPlans.Name, ToolsetMetadataPlans.Description},
@@ -68,8 +67,7 @@ func TestToolsetMetadata(t *testing.T) {
 func TestAllToolsets(t *testing.T) {
 	toolsets := AllToolsets()
 
-	assert.Len(t, toolsets, 7)
-	assert.Contains(t, toolsets, "apply")
+	assert.Len(t, toolsets, 6)
 	assert.Contains(t, toolsets, "documentation")
 	assert.Contains(t, toolsets, "job")
 	assert.Contains(t, toolsets, "plan")

@@ -435,7 +435,9 @@ func TestCreateAgentRun(t *testing.T) {
 				ctx = withCaller(ctx, test.caller)
 			}
 
+			testLogger, _ := logger.NewForTest()
 			svc := &service{aiEnabled: true,
+				logger: testLogger,
 				dbClient: &db.Client{
 					AgentSessions:    mockSessions,
 					AgentSessionRuns: mockRuns,
@@ -504,7 +506,8 @@ func TestCancelAgentRun(t *testing.T) {
 				ctx = withCaller(ctx, test.caller)
 			}
 
-			svc := &service{aiEnabled: true, dbClient: &db.Client{
+			testLogger, _ := logger.NewForTest()
+			svc := &service{aiEnabled: true, logger: testLogger, dbClient: &db.Client{
 				AgentSessions:    mockSessions,
 				AgentSessionRuns: mockRuns,
 			}}

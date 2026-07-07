@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -394,6 +395,68 @@ func TestWorkspaces_GetWorkspaceByID(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWorkspaces_GetWorkspacesMinDurationSinceLastAssessment(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:     "test-group-min-duration",
+		FullPath: "test-group-min-duration",
+	})
+	require.NoError(t, err)
+
+	createWorkspace := func(name string) *models.Workspace {
+		ws, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+			Name:           name,
+			GroupID:        group.Metadata.ID,
+			MaxJobDuration: ptr.Int32(1),
+		})
+		require.NoError(t, err)
+		return ws
+	}
+
+	now := time.Now().UTC()
+
+	// Never assessed: matched via the "no assessment" branch.
+	createWorkspace("ws-no-assessment")
+
+	// Fresh in-progress assessment: should NOT be matched (not stale, not completed).
+	freshWorkspace := createWorkspace("ws-fresh-in-progress")
+	_, err = testClient.client.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, &models.WorkspaceAssessment{
+		WorkspaceID:        freshWorkspace.Metadata.ID,
+		StartedAtTimestamp: now,
+	})
+	require.NoError(t, err)
+
+	// Stale in-progress assessment: matched via the stale branch once updated_at is
+	// backdated beyond the stale timeout.
+	staleWorkspace := createWorkspace("ws-stale-in-progress")
+	staleAssessment, err := testClient.client.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, &models.WorkspaceAssessment{
+		WorkspaceID:        staleWorkspace.Metadata.ID,
+		StartedAtTimestamp: now,
+	})
+	require.NoError(t, err)
+	_, err = testClient.client.getConnection(ctx).Exec(ctx,
+		"UPDATE workspace_assessments SET updated_at = $1 WHERE id = $2",
+		now.Add(-2*models.AssessmentStaleTimeout), staleAssessment.Metadata.ID)
+	require.NoError(t, err)
+
+	minDuration := time.Hour
+	result, err := testClient.client.Workspaces.GetWorkspaces(ctx, &GetWorkspacesInput{
+		Filter: &WorkspaceFilter{MinDurationSinceLastAssessment: &minDuration},
+	})
+	require.NoError(t, err)
+
+	matched := map[string]bool{}
+	for _, ws := range result.Workspaces {
+		matched[ws.Name] = true
+	}
+	assert.True(t, matched["ws-no-assessment"], "workspace with no assessment should be eligible")
+	assert.True(t, matched["ws-stale-in-progress"], "workspace with a stale in-progress assessment should be eligible")
+	assert.False(t, matched["ws-fresh-in-progress"], "workspace with a fresh in-progress assessment should not be eligible")
 }
 
 func TestWorkspaces_GetWorkspaces(t *testing.T) {

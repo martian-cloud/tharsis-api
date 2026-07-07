@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a30f1f6ead28cab534ed34365fb9de0c>>
+ * @generated SignedSource<<9f18eb884a48c846310146e73c7c8783>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,9 +9,9 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type PlanStatus = "canceled" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "%future added value";
+export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
+export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
+export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "queuing" | "queuing_apply" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunDetailsSidebarFragment_details$data = {
   readonly apply: {
@@ -25,6 +25,7 @@ export type RunDetailsSidebarFragment_details$data = {
     readonly status: ApplyStatus;
   } | null | undefined;
   readonly assessment: boolean;
+  readonly autoApply: boolean;
   readonly configurationVersion: {
     readonly id: string;
   } | null | undefined;
@@ -33,6 +34,7 @@ export type RunDetailsSidebarFragment_details$data = {
   readonly isDestroy: boolean;
   readonly metadata: {
     readonly createdAt: any;
+    readonly trn: string;
   };
   readonly moduleSource: string | null | undefined;
   readonly moduleVersion: string | null | undefined;
@@ -75,24 +77,24 @@ v1 = {
 v2 = {
   "alias": null,
   "args": null,
-  "concreteType": "ResourceMetadata",
-  "kind": "LinkedField",
-  "name": "metadata",
-  "plural": false,
-  "selections": [
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "createdAt",
-      "storageKey": null
-    }
-  ],
+  "kind": "ScalarField",
+  "name": "createdAt",
   "storageKey": null
 },
 v3 = [
   (v1/*: any*/),
-  (v2/*: any*/),
+  {
+    "alias": null,
+    "args": null,
+    "concreteType": "ResourceMetadata",
+    "kind": "LinkedField",
+    "name": "metadata",
+    "plural": false,
+    "selections": [
+      (v2/*: any*/)
+    ],
+    "storageKey": null
+  },
   {
     "alias": null,
     "args": null,
@@ -152,6 +154,13 @@ return {
       "alias": null,
       "args": null,
       "kind": "ScalarField",
+      "name": "autoApply",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
       "name": "moduleSource",
       "storageKey": null
     },
@@ -180,7 +189,25 @@ return {
       ],
       "storageKey": null
     },
-    (v2/*: any*/),
+    {
+      "alias": null,
+      "args": null,
+      "concreteType": "ResourceMetadata",
+      "kind": "LinkedField",
+      "name": "metadata",
+      "plural": false,
+      "selections": [
+        (v2/*: any*/),
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "trn",
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
+    },
     {
       "alias": null,
       "args": null,
@@ -219,6 +246,6 @@ return {
 };
 })();
 
-(node as any).hash = "521c1437da1f7f14b2c80fc37e209c14";
+(node as any).hash = "8dbad14bb9091b72aa4bd9bd49896ed3";
 
 export default node;

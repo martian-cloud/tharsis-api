@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<533a2f862ab73a306e6cf7a7a7ce32d3>>
+ * @generated SignedSource<<1b323135670e2e5440517a1d929b1b09>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -203,6 +203,13 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "kind": "ScalarField",
+                    "name": "destroyed",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "concreteType": "WorkspaceLabel",
                     "kind": "LinkedField",
                     "name": "labels",
@@ -303,12 +310,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "7830bd50ec16833975f89747e4a06919",
+    "cacheID": "ad9443672f96c2a8eb91fc5c7adb133c",
     "id": null,
     "metadata": {},
     "name": "WorkspaceListQuery",
     "operationKind": "query",
-    "text": "query WorkspaceListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $groupId: String!\n  $search: String\n) {\n  ...WorkspaceListFragment_workspaces\n}\n\nfragment WorkspaceListFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, groupId: $groupId, search: $search, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        ...WorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  labels {\n    key\n    value\n  }\n}\n"
+    "text": "query WorkspaceListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $groupId: String!\n  $search: String\n) {\n  ...WorkspaceListFragment_workspaces\n}\n\nfragment WorkspaceListFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, groupId: $groupId, search: $search, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        ...WorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  destroyed\n  labels {\n    key\n    value\n  }\n}\n"
   }
 };
 })();

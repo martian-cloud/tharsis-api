@@ -107,5 +107,10 @@ func (s *service) UpdateResourceLimit(ctx context.Context, input *UpdateResource
 		return nil, err
 	}
 
+	s.logger.WithContextFields(ctx).Infow("Updated a resource limit.",
+		"name", newLimit.Name,
+		"value", newLimit.Value,
+	)
+
 	return newLimit, nil
 }

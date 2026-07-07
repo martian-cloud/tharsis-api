@@ -13,7 +13,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -170,7 +169,10 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 			dbClient := buildDBClientWithMocks(t)
 			limiter := limits.NewLimitChecker(dbClient.Client)
 
-			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(
+				func(ctx context.Context) context.Context { return ctx },
+				nil,
+			)
 			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
@@ -215,9 +217,8 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 					Value: test.limit,
 				}, nil)
 
-			mockActivityEvents := activityevent.NewMockService(t)
 			if test.expectErrorCode == "" {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+				dbClient.MockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			}
 
 			testCaller := auth.NewUserCaller(
@@ -235,7 +236,7 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 			)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient.Client, limiter, mockActivityEvents)
+			service := NewService(logger, dbClient.Client, limiter)
 
 			// Call the service function.
 			toCreate := CreateGPGKeyInput{
@@ -314,6 +315,74 @@ func TestGPGKeyByTRN(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, test.gpgkey, actualGPGKey)
+		})
+	}
+}
+
+func TestDeleteGPGKey(t *testing.T) {
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject is not authorized",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			gpgKey := &models.GPGKey{
+				Metadata: models.ResourceMetadata{ID: "gpgkey-1"},
+				GroupID:  "group-1",
+			}
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteGPGKeyPermission, mock.Anything).Return(test.authError)
+
+			mockTransactions := db.NewMockTransactions(t)
+			mockGPGKeys := db.NewMockGPGKeys(t)
+			mockGroups := db.NewMockGroups(t)
+
+			if test.authError == nil {
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockGPGKeys.On("DeleteGPGKey", mock.Anything, gpgKey).Return(nil)
+				mockGroups.On("GetGroupByID", mock.Anything, gpgKey.GroupID).Return(&models.Group{
+					Metadata: models.ResourceMetadata{ID: gpgKey.GroupID},
+					FullPath: "group-1",
+				}, nil)
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient: &db.Client{
+					Transactions: mockTransactions,
+					GPGKeys:      mockGPGKeys,
+					Groups:       mockGroups,
+				},
+				logger: logger,
+			}
+
+			err := service.DeleteGPGKey(auth.WithCaller(ctx, mockCaller), gpgKey)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }

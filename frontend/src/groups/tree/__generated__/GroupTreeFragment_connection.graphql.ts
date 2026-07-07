@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<159f7c867c26d9c77ee72a0cedfb573d>>
+ * @generated SignedSource<<78987fe5cc4e404d05df3d68f6de351c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,6 +17,7 @@ export type GroupTreeFragment_connection$data = {
       readonly " $fragmentSpreads": FragmentRefs<"GroupTreeListItemFragment_group">;
     } | null | undefined;
   } | null | undefined> | null | undefined;
+  readonly totalCount: number;
   readonly " $fragmentType": "GroupTreeFragment_connection";
 };
 export type GroupTreeFragment_connection$key = {
@@ -30,6 +31,13 @@ const node: ReaderFragment = {
   "metadata": null,
   "name": "GroupTreeFragment_connection",
   "selections": [
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "totalCount",
+      "storageKey": null
+    },
     {
       "alias": null,
       "args": null,
@@ -69,6 +77,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "cda5a11b47b51eb01d52b142c975ee2c";
+(node as any).hash = "83be7bff2e64e4a3f3cd388394990eca";
 
 export default node;

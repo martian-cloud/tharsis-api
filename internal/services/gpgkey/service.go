@@ -10,11 +10,11 @@ import (
 	"github.com/aws/smithy-go/ptr"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -50,10 +50,9 @@ type Service interface {
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	limitChecker    limits.LimitChecker
-	activityService activityevent.Service
+	logger       logger.Logger
+	dbClient     *db.Client
+	limitChecker limits.LimitChecker
 }
 
 // NewService creates an instance of Service
@@ -61,13 +60,11 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	activityService activityevent.Service,
 ) Service {
 	return newService(
 		logger,
 		dbClient,
 		limitChecker,
-		activityService,
 	)
 }
 
@@ -75,13 +72,11 @@ func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	activityService activityevent.Service,
 ) Service {
 	return &service{
-		logger:          logger,
-		dbClient:        dbClient,
-		limitChecker:    limitChecker,
-		activityService: activityService,
+		logger:       logger,
+		dbClient:     dbClient,
+		limitChecker: limitChecker,
 	}
 }
 
@@ -220,8 +215,8 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 		return fmt.Errorf("group ID does not exist: %s", gpgKey.GroupID)
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,
@@ -393,8 +388,8 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetGPGKey,

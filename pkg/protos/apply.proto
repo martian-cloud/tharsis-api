@@ -8,13 +8,15 @@ import "metadata.proto";
 
 // ApplyStatus defines the status of an Apply.
 enum ApplyStatus {
-  CANCELED = 0;
-  CREATED  = 1;
-  ERRORED  = 2;
-  FINISHED = 3;
-  PENDING  = 4;
-  QUEUED   = 5;
-  RUNNING  = 6;
+  UNSPECIFIED = 0;
+  CREATED     = 1;
+  PENDING     = 2;
+  QUEUED      = 3;
+  RUNNING     = 4;
+  FINISHED    = 5;
+  ERRORED     = 6;
+  CANCELED    = 7;
+  SKIPPED     = 8;
 }
 
 // GetApplyByIDRequest is the input for retrieving an Apply by its ID.
@@ -26,14 +28,17 @@ message GetApplyByIDRequest {
 message UpdateApplyRequest {
   string          id            = 1;
   optional int64  version       = 2;
-  ApplyStatus     status        = 3;
+  // Field number 3 was used for the status field which has been removed
+  reserved 3;
   optional string error_message = 4;
 }
 
 // Apply represents a Terraform apply.
 message Apply {
-  metadata.ResourceMetadata metadata      = 1;
-  string                    status        = 2;
-  string                    triggered_by  = 3;
-  optional string           error_message = 4;
+  metadata.ResourceMetadata metadata          = 1;
+  string                    deprecated_status = 2 [deprecated = true];
+  string                    triggered_by      = 3;
+  optional string           error_message     = 4;
+  optional string           latest_job_id     = 5;
+  ApplyStatus               status            = 6;
 }

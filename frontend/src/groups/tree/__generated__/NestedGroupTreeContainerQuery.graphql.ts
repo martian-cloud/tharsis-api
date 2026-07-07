@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<73b2081898b8529758493ff0c119a2aa>>
+ * @generated SignedSource<<bc66f44166fefa90f4ea051f4b7fe28e>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -90,14 +90,15 @@ v6 = [
     "value": 0
   }
 ],
-v7 = [
-  {
-    "alias": null,
-    "args": null,
-    "kind": "ScalarField",
-    "name": "totalCount",
-    "storageKey": null
-  }
+v7 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "totalCount",
+  "storageKey": null
+},
+v8 = [
+  (v7/*: any*/)
 ];
 return {
   "fragment": {
@@ -217,7 +218,7 @@ return {
                     "kind": "LinkedField",
                     "name": "descendentGroups",
                     "plural": false,
-                    "selections": (v7/*: any*/),
+                    "selections": (v8/*: any*/),
                     "storageKey": "descendentGroups(first:0)"
                   },
                   {
@@ -227,7 +228,7 @@ return {
                     "kind": "LinkedField",
                     "name": "workspaces",
                     "plural": false,
-                    "selections": (v7/*: any*/),
+                    "selections": (v8/*: any*/),
                     "storageKey": "workspaces(first:0)"
                   }
                 ],
@@ -243,6 +244,7 @@ return {
             ],
             "storageKey": null
           },
+          (v7/*: any*/),
           {
             "alias": null,
             "args": null,
@@ -300,12 +302,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "5178952467e75d1f188feb3d7fde416d",
+    "cacheID": "6c3e565fa7a4d351b62c0049437ade69",
     "id": null,
     "metadata": {},
     "name": "NestedGroupTreeContainerQuery",
     "operationKind": "query",
-    "text": "query NestedGroupTreeContainerQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $parentPath: String!\n) {\n  ...NestedGroupTreeContainerFragment_groups\n}\n\nfragment GroupTreeFragment_connection on GroupConnection {\n  edges {\n    node {\n      id\n      ...GroupTreeListItemFragment_group\n    }\n  }\n}\n\nfragment GroupTreeListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n\nfragment NestedGroupTreeContainerFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, parentPath: $parentPath, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...GroupTreeFragment_connection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
+    "text": "query NestedGroupTreeContainerQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $parentPath: String!\n) {\n  ...NestedGroupTreeContainerFragment_groups\n}\n\nfragment GroupTreeFragment_connection on GroupConnection {\n  totalCount\n  edges {\n    node {\n      id\n      ...GroupTreeListItemFragment_group\n    }\n  }\n}\n\nfragment GroupTreeListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n\nfragment NestedGroupTreeContainerFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, parentPath: $parentPath, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...GroupTreeFragment_connection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
   }
 };
 })();

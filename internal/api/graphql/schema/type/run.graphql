@@ -10,12 +10,15 @@ enum RunStatus {
   apply_queued
   applying
   canceled
+  discarded
   errored
   pending
   plan_queued
   planned
   planned_and_finished
   planning
+  queuing
+  queuing_apply
 }
 
 type RunConnection {
@@ -32,10 +35,6 @@ type RunEdge {
 type RunVariable {
   namespacePath: String
   category: VariableCategory!
-  hcl: Boolean
-    @deprecated(
-      reason: "HCL field will be determined automatically, to be removed in a future release"
-    )
   key: String!
   value: String
   sensitive: Boolean!
@@ -73,6 +72,7 @@ type Run implements Node {
   refresh: Boolean!
   refreshOnly: Boolean!
   speculative: Boolean!
+  autoApply: Boolean!
   assessment: Boolean!
 }
 
@@ -129,6 +129,11 @@ input CreateRunInput {
   refreshOnly: Boolean
   speculative: Boolean
   """
+  When true, the run's apply phase starts automatically once the plan finishes
+  with changes, instead of waiting for a manual apply. Defaults to false.
+  """
+  autoApply: Boolean
+  """
   When true and moduleVersion is unset or a constraint range, prerelease module
   versions are eligible to be selected as "latest". Defaults to false. Has no
   effect when moduleVersion is an exact match. Requires moduleSource to be set.
@@ -142,11 +147,45 @@ input ApplyRunInput {
   comment: String
 }
 
+input SetRunAutoApplyInput {
+  clientMutationId: String
+  runId: String!
+  """
+  When true, the run's apply phase starts automatically once the plan finishes
+  with changes. Can only be changed before the plan completes.
+  """
+  autoApply: Boolean!
+}
+
 input CancelRunInput {
   clientMutationId: String
   runId: String!
   comment: String
   force: Boolean
+}
+
+"""
+RetryRunNodeInput retries a run's failed or canceled plan/apply node by resetting it
+to pending. The node is identified by runId and nodePath ("plan" or "apply").
+"""
+input RetryRunNodeInput {
+  clientMutationId: String
+  runId: String!
+  nodePath: String!
+}
+
+"""
+DiscardRunInput discards a run that is in the planned state, moving it to the
+terminal discarded status.
+"""
+input DiscardRunInput {
+  clientMutationId: String
+  runId: String!
+}
+
+input UndiscardRunInput {
+  clientMutationId: String
+  runId: String!
 }
 
 input SetVariablesIncludedInTFConfigInput {

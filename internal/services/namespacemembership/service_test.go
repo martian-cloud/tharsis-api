@@ -15,7 +15,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/builder"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -277,12 +276,9 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				Roles:                &mockRoles,
 			}
 
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
 			mockRoles.On("GetRoleByID", mock.Anything, test.input.RoleID).Return(&models.Role{Name: "role-1"}, nil)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
@@ -296,8 +292,6 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			}, nil)
 
 			// If a new test case is added that uses a team principal, will need to mock GetTeamByID here.
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 			mockNamespaceMemberships.On("GetNamespaceMemberships", mock.Anything, mock.Anything).
 				Return(&db.NamespaceMembershipResult{}, nil).Maybe()
@@ -313,7 +307,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			mockTaskManager.On("StartTask", mock.Anything).Maybe()
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockActivityEvents, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
+			service := NewService(logger, &dbClient, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
 
 			namespaceMembership, err := service.CreateNamespaceMembership(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrorCode != "" {
@@ -490,14 +484,9 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				Roles:                &mockRoles,
 			}
 
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 			mockEmailClient := email.MockClient{}
 			mockEmailClient.Test(t)
@@ -510,7 +499,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 			mockTaskManager.On("StartTask", mock.Anything).Maybe()
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockActivityEvents, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
+			service := NewService(logger, &dbClient, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
 
 			namespaceMembership, err := service.UpdateNamespaceMembership(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrorCode != "" {
@@ -872,11 +861,6 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 				Transactions:         &mockTransactions,
 			}
 
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
 			mockEmailClient := email.MockClient{}
 			mockEmailClient.Test(t)
 
@@ -888,9 +872,9 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 			mockTaskManager.On("StartTask", mock.Anything).Maybe()
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockActivityEvents, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
+			service := NewService(logger, &dbClient, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 

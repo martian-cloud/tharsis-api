@@ -12,7 +12,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -39,7 +38,7 @@ func TestGetAvailablePermissions(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			service := NewService(nil, nil, nil)
+			service := NewService(nil, nil)
 			actualPerms, err := service.GetAvailablePermissions(auth.WithCaller(context.TODO(), test.caller))
 
 			if test.expectErrorCode != "" {
@@ -95,7 +94,7 @@ func TestGetRoleByID(t *testing.T) {
 				Roles: mockRoles,
 			}
 
-			service := NewService(nil, &dbClient, nil)
+			service := NewService(nil, &dbClient)
 			actualRole, err := service.GetRoleByID(auth.WithCaller(context.TODO(), test.caller), test.search)
 
 			if test.expectErrorCode != "" {
@@ -212,7 +211,7 @@ func TestGetRolesByIDs(t *testing.T) {
 				Roles: mockRoles,
 			}
 
-			service := NewService(nil, &dbClient, nil)
+			service := NewService(nil, &dbClient)
 			actualRoles, err := service.GetRolesByIDs(auth.WithCaller(context.TODO(), test.caller), test.input)
 
 			if test.expectErrorCode != "" {
@@ -279,7 +278,7 @@ func TestGetRoles(t *testing.T) {
 				Roles: mockRoles,
 			}
 
-			service := NewService(nil, &dbClient, nil)
+			service := NewService(nil, &dbClient)
 			actualRoles, err := service.GetRoles(auth.WithCaller(context.TODO(), test.caller), test.input)
 
 			if test.expectErrorCode != "" {
@@ -386,16 +385,10 @@ func TestCreateRole(t *testing.T) {
 			ctx := auth.WithCaller(context.TODO(), caller)
 
 			mockRoles := db.NewMockRoles(t)
-			mockActivityEvents := activityevent.NewMockService(t)
+			mockActivityEventsDB := db.NewMockActivityEvents(t)
 			mockTransactions := db.NewMockTransactions(t)
 
 			if test.expectRole != nil {
-				eventsInput := &activityevent.CreateActivityEventInput{
-					Action:     models.ActionCreate,
-					TargetType: models.TargetRole,
-					TargetID:   test.expectRole.Metadata.ID,
-				}
-
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
@@ -403,16 +396,21 @@ func TestCreateRole(t *testing.T) {
 				test.expectRole.SetPermissions(test.input.Permissions)
 				mockRoles.On("CreateRole", mock.Anything, test.expectRole).Return(test.expectRole, nil)
 
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, eventsInput).Return(&models.ActivityEvent{}, nil)
+				mockActivityEventsDB.On("CreateActivityEvent", mock.Anything, mock.MatchedBy(func(in *models.ActivityEvent) bool {
+					return in.Action == models.ActionCreate &&
+						in.TargetType == models.TargetRole &&
+						in.TargetID == test.expectRole.Metadata.ID
+				})).Return(&models.ActivityEvent{}, nil)
 			}
 
 			dbClient := &db.Client{
-				Roles:        mockRoles,
-				Transactions: mockTransactions,
+				Roles:          mockRoles,
+				Transactions:   mockTransactions,
+				ActivityEvents: mockActivityEventsDB,
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, mockActivityEvents)
+			service := NewService(logger, dbClient)
 
 			actualRole, err := service.CreateRole(ctx, test.input)
 
@@ -549,19 +547,13 @@ func TestUpdateRole(t *testing.T) {
 			ctx := auth.WithCaller(context.TODO(), caller)
 
 			mockRoles := db.NewMockRoles(t)
-			mockActivityEvents := activityevent.NewMockService(t)
+			mockActivityEventsDB := db.NewMockActivityEvents(t)
 			mockTransactions := db.NewMockTransactions(t)
 
 			// Set models.
 			test.input.Role.SetPermissions(test.updatePerms)
 
 			if test.expectRole != nil {
-				eventsInput := &activityevent.CreateActivityEventInput{
-					Action:     models.ActionUpdate,
-					TargetType: models.TargetRole,
-					TargetID:   test.expectRole.Metadata.ID,
-				}
-
 				test.expectRole.SetPermissions(test.expectPerms)
 
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
@@ -570,16 +562,21 @@ func TestUpdateRole(t *testing.T) {
 
 				mockRoles.On("UpdateRole", mock.Anything, test.expectRole).Return(test.expectRole, nil)
 
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, eventsInput).Return(&models.ActivityEvent{}, nil)
+				mockActivityEventsDB.On("CreateActivityEvent", mock.Anything, mock.MatchedBy(func(in *models.ActivityEvent) bool {
+					return in.Action == models.ActionUpdate &&
+						in.TargetType == models.TargetRole &&
+						in.TargetID == test.expectRole.Metadata.ID
+				})).Return(&models.ActivityEvent{}, nil)
 			}
 
 			dbClient := &db.Client{
-				Roles:        mockRoles,
-				Transactions: mockTransactions,
+				Roles:          mockRoles,
+				Transactions:   mockTransactions,
+				ActivityEvents: mockActivityEventsDB,
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, mockActivityEvents)
+			service := NewService(logger, dbClient)
 
 			actualRole, err := service.UpdateRole(ctx, test.input)
 
@@ -728,7 +725,7 @@ func TestDeleteRole(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, nil)
+			service := NewService(logger, &dbClient)
 
 			caller := test.caller
 			if uc, ok := caller.(*auth.UserCaller); ok {

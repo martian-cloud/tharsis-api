@@ -20,11 +20,11 @@ import (
 	"github.com/hashicorp/go-slug"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	mtypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
@@ -256,7 +256,6 @@ type service struct {
 	limitChecker        limits.LimitChecker
 	signingKeyManager   auth.SigningKeyManager
 	vcsProviderMap      map[models.VCSProviderType]Provider
-	activityService     activityevent.Service
 	runService          run.Service
 	workspaceService    workspace.Service
 	taskManager         asynctask.Manager
@@ -273,7 +272,6 @@ func NewService(
 	limitChecker limits.LimitChecker,
 	signingKeyManager auth.SigningKeyManager,
 	httpClient *http.Client,
-	activityService activityevent.Service,
 	runService run.Service,
 	workspaceService workspace.Service,
 	taskManager asynctask.Manager,
@@ -291,7 +289,6 @@ func NewService(
 		limitChecker,
 		signingKeyManager,
 		vcsProviderMap,
-		activityService,
 		runService,
 		workspaceService,
 		taskManager,
@@ -307,7 +304,6 @@ func newService(
 	limitChecker limits.LimitChecker,
 	signingKeyManager auth.SigningKeyManager,
 	vcsProviderMap map[models.VCSProviderType]Provider,
-	activityService activityevent.Service,
 	runService run.Service,
 	workspaceService workspace.Service,
 	taskManager asynctask.Manager,
@@ -321,7 +317,6 @@ func newService(
 		limitChecker,
 		signingKeyManager,
 		vcsProviderMap,
-		activityService,
 		runService,
 		workspaceService,
 		taskManager,
@@ -587,8 +582,8 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetVCSProvider,
@@ -663,8 +658,8 @@ func (s *service) UpdateVCSProvider(ctx context.Context, input *UpdateVCSProvide
 
 	groupPath := updatedProvider.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionUpdate,
 			TargetType:    models.TargetVCSProvider,
@@ -771,8 +766,8 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 	}
 
 	groupPath := input.Provider.GetGroupPath()
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
 			NamespacePath: &groupPath,
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,
@@ -1459,6 +1454,11 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 	// Download and create the run in a goroutine.
 	s.taskManager.StartTask(handleVCSRunCallback)
 
+	s.logger.WithContextFields(ctx).Infow("Created a manual VCS run.",
+		"workspacePath", input.Workspace.FullPath,
+		"vcsEventID", createdEvent.Metadata.ID,
+	)
+
 	return nil
 }
 
@@ -1615,6 +1615,12 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 	// Processing the event in its own goroutine.
 	s.taskManager.StartTask(handleEventCallback)
 
+	s.logger.WithContextFields(ctx).Infow("Processed a VCS webhook event.",
+		"workspacePath", workspace.FullPath,
+		"vcsEventID", createdEvent.Metadata.ID,
+		"type", eventType,
+	)
+
 	return nil
 }
 
@@ -1655,6 +1661,12 @@ func (s *service) ResetVCSProviderOAuthToken(ctx context.Context, input *ResetVC
 		tracing.RecordError(span, err, "failed to update provider")
 		return nil, err
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Reset the OAuth token for a VCS provider.",
+		"name", updatedProvider.Name,
+		"groupID", updatedProvider.GroupID,
+		"type", updatedProvider.Type,
+	)
 
 	authorizationURL, err := s.getOAuthAuthorizationURL(ctx, updatedProvider)
 	if err != nil {
@@ -1784,6 +1796,12 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 		tracing.RecordError(span, err, "failed to update VCS provider in service layer ProcessOAuth")
 		return fmt.Errorf("failed to update VCS provider in service layer ProcessOAuth: %v", err)
 	}
+
+	s.logger.WithContextFields(ctx).Infow("Completed the OAuth flow for a VCS provider.",
+		"name", vp.Name,
+		"groupID", vp.GroupID,
+		"type", vp.Type,
+	)
 
 	return nil
 }

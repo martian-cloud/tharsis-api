@@ -11,6 +11,7 @@ export type RunFormData = {
     source: string;
     runType: string | null;
     refreshOnly: boolean;
+    autoApply: boolean;
     options: ModuleRunDataOptions | ConfigVersionRunDataOptions | VCSRunDataOptions | null;
 };
 
@@ -58,6 +59,7 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
                                 source: source.name,
                                 runType: '',
                                 refreshOnly: false,
+                                autoApply: false,
                                 options: DEFAULT_RUN_OPTIONS[source.name]
                             })
                         }}>
@@ -75,7 +77,7 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
                     {RUN_TYPES.map(run => <PanelButton
                         key={run.type}
                         selected={data.runType === run.type}
-                        onClick={() => onChange({ ...data, runType: run.type })}
+                        onClick={() => onChange({ ...data, runType: run.type, autoApply: run.type === 'plan' ? false : data.autoApply })}
                     >
                         <Typography variant="subtitle1">{run.label}</Typography>
                         <Typography variant="caption" align="center">
@@ -87,6 +89,20 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
             {(data.source === 'module' || data.source === 'configuration_version') && <Box marginBottom={4}>
                 <Typography variant="subtitle1" gutterBottom>Options</Typography>
                 <Divider light />
+                <FormControlLabel
+                    sx={{ mt: 1 }}
+                    control={
+                        <Checkbox
+                            checked={data.autoApply}
+                            disabled={data.runType === 'plan'}
+                            onChange={(e) => onChange({ ...data, autoApply: e.target.checked })}
+                        />
+                    }
+                    label="Auto Apply"
+                />
+                <Typography variant="caption" display="block" sx={{ ml: 4, color: 'text.secondary' }}>
+                    Automatically apply the run once the plan completes successfully, without waiting for manual approval. Not available for plan-only runs.
+                </Typography>
                 <FormControlLabel
                     sx={{ mt: 1 }}
                     control={

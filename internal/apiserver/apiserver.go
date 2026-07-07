@@ -25,6 +25,15 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/registry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/admission"
+	runcommands "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/commands"
+	runeventhandlers "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/eventhandlers"
+	runtransformers "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/transformers"
+	runtypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/types"
+	runvariables "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/variables"
+	coreworkspace "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
@@ -36,7 +45,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
@@ -57,8 +65,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/resourcelimit"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/role"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state/eventhandlers"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/scim"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
@@ -192,7 +198,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	respWriter := response.NewWriter(logger)
 
-	artifactStore := workspacesvc.NewArtifactStore(pluginCatalog.ObjectStore)
+	artifactStore := coreworkspace.NewArtifactStore(pluginCatalog.ObjectStore)
 	providerRegistryStore := providerregistry.NewRegistryStore(pluginCatalog.ObjectStore)
 	moduleRegistryStore := moduleregistry.NewRegistryStore(pluginCatalog.ObjectStore)
 	cliStore := cli.NewCLIStore(pluginCatalog.ObjectStore)
@@ -209,38 +215,65 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	limits := limits.NewLimitChecker(dbClient)
 	notificationManager := namespace.NewNotificationManager(dbClient, inheritedSettingsResolver)
 	federatedRegistryClient := registry.NewFederatedRegistryClient(logger, signingKeyManager, apiVersion)
+	moduleResolver := registry.NewModuleResolver(dbClient, httpClient, federatedRegistryClient, logger, cfg.TharsisAPIURL, signingKeyManager)
+	runVariablesBuilder := runvariables.NewBuilder(dbClient, pluginCatalog.SecretManager, artifactStore)
+	runAdmitter := admission.New(dbClient)
+	runCmdFactory := runcommands.NewFactory(logger, dbClient, runAdmitter, runVariablesBuilder, moduleResolver, cfg.TerraformCLIVersionConstraint, limits, artifactStore)
 
-	runStateManager := state.NewRunStateManager(dbClient, logger)
-	eventhandlers.NewErroredRunEmailHandler(logger, dbClient, runStateManager, emailClient, notificationManager, taskManager).RegisterHandlers()
-	eventhandlers.NewAssessmentRunHandler(logger, dbClient, runStateManager).RegisterHandlers()
+	// Run command processor and handlers
+	runCmdProcessor := engine.NewCmdProcessor(
+		logger,
+		dbClient,
+		[]runtypes.Transformer{
+			runtransformers.NewAutoApplyTransformer(),
+			runtransformers.NewAdmissionTransformer(runAdmitter),
+			runtransformers.NewJobCreationTransformer(dbClient, inheritedSettingsResolver),
+		},
+		[]runtypes.RunChangeHandler{
+			runeventhandlers.NewWorkspaceLockManager(logger, dbClient),
+			runeventhandlers.NewAssessmentRunHandler(logger, dbClient),
+			runeventhandlers.NewStalePlannedRunDiscarder(logger, dbClient),
+		},
+		[]runtypes.RunChangeHandler{
+			runeventhandlers.NewFailedRunEmailHandler(logger, dbClient, taskManager, emailClient, notificationManager),
+			runeventhandlers.NewRunMetricsHandler(logger, dbClient),
+		},
+	)
+
+	// Start run work item consumer
+	runWorkItemConsumer := engine.NewWorkItemConsumer(logger, dbClient, eventManager, runCmdProcessor, runCmdFactory, maintenanceMonitor)
+	runWorkItemConsumer.Start(ctx)
+
+	// Start the run reconciler: a safety net that re-drives runs stranded in
+	// queuing/queuing_apply when their work item was never enqueued or processed.
+	engine.NewReconciler(logger, dbClient, maintenanceMonitor).Start(ctx)
 
 	// Services.
 	var (
 		activityService            = activityevent.NewService(dbClient, logger)
 		adminLogTailService        = adminlogtail.NewService(pluginCatalog.AdminLogTailStore)
+		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore, cfg.TerraformCLIVersionConstraint)
 		announcementService        = announcement.NewService(logger, dbClient)
 		userService                = user.NewService(logger, dbClient, inheritedSettingsResolver)
-		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService, emailClient, notificationManager, taskManager)
-		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, activityService, inheritedSettingsResolver)
-		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore, cfg.TerraformCLIVersionConstraint)
-		workspaceService           = workspacesvc.NewService(logger, dbClient, limits, artifactStore, eventManager, cliService, activityService, inheritedSettingsResolver)
-		jobService                 = job.NewService(logger, dbClient, signingKeyManager, logStreamManager, eventManager, runStateManager)
-		managedIdentityService     = managedidentity.NewService(logger, dbClient, limits, managedIdentityDelegates, workspaceService, jobService, activityService)
-		saService                  = serviceaccount.NewService(logger, dbClient, limits, signingKeyManager, openIDConfigFetcher, activityService, cfg.ServiceAccountClientSecretMaxExpirationDays)
-		variableService            = variable.NewService(logger, dbClient, limits, activityService, pluginCatalog.SecretManager, cfg.DisableSensitiveVariableFeature)
-		teamService                = team.NewService(logger, dbClient, activityService)
-		providerRegistryService    = providerregistry.NewService(logger, dbClient, limits, providerRegistryStore, activityService)
-		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, activityService, taskManager)
-		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits, activityService)
+		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, emailClient, notificationManager, taskManager)
+		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, inheritedSettingsResolver)
+		workspaceService           = workspacesvc.NewService(logger, dbClient, limits, artifactStore, eventManager, cfg.TerraformCLIVersionConstraint, inheritedSettingsResolver)
+		jobService                 = job.NewService(logger, dbClient, runCmdProcessor, runCmdFactory, signingKeyManager, logStreamManager, eventManager)
+		managedIdentityService     = managedidentity.NewService(logger, dbClient, limits, managedIdentityDelegates, workspaceService, jobService)
+		saService                  = serviceaccount.NewService(logger, dbClient, limits, signingKeyManager, openIDConfigFetcher, cfg.ServiceAccountClientSecretMaxExpirationDays)
+		variableService            = variable.NewService(logger, dbClient, limits, pluginCatalog.SecretManager, cfg.DisableSensitiveVariableFeature)
+		teamService                = team.NewService(logger, dbClient)
+		providerRegistryService    = providerregistry.NewService(logger, dbClient, limits, providerRegistryStore)
+		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, taskManager)
+		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits)
 		scimService                = scim.NewService(logger, dbClient, signingKeyManager, cfg.OauthProviders)
-		federatedRegistryService   = federatedregistry.NewService(logger, dbClient, limits, activityService, signingKeyManager)
-		moduleResolver             = registry.NewModuleResolver(dbClient, httpClient, federatedRegistryClient, logger, cfg.TharsisAPIURL, signingKeyManager)
+		federatedRegistryService   = federatedregistry.NewService(logger, dbClient, limits, signingKeyManager)
 		providerRegistryClient     = provider.NewRegistryClient(httpClient)
-		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleResolver, runStateManager, limits, pluginCatalog.SecretManager, inheritedSettingsResolver)
-		runnerService              = runner.NewService(logger, dbClient, limits, activityService, logStreamManager, eventManager)
-		roleService                = role.NewService(logger, dbClient, activityService)
+		runService                 = run.NewService(logger, dbClient, runCmdProcessor, runCmdFactory, artifactStore, eventManager, runVariablesBuilder)
+		runnerService              = runner.NewService(logger, dbClient, limits, logStreamManager, eventManager)
+		roleService                = role.NewService(logger, dbClient)
 		resourceLimitService       = resourcelimit.NewService(logger, dbClient)
-		providerMirrorService      = providermirror.NewService(logger, dbClient, providerRegistryClient, limits, activityService, mirrorStore)
+		providerMirrorService      = providermirror.NewService(logger, dbClient, providerRegistryClient, limits, mirrorStore)
 		maintenanceModeService     = maint.NewService(logger, dbClient)
 	)
 
@@ -256,7 +289,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		limits,
 		signingKeyManager,
 		httpClient,
-		activityService,
 		runService,
 		workspaceService,
 		taskManager,
@@ -301,7 +333,8 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	workspace.NewAssessmentScheduler(
 		dbClient,
 		logger,
-		runService,
+		runCmdProcessor,
+		runCmdFactory,
 		inheritedSettingsResolver,
 		maintenanceMonitor,
 		time.Duration(cfg.WorkspaceAssessmentIntervalHours)*time.Hour,
@@ -372,7 +405,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		runnerModel, err := dbClient.Runners.CreateRunner(ctx, &models.Runner{
 			Type:            models.SharedRunnerType,
 			Name:            r.Name,
-			CreatedBy:       "system",
+			CreatedBy:       auth.System,
 			RunUntaggedJobs: true,
 		})
 		if err != nil {

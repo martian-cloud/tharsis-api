@@ -16,7 +16,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -136,7 +135,6 @@ func TestGetFederatedRegistriesByIDs(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			mockLimits := limits.NewMockLimitChecker(t)
-			mockActivity := activityevent.NewMockService(t)
 
 			mockDBClient := buildDBClientWithMocks(t)
 
@@ -170,10 +168,9 @@ func TestGetFederatedRegistriesByIDs(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 			service := &service{
-				logger:          testLogger,
-				dbClient:        mockDBClient.Client,
-				limitChecker:    mockLimits,
-				activityService: mockActivity,
+				logger:       testLogger,
+				dbClient:     mockDBClient.Client,
+				limitChecker: mockLimits,
 			}
 
 			mockDBClient.MockFederatedRegistries.On("GetFederatedRegistries", mock.Anything,
@@ -266,7 +263,6 @@ func TestGetFederatedRegistryByID(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockLimits := limits.NewMockLimitChecker(t)
-			mockActivity := activityevent.NewMockService(t)
 
 			mockDBClient := buildDBClientWithMocks(t)
 
@@ -280,10 +276,9 @@ func TestGetFederatedRegistryByID(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 			service := &service{
-				logger:          testLogger,
-				dbClient:        mockDBClient.Client,
-				limitChecker:    mockLimits,
-				activityService: mockActivity,
+				logger:       testLogger,
+				dbClient:     mockDBClient.Client,
+				limitChecker: mockLimits,
 			}
 
 			mockDBClient.MockFederatedRegistries.On("GetFederatedRegistryByID", mock.Anything, registryID).
@@ -520,7 +515,6 @@ func TestGetFederatedRegistries(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			mockLimits := limits.NewMockLimitChecker(t)
-			mockActivity := activityevent.NewMockService(t)
 
 			mockDBClient := buildDBClientWithMocks(t)
 
@@ -583,10 +577,9 @@ func TestGetFederatedRegistries(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 			service := &service{
-				logger:          testLogger,
-				dbClient:        mockDBClient.Client,
-				limitChecker:    mockLimits,
-				activityService: mockActivity,
+				logger:       testLogger,
+				dbClient:     mockDBClient.Client,
+				limitChecker: mockLimits,
 			}
 
 			var wantGroupPaths []string
@@ -694,7 +687,6 @@ func TestCreateFederatedRegistry(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockLimits := limits.NewMockLimitChecker(t)
-			mockActivity := activityevent.NewMockService(t)
 
 			mockDBClient := buildDBClientWithMocks(t)
 
@@ -710,13 +702,12 @@ func TestCreateFederatedRegistry(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 			service := &service{
-				logger:          testLogger,
-				dbClient:        mockDBClient.Client,
-				limitChecker:    mockLimits,
-				activityService: mockActivity,
+				logger:       testLogger,
+				dbClient:     mockDBClient.Client,
+				limitChecker: mockLimits,
 			}
 
-			mockDBClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockDBClient.MockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil).Maybe()
 			mockDBClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 			mockDBClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
@@ -749,11 +740,6 @@ func TestCreateFederatedRegistry(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: groupID,
 					},
-				}, nil).Maybe()
-
-			mockActivity.On("CreateActivityEvent", mock.Anything, mock.Anything).
-				Return(&models.ActivityEvent{
-					// The event is ignored, so don't need to assign anything.
 				}, nil).Maybe()
 
 			testCtx := ctx
@@ -844,7 +830,6 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockLimits := limits.NewMockLimitChecker(t)
-			mockActivity := activityevent.NewMockService(t)
 
 			mockDBClient := buildDBClientWithMocks(t)
 
@@ -856,13 +841,12 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 			service := &service{
-				logger:          testLogger,
-				dbClient:        mockDBClient.Client,
-				limitChecker:    mockLimits,
-				activityService: mockActivity,
+				logger:       testLogger,
+				dbClient:     mockDBClient.Client,
+				limitChecker: mockLimits,
 			}
 
-			mockDBClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockDBClient.MockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil).Maybe()
 			mockDBClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 			mockDBClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
@@ -893,11 +877,6 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: groupID,
 					},
-				}, nil).Maybe()
-
-			mockActivity.On("CreateActivityEvent", mock.Anything, mock.Anything).
-				Return(&models.ActivityEvent{
-					// The event is ignored, so don't need to assign anything.
 				}, nil).Maybe()
 
 			testCtx := ctx
@@ -973,7 +952,6 @@ func TestDeleteFederatedRegistry(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockLimits := limits.NewMockLimitChecker(t)
-			mockActivity := activityevent.NewMockService(t)
 
 			mockDBClient := buildDBClientWithMocks(t)
 
@@ -985,13 +963,12 @@ func TestDeleteFederatedRegistry(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 			service := &service{
-				logger:          testLogger,
-				dbClient:        mockDBClient.Client,
-				limitChecker:    mockLimits,
-				activityService: mockActivity,
+				logger:       testLogger,
+				dbClient:     mockDBClient.Client,
+				limitChecker: mockLimits,
 			}
 
-			mockDBClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockDBClient.MockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil).Maybe()
 			mockDBClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 			mockDBClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
@@ -1027,11 +1004,6 @@ func TestDeleteFederatedRegistry(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: groupID,
 					},
-				}, nil).Maybe()
-
-			mockActivity.On("CreateActivityEvent", mock.Anything, mock.Anything).
-				Return(&models.ActivityEvent{
-					// The event is ignored, so don't need to assign anything.
 				}, nil).Maybe()
 
 			testCtx := ctx
@@ -1131,13 +1103,11 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 			mockLimits := limits.NewMockLimitChecker(t)
-			mockActivity := activityevent.NewMockService(t)
 
 			service := &service{
 				logger:           logger,
 				dbClient:         mockDBClient,
 				limitChecker:     mockLimits,
-				activityService:  mockActivity,
 				identityProvider: mockIDP,
 			}
 

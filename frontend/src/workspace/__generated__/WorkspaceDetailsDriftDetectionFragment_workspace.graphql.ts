@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<788a14791a10f1411e3e87c3f99dd969>>
+ * @generated SignedSource<<ffd9e1aa256649ae0feec8177fc159e9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,6 +9,7 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
+export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "queuing" | "queuing_apply" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type WorkspaceDetailsDriftDetectionFragment_workspace$data = {
   readonly assessment: {
@@ -16,6 +17,7 @@ export type WorkspaceDetailsDriftDetectionFragment_workspace$data = {
     readonly hasDrift: boolean;
     readonly run: {
       readonly id: string;
+      readonly status: RunStatus;
     } | null | undefined;
     readonly startedAt: any;
   } | null | undefined;
@@ -87,7 +89,14 @@ return {
           "name": "run",
           "plural": false,
           "selections": [
-            (v0/*: any*/)
+            (v0/*: any*/),
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "status",
+              "storageKey": null
+            }
           ],
           "storageKey": null
         }
@@ -100,6 +109,6 @@ return {
 };
 })();
 
-(node as any).hash = "75bfd49261bbe4ad81bab05af5345fce";
+(node as any).hash = "9814940926704f320abe44420c34c410";
 
 export default node;

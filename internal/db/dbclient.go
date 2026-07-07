@@ -85,8 +85,6 @@ type Client struct {
 	Groups                           Groups
 	Runs                             Runs
 	Jobs                             Jobs
-	Plans                            Plans
-	Applies                          Applies
 	ConfigurationVersions            ConfigurationVersions
 	StateVersionOutputs              StateVersionOutputs
 	Workspaces                       Workspaces
@@ -131,6 +129,7 @@ type Client struct {
 	AgentSessionRuns                 AgentSessionRuns
 	AgentSessionMessages             AgentSessionMessages
 	AgentCreditQuotas                AgentCreditQuotas
+	WorkItemsQueue                   WorkItemsQueue
 }
 
 // NewClient creates a new Client
@@ -208,8 +207,6 @@ func NewClient(
 	dbClient.Groups = NewGroups(dbClient)
 	dbClient.Runs = NewRuns(dbClient)
 	dbClient.Jobs = NewJobs(dbClient)
-	dbClient.Plans = NewPlans(dbClient)
-	dbClient.Applies = NewApplies(dbClient)
 	dbClient.ConfigurationVersions = NewConfigurationVersions(dbClient)
 	dbClient.StateVersionOutputs = NewStateVersionOutputs(dbClient)
 	dbClient.Workspaces = NewWorkspaces(dbClient)
@@ -254,6 +251,7 @@ func NewClient(
 	dbClient.AgentSessionRuns = NewAgentSessionRuns(dbClient)
 	dbClient.AgentSessionMessages = NewAgentSessionMessages(dbClient)
 	dbClient.AgentCreditQuotas = NewAgentCreditQuotas(dbClient)
+	dbClient.WorkItemsQueue = NewWorkItemsQueue(dbClient)
 
 	return dbClient, nil
 }

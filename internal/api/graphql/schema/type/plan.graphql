@@ -1,4 +1,5 @@
 enum PlanStatus {
+  created
   canceled
   queued
   errored
@@ -21,12 +22,6 @@ enum PlanChangeAction {
 enum TerraformResourceMode {
   data
   managed
-}
-
-type UpdatePlanPayload {
-  clientMutationId: String
-  plan: Plan
-  problems: [Problem!]!
 }
 
 enum PlanChangeWarningType {
@@ -79,14 +74,23 @@ type PlanSummary {
   outputDestructions: Int!
 }
 
-type Plan implements Node {
+type Plan {
   id: ID!
-  metadata: ResourceMetadata!
+  metadata: ResourceMetadata! @deprecated(
+      reason: "use run metadata instead"
+  )
   status: PlanStatus!
   errorMessage: String
   hasChanges: Boolean!
   summary: PlanSummary!
   currentJob: Job
+  jobs(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: JobSort
+  ): JobConnection!
   changes: PlanChanges
   diffSize: Int!
   resourceAdditions: Int!
@@ -101,13 +105,4 @@ type Plan implements Node {
     @deprecated(
       reason: "Field has been moved to the PlanSummary type and will be removed in an upcoming release"
     )
-}
-
-input UpdatePlanInput {
-  clientMutationId: String
-  id: ID!
-  metadata: ResourceMetadataInput
-  status: PlanStatus!
-  hasChanges: Boolean!
-  errorMessage: String
 }

@@ -25,7 +25,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	terrs "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -42,7 +41,6 @@ type serviceAccountMocks struct {
 	serviceAccounts      *db.MockServiceAccounts
 	namespaceMemberships *db.MockNamespaceMemberships
 	transactions         *db.MockTransactions
-	activityEvents       *activityevent.MockService
 	limitChecker         *limits.MockLimitChecker
 	signingKeyMgr        *auth.MockSigningKeyManager
 	configFetcher        *auth.MockOpenIDConfigFetcher
@@ -55,7 +53,6 @@ func newServiceAccountMocks(t *testing.T) *serviceAccountMocks {
 		serviceAccounts:      db.NewMockServiceAccounts(t),
 		namespaceMemberships: db.NewMockNamespaceMemberships(t),
 		transactions:         db.NewMockTransactions(t),
-		activityEvents:       activityevent.NewMockService(t),
 		limitChecker:         limits.NewMockLimitChecker(t),
 		signingKeyMgr:        auth.NewMockSigningKeyManager(t),
 		configFetcher:        auth.NewMockOpenIDConfigFetcher(t),
@@ -216,11 +213,10 @@ func TestDeleteServiceAccount(t *testing.T) {
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
 				m.caller.On("RequirePermission", mock.Anything, models.DeleteServiceAccountPermission, mock.Anything).Return(nil)
-				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(t.Context(), m.caller), nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
 				m.serviceAccounts.On("DeleteServiceAccount", mock.Anything, existingSA).Return(nil)
-				m.activityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			},
 		},
 		{
@@ -249,7 +245,6 @@ func TestDeleteServiceAccount(t *testing.T) {
 			service := &service{
 				logger:                  testLogger,
 				dbClient:                m.dbClient(),
-				activityService:         m.activityEvents,
 				secretMaxExpirationDays: 90,
 			}
 
@@ -415,7 +410,7 @@ func TestCreateServiceAccount(t *testing.T) {
 			setupMocks: func(m *serviceAccountMocks) {
 				m.caller.On("RequirePermission", mock.Anything, models.CreateServiceAccountPermission, mock.Anything).Return(nil)
 				m.caller.On("GetSubject").Return("mockSubject")
-				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(t.Context(), m.caller), nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
 				m.serviceAccounts.On("CreateServiceAccount", mock.Anything, mock.Anything).Return(createdSA, nil)
@@ -423,7 +418,6 @@ func TestCreateServiceAccount(t *testing.T) {
 					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(5)},
 				}, nil)
 				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, mock.MatchedBy(func(c pagination.CountFunc) bool { v, _ := c(context.Background()); return v == 5 })).Return(nil)
-				m.activityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			},
 		},
 		{
@@ -438,7 +432,7 @@ func TestCreateServiceAccount(t *testing.T) {
 			setupMocks: func(m *serviceAccountMocks) {
 				m.caller.On("RequirePermission", mock.Anything, models.CreateServiceAccountPermission, mock.Anything).Return(nil)
 				m.caller.On("GetSubject").Return("mockSubject")
-				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(t.Context(), m.caller), nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
 				m.serviceAccounts.On("CreateServiceAccount", mock.Anything, mock.Anything).Return(&models.ServiceAccount{
@@ -454,7 +448,6 @@ func TestCreateServiceAccount(t *testing.T) {
 					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(5)},
 				}, nil)
 				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, mock.MatchedBy(func(c pagination.CountFunc) bool { v, _ := c(context.Background()); return v == 5 })).Return(nil)
-				m.activityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			},
 			expectClientCredentialsEnabled: true,
 		},
@@ -504,7 +497,6 @@ func TestCreateServiceAccount(t *testing.T) {
 				logger:                  testLogger,
 				dbClient:                m.dbClient(),
 				limitChecker:            m.limitChecker,
-				activityService:         m.activityEvents,
 				secretMaxExpirationDays: 90,
 			}
 
@@ -580,15 +572,9 @@ func TestUpdateServiceAccount(t *testing.T) {
 				updated := *existingSA
 				updated.Description = updatedDescription
 				m.serviceAccounts.On("UpdateServiceAccount", mock.Anything, &updated).Return(&updated, nil)
-				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(t.Context(), m.caller), nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
-				m.activityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-					NamespacePath: &groupPath,
-					Action:        models.ActionUpdate,
-					TargetType:    models.TargetServiceAccount,
-					TargetID:      serviceAccountID,
-				}).Return(&models.ActivityEvent{}, nil)
 			},
 		},
 		{
@@ -615,15 +601,9 @@ func TestUpdateServiceAccount(t *testing.T) {
 				updated := *existingSA
 				updated.Description = updatedDescription
 				m.serviceAccounts.On("UpdateServiceAccount", mock.Anything, &updated).Return(&updated, nil)
-				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(t.Context(), m.caller), nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
-				m.activityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-					NamespacePath: &groupPath,
-					Action:        models.ActionUpdate,
-					TargetType:    models.TargetServiceAccount,
-					TargetID:      serviceAccountID,
-				}).Return(&models.ActivityEvent{}, nil)
 			},
 		},
 		{
@@ -639,15 +619,9 @@ func TestUpdateServiceAccount(t *testing.T) {
 				updated := *existingSA
 				updated.Description = updatedDescription
 				m.serviceAccounts.On("UpdateServiceAccount", mock.Anything, &updated).Return(&updated, nil)
-				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(t.Context(), m.caller), nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
-				m.activityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-					NamespacePath: &groupPath,
-					Action:        models.ActionUpdate,
-					TargetType:    models.TargetServiceAccount,
-					TargetID:      serviceAccountID,
-				}).Return(&models.ActivityEvent{}, nil)
 			},
 		},
 		{
@@ -703,15 +677,9 @@ func TestUpdateServiceAccount(t *testing.T) {
 					ClientSecretHash:      ptr.String("hash"),
 					ClientSecretExpiresAt: &clientSecretExpiry,
 				}, nil)
-				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(t.Context(), m.caller), nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
-				m.activityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
-					NamespacePath: &groupPath,
-					Action:        models.ActionUpdate,
-					TargetType:    models.TargetServiceAccount,
-					TargetID:      serviceAccountID,
-				}).Return(&models.ActivityEvent{}, nil)
 			},
 			expectClientCredentialsEnabled: true,
 		},
@@ -758,7 +726,6 @@ func TestUpdateServiceAccount(t *testing.T) {
 			service := &service{
 				logger:                  testLogger,
 				dbClient:                m.dbClient(),
-				activityService:         m.activityEvents,
 				secretMaxExpirationDays: 90,
 			}
 
@@ -1051,7 +1018,6 @@ func TestCreateOIDCToken(t *testing.T) {
 
 			mockConfigFetcher := auth.NewMockOpenIDConfigFetcher(t)
 
-			mockActivityEvents := activityevent.NewMockService(t)
 			mockTokenVerifier := auth.NewMockOIDCTokenVerifier(t)
 
 			mockTokenVerifier.On("VerifyToken", mock.Anything, string(test.token), mock.Anything).Return(
@@ -1082,7 +1048,6 @@ func TestCreateOIDCToken(t *testing.T) {
 				limitChecker:        limits.NewLimitChecker(&dbClient),
 				signingKeyManager:   mockSigningKeyManager,
 				openIDConfigFetcher: mockConfigFetcher,
-				activityService:     mockActivityEvents,
 				buildOIDCTokenVerifier: func(_ context.Context, _ []string, _ auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier {
 					return mockTokenVerifier
 				},

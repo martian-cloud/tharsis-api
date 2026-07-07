@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -32,6 +33,25 @@ func (s JobStatus) IsFinal() bool {
 	return false
 }
 
+// jobStatusTransitions lists the statuses each job status may legally transition to.
+// Final statuses are absent (no outgoing transitions).
+var jobStatusTransitions = map[JobStatus][]JobStatus{
+	JobQueued:    {JobPending, JobCanceled},
+	JobPending:   {JobRunning, JobCanceled},
+	JobRunning:   {JobFinished, JobFailed, JobCanceled, JobCanceling},
+	JobCanceling: {JobCanceled, JobFinished, JobFailed},
+}
+
+// canTransitionTo reports whether the job may move from its current status to next.
+func (s JobStatus) canTransitionTo(next JobStatus) bool {
+	for _, allowed := range jobStatusTransitions[s] {
+		if allowed == next {
+			return true
+		}
+	}
+	return false
+}
+
 // JobType indicates the type of job
 type JobType string
 
@@ -58,7 +78,7 @@ type JobTimestamps struct {
 type Job struct {
 	Timestamps               JobTimestamps
 	CancelRequestedTimestamp *time.Time
-	Status                   JobStatus
+	status                   JobStatus
 	Type                     JobType
 	WorkspaceID              string
 	RunID                    string
@@ -69,6 +89,22 @@ type Job struct {
 	ForceCanceled            bool
 	Tags                     []string
 	Properties               map[string]string
+}
+
+// GetStatus returns the job's current status.
+func (j *Job) GetStatus() JobStatus {
+	return j.status
+}
+
+// SetStatus transitions the job to a new status. The initial assignment from the
+// zero value — constructing a new job or hydrating one from the database — is always
+// allowed; any later change must be a valid job lifecycle transition.
+func (j *Job) SetStatus(status JobStatus) error {
+	if j.status != "" && !j.status.canTransitionTo(status) {
+		return fmt.Errorf("invalid job status transition from %q to %q", j.status, status)
+	}
+	j.status = status
+	return nil
 }
 
 // GetID returns the Metadata ID.

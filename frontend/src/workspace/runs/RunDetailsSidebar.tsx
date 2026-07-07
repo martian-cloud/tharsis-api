@@ -1,24 +1,27 @@
 import CopyIcon from '@mui/icons-material/ContentCopy';
-import { Chip, List, Stack, Tooltip, Typography, Button } from '@mui/material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { Chip, List, Stack, Tooltip, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import graphql from 'babel-plugin-relay/macro';
-import { useContext, useMemo } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { Link as LinkRouter } from 'react-router-dom';
 import { ApiConfigContext } from '../../ApiConfigContext';
+import ConfirmationDialog from '../../common/ConfirmationDialog';
 import Drawer from '../../common/Drawer';
 import { MutationError } from '../../common/error';
 import Gravatar from '../../common/Gravatar';
 import Timestamp from '../../common/Timestamp';
+import TRNButton from '../../common/TRNButton';
 import Link from '../../routes/Link';
-import { RunDetailsSidebarCancelRunMutation } from './__generated__/RunDetailsSidebarCancelRunMutation.graphql';
 import { RunDetailsSidebarFragment_details$key } from './__generated__/RunDetailsSidebarFragment_details.graphql';
+import { RunDetailsSidebarSetRunAutoApplyMutation } from './__generated__/RunDetailsSidebarSetRunAutoApplyMutation.graphql';
 import RunStageStatusTypes from './RunStageStatusTypes';
-import React from 'react';
+import RunStatusChip from './RunStatusChip';
 
 interface Props {
     fragmentRef: RunDetailsSidebarFragment_details$key
@@ -30,8 +33,6 @@ interface Props {
 }
 
 export const SidebarWidth = 300;
-
-const RUN_FINALITY_STATES = ['planned_and_finished', 'applied', 'errored', 'canceled']
 
 function RunDetailsSidebar(props: Props) {
     const { stage, open, temporary, onClose, onError } = props;
@@ -46,6 +47,7 @@ function RunDetailsSidebar(props: Props) {
         createdBy
         isDestroy
         assessment
+        autoApply
         moduleSource
         moduleVersion
         workspace {
@@ -53,6 +55,7 @@ function RunDetailsSidebar(props: Props) {
         }
         metadata {
           createdAt
+          trn
         }
         configurationVersion {
           id
@@ -80,9 +83,9 @@ function RunDetailsSidebar(props: Props) {
     }
   `, props.fragmentRef)
 
-    const [commitCancelRun, commitCancelRunInFlight] = useMutation<RunDetailsSidebarCancelRunMutation>(graphql`
-        mutation RunDetailsSidebarCancelRunMutation($input: CancelRunInput!) {
-            cancelRun(input: $input) {
+    const [commitSetAutoApply, setAutoApplyInFlight] = useMutation<RunDetailsSidebarSetRunAutoApplyMutation>(graphql`
+        mutation RunDetailsSidebarSetRunAutoApplyMutation($input: SetRunAutoApplyInput!) {
+            setRunAutoApply(input: $input) {
                 run {
                     ...RunDetailsSidebarFragment_details
                 }
@@ -95,20 +98,31 @@ function RunDetailsSidebar(props: Props) {
         }
     `);
 
-    const cancelRun = () => {
-        commitCancelRun({
+    const [editingAutoApply, setEditingAutoApply] = useState(false);
+
+    // Auto-apply only takes effect when the plan finishes, so it can only be changed while the
+    // run is still planning and its apply phase has not started.
+    const canEditAutoApply = !!data.apply
+        && data.apply.status === 'created'
+        && ['pending', 'queuing', 'plan_queued', 'planning'].includes(data.status);
+
+    const confirmAutoApply = () => {
+        commitSetAutoApply({
             variables: {
                 input: {
-                    runId: data.id
+                    runId: data.id,
+                    autoApply: !data.autoApply,
                 },
             },
-            onCompleted: data => {
-                if (data.cancelRun.problems.length) {
+            onCompleted: response => {
+                if (response.setRunAutoApply.problems.length) {
                     onError({
                         severity: 'warning',
-                        message: data.cancelRun.problems.map(problem => problem.message).join('; ')
+                        message: response.setRunAutoApply.problems.map(problem => problem.message).join('; ')
                     });
+                    return;
                 }
+                setEditingAutoApply(false);
             },
             onError: error => {
                 onError({
@@ -116,8 +130,8 @@ function RunDetailsSidebar(props: Props) {
                     message: `Unexpected Error Occurred: ${error.message}`
                 });
             }
-        })
-    }
+        });
+    };
 
     // If module source references a module in the tharsis registry than strip the host
     const moduleSource = useMemo(
@@ -143,10 +157,11 @@ function RunDetailsSidebar(props: Props) {
             <Box padding={2}>
                 <Box marginBottom={2} display="flex" alignItems="center" justifyContent="space-between">
                     <Typography variant="h6">Run Details</Typography>
-                    {!RUN_FINALITY_STATES.includes(data.status) &&
-                        !data.plan.currentJob?.cancelRequested &&
-                        !data.apply?.currentJob?.cancelRequested &&
-                        <Button loading={commitCancelRunInFlight} size="small" variant="outlined" color="error" onClick={cancelRun}>Cancel</Button>}
+                    <TRNButton size="small" trn={data.metadata.trn} />
+                </Box>
+                <Box marginBottom={3}>
+                    <Typography sx={{ marginBottom: 1 }}>Status</Typography>
+                    <RunStatusChip status={data.status} />
                 </Box>
                 <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Type</Typography>
@@ -154,6 +169,33 @@ function RunDetailsSidebar(props: Props) {
                     {data.isDestroy && <Chip size="small" label="Destroy" sx={{ color: 'runStatus.destroy' }} />}
                     {!data.apply && <Chip size="small" label={data.assessment ? "Assessment" : "Speculative"} />}
                 </Box>
+                {data.apply && <Box marginBottom={3}>
+                    <Box display="flex" alignItems="center" sx={{ marginBottom: 1 }}>
+                        <Typography>Auto Apply</Typography>
+                        <Tooltip title="When auto apply is enabled, the apply stage starts automatically after the plan completes with changes. When disabled, the run waits at the planned state for a user to manually start the apply.">
+                            <HelpOutlineIcon sx={{
+                                width: 16,
+                                height: 16,
+                                marginLeft: '6px',
+                                opacity: '40%',
+                                transition: 'ease',
+                                transitionDuration: '300ms',
+                                ":hover": {
+                                    opacity: '100%'
+                                }
+                            }} />
+                        </Tooltip>
+                    </Box>
+                    {canEditAutoApply
+                        ? <Tooltip title="Click to change">
+                            <Chip
+                                size="small"
+                                label={data.autoApply ? 'Enabled' : 'Disabled'}
+                                onClick={() => setEditingAutoApply(true)}
+                            />
+                        </Tooltip>
+                        : <Chip size="small" label={data.autoApply ? 'Enabled' : 'Disabled'} />}
+                </Box>}
                 <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Created</Typography>
                     <Box display="flex" alignItems="center">
@@ -232,6 +274,20 @@ function RunDetailsSidebar(props: Props) {
                     </List>
                 </Box>
             </Box>
+            {editingAutoApply && <ConfirmationDialog
+                title="Edit Auto Apply"
+                confirmColor="primary"
+                confirmLabel={data.autoApply ? 'Disable' : 'Enable'}
+                confirmInProgress={setAutoApplyInFlight}
+                onConfirm={confirmAutoApply}
+                onClose={() => setEditingAutoApply(false)}
+            >
+                <Typography>
+                    {data.autoApply
+                        ? 'Disabling auto apply means this run will wait at the planned state for a user to manually start the apply.'
+                        : 'Enabling auto apply means this run\'s apply phase will start automatically once the plan completes with changes.'}
+                </Typography>
+            </ConfirmationDialog>}
         </Drawer>
     );
 }

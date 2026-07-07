@@ -25,7 +25,7 @@ type Workspace struct {
 	FullPath              string
 	GroupID               string
 	Description           string
-	CurrentJobID          string
+	CurrentApplyRunID     *string
 	CurrentStateVersionID string
 	CreatedBy             string
 	TerraformVersion      string

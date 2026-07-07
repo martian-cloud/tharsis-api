@@ -2,14 +2,9 @@ package resolver
 
 import (
 	"context"
-	"strconv"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
-	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 )
 
@@ -17,167 +12,60 @@ import (
 
 // ApplyResolver resolves a apply resource
 type ApplyResolver struct {
-	apply *models.Apply
+	run *models.Run
 }
 
 // ID resolver
 func (r *ApplyResolver) ID() graphql.ID {
-	return graphql.ID(r.apply.GetGlobalID())
+	return graphql.ID(r.run.Apply.GetGlobalID())
 }
 
 // Status resolver
 func (r *ApplyResolver) Status() string {
-	return string(r.apply.Status)
+	return string(r.run.Apply.Status)
 }
 
 // ErrorMessage resolver
 func (r *ApplyResolver) ErrorMessage() *string {
-	return r.apply.ErrorMessage
+	return r.run.Apply.ErrorMessage
 }
 
 // TriggeredBy resolver
 func (r *ApplyResolver) TriggeredBy() *string {
-	if r.apply.TriggeredBy == "" {
+	apply := r.run.Apply
+	if apply.TriggeredBy == "" {
 		return nil
 	}
-	return &r.apply.TriggeredBy
+	return &apply.TriggeredBy
 }
 
 // Metadata resolver
-func (r *ApplyResolver) Metadata() *MetadataResolver {
-	return &MetadataResolver{metadata: &r.apply.Metadata}
+func (r *ApplyResolver) Metadata() (*MetadataResolver, error) {
+	apply := r.run.Apply
+	return &MetadataResolver{metadata: apply.Metadata(r.run)}, nil
+}
+
+// Jobs returns the connection of jobs associated with the apply.
+func (r *ApplyResolver) Jobs(ctx context.Context, args *ConnectionQueryArgs) (*JobConnectionResolver, error) {
+	return jobConnectionForRunNode(ctx, r.run, models.JobApplyType, args)
 }
 
 // CurrentJob returns the current job for the apply resource
 func (r *ApplyResolver) CurrentJob(ctx context.Context) (*JobResolver, error) {
-	job, err := getServiceCatalog(ctx).RunService.GetLatestJobForApply(ctx, r.apply.Metadata.ID)
+	apply := r.run.Apply
+	if apply.LatestJobID == nil {
+		return nil, nil
+	}
+
+	job, err := loadJob(ctx, *apply.LatestJobID)
 	if err != nil {
-		if errors.ErrorCode(err) == errors.ENotFound {
-			return nil, nil
-		}
 		return nil, err
 	}
+
 	return &JobResolver{job: job}, nil
 }
 
 // Comment resolver
 func (r *ApplyResolver) Comment() string {
-	return r.apply.Comment
-}
-
-/* Apply Mutation Resolvers */
-
-// ApplyMutationPayload is the response payload for an apply mutation
-type ApplyMutationPayload struct {
-	ClientMutationID *string
-	Apply            *models.Apply
-	Problems         []Problem
-}
-
-// ApplyMutationPayloadResolver resolves a ApplyMutationPayload
-type ApplyMutationPayloadResolver struct {
-	ApplyMutationPayload
-}
-
-// Apply field resolver
-func (r *ApplyMutationPayloadResolver) Apply() *ApplyResolver {
-	if r.ApplyMutationPayload.Apply == nil {
-		return nil
-	}
-	return &ApplyResolver{apply: r.ApplyMutationPayload.Apply}
-}
-
-// UpdateApplyInput contains the input for updating an apply
-type UpdateApplyInput struct {
-	ClientMutationID *string
-	ID               string
-	Metadata         *MetadataInput
-	Status           models.ApplyStatus
-	ErrorMessage     *string
-}
-
-func handleApplyMutationProblem(e error, clientMutationID *string) (*ApplyMutationPayloadResolver, error) {
-	problem, err := buildProblem(e)
-	if err != nil {
-		return nil, err
-	}
-	payload := ApplyMutationPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}
-	return &ApplyMutationPayloadResolver{ApplyMutationPayload: payload}, nil
-}
-
-// Deprecated: Use the gRPC API instead.
-func updateApplyMutation(ctx context.Context, input *UpdateApplyInput) (*ApplyMutationPayloadResolver, error) {
-	serviceCatalog := getServiceCatalog(ctx)
-
-	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	updateInput := &run.UpdateApplyInput{
-		ApplyID:      id,
-		Status:       input.Status,
-		ErrorMessage: input.ErrorMessage,
-	}
-
-	// Check if resource version is specified
-	if input.Metadata != nil {
-		v, cErr := strconv.Atoi(input.Metadata.Version)
-		if cErr != nil {
-			return nil, cErr
-		}
-
-		updateInput.MetadataVersion = &v
-	}
-
-	apply, err := serviceCatalog.RunService.UpdateApply(ctx, updateInput)
-	if err != nil {
-		return nil, err
-	}
-
-	payload := ApplyMutationPayload{ClientMutationID: input.ClientMutationID, Apply: apply, Problems: []Problem{}}
-	return &ApplyMutationPayloadResolver{ApplyMutationPayload: payload}, nil
-}
-
-/* Apply loader */
-
-const applyLoaderKey = "apply"
-
-// RegisterApplyLoader registers an apply loader function
-func RegisterApplyLoader(collection *loader.Collection) {
-	collection.Register(applyLoaderKey, applyBatchFunc)
-}
-
-func loadApply(ctx context.Context, id string) (*models.Apply, error) {
-	ldr, err := loader.Extract(ctx, applyLoaderKey)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := ldr.Load(ctx, dataloader.StringKey(id))()
-	if err != nil {
-		return nil, err
-	}
-
-	ws, ok := data.(models.Apply)
-	if !ok {
-		return nil, errors.New("Wrong type")
-	}
-
-	return &ws, nil
-}
-
-func applyBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	applies, err := getServiceCatalog(ctx).RunService.GetAppliesByIDs(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-
-	// Build map of results
-	batch := loader.DataBatch{}
-	for _, result := range applies {
-		batch[result.Metadata.ID] = result
-	}
-
-	return batch, nil
+	return r.run.Apply.Comment
 }

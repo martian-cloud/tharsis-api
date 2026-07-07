@@ -44,36 +44,6 @@ func (_m *MockRuns) CreateRun(ctx context.Context, run *models.Run) (*models.Run
 	return r0, r1
 }
 
-// GetRunByApplyID provides a mock function with given fields: ctx, applyID
-func (_m *MockRuns) GetRunByApplyID(ctx context.Context, applyID string) (*models.Run, error) {
-	ret := _m.Called(ctx, applyID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetRunByApplyID")
-	}
-
-	var r0 *models.Run
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Run, error)); ok {
-		return rf(ctx, applyID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Run); ok {
-		r0 = rf(ctx, applyID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.Run)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, applyID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetRunByID provides a mock function with given fields: ctx, id
 func (_m *MockRuns) GetRunByID(ctx context.Context, id string) (*models.Run, error) {
 	ret := _m.Called(ctx, id)
@@ -104,21 +74,21 @@ func (_m *MockRuns) GetRunByID(ctx context.Context, id string) (*models.Run, err
 	return r0, r1
 }
 
-// GetRunByPlanID provides a mock function with given fields: ctx, planID
-func (_m *MockRuns) GetRunByPlanID(ctx context.Context, planID string) (*models.Run, error) {
-	ret := _m.Called(ctx, planID)
+// GetRunByNodeID provides a mock function with given fields: ctx, nodeID
+func (_m *MockRuns) GetRunByNodeID(ctx context.Context, nodeID string) (*models.Run, error) {
+	ret := _m.Called(ctx, nodeID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetRunByPlanID")
+		panic("no return value specified for GetRunByNodeID")
 	}
 
 	var r0 *models.Run
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Run, error)); ok {
-		return rf(ctx, planID)
+		return rf(ctx, nodeID)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Run); ok {
-		r0 = rf(ctx, planID)
+		r0 = rf(ctx, nodeID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Run)
@@ -126,7 +96,7 @@ func (_m *MockRuns) GetRunByPlanID(ctx context.Context, planID string) (*models.
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, planID)
+		r1 = rf(ctx, nodeID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -194,9 +164,16 @@ func (_m *MockRuns) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResu
 	return r0, r1
 }
 
-// UpdateRun provides a mock function with given fields: ctx, run
-func (_m *MockRuns) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, error) {
-	ret := _m.Called(ctx, run)
+// UpdateRun provides a mock function with given fields: ctx, run, nodeIDs
+func (_m *MockRuns) UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string) (*models.Run, error) {
+	_va := make([]interface{}, len(nodeIDs))
+	for _i := range nodeIDs {
+		_va[_i] = nodeIDs[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, run)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateRun")
@@ -204,19 +181,19 @@ func (_m *MockRuns) UpdateRun(ctx context.Context, run *models.Run) (*models.Run
 
 	var r0 *models.Run
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Run) (*models.Run, error)); ok {
-		return rf(ctx, run)
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, ...string) (*models.Run, error)); ok {
+		return rf(ctx, run, nodeIDs...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Run) *models.Run); ok {
-		r0 = rf(ctx, run)
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, ...string) *models.Run); ok {
+		r0 = rf(ctx, run, nodeIDs...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Run)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.Run) error); ok {
-		r1 = rf(ctx, run)
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Run, ...string) error); ok {
+		r1 = rf(ctx, run, nodeIDs...)
 	} else {
 		r1 = ret.Error(1)
 	}
