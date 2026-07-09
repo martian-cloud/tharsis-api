@@ -25,6 +25,7 @@ import StateVersionFile from './state/StateVersionFile';
 import StateVersionInputVariables from './state/StateVersionInputVariables';
 import StateVersionOutputs from './state/StateVersionOutputs';
 import StateVersionResources from './state/StateVersionResources';
+import StateVersionCheckResults from './state/StateVersionCheckResults';
 import WorkspaceDetailsDriftDetection from './WorkspaceDetailsDriftDetection';
 import WorkspaceNotificationPreference from '../notifications/WorkspaceNotificationPreference';
 import NamespaceFavoriteButton from '../common/NamespaceFavoriteButton';
@@ -78,8 +79,11 @@ function WorkspaceDetailsIndex(props: Props) {
         currentStateVersion {
             id
             ...StateVersionOutputsFragment_outputs
-            ...StateVersionResourcesFragment_resources
-            ...StateVersionDependenciesFragment_dependencies
+            inventory {
+                ...StateVersionResourcesFragment_resources
+                ...StateVersionDependenciesFragment_dependencies
+                ...StateVersionCheckResultsFragment_checkResults
+            }
             ...StateVersionFileFragment_stateVersion
             metadata {
                 createdAt
@@ -429,11 +433,12 @@ function WorkspaceDetailsIndex(props: Props) {
                         <Tab label="Input Variables" value="inputs" />
                         <Tab label="Outputs" value="outputs" />
                         <Tab label="Dependencies" value="dependencies" />
+                        <Tab label="Checks" value="checks" />
                         <Tab label="Drift" value="drift" />
                         <Tab label="State File" value="stateFile" />
                     </Tabs>
                 </Box>
-                {tab === 'resources' && <StateVersionResources fragmentRef={data.currentStateVersion} destroyed={workspaceDestroyed} />}
+                {tab === 'resources' && <StateVersionResources fragmentRef={data.currentStateVersion.inventory} destroyed={workspaceDestroyed} />}
                 {tab === 'inputs' && <React.Fragment>
                     {data.currentStateVersion.run && <StateVersionInputVariables fragmentRef={data.currentStateVersion.run} />}
                     {!data.currentStateVersion.run && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
@@ -445,7 +450,8 @@ function WorkspaceDetailsIndex(props: Props) {
                     </Paper>}
                 </React.Fragment>}
                 {tab === 'outputs' && <StateVersionOutputs fragmentRef={data.currentStateVersion} />}
-                {tab === 'dependencies' && <StateVersionDependencies fragmentRef={data.currentStateVersion} />}
+                {tab === 'dependencies' && <StateVersionDependencies fragmentRef={data.currentStateVersion.inventory} />}
+                {tab === 'checks' && <StateVersionCheckResults fragmentRef={data.currentStateVersion.inventory} />}
                 {tab === 'drift' && <WorkspaceDetailsDriftDetection fragmentRef={data} />}
                 {tab === 'stateFile' && <TabContent>
                     <StateVersionFile fragmentRef={data.currentStateVersion} />

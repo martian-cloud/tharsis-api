@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d40541f0bb1661aeed7b9dfe7125c2de>>
+ * @generated SignedSource<<cccf8cb39d36387c1487e7691afbdf18>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -431,70 +431,103 @@ return {
                   {
                     "alias": null,
                     "args": null,
-                    "concreteType": "StateVersionResource",
+                    "concreteType": "StateVersionInventory",
                     "kind": "LinkedField",
-                    "name": "resources",
-                    "plural": true,
-                    "selections": [
-                      (v3/*: any*/),
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "provider",
-                        "storageKey": null
-                      },
-                      (v17/*: any*/),
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "mode",
-                        "storageKey": null
-                      },
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "module",
-                        "storageKey": null
-                      }
-                    ],
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "concreteType": "StateVersionDependency",
-                    "kind": "LinkedField",
-                    "name": "dependencies",
-                    "plural": true,
+                    "name": "inventory",
+                    "plural": false,
                     "selections": [
                       {
                         "alias": null,
                         "args": null,
-                        "kind": "ScalarField",
-                        "name": "workspacePath",
-                        "storageKey": null
-                      },
-                      {
-                        "alias": null,
-                        "args": null,
-                        "concreteType": "StateVersion",
+                        "concreteType": "StateVersionResource",
                         "kind": "LinkedField",
-                        "name": "stateVersion",
-                        "plural": false,
+                        "name": "resources",
+                        "plural": true,
                         "selections": [
-                          (v2/*: any*/),
+                          (v3/*: any*/),
                           {
                             "alias": null,
                             "args": null,
-                            "concreteType": "ResourceMetadata",
+                            "kind": "ScalarField",
+                            "name": "provider",
+                            "storageKey": null
+                          },
+                          (v17/*: any*/),
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "mode",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "module",
+                            "storageKey": null
+                          }
+                        ],
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "StateVersionDependency",
+                        "kind": "LinkedField",
+                        "name": "dependencies",
+                        "plural": true,
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "workspacePath",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "concreteType": "StateVersion",
                             "kind": "LinkedField",
-                            "name": "metadata",
+                            "name": "stateVersion",
                             "plural": false,
                             "selections": [
-                              (v15/*: any*/)
+                              (v2/*: any*/),
+                              {
+                                "alias": null,
+                                "args": null,
+                                "concreteType": "ResourceMetadata",
+                                "kind": "LinkedField",
+                                "name": "metadata",
+                                "plural": false,
+                                "selections": [
+                                  (v15/*: any*/)
+                                ],
+                                "storageKey": null
+                              }
+                            ],
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "concreteType": "Workspace",
+                            "kind": "LinkedField",
+                            "name": "workspace",
+                            "plural": false,
+                            "selections": [
+                              (v2/*: any*/),
+                              {
+                                "alias": null,
+                                "args": null,
+                                "concreteType": "StateVersion",
+                                "kind": "LinkedField",
+                                "name": "currentStateVersion",
+                                "plural": false,
+                                "selections": (v13/*: any*/),
+                                "storageKey": null
+                              }
                             ],
                             "storageKey": null
                           }
@@ -504,20 +537,37 @@ return {
                       {
                         "alias": null,
                         "args": null,
-                        "concreteType": "Workspace",
+                        "concreteType": "CheckResult",
                         "kind": "LinkedField",
-                        "name": "workspace",
-                        "plural": false,
+                        "name": "checkResults",
+                        "plural": true,
                         "selections": [
-                          (v2/*: any*/),
+                          (v3/*: any*/),
+                          (v6/*: any*/),
                           {
                             "alias": null,
                             "args": null,
-                            "concreteType": "StateVersion",
+                            "concreteType": "CheckResultObject",
                             "kind": "LinkedField",
-                            "name": "currentStateVersion",
-                            "plural": false,
-                            "selections": (v13/*: any*/),
+                            "name": "objects",
+                            "plural": true,
+                            "selections": [
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "address",
+                                "storageKey": null
+                              },
+                              (v6/*: any*/),
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "failureMessages",
+                                "storageKey": null
+                              }
+                            ],
                             "storageKey": null
                           }
                         ],
@@ -626,12 +676,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "f0de2bd7f7be0d61d2c93a1c94f23337",
+    "cacheID": "183336104e182905baf103d78eb64995",
     "id": null,
     "metadata": {},
     "name": "WorkspaceDetailsWorkspaceEventSubscription",
     "operationKind": "subscription",
-    "text": "subscription WorkspaceDetailsWorkspaceEventSubscription(\n  $input: WorkspaceSubscriptionInput!\n) {\n  workspaceEvents(input: $input) {\n    workspace {\n      id\n      ...WorkspaceDetailsIndexFragment_workspace\n    }\n  }\n}\n\nfragment StateVersionDependenciesFragment_dependencies on StateVersion {\n  dependencies {\n    workspacePath\n    ...StateVersionDependencyListItemFragment_dependency\n  }\n}\n\nfragment StateVersionDependencyListItemFragment_dependency on StateVersionDependency {\n  workspacePath\n  stateVersion {\n    id\n    metadata {\n      updatedAt\n    }\n  }\n  workspace {\n    id\n    currentStateVersion {\n      id\n    }\n  }\n}\n\nfragment StateVersionFileFragment_stateVersion on StateVersion {\n  id\n}\n\nfragment StateVersionInputVariableListItemFragment_variable on RunVariable {\n  key\n  value\n  category\n  namespacePath\n  sensitive\n  versionId\n  includedInTfConfig\n}\n\nfragment StateVersionInputVariablesFragment_variables on Run {\n  variables {\n    key\n    category\n    namespacePath\n    includedInTfConfig\n    ...StateVersionInputVariableListItemFragment_variable\n  }\n}\n\nfragment StateVersionOutputListItemFragment_output on StateVersionOutput {\n  name\n  value\n  type\n  sensitive\n}\n\nfragment StateVersionOutputsFragment_outputs on StateVersion {\n  outputs {\n    name\n    ...StateVersionOutputListItemFragment_output\n    id\n  }\n}\n\nfragment StateVersionResourceListItemFragment_resource on StateVersionResource {\n  name\n  type\n  provider\n  mode\n  module\n}\n\nfragment StateVersionResourcesFragment_resources on StateVersion {\n  resources {\n    name\n    provider\n    type\n    ...StateVersionResourceListItemFragment_resource\n  }\n}\n\nfragment WorkspaceDetailsCurrentApplyRunFragment_workspace on Workspace {\n  id\n  fullPath\n  currentApplyRun {\n    id\n    status\n    createdBy\n    isDestroy\n    moduleSource\n    moduleVersion\n    metadata {\n      createdAt\n    }\n    configurationVersion {\n      id\n    }\n    plan {\n      status\n      metadata {\n        createdAt\n      }\n      id\n    }\n    apply {\n      status\n      triggeredBy\n      metadata {\n        createdAt\n        updatedAt\n      }\n      id\n    }\n  }\n}\n\nfragment WorkspaceDetailsDriftDetectionFragment_workspace on Workspace {\n  id\n  fullPath\n  assessment {\n    hasDrift\n    startedAt\n    completedAt\n    run {\n      id\n      status\n    }\n    id\n  }\n}\n\nfragment WorkspaceDetailsEmptyFragment_workspace on Workspace {\n  id\n  fullPath\n}\n\nfragment WorkspaceDetailsIndexFragment_workspace on Workspace {\n  id\n  name\n  description\n  fullPath\n  locked\n  destroyed\n  preventDestroyPlan\n  labels {\n    key\n    value\n  }\n  metadata {\n    trn\n  }\n  assessment {\n    hasDrift\n    id\n  }\n  ...WorkspaceDetailsEmptyFragment_workspace\n  ...WorkspaceDetailsCurrentApplyRunFragment_workspace\n  ...WorkspaceNotificationPreferenceFragment_workspace\n  currentApplyRun {\n    id\n  }\n  currentStateVersion {\n    id\n    ...StateVersionOutputsFragment_outputs\n    ...StateVersionResourcesFragment_resources\n    ...StateVersionDependenciesFragment_dependencies\n    ...StateVersionFileFragment_stateVersion\n    metadata {\n      createdAt\n    }\n    run {\n      ...StateVersionInputVariablesFragment_variables\n      id\n      status\n      createdBy\n      isDestroy\n      moduleSource\n      moduleVersion\n      metadata {\n        createdAt\n      }\n      configurationVersion {\n        id\n        vcsEvent {\n          status\n          id\n        }\n      }\n      plan {\n        status\n        metadata {\n          createdAt\n        }\n        id\n      }\n      apply {\n        status\n        triggeredBy\n        metadata {\n          createdAt\n          updatedAt\n        }\n        id\n      }\n    }\n  }\n  ...WorkspaceDetailsDriftDetectionFragment_workspace\n}\n\nfragment WorkspaceNotificationPreferenceFragment_workspace on Workspace {\n  fullPath\n}\n"
+    "text": "subscription WorkspaceDetailsWorkspaceEventSubscription(\n  $input: WorkspaceSubscriptionInput!\n) {\n  workspaceEvents(input: $input) {\n    workspace {\n      id\n      ...WorkspaceDetailsIndexFragment_workspace\n    }\n  }\n}\n\nfragment StateVersionCheckResultRowFragment_checkResult on CheckResult {\n  name\n  status\n  objects {\n    address\n    status\n    failureMessages\n  }\n}\n\nfragment StateVersionCheckResultsFragment_checkResults on StateVersionInventory {\n  checkResults {\n    name\n    status\n    ...StateVersionCheckResultRowFragment_checkResult\n  }\n}\n\nfragment StateVersionDependenciesFragment_dependencies on StateVersionInventory {\n  dependencies {\n    workspacePath\n    ...StateVersionDependencyListItemFragment_dependency\n  }\n}\n\nfragment StateVersionDependencyListItemFragment_dependency on StateVersionDependency {\n  workspacePath\n  stateVersion {\n    id\n    metadata {\n      updatedAt\n    }\n  }\n  workspace {\n    id\n    currentStateVersion {\n      id\n    }\n  }\n}\n\nfragment StateVersionFileFragment_stateVersion on StateVersion {\n  id\n}\n\nfragment StateVersionInputVariableListItemFragment_variable on RunVariable {\n  key\n  value\n  category\n  namespacePath\n  sensitive\n  versionId\n  includedInTfConfig\n}\n\nfragment StateVersionInputVariablesFragment_variables on Run {\n  variables {\n    key\n    category\n    namespacePath\n    includedInTfConfig\n    ...StateVersionInputVariableListItemFragment_variable\n  }\n}\n\nfragment StateVersionOutputListItemFragment_output on StateVersionOutput {\n  name\n  value\n  type\n  sensitive\n}\n\nfragment StateVersionOutputsFragment_outputs on StateVersion {\n  outputs {\n    name\n    ...StateVersionOutputListItemFragment_output\n    id\n  }\n}\n\nfragment StateVersionResourceListItemFragment_resource on StateVersionResource {\n  name\n  type\n  provider\n  mode\n  module\n}\n\nfragment StateVersionResourcesFragment_resources on StateVersionInventory {\n  resources {\n    name\n    provider\n    type\n    ...StateVersionResourceListItemFragment_resource\n  }\n}\n\nfragment WorkspaceDetailsCurrentApplyRunFragment_workspace on Workspace {\n  id\n  fullPath\n  currentApplyRun {\n    id\n    status\n    createdBy\n    isDestroy\n    moduleSource\n    moduleVersion\n    metadata {\n      createdAt\n    }\n    configurationVersion {\n      id\n    }\n    plan {\n      status\n      metadata {\n        createdAt\n      }\n      id\n    }\n    apply {\n      status\n      triggeredBy\n      metadata {\n        createdAt\n        updatedAt\n      }\n      id\n    }\n  }\n}\n\nfragment WorkspaceDetailsDriftDetectionFragment_workspace on Workspace {\n  id\n  fullPath\n  assessment {\n    hasDrift\n    startedAt\n    completedAt\n    run {\n      id\n      status\n    }\n    id\n  }\n}\n\nfragment WorkspaceDetailsEmptyFragment_workspace on Workspace {\n  id\n  fullPath\n}\n\nfragment WorkspaceDetailsIndexFragment_workspace on Workspace {\n  id\n  name\n  description\n  fullPath\n  locked\n  destroyed\n  preventDestroyPlan\n  labels {\n    key\n    value\n  }\n  metadata {\n    trn\n  }\n  assessment {\n    hasDrift\n    id\n  }\n  ...WorkspaceDetailsEmptyFragment_workspace\n  ...WorkspaceDetailsCurrentApplyRunFragment_workspace\n  ...WorkspaceNotificationPreferenceFragment_workspace\n  currentApplyRun {\n    id\n  }\n  currentStateVersion {\n    id\n    ...StateVersionOutputsFragment_outputs\n    inventory {\n      ...StateVersionResourcesFragment_resources\n      ...StateVersionDependenciesFragment_dependencies\n      ...StateVersionCheckResultsFragment_checkResults\n    }\n    ...StateVersionFileFragment_stateVersion\n    metadata {\n      createdAt\n    }\n    run {\n      ...StateVersionInputVariablesFragment_variables\n      id\n      status\n      createdBy\n      isDestroy\n      moduleSource\n      moduleVersion\n      metadata {\n        createdAt\n      }\n      configurationVersion {\n        id\n        vcsEvent {\n          status\n          id\n        }\n      }\n      plan {\n        status\n        metadata {\n          createdAt\n        }\n        id\n      }\n      apply {\n        status\n        triggeredBy\n        metadata {\n          createdAt\n          updatedAt\n        }\n        id\n      }\n    }\n  }\n  ...WorkspaceDetailsDriftDetectionFragment_workspace\n}\n\nfragment WorkspaceNotificationPreferenceFragment_workspace on Workspace {\n  fullPath\n}\n"
   }
 };
 })();

@@ -22,6 +22,7 @@ import RunDetailsStageStatusCard from './RunDetailsStageStatusCard';
 import RunDetailsStageTabEmptyState from './RunDetailsStageTabEmptyState';
 import RunStageStatusTypes from './RunStageStatusTypes';
 import RunVariables from './RunVariables';
+import CheckResultsPanel from './CheckResultsPanel';
 import { RunDetailsPlanStageApplyRunMutation } from './__generated__/RunDetailsPlanStageApplyRunMutation.graphql';
 import { RunDetailsPlanStageCancelRunMutation } from './__generated__/RunDetailsPlanStageCancelRunMutation.graphql';
 import { RunDetailsPlanStageDiscardRunMutation } from './__generated__/RunDetailsPlanStageDiscardRunMutation.graphql';
@@ -76,6 +77,9 @@ function RunDetailsPlanStage(props: Props) {
                 errorMessage
                 hasChanges
                 diffSize
+                checkResults {
+                    ...CheckResultsPanelFragment_checkResult
+                }
                 currentJob {
                   id
                   status
@@ -389,6 +393,7 @@ function RunDetailsPlanStage(props: Props) {
             >
                 {statusCardContent}
             </RunDetailsStageStatusCard>
+            {data.plan.status === 'finished' && data.plan.checkResults && data.plan.checkResults.length > 0 && <CheckResultsPanel fragmentRefs={data.plan.checkResults} />}
             <RunDetailsStageJobsCard stage="plan" totalCount={data.plan.jobs.totalCount} onOpenJobs={() => setJobDialogOpen(true)} />
             <Box>
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>

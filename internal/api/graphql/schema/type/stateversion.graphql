@@ -34,13 +34,18 @@ type StateVersionDependency {
   stateVersion: StateVersion
 }
 
+type StateVersionInventory {
+  resources: [StateVersionResource!]!
+  dependencies: [StateVersionDependency!]!
+  checkResults: [CheckResult!]!
+}
+
 type StateVersion implements Node {
   id: ID!
   metadata: ResourceMetadata!
   run: Run
   outputs: [StateVersionOutput!]!
-  resources: [StateVersionResource!]!
-  dependencies: [StateVersionDependency!]!
+  inventory: StateVersionInventory!
   data: String!
   createdBy: String!
 }

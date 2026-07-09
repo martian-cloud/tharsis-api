@@ -27,6 +27,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
+
+	corerun "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -774,6 +776,242 @@ func TestGetPlanDiff(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, test.expectedDiff, actualDiff)
+		})
+	}
+}
+
+func TestGetPlanCheckResults(t *testing.T) {
+	workspaceID := "ws1"
+	runID := "run1"
+	planID := "plan-1"
+
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{
+			ID: runID,
+		},
+		WorkspaceID: workspaceID,
+		Plan:        models.Plan{ID: planID},
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		runError        error
+		run             *models.Run
+		artifactError   error
+		planJSON        string
+		skipCaller      bool
+		expectResult    []corerun.CheckResult
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "auth failure",
+			skipCaller:      true,
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			name:            "permission denied",
+			run:             run,
+			authError:       errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "run not found",
+			run:             nil,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "failed to get run by plan ID",
+			runError:        errors.New("db error", errors.WithErrorCode(errors.EInternal)),
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:            "artifact store error",
+			run:             run,
+			artifactError:   errors.New("store error", errors.WithErrorCode(errors.EInternal)),
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:            "invalid plan JSON",
+			run:             run,
+			planJSON:        "not-json",
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:         "empty checks",
+			run:          run,
+			planJSON:     `{"format_version":"1.0","checks":[]}`,
+			expectResult: []corerun.CheckResult{},
+		},
+		{
+			name:         "no checks field",
+			run:          run,
+			planJSON:     `{"format_version":"1.0"}`,
+			expectResult: []corerun.CheckResult{},
+		},
+		{
+			name: "check with failure messages",
+			run:  run,
+			planJSON: `{"format_version":"1.0","checks":[
+				{"address":{"to_display":"check.health","kind":"check"},"status":"fail",
+				 "instances":[{"address":{"to_display":"check.health"},"status":"fail",
+				   "problems":[{"message":"Service returned 503"}]}]}
+			]}`,
+			expectResult: []corerun.CheckResult{
+				{
+					Name:   "check.health",
+					Status: "fail",
+					Objects: []corerun.CheckResultObject{
+						{Address: "check.health", Status: "fail", FailureMessages: []string{"Service returned 503"}},
+					},
+				},
+			},
+		},
+		{
+			name: "check with multiple instances preserves per-object detail",
+			run:  run,
+			planJSON: `{"format_version":"1.0","checks":[
+				{"address":{"to_display":"check.multi","kind":"check"},"status":"fail",
+				 "instances":[
+				   {"address":{"to_display":"check.multi[0]"},"status":"fail","problems":[{"message":"First failed"}]},
+				   {"address":{"to_display":"check.multi[1]"},"status":"fail","problems":[{"message":"Second failed"}]}
+				 ]}
+			]}`,
+			expectResult: []corerun.CheckResult{
+				{
+					Name:   "check.multi",
+					Status: "fail",
+					Objects: []corerun.CheckResultObject{
+						{Address: "check.multi[0]", Status: "fail", FailureMessages: []string{"First failed"}},
+						{Address: "check.multi[1]", Status: "fail", FailureMessages: []string{"Second failed"}},
+					},
+				},
+			},
+		},
+		{
+			name: "mixed instance results - one pass one fail",
+			run:  run,
+			planJSON: `{"format_version":"1.0","checks":[
+				{"address":{"to_display":"null_resource.web","kind":"resource"},"status":"fail",
+				 "instances":[
+				   {"address":{"to_display":"null_resource.web[0]"},"status":"pass"},
+				   {"address":{"to_display":"null_resource.web[1]"},"status":"fail","problems":[{"message":"port too low"}]}
+				 ]}
+			]}`,
+			expectResult: []corerun.CheckResult{
+				{
+					Name:   "null_resource.web",
+					Status: "fail",
+					Objects: []corerun.CheckResultObject{
+						{Address: "null_resource.web[0]", Status: "pass", FailureMessages: nil},
+						{Address: "null_resource.web[1]", Status: "fail", FailureMessages: []string{"port too low"}},
+					},
+				},
+			},
+		},
+		{
+			name: "passing check has no failure messages",
+			run:  run,
+			planJSON: `{"format_version":"1.0","checks":[
+				{"address":{"to_display":"check.cert","kind":"check"},"status":"pass",
+				 "instances":[{"address":{"to_display":"check.cert"},"status":"pass"}]}
+			]}`,
+			expectResult: []corerun.CheckResult{
+				{
+					Name:   "check.cert",
+					Status: "pass",
+					Objects: []corerun.CheckResultObject{
+						{Address: "check.cert", Status: "pass", FailureMessages: nil},
+					},
+				},
+			},
+		},
+		{
+			name: "unknown status at plan time",
+			run:  run,
+			planJSON: `{"format_version":"1.0","checks":[
+				{"address":{"to_display":"check.pending","kind":"check"},"status":"unknown",
+				 "instances":[{"address":{"to_display":"check.pending"},"status":"unknown"}]}
+			]}`,
+			expectResult: []corerun.CheckResult{
+				{
+					Name:   "check.pending",
+					Status: "unknown",
+					Objects: []corerun.CheckResultObject{
+						{Address: "check.pending", Status: "unknown", FailureMessages: nil},
+					},
+				},
+			},
+		},
+		{
+			name: "unrecognized status normalized to unknown",
+			run:  run,
+			planJSON: `{"format_version":"1.0","checks":[
+				{"address":{"to_display":"check.future","kind":"check"},"status":"skipped",
+				 "instances":[{"address":{"to_display":"check.future"},"status":"skipped"}]}
+			]}`,
+			expectResult: []corerun.CheckResult{
+				{
+					Name:   "check.future",
+					Status: "unknown",
+					Objects: []corerun.CheckResultObject{
+						{Address: "check.future", Status: "unknown", FailureMessages: nil},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+
+			if !test.skipCaller {
+				mockRuns.On("GetRunByNodeID", mock.Anything, planID).Return(test.run, test.runError)
+
+				if test.run != nil && test.runError == nil {
+					mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+				}
+
+				if test.authError == nil && test.run != nil && test.runError == nil {
+					var reader io.ReadCloser
+					if test.planJSON != "" {
+						reader = io.NopCloser(strings.NewReader(test.planJSON))
+					}
+					mockArtifactStore.On("GetPlanJSON", mock.Anything, test.run).Return(reader, test.artifactError).Maybe()
+				}
+			}
+
+			dbClient := &db.Client{
+				Runs: mockRuns,
+			}
+
+			service := &service{
+				dbClient:      dbClient,
+				artifactStore: mockArtifactStore,
+			}
+
+			callCtx := ctx
+			if !test.skipCaller {
+				callCtx = auth.WithCaller(ctx, mockCaller)
+			}
+
+			result, err := service.GetPlanCheckResults(callCtx, planID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectResult, result)
 		})
 	}
 }

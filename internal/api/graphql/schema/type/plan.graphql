@@ -105,4 +105,5 @@ type Plan {
     @deprecated(
       reason: "Field has been moved to the PlanSummary type and will be removed in an upcoming release"
     )
+  checkResults: [CheckResult!]!
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
+	corerun "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run"
 	runvariables "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/variables"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -952,4 +953,58 @@ func runStateVersionBatchFunc(ctx context.Context, ids []string) (loader.DataBat
 	}
 
 	return batch, nil
+}
+
+// CheckResultResolver resolves a check result
+type CheckResultResolver struct {
+	checkResult *corerun.CheckResult
+}
+
+// Name resolver
+func (r *CheckResultResolver) Name() string {
+	return r.checkResult.Name
+}
+
+// Status resolver
+func (r *CheckResultResolver) Status() string {
+	return r.checkResult.Status
+}
+
+// Objects resolver
+func (r *CheckResultResolver) Objects() []*CheckResultObjectResolver {
+	resolvers := []*CheckResultObjectResolver{}
+	for _, obj := range r.checkResult.Objects {
+		objCopy := obj
+		resolvers = append(resolvers, &CheckResultObjectResolver{
+			address:         objCopy.Address,
+			status:          objCopy.Status,
+			failureMessages: objCopy.FailureMessages,
+		})
+	}
+	return resolvers
+}
+
+// CheckResultObjectResolver resolves an individual checkable object within a check result
+type CheckResultObjectResolver struct {
+	address         string
+	status          string
+	failureMessages []string
+}
+
+// Address resolver
+func (r *CheckResultObjectResolver) Address() string {
+	return r.address
+}
+
+// Status resolver
+func (r *CheckResultObjectResolver) Status() string {
+	return r.status
+}
+
+// FailureMessages resolver
+func (r *CheckResultObjectResolver) FailureMessages() []string {
+	if r.failureMessages == nil {
+		return []string{}
+	}
+	return r.failureMessages
 }

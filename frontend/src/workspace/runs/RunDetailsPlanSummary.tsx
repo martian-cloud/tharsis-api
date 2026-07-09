@@ -1,10 +1,9 @@
-import MuiInfoIcon from '@mui/icons-material/Info';
-import { alpha, Chip, Paper, Tooltip, Typography, useTheme } from '@mui/material';
+import { alpha, Chip, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
-import { darken, SxProps, Theme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import React, { useMemo } from 'react';
 import { useFragment } from 'react-relay/hooks';
+import { InfoIcon, SummaryRowCol } from './SummaryRow';
 import { RunDetailsPlanSummaryFragment_plan$key } from './__generated__/RunDetailsPlanSummaryFragment_plan.graphql';
 
 const planSummaryLabels = {
@@ -52,47 +51,6 @@ const planSummaryColors = {
     outputChanges: 'planDiff.update',
     outputDestructions: 'planDiff.delete'
 };
-
-function InfoIcon({ text }: { text: string }) {
-    return (
-        <Tooltip title={text}>
-            <MuiInfoIcon sx={{
-                width: 16,
-                height: 16,
-                marginLeft: '10px',
-                verticalAlign: 'middle',
-                opacity: '20%',
-                transition: 'ease',
-                transitionDuration: '300ms',
-                ":hover": {
-                    opacity: '100%'
-                }
-            }} />
-        </Tooltip>
-    );
-}
-
-function SummaryRowCol({ children, sx }: { children: React.ReactNode, sx?: SxProps<Theme> }) {
-    const theme = useTheme();
-    return (
-        <Paper
-            sx={{
-                ...sx,
-                height: 41,
-                pt: 1,
-                pb: 1,
-                backgroundColor: darken(theme.palette.background.default, 0.3),
-                display: 'flex',
-                alignItems: 'center',
-                width: '100%',
-                boxShadow: 'none',
-                borderRadius: 0,
-                borderBottom: `1px solid ${theme.palette.divider}`
-            }}>
-            {children}
-        </Paper>
-    );
-}
 
 interface Props {
     ml?: number

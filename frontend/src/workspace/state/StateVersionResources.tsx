@@ -15,7 +15,7 @@ interface Props {
     destroyed?: boolean
 }
 
-const searchFilter = (search: string) => (resource: any) => {
+const searchFilter = (search: string) => (resource: { readonly name: string; readonly type: string }) => {
     return resource.name.toLowerCase().includes(search) || resource.type.includes(search);
 };
 
@@ -24,7 +24,7 @@ function StateVersionResources(props: Props) {
 
     const data = useFragment<StateVersionResourcesFragment_resources$key>(
         graphql`
-        fragment StateVersionResourcesFragment_resources on StateVersion
+        fragment StateVersionResourcesFragment_resources on StateVersionInventory
         {
             resources {
                 name
@@ -81,7 +81,7 @@ function StateVersionResources(props: Props) {
                         { label: 'Module' },
                     ]}
                 >
-                    {filteredOutputs.map((r: any) => <StateVersionResourceListItem
+                    {filteredOutputs.map((r) => <StateVersionResourceListItem
                         key={`${r.provider}::${r.type}::${r.name}`}
                         fragmentRef={r}
                     />)}

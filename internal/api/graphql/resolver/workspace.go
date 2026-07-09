@@ -335,12 +335,12 @@ func (r *WorkspaceResolver) Destroyed(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 
-	resources, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionResources(ctx, stateVersion)
+	inventory, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionInventory(ctx, stateVersion)
 	if err != nil {
 		return false, err
 	}
 
-	return len(resources) == 0, nil
+	return len(inventory.Resources) == 0, nil
 }
 
 // ServiceAccounts resolver

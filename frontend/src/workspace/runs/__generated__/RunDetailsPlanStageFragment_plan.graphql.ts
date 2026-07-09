@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<273a3834bc202f1eea67e60b527bf3b0>>
+ * @generated SignedSource<<39431a934d33e6259a71a4171d287a39>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -21,6 +21,9 @@ export type RunDetailsPlanStageFragment_plan$data = {
   readonly createdBy: string;
   readonly id: string;
   readonly plan: {
+    readonly checkResults: ReadonlyArray<{
+      readonly " $fragmentSpreads": FragmentRefs<"CheckResultsPanelFragment_checkResult">;
+    }>;
     readonly currentJob: {
       readonly cancelRequested: boolean;
       readonly id: string;
@@ -130,6 +133,22 @@ return {
           "args": null,
           "kind": "ScalarField",
           "name": "diffSize",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": "CheckResult",
+          "kind": "LinkedField",
+          "name": "checkResults",
+          "plural": true,
+          "selections": [
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "CheckResultsPanelFragment_checkResult"
+            }
+          ],
           "storageKey": null
         },
         {
@@ -256,6 +275,6 @@ return {
 };
 })();
 
-(node as any).hash = "277d053ff2ec019780bcd3d5f0037547";
+(node as any).hash = "4b3d797246a2121810678c9f709bd92b";
 
 export default node;

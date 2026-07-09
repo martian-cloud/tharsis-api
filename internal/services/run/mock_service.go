@@ -4,9 +4,11 @@ package run
 
 import (
 	context "context"
-	io "io"
 
+	corerun "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run"
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+
+	io "io"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -252,6 +254,36 @@ func (_m *MockService) DownloadPlan(ctx context.Context, planID string) (io.Read
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, planID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPlanCheckResults provides a mock function with given fields: ctx, planID
+func (_m *MockService) GetPlanCheckResults(ctx context.Context, planID string) ([]corerun.CheckResult, error) {
+	ret := _m.Called(ctx, planID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPlanCheckResults")
+	}
+
+	var r0 []corerun.CheckResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]corerun.CheckResult, error)); ok {
+		return rf(ctx, planID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []corerun.CheckResult); ok {
+		r0 = rf(ctx, planID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]corerun.CheckResult)
 		}
 	}
 

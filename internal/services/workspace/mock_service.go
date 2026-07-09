@@ -458,24 +458,24 @@ func (_m *MockService) GetStateVersionContent(ctx context.Context, stateVersionI
 	return r0, r1
 }
 
-// GetStateVersionDependencies provides a mock function with given fields: ctx, stateVersion
-func (_m *MockService) GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error) {
+// GetStateVersionInventory provides a mock function with given fields: ctx, stateVersion
+func (_m *MockService) GetStateVersionInventory(ctx context.Context, stateVersion *models.StateVersion) (*StateVersionInventory, error) {
 	ret := _m.Called(ctx, stateVersion)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetStateVersionDependencies")
+		panic("no return value specified for GetStateVersionInventory")
 	}
 
-	var r0 []StateVersionDependency
+	var r0 *StateVersionInventory
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion) ([]StateVersionDependency, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion) (*StateVersionInventory, error)); ok {
 		return rf(ctx, stateVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion) []StateVersionDependency); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion) *StateVersionInventory); ok {
 		r0 = rf(ctx, stateVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]StateVersionDependency)
+			r0 = ret.Get(0).(*StateVersionInventory)
 		}
 	}
 
@@ -571,36 +571,6 @@ func (_m *MockService) GetStateVersionOutputs(ctx context.Context, stateVersionI
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, stateVersionID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetStateVersionResources provides a mock function with given fields: ctx, stateVersion
-func (_m *MockService) GetStateVersionResources(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionResource, error) {
-	ret := _m.Called(ctx, stateVersion)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetStateVersionResources")
-	}
-
-	var r0 []StateVersionResource
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion) ([]StateVersionResource, error)); ok {
-		return rf(ctx, stateVersion)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion) []StateVersionResource); ok {
-		r0 = rf(ctx, stateVersion)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]StateVersionResource)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *models.StateVersion) error); ok {
-		r1 = rf(ctx, stateVersion)
 	} else {
 		r1 = ret.Error(1)
 	}

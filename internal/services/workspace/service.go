@@ -16,6 +16,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
+	corerun "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/terraform"
 	coreworkspace "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -120,6 +121,13 @@ type StateVersionDependency struct {
 	StateVersionID string
 }
 
+// StateVersionInventory contains all state-derived data resolved from a single artifact download.
+type StateVersionInventory struct {
+	Resources    []*StateVersionResource
+	Dependencies []*StateVersionDependency
+	CheckResults []*corerun.CheckResult
+}
+
 // GetWorkspacesInput is the input for querying a list of workspaces
 type GetWorkspacesInput struct {
 	// Sort specifies the field to sort on and direction
@@ -194,8 +202,7 @@ type Service interface {
 	GetStateVersionOutputByID(ctx context.Context, id string) (*models.StateVersionOutput, error)
 	GetStateVersionOutputByTRN(ctx context.Context, trn string) (*models.StateVersionOutput, error)
 	GetStateVersionOutputs(ctx context.Context, stateVersionID string) ([]models.StateVersionOutput, error)
-	GetStateVersionResources(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionResource, error)
-	GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error)
+	GetStateVersionInventory(ctx context.Context, stateVersion *models.StateVersion) (*StateVersionInventory, error)
 	MigrateWorkspace(ctx context.Context, workspaceID string, newGroupID string) (*models.Workspace, error)
 	GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*namespace.RunnerTagsSetting, error)
 	GetDriftDetectionEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.DriftDetectionEnabledSetting, error)
@@ -1011,43 +1018,37 @@ func (s *service) GetCurrentStateVersion(ctx context.Context, workspaceID string
 	return s.getStateVersionByID(ctx, workspace.CurrentStateVersionID)
 }
 
-func (s *service) GetStateVersionResources(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionResource, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetStateVersionResources")
-	// TODO: Consider setting trace/span attributes for the input.
+func (s *service) GetStateVersionInventory(ctx context.Context, stateVersion *models.StateVersion) (*StateVersionInventory, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionInventory")
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
-		return nil, err
+		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
-		return nil, err
+		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
 	}
 
 	reader, err := s.artifactStore.GetStateVersion(ctx, stateVersion)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get state version")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get state version", errors.WithSpan(span))
 	}
+	defer reader.Close()
 
-	// Attempt to unmarshal to a stateV4:
 	var state stateV4
 	if err := json.NewDecoder(reader).Decode(&state); err != nil {
-		tracing.RecordError(span, nil, "failed to unmarshal decoded data: %s", err)
-		return nil, fmt.Errorf("failed to unmarshal decoded data: %s", err)
+		return nil, errors.Wrap(err, "failed to unmarshal decoded data", errors.WithSpan(span))
 	}
 
 	if state.Version != version4 {
-		tracing.RecordError(span, nil, "expected stateVersionV4, got %d", state.Version)
-		return nil, fmt.Errorf("expected stateVersionV4, got %d", state.Version)
+		return nil, errors.New("expected stateVersionV4, got %d", state.Version, errors.WithSpan(span))
 	}
 
-	response := []StateVersionResource{}
-
+	// Extract resources
+	resources := []*StateVersionResource{}
 	for _, r := range state.Resources {
 		resource := StateVersionResource{
 			Mode:   r.Mode,
@@ -1062,60 +1063,24 @@ func (s *service) GetStateVersionResources(ctx context.Context, stateVersion *mo
 
 		startIndex := strings.Index(r.ProviderConfig, "[\"")
 		if startIndex == -1 {
-			tracing.RecordError(span, nil,
-				"invalid provider config encountered when parsing state version resources %s", r.ProviderConfig)
-			return nil, fmt.Errorf("invalid provider config encountered when parsing state version resources %s", r.ProviderConfig)
+			return nil, errors.New(
+				"invalid provider config encountered when parsing state version resources %s", r.ProviderConfig,
+				errors.WithSpan(span))
 		}
 		endIndex := strings.LastIndex(r.ProviderConfig, "\"]")
 		if endIndex == -1 {
-			tracing.RecordError(span, nil,
-				"invalid provider config encountered when parsing state version resources %s", r.ProviderConfig)
-			return nil, fmt.Errorf("invalid provider config encountered when parsing state version resources %s", r.ProviderConfig)
+			return nil, errors.New(
+				"invalid provider config encountered when parsing state version resources %s", r.ProviderConfig,
+				errors.WithSpan(span))
 		}
 
 		resource.Provider = r.ProviderConfig[startIndex+2 : endIndex]
 
-		response = append(response, resource)
+		resources = append(resources, &resource)
 	}
 
-	return response, nil
-}
-
-func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetStateVersionDependencies")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	caller, err := auth.AuthorizeCaller(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
-		return nil, err
-	}
-
-	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
-	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
-		return nil, err
-	}
-
-	reader, err := s.artifactStore.GetStateVersion(ctx, stateVersion)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get state version")
-		return nil, err
-	}
-
-	// Attempt to unmarshal to a stateV4:
-	var state stateV4
-	if err := json.NewDecoder(reader).Decode(&state); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal decoded data", errors.WithSpan(span))
-	}
-
-	if state.Version != version4 {
-		return nil, errors.New("expected stateVersionV4, got %d", state.Version, errors.WithSpan(span))
-	}
-
-	response := []StateVersionDependency{}
-
+	// Extract dependencies
+	dependencies := []*StateVersionDependency{}
 	for _, r := range state.Resources {
 		if r.ProviderConfig == tharsisTerraformProviderConfig && r.Type == tharsisWorkspaceOutputsDatasourceName && len(r.Instances) > 0 {
 			attributes := map[string]interface{}{}
@@ -1158,7 +1123,7 @@ func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion 
 				return nil, errors.New("workspace_id attribute is not a string in %s resource %s", r.Type, r.Name, errors.WithSpan(span))
 			}
 
-			response = append(response, StateVersionDependency{
+			dependencies = append(dependencies, &StateVersionDependency{
 				WorkspacePath:  fullPath,
 				WorkspaceID:    gid.FromGlobalID(workspaceID),
 				StateVersionID: gid.FromGlobalID(stateVersionID),
@@ -1166,7 +1131,29 @@ func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion 
 		}
 	}
 
-	return response, nil
+	// Extract check results
+	checkResults := []*corerun.CheckResult{}
+	for _, cr := range state.CheckResults {
+		objects := []corerun.CheckResultObject{}
+		for _, obj := range cr.Objects {
+			objects = append(objects, corerun.CheckResultObject{
+				Address:         obj.ObjectAddr,
+				Status:          corerun.NormalizeCheckStatus(obj.Status),
+				FailureMessages: obj.FailureMessages,
+			})
+		}
+		checkResults = append(checkResults, &corerun.CheckResult{
+			Name:    cr.ConfigAddr,
+			Status:  corerun.NormalizeCheckStatus(cr.Status),
+			Objects: objects,
+		})
+	}
+
+	return &StateVersionInventory{
+		Resources:    resources,
+		Dependencies: dependencies,
+		CheckResults: checkResults,
+	}, nil
 }
 
 func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string) (*models.StateVersion, error) {
