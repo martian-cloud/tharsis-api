@@ -59,6 +59,12 @@ declare module '@mui/material/styles' {
             drift: string;
             read: string;
         };
+        checkResult: {
+            pass: string;
+            fail: string;
+            error: string;
+            unknown: string;
+        };
         avatar: {
             default: string;
             serviceAccount: string;
@@ -75,6 +81,7 @@ declare module '@mui/material/styles' {
         runStatus?: Palette['runStatus'];
         jobStatus?: Palette['jobStatus'];
         planDiff?: Palette['planDiff'];
+        checkResult?: Palette['checkResult'];
         avatar?: Palette['avatar'];
         announcement?: Palette['announcement'];
     }
@@ -145,6 +152,12 @@ export default createTheme({
             import: '#60a5fa',
             drift: '#fbbf24',
             read: '#5eead4',
+        },
+        checkResult: {
+            pass: '#34d399',
+            fail: '#f87171',
+            error: '#fbbf24',
+            unknown: '#9ca3af',
         },
         avatar: {
             default: teal[200],

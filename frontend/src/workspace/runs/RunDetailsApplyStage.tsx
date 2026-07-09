@@ -22,6 +22,7 @@ import RunDetailsStageStatusCard from './RunDetailsStageStatusCard';
 import RunDetailsStageTabEmptyState from './RunDetailsStageTabEmptyState';
 import RunStageStatusTypes from './RunStageStatusTypes';
 import RunVariables from './RunVariables';
+import CheckResultsPanel from './CheckResultsPanel';
 import { RunDetailsApplyStageApplyRunMutation } from './__generated__/RunDetailsApplyStageApplyRunMutation.graphql';
 import { RunDetailsApplyStageCancelRunMutation } from './__generated__/RunDetailsApplyStageCancelRunMutation.graphql';
 import { RunDetailsApplyStageFragment_apply$key } from './__generated__/RunDetailsApplyStageFragment_apply.graphql';
@@ -124,6 +125,13 @@ function RunDetailsApplyStage(props: Props) {
             }
             ...RunVariablesFragment_variables
             ...ForceCancelRunAlertFragment_run
+            stateVersion {
+                inventory {
+                    checkResults {
+                        ...CheckResultsPanelFragment_checkResult
+                    }
+                }
+            }
         }
       `, props.fragmentRef)
 
@@ -341,6 +349,7 @@ function RunDetailsApplyStage(props: Props) {
             >
                 {statusCardContent}
             </RunDetailsStageStatusCard>
+            {apply.status === 'finished' && data.stateVersion && data.stateVersion.inventory.checkResults.length > 0 && <CheckResultsPanel fragmentRefs={data.stateVersion.inventory.checkResults} />}
             <RunDetailsStageJobsCard stage="apply" totalCount={apply.jobs.totalCount} onOpenJobs={() => setJobDialogOpen(true)} />
             <Box>
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>

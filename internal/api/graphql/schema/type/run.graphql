@@ -192,3 +192,22 @@ input SetVariablesIncludedInTFConfigInput {
   runId: String!
   variableKeys: [String!]!
 }
+
+type CheckResultObject {
+  address: String!
+  status: CheckResultStatus!
+  failureMessages: [String!]!
+}
+
+type CheckResult {
+  name: String!
+  status: CheckResultStatus!
+  objects: [CheckResultObject!]!
+}
+
+enum CheckResultStatus {
+  pass
+  fail
+  error
+  unknown
+}

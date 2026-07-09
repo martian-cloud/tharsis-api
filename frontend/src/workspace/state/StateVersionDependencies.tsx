@@ -13,7 +13,7 @@ interface Props {
     fragmentRef: StateVersionDependenciesFragment_dependencies$key
 }
 
-const dependencySearchFilter = (search: string) => (dependency: any) => {
+const dependencySearchFilter = (search: string) => (dependency: { readonly workspacePath: string }) => {
     return dependency.workspacePath.toLowerCase().includes(search);
 };
 
@@ -22,7 +22,7 @@ function StateVersionDependencies(props: Props) {
 
     const data = useFragment<StateVersionDependenciesFragment_dependencies$key>(
         graphql`
-        fragment StateVersionDependenciesFragment_dependencies on StateVersion
+        fragment StateVersionDependenciesFragment_dependencies on StateVersionInventory
         {
             dependencies {
                 workspacePath
@@ -63,7 +63,7 @@ function StateVersionDependencies(props: Props) {
                     </Box>
                 </Paper>
                 <List disablePadding>
-                    {filteredDependencies.map((v: any) => <StateVersionDependencyListItem
+                    {filteredDependencies.map((v) => <StateVersionDependencyListItem
                         key={v.workspacePath}
                         fragmentRef={v}
                     />)}

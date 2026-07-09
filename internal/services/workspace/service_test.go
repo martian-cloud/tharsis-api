@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	corerun "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run"
 	coreworkspace "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -1329,28 +1330,9 @@ func TestGetWorkspaces(t *testing.T) {
 	}
 }
 
-func TestGetStateVersionDependencies(t *testing.T) {
+func TestGetStateVersionInventory(t *testing.T) {
 	workspaceID := "workspace-1"
 
-	buildStateJSON := func(attributes json.RawMessage) string {
-		state := stateV4{
-			Version: version4,
-			Resources: []resourceStateV4{
-				{
-					ProviderConfig: tharsisTerraformProviderConfig,
-					Type:           tharsisWorkspaceOutputsDatasourceName,
-					Name:           "test",
-					Instances: []instanceObjectStateV4{
-						{AttributesRaw: attributes},
-					},
-				},
-			},
-		}
-		b, _ := json.Marshal(state)
-		return string(b)
-	}
-
-	// setupCaller creates a mock caller with the given permission error and adds it to the context.
 	setupCaller := func(ctx context.Context, t *testing.T, permErr error) context.Context {
 		mockCaller := auth.MockCaller{}
 		mockCaller.Test(t)
@@ -1359,7 +1341,6 @@ func TestGetStateVersionDependencies(t *testing.T) {
 		return auth.WithCaller(ctx, &mockCaller)
 	}
 
-	// setupService creates a service with the given artifact store reader.
 	setupService := func(t *testing.T, reader io.ReadCloser, readErr error) *service {
 		mockArtifactStore := coreworkspace.NewMockArtifactStore(t)
 		mockArtifactStore.On("GetStateVersion", mock.Anything, mock.Anything).
@@ -1367,143 +1348,354 @@ func TestGetStateVersionDependencies(t *testing.T) {
 		return &service{dbClient: &db.Client{}, artifactStore: mockArtifactStore}
 	}
 
-	tests := []struct {
-		mockSetup       func(ctx context.Context, t *testing.T) (context.Context, *service)
-		name            string
-		expectResult    []StateVersionDependency
-		expectErrorCode errors.CodeType
-	}{
-		{
-			name: "auth failure",
-			mockSetup: func(ctx context.Context, _ *testing.T) (context.Context, *service) {
-				return ctx, &service{dbClient: &db.Client{}}
-			},
-			expectErrorCode: errors.EUnauthorized,
-		},
-		{
-			name: "permission error",
-			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
-				ctx = setupCaller(ctx, t, errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
-				return ctx, &service{dbClient: &db.Client{}}
-			},
-			expectErrorCode: errors.EForbidden,
-		},
-		{
-			name: "artifact store error",
-			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
-				ctx = setupCaller(ctx, t, nil)
-				svc := setupService(t, nil, errors.New("store error", errors.WithErrorCode(errors.EInternal)))
-				return ctx, svc
-			},
-			expectErrorCode: errors.EInternal,
-		},
-		{
-			name: "invalid state JSON",
-			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
-				ctx = setupCaller(ctx, t, nil)
-				svc := setupService(t, io.NopCloser(strings.NewReader("not-json")), nil)
-				return ctx, svc
-			},
-			expectErrorCode: errors.EInternal,
-		},
-		{
-			name: "wrong state version",
-			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
-				ctx = setupCaller(ctx, t, nil)
-				state, _ := json.Marshal(stateV4{Version: 3})
-				svc := setupService(t, io.NopCloser(strings.NewReader(string(state))), nil)
-				return ctx, svc
-			},
-			expectErrorCode: errors.EInternal,
-		},
-		{
-			name: "valid dependencies",
-			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
-				ctx = setupCaller(ctx, t, nil)
-				stateJSON := buildStateJSON(json.RawMessage(`{"full_path":"group/ws","state_version_id":"SV_abc","workspace_id":"WS_123"}`))
-				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
-				return ctx, svc
-			},
-			expectResult: []StateVersionDependency{
-				{
-					WorkspacePath:  "group/ws",
-					WorkspaceID:    gid.FromGlobalID("WS_123"),
-					StateVersionID: gid.FromGlobalID("SV_abc"),
+	t.Run("auth failure", func(t *testing.T) {
+		ctx := t.Context()
+		svc := &service{dbClient: &db.Client{}}
+
+		_, err := svc.GetStateVersionInventory(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+		assert.Equal(t, errors.EUnauthorized, errors.ErrorCode(err))
+	})
+
+	t.Run("permission denied", func(t *testing.T) {
+		ctx := setupCaller(t.Context(), t, errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
+		svc := &service{dbClient: &db.Client{}}
+
+		_, err := svc.GetStateVersionInventory(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+		assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
+	})
+
+	t.Run("artifact store error", func(t *testing.T) {
+		ctx := setupCaller(t.Context(), t, nil)
+		svc := setupService(t, nil, errors.New("store error", errors.WithErrorCode(errors.EInternal)))
+
+		_, err := svc.GetStateVersionInventory(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	})
+
+	t.Run("invalid state JSON", func(t *testing.T) {
+		ctx := setupCaller(t.Context(), t, nil)
+		svc := setupService(t, io.NopCloser(strings.NewReader("not-json")), nil)
+
+		_, err := svc.GetStateVersionInventory(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	})
+
+	t.Run("wrong state version", func(t *testing.T) {
+		ctx := setupCaller(t.Context(), t, nil)
+		state, _ := json.Marshal(stateV4{Version: 3})
+		svc := setupService(t, io.NopCloser(strings.NewReader(string(state))), nil)
+
+		_, err := svc.GetStateVersionInventory(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	})
+
+	t.Run("resources", func(t *testing.T) {
+		buildStateJSON := func(resources []resourceStateV4) string {
+			state := stateV4{
+				Version:   version4,
+				Resources: resources,
+			}
+			b, _ := json.Marshal(state)
+			return string(b)
+		}
+
+		tests := []struct {
+			name         string
+			resources    []resourceStateV4
+			expectResult []*StateVersionResource
+		}{
+			{
+				name: "valid resources",
+				resources: []resourceStateV4{
+					{
+						Mode:           "managed",
+						Type:           "aws_instance",
+						Name:           "web",
+						ProviderConfig: `provider["registry.terraform.io/hashicorp/aws"]`,
+						Instances:      []instanceObjectStateV4{{}},
+					},
+				},
+				expectResult: []*StateVersionResource{
+					{
+						Mode:     "managed",
+						Type:     "aws_instance",
+						Name:     "web",
+						Provider: "registry.terraform.io/hashicorp/aws",
+						Module:   "root",
+					},
 				},
 			},
-		},
-		{
-			name: "nil attribute values are skipped",
-			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
-				ctx = setupCaller(ctx, t, nil)
-				stateJSON := buildStateJSON(json.RawMessage(`{"full_path":null,"state_version_id":null,"workspace_id":null}`))
-				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
-				return ctx, svc
-			},
-			expectResult: []StateVersionDependency{},
-		},
-		{
-			name: "partially nil attribute values are skipped",
-			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
-				ctx = setupCaller(ctx, t, nil)
-				stateJSON := buildStateJSON(json.RawMessage(`{"full_path":"group/ws","state_version_id":null,"workspace_id":"WS_123"}`))
-				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
-				return ctx, svc
-			},
-			expectResult: []StateVersionDependency{},
-		},
-		{
-			name: "missing full_path attribute",
-			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
-				ctx = setupCaller(ctx, t, nil)
-				stateJSON := buildStateJSON(json.RawMessage(`{"state_version_id":"SV_abc","workspace_id":"WS_123"}`))
-				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
-				return ctx, svc
-			},
-			expectErrorCode: errors.EInternal,
-		},
-		{
-			name: "non-string full_path attribute",
-			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
-				ctx = setupCaller(ctx, t, nil)
-				stateJSON := buildStateJSON(json.RawMessage(`{"full_path":123,"state_version_id":"SV_abc","workspace_id":"WS_123"}`))
-				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
-				return ctx, svc
-			},
-			expectErrorCode: errors.EInternal,
-		},
-		{
-			name: "no tharsis resources in state",
-			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
-				ctx = setupCaller(ctx, t, nil)
-				state, _ := json.Marshal(stateV4{
-					Version: version4,
-					Resources: []resourceStateV4{
-						{ProviderConfig: "provider[\"registry.terraform.io/hashicorp/aws\"]", Type: "aws_instance", Name: "test"},
+			{
+				name: "resource with module",
+				resources: []resourceStateV4{
+					{
+						Module:         "module.vpc",
+						Mode:           "managed",
+						Type:           "aws_subnet",
+						Name:           "private",
+						ProviderConfig: `provider["registry.terraform.io/hashicorp/aws"]`,
+						Instances:      []instanceObjectStateV4{{}},
 					},
-				})
-				svc := setupService(t, io.NopCloser(strings.NewReader(string(state))), nil)
-				return ctx, svc
+				},
+				expectResult: []*StateVersionResource{
+					{
+						Mode:     "managed",
+						Type:     "aws_subnet",
+						Name:     "private",
+						Provider: "registry.terraform.io/hashicorp/aws",
+						Module:   "module.vpc",
+					},
+				},
 			},
-			expectResult: []StateVersionDependency{},
-		},
-	}
+			{
+				name:         "no resources in state",
+				resources:    []resourceStateV4{},
+				expectResult: []*StateVersionResource{},
+			},
+			{
+				name: "multiple resources",
+				resources: []resourceStateV4{
+					{
+						Mode:           "managed",
+						Type:           "aws_instance",
+						Name:           "web",
+						ProviderConfig: `provider["registry.terraform.io/hashicorp/aws"]`,
+						Instances:      []instanceObjectStateV4{{}},
+					},
+					{
+						Mode:           "data",
+						Type:           "aws_ami",
+						Name:           "ubuntu",
+						ProviderConfig: `provider["registry.terraform.io/hashicorp/aws"]`,
+						Instances:      []instanceObjectStateV4{{}},
+					},
+				},
+				expectResult: []*StateVersionResource{
+					{
+						Mode:     "managed",
+						Type:     "aws_instance",
+						Name:     "web",
+						Provider: "registry.terraform.io/hashicorp/aws",
+						Module:   "root",
+					},
+					{
+						Mode:     "data",
+						Type:     "aws_ami",
+						Name:     "ubuntu",
+						Provider: "registry.terraform.io/hashicorp/aws",
+						Module:   "root",
+					},
+				},
+			},
+		}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			ctx, svc := test.mockSetup(t.Context(), t)
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				ctx := setupCaller(t.Context(), t, nil)
+				stateJSON := buildStateJSON(test.resources)
+				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
 
-			result, err := svc.GetStateVersionDependencies(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+				result, err := svc.GetStateVersionInventory(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+				require.NoError(t, err)
+				assert.Equal(t, test.expectResult, result.Resources)
+			})
+		}
+	})
 
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
+	t.Run("dependencies", func(t *testing.T) {
+		buildStateJSON := func(attributes json.RawMessage) string {
+			state := stateV4{
+				Version: version4,
+				Resources: []resourceStateV4{
+					{
+						ProviderConfig: tharsisTerraformProviderConfig,
+						Type:           tharsisWorkspaceOutputsDatasourceName,
+						Name:           "test",
+						Instances: []instanceObjectStateV4{
+							{AttributesRaw: attributes},
+						},
+					},
+				},
 			}
+			b, _ := json.Marshal(state)
+			return string(b)
+		}
 
-			require.NoError(t, err)
-			assert.Equal(t, test.expectResult, result)
-		})
-	}
+		tests := []struct {
+			name            string
+			mockSetup       func(ctx context.Context, t *testing.T) (context.Context, *service)
+			expectResult    []*StateVersionDependency
+			expectErrorCode errors.CodeType
+		}{
+			{
+				name: "valid dependencies",
+				mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+					ctx = setupCaller(ctx, t, nil)
+					stateJSON := buildStateJSON(json.RawMessage(`{"full_path":"group/ws","state_version_id":"SV_abc","workspace_id":"WS_123"}`))
+					svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+					return ctx, svc
+				},
+				expectResult: []*StateVersionDependency{
+					{
+						WorkspacePath:  "group/ws",
+						WorkspaceID:    gid.FromGlobalID("WS_123"),
+						StateVersionID: gid.FromGlobalID("SV_abc"),
+					},
+				},
+			},
+			{
+				name: "nil attribute values are skipped",
+				mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+					ctx = setupCaller(ctx, t, nil)
+					stateJSON := buildStateJSON(json.RawMessage(`{"full_path":null,"state_version_id":null,"workspace_id":null}`))
+					svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+					return ctx, svc
+				},
+				expectResult: []*StateVersionDependency{},
+			},
+			{
+				name: "partially nil attribute values are skipped",
+				mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+					ctx = setupCaller(ctx, t, nil)
+					stateJSON := buildStateJSON(json.RawMessage(`{"full_path":"group/ws","state_version_id":null,"workspace_id":"WS_123"}`))
+					svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+					return ctx, svc
+				},
+				expectResult: []*StateVersionDependency{},
+			},
+			{
+				name: "missing full_path attribute",
+				mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+					ctx = setupCaller(ctx, t, nil)
+					stateJSON := buildStateJSON(json.RawMessage(`{"state_version_id":"SV_abc","workspace_id":"WS_123"}`))
+					svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+					return ctx, svc
+				},
+				expectErrorCode: errors.EInternal,
+			},
+			{
+				name: "non-string full_path attribute",
+				mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+					ctx = setupCaller(ctx, t, nil)
+					stateJSON := buildStateJSON(json.RawMessage(`{"full_path":123,"state_version_id":"SV_abc","workspace_id":"WS_123"}`))
+					svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+					return ctx, svc
+				},
+				expectErrorCode: errors.EInternal,
+			},
+			{
+				name: "no tharsis resources in state",
+				mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+					ctx = setupCaller(ctx, t, nil)
+					state, _ := json.Marshal(stateV4{
+						Version: version4,
+						Resources: []resourceStateV4{
+							{ProviderConfig: `provider["registry.terraform.io/hashicorp/aws"]`, Type: "aws_instance", Name: "test"},
+						},
+					})
+					svc := setupService(t, io.NopCloser(strings.NewReader(string(state))), nil)
+					return ctx, svc
+				},
+				expectResult: []*StateVersionDependency{},
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				ctx, svc := test.mockSetup(t.Context(), t)
+
+				result, err := svc.GetStateVersionInventory(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+
+				if test.expectErrorCode != "" {
+					assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+					return
+				}
+
+				require.NoError(t, err)
+				assert.Equal(t, test.expectResult, result.Dependencies)
+			})
+		}
+	})
+
+	t.Run("check results", func(t *testing.T) {
+		buildStateJSON := func(checkResults []checkResultV4) string {
+			state := stateV4{
+				Version:      version4,
+				CheckResults: checkResults,
+			}
+			b, _ := json.Marshal(state)
+			return string(b)
+		}
+
+		tests := []struct {
+			name         string
+			checkResults []checkResultV4
+			expectResult []*corerun.CheckResult
+		}{
+			{
+				name:         "all checks passing",
+				checkResults: []checkResultV4{{ConfigAddr: "check.certificate", Status: "pass", Objects: []checkResultObjectV4{{ObjectAddr: "check.certificate", Status: "pass"}}}},
+				expectResult: []*corerun.CheckResult{{Name: "check.certificate", Status: "pass", Objects: []corerun.CheckResultObject{{Address: "check.certificate", Status: "pass", FailureMessages: nil}}}},
+			},
+			{
+				name:         "failed check with failure messages",
+				checkResults: []checkResultV4{{ConfigAddr: "check.health_endpoint", Status: "fail", Objects: []checkResultObjectV4{{ObjectAddr: "check.health_endpoint", Status: "fail", FailureMessages: []string{"App returned 503"}}}}},
+				expectResult: []*corerun.CheckResult{{Name: "check.health_endpoint", Status: "fail", Objects: []corerun.CheckResultObject{{Address: "check.health_endpoint", Status: "fail", FailureMessages: []string{"App returned 503"}}}}},
+			},
+			{
+				name: "mixed statuses",
+				checkResults: []checkResultV4{
+					{ConfigAddr: "check.certificate", Status: "pass", Objects: []checkResultObjectV4{{ObjectAddr: "check.certificate", Status: "pass"}}},
+					{ConfigAddr: "check.health", Status: "fail", Objects: []checkResultObjectV4{{ObjectAddr: "check.health", Status: "fail", FailureMessages: []string{"Service down"}}}},
+					{ConfigAddr: "check.dns", Status: "error", Objects: []checkResultObjectV4{{ObjectAddr: "check.dns", Status: "error", FailureMessages: []string{"Could not resolve"}}}},
+					{ConfigAddr: "check.pending", Status: "unknown", Objects: []checkResultObjectV4{{ObjectAddr: "check.pending", Status: "unknown"}}},
+				},
+				expectResult: []*corerun.CheckResult{
+					{Name: "check.certificate", Status: "pass", Objects: []corerun.CheckResultObject{{Address: "check.certificate", Status: "pass", FailureMessages: nil}}},
+					{Name: "check.health", Status: "fail", Objects: []corerun.CheckResultObject{{Address: "check.health", Status: "fail", FailureMessages: []string{"Service down"}}}},
+					{Name: "check.dns", Status: "error", Objects: []corerun.CheckResultObject{{Address: "check.dns", Status: "error", FailureMessages: []string{"Could not resolve"}}}},
+					{Name: "check.pending", Status: "unknown", Objects: []corerun.CheckResultObject{{Address: "check.pending", Status: "unknown", FailureMessages: nil}}},
+				},
+			},
+			{
+				name:         "no check results in state (null)",
+				checkResults: nil,
+				expectResult: []*corerun.CheckResult{},
+			},
+			{
+				name:         "empty check results array",
+				checkResults: []checkResultV4{},
+				expectResult: []*corerun.CheckResult{},
+			},
+			{
+				name: "check with multiple objects preserves per-object detail",
+				checkResults: []checkResultV4{
+					{ConfigAddr: "check.multi", Status: "fail", Objects: []checkResultObjectV4{
+						{ObjectAddr: "check.multi[0]", Status: "fail", FailureMessages: []string{"First failed"}},
+						{ObjectAddr: "check.multi[1]", Status: "fail", FailureMessages: []string{"Second failed"}},
+					}},
+				},
+				expectResult: []*corerun.CheckResult{
+					{Name: "check.multi", Status: "fail", Objects: []corerun.CheckResultObject{
+						{Address: "check.multi[0]", Status: "fail", FailureMessages: []string{"First failed"}},
+						{Address: "check.multi[1]", Status: "fail", FailureMessages: []string{"Second failed"}},
+					}},
+				},
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				ctx := setupCaller(t.Context(), t, nil)
+				stateJSON := buildStateJSON(test.checkResults)
+				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+
+				result, err := svc.GetStateVersionInventory(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+				require.NoError(t, err)
+				assert.Equal(t, test.expectResult, result.CheckResults)
+			})
+		}
+	})
 }
 
 func TestCreateStateVersion(t *testing.T) {

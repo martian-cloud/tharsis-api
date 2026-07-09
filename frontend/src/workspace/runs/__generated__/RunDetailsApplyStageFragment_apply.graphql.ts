@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<278408e1afc8c2ebdfb029af66932f96>>
+ * @generated SignedSource<<9286ff7dff65f7fe3e6f762c6cbceee1>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -43,6 +43,13 @@ export type RunDetailsApplyStageFragment_apply$data = {
     readonly status: PlanStatus;
     readonly " $fragmentSpreads": FragmentRefs<"RunDetailsPlanSummaryFragment_plan">;
   };
+  readonly stateVersion: {
+    readonly inventory: {
+      readonly checkResults: ReadonlyArray<{
+        readonly " $fragmentSpreads": FragmentRefs<"CheckResultsPanelFragment_checkResult">;
+      }>;
+    };
+  } | null | undefined;
   readonly status: RunStatus;
   readonly " $fragmentSpreads": FragmentRefs<"ForceCancelRunAlertFragment_run" | "RunVariablesFragment_variables">;
   readonly " $fragmentType": "RunDetailsApplyStageFragment_apply";
@@ -233,6 +240,44 @@ return {
       "args": null,
       "kind": "FragmentSpread",
       "name": "ForceCancelRunAlertFragment_run"
+    },
+    {
+      "alias": null,
+      "args": null,
+      "concreteType": "StateVersion",
+      "kind": "LinkedField",
+      "name": "stateVersion",
+      "plural": false,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": "StateVersionInventory",
+          "kind": "LinkedField",
+          "name": "inventory",
+          "plural": false,
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "concreteType": "CheckResult",
+              "kind": "LinkedField",
+              "name": "checkResults",
+              "plural": true,
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "CheckResultsPanelFragment_checkResult"
+                }
+              ],
+              "storageKey": null
+            }
+          ],
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
     }
   ],
   "type": "Run",
@@ -240,6 +285,6 @@ return {
 };
 })();
 
-(node as any).hash = "265e9f4b6aea922a7c26bd108c0b58e4";
+(node as any).hash = "14fc0e6ce9d086044a292ee64a41fae3";
 
 export default node;

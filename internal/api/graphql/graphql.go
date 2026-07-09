@@ -35,6 +35,7 @@ const (
 var fieldOverrides = map[string]int{
 	"readme":                   1,
 	"runnerAvailabilityStatus": 5,
+	"inventory":                5,
 }
 
 type queryComplexityResult struct {

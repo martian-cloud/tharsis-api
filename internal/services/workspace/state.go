@@ -385,11 +385,24 @@ const (
 
 type stateV4 struct {
 	RootOutputs      map[string]outputStateV4 `json:"outputs"`
+	CheckResults     []checkResultV4          `json:"check_results"`
 	TerraformVersion string                   `json:"terraform_version"`
 	Lineage          string                   `json:"lineage"`
 	Resources        []resourceStateV4        `json:"resources"`
 	Version          stateVersionV4           `json:"version"`
 	Serial           uint64                   `json:"serial"`
+}
+
+type checkResultV4 struct {
+	ConfigAddr string                `json:"config_addr"`
+	Status     string                `json:"status"`
+	Objects    []checkResultObjectV4 `json:"objects"`
+}
+
+type checkResultObjectV4 struct {
+	ObjectAddr      string   `json:"object_addr"`
+	Status          string   `json:"status"`
+	FailureMessages []string `json:"failure_messages"`
 }
 
 type outputStateV4 struct {

@@ -24,6 +24,7 @@ import (
 	namespaceutils "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 
+	corerun "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -225,6 +226,7 @@ type Service interface {
 	CreateReconcileRunForWorkspace(ctx context.Context, options *CreateReconcileRunForWorkspaceInput) (*models.Run, error)
 	SetVariablesIncludedInTFConfig(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) error
 	GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, error)
+	GetPlanCheckResults(ctx context.Context, planID string) ([]corerun.CheckResult, error)
 	UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*models.Plan, error)
 	DownloadPlan(ctx context.Context, planID string) (io.ReadCloser, error)
 	UploadPlanBinary(ctx context.Context, planID string, reader io.Reader) error
@@ -1294,6 +1296,65 @@ func (s *service) GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, e
 	}
 
 	return diff, nil
+}
+
+// GetPlanCheckResults returns check results from the plan JSON
+func (s *service) GetPlanCheckResults(ctx context.Context, planID string) ([]corerun.CheckResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetPlanCheckResults")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, planID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get run by plan ID", errors.WithSpan(span))
+	}
+
+	if run == nil {
+		return nil, errors.New("run with plan ID %s not found", planID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
+		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	}
+
+	reader, err := s.artifactStore.GetPlanJSON(ctx, run)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get plan JSON from artifact store", errors.WithSpan(span))
+	}
+	defer reader.Close()
+
+	var tfPlan tfjson.Plan
+	if err := json.NewDecoder(reader).Decode(&tfPlan); err != nil {
+		return nil, errors.Wrap(err, "failed to decode plan JSON", errors.WithSpan(span))
+	}
+
+	results := []corerun.CheckResult{}
+	for _, check := range tfPlan.Checks {
+		objects := []corerun.CheckResultObject{}
+		for _, instance := range check.Instances {
+			var failureMessages []string
+			for _, problem := range instance.Problems {
+				failureMessages = append(failureMessages, problem.Message)
+			}
+			objects = append(objects, corerun.CheckResultObject{
+				Address:         instance.Address.ToDisplay,
+				Status:          corerun.NormalizeCheckStatus(string(instance.Status)),
+				FailureMessages: failureMessages,
+			})
+		}
+		results = append(results, corerun.CheckResult{
+			Name:    check.Address.ToDisplay,
+			Status:  corerun.NormalizeCheckStatus(string(check.Status)),
+			Objects: objects,
+		})
+	}
+
+	return results, nil
 }
 
 func (s *service) UpdateApply(ctx context.Context, input *UpdateApplyInput) (*models.Apply, error) {

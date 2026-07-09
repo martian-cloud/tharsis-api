@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<84ffce160e3de7ae42dc44779105f233>>
+ * @generated SignedSource<<8e0bf43ddde545876ce78a5d87ac26a1>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -22,6 +22,9 @@ export type WorkspaceDetailsIndexFragment_workspace$data = {
   } | null | undefined;
   readonly currentStateVersion: {
     readonly id: string;
+    readonly inventory: {
+      readonly " $fragmentSpreads": FragmentRefs<"StateVersionCheckResultsFragment_checkResults" | "StateVersionDependenciesFragment_dependencies" | "StateVersionResourcesFragment_resources">;
+    };
     readonly metadata: {
       readonly createdAt: any;
     };
@@ -57,7 +60,7 @@ export type WorkspaceDetailsIndexFragment_workspace$data = {
       readonly status: RunStatus;
       readonly " $fragmentSpreads": FragmentRefs<"StateVersionInputVariablesFragment_variables">;
     } | null | undefined;
-    readonly " $fragmentSpreads": FragmentRefs<"StateVersionDependenciesFragment_dependencies" | "StateVersionFileFragment_stateVersion" | "StateVersionOutputsFragment_outputs" | "StateVersionResourcesFragment_resources">;
+    readonly " $fragmentSpreads": FragmentRefs<"StateVersionFileFragment_stateVersion" | "StateVersionOutputsFragment_outputs">;
   } | null | undefined;
   readonly description: string;
   readonly destroyed: boolean;
@@ -267,14 +270,30 @@ return {
           "name": "StateVersionOutputsFragment_outputs"
         },
         {
+          "alias": null,
           "args": null,
-          "kind": "FragmentSpread",
-          "name": "StateVersionResourcesFragment_resources"
-        },
-        {
-          "args": null,
-          "kind": "FragmentSpread",
-          "name": "StateVersionDependenciesFragment_dependencies"
+          "concreteType": "StateVersionInventory",
+          "kind": "LinkedField",
+          "name": "inventory",
+          "plural": false,
+          "selections": [
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "StateVersionResourcesFragment_resources"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "StateVersionDependenciesFragment_dependencies"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "StateVersionCheckResultsFragment_checkResults"
+            }
+          ],
+          "storageKey": null
         },
         {
           "args": null,
@@ -418,6 +437,6 @@ return {
 };
 })();
 
-(node as any).hash = "b6988a28815796efade3ebd6f715284c";
+(node as any).hash = "273b32c210d5f23068df49359499bce1";
 
 export default node;

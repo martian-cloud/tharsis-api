@@ -141,3 +141,22 @@ func (r *PlanResolver) Changes(ctx context.Context) (*PlanChangesResolver, error
 
 	return &PlanChangesResolver{planDiff: diff}, nil
 }
+
+// CheckResults resolver
+func (r *PlanResolver) CheckResults(ctx context.Context) ([]*CheckResultResolver, error) {
+	results, err := getServiceCatalog(ctx).RunService.GetPlanCheckResults(ctx, r.run.Plan.ID)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return []*CheckResultResolver{}, nil
+		}
+		return nil, err
+	}
+
+	resolvers := []*CheckResultResolver{}
+	for _, result := range results {
+		resultCopy := result
+		resolvers = append(resolvers, &CheckResultResolver{checkResult: &resultCopy})
+	}
+
+	return resolvers, nil
+}

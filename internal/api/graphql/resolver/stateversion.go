@@ -193,40 +193,41 @@ func (r *StateVersionResolver) Outputs(ctx context.Context) ([]*StateVersionOutp
 	return resolvers, nil
 }
 
-// Resources resolver
-func (r *StateVersionResolver) Resources(ctx context.Context) ([]*workspace.StateVersionResource, error) {
-	resources, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionResources(ctx, r.stateVersion)
+// Inventory resolver
+func (r *StateVersionResolver) Inventory(ctx context.Context) (*StateVersionInventoryResolver, error) {
+	inventory, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionInventory(ctx, r.stateVersion)
 	if err != nil {
 		return nil, err
 	}
+	return &StateVersionInventoryResolver{inventory: inventory}, nil
+}
 
-	response := []*workspace.StateVersionResource{}
+// StateVersionInventoryResolver resolves the inventory for a state version
+type StateVersionInventoryResolver struct {
+	inventory *workspace.StateVersionInventory
+}
 
-	for _, resource := range resources {
-		resourceCopy := resource
-		response = append(response, &resourceCopy)
-	}
-
-	return response, nil
+// Resources resolver
+func (r *StateVersionInventoryResolver) Resources() []*workspace.StateVersionResource {
+	return r.inventory.Resources
 }
 
 // Dependencies resolver
-func (r *StateVersionResolver) Dependencies(ctx context.Context) ([]*StateVersionDependencyResolver, error) {
-	dependencies, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionDependencies(ctx, r.stateVersion)
-	if err != nil {
-		return nil, err
+func (r *StateVersionInventoryResolver) Dependencies() []*StateVersionDependencyResolver {
+	resolvers := make([]*StateVersionDependencyResolver, len(r.inventory.Dependencies))
+	for i, dependency := range r.inventory.Dependencies {
+		resolvers[i] = &StateVersionDependencyResolver{dependency: dependency}
 	}
+	return resolvers
+}
 
-	resolvers := []*StateVersionDependencyResolver{}
-
-	for _, dependency := range dependencies {
-		dependencyCopy := dependency
-		resolvers = append(resolvers, &StateVersionDependencyResolver{
-			dependency: &dependencyCopy,
-		})
+// CheckResults resolver
+func (r *StateVersionInventoryResolver) CheckResults() []*CheckResultResolver {
+	resolvers := make([]*CheckResultResolver, len(r.inventory.CheckResults))
+	for i, result := range r.inventory.CheckResults {
+		resolvers[i] = &CheckResultResolver{checkResult: result}
 	}
-
-	return resolvers, nil
+	return resolvers
 }
 
 // Data resolver

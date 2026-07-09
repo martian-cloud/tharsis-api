@@ -2150,6 +2150,7 @@ type PageInfo {
 
 type Plan {
   changes: PlanChanges
+  checkResults: [CheckResult!]!
   currentJob: Job
   diffSize: Int!
   errorMessage: String
@@ -2740,12 +2741,36 @@ type SetVariablesIncludedInTFConfigPayload {
 type StateVersion implements Node {
   createdBy: String!
   data: String!
-  dependencies: [StateVersionDependency!]!
   id: ID!
+  inventory: StateVersionInventory!
   metadata: ResourceMetadata!
   outputs: [StateVersionOutput!]!
-  resources: [StateVersionResource!]!
   run: Run
+}
+
+type StateVersionInventory {
+  resources: [StateVersionResource!]!
+  dependencies: [StateVersionDependency!]!
+  checkResults: [CheckResult!]!
+}
+
+type CheckResultObject {
+  address: String!
+  status: CheckResultStatus!
+  failureMessages: [String!]!
+}
+
+type CheckResult {
+  name: String!
+  objects: [CheckResultObject!]!
+  status: CheckResultStatus!
+}
+
+enum CheckResultStatus {
+  pass
+  fail
+  error
+  unknown
 }
 
 type StateVersionConnection {
