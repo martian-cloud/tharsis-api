@@ -78,6 +78,7 @@ type Job implements Node {
   runnerAvailabilityStatus: RunnerAvailabilityStatus!
   properties: [KeyValueEntry!]!
   completed: Boolean!
+  outdatedJobProtocolVersion: Boolean!
 }
 
 input JobLogStreamSubscriptionInput {

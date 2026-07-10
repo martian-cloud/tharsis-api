@@ -10,6 +10,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/client"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
@@ -108,7 +109,7 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 		j.handleJobFailureWithError(ctx, jobLogger, err)
 	} else {
 		jobLogger.Flush()
-		if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_finished); err != nil {
+		if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_finished, models.CurrentJobProtocolVersion); err != nil {
 			return fmt.Errorf("failed to set job status to succeeded: %v", err)
 		}
 	}
@@ -125,7 +126,7 @@ func (j *JobExecutor) handleJobFailureWithError(ctx context.Context, jobLogger j
 func (j *JobExecutor) handleJobFailure(ctx context.Context, jobLogger joblogger.Logger) {
 	jobLogger.Flush()
 
-	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_failed); err != nil {
+	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_failed, models.CurrentJobProtocolVersion); err != nil {
 		j.logger.Errorf("failed to set job status to failed: %v", err)
 	}
 }
@@ -133,14 +134,14 @@ func (j *JobExecutor) handleJobFailure(ctx context.Context, jobLogger joblogger.
 func (j *JobExecutor) handleJobCanceled(ctx context.Context, jobLogger joblogger.Logger) {
 	jobLogger.Flush()
 
-	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_canceled); err != nil {
+	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_canceled, models.CurrentJobProtocolVersion); err != nil {
 		j.logger.Errorf("failed to set job status to canceled: %v", err)
 	}
 }
 
 func (j *JobExecutor) execute(ctx context.Context, jobLogger joblogger.Logger) error {
 	// Set job status to running
-	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_running); err != nil {
+	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_running, models.CurrentJobProtocolVersion); err != nil {
 		if status.Code(err) == codes.InvalidArgument {
 			// Check if job is already canceled
 			job, err := j.client.GetJob(ctx, j.cfg.JobID)

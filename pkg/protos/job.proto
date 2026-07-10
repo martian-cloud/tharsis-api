@@ -72,8 +72,9 @@ message GetLatestJobForApplyRequest {
 
 // SetJobStatusInput is the input for setting the status of a job.
 message SetJobStatusInput {
-  string job_id = 1;
-  JobStatus status = 2;
+  string    job_id               = 1;
+  JobStatus status               = 2;
+  string    job_protocol_version = 3;
 }
 
 // SubscribeToJobLogStreamRequest is the input for subscribing to job log stream events.
@@ -107,15 +108,16 @@ message SaveJobLogsRequest {
 
 // Job represents a Terraform job.
 message Job {
-  metadata.ResourceMetadata metadata         = 1;
-  string                    workspace_id     = 2;
-  string                    run_id           = 3;
-  string                    type             = 4;
-  JobStatus                 status           = 5;
-  int32                     max_job_duration = 6;
-  map<string, string>       properties       = 7;
-  bool                      cancel_requested = 8;
-  bool                      force_canceled   = 9;
+  metadata.ResourceMetadata metadata                       = 1;
+  string                    workspace_id                   = 2;
+  string                    run_id                         = 3;
+  string                    type                           = 4;
+  JobStatus                 status                         = 5;
+  int32                     max_job_duration               = 6;
+  map<string, string>       properties                     = 7;
+  bool                      cancel_requested               = 8;
+  bool                      force_canceled                 = 9;
+  bool                      outdated_job_protocol_version  = 10;
 }
 
 // JobLogStreamEventData contains the log data.

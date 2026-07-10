@@ -101,7 +101,7 @@ type jobs struct {
 
 var jobFieldList = append(metadataFieldList, "status", "type", "workspace_id", "run_id",
 	"cancel_requested_at",
-	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration", "force_canceled", "tags", "properties")
+	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration", "force_canceled", "tags", "properties", "outdated_job_protocol_version")
 
 // NewJobs returns an instance of the Jobs interface
 func NewJobs(dbClient *Client) Jobs {
@@ -294,21 +294,22 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 			dialect.Update("jobs").
 				Set(
 					goqu.Record{
-						"version":             goqu.L("? + ?", goqu.C("version"), 1),
-						"updated_at":          timestamp,
-						"status":              job.GetStatus(),
-						"type":                job.Type,
-						"workspace_id":        job.WorkspaceID,
-						"run_id":              job.RunID,
-						"cancel_requested_at": job.CancelRequestedTimestamp,
-						"queued_at":           job.Timestamps.QueuedTimestamp,
-						"pending_at":          job.Timestamps.PendingTimestamp,
-						"running_at":          job.Timestamps.RunningTimestamp,
-						"finished_at":         job.Timestamps.FinishedTimestamp,
-						"runner_id":           job.RunnerID,
-						"runner_path":         job.RunnerPath,
-						"force_canceled":      job.ForceCanceled,
-						"tags":                tags,
+						"version":                       goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":                    timestamp,
+						"status":                        job.GetStatus(),
+						"type":                          job.Type,
+						"workspace_id":                  job.WorkspaceID,
+						"run_id":                        job.RunID,
+						"cancel_requested_at":           job.CancelRequestedTimestamp,
+						"queued_at":                     job.Timestamps.QueuedTimestamp,
+						"pending_at":                    job.Timestamps.PendingTimestamp,
+						"running_at":                    job.Timestamps.RunningTimestamp,
+						"finished_at":                   job.Timestamps.FinishedTimestamp,
+						"runner_id":                     job.RunnerID,
+						"runner_path":                   job.RunnerPath,
+						"force_canceled":                job.ForceCanceled,
+						"outdated_job_protocol_version": job.OutdatedJobProtocolVersion,
+						"tags":                          tags,
 					},
 				).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).
 				Returning("*"),
@@ -356,25 +357,26 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 		With("jobs",
 			dialect.Insert("jobs").
 				Rows(goqu.Record{
-					"id":                  newResourceID(),
-					"version":             initialResourceVersion,
-					"created_at":          timestamp,
-					"updated_at":          timestamp,
-					"status":              job.GetStatus(),
-					"type":                job.Type,
-					"workspace_id":        job.WorkspaceID,
-					"run_id":              job.RunID,
-					"cancel_requested_at": job.CancelRequestedTimestamp,
-					"queued_at":           job.Timestamps.QueuedTimestamp,
-					"pending_at":          job.Timestamps.PendingTimestamp,
-					"running_at":          job.Timestamps.RunningTimestamp,
-					"finished_at":         job.Timestamps.FinishedTimestamp,
-					"max_job_duration":    job.MaxJobDuration,
-					"runner_id":           job.RunnerID,
-					"runner_path":         job.RunnerPath,
-					"force_canceled":      job.ForceCanceled,
-					"tags":                tags,
-					"properties":          properties,
+					"id":                            newResourceID(),
+					"version":                       initialResourceVersion,
+					"created_at":                    timestamp,
+					"updated_at":                    timestamp,
+					"status":                        job.GetStatus(),
+					"type":                          job.Type,
+					"workspace_id":                  job.WorkspaceID,
+					"run_id":                        job.RunID,
+					"cancel_requested_at":           job.CancelRequestedTimestamp,
+					"queued_at":                     job.Timestamps.QueuedTimestamp,
+					"pending_at":                    job.Timestamps.PendingTimestamp,
+					"running_at":                    job.Timestamps.RunningTimestamp,
+					"finished_at":                   job.Timestamps.FinishedTimestamp,
+					"max_job_duration":              job.MaxJobDuration,
+					"runner_id":                     job.RunnerID,
+					"runner_path":                   job.RunnerPath,
+					"force_canceled":                job.ForceCanceled,
+					"outdated_job_protocol_version": job.OutdatedJobProtocolVersion,
+					"tags":                          tags,
+					"properties":                    properties,
 				}).Returning("*"),
 		).Select(j.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})))
@@ -498,6 +500,7 @@ func scanJob(row scanner) (*models.Job, error) {
 		&job.ForceCanceled,
 		&job.Tags,
 		&job.Properties,
+		&job.OutdatedJobProtocolVersion,
 		&workspacePath,
 	}
 

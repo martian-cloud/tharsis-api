@@ -12,6 +12,7 @@ import Link from '../../routes/Link';
 import ForceCancelRunAlert from './ForceCancelRunAlert';
 import JobLogs from './JobLogs';
 import NoRunnerAlert from './NoRunnerAlert';
+import OutdatedProtocolAlert from './OutdatedProtocolAlert';
 import RunDetailsErrorSummary from './RunDetailsErrorSummary';
 import RunDetailsPlanSummary from './RunDetailsPlanSummary';
 import RunJobDialog from './RunJobDialog';
@@ -91,6 +92,7 @@ function RunDetailsPlanStage(props: Props) {
                     finishedAt
                   }
                   ...NoRunnerAlertFragment_job
+                  ...OutdatedProtocolAlertFragment_job
                 }
                 jobs(first: 0) {
                   totalCount
@@ -383,6 +385,7 @@ function RunDetailsPlanStage(props: Props) {
         <Box>
             {data.plan.currentJob?.cancelRequested && data.plan.status !== 'canceled' && <ForceCancelRunAlert fragmentRef={data} />}
             {data.plan.currentJob && <NoRunnerAlert fragmentRef={data.plan.currentJob} sx={{ mb: 2 }} />}
+            {data.plan.currentJob && <OutdatedProtocolAlert fragmentRef={data.plan.currentJob} />}
             <RunDetailsStageHeader stage="Plan" triggeredAt={data.plan.metadata.createdAt as string} triggeredBy={data.createdBy} />
             <RunDetailsStageStatusCard
                 icon={<StatusIcon sx={{ width: 32, height: 32, mr: 2 }} />}

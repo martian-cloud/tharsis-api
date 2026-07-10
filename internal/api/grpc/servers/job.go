@@ -126,7 +126,7 @@ func (s *JobServer) SetJobStatus(ctx context.Context, req *pb.SetJobStatusInput)
 		return nil, err
 	}
 
-	job, err := s.serviceCatalog.JobService.SetJobStatus(ctx, jobID, models.JobStatus(req.GetStatus().String()))
+	job, err := s.serviceCatalog.JobService.SetJobStatus(ctx, jobID, models.JobStatus(req.GetStatus().String()), req.GetJobProtocolVersion())
 	if err != nil {
 		return nil, err
 	}
@@ -284,14 +284,15 @@ func (s *JobServer) SubscribeToJobCancellationEvent(req *pb.SubscribeToJobCancel
 // toPBJob converts from Job model to ProtoBuf model.
 func toPBJob(j *models.Job) *pb.Job {
 	return &pb.Job{
-		Metadata:        toPBMetadata(&j.Metadata, types.JobModelType),
-		WorkspaceId:     gid.ToGlobalID(types.WorkspaceModelType, j.WorkspaceID),
-		RunId:           gid.ToGlobalID(types.RunModelType, j.RunID),
-		Type:            string(j.Type),
-		Status:          pb.JobStatus(pb.JobStatus_value[string(j.GetStatus())]),
-		MaxJobDuration:  j.MaxJobDuration,
-		Properties:      j.Properties,
-		CancelRequested: j.GetStatus() == models.JobCanceling,
-		ForceCanceled:   j.ForceCanceled,
+		Metadata:                   toPBMetadata(&j.Metadata, types.JobModelType),
+		WorkspaceId:                gid.ToGlobalID(types.WorkspaceModelType, j.WorkspaceID),
+		RunId:                      gid.ToGlobalID(types.RunModelType, j.RunID),
+		Type:                       string(j.Type),
+		Status:                     pb.JobStatus(pb.JobStatus_value[string(j.GetStatus())]),
+		MaxJobDuration:             j.MaxJobDuration,
+		Properties:                 j.Properties,
+		CancelRequested:            j.GetStatus() == models.JobCanceling,
+		ForceCanceled:              j.ForceCanceled,
+		OutdatedJobProtocolVersion: j.OutdatedJobProtocolVersion,
 	}
 }

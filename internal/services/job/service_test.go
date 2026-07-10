@@ -1254,16 +1254,18 @@ func TestSetJobStatus(t *testing.T) {
 	now := time.Now()
 
 	type testCase struct {
-		name            string
-		existingJob     *models.Job
-		inputStatus     models.JobStatus
-		authError       error
-		expectErrorCode errors.CodeType
+		name                          string
+		existingJob                   *models.Job
+		inputStatus                   models.JobStatus
+		jobProtocolVersion            string
+		authError                     error
+		expectErrorCode               errors.CodeType
+		expectOutdatedProtocolVersion *bool
 	}
 
 	testCases := []testCase{
 		{
-			name: "successfully set job status to running",
+			name: "successfully set job status to running with current protocol version",
 			existingJob: jobWithStatus(&models.Job{
 				Metadata:    models.ResourceMetadata{ID: jobID},
 				WorkspaceID: workspaceID,
@@ -1273,10 +1275,42 @@ func TestSetJobStatus(t *testing.T) {
 					PendingTimestamp: &now,
 				},
 			}, models.JobPending),
-			inputStatus: models.JobRunning,
+			inputStatus:                   models.JobRunning,
+			jobProtocolVersion:            models.CurrentJobProtocolVersion,
+			expectOutdatedProtocolVersion: ptr.Bool(false),
 		},
 		{
-			name: "successfully set job status to finished",
+			name: "successfully set job status to running with outdated protocol version",
+			existingJob: jobWithStatus(&models.Job{
+				Metadata:    models.ResourceMetadata{ID: jobID},
+				WorkspaceID: workspaceID,
+				RunnerPath:  &runnerPath,
+				Timestamps: models.JobTimestamps{
+					QueuedTimestamp:  &now,
+					PendingTimestamp: &now,
+				},
+			}, models.JobPending),
+			inputStatus:                   models.JobRunning,
+			jobProtocolVersion:            "0.1.0",
+			expectOutdatedProtocolVersion: ptr.Bool(true),
+		},
+		{
+			name: "successfully set job status to running with empty protocol version",
+			existingJob: jobWithStatus(&models.Job{
+				Metadata:    models.ResourceMetadata{ID: jobID},
+				WorkspaceID: workspaceID,
+				RunnerPath:  &runnerPath,
+				Timestamps: models.JobTimestamps{
+					QueuedTimestamp:  &now,
+					PendingTimestamp: &now,
+				},
+			}, models.JobPending),
+			inputStatus:                   models.JobRunning,
+			jobProtocolVersion:            "",
+			expectOutdatedProtocolVersion: ptr.Bool(true),
+		},
+		{
+			name: "successfully set job status to finished with current protocol version",
 			existingJob: jobWithStatus(&models.Job{
 				Metadata:    models.ResourceMetadata{ID: jobID},
 				WorkspaceID: workspaceID,
@@ -1284,13 +1318,29 @@ func TestSetJobStatus(t *testing.T) {
 					RunningTimestamp: &now,
 				},
 			}, models.JobRunning),
-			inputStatus: models.JobFinished,
+			inputStatus:                   models.JobFinished,
+			jobProtocolVersion:            models.CurrentJobProtocolVersion,
+			expectOutdatedProtocolVersion: ptr.Bool(false),
 		},
 		{
-			name:            "job not found",
-			existingJob:     nil,
-			inputStatus:     models.JobRunning,
-			expectErrorCode: errors.ENotFound,
+			name: "outdated protocol version on finished transition flags job (simulates API upgrade mid-job)",
+			existingJob: jobWithStatus(&models.Job{
+				Metadata:    models.ResourceMetadata{ID: jobID},
+				WorkspaceID: workspaceID,
+				Timestamps: models.JobTimestamps{
+					RunningTimestamp: &now,
+				},
+			}, models.JobRunning),
+			inputStatus:                   models.JobFinished,
+			jobProtocolVersion:            "0.1.0",
+			expectOutdatedProtocolVersion: ptr.Bool(true),
+		},
+		{
+			name:               "job not found",
+			existingJob:        nil,
+			inputStatus:        models.JobRunning,
+			jobProtocolVersion: "",
+			expectErrorCode:    errors.ENotFound,
 		},
 		{
 			name: "subject does not have permission to update job",
@@ -1298,12 +1348,12 @@ func TestSetJobStatus(t *testing.T) {
 				Metadata:    models.ResourceMetadata{ID: jobID},
 				WorkspaceID: workspaceID,
 			}, models.JobPending),
-			inputStatus:     models.JobRunning,
-			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode: errors.EForbidden,
+			inputStatus:        models.JobRunning,
+			jobProtocolVersion: "",
+			authError:          errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode:    errors.EForbidden,
 		},
 	}
-
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := t.Context()
@@ -1354,7 +1404,7 @@ func TestSetJobStatus(t *testing.T) {
 				cmdFactory:   &commands.Factory{},
 			}
 
-			result, err := svc.SetJobStatus(auth.WithCaller(ctx, mockCaller), jobID, test.inputStatus)
+			result, err := svc.SetJobStatus(auth.WithCaller(ctx, mockCaller), jobID, test.inputStatus, test.jobProtocolVersion)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -1363,6 +1413,10 @@ func TestSetJobStatus(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, result)
+
+			if test.expectOutdatedProtocolVersion != nil {
+				assert.Equal(t, *test.expectOutdatedProtocolVersion, result.OutdatedJobProtocolVersion)
+			}
 		})
 	}
 }
@@ -1745,6 +1799,32 @@ func TestGetLogStreamsByJobIDs(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, []models.LogStream{sampleLogStream}, actual)
+		})
+	}
+}
+
+func TestIsProtocolVersionOutdated(t *testing.T) {
+	// Tests run against the package-level currentProtocolVersion which is
+	// models.CurrentJobProtocolVersion ("1.0.0" at the time of writing).
+	tests := []struct {
+		name            string
+		executorVersion string
+		expected        bool
+	}{
+		{"older major", "0.9.0", true},
+		{"older minor", "0.1.0", true},
+		{"older patch", "0.0.1", true},
+		{"same version", models.CurrentJobProtocolVersion, false},
+		{"newer minor", "1.1.0", false},
+		{"newer major", "2.0.0", false},
+		{"invalid executor version", "invalid", true},
+		{"empty executor version", "", true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := isProtocolVersionOutdated(test.executorVersion)
+			assert.Equal(t, test.expected, result)
 		})
 	}
 }
