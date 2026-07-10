@@ -268,6 +268,11 @@ func (r *JobResolver) ForceCanceled() bool {
 	return r.job.ForceCanceled
 }
 
+// OutdatedJobProtocolVersion resolver
+func (r *JobResolver) OutdatedJobProtocolVersion() bool {
+	return r.job.OutdatedJobProtocolVersion
+}
+
 // Metadata resolver
 func (r *JobResolver) Metadata() *MetadataResolver {
 	return &MetadataResolver{metadata: &r.job.Metadata}

@@ -329,11 +329,12 @@ func (x *GetLatestJobForApplyRequest) GetApplyId() string {
 
 // SetJobStatusInput is the input for setting the status of a job.
 type SetJobStatusInput struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
-	Status        JobStatus              `protobuf:"varint,2,opt,name=status,proto3,enum=martiancloud.tharsis.api.job.JobStatus" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	JobId              string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Status             JobStatus              `protobuf:"varint,2,opt,name=status,proto3,enum=martiancloud.tharsis.api.job.JobStatus" json:"status,omitempty"`
+	JobProtocolVersion string                 `protobuf:"bytes,3,opt,name=job_protocol_version,json=jobProtocolVersion,proto3" json:"job_protocol_version,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *SetJobStatusInput) Reset() {
@@ -378,6 +379,13 @@ func (x *SetJobStatusInput) GetStatus() JobStatus {
 		return x.Status
 	}
 	return JobStatus_queued
+}
+
+func (x *SetJobStatusInput) GetJobProtocolVersion() string {
+	if x != nil {
+		return x.JobProtocolVersion
+	}
+	return ""
 }
 
 // SubscribeToJobLogStreamRequest is the input for subscribing to job log stream events.
@@ -639,18 +647,19 @@ func (x *SaveJobLogsRequest) GetLogs() string {
 
 // Job represents a Terraform job.
 type Job struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Metadata        *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	WorkspaceId     string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	RunId           string                 `protobuf:"bytes,3,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	Type            string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
-	Status          JobStatus              `protobuf:"varint,5,opt,name=status,proto3,enum=martiancloud.tharsis.api.job.JobStatus" json:"status,omitempty"`
-	MaxJobDuration  int32                  `protobuf:"varint,6,opt,name=max_job_duration,json=maxJobDuration,proto3" json:"max_job_duration,omitempty"`
-	Properties      map[string]string      `protobuf:"bytes,7,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	CancelRequested bool                   `protobuf:"varint,8,opt,name=cancel_requested,json=cancelRequested,proto3" json:"cancel_requested,omitempty"`
-	ForceCanceled   bool                   `protobuf:"varint,9,opt,name=force_canceled,json=forceCanceled,proto3" json:"force_canceled,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	Metadata                   *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	WorkspaceId                string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	RunId                      string                 `protobuf:"bytes,3,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	Type                       string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	Status                     JobStatus              `protobuf:"varint,5,opt,name=status,proto3,enum=martiancloud.tharsis.api.job.JobStatus" json:"status,omitempty"`
+	MaxJobDuration             int32                  `protobuf:"varint,6,opt,name=max_job_duration,json=maxJobDuration,proto3" json:"max_job_duration,omitempty"`
+	Properties                 map[string]string      `protobuf:"bytes,7,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	CancelRequested            bool                   `protobuf:"varint,8,opt,name=cancel_requested,json=cancelRequested,proto3" json:"cancel_requested,omitempty"`
+	ForceCanceled              bool                   `protobuf:"varint,9,opt,name=force_canceled,json=forceCanceled,proto3" json:"force_canceled,omitempty"`
+	OutdatedJobProtocolVersion bool                   `protobuf:"varint,10,opt,name=outdated_job_protocol_version,json=outdatedJobProtocolVersion,proto3" json:"outdated_job_protocol_version,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *Job) Reset() {
@@ -742,6 +751,13 @@ func (x *Job) GetCancelRequested() bool {
 func (x *Job) GetForceCanceled() bool {
 	if x != nil {
 		return x.ForceCanceled
+	}
+	return false
+}
+
+func (x *Job) GetOutdatedJobProtocolVersion() bool {
+	if x != nil {
+		return x.OutdatedJobProtocolVersion
 	}
 	return false
 }
@@ -1070,10 +1086,11 @@ const file_job_proto_rawDesc = "" +
 	"\x1aGetLatestJobForPlanRequest\x12\x17\n" +
 	"\aplan_id\x18\x01 \x01(\tR\x06planId\"8\n" +
 	"\x1bGetLatestJobForApplyRequest\x12\x19\n" +
-	"\bapply_id\x18\x01 \x01(\tR\aapplyId\"k\n" +
+	"\bapply_id\x18\x01 \x01(\tR\aapplyId\"\x9d\x01\n" +
 	"\x11SetJobStatusInput\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12?\n" +
-	"\x06status\x18\x02 \x01(\x0e2'.martiancloud.tharsis.api.job.JobStatusR\x06status\"\x80\x01\n" +
+	"\x06status\x18\x02 \x01(\x0e2'.martiancloud.tharsis.api.job.JobStatusR\x06status\x120\n" +
+	"\x14job_protocol_version\x18\x03 \x01(\tR\x12jobProtocolVersion\"\x80\x01\n" +
 	"\x1eSubscribeToJobLogStreamRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x120\n" +
 	"\x12last_seen_log_size\x18\x02 \x01(\x05H\x00R\x0flastSeenLogSize\x88\x01\x01B\x15\n" +
@@ -1091,7 +1108,7 @@ const file_job_proto_rawDesc = "" +
 	"\x12SaveJobLogsRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12!\n" +
 	"\fstart_offset\x18\x02 \x01(\x05R\vstartOffset\x12\x12\n" +
-	"\x04logs\x18\x03 \x01(\tR\x04logs\"\xf3\x03\n" +
+	"\x04logs\x18\x03 \x01(\tR\x04logs\"\xb6\x04\n" +
 	"\x03Job\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x15\n" +
@@ -1103,7 +1120,9 @@ const file_job_proto_rawDesc = "" +
 	"properties\x18\a \x03(\v21.martiancloud.tharsis.api.job.Job.PropertiesEntryR\n" +
 	"properties\x12)\n" +
 	"\x10cancel_requested\x18\b \x01(\bR\x0fcancelRequested\x12%\n" +
-	"\x0eforce_canceled\x18\t \x01(\bR\rforceCanceled\x1a=\n" +
+	"\x0eforce_canceled\x18\t \x01(\bR\rforceCanceled\x12A\n" +
+	"\x1doutdated_job_protocol_version\x18\n" +
+	" \x01(\bR\x1aoutdatedJobProtocolVersion\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"C\n" +

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	goversion "github.com/hashicorp/go-version"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/commands"
@@ -45,6 +46,10 @@ const (
 // internal control flow: getNextAvailableQueuedJob catches it and waits for one of
 // the runner's jobs to finish; it is never returned to the caller.
 var errRunnerJobLimitReached = errors.New("runner has reached its concurrent job limit")
+
+// currentProtocolVersion is the parsed semver of the API's job protocol version,
+// computed once at package init to avoid re-parsing on every request.
+var currentProtocolVersion = goversion.Must(goversion.NewVersion(models.CurrentJobProtocolVersion))
 
 // RunnerAvailabilityStatusType describes a job's runner availability status
 type RunnerAvailabilityStatusType string
@@ -134,7 +139,7 @@ type Service interface {
 	GetJobsByIDs(ctx context.Context, idList []string) ([]models.Job, error)
 	GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsResult, error)
 	GetLatestJobForRun(ctx context.Context, run *models.Run) (*models.Job, error)
-	SetJobStatus(ctx context.Context, jobID string, status models.JobStatus) (*models.Job, error)
+	SetJobStatus(ctx context.Context, jobID string, status models.JobStatus, jobProtocolVersion string) (*models.Job, error)
 	SubscribeToCancellationEvent(ctx context.Context, options *CancellationSubscriptionsOptions) (<-chan *CancellationEvent, error)
 	WriteLogs(ctx context.Context, jobID string, startOffset int, logs []byte) (int, error)
 	ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) (io.ReadCloser, error)
@@ -350,7 +355,7 @@ func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*mod
 	return &jobsResult.Jobs[0], nil
 }
 
-func (s *service) SetJobStatus(ctx context.Context, jobID string, status models.JobStatus) (*models.Job, error) {
+func (s *service) SetJobStatus(ctx context.Context, jobID string, status models.JobStatus, jobProtocolVersion string) (*models.Job, error) {
 	ctx, span := tracer.Start(ctx, "svc.SetJobStatus")
 	defer span.End()
 
@@ -411,6 +416,8 @@ func (s *service) SetJobStatus(ctx context.Context, jobID string, status models.
 		case models.JobFinished, models.JobFailed, models.JobCanceled:
 			current.Timestamps.FinishedTimestamp = &now
 		}
+
+		current.OutdatedJobProtocolVersion = isProtocolVersionOutdated(jobProtocolVersion)
 
 		updatedJob, err = s.dbClient.Jobs.UpdateJob(txCtx, current)
 		if err != nil {
@@ -1295,4 +1302,19 @@ func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*mo
 	}
 
 	return nil, nil
+}
+
+// isProtocolVersionOutdated compares the job executor's protocol version against
+// the API's version using semver. Returns true if the executor version is older.
+func isProtocolVersionOutdated(executorVersion string) bool {
+	if executorVersion == models.CurrentJobProtocolVersion {
+		return false
+	}
+
+	execVersion, err := goversion.NewVersion(executorVersion)
+	if err != nil {
+		return true
+	}
+
+	return execVersion.LessThan(currentProtocolVersion)
 }

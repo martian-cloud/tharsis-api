@@ -1571,6 +1571,7 @@ type Job implements Node {
   logs(limit: Int!, startOffset: Int!): String!
   maxJobDuration: Int!
   metadata: ResourceMetadata!
+  outdatedJobProtocolVersion: Boolean!
   properties: [KeyValueEntry!]!
   run: Run!
   runner: Runner

@@ -290,9 +290,9 @@ func (_m *MockService) ReadLogs(ctx context.Context, jobID string, startOffset i
 	return r0, r1
 }
 
-// SetJobStatus provides a mock function with given fields: ctx, jobID, status
-func (_m *MockService) SetJobStatus(ctx context.Context, jobID string, status models.JobStatus) (*models.Job, error) {
-	ret := _m.Called(ctx, jobID, status)
+// SetJobStatus provides a mock function with given fields: ctx, jobID, status, jobProtocolVersion
+func (_m *MockService) SetJobStatus(ctx context.Context, jobID string, status models.JobStatus, jobProtocolVersion string) (*models.Job, error) {
+	ret := _m.Called(ctx, jobID, status, jobProtocolVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SetJobStatus")
@@ -300,19 +300,19 @@ func (_m *MockService) SetJobStatus(ctx context.Context, jobID string, status mo
 
 	var r0 *models.Job
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, models.JobStatus) (*models.Job, error)); ok {
-		return rf(ctx, jobID, status)
+	if rf, ok := ret.Get(0).(func(context.Context, string, models.JobStatus, string) (*models.Job, error)); ok {
+		return rf(ctx, jobID, status, jobProtocolVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, models.JobStatus) *models.Job); ok {
-		r0 = rf(ctx, jobID, status)
+	if rf, ok := ret.Get(0).(func(context.Context, string, models.JobStatus, string) *models.Job); ok {
+		r0 = rf(ctx, jobID, status, jobProtocolVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Job)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, models.JobStatus) error); ok {
-		r1 = rf(ctx, jobID, status)
+	if rf, ok := ret.Get(1).(func(context.Context, string, models.JobStatus, string) error); ok {
+		r1 = rf(ctx, jobID, status, jobProtocolVersion)
 	} else {
 		r1 = ret.Error(1)
 	}

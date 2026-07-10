@@ -51,7 +51,7 @@ type Client interface {
 	SubscribeToJobCancellationEvent(ctx context.Context, jobID string) (pb.Jobs_SubscribeToJobCancellationEventClient, error)
 	UpdateApply(ctx context.Context, input *UpdateApplyInput) (*pb.Apply, error)
 	UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*pb.Plan, error)
-	SetJobStatus(ctx context.Context, jobID string, status pb.JobStatus) (*pb.Job, error)
+	SetJobStatus(ctx context.Context, jobID string, status pb.JobStatus, jobProtocolVersion string) (*pb.Job, error)
 	UploadPlanCache(ctx context.Context, planID string, body io.Reader) error
 	UploadPlanData(ctx context.Context, planID string, tfPlan *tfjson.Plan, tfProviderSchemas *tfjson.ProviderSchemas) error
 	DownloadConfigurationVersion(ctx context.Context, configVersionID string, writer io.Writer) error
@@ -220,10 +220,11 @@ func (c *jobClient) UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*pb
 }
 
 // SetJobStatus sets the status of a job via gRPC.
-func (c *jobClient) SetJobStatus(ctx context.Context, jobID string, status pb.JobStatus) (*pb.Job, error) {
+func (c *jobClient) SetJobStatus(ctx context.Context, jobID string, status pb.JobStatus, jobProtocolVersion string) (*pb.Job, error) {
 	return c.grpcClient.JobsClient.SetJobStatus(ctx, &pb.SetJobStatusInput{
-		JobId:  jobID,
-		Status: status,
+		JobId:              jobID,
+		Status:             status,
+		JobProtocolVersion: jobProtocolVersion,
 	})
 }
 

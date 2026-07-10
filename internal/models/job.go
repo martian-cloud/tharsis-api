@@ -66,6 +66,10 @@ const (
 	JobPropertyProviderMirrorEnabled = "providerMirrorEnabled"
 )
 
+// CurrentJobProtocolVersion is the current version of the job protocol.
+// This should only be incremented when the protocol between the job executor and the API changes.
+const CurrentJobProtocolVersion = "1.0.0"
+
 // JobTimestamps includes the timestamp for each job state change
 type JobTimestamps struct {
 	QueuedTimestamp   *time.Time
@@ -76,19 +80,20 @@ type JobTimestamps struct {
 
 // Job represents a unit of work that needs to be completed
 type Job struct {
-	Timestamps               JobTimestamps
-	CancelRequestedTimestamp *time.Time
-	status                   JobStatus
-	Type                     JobType
-	WorkspaceID              string
-	RunID                    string
-	RunnerID                 *string
-	RunnerPath               *string
-	Metadata                 ResourceMetadata
-	MaxJobDuration           int32
-	ForceCanceled            bool
-	Tags                     []string
-	Properties               map[string]string
+	Timestamps                 JobTimestamps
+	CancelRequestedTimestamp   *time.Time
+	status                     JobStatus
+	Type                       JobType
+	WorkspaceID                string
+	RunID                      string
+	RunnerID                   *string
+	RunnerPath                 *string
+	Metadata                   ResourceMetadata
+	MaxJobDuration             int32
+	ForceCanceled              bool
+	OutdatedJobProtocolVersion bool
+	Tags                       []string
+	Properties                 map[string]string
 }
 
 // GetStatus returns the job's current status.
