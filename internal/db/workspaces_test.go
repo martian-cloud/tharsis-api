@@ -593,6 +593,15 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 			},
 			expectCount: 1,
 		},
+		{
+			name: "exclude favorited workspaces",
+			input: &GetWorkspacesInput{
+				Filter: &WorkspaceFilter{
+					ExcludeFavoriteUserID: &user.Metadata.ID,
+				},
+			},
+			expectCount: 1,
+		},
 	}
 
 	for _, test := range testCases {

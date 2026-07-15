@@ -310,6 +310,15 @@ func TestGroups_GetGroups(t *testing.T) {
 			},
 			expectCount: 1,
 		},
+		{
+			name: "exclude favorited groups",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					ExcludeFavoriteUserID: &user.Metadata.ID,
+				},
+			},
+			expectCount: 1,
+		},
 	}
 
 	for _, test := range testCases {
