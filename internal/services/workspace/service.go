@@ -146,6 +146,8 @@ type GetWorkspacesInput struct {
 	LabelFilters []db.WorkspaceLabelFilter
 	// Favorites filters to only return user's favorite workspaces
 	Favorites *bool
+	// ExcludeFavorites excludes the user's favorite workspaces from the results
+	ExcludeFavorites *bool
 }
 
 // GetStateVersionsInput is the input for querying a list of state versions
@@ -424,6 +426,14 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 			return nil, errors.New("only users can filter by favorites", errors.WithErrorCode(errors.EInvalid))
 		}
 		dbInput.Filter.FavoriteUserID = &userCaller.User.Metadata.ID
+	}
+
+	// Handle exclude favorites filter
+	if input.ExcludeFavorites != nil && *input.ExcludeFavorites {
+		userCaller, ok := caller.(*auth.UserCaller)
+		if ok {
+			dbInput.Filter.ExcludeFavoriteUserID = &userCaller.User.Metadata.ID
+		}
 	}
 
 	if input.GroupID != nil {

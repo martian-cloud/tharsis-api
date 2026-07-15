@@ -4,6 +4,7 @@ package universalsearch
 import (
 	"context"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
@@ -22,6 +23,7 @@ func groupSearcher(service group.Service) searchFunc {
 			Search:            &query,
 			PaginationOptions: &pagination.Options{First: &limit},
 			Sort:              &sortBy,
+			ExcludeFavorites:  ptr.Bool(true),
 		})
 		if err != nil {
 			return nil, err
@@ -42,6 +44,7 @@ func workspaceSearcher(service workspace.Service) searchFunc {
 			Search:            &query,
 			PaginationOptions: &pagination.Options{First: &limit},
 			Sort:              &sortBy,
+			ExcludeFavorites:  ptr.Bool(true),
 		})
 		if err != nil {
 			return nil, err

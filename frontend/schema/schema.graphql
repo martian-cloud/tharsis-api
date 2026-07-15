@@ -130,8 +130,8 @@ type ActivityEventUpdateNamespaceMembershipPayload {
 }
 
 type ActivityEventUpdateRunPayload {
-  type: String!
   nodePath: String
+  type: String!
 }
 
 type ActivityEventUpdateTeamMemberPayload {
@@ -417,12 +417,6 @@ input ApplyRunInput {
   runId: String!
 }
 
-input SetRunAutoApplyInput {
-  autoApply: Boolean!
-  clientMutationId: String
-  runId: String!
-}
-
 enum ApplyStatus {
   canceled
   created
@@ -501,6 +495,25 @@ input CancelRunInput {
   comment: String
   force: Boolean
   runId: String!
+}
+
+type CheckResult {
+  name: String!
+  objects: [CheckResultObject!]!
+  status: CheckResultStatus!
+}
+
+type CheckResultObject {
+  address: String!
+  failureMessages: [String!]!
+  status: CheckResultStatus!
+}
+
+enum CheckResultStatus {
+  error
+  fail
+  pass
+  unknown
 }
 
 input ClaimJobInput {
@@ -1402,11 +1415,6 @@ input DiscardRunInput {
   runId: String!
 }
 
-input UndiscardRunInput {
-  clientMutationId: String
-  runId: String!
-}
-
 input EnableMaintenanceModeInput {
   clientMutationId: String
 }
@@ -1568,6 +1576,7 @@ type Job implements Node {
   id: ID!
   logLastUpdatedAt: Time
   logSize: Int!
+  logTruncated: Boolean!
   logs(limit: Int!, startOffset: Int!): String!
   maxJobDuration: Int!
   metadata: ResourceMetadata!
@@ -1612,6 +1621,7 @@ type JobLogStreamEvent {
   completed: Boolean!
   data: JobLogStreamEventData
   size: Int!
+  truncated: Boolean!
 }
 
 type JobLogStreamEventData {
@@ -1902,7 +1912,6 @@ type Mutation {
   destroyWorkspace(input: DestroyWorkspaceInput!): DestroyWorkspacePayload!
   disableMaintenanceMode(input: DisableMaintenanceModeInput!): DisableMaintenanceModePayload!
   discardRun(input: DiscardRunInput!): RunMutationPayload!
-  undiscardRun(input: UndiscardRunInput!): RunMutationPayload!
   enableMaintenanceMode(input: EnableMaintenanceModeInput!): EnableMaintenanceModePayload!
   favoriteNamespace(input: NamespaceFavoriteInput!): NamespaceFavoriteMutationPayload!
   lockWorkspace(input: LockWorkspaceInput!): LockWorkspacePayload!
@@ -1925,6 +1934,7 @@ type Mutation {
   setVariablesIncludedInTFConfig(input: SetVariablesIncludedInTFConfigInput!): SetVariablesIncludedInTFConfigPayload! @deprecated(reason: "Use the gRPC API instead.")
   unassignManagedIdentity(input: AssignManagedIdentityInput!): AssignManagedIdentityPayload!
   unassignServiceAccountFromRunner(input: AssignServiceAccountToRunnerInput!): AssignServiceAccountToRunnerPayload!
+  undiscardRun(input: UndiscardRunInput!): RunMutationPayload!
   unfavoriteNamespace(input: NamespaceFavoriteInput!): NamespaceUnfavoriteMutationPayload!
   unlockWorkspace(input: UnlockWorkspaceInput!): UnlockWorkspacePayload!
   updateAnnouncement(input: UpdateAnnouncementInput!): UpdateAnnouncementPayload!
@@ -2489,7 +2499,6 @@ input RunSubscriptionInput {
 
 type RunVariable {
   category: VariableCategory!
-  hcl: Boolean @deprecated(reason: "HCL field will be determined automatically, to be removed in a future release")
   includedInTfConfig: Boolean
   key: String!
   namespacePath: String
@@ -2702,6 +2711,12 @@ input SetNamespaceVariablesInput {
   variables: [NamespaceVariableInput!]!
 }
 
+input SetRunAutoApplyInput {
+  autoApply: Boolean!
+  clientMutationId: String
+  runId: String!
+}
+
 input SetUserNotificationPreferenceInput {
   clientMutationId: String
   customEvents: UserNotificationPreferenceCustomEventsInput
@@ -2749,31 +2764,6 @@ type StateVersion implements Node {
   run: Run
 }
 
-type StateVersionInventory {
-  resources: [StateVersionResource!]!
-  dependencies: [StateVersionDependency!]!
-  checkResults: [CheckResult!]!
-}
-
-type CheckResultObject {
-  address: String!
-  status: CheckResultStatus!
-  failureMessages: [String!]!
-}
-
-type CheckResult {
-  name: String!
-  objects: [CheckResultObject!]!
-  status: CheckResultStatus!
-}
-
-enum CheckResultStatus {
-  pass
-  fail
-  error
-  unknown
-}
-
 type StateVersionConnection {
   edges: [StateVersionEdge]
   pageInfo: PageInfo!
@@ -2789,6 +2779,12 @@ type StateVersionDependency {
 type StateVersionEdge {
   cursor: String!
   node: StateVersion
+}
+
+type StateVersionInventory {
+  checkResults: [CheckResult!]!
+  dependencies: [StateVersionDependency!]!
+  resources: [StateVersionResource!]!
 }
 
 type StateVersionOutput implements Node {
@@ -3188,6 +3184,11 @@ enum TerraformResourceMode {
 
 """Time represented in ISO 8601"""
 scalar Time
+
+input UndiscardRunInput {
+  clientMutationId: String
+  runId: String!
+}
 
 input UnlockWorkspaceInput {
   clientMutationId: String
@@ -3733,8 +3734,15 @@ type WorkspaceEdge {
 }
 
 type WorkspaceEvent {
-  action: String!
+  type: WorkspaceEventType!
   workspace: Workspace!
+}
+
+enum WorkspaceEventType {
+  WORKSPACE_ASSESSMENT_CREATED
+  WORKSPACE_ASSESSMENT_UPDATED
+  WORKSPACE_CREATED
+  WORKSPACE_UPDATED
 }
 
 """Workspace label types"""

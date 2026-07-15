@@ -827,6 +827,21 @@ func TestGetGroups(t *testing.T) {
 			},
 			expectErrorCode: errors.EInvalid,
 		},
+		{
+			name:       "user caller with exclude favorites filter",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				ExcludeFavorites: ptr.Bool(true),
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					RootNamespaceMemberships: []models.MembershipNamespace{
+						{ID: rootNamespaceID, Path: rootNamespacePath},
+					},
+					ExcludeFavoriteUserID: &userMemberID,
+				},
+			},
+		},
 	}
 
 	for _, test := range testCases {

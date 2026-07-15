@@ -80,6 +80,7 @@ type WorkspaceFilter struct {
 	WorkspacePath                  *string
 	LabelFilters                   []WorkspaceLabelFilter
 	FavoriteUserID                 *string
+	ExcludeFavoriteUserID          *string
 }
 
 // WorkspaceLabelFilter represents a label filter for workspace queries
@@ -222,6 +223,17 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 			goqu.Ex{"namespace_favorites.workspace_id": goqu.I("workspaces.id")},
 			goqu.Ex{"namespace_favorites.user_id": *input.Filter.FavoriteUserID},
 		)))
+	}
+
+	if input.Filter != nil && input.Filter.ExcludeFavoriteUserID != nil {
+		query = query.LeftJoin(
+			goqu.T("namespace_favorites").As("exclude_favs"),
+			goqu.On(goqu.And(
+				goqu.Ex{"exclude_favs.workspace_id": goqu.I("workspaces.id")},
+				goqu.Ex{"exclude_favs.user_id": *input.Filter.ExcludeFavoriteUserID},
+			)),
+		)
+		ex = ex.Append(goqu.I("exclude_favs.id").IsNull())
 	}
 
 	// Since managed identities is a many to many relationship only join them when we are looking for exactly one.

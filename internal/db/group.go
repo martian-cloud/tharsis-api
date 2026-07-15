@@ -52,6 +52,7 @@ type GroupFilter struct {
 	RootOnly                 bool
 	GroupPaths               []string
 	FavoriteUserID           *string
+	ExcludeFavoriteUserID    *string
 }
 
 // GroupSortableField represents the fields that a group can be sorted by
@@ -203,6 +204,17 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 			goqu.Ex{"namespace_favorites.group_id": goqu.I("groups.id")},
 			goqu.Ex{"namespace_favorites.user_id": *input.Filter.FavoriteUserID},
 		)))
+	}
+
+	if input.Filter != nil && input.Filter.ExcludeFavoriteUserID != nil {
+		query = query.LeftJoin(
+			goqu.T("namespace_favorites").As("exclude_favs"),
+			goqu.On(goqu.And(
+				goqu.Ex{"exclude_favs.group_id": goqu.I("groups.id")},
+				goqu.Ex{"exclude_favs.user_id": *input.Filter.ExcludeFavoriteUserID},
+			)),
+		)
+		ex = ex.Append(goqu.I("exclude_favs.id").IsNull())
 	}
 
 	query = query.Where(ex)

@@ -1223,6 +1223,18 @@ func TestGetWorkspaces(t *testing.T) {
 			adminMode:        false,
 			expectErrorCode:  errors.EInvalid,
 		},
+		{
+			name: "positive: user caller with exclude favorites filter",
+			input: &GetWorkspacesInput{
+				ExcludeFavorites: ptr.Bool(true),
+			},
+			userID:            ptr.String("user-1"),
+			adminMode:         false,
+			expectMemberships: []models.MembershipNamespace{},
+			expectResult: []models.Workspace{
+				sampleWorkspace,
+			},
+		},
 	}
 
 	for _, test := range testCases {
@@ -1234,7 +1246,8 @@ func TestGetWorkspaces(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if !test.failAuthorization {
-				if test.input.Favorites != nil && *test.input.Favorites && test.userID != nil {
+				if (test.input.Favorites != nil && *test.input.Favorites && test.userID != nil) ||
+					(test.input.ExcludeFavorites != nil && *test.input.ExcludeFavorites && test.userID != nil) {
 					mockAuthorizer := auth.NewMockAuthorizer(t)
 					mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
 					mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{}, nil).Maybe()
@@ -1265,6 +1278,11 @@ func TestGetWorkspaces(t *testing.T) {
 				input.Filter.FavoriteUserID = test.userID
 			}
 
+			// Handle exclude favorites filter
+			if test.input.ExcludeFavorites != nil && *test.input.ExcludeFavorites && test.userID != nil {
+				input.Filter.ExcludeFavoriteUserID = test.userID
+			}
+
 			if test.input.GroupID != nil {
 				input.Filter.GroupID = test.input.GroupID
 
@@ -1276,7 +1294,8 @@ func TestGetWorkspaces(t *testing.T) {
 			}
 
 			// The membership filter branch only runs for non-group queries on the mockCaller.
-			usesMockCaller := !(test.input.Favorites != nil && *test.input.Favorites && test.userID != nil)
+			usesMockCaller := !((test.input.Favorites != nil && *test.input.Favorites && test.userID != nil) ||
+				(test.input.ExcludeFavorites != nil && *test.input.ExcludeFavorites && test.userID != nil))
 			if test.input.GroupID == nil && usesMockCaller {
 				mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.adminMode).Maybe()
 				if !test.adminMode {
