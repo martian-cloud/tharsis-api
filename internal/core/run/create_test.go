@@ -26,27 +26,27 @@ import (
 // createTestEnv bundles the collaborators that corerun.Create needs so each test
 // can wire only the behavior it cares about.
 type createTestEnv struct {
-	dbClient      *db.Client
-	workspaces    *db.MockWorkspaces
-	managedIDs    *db.MockManagedIdentities
-	configVers    *db.MockConfigurationVersions
-	runs          *db.MockRuns
-	activityEvts  *db.MockActivityEvents
-	ruleEnforcer  *rules.MockRuleEnforcer
-	limitChecker  *limits.MockLimitChecker
-	artifactStore *workspace.MockArtifactStore
+	dbClient        *db.Client
+	workspaces      *db.MockWorkspaces
+	managedIDs      *db.MockManagedIdentities
+	configVers      *db.MockConfigurationVersions
+	runs            *db.MockRuns
+	activityEvts    *db.MockActivityEvents
+	objectStoreRefs *db.MockObjectStoreRefs
+	ruleEnforcer    *rules.MockRuleEnforcer
+	limitChecker    *limits.MockLimitChecker
 }
 
 func newCreateTestEnv(t *testing.T) *createTestEnv {
 	env := &createTestEnv{
-		workspaces:    db.NewMockWorkspaces(t),
-		managedIDs:    db.NewMockManagedIdentities(t),
-		configVers:    db.NewMockConfigurationVersions(t),
-		runs:          db.NewMockRuns(t),
-		activityEvts:  db.NewMockActivityEvents(t),
-		ruleEnforcer:  rules.NewMockRuleEnforcer(t),
-		limitChecker:  limits.NewMockLimitChecker(t),
-		artifactStore: workspace.NewMockArtifactStore(t),
+		workspaces:      db.NewMockWorkspaces(t),
+		managedIDs:      db.NewMockManagedIdentities(t),
+		configVers:      db.NewMockConfigurationVersions(t),
+		runs:            db.NewMockRuns(t),
+		activityEvts:    db.NewMockActivityEvents(t),
+		objectStoreRefs: db.NewMockObjectStoreRefs(t),
+		ruleEnforcer:    rules.NewMockRuleEnforcer(t),
+		limitChecker:    limits.NewMockLimitChecker(t),
 	}
 	env.dbClient = &db.Client{
 		Workspaces:            env.workspaces,
@@ -54,12 +54,13 @@ func newCreateTestEnv(t *testing.T) *createTestEnv {
 		ConfigurationVersions: env.configVers,
 		Runs:                  env.runs,
 		ActivityEvents:        env.activityEvts,
+		ObjectStoreRefs:       env.objectStoreRefs,
 	}
 	return env
 }
 
 func (e *createTestEnv) create(ctx context.Context, input *CreateRunInput) (*models.Run, error) {
-	return Create(ctx, e.dbClient, "", e.ruleEnforcer, e.limitChecker, e.artifactStore, input)
+	return Create(ctx, e.dbClient, "", e.ruleEnforcer, e.limitChecker, input)
 }
 
 // callerCtx returns a context carrying a service-account caller so the activity
@@ -83,7 +84,6 @@ func (e *createTestEnv) stubCreatePersistence(ctx context.Context) {
 	e.activityEvts.On("CreateActivityEvent", mock.Anything, mock.MatchedBy(func(in *models.ActivityEvent) bool {
 		return in.Action == models.ActionCreate && in.TargetType == models.TargetRun
 	})).Return(&models.ActivityEvent{}, nil)
-	e.artifactStore.On("UploadRunVariables", ctx, mock.Anything, mock.Anything).Return(nil)
 }
 
 func TestCreate_HappyPath_NonSpeculative(t *testing.T) {
@@ -128,7 +128,6 @@ func TestCreate_SkipActivityEvent(t *testing.T) {
 	env.runs.On("GetRuns", ctx, mock.Anything).
 		Return(&db.RunsResult{PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)}}, nil)
 	env.limitChecker.On("CheckLimit", ctx, limits.ResourceLimitRunsPerWorkspacePerTimePeriod, mock.Anything).Return(nil)
-	env.artifactStore.On("UploadRunVariables", ctx, mock.Anything, mock.Anything).Return(nil)
 
 	run, err := env.create(ctx, &CreateRunInput{
 		Subject:           "system",
@@ -227,44 +226,30 @@ func TestCreate_RunLimitExceeded(t *testing.T) {
 	assert.Nil(t, run)
 }
 
-func TestCreate_SensitiveVariablesAreMaskedBeforeUpload(t *testing.T) {
-	ctx := callerCtx()
-	env := newCreateTestEnv(t)
+func TestUploadRunVariables_MasksSensitiveValues(t *testing.T) {
+	ctx := context.Background()
+	artifactStore := workspace.NewMockArtifactStore(t)
 
-	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
-		Return(&models.Workspace{FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
-	env.runs.On("CreateRun", ctx, mock.Anything).Return(func(_ context.Context, run *models.Run) *models.Run {
-		run.Metadata.ID = "run-1"
-		run.Metadata.CreationTimestamp = ptr.Time(time.Now().UTC())
-		return run
-	}, nil)
-	env.runs.On("GetRuns", ctx, mock.Anything).
-		Return(&db.RunsResult{PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)}}, nil)
-	env.limitChecker.On("CheckLimit", ctx, limits.ResourceLimitRunsPerWorkspacePerTimePeriod, mock.Anything).Return(nil)
-	env.activityEvts.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-
-	// Capture the uploaded variable payload to confirm sensitive values are stripped.
+	// Capture the uploaded payload to confirm sensitive values are stripped.
 	var uploaded []runvariables.Variable
-	env.artifactStore.On("UploadRunVariables", ctx, mock.Anything, mock.Anything).
-		Return(nil).Run(func(args mock.Arguments) {
-		body := args.Get(2).(io.Reader)
-		data, err := io.ReadAll(body)
-		require.NoError(t, err)
-		require.NoError(t, json.Unmarshal(data, &uploaded))
-	})
+	artifactStore.On("UploadRunVariables", ctx, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			body := args.Get(2).(io.Reader)
+			data, err := io.ReadAll(body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(data, &uploaded))
+		}).
+		Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), "workspaces/ws-1/run_variables/key.json", nil)
 
 	secretVal := "super-secret"
 	plainVal := "plain"
-	_, err := env.create(ctx, &CreateRunInput{
-		Subject:     "u",
-		WorkspaceID: "ws-1",
-		Variables: []runvariables.Variable{
-			{Key: "secret", Value: &secretVal, Sensitive: true, Category: models.TerraformVariableCategory},
-			{Key: "plain", Value: &plainVal, Sensitive: false, Category: models.TerraformVariableCategory},
-		},
+	retainFn, key, err := UploadRunVariables(ctx, artifactStore, "ws-1", []runvariables.Variable{
+		{Key: "secret", Value: &secretVal, Sensitive: true, Category: models.TerraformVariableCategory},
+		{Key: "plain", Value: &plainVal, Sensitive: false, Category: models.TerraformVariableCategory},
 	})
 	require.NoError(t, err)
+	assert.Equal(t, "workspaces/ws-1/run_variables/key.json", key)
+	assert.NotNil(t, retainFn)
 
 	require.Len(t, uploaded, 2)
 	for _, v := range uploaded {

@@ -83,7 +83,7 @@ type stateVersions struct {
 	dbClient *Client
 }
 
-var stateVersionFieldList = append(metadataFieldList, "workspace_id", "run_id", "created_by")
+var stateVersionFieldList = append(metadataFieldList, "workspace_id", "run_id", "created_by", "object_store_key")
 
 // NewStateVersions returns an instance of the StateVersion interface
 func NewStateVersions(dbClient *Client) StateVersions {
@@ -214,13 +214,14 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 		With("state_versions",
 			dialect.Insert("state_versions").
 				Rows(goqu.Record{
-					"id":           newResourceID(),
-					"version":      initialResourceVersion,
-					"created_at":   timestamp,
-					"updated_at":   timestamp,
-					"workspace_id": stateVersion.WorkspaceID,
-					"run_id":       stateVersion.RunID,
-					"created_by":   stateVersion.CreatedBy,
+					"id":               newResourceID(),
+					"version":          initialResourceVersion,
+					"created_at":       timestamp,
+					"updated_at":       timestamp,
+					"workspace_id":     stateVersion.WorkspaceID,
+					"run_id":           stateVersion.RunID,
+					"created_by":       stateVersion.CreatedBy,
+					"object_store_key": nullableString(stateVersion.ObjectStoreKey),
 				}).Returning("*"),
 		).Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})))
@@ -284,7 +285,10 @@ func (s *stateVersions) getSelectFields() []interface{} {
 }
 
 func scanStateVersion(row scanner) (*models.StateVersion, error) {
-	var workspacePath string
+	var (
+		workspacePath  string
+		objectStoreKey *string
+	)
 	stateVersion := &models.StateVersion{}
 
 	err := row.Scan(
@@ -295,10 +299,15 @@ func scanStateVersion(row scanner) (*models.StateVersion, error) {
 		&stateVersion.WorkspaceID,
 		&stateVersion.RunID,
 		&stateVersion.CreatedBy,
+		&objectStoreKey,
 		&workspacePath,
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if objectStoreKey != nil {
+		stateVersion.ObjectStoreKey = *objectStoreKey
 	}
 
 	stateVersion.Metadata.TRN = trn.TypeStateVersion.Build(workspacePath, stateVersion.GetGlobalID())

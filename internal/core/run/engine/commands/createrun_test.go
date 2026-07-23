@@ -65,24 +65,30 @@ func TestCreateRun_Prepare(t *testing.T) {
 				dbClient:         dbClient,
 				variablesBuilder: runvariables.NewBuilder(dbClient, secret.NewMockManager(t), coreworkspace.NewMockArtifactStore(t)),
 				moduleResolver:   nil, // ModuleSource nil -> ResolveModule returns a zero-value result, resolver unused.
-				in:               &NewRunInput{Subject: "u@example.com", WorkspaceID: "ws-1", Refresh: test.refresh},
+				uploadRunVariables: func(_ context.Context, _ string, _ []runvariables.Variable) (db.RetainObjectRefFunc, string, error) {
+					return nil, "vars-key", nil
+				},
+				in: &NewRunInput{Subject: "u@example.com", WorkspaceID: "ws-1", Refresh: test.refresh},
 			}
 
 			require.NoError(t, cmd.Prepare(ctx))
 			require.NotNil(t, cmd.createInput)
 			assert.Equal(t, test.wantRefresh, cmd.createInput.Refresh)
+			assert.Equal(t, "vars-key", cmd.createInput.VariablesObjectStoreKey)
 		})
 	}
 }
 
 func TestCreateRun_Execute(t *testing.T) {
 	tests := []struct {
-		name      string
-		createErr error
-		wantErr   bool
+		name       string
+		createErr  error
+		linkRefErr error
+		wantErr    bool
 	}{
 		{name: "creates the run and queues it"},
 		{name: "propagates a create error", createErr: errors.New("boom"), wantErr: true},
+		{name: "LinkRef error is returned", linkRefErr: errors.New("link error"), wantErr: true},
 	}
 
 	for _, test := range tests {
@@ -92,7 +98,11 @@ func TestCreateRun_Execute(t *testing.T) {
 
 			var gotInput *corerun.CreateRunInput
 			cmd := &CreateRun{
-				createRun:   stubCreateRun(&gotInput, test.createErr),
+				dbClient:  &db.Client{},
+				createRun: stubCreateRun(&gotInput, test.createErr),
+				variablesRetainFn: func(_ context.Context, _ string) error {
+					return test.linkRefErr
+				},
 				createInput: input,
 			}
 

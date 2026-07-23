@@ -90,6 +90,7 @@ var configurationVersionFieldList = append(
 	"workspace_id",
 	"created_by",
 	"vcs_event_id",
+	"object_store_key",
 )
 
 // NewConfigurationVersions returns an instance of the ConfigurationVersions interface
@@ -219,15 +220,16 @@ func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, 
 		With("configuration_versions",
 			dialect.Insert("configuration_versions").
 				Rows(goqu.Record{
-					"id":           newResourceID(),
-					"version":      initialResourceVersion,
-					"created_at":   timestamp,
-					"updated_at":   timestamp,
-					"status":       configurationVersion.Status,
-					"speculative":  configurationVersion.Speculative,
-					"workspace_id": configurationVersion.WorkspaceID,
-					"created_by":   configurationVersion.CreatedBy,
-					"vcs_event_id": configurationVersion.VCSEventID,
+					"id":               newResourceID(),
+					"version":          initialResourceVersion,
+					"created_at":       timestamp,
+					"updated_at":       timestamp,
+					"status":           configurationVersion.Status,
+					"speculative":      configurationVersion.Speculative,
+					"workspace_id":     configurationVersion.WorkspaceID,
+					"created_by":       configurationVersion.CreatedBy,
+					"vcs_event_id":     configurationVersion.VCSEventID,
+					"object_store_key": nullableString(configurationVersion.ObjectStoreKey),
 				}).Returning("*"),
 		).Select(c.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"configuration_versions.workspace_id": goqu.I("namespaces.workspace_id")})))
@@ -259,11 +261,12 @@ func (c *configurationVersions) UpdateConfigurationVersion(ctx context.Context, 
 			dialect.Update("configuration_versions").
 				Set(
 					goqu.Record{
-						"version":      goqu.L("? + ?", goqu.C("version"), 1),
-						"updated_at":   timestamp,
-						"status":       configurationVersion.Status,
-						"speculative":  configurationVersion.Speculative,
-						"workspace_id": configurationVersion.WorkspaceID,
+						"version":          goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":       timestamp,
+						"status":           configurationVersion.Status,
+						"speculative":      configurationVersion.Speculative,
+						"workspace_id":     configurationVersion.WorkspaceID,
+						"object_store_key": nullableString(configurationVersion.ObjectStoreKey),
 					},
 				).Where(goqu.Ex{"id": configurationVersion.Metadata.ID, "version": configurationVersion.Metadata.Version}).
 				Returning("*"),
@@ -333,7 +336,10 @@ func (c *configurationVersions) getSelectFields() []interface{} {
 }
 
 func scanConfigurationVersion(row scanner) (*models.ConfigurationVersion, error) {
-	var workspacePath string
+	var (
+		workspacePath  string
+		objectStoreKey *string
+	)
 	configurationVersion := &models.ConfigurationVersion{}
 
 	err := row.Scan(
@@ -346,10 +352,15 @@ func scanConfigurationVersion(row scanner) (*models.ConfigurationVersion, error)
 		&configurationVersion.WorkspaceID,
 		&configurationVersion.CreatedBy,
 		&configurationVersion.VCSEventID,
+		&objectStoreKey,
 		&workspacePath,
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if objectStoreKey != nil {
+		configurationVersion.ObjectStoreKey = *objectStoreKey
 	}
 
 	configurationVersion.Metadata.TRN = trn.TypeConfigurationVersion.Build(workspacePath, configurationVersion.GetGlobalID())

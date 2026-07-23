@@ -27,6 +27,7 @@ func TestCreateReconcileRun_Execute(t *testing.T) {
 
 	var gotInput *corerun.CreateRunInput
 	cmd := &CreateReconcileRun{
+		dbClient: &db.Client{},
 		createRun: func(_ context.Context, in *corerun.CreateRunInput) (*models.Run, error) {
 			gotInput = in
 			return &models.Run{
@@ -35,7 +36,8 @@ func TestCreateReconcileRun_Execute(t *testing.T) {
 				Plan:     models.Plan{Status: models.PlanCreated},
 			}, nil
 		},
-		createInput: input,
+		variablesRetainFn: func(_ context.Context, _ string) error { return nil },
+		createInput:       input,
 	}
 
 	runStore := store.NewRunStore(&db.Client{})
@@ -68,7 +70,10 @@ func TestCreateReconcileRun_Prepare(t *testing.T) {
 	cmd := &CreateReconcileRun{
 		dbClient:         dbClient,
 		variablesBuilder: runvariables.NewBuilder(dbClient, secret.NewMockManager(t), artifactStore),
-		in:               &CreateReconcileRunInput{Subject: "u", WorkspaceID: "ws-1"},
+		uploadRunVariables: func(_ context.Context, _ string, _ []runvariables.Variable) (db.RetainObjectRefFunc, string, error) {
+			return nil, "vars-key", nil
+		},
+		in: &CreateReconcileRunInput{Subject: "u", WorkspaceID: "ws-1"},
 	}
 
 	require.NoError(t, cmd.Prepare(ctx))
@@ -76,4 +81,5 @@ func TestCreateReconcileRun_Prepare(t *testing.T) {
 	assert.False(t, cmd.createInput.IsDestroy)
 	assert.False(t, cmd.createInput.RefreshOnly)
 	assert.True(t, cmd.createInput.Refresh)
+	assert.Equal(t, "vars-key", cmd.createInput.VariablesObjectStoreKey)
 }

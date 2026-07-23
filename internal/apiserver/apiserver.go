@@ -44,6 +44,7 @@ import (
 	mcptools "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/mcp/tools"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/objectstoregc"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
@@ -198,13 +199,14 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	respWriter := response.NewWriter(logger)
 
-	artifactStore := coreworkspace.NewArtifactStore(pluginCatalog.ObjectStore)
-	providerRegistryStore := providerregistry.NewRegistryStore(pluginCatalog.ObjectStore)
-	moduleRegistryStore := moduleregistry.NewRegistryStore(pluginCatalog.ObjectStore)
+	trackedObjectStore := objectstoregc.New(pluginCatalog.ObjectStore, dbClient.ObjectStoreRefs)
+	artifactStore := coreworkspace.NewArtifactStore(trackedObjectStore, dbClient.ObjectStoreRefs)
+	providerRegistryStore := providerregistry.NewRegistryStore(trackedObjectStore, dbClient.ObjectStoreRefs)
+	moduleRegistryStore := moduleregistry.NewRegistryStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 	cliStore := cli.NewCLIStore(pluginCatalog.ObjectStore)
-	mirrorStore := providermirror.NewProviderMirrorStore(pluginCatalog.ObjectStore)
+	mirrorStore := providermirror.NewProviderMirrorStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 
-	logStreamStore := logstream.NewLogStore(pluginCatalog.ObjectStore)
+	logStreamStore := logstream.NewLogStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 	logStreamManager := logstream.New(logStreamStore, dbClient, eventManager, logger, cfg.MaxLogStreamSizeBytes)
 
 	managedIdentityDelegates, err := managedidentity.NewManagedIdentityDelegateMap(ctx, signingKeyManager)
@@ -247,6 +249,8 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	// Start the run reconciler: a safety net that re-drives runs stranded in
 	// queuing/queuing_apply when their work item was never enqueued or processed.
 	engine.NewReconciler(logger, dbClient, maintenanceMonitor).Start(ctx)
+
+	objectstoregc.NewJanitor(logger, dbClient, pluginCatalog.ObjectStore, maintenanceMonitor).Start(ctx)
 
 	// Services.
 	var (
@@ -358,7 +362,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		notificationManager,
 	).Start(ctx)
 
-	agentStore := agent.NewAgentStore(pluginCatalog.ObjectStore)
+	agentStore := agent.NewAgentStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 
 	systemAgent := agent.NewSystemAgent(
 		logger,

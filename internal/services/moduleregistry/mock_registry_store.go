@@ -6,6 +6,8 @@ import (
 	context "context"
 	io "io"
 
+	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+
 	mock "github.com/stretchr/testify/mock"
 
 	models "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -16,17 +18,17 @@ type MockRegistryStore struct {
 	mock.Mock
 }
 
-// DownloadModulePackage provides a mock function with given fields: ctx, moduleVersion, module, writer
-func (_m *MockRegistryStore) DownloadModulePackage(ctx context.Context, moduleVersion *models.TerraformModuleVersion, module *models.TerraformModule, writer io.WriterAt) error {
-	ret := _m.Called(ctx, moduleVersion, module, writer)
+// DownloadModulePackage provides a mock function with given fields: ctx, objectKey, writer
+func (_m *MockRegistryStore) DownloadModulePackage(ctx context.Context, objectKey string, writer io.WriterAt) error {
+	ret := _m.Called(ctx, objectKey, writer)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DownloadModulePackage")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformModuleVersion, *models.TerraformModule, io.WriterAt) error); ok {
-		r0 = rf(ctx, moduleVersion, module, writer)
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.WriterAt) error); ok {
+		r0 = rf(ctx, objectKey, writer)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -64,9 +66,9 @@ func (_m *MockRegistryStore) GetModuleConfigurationDetails(ctx context.Context, 
 	return r0, r1
 }
 
-// GetModulePackagePresignedURL provides a mock function with given fields: ctx, moduleVersion, module
-func (_m *MockRegistryStore) GetModulePackagePresignedURL(ctx context.Context, moduleVersion *models.TerraformModuleVersion, module *models.TerraformModule) (string, error) {
-	ret := _m.Called(ctx, moduleVersion, module)
+// GetModulePackagePresignedURL provides a mock function with given fields: ctx, objectKey
+func (_m *MockRegistryStore) GetModulePackagePresignedURL(ctx context.Context, objectKey string) (string, error) {
+	ret := _m.Called(ctx, objectKey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetModulePackagePresignedURL")
@@ -74,17 +76,17 @@ func (_m *MockRegistryStore) GetModulePackagePresignedURL(ctx context.Context, m
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformModuleVersion, *models.TerraformModule) (string, error)); ok {
-		return rf(ctx, moduleVersion, module)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, objectKey)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformModuleVersion, *models.TerraformModule) string); ok {
-		r0 = rf(ctx, moduleVersion, module)
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, objectKey)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformModuleVersion, *models.TerraformModule) error); ok {
-		r1 = rf(ctx, moduleVersion, module)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, objectKey)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -93,39 +95,77 @@ func (_m *MockRegistryStore) GetModulePackagePresignedURL(ctx context.Context, m
 }
 
 // UploadModuleConfigurationDetails provides a mock function with given fields: ctx, metadata, moduleVersion, module
-func (_m *MockRegistryStore) UploadModuleConfigurationDetails(ctx context.Context, metadata *ModuleConfigurationDetails, moduleVersion *models.TerraformModuleVersion, module *models.TerraformModule) error {
+func (_m *MockRegistryStore) UploadModuleConfigurationDetails(ctx context.Context, metadata *ModuleConfigurationDetails, moduleVersion *models.TerraformModuleVersion, module *models.TerraformModule) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, metadata, moduleVersion, module)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadModuleConfigurationDetails")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *ModuleConfigurationDetails, *models.TerraformModuleVersion, *models.TerraformModule) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *ModuleConfigurationDetails, *models.TerraformModuleVersion, *models.TerraformModule) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, metadata, moduleVersion, module)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *ModuleConfigurationDetails, *models.TerraformModuleVersion, *models.TerraformModule) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, metadata, moduleVersion, module)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *ModuleConfigurationDetails, *models.TerraformModuleVersion, *models.TerraformModule) string); ok {
+		r1 = rf(ctx, metadata, moduleVersion, module)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *ModuleConfigurationDetails, *models.TerraformModuleVersion, *models.TerraformModule) error); ok {
+		r2 = rf(ctx, metadata, moduleVersion, module)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UploadModulePackage provides a mock function with given fields: ctx, moduleVersion, module, body
-func (_m *MockRegistryStore) UploadModulePackage(ctx context.Context, moduleVersion *models.TerraformModuleVersion, module *models.TerraformModule, body io.Reader) error {
+func (_m *MockRegistryStore) UploadModulePackage(ctx context.Context, moduleVersion *models.TerraformModuleVersion, module *models.TerraformModule, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, moduleVersion, module, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadModulePackage")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformModuleVersion, *models.TerraformModule, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformModuleVersion, *models.TerraformModule, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, moduleVersion, module, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformModuleVersion, *models.TerraformModule, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, moduleVersion, module, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformModuleVersion, *models.TerraformModule, io.Reader) string); ok {
+		r1 = rf(ctx, moduleVersion, module, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.TerraformModuleVersion, *models.TerraformModule, io.Reader) error); ok {
+		r2 = rf(ctx, moduleVersion, module, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // NewMockRegistryStore creates a new instance of MockRegistryStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

@@ -113,13 +113,16 @@ type RunNode interface {
 
 // Plan represents a plan task within a run
 type Plan struct {
-	ErrorMessage *string
-	LatestJobID  *string
-	ID           string
-	Status       PlanStatus
-	DiffSize     int
-	Summary      PlanSummary
-	HasChanges   bool
+	ErrorMessage        *string
+	LatestJobID         *string
+	ID                  string
+	CacheObjectStoreKey *string
+	JSONObjectStoreKey  *string
+	DiffObjectStoreKey  *string
+	Status              PlanStatus
+	DiffSize            int
+	Summary             PlanSummary
+	HasChanges          bool
 }
 
 // GetID returns the node ID
@@ -180,27 +183,28 @@ func (n *Apply) GetGlobalID() string {
 // Only one of ConfigurationVersionID, ModuleSource/ModuleVersion can be non-nil.
 // The ModuleVersion field is optional: blank if non-registry or want latest version
 type Run struct {
-	ConfigurationVersionID *string
-	ForceCancelAvailableAt *time.Time
-	ForceCanceledBy        *string
-	ModuleVersion          *string
-	ModuleSource           *string
-	TargetAddresses        []string
-	Plan                   Plan
-	Apply                  *Apply
-	ModuleDigest           []byte // This is only set for modules stored in the Tharsis module registry
-	CreatedBy              string
-	WorkspaceID            string
-	Status                 RunStatus
-	Comment                string
-	TerraformVersion       string
-	Metadata               ResourceMetadata
-	IsDestroy              bool
-	IsAssessmentRun        bool
-	ForceCanceled          bool
-	AutoApply              bool
-	Refresh                bool
-	RefreshOnly            bool
+	ConfigurationVersionID  *string
+	ForceCancelAvailableAt  *time.Time
+	ForceCanceledBy         *string
+	ModuleVersion           *string
+	ModuleSource            *string
+	TargetAddresses         []string
+	Plan                    Plan
+	Apply                   *Apply
+	ModuleDigest            []byte // This is only set for modules stored in the Tharsis module registry
+	CreatedBy               string
+	WorkspaceID             string
+	VariablesObjectStoreKey *string
+	Status                  RunStatus
+	Comment                 string
+	TerraformVersion        string
+	Metadata                ResourceMetadata
+	IsDestroy               bool
+	IsAssessmentRun         bool
+	ForceCanceled           bool
+	AutoApply               bool
+	Refresh                 bool
+	RefreshOnly             bool
 }
 
 // GetID returns the Metadata ID.
@@ -345,19 +349,23 @@ func (r *Run) ShallowCompare(other *Run) bool {
 		ptrStringEqual(r.ForceCanceledBy, other.ForceCanceledBy) &&
 		ptrTimeEqual(r.ForceCancelAvailableAt, other.ForceCancelAvailableAt) &&
 		slices.Equal(r.TargetAddresses, other.TargetAddresses) &&
-		slices.Equal(r.ModuleDigest, other.ModuleDigest)
+		slices.Equal(r.ModuleDigest, other.ModuleDigest) &&
+		ptrStringEqual(r.VariablesObjectStoreKey, other.VariablesObjectStoreKey)
 }
 
 // Copy creates a deep copy of the Plan.
 func (n *Plan) Copy() RunNode {
 	return &Plan{
-		ErrorMessage: n.ErrorMessage,
-		LatestJobID:  n.LatestJobID,
-		ID:           n.ID,
-		Status:       n.Status,
-		DiffSize:     n.DiffSize,
-		Summary:      n.Summary,
-		HasChanges:   n.HasChanges,
+		ErrorMessage:        n.ErrorMessage,
+		LatestJobID:         n.LatestJobID,
+		ID:                  n.ID,
+		Status:              n.Status,
+		DiffSize:            n.DiffSize,
+		Summary:             n.Summary,
+		HasChanges:          n.HasChanges,
+		CacheObjectStoreKey: n.CacheObjectStoreKey,
+		JSONObjectStoreKey:  n.JSONObjectStoreKey,
+		DiffObjectStoreKey:  n.DiffObjectStoreKey,
 	}
 }
 
@@ -377,6 +385,9 @@ func (n *Plan) ShallowCompare(other RunNode) bool {
 		n.HasChanges == o.HasChanges &&
 		n.DiffSize == o.DiffSize &&
 		n.Summary == o.Summary &&
+		ptrStringEqual(n.CacheObjectStoreKey, o.CacheObjectStoreKey) &&
+		ptrStringEqual(n.JSONObjectStoreKey, o.JSONObjectStoreKey) &&
+		ptrStringEqual(n.DiffObjectStoreKey, o.DiffObjectStoreKey) &&
 		ptrStringEqual(n.LatestJobID, o.LatestJobID) &&
 		ptrStringEqual(n.ErrorMessage, o.ErrorMessage)
 }

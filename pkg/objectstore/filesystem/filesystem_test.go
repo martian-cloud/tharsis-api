@@ -517,6 +517,55 @@ func TestSymlinkHandling(t *testing.T) {
 	})
 }
 
+func TestDeleteObject(t *testing.T) {
+	ctx := t.Context()
+
+	newStore := func(t *testing.T) *ObjectStore {
+		t.Helper()
+		testLogger, _ := logger.NewForTest()
+		store, err := New(testLogger, "http://localhost", map[string]string{"directory": t.TempDir()}, nil)
+		require.NoError(t, err)
+		return store
+	}
+
+	t.Run("deletes existing object", func(t *testing.T) {
+		store := newStore(t)
+		require.NoError(t, store.UploadObject(ctx, "a/b/c.txt", bytes.NewReader([]byte("hi"))))
+		require.NoError(t, store.deleteObject(ctx, "a/b/c.txt"))
+		_, err := os.Stat(filepath.Join(store.basePath, "a/b/c.txt"))
+		require.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("pruning: removes empty parent directories", func(t *testing.T) {
+		store := newStore(t)
+		require.NoError(t, store.UploadObject(ctx, "a/b/c.txt", bytes.NewReader([]byte("hi"))))
+		require.NoError(t, store.deleteObject(ctx, "a/b/c.txt"))
+		_, err := os.Stat(filepath.Join(store.basePath, "a"))
+		require.True(t, os.IsNotExist(err), "empty parent dir should be pruned")
+	})
+
+	t.Run("pruning: stops at non-empty directory", func(t *testing.T) {
+		store := newStore(t)
+		require.NoError(t, store.UploadObject(ctx, "a/b/c.txt", bytes.NewReader([]byte("hi"))))
+		require.NoError(t, store.UploadObject(ctx, "a/other.txt", bytes.NewReader([]byte("hi"))))
+		require.NoError(t, store.deleteObject(ctx, "a/b/c.txt"))
+		_, err := os.Stat(filepath.Join(store.basePath, "a"))
+		require.NoError(t, err, "non-empty parent dir should be kept")
+	})
+
+	t.Run("returns nil for non-existent key", func(t *testing.T) {
+		store := newStore(t)
+		require.NoError(t, store.deleteObject(ctx, "does/not/exist.txt"))
+	})
+
+	t.Run("returns error for empty key", func(t *testing.T) {
+		store := newStore(t)
+		err := store.deleteObject(ctx, "")
+		require.Error(t, err)
+		assert.Equal(t, te.EInvalid, te.ErrorCode(err))
+	})
+}
+
 type writeAtBuffer struct {
 	data []byte
 }

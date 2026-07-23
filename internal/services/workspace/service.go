@@ -1190,6 +1190,15 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		return nil, err
 	}
 
+	// Upload before the transaction so the pending ref is committed immediately.
+	// If the TX rolls back, the janitor will clean up the orphaned S3 object.
+	svRetainFn, svKey, err := s.artifactStore.UploadStateVersion(ctx, stateVersion, bytes.NewBuffer(decoded))
+	if err != nil {
+		tracing.RecordError(span, err, "failed to upload state version")
+		return nil, errors.Wrap(err, "Failed to write state version to object storage")
+	}
+	stateVersion.ObjectStoreKey = svKey
+
 	// Wrap a transaction around persisting the state version and the state version outputs.
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
@@ -1209,6 +1218,11 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	createdStateVersion, err := s.dbClient.StateVersions.CreateStateVersion(txContext, stateVersion)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to create state version")
+		return nil, err
+	}
+
+	if err = svRetainFn(txContext, createdStateVersion.Metadata.ID); err != nil {
+		tracing.RecordError(span, err, "failed to link state version object store ref")
 		return nil, err
 	}
 
@@ -1279,16 +1293,6 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 			return nil, err
 		}
 
-	}
-
-	// Upload state version data to object store
-	// Does not touch the DB, so no need to use the transaction context.
-	if err = s.artifactStore.UploadStateVersion(ctx, createdStateVersion, bytes.NewBuffer(decoded)); err != nil {
-		tracing.RecordError(span, err, "failed to upload state version")
-		return nil, errors.Wrap(
-			err,
-			"Failed to write state version to object storage",
-		)
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -1814,22 +1818,43 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 		)
 	}
 
-	if err := s.artifactStore.UploadConfigurationVersion(ctx, cv, reader); err != nil {
+	cvRetainFn, cvKey, err := s.artifactStore.UploadConfigurationVersion(ctx, cv, reader)
+	if err != nil {
 		tracing.RecordError(span, err, "Failed to write configuration version to object storage")
-		return errors.Wrap(
-			err,
-			"Failed to write configuration version to object storage",
-		)
+		return errors.Wrap(err, "Failed to write configuration version to object storage")
 	}
 
+	cv.ObjectStoreKey = cvKey
 	// Update status of configuration version to uploaded
 	cv.Status = models.ConfigurationUploaded
-	if _, err := s.dbClient.ConfigurationVersions.UpdateConfigurationVersion(ctx, *cv); err != nil {
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
+		return err
+	}
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for UploadConfigurationVersion: %v", txErr)
+		}
+	}()
+
+	if _, err := s.dbClient.ConfigurationVersions.UpdateConfigurationVersion(txContext, *cv); err != nil {
 		tracing.RecordError(span, err, "Failed to to update configuration version")
 		return errors.Wrap(
 			err,
 			"Failed to to update configuration version",
 		)
+	}
+
+	if err := cvRetainFn(txContext, cv.Metadata.ID); err != nil {
+		tracing.RecordError(span, err, "failed to link configuration version object store ref")
+		return err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return err
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Uploaded a configuration version.",

@@ -93,7 +93,7 @@ type terraformProviderVersions struct {
 	dbClient *Client
 }
 
-var providerVersionFieldList = append(metadataFieldList, "provider_id", "provider_sem_version", "gpg_key_id", "gpg_ascii_armor", "protocols", "sha_sums_uploaded", "sha_sums_sig_uploaded", "readme_uploaded", "latest", "created_by")
+var providerVersionFieldList = append(metadataFieldList, "provider_id", "provider_sem_version", "gpg_key_id", "gpg_ascii_armor", "protocols", "sha_sums_uploaded", "sha_sums_sig_uploaded", "readme_uploaded", "latest", "created_by", "readme_object_store_key", "shasums_object_store_key", "shasums_signature_object_store_key")
 
 // NewTerraformProviderVersions returns an instance of the TerraformProviderVersions interface
 func NewTerraformProviderVersions(dbClient *Client) TerraformProviderVersions {
@@ -242,20 +242,23 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 		With("terraform_provider_versions",
 			dialect.Insert("terraform_provider_versions").
 				Rows(goqu.Record{
-					"id":                    newResourceID(),
-					"version":               initialResourceVersion,
-					"created_at":            timestamp,
-					"updated_at":            timestamp,
-					"provider_id":           providerVersion.ProviderID,
-					"provider_sem_version":  providerVersion.SemanticVersion,
-					"gpg_key_id":            castUint64PtrToInt64Ptr(providerVersion.GPGKeyID), // Cast *uint64 to *int64 for PostgreSQL
-					"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
-					"protocols":             protocolsJSON,
-					"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
-					"sha_sums_sig_uploaded": providerVersion.SHASumsSignatureUploaded,
-					"readme_uploaded":       providerVersion.ReadmeUploaded,
-					"created_by":            providerVersion.CreatedBy,
-					"latest":                providerVersion.Latest,
+					"id":                                 newResourceID(),
+					"version":                            initialResourceVersion,
+					"created_at":                         timestamp,
+					"updated_at":                         timestamp,
+					"provider_id":                        providerVersion.ProviderID,
+					"provider_sem_version":               providerVersion.SemanticVersion,
+					"gpg_key_id":                         castUint64PtrToInt64Ptr(providerVersion.GPGKeyID), // Cast *uint64 to *int64 for PostgreSQL
+					"gpg_ascii_armor":                    providerVersion.GPGASCIIArmor,
+					"protocols":                          protocolsJSON,
+					"sha_sums_uploaded":                  providerVersion.SHASumsUploaded,
+					"sha_sums_sig_uploaded":              providerVersion.SHASumsSignatureUploaded,
+					"readme_uploaded":                    providerVersion.ReadmeUploaded,
+					"created_by":                         providerVersion.CreatedBy,
+					"latest":                             providerVersion.Latest,
+					"readme_object_store_key":            providerVersion.ReadmeObjectStoreKey,
+					"shasums_object_store_key":           providerVersion.SHASumsObjectStoreKey,
+					"shasums_signature_object_store_key": providerVersion.SHASumsSignatureObjectStoreKey,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_providers"), goqu.On(goqu.I("terraform_providers.id").Eq(goqu.I("terraform_provider_versions.provider_id")))).
@@ -300,15 +303,18 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 			dialect.Update("terraform_provider_versions").
 				Set(
 					goqu.Record{
-						"version":               goqu.L("? + ?", goqu.C("version"), 1),
-						"updated_at":            timestamp,
-						"gpg_key_id":            castUint64PtrToInt64Ptr(providerVersion.GPGKeyID), // Cast *uint64 to *int64 for PostgreSQL
-						"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
-						"protocols":             protocolsJSON,
-						"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
-						"sha_sums_sig_uploaded": providerVersion.SHASumsSignatureUploaded,
-						"readme_uploaded":       providerVersion.ReadmeUploaded,
-						"latest":                providerVersion.Latest,
+						"version":                            goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":                         timestamp,
+						"gpg_key_id":                         castUint64PtrToInt64Ptr(providerVersion.GPGKeyID), // Cast *uint64 to *int64 for PostgreSQL
+						"gpg_ascii_armor":                    providerVersion.GPGASCIIArmor,
+						"protocols":                          protocolsJSON,
+						"sha_sums_uploaded":                  providerVersion.SHASumsUploaded,
+						"sha_sums_sig_uploaded":              providerVersion.SHASumsSignatureUploaded,
+						"readme_uploaded":                    providerVersion.ReadmeUploaded,
+						"latest":                             providerVersion.Latest,
+						"readme_object_store_key":            providerVersion.ReadmeObjectStoreKey,
+						"shasums_object_store_key":           providerVersion.SHASumsObjectStoreKey,
+						"shasums_signature_object_store_key": providerVersion.SHASumsSignatureObjectStoreKey,
 					},
 				).Where(goqu.Ex{"id": providerVersion.Metadata.ID, "version": providerVersion.Metadata.Version}).
 				Returning("*"),
@@ -418,6 +424,7 @@ func (t *terraformProviderVersions) getSelectFields() []interface{} {
 func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion, error) {
 	var groupPath, providerName string
 	var gpgKeyID *int64 // Scan as *int64 from PostgreSQL BIGINT
+	var readmeKey, shasumsKey, shasumsSigKey *string
 	providerVersion := &models.TerraformProviderVersion{}
 
 	fields := []interface{}{
@@ -435,6 +442,9 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 		&providerVersion.ReadmeUploaded,
 		&providerVersion.Latest,
 		&providerVersion.CreatedBy,
+		&readmeKey,
+		&shasumsKey,
+		&shasumsSigKey,
 		&groupPath,
 		&providerName,
 	}
@@ -449,6 +459,10 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 		val := uint64(*gpgKeyID)
 		providerVersion.GPGKeyID = &val
 	}
+
+	providerVersion.ReadmeObjectStoreKey = readmeKey
+	providerVersion.SHASumsObjectStoreKey = shasumsKey
+	providerVersion.SHASumsSignatureObjectStoreKey = shasumsSigKey
 
 	providerVersion.Metadata.TRN = trn.TypeTerraformProviderVersion.Build(
 		groupPath,

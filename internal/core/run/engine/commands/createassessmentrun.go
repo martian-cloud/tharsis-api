@@ -34,13 +34,15 @@ type CreateAssessmentRunInput struct {
 // upsert and the run creation happen in the command processor's single
 // transaction, so they are persisted atomically.
 type CreateAssessmentRun struct {
-	dbClient         *db.Client
-	variablesBuilder *runvariables.Builder
-	moduleResolver   registry.ModuleResolver
-	createRun        createRunFunc
+	dbClient           *db.Client
+	variablesBuilder   *runvariables.Builder
+	moduleResolver     registry.ModuleResolver
+	createRun          createRunFunc
+	uploadRunVariables uploadRunVariablesFunc
 
-	in          *CreateAssessmentRunInput
-	createInput *corerun.CreateRunInput
+	in                *CreateAssessmentRunInput
+	createInput       *corerun.CreateRunInput
+	variablesRetainFn db.RetainObjectRefFunc
 
 	// Created is populated with the persisted run once Execute succeeds.
 	Created *models.Run
@@ -73,20 +75,26 @@ func (c *CreateAssessmentRun) Prepare(ctx context.Context) error {
 		return err
 	}
 
+	variablesRetainFn, variablesObjectKey, err := c.uploadRunVariables(ctx, c.in.WorkspaceID, variables)
+	if err != nil {
+		return errors.Wrap(err, "failed to upload run variables")
+	}
+	c.variablesRetainFn = variablesRetainFn
+
 	c.createInput = &corerun.CreateRunInput{
-		Subject:                c.in.Subject,
-		WorkspaceID:            c.in.WorkspaceID,
-		ConfigurationVersionID: source.ConfigurationVersionID,
-		ModuleSource:           source.ModuleSource,
-		ModuleVersion:          resolvedModule.Version,
-		ModuleDigest:           resolvedModule.Digest,
-		ModuleRegistrySource:   resolvedModule.Source,
-		IsAssessmentRun:        true,
-		Speculative:            ptr.Bool(true),
-		RefreshOnly:            true,
-		Refresh:                true,
-		SkipActivityEvent:      c.in.SkipActivityEvent,
-		Variables:              variables,
+		Subject:                 c.in.Subject,
+		WorkspaceID:             c.in.WorkspaceID,
+		ConfigurationVersionID:  source.ConfigurationVersionID,
+		ModuleSource:            source.ModuleSource,
+		ModuleVersion:           resolvedModule.Version,
+		ModuleDigest:            resolvedModule.Digest,
+		ModuleRegistrySource:    resolvedModule.Source,
+		IsAssessmentRun:         true,
+		Speculative:             ptr.Bool(true),
+		RefreshOnly:             true,
+		Refresh:                 true,
+		SkipActivityEvent:       c.in.SkipActivityEvent,
+		VariablesObjectStoreKey: variablesObjectKey,
 	}
 	return nil
 }
@@ -101,6 +109,10 @@ func (c *CreateAssessmentRun) Execute(ctx context.Context, input *types.ExecuteI
 	created, err := c.createRun(ctx, c.createInput)
 	if err != nil {
 		return err
+	}
+
+	if err = c.variablesRetainFn(ctx, created.Metadata.ID); err != nil {
+		return errors.Wrap(err, "failed to link run variables object store ref")
 	}
 
 	input.RunStore.AddRun(created)

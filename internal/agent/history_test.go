@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 )
 
 func TestHistoryRepository_Load(t *testing.T) {
@@ -34,7 +35,8 @@ func TestHistoryRepository_LoadNil(t *testing.T) {
 
 func TestHistoryRepository_Save(t *testing.T) {
 	mockStore := NewMockStore(t)
-	mockStore.On("SaveHistory", mock.Anything, "session-1", mock.Anything).Return(nil)
+	noopRetain := db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil })
+	mockStore.On("SaveHistory", mock.Anything, "session-1", mock.Anything).Return(noopRetain, "agent-sessions/session-1/history", nil)
 
 	repo := newHistoryRepository(mockStore)
 	err := repo.Save(context.Background(), "session-1", &gollem.History{})

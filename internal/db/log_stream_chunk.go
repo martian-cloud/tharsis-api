@@ -25,7 +25,7 @@ type LogStreamChunks interface {
 	UpdateLogStreamChunk(ctx context.Context, chunk *models.LogStreamChunk) (*models.LogStreamChunk, error)
 }
 
-var logStreamChunkFieldList = append(metadataFieldList, "log_stream_id", "chunk_index", "start_offset", "size", "object_key", "sealed")
+var logStreamChunkFieldList = append(metadataFieldList, "log_stream_id", "chunk_index", "start_offset", "size", "object_store_key", "sealed")
 
 type logStreamChunks struct {
 	dbClient *Client
@@ -91,16 +91,16 @@ func (l *logStreamChunks) CreateLogStreamChunk(ctx context.Context, chunk *model
 	sql, args, err := toSQLWithTag("log_stream_chunk.CreateLogStreamChunk", dialect.Insert("log_stream_chunks").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":            newResourceID(),
-			"version":       initialResourceVersion,
-			"created_at":    timestamp,
-			"updated_at":    timestamp,
-			"log_stream_id": chunk.LogStreamID,
-			"chunk_index":   chunk.ChunkIndex,
-			"start_offset":  chunk.StartOffset,
-			"size":          chunk.Size,
-			"object_key":    chunk.ObjectKey,
-			"sealed":        chunk.Sealed,
+			"id":               newResourceID(),
+			"version":          initialResourceVersion,
+			"created_at":       timestamp,
+			"updated_at":       timestamp,
+			"log_stream_id":    chunk.LogStreamID,
+			"chunk_index":      chunk.ChunkIndex,
+			"start_offset":     chunk.StartOffset,
+			"size":             chunk.Size,
+			"object_store_key": chunk.ObjectStoreKey,
+			"sealed":           chunk.Sealed,
 		}).
 		Returning(logStreamChunkFieldList...))
 	if err != nil {
@@ -201,7 +201,7 @@ func scanLogStreamChunk(row scanner) (*models.LogStreamChunk, error) {
 		&chunk.ChunkIndex,
 		&chunk.StartOffset,
 		&chunk.Size,
-		&chunk.ObjectKey,
+		&chunk.ObjectStoreKey,
 		&chunk.Sealed,
 	}
 

@@ -11,12 +11,13 @@ var _ Model = (*AgentSessionMessage)(nil)
 
 // AgentSessionMessage represents a single message in an agent session's conversation history.
 type AgentSessionMessage struct {
-	Metadata  ResourceMetadata
-	SessionID string
-	RunID     string
-	ParentID  *string
-	Role      string
-	Content   json.RawMessage
+	Metadata                  ResourceMetadata
+	SessionID                 string
+	RunID                     string
+	ParentID                  *string
+	Role                      string
+	Content                   json.RawMessage
+	ToolContentObjectStoreKey string
 }
 
 // GetID returns the Metadata ID.

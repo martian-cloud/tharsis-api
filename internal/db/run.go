@@ -42,8 +42,8 @@ const (
 	RunSortableFieldUpdatedAtDesc RunSortableField = "UPDATED_AT_DESC"
 )
 
-func (sf RunSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
-	switch sf {
+func (r RunSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
+	switch r {
 	case RunSortableFieldCreatedAtAsc, RunSortableFieldCreatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "created_at", Table: "runs", Col: "created_at"}
 	case RunSortableFieldUpdatedAtAsc, RunSortableFieldUpdatedAtDesc:
@@ -53,8 +53,8 @@ func (sf RunSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	}
 }
 
-func (sf RunSortableField) getSortDirection() pagination.SortDirection {
-	if strings.HasSuffix(string(sf), "_DESC") {
+func (r RunSortableField) getSortDirection() pagination.SortDirection {
+	if strings.HasSuffix(string(r), "_DESC") {
 		return pagination.DescSort
 	}
 	return pagination.AscSort
@@ -111,6 +111,9 @@ type runNode struct {
 	ErrorMessage         *string
 	TriggeredBy          *string
 	Comment              *string
+	CacheObjectStoreKey  *string
+	JSONObjectStoreKey   *string
+	DiffObjectStoreKey   *string
 	HasChanges           *bool
 	DiffSize             *int
 	ResourceAdditions    *int32
@@ -165,19 +168,22 @@ var runNodeKinds = []runNodeKind{
 		contentColumns: func(run *models.Run) goqu.Record {
 			p := &run.Plan
 			return goqu.Record{
-				"status":                     string(p.Status),
-				"latest_job_id":              p.LatestJobID,
-				"error_message":              p.ErrorMessage,
-				"plan_has_changes":           p.HasChanges,
-				"plan_diff_size":             p.DiffSize,
-				"plan_resource_additions":    p.Summary.ResourceAdditions,
-				"plan_resource_changes":      p.Summary.ResourceChanges,
-				"plan_resource_destructions": p.Summary.ResourceDestructions,
-				"plan_resource_imports":      p.Summary.ResourceImports,
-				"plan_resource_drift":        p.Summary.ResourceDrift,
-				"plan_output_additions":      p.Summary.OutputAdditions,
-				"plan_output_changes":        p.Summary.OutputChanges,
-				"plan_output_destructions":   p.Summary.OutputDestructions,
+				"status":                      string(p.Status),
+				"latest_job_id":               p.LatestJobID,
+				"error_message":               p.ErrorMessage,
+				"plan_has_changes":            p.HasChanges,
+				"plan_diff_size":              p.DiffSize,
+				"plan_resource_additions":     p.Summary.ResourceAdditions,
+				"plan_resource_changes":       p.Summary.ResourceChanges,
+				"plan_resource_destructions":  p.Summary.ResourceDestructions,
+				"plan_resource_imports":       p.Summary.ResourceImports,
+				"plan_resource_drift":         p.Summary.ResourceDrift,
+				"plan_output_additions":       p.Summary.OutputAdditions,
+				"plan_output_changes":         p.Summary.OutputChanges,
+				"plan_output_destructions":    p.Summary.OutputDestructions,
+				"plan_cache_object_store_key": p.CacheObjectStoreKey,
+				"plan_json_object_store_key":  p.JSONObjectStoreKey,
+				"plan_diff_object_store_key":  p.DiffObjectStoreKey,
 			}
 		},
 		load: func(run *models.Run, n *runNode) {
@@ -203,6 +209,9 @@ var runNodeKinds = []runNodeKind{
 			if n.DiffSize != nil {
 				plan.DiffSize = *n.DiffSize
 			}
+			plan.CacheObjectStoreKey = n.CacheObjectStoreKey
+			plan.JSONObjectStoreKey = n.JSONObjectStoreKey
+			plan.DiffObjectStoreKey = n.DiffObjectStoreKey
 			run.Plan = plan
 		},
 	},
@@ -273,6 +282,7 @@ var runFieldList = append(
 	"refresh",
 	"refresh_only",
 	"is_assessment_run",
+	"variables_object_store_key",
 )
 
 // runNodeColumns is the single ordered source of truth for run_nodes columns, shared by the SELECT
@@ -301,6 +311,9 @@ var runNodeColumns = []struct {
 	{"plan_output_destructions", func(n *runNode) any { return &n.OutputDestructions }},
 	{"apply_triggered_by", func(n *runNode) any { return &n.TriggeredBy }},
 	{"apply_comment", func(n *runNode) any { return &n.Comment }},
+	{"plan_cache_object_store_key", func(n *runNode) any { return &n.CacheObjectStoreKey }},
+	{"plan_json_object_store_key", func(n *runNode) any { return &n.JSONObjectStoreKey }},
+	{"plan_diff_object_store_key", func(n *runNode) any { return &n.DiffObjectStoreKey }},
 }
 
 type runs struct {
@@ -537,28 +550,29 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 		With("runs",
 			dialect.Insert("runs").
 				Rows(goqu.Record{
-					"id":                        newResourceID(),
-					"version":                   initialResourceVersion,
-					"created_at":                timestamp,
-					"updated_at":                timestamp,
-					"status":                    run.Status,
-					"is_destroy":                run.IsDestroy,
-					"workspace_id":              run.WorkspaceID,
-					"configuration_version_id":  run.ConfigurationVersionID,
-					"created_by":                run.CreatedBy,
-					"module_source":             run.ModuleSource,
-					"module_version":            run.ModuleVersion,
-					"module_digest":             run.ModuleDigest,
-					"force_canceled_by":         run.ForceCanceledBy,
-					"force_cancel_available_at": run.ForceCancelAvailableAt,
-					"force_canceled":            run.ForceCanceled,
-					"comment":                   run.Comment,
-					"auto_apply":                run.AutoApply,
-					"terraform_version":         run.TerraformVersion,
-					"targets":                   targets,
-					"refresh":                   run.Refresh,
-					"refresh_only":              run.RefreshOnly,
-					"is_assessment_run":         run.IsAssessmentRun,
+					"id":                         newResourceID(),
+					"version":                    initialResourceVersion,
+					"created_at":                 timestamp,
+					"updated_at":                 timestamp,
+					"status":                     run.Status,
+					"is_destroy":                 run.IsDestroy,
+					"workspace_id":               run.WorkspaceID,
+					"configuration_version_id":   run.ConfigurationVersionID,
+					"created_by":                 run.CreatedBy,
+					"module_source":              run.ModuleSource,
+					"module_version":             run.ModuleVersion,
+					"module_digest":              run.ModuleDigest,
+					"force_canceled_by":          run.ForceCanceledBy,
+					"force_cancel_available_at":  run.ForceCancelAvailableAt,
+					"force_canceled":             run.ForceCanceled,
+					"comment":                    run.Comment,
+					"auto_apply":                 run.AutoApply,
+					"terraform_version":          run.TerraformVersion,
+					"targets":                    targets,
+					"refresh":                    run.Refresh,
+					"refresh_only":               run.RefreshOnly,
+					"is_assessment_run":          run.IsAssessmentRun,
+					"variables_object_store_key": run.VariablesObjectStoreKey,
 				}).Returning("*"),
 		).Select(r.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})))
@@ -627,16 +641,17 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string
 			dialect.Update("runs").
 				Set(
 					goqu.Record{
-						"version":                   goqu.L("? + ?", goqu.C("version"), 1),
-						"updated_at":                timestamp,
-						"status":                    run.Status,
-						"module_source":             run.ModuleSource,
-						"module_version":            run.ModuleVersion,
-						"module_digest":             run.ModuleDigest,
-						"auto_apply":                run.AutoApply,
-						"force_canceled_by":         run.ForceCanceledBy,
-						"force_cancel_available_at": run.ForceCancelAvailableAt,
-						"force_canceled":            run.ForceCanceled,
+						"version":                    goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":                 timestamp,
+						"status":                     run.Status,
+						"module_source":              run.ModuleSource,
+						"module_version":             run.ModuleVersion,
+						"module_digest":              run.ModuleDigest,
+						"auto_apply":                 run.AutoApply,
+						"force_canceled_by":          run.ForceCanceledBy,
+						"force_cancel_available_at":  run.ForceCancelAvailableAt,
+						"force_canceled":             run.ForceCanceled,
+						"variables_object_store_key": run.VariablesObjectStoreKey,
 					},
 				).Where(goqu.Ex{"id": run.Metadata.ID, "version": run.Metadata.Version}).
 				Returning("*"),
@@ -888,7 +903,10 @@ func (r *runs) getSelectFields() []any {
 }
 
 func scanRun(row scanner) (*models.Run, error) {
-	var workspacePath string
+	var (
+		workspacePath           string
+		variablesObjectStoreKey *string
+	)
 	run := &models.Run{}
 	run.TargetAddresses = []string{}
 
@@ -915,11 +933,14 @@ func scanRun(row scanner) (*models.Run, error) {
 		&run.Refresh,
 		&run.RefreshOnly,
 		&run.IsAssessmentRun,
+		&variablesObjectStoreKey,
 		&workspacePath,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	run.VariablesObjectStoreKey = variablesObjectStoreKey
 
 	run.Metadata.TRN = trn.TypeRun.Build(workspacePath, run.GetGlobalID())
 

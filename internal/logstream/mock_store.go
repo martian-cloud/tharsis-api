@@ -6,6 +6,8 @@ import (
 	context "context"
 	io "io"
 
+	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -45,39 +47,63 @@ func (_m *MockStore) ReadRange(ctx context.Context, key string, offset int, leng
 }
 
 // WriteChunk provides a mock function with given fields: ctx, key, byteOffset, buffer
-func (_m *MockStore) WriteChunk(ctx context.Context, key string, byteOffset int, buffer []byte) error {
+func (_m *MockStore) WriteChunk(ctx context.Context, key string, byteOffset int, buffer []byte) (db.RetainObjectRefFunc, error) {
 	ret := _m.Called(ctx, key, byteOffset, buffer)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WriteChunk")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, []byte) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, []byte) (db.RetainObjectRefFunc, error)); ok {
+		return rf(ctx, key, byteOffset, buffer)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, []byte) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, key, byteOffset, buffer)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, []byte) error); ok {
+		r1 = rf(ctx, key, byteOffset, buffer)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
-// WriteObject provides a mock function with given fields: ctx, key, r
-func (_m *MockStore) WriteObject(ctx context.Context, key string, r io.Reader) error {
-	ret := _m.Called(ctx, key, r)
+// WriteConsolidated provides a mock function with given fields: ctx, key, reader
+func (_m *MockStore) WriteConsolidated(ctx context.Context, key string, reader io.Reader) (db.RetainObjectRefFunc, error) {
+	ret := _m.Called(ctx, key, reader)
 
 	if len(ret) == 0 {
-		panic("no return value specified for WriteObject")
+		panic("no return value specified for WriteConsolidated")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader) error); ok {
-		r0 = rf(ctx, key, r)
+	var r0 db.RetainObjectRefFunc
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader) (db.RetainObjectRefFunc, error)); ok {
+		return rf(ctx, key, reader)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader) db.RetainObjectRefFunc); ok {
+		r0 = rf(ctx, key, reader)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader) error); ok {
+		r1 = rf(ctx, key, reader)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewMockStore creates a new instance of MockStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

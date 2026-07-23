@@ -27,11 +27,12 @@ import (
 
 // CreateNamespaceMembershipInput is the input for creating a new namespace membership
 type CreateNamespaceMembershipInput struct {
-	User           *models.User
-	ServiceAccount *models.ServiceAccount
-	Team           *models.Team
-	RoleID         string
-	NamespacePath  string
+	User             *models.User
+	ServiceAccount   *models.ServiceAccount
+	Team             *models.Team
+	RoleID           string
+	NamespacePath    string
+	SkipNotification bool
 }
 
 // GetNamespaceMembershipsForSubjectInput is the input for querying a list of namespace memberships
@@ -362,6 +363,9 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		teamID = &input.Team.Metadata.ID
 	}
 
+	// skip if caller is modifying their own membership or explicitly opted out
+	skipEmailNotification := input.SkipNotification || callerIsMembershipSubject(caller, userID)
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin DB transaction")
@@ -423,18 +427,20 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		"namespacePath", input.NamespacePath,
 	)
 
-	emailInput := &sendMembershipChangeEmailInput{
-		membership:   namespaceMembership,
-		action:       builder.MembershipChangeActionCreated,
-		roleName:     role.Name,
-		isCustomRole: !models.DefaultRoleID(role.Metadata.ID).IsDefaultRole(),
-		caller:       caller,
-	}
-	s.asyncTaskManager.StartTask(func(ctx context.Context) {
-		if err := s.sendMembershipChangeEmail(ctx, emailInput); err != nil {
-			s.logger.Errorf("failed to send membership change email: %v", err)
+	if !skipEmailNotification {
+		emailInput := &sendMembershipChangeEmailInput{
+			membership:   namespaceMembership,
+			action:       builder.MembershipChangeActionCreated,
+			roleName:     role.Name,
+			isCustomRole: !models.DefaultRoleID(role.Metadata.ID).IsDefaultRole(),
+			caller:       caller,
 		}
-	})
+		s.asyncTaskManager.StartTask(func(ctx context.Context) {
+			if err := s.sendMembershipChangeEmail(ctx, emailInput); err != nil {
+				s.logger.Errorf("failed to send membership change email: %v", err)
+			}
+		})
+	}
 
 	return namespaceMembership, nil
 }
@@ -539,20 +545,23 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 		"namespacePath", updatedNamespaceMembership.Namespace.Path,
 	)
 
-	input := &sendMembershipChangeEmailInput{
-		membership:       updatedNamespaceMembership,
-		action:           builder.MembershipChangeActionRoleChanged,
-		roleName:         newRole.Name,
-		prevRoleName:     prevRole.Name,
-		isCustomRole:     !models.DefaultRoleID(newRole.Metadata.ID).IsDefaultRole(),
-		isPrevCustomRole: !models.DefaultRoleID(prevRole.Metadata.ID).IsDefaultRole(),
-		caller:           caller,
-	}
-	s.asyncTaskManager.StartTask(func(ctx context.Context) {
-		if err := s.sendMembershipChangeEmail(ctx, input); err != nil {
-			s.logger.Errorf("failed to send membership change email: %v", err)
+	// skip if caller is modifying their own membership
+	if !callerIsMembershipSubject(caller, updatedNamespaceMembership.UserID) {
+		input := &sendMembershipChangeEmailInput{
+			membership:       updatedNamespaceMembership,
+			action:           builder.MembershipChangeActionRoleChanged,
+			roleName:         newRole.Name,
+			prevRoleName:     prevRole.Name,
+			isCustomRole:     !models.DefaultRoleID(newRole.Metadata.ID).IsDefaultRole(),
+			isPrevCustomRole: !models.DefaultRoleID(prevRole.Metadata.ID).IsDefaultRole(),
+			caller:           caller,
 		}
-	})
+		s.asyncTaskManager.StartTask(func(ctx context.Context) {
+			if err := s.sendMembershipChangeEmail(ctx, input); err != nil {
+				s.logger.Errorf("failed to send membership change email: %v", err)
+			}
+		})
+	}
 
 	return updatedNamespaceMembership, nil
 }
@@ -627,16 +636,19 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 		"namespacePath", namespaceMembership.Namespace.Path,
 	)
 
-	input := &sendMembershipChangeEmailInput{
-		membership: namespaceMembership,
-		action:     builder.MembershipChangeActionRemoved,
-		caller:     caller,
-	}
-	s.asyncTaskManager.StartTask(func(ctx context.Context) {
-		if err := s.sendMembershipChangeEmail(ctx, input); err != nil {
-			s.logger.Errorf("failed to send membership change email: %v", err)
+	// skip if caller is modifying their own membership
+	if !callerIsMembershipSubject(caller, namespaceMembership.UserID) {
+		input := &sendMembershipChangeEmailInput{
+			membership: namespaceMembership,
+			action:     builder.MembershipChangeActionRemoved,
+			caller:     caller,
 		}
-	})
+		s.asyncTaskManager.StartTask(func(ctx context.Context) {
+			if err := s.sendMembershipChangeEmail(ctx, input); err != nil {
+				s.logger.Errorf("failed to send membership change email: %v", err)
+			}
+		})
+	}
 
 	return nil
 }
@@ -785,4 +797,17 @@ func getTargetTypeID(namespaceMembership *models.NamespaceMembership) (models.Ac
 		eventTargetID = *namespaceMembership.Namespace.WorkspaceID
 	}
 	return eventTargetType, eventTargetID
+}
+
+func callerIsMembershipSubject(caller auth.Caller, userID *string) bool {
+	if userID == nil {
+		return false
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return false
+	}
+
+	return userCaller.User.Metadata.ID == *userID
 }

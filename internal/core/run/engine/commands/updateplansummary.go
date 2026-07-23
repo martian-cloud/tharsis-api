@@ -24,10 +24,9 @@ type UpdatePlanSummaryInput struct {
 	TFProviderSchemas *tfjson.ProviderSchemas
 }
 
-// UpdatePlanSummary parses the Terraform plan into a diff/summary in Prepare
-// (before the transaction is opened), then in Execute records the summary on the
-// plan node and uploads the plan diff and JSON to the artifact store. The uploads
-// are idempotent by storage key, so OLE retries are safe.
+// UpdatePlanSummary parses the plan and uploads the diff/JSON in Prepare (once, before the
+// transaction), then in Execute records the summary and object keys on the plan node. Uploading in
+// Prepare keeps the S3 writes out of the transaction and off the OLE-retry path.
 type UpdatePlanSummary struct {
 	dbClient      *db.Client
 	planParser    plan.Parser
@@ -35,10 +34,13 @@ type UpdatePlanSummary struct {
 	in            *UpdatePlanSummaryInput
 
 	// Populated by Prepare.
-	runID    string
-	summary  models.PlanSummary
-	planDiff []byte
-	planJSON []byte
+	runID         string
+	summary       models.PlanSummary
+	diffSize      int
+	diffObjectKey string
+	jsonObjectKey string
+	diffRetainFn  db.RetainObjectRefFunc
+	jsonRetainFn  db.RetainObjectRefFunc
 }
 
 // Prepare resolves the run, parses the plan diff, and computes the summary. It
@@ -99,15 +101,27 @@ func (c *UpdatePlanSummary) Prepare(ctx context.Context) error {
 		return errors.Wrap(err, "failed to marshal plan json")
 	}
 
+	diffRetainFn, diffKey, err := c.artifactStore.UploadPlanDiff(ctx, run, bytes.NewReader(planDiff))
+	if err != nil {
+		return errors.Wrap(err, "failed to write plan diff to object storage")
+	}
+
+	jsonRetainFn, jsonKey, err := c.artifactStore.UploadPlanJSON(ctx, run, bytes.NewReader(planJSON))
+	if err != nil {
+		return errors.Wrap(err, "failed to write plan json to object storage")
+	}
+
 	c.runID = run.Metadata.ID
 	c.summary = summary
-	c.planDiff = planDiff
-	c.planJSON = planJSON
+	c.diffSize = len(planDiff)
+	c.diffObjectKey = diffKey
+	c.jsonObjectKey = jsonKey
+	c.diffRetainFn = diffRetainFn
+	c.jsonRetainFn = jsonRetainFn
 	return nil
 }
 
-// Execute records the plan summary on the plan node and uploads the plan diff
-// and JSON to the artifact store.
+// Execute records the plan summary and the uploaded object keys on the plan node.
 func (c *UpdatePlanSummary) Execute(ctx context.Context, input *types.ExecuteInput) error {
 	run, err := input.RunStore.GetRunByID(ctx, c.runID)
 	if err != nil {
@@ -120,14 +134,16 @@ func (c *UpdatePlanSummary) Execute(ctx context.Context, input *types.ExecuteInp
 	// disagreeing with Terraform (e.g. import/drift-only plans).
 	planNode := &run.Plan
 	planNode.Summary = c.summary
-	planNode.DiffSize = len(c.planDiff)
+	planNode.DiffSize = c.diffSize
+	planNode.DiffObjectStoreKey = &c.diffObjectKey
+	planNode.JSONObjectStoreKey = &c.jsonObjectKey
 
-	if err := c.artifactStore.UploadPlanDiff(ctx, run, bytes.NewReader(c.planDiff)); err != nil {
-		return errors.Wrap(err, "failed to write plan diff to object storage")
+	if err = c.diffRetainFn(ctx, c.runID); err != nil {
+		return errors.Wrap(err, "failed to link plan diff object store ref")
 	}
 
-	if err := c.artifactStore.UploadPlanJSON(ctx, run, bytes.NewReader(c.planJSON)); err != nil {
-		return errors.Wrap(err, "failed to write plan json to object storage")
+	if err = c.jsonRetainFn(ctx, c.runID); err != nil {
+		return errors.Wrap(err, "failed to link plan json object store ref")
 	}
 
 	return nil

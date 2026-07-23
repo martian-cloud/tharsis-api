@@ -6,6 +6,8 @@ import (
 	context "context"
 	io "io"
 
+	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+
 	mock "github.com/stretchr/testify/mock"
 
 	models "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -258,111 +260,225 @@ func (_m *MockArtifactStore) GetStateVersion(ctx context.Context, stateVersion *
 }
 
 // UploadConfigurationVersion provides a mock function with given fields: ctx, configurationVersion, body
-func (_m *MockArtifactStore) UploadConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion, body io.Reader) error {
+func (_m *MockArtifactStore) UploadConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, configurationVersion, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadConfigurationVersion")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.ConfigurationVersion, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.ConfigurationVersion, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, configurationVersion, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.ConfigurationVersion, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, configurationVersion, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.ConfigurationVersion, io.Reader) string); ok {
+		r1 = rf(ctx, configurationVersion, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.ConfigurationVersion, io.Reader) error); ok {
+		r2 = rf(ctx, configurationVersion, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UploadPlanCache provides a mock function with given fields: ctx, run, body
-func (_m *MockArtifactStore) UploadPlanCache(ctx context.Context, run *models.Run, body io.Reader) error {
+func (_m *MockArtifactStore) UploadPlanCache(ctx context.Context, run *models.Run, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, run, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadPlanCache")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, run, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, run, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Run, io.Reader) string); ok {
+		r1 = rf(ctx, run, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.Run, io.Reader) error); ok {
+		r2 = rf(ctx, run, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UploadPlanDiff provides a mock function with given fields: ctx, run, body
-func (_m *MockArtifactStore) UploadPlanDiff(ctx context.Context, run *models.Run, body io.Reader) error {
+func (_m *MockArtifactStore) UploadPlanDiff(ctx context.Context, run *models.Run, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, run, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadPlanDiff")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, run, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, run, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Run, io.Reader) string); ok {
+		r1 = rf(ctx, run, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.Run, io.Reader) error); ok {
+		r2 = rf(ctx, run, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UploadPlanJSON provides a mock function with given fields: ctx, run, body
-func (_m *MockArtifactStore) UploadPlanJSON(ctx context.Context, run *models.Run, body io.Reader) error {
+func (_m *MockArtifactStore) UploadPlanJSON(ctx context.Context, run *models.Run, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, run, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadPlanJSON")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, run, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, run, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Run, io.Reader) string); ok {
+		r1 = rf(ctx, run, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.Run, io.Reader) error); ok {
+		r2 = rf(ctx, run, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UploadRunVariables provides a mock function with given fields: ctx, run, body
-func (_m *MockArtifactStore) UploadRunVariables(ctx context.Context, run *models.Run, body io.Reader) error {
+func (_m *MockArtifactStore) UploadRunVariables(ctx context.Context, run *models.Run, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, run, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadRunVariables")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, run, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, run, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Run, io.Reader) string); ok {
+		r1 = rf(ctx, run, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.Run, io.Reader) error); ok {
+		r2 = rf(ctx, run, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UploadStateVersion provides a mock function with given fields: ctx, stateVersion, body
-func (_m *MockArtifactStore) UploadStateVersion(ctx context.Context, stateVersion *models.StateVersion, body io.Reader) error {
+func (_m *MockArtifactStore) UploadStateVersion(ctx context.Context, stateVersion *models.StateVersion, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, stateVersion, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadStateVersion")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, stateVersion, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, stateVersion, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.StateVersion, io.Reader) string); ok {
+		r1 = rf(ctx, stateVersion, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.StateVersion, io.Reader) error); ok {
+		r2 = rf(ctx, stateVersion, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // NewMockArtifactStore creates a new instance of MockArtifactStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

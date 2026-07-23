@@ -18,10 +18,17 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
+// makePlanLinkFunc builds a no-op RetainObjectRefFunc that satisfies mock expectations on refs.
+func makePlanLinkFunc(refs *db.MockObjectStoreRefs, key string) db.RetainObjectRefFunc {
+	return func(ctx context.Context, ownerID string) error {
+		return refs.LinkRef(ctx, key, db.ObjectStoreRefOwnerRun, ownerID)
+	}
+}
+
 func TestUpdatePlanSummary_Execute(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("records the summary on the plan node and uploads diff and json", func(t *testing.T) {
+	t.Run("records the summary and object keys on the plan node", func(t *testing.T) {
 		run := &models.Run{
 			Metadata: models.ResourceMetadata{ID: "run-1"},
 			Plan:     models.Plan{ID: "plan-1"},
@@ -29,47 +36,27 @@ func TestUpdatePlanSummary_Execute(t *testing.T) {
 		runStore := store.NewRunStore(&db.Client{})
 		runStore.AddRun(run)
 
-		mockArtifactStore := workspace.NewMockArtifactStore(t)
-		mockArtifactStore.On("UploadPlanDiff", ctx, run, mock.Anything).Return(nil)
-		mockArtifactStore.On("UploadPlanJSON", ctx, run, mock.Anything).Return(nil)
-
 		summary := models.PlanSummary{ResourceAdditions: 3}
-		diff := []byte(`{"resources":[]}`)
+
+		mockRefs := db.NewMockObjectStoreRefs(t)
+		mockRefs.On("LinkRef", mock.Anything, mock.Anything, db.ObjectStoreRefOwnerRun, "run-1").Return(nil)
+
 		cmd := &UpdatePlanSummary{
-			artifactStore: mockArtifactStore,
+			dbClient:      &db.Client{},
 			runID:         "run-1",
 			summary:       summary,
-			planDiff:      diff,
-			planJSON:      []byte(`{}`),
+			diffSize:      16,
+			diffObjectKey: "plan/diff",
+			jsonObjectKey: "plan/json",
+			diffRetainFn:  makePlanLinkFunc(mockRefs, "plan/diff"),
+			jsonRetainFn:  makePlanLinkFunc(mockRefs, "plan/json"),
 		}
 
 		require.NoError(t, cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore}))
 		assert.Equal(t, summary, run.Plan.Summary)
-		assert.Equal(t, len(diff), run.Plan.DiffSize)
-	})
-
-	t.Run("propagates an artifact store upload error", func(t *testing.T) {
-		run := &models.Run{
-			Metadata: models.ResourceMetadata{ID: "run-1"},
-			Plan:     models.Plan{ID: "plan-1"},
-		}
-		runStore := store.NewRunStore(&db.Client{})
-		runStore.AddRun(run)
-
-		mockArtifactStore := workspace.NewMockArtifactStore(t)
-		mockArtifactStore.On("UploadPlanDiff", ctx, run, mock.Anything).
-			Return(errors.New("object store unavailable"))
-
-		cmd := &UpdatePlanSummary{
-			artifactStore: mockArtifactStore,
-			runID:         "run-1",
-			planDiff:      []byte(`{}`),
-			planJSON:      []byte(`{}`),
-		}
-
-		err := cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to write plan diff to object storage")
+		assert.Equal(t, 16, run.Plan.DiffSize)
+		assert.Equal(t, &cmd.diffObjectKey, run.Plan.DiffObjectStoreKey)
+		assert.Equal(t, &cmd.jsonObjectKey, run.Plan.JSONObjectStoreKey)
 	})
 }
 
@@ -104,10 +91,17 @@ func TestUpdatePlanSummary_Prepare(t *testing.T) {
 		mockParser := plan.NewMockParser(t)
 		mockParser.On("Parse", mock.Anything, mock.Anything).Return(diff, nil)
 
+		mockArtifactStore := workspace.NewMockArtifactStore(t)
+		mockArtifactStore.On("UploadPlanDiff", ctx, mock.Anything, mock.Anything).
+			Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), "plan/diff", nil)
+		mockArtifactStore.On("UploadPlanJSON", ctx, mock.Anything, mock.Anything).
+			Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), "plan/json", nil)
+
 		cmd := &UpdatePlanSummary{
-			dbClient:   &db.Client{Runs: mockRuns},
-			planParser: mockParser,
-			in:         &UpdatePlanSummaryInput{PlanID: "plan-1"},
+			dbClient:      &db.Client{Runs: mockRuns},
+			planParser:    mockParser,
+			artifactStore: mockArtifactStore,
+			in:            &UpdatePlanSummaryInput{PlanID: "plan-1"},
 		}
 
 		require.NoError(t, cmd.Prepare(ctx))
@@ -123,7 +117,9 @@ func TestUpdatePlanSummary_Prepare(t *testing.T) {
 		assert.Equal(t, int32(2), cmd.summary.OutputChanges)
 		assert.Equal(t, int32(1), cmd.summary.OutputDestructions)
 		assert.Equal(t, "run-1", cmd.runID)
-		assert.NotEmpty(t, cmd.planDiff)
+		assert.Equal(t, "plan/diff", cmd.diffObjectKey)
+		assert.Equal(t, "plan/json", cmd.jsonObjectKey)
+		assert.NotZero(t, cmd.diffSize)
 	})
 
 	t.Run("empty diff yields no changes", func(t *testing.T) {
@@ -134,10 +130,18 @@ func TestUpdatePlanSummary_Prepare(t *testing.T) {
 		mockParser := plan.NewMockParser(t)
 		mockParser.On("Parse", mock.Anything, mock.Anything).Return(&plan.Diff{}, nil)
 
+		noopLinkFunc := db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil })
+		mockArtifactStore := workspace.NewMockArtifactStore(t)
+		mockArtifactStore.On("UploadPlanDiff", ctx, mock.Anything, mock.Anything).
+			Return(noopLinkFunc, "plan/diff", nil)
+		mockArtifactStore.On("UploadPlanJSON", ctx, mock.Anything, mock.Anything).
+			Return(noopLinkFunc, "plan/json", nil)
+
 		cmd := &UpdatePlanSummary{
-			dbClient:   &db.Client{Runs: mockRuns},
-			planParser: mockParser,
-			in:         &UpdatePlanSummaryInput{PlanID: "plan-1"},
+			dbClient:      &db.Client{Runs: mockRuns},
+			planParser:    mockParser,
+			artifactStore: mockArtifactStore,
+			in:            &UpdatePlanSummaryInput{PlanID: "plan-1"},
 		}
 
 		require.NoError(t, cmd.Prepare(ctx))
@@ -160,14 +164,43 @@ func TestUpdatePlanSummary_Prepare(t *testing.T) {
 		mockParser := plan.NewMockParser(t)
 		mockParser.On("Parse", mock.Anything, mock.Anything).Return(diff, nil)
 
+		noopLinkFunc := db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil })
+		mockArtifactStore := workspace.NewMockArtifactStore(t)
+		mockArtifactStore.On("UploadPlanDiff", ctx, mock.Anything, mock.Anything).
+			Return(noopLinkFunc, "plan/diff", nil)
+		mockArtifactStore.On("UploadPlanJSON", ctx, mock.Anything, mock.Anything).
+			Return(noopLinkFunc, "plan/json", nil)
+
 		cmd := &UpdatePlanSummary{
-			dbClient:   &db.Client{Runs: mockRuns},
-			planParser: mockParser,
-			in:         &UpdatePlanSummaryInput{PlanID: "plan-1"},
+			dbClient:      &db.Client{Runs: mockRuns},
+			planParser:    mockParser,
+			artifactStore: mockArtifactStore,
+			in:            &UpdatePlanSummaryInput{PlanID: "plan-1"},
 		}
 
 		require.NoError(t, cmd.Prepare(ctx))
 		assert.Equal(t, int32(1), cmd.summary.ResourceDrift)
+	})
+
+	t.Run("UploadPlanDiff error is returned", func(t *testing.T) {
+		mockRuns := db.NewMockRuns(t)
+		mockRuns.On("GetRunByNodeID", ctx, "plan-1").Return(
+			&models.Run{Metadata: models.ResourceMetadata{ID: "run-1"}}, nil)
+
+		mockParser := plan.NewMockParser(t)
+		mockParser.On("Parse", mock.Anything, mock.Anything).Return(&plan.Diff{}, nil)
+
+		mockArtifactStore := workspace.NewMockArtifactStore(t)
+		mockArtifactStore.On("UploadPlanDiff", ctx, mock.Anything, mock.Anything).Return(db.RetainObjectRefFunc(nil), "", errors.New("s3 error"))
+
+		cmd := &UpdatePlanSummary{
+			dbClient:      &db.Client{Runs: mockRuns},
+			planParser:    mockParser,
+			artifactStore: mockArtifactStore,
+			in:            &UpdatePlanSummaryInput{PlanID: "plan-1"},
+		}
+
+		require.Error(t, cmd.Prepare(ctx))
 	})
 
 	t.Run("missing run yields not found", func(t *testing.T) {

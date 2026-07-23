@@ -6,6 +6,8 @@ import (
 	context "context"
 	io "io"
 
+	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -14,9 +16,9 @@ type MockTerraformProviderMirrorStore struct {
 	mock.Mock
 }
 
-// GetProviderPlatformPackagePresignedURL provides a mock function with given fields: ctx, platformMirrorID
-func (_m *MockTerraformProviderMirrorStore) GetProviderPlatformPackagePresignedURL(ctx context.Context, platformMirrorID string) (string, error) {
-	ret := _m.Called(ctx, platformMirrorID)
+// GetProviderPlatformPackagePresignedURL provides a mock function with given fields: ctx, objectStoreKey
+func (_m *MockTerraformProviderMirrorStore) GetProviderPlatformPackagePresignedURL(ctx context.Context, objectStoreKey string) (string, error) {
+	ret := _m.Called(ctx, objectStoreKey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetProviderPlatformPackagePresignedURL")
@@ -25,16 +27,16 @@ func (_m *MockTerraformProviderMirrorStore) GetProviderPlatformPackagePresignedU
 	var r0 string
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
-		return rf(ctx, platformMirrorID)
+		return rf(ctx, objectStoreKey)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
-		r0 = rf(ctx, platformMirrorID)
+		r0 = rf(ctx, objectStoreKey)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, platformMirrorID)
+		r1 = rf(ctx, objectStoreKey)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -42,22 +44,41 @@ func (_m *MockTerraformProviderMirrorStore) GetProviderPlatformPackagePresignedU
 	return r0, r1
 }
 
-// UploadProviderPlatformPackage provides a mock function with given fields: ctx, platformMirrorID, body
-func (_m *MockTerraformProviderMirrorStore) UploadProviderPlatformPackage(ctx context.Context, platformMirrorID string, body io.Reader) error {
-	ret := _m.Called(ctx, platformMirrorID, body)
+// UploadProviderPlatformPackage provides a mock function with given fields: ctx, body
+func (_m *MockTerraformProviderMirrorStore) UploadProviderPlatformPackage(ctx context.Context, body io.Reader) (db.RetainObjectRefFunc, string, error) {
+	ret := _m.Called(ctx, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadProviderPlatformPackage")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader) error); ok {
-		r0 = rf(ctx, platformMirrorID, body)
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, io.Reader) db.RetainObjectRefFunc); ok {
+		r0 = rf(ctx, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, io.Reader) string); ok {
+		r1 = rf(ctx, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, io.Reader) error); ok {
+		r2 = rf(ctx, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // NewMockTerraformProviderMirrorStore creates a new instance of MockTerraformProviderMirrorStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

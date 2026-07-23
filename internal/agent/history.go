@@ -36,5 +36,11 @@ func (r *historyRepository) Save(ctx context.Context, sessionID string, history 
 	if err != nil {
 		return err
 	}
-	return r.store.SaveHistory(ctx, sessionID, data)
+
+	retainFn, _, err := r.store.SaveHistory(ctx, sessionID, data)
+	if err != nil {
+		return err
+	}
+
+	return retainFn(ctx, sessionID)
 }

@@ -715,7 +715,7 @@ func TestGetPlanDiff(t *testing.T) {
 			ID: runID,
 		},
 		WorkspaceID: workspaceID,
-		Plan:        models.Plan{ID: "plan-1"},
+		Plan:        models.Plan{ID: "plan-1", DiffObjectStoreKey: ptr.String("workspaces/ws1/runs/run1/plan/diff.json")},
 	}
 
 	planID := run.Plan.GetID()
@@ -790,7 +790,7 @@ func TestGetPlanCheckResults(t *testing.T) {
 			ID: runID,
 		},
 		WorkspaceID: workspaceID,
-		Plan:        models.Plan{ID: planID},
+		Plan:        models.Plan{ID: planID, JSONObjectStoreKey: ptr.String("workspaces/ws1/runs/run1/plan/plan.json")},
 	}
 
 	type testCase struct {
@@ -1021,20 +1021,19 @@ func TestUploadPlanBinary(t *testing.T) {
 	runID := "run1"
 
 	run := &models.Run{
-		Metadata: models.ResourceMetadata{
-			ID: runID,
-		},
+		Metadata:    models.ResourceMetadata{ID: runID},
 		WorkspaceID: workspaceID,
 		Plan:        models.Plan{ID: "plan-1"},
 	}
 
 	planID := run.Plan.GetID()
+	cacheKey := "workspaces/ws1/runs/run1/plan/plan-1"
 
 	type testCase struct {
 		authError       error
+		linkRefErr      error
 		name            string
 		expectErrorCode errors.CodeType
-		expectData      string
 	}
 
 	testCases := []testCase{
@@ -1044,8 +1043,12 @@ func TestUploadPlanBinary(t *testing.T) {
 			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name:       "upload plan binary",
-			expectData: "test data",
+			name: "upload plan binary",
+		},
+		{
+			name:            "retainFn error is propagated",
+			linkRefErr:      errors.New("link failed", errors.WithErrorCode(errors.EInternal)),
+			expectErrorCode: errors.EInternal,
 		},
 	}
 
@@ -1055,35 +1058,35 @@ func TestUploadPlanBinary(t *testing.T) {
 			defer cancel()
 
 			mockCaller := auth.NewMockCaller(t)
-
-			mockRuns := db.NewMockRuns(t)
-
-			mockArtifactStore := workspace.NewMockArtifactStore(t)
-
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(test.authError)
 
+			mockRuns := db.NewMockRuns(t)
 			mockRuns.On("GetRunByNodeID", mock.Anything, planID).Return(run, nil).Maybe()
+			mockRuns.On("UpdateRun", mock.Anything, run, run.Plan.GetID()).Return(run, nil).Maybe()
 
-			if test.authError == nil {
-				matcher := mock.MatchedBy(func(reader io.Reader) bool {
-					actual, err := io.ReadAll(reader)
-					require.NoError(t, err)
+			mockTransactions := db.NewMockTransactions(t)
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
-					return string(actual) == test.expectData
-				})
-				mockArtifactStore.On("UploadPlanCache", mock.Anything, run, matcher).Return(nil)
-			}
+			mockObjectStoreRefs := db.NewMockObjectStoreRefs(t)
+			mockObjectStoreRefs.On("LinkRef", mock.Anything, cacheKey, db.ObjectStoreRefOwnerRun, runID).Return(test.linkRefErr).Maybe()
 
-			dbClient := &db.Client{
-				Runs: mockRuns,
-			}
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+			mockArtifactStore.On("UploadPlanCache", mock.Anything, run, mock.Anything).
+				Return(db.RetainObjectRefFunc(func(ctx context.Context, ownerID string) error {
+					return mockObjectStoreRefs.LinkRef(ctx, cacheKey, db.ObjectStoreRefOwnerRun, ownerID)
+				}), cacheKey, nil).Maybe()
+
+			testLogger, _ := logger.NewForTest()
 
 			service := &service{
-				dbClient:      dbClient,
+				logger:        testLogger,
+				dbClient:      &db.Client{Runs: mockRuns, Transactions: mockTransactions},
 				artifactStore: mockArtifactStore,
 			}
 
-			err := service.UploadPlanBinary(auth.WithCaller(ctx, mockCaller), planID, strings.NewReader(test.expectData))
+			err := service.UploadPlanBinary(auth.WithCaller(ctx, mockCaller), planID, strings.NewReader("test data"))
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -1091,6 +1094,7 @@ func TestUploadPlanBinary(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			assert.Equal(t, &cacheKey, run.Plan.CacheObjectStoreKey)
 		})
 	}
 }
@@ -1601,6 +1605,7 @@ func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 		name            string
 		run             *models.Run
 		authError       error
+		linkRefErr      error
 		expectErrorCode errors.CodeType
 	}
 
@@ -1628,6 +1633,17 @@ func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 		{
 			name:            "run not found",
 			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "retainFn error is propagated",
+			run: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: runID,
+				},
+				Plan: models.Plan{ID: "plan-1"},
+			},
+			linkRefErr:      errors.New("link failed", errors.WithErrorCode(errors.EInternal)),
+			expectErrorCode: errors.EInternal,
 		},
 	}
 
@@ -1677,7 +1693,8 @@ func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 					data, err = json.Marshal(sampleVariables)
 					require.NoError(t, err)
 
-					mockArtifactStore.On("UploadRunVariables", mock.Anything, tc.run, bytes.NewReader(data)).Return(nil)
+					mockArtifactStore.On("UploadRunVariables", mock.Anything, tc.run, bytes.NewReader(data)).
+						Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return tc.linkRefErr }), "workspaces/ws1/runs/run1/variables.json", nil)
 				}
 			}
 

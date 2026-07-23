@@ -58,7 +58,7 @@ func TestWriteLogs(t *testing.T) {
 			Metadata: models.ResourceMetadata{ID: streamID}, Size: 0,
 		}
 		mockLC.On("GetActiveChunk", mock.Anything, streamID).Return(nil, nil)
-		mockStore.On("WriteChunk", mock.Anything, mock.AnythingOfType("string"), 0, logs).Return(nil)
+		mockStore.On("WriteChunk", mock.Anything, mock.AnythingOfType("string"), 0, logs).Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), nil)
 
 		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
 		mockTx.On("RollbackTx", mock.Anything).Return(nil)
@@ -89,9 +89,9 @@ func TestWriteLogs(t *testing.T) {
 		}
 		mockLC.On("GetActiveChunk", mock.Anything, streamID).Return(&models.LogStreamChunk{
 			Metadata: models.ResourceMetadata{ID: "chunk0"}, LogStreamID: streamID,
-			ChunkIndex: 0, StartOffset: 0, Size: existing, ObjectKey: "logstreams/stream1/c0.txt",
+			ChunkIndex: 0, StartOffset: 0, Size: existing, ObjectStoreKey: "logstreams/stream1/c0.txt",
 		}, nil)
-		mockStore.On("WriteChunk", mock.Anything, "logstreams/stream1/c0.txt", existing, logs).Return(nil)
+		mockStore.On("WriteChunk", mock.Anything, "logstreams/stream1/c0.txt", existing, logs).Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), nil)
 
 		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
 		mockTx.On("RollbackTx", mock.Anything).Return(nil)
@@ -122,7 +122,7 @@ func TestWriteLogs(t *testing.T) {
 			Metadata: models.ResourceMetadata{ID: streamID}, Size: 0,
 		}
 		mockLC.On("GetActiveChunk", mock.Anything, streamID).Return(nil, nil)
-		mockStore.On("WriteChunk", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockStore.On("WriteChunk", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), nil)
 
 		var created []*models.LogStreamChunk
 		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
@@ -165,7 +165,7 @@ func TestWriteLogs(t *testing.T) {
 			Metadata: models.ResourceMetadata{ID: streamID}, Size: 100,
 		}
 		mockLC.On("GetActiveChunk", mock.Anything, streamID).Return(nil, nil)
-		mockStore.On("WriteChunk", mock.Anything, mock.Anything, 0, logs).Return(nil)
+		mockStore.On("WriteChunk", mock.Anything, mock.Anything, 0, logs).Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), nil)
 
 		var created []*models.LogStreamChunk
 		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
@@ -191,7 +191,7 @@ func TestWriteLogs(t *testing.T) {
 		assert.Equal(t, 0, created[0].StartOffset)
 		assert.Equal(t, 100, created[0].Size)
 		assert.True(t, created[0].Sealed)
-		assert.Equal(t, consolidatedObjectKey(streamID), created[0].ObjectKey)
+		assert.Equal(t, consolidatedObjectKey(streamID), created[0].ObjectStoreKey)
 		// chunk 1 holds the new bytes
 		assert.Equal(t, 1, created[1].ChunkIndex)
 		assert.Equal(t, 100, created[1].StartOffset)
@@ -209,7 +209,7 @@ func TestWriteLogs(t *testing.T) {
 		}
 		// Overlap verification reads [0,5) and finds it matches the re-sent bytes.
 		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, 0, 5).Return([]models.LogStreamChunk{
-			{StartOffset: 0, Size: 10, ObjectKey: "k"},
+			{StartOffset: 0, Size: 10, ObjectStoreKey: "k"},
 		}, nil)
 		mockStore.On("ReadRange", mock.Anything, "k", 0, 5).Return(rc("hello"), nil)
 
@@ -233,7 +233,7 @@ func TestWriteLogs(t *testing.T) {
 		}
 		// Stored bytes at [0,5) are "hello", but the caller re-sends "world" at offset 0.
 		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, 0, 5).Return([]models.LogStreamChunk{
-			{StartOffset: 0, Size: 10, ObjectKey: "k"},
+			{StartOffset: 0, Size: 10, ObjectStoreKey: "k"},
 		}, nil)
 		mockStore.On("ReadRange", mock.Anything, "k", 0, 5).Return(rc("hello"), nil)
 
@@ -300,7 +300,7 @@ func TestWriteLogsMaxSize(t *testing.T) {
 			Metadata: models.ResourceMetadata{ID: streamID}, Size: 0,
 		}
 		mockLC.On("GetActiveChunk", mock.Anything, streamID).Return(nil, nil)
-		mockStore.On("WriteChunk", mock.Anything, mock.AnythingOfType("string"), 0, []byte("0123456789")).Return(nil)
+		mockStore.On("WriteChunk", mock.Anything, mock.AnythingOfType("string"), 0, []byte("0123456789")).Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), nil)
 
 		var created []*models.LogStreamChunk
 		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
@@ -387,28 +387,30 @@ func TestCompactStream(t *testing.T) {
 
 		// Reading all chunks [0,10) for the consolidation.
 		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, 0, 10).Return([]models.LogStreamChunk{
-			{StartOffset: 0, Size: 4, ObjectKey: "k0"},
-			{StartOffset: 4, Size: 4, ObjectKey: "k1"},
-			{StartOffset: 8, Size: 2, ObjectKey: "k2"},
+			{StartOffset: 0, Size: 4, ObjectStoreKey: "k0"},
+			{StartOffset: 4, Size: 4, ObjectStoreKey: "k1"},
+			{StartOffset: 8, Size: 2, ObjectStoreKey: "k2"},
 		}, nil)
 		mockStore.On("ReadRange", mock.Anything, "k0", 0, 4).Return(rc("abcd"), nil)
 		mockStore.On("ReadRange", mock.Anything, "k1", 0, 4).Return(rc("efgh"), nil)
 		mockStore.On("ReadRange", mock.Anything, "k2", 0, 2).Return(rc("ij"), nil)
 
-		// The consolidated object is written to the static key with the full stitched content.
-		// Capture the reader's bytes via Run (reading it once, as the real WriteObject would) instead
-		// of a MatchedBy, which testify may invoke multiple times and would drain the reader.
+		// WriteConsolidated captures the reader bytes and returns a no-op retainFn.
 		var written string
-		mockStore.On("WriteObject", mock.Anything, consolidatedObjectKey(streamID), mock.Anything).
+		mockStore.On("WriteConsolidated", mock.Anything, consolidatedObjectKey(streamID), mock.Anything).
 			Run(func(args mock.Arguments) {
 				b, _ := io.ReadAll(args.Get(2).(io.Reader))
 				written = string(b)
-			}).Return(nil)
+			}).Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), nil)
 
+		mockTx := db.NewMockTransactions(t)
+		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
+		mockTx.On("RollbackTx", mock.Anything).Return(nil)
+		mockTx.On("CommitTx", mock.Anything).Return(nil)
 		mockLS.On("UpdateLogStream", mock.Anything, mock.Anything).Return(echoStream)
 
 		logr, _ := logger.NewForTest()
-		manager := New(mockStore, &db.Client{LogStreams: mockLS, LogStreamChunks: mockLC}, nil, logr, 0)
+		manager := New(mockStore, &db.Client{Transactions: mockTx, LogStreams: mockLS, LogStreamChunks: mockLC}, nil, logr, 0)
 
 		err := manager.CompactStream(ctx, logStream)
 		require.NoError(t, err)
@@ -424,10 +426,14 @@ func TestCompactStream(t *testing.T) {
 
 		logStream := &models.LogStream{Metadata: models.ResourceMetadata{ID: streamID}, Size: 0, Completed: true}
 		// No WriteObject / ReadRange / chunk calls expected.
+		mockTx := db.NewMockTransactions(t)
+		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
+		mockTx.On("RollbackTx", mock.Anything).Return(nil)
+		mockTx.On("CommitTx", mock.Anything).Return(nil)
 		mockLS.On("UpdateLogStream", mock.Anything, mock.Anything).Return(echoStream)
 
 		logr, _ := logger.NewForTest()
-		manager := New(mockStore, &db.Client{LogStreams: mockLS}, nil, logr, 0)
+		manager := New(mockStore, &db.Client{Transactions: mockTx, LogStreams: mockLS}, nil, logr, 0)
 
 		err := manager.CompactStream(ctx, logStream)
 		require.NoError(t, err)
@@ -457,10 +463,13 @@ func TestCompactStream(t *testing.T) {
 		// (scheduler) has already claimed the stream via SKIP LOCKED, so a lost optimistic lock here is
 		// a rare concurrent update; compaction aborts cleanly without error.
 		logStream := &models.LogStream{Metadata: models.ResourceMetadata{ID: streamID}, Size: 0, Completed: true}
+		mockTx := db.NewMockTransactions(t)
+		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
+		mockTx.On("RollbackTx", mock.Anything).Return(nil)
 		mockLS.On("UpdateLogStream", mock.Anything, mock.Anything).Return(nil, db.ErrOptimisticLockError).Once()
 
 		logr, _ := logger.NewForTest()
-		manager := New(mockStore, &db.Client{LogStreams: mockLS}, nil, logr, 0)
+		manager := New(mockStore, &db.Client{Transactions: mockTx, LogStreams: mockLS}, nil, logr, 0)
 
 		err := manager.CompactStream(ctx, logStream)
 		require.NoError(t, err)
@@ -478,9 +487,9 @@ func TestReadLogs(t *testing.T) {
 
 		logStream := &models.LogStream{Metadata: models.ResourceMetadata{ID: streamID}, Size: 10}
 		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, 0, 100).Return([]models.LogStreamChunk{
-			{StartOffset: 0, Size: 4, ObjectKey: "k0"},
-			{StartOffset: 4, Size: 4, ObjectKey: "k1"},
-			{StartOffset: 8, Size: 2, ObjectKey: "k2"},
+			{StartOffset: 0, Size: 4, ObjectStoreKey: "k0"},
+			{StartOffset: 4, Size: 4, ObjectStoreKey: "k1"},
+			{StartOffset: 8, Size: 2, ObjectStoreKey: "k2"},
 		}, nil)
 		mockStore.On("ReadRange", mock.Anything, "k0", 0, 4).Return(rc("abcd"), nil)
 		mockStore.On("ReadRange", mock.Anything, "k1", 0, 4).Return(rc("efgh"), nil)
@@ -503,9 +512,9 @@ func TestReadLogs(t *testing.T) {
 		logStream := &models.LogStream{Metadata: models.ResourceMetadata{ID: streamID}, Size: 10}
 		// Read [3, 9): touches chunk0 [0,4) -> bytes [3,4), chunk1 [4,8) -> [4,8), chunk2 [8,10) -> [8,9)
 		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, 3, 9).Return([]models.LogStreamChunk{
-			{StartOffset: 0, Size: 4, ObjectKey: "k0"},
-			{StartOffset: 4, Size: 4, ObjectKey: "k1"},
-			{StartOffset: 8, Size: 2, ObjectKey: "k2"},
+			{StartOffset: 0, Size: 4, ObjectStoreKey: "k0"},
+			{StartOffset: 4, Size: 4, ObjectStoreKey: "k1"},
+			{StartOffset: 8, Size: 2, ObjectStoreKey: "k2"},
 		}, nil)
 		mockStore.On("ReadRange", mock.Anything, "k0", 3, 1).Return(rc("d"), nil)
 		mockStore.On("ReadRange", mock.Anything, "k1", 0, 4).Return(rc("efgh"), nil)
@@ -648,7 +657,7 @@ func TestSubscribe(t *testing.T) {
 			if test.logStreamExists {
 				// A single chunk covering the whole stream; reads are keyed by offset below.
 				mockChunks.On("GetOverlappingChunks", mock.Anything, streamID, mock.Anything, mock.Anything).Return(
-					[]models.LogStreamChunk{{StartOffset: 0, Size: 1 << 20, ObjectKey: "k"}}, nil).Maybe()
+					[]models.LogStreamChunk{{StartOffset: 0, Size: 1 << 20, ObjectStoreKey: "k"}}, nil).Maybe()
 				for _, event := range test.expectedEvents {
 					logs := event.logs
 					mockStore.On("ReadRange", mock.Anything, "k", event.offset, mock.AnythingOfType("int")).Return(rc(logs), nil).Maybe()
@@ -732,7 +741,7 @@ func TestWriteLogsEdgeCases(t *testing.T) {
 			Metadata: models.ResourceMetadata{ID: streamID}, Size: 0,
 		}
 		mockLC.On("GetActiveChunk", mock.Anything, streamID).Return(nil, nil)
-		mockStore.On("WriteChunk", mock.Anything, mock.Anything, 0, logs).Return(nil)
+		mockStore.On("WriteChunk", mock.Anything, mock.Anything, 0, logs).Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), nil)
 
 		var created []*models.LogStreamChunk
 		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
@@ -795,15 +804,15 @@ func TestWriteLogsEdgeCases(t *testing.T) {
 		}
 		// Overlap verification reads the stored [0,5) and finds it matches.
 		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, 0, 5).Return([]models.LogStreamChunk{
-			{StartOffset: 0, Size: 5, ObjectKey: "k"},
+			{StartOffset: 0, Size: 5, ObjectStoreKey: "k"},
 		}, nil)
 		mockStore.On("ReadRange", mock.Anything, "k", 0, 5).Return(rc("hello"), nil)
 		// Only the new "world" bytes are written, at offset 5 into the active chunk.
 		mockLC.On("GetActiveChunk", mock.Anything, streamID).Return(&models.LogStreamChunk{
 			Metadata: models.ResourceMetadata{ID: "chunk0"}, LogStreamID: streamID,
-			ChunkIndex: 0, StartOffset: 0, Size: 5, ObjectKey: "k",
+			ChunkIndex: 0, StartOffset: 0, Size: 5, ObjectStoreKey: "k",
 		}, nil)
-		mockStore.On("WriteChunk", mock.Anything, "k", 5, []byte("world")).Return(nil)
+		mockStore.On("WriteChunk", mock.Anything, "k", 5, []byte("world")).Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), nil)
 
 		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
 		mockTx.On("RollbackTx", mock.Anything).Return(nil)
@@ -830,9 +839,8 @@ func TestWriteLogsEdgeCases(t *testing.T) {
 			Metadata: models.ResourceMetadata{ID: streamID}, Size: 0,
 		}
 		mockLC.On("GetActiveChunk", mock.Anything, streamID).Return(nil, nil)
-		// Objects are written before the transaction, so a write failure must abort before any DB change.
 		mockStore.On("WriteChunk", mock.Anything, mock.Anything, 0, mock.Anything).
-			Return(errors.New("object store down"))
+			Return(db.RetainObjectRefFunc(nil), errors.New("object store down"))
 
 		logr, _ := logger.NewForTest()
 		// No Transactions / Create / Update mocks: if any DB call happened the nil db fields would panic,
@@ -857,9 +865,9 @@ func TestWriteLogsEdgeCases(t *testing.T) {
 		// The tail chunk is sealed, so new data must start a fresh chunk at index+1.
 		mockLC.On("GetActiveChunk", mock.Anything, streamID).Return(&models.LogStreamChunk{
 			Metadata: models.ResourceMetadata{ID: "chunk0"}, LogStreamID: streamID,
-			ChunkIndex: 0, StartOffset: 0, Size: 4, ObjectKey: "k0", Sealed: true,
+			ChunkIndex: 0, StartOffset: 0, Size: 4, ObjectStoreKey: "k0", Sealed: true,
 		}, nil)
-		mockStore.On("WriteChunk", mock.Anything, mock.Anything, 0, []byte("xyz")).Return(nil)
+		mockStore.On("WriteChunk", mock.Anything, mock.Anything, 0, []byte("xyz")).Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), nil)
 
 		var created []*models.LogStreamChunk
 		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
@@ -938,7 +946,7 @@ func TestReadLogsEdgeCases(t *testing.T) {
 
 		logStream := &models.LogStream{Metadata: models.ResourceMetadata{ID: streamID}, Size: 10}
 		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, 2, 5).Return([]models.LogStreamChunk{
-			{StartOffset: 0, Size: 10, ObjectKey: "k"},
+			{StartOffset: 0, Size: 10, ObjectStoreKey: "k"},
 		}, nil)
 		mockStore.On("ReadRange", mock.Anything, "k", 2, 3).Return(rc("cde"), nil)
 
@@ -958,9 +966,9 @@ func TestReadLogsEdgeCases(t *testing.T) {
 
 		logStream := &models.LogStream{Metadata: models.ResourceMetadata{ID: streamID}, Size: 10}
 		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, 0, 100).Return([]models.LogStreamChunk{
-			{StartOffset: 0, Size: 4, ObjectKey: "k0"},
-			{StartOffset: 4, Size: 4, ObjectKey: "k1"},
-			{StartOffset: 8, Size: 2, ObjectKey: "k2"},
+			{StartOffset: 0, Size: 4, ObjectStoreKey: "k0"},
+			{StartOffset: 4, Size: 4, ObjectStoreKey: "k1"},
+			{StartOffset: 8, Size: 2, ObjectStoreKey: "k2"},
 		}, nil)
 		mockStore.On("ReadRange", mock.Anything, "k0", 0, 4).Return(rc("abcd"), nil)
 		mockStore.On("ReadRange", mock.Anything, "k1", 0, 4).Return(rc("efgh"), nil)
@@ -1005,7 +1013,6 @@ func TestCompactStreamEdgeCases(t *testing.T) {
 		ctx := context.Background()
 
 		mockLC := db.NewMockLogStreamChunks(t)
-		mockLS := db.NewMockLogStreams(t)
 		mockStore := NewMockStore(t)
 
 		logStream := &models.LogStream{Metadata: models.ResourceMetadata{ID: streamID}, Size: 10, Completed: true}
@@ -1013,17 +1020,16 @@ func TestCompactStreamEdgeCases(t *testing.T) {
 		// The stream is already claimed by the caller. Chunks read back, but the consolidated object
 		// write fails before any DB write, so the compacted flag is never set and a later run retries.
 		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, 0, 10).Return([]models.LogStreamChunk{
-			{StartOffset: 0, Size: 10, ObjectKey: "k0"},
+			{StartOffset: 0, Size: 10, ObjectStoreKey: "k0"},
 		}, nil)
 		mockStore.On("ReadRange", mock.Anything, "k0", 0, 10).Return(rc("abcdefghij"), nil)
-		// WriteObject consumes the (lazy) stitched reader as a real upload would, then fails.
-		mockStore.On("WriteObject", mock.Anything, consolidatedObjectKey(streamID), mock.Anything).
+		mockStore.On("WriteConsolidated", mock.Anything, consolidatedObjectKey(streamID), mock.Anything).
 			Run(func(args mock.Arguments) {
 				_, _ = io.ReadAll(args.Get(2).(io.Reader))
-			}).Return(errors.New("object store down"))
+			}).Return(db.RetainObjectRefFunc(nil), errors.New("object store down"))
 
 		logr, _ := logger.NewForTest()
-		manager := New(mockStore, &db.Client{LogStreams: mockLS, LogStreamChunks: mockLC}, nil, logr, 0)
+		manager := New(mockStore, &db.Client{LogStreamChunks: mockLC}, nil, logr, 0)
 
 		err := manager.CompactStream(ctx, logStream)
 		require.Error(t, err)
@@ -1044,18 +1050,22 @@ func TestCompactStreamEdgeCases(t *testing.T) {
 		// error (the scheduler shouldn't log a failure) and without marking compacted, so reads keep
 		// using the chunk path and a later run recompacts.
 		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, 0, 10).Return([]models.LogStreamChunk{
-			{StartOffset: 0, Size: 10, ObjectKey: "k0"},
+			{StartOffset: 0, Size: 10, ObjectStoreKey: "k0"},
 		}, nil)
 		mockStore.On("ReadRange", mock.Anything, "k0", 0, 10).Return(rc("abcdefghij"), nil)
-		mockStore.On("WriteObject", mock.Anything, consolidatedObjectKey(streamID), mock.Anything).
+		mockStore.On("WriteConsolidated", mock.Anything, consolidatedObjectKey(streamID), mock.Anything).
 			Run(func(args mock.Arguments) {
 				_, _ = io.ReadAll(args.Get(2).(io.Reader))
-			}).Return(nil)
+			}).Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), nil)
 		mockLS.On("UpdateLogStream", mock.Anything, mock.Anything).
-			Return(nil, errors.New("optimistic lock", errors.WithErrorCode(errors.EOptimisticLock))).Once() // mark
+			Return(nil, errors.New("optimistic lock", errors.WithErrorCode(errors.EOptimisticLock))).Once()
+
+		mockTx := db.NewMockTransactions(t)
+		mockTx.On("BeginTx", mock.Anything).Return(ctx, nil)
+		mockTx.On("RollbackTx", mock.Anything).Return(nil)
 
 		logr, _ := logger.NewForTest()
-		manager := New(mockStore, &db.Client{LogStreams: mockLS, LogStreamChunks: mockLC}, nil, logr, 0)
+		manager := New(mockStore, &db.Client{Transactions: mockTx, LogStreams: mockLS, LogStreamChunks: mockLC}, nil, logr, 0)
 
 		err := manager.CompactStream(ctx, logStream)
 		require.NoError(t, err)
@@ -1086,7 +1096,7 @@ func TestSubscribeCompletionDrainsTail(t *testing.T) {
 		Metadata: models.ResourceMetadata{ID: streamID}, Size: 10,
 	}, nil)
 	mockChunks.On("GetOverlappingChunks", mock.Anything, streamID, mock.Anything, mock.Anything).Return(
-		[]models.LogStreamChunk{{StartOffset: 0, Size: 1 << 20, ObjectKey: "k"}}, nil).Maybe()
+		[]models.LogStreamChunk{{StartOffset: 0, Size: 1 << 20, ObjectStoreKey: "k"}}, nil).Maybe()
 	// The tail [10,13) is read from the chunk during the drain.
 	mockStore.On("ReadRange", mock.Anything, "k", 10, mock.AnythingOfType("int")).Return(rc("abc"), nil).Maybe()
 

@@ -9,13 +9,13 @@ var _ Model = (*LogStreamChunk)(nil)
 
 // LogStreamChunk represents a contiguous chunk of a log stream stored as a single object-store file.
 type LogStreamChunk struct {
-	Metadata    ResourceMetadata
-	LogStreamID string
-	ObjectKey   string
-	ChunkIndex  int
-	StartOffset int
-	Size        int
-	Sealed      bool
+	Metadata       ResourceMetadata
+	LogStreamID    string
+	ObjectStoreKey string
+	ChunkIndex     int
+	StartOffset    int
+	Size           int
+	Sealed         bool
 }
 
 // GetID returns the Metadata ID.

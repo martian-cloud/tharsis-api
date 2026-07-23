@@ -48,40 +48,27 @@ type CreateRunInput struct {
 	// would otherwise flood the activity feed with noise.
 	SkipActivityEvent bool
 
-	// Variables are the final, already-resolved run variables.
-	Variables []runvariables.Variable
+	// VariablesObjectStoreKey is the key of the run variables the caller already uploaded (in Prepare,
+	// before the transaction), stored on the run row at insert.
+	VariablesObjectStoreKey string
 }
 
 // Create assembles the run model from the (already module-resolved) input and creates it within
 // the caller's transaction: it validates the Terraform version, enforces managed-identity rules,
-// inserts the run, enforces the per-workspace run limit, records the creation activity event, and
-// uploads the run variables. It returns the persisted run.
+// inserts the run, enforces the per-workspace run limit, and records the creation activity event.
+// It returns the persisted run.
 //
-// Module version/digest resolution is done by the caller via ResolveModule (before the
-// transaction); Create takes the resolved values as input. Create does not register or queue the
-// run on the run graph — that is engine-level orchestration the caller performs afterward.
+// Module resolution (ResolveModule) and the run-variables upload (UploadRunVariables) are done by
+// the caller before the transaction; Create takes their results as input. Create does not register
+// or queue the run on the run graph — that is engine-level orchestration the caller performs after.
 func Create(
 	ctx context.Context,
 	dbClient *db.Client,
 	terraformCLIVersionConstraint string,
 	ruleEnforcer rules.RuleEnforcer,
 	limitChecker limits.LimitChecker,
-	artifactStore workspace.ArtifactStore,
 	input *CreateRunInput,
 ) (*models.Run, error) {
-	// The variables are already resolved by the caller. Strip sensitive values so they aren't
-	// persisted to object storage.
-	variables := input.Variables
-	for i := range variables {
-		if variables[i].Sensitive {
-			variables[i].Value = nil
-		}
-	}
-	variablesData, err := json.Marshal(variables)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal run variables")
-	}
-
 	ws, err := dbClient.Workspaces.GetWorkspaceByID(ctx, input.WorkspaceID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get workspace (ID %s) associated with run", input.WorkspaceID)
@@ -151,21 +138,22 @@ func Create(
 	}
 
 	runModel := &models.Run{
-		WorkspaceID:            input.WorkspaceID,
-		ConfigurationVersionID: input.ConfigurationVersionID,
-		IsDestroy:              input.IsDestroy,
-		Status:                 models.RunPending,
-		CreatedBy:              input.Subject,
-		AutoApply:              input.AutoApply,
-		ModuleSource:           input.ModuleSource,
-		ModuleVersion:          input.ModuleVersion,
-		ModuleDigest:           input.ModuleDigest,
-		TerraformVersion:       terraformVersion,
-		TargetAddresses:        input.TargetAddresses,
-		Refresh:                input.Refresh,
-		RefreshOnly:            input.RefreshOnly,
-		IsAssessmentRun:        input.IsAssessmentRun,
-		Plan:                   models.Plan{Status: models.PlanCreated},
+		WorkspaceID:             input.WorkspaceID,
+		ConfigurationVersionID:  input.ConfigurationVersionID,
+		IsDestroy:               input.IsDestroy,
+		Status:                  models.RunPending,
+		CreatedBy:               input.Subject,
+		AutoApply:               input.AutoApply,
+		ModuleSource:            input.ModuleSource,
+		ModuleVersion:           input.ModuleVersion,
+		ModuleDigest:            input.ModuleDigest,
+		TerraformVersion:        terraformVersion,
+		TargetAddresses:         input.TargetAddresses,
+		Refresh:                 input.Refresh,
+		RefreshOnly:             input.RefreshOnly,
+		IsAssessmentRun:         input.IsAssessmentRun,
+		VariablesObjectStoreKey: &input.VariablesObjectStoreKey,
+		Plan:                    models.Plan{Status: models.PlanCreated},
 	}
 	if input.Comment != nil {
 		runModel.Comment = *input.Comment
@@ -207,11 +195,36 @@ func Create(
 		}
 	}
 
-	if err := artifactStore.UploadRunVariables(ctx, created, bytes.NewReader(variablesData)); err != nil {
-		return nil, errors.Wrap(err, "failed to upload run variables")
+	return created, nil
+}
+
+// UploadRunVariables strips sensitive values, marshals the run variables, uploads them, and returns
+// the object key and a link func. Commands call it from Prepare so the upload stays out of the transaction.
+func UploadRunVariables(
+	ctx context.Context,
+	artifactStore workspace.ArtifactStore,
+	workspaceID string,
+	variables []runvariables.Variable,
+) (db.RetainObjectRefFunc, string, error) {
+	// Don't persist sensitive values to object storage.
+	for i := range variables {
+		if variables[i].Sensitive {
+			variables[i].Value = nil
+		}
 	}
 
-	return created, nil
+	variablesData, err := json.Marshal(variables)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to marshal run variables")
+	}
+
+	run := &models.Run{WorkspaceID: workspaceID}
+	retainFn, varKey, err := artifactStore.UploadRunVariables(ctx, run, bytes.NewReader(variablesData))
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to upload run variables")
+	}
+
+	return retainFn, varKey, nil
 }
 
 // GetFederatedRegistry returns a getter that searches the workspace's parent group paths for a

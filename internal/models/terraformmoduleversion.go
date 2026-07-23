@@ -26,6 +26,7 @@ type TerraformModuleVersion struct {
 	CreatedBy              string
 	ModuleID               string
 	SemanticVersion        string
+	PackageObjectStoreKey  *string
 	Status                 TerraformModuleVersionStatus
 	Error                  string
 	Diagnostics            string

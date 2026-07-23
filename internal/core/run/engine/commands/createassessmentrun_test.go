@@ -105,7 +105,8 @@ func TestCreateAssessmentRun_Execute(t *testing.T) {
 
 			createCalled := false
 			cmd := &CreateAssessmentRun{
-				dbClient: &db.Client{WorkspaceAssessments: workspaceAssessments},
+				dbClient:          &db.Client{WorkspaceAssessments: workspaceAssessments},
+				variablesRetainFn: func(_ context.Context, _ string) error { return nil },
 				createRun: func(_ context.Context, _ *corerun.CreateRunInput) (*models.Run, error) {
 					createCalled = true
 					return &models.Run{

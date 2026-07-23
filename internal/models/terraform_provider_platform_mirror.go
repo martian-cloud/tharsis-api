@@ -13,6 +13,7 @@ type TerraformProviderPlatformMirror struct {
 	OS              string
 	Architecture    string
 	VersionMirrorID string
+	ObjectStoreKey  string
 	Metadata        ResourceMetadata
 }
 

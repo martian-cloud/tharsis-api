@@ -130,6 +130,7 @@ type Client struct {
 	AgentSessionMessages             AgentSessionMessages
 	AgentCreditQuotas                AgentCreditQuotas
 	WorkItemsQueue                   WorkItemsQueue
+	ObjectStoreRefs                  ObjectStoreRefs
 }
 
 // NewClient creates a new Client
@@ -252,6 +253,7 @@ func NewClient(
 	dbClient.AgentSessionMessages = NewAgentSessionMessages(dbClient)
 	dbClient.AgentCreditQuotas = NewAgentCreditQuotas(dbClient)
 	dbClient.WorkItemsQueue = NewWorkItemsQueue(dbClient)
+	dbClient.ObjectStoreRefs = NewObjectStoreRefs(dbClient)
 
 	return dbClient, nil
 }

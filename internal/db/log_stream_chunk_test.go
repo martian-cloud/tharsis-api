@@ -74,16 +74,16 @@ func TestLogStreamChunks_CreateAndGet(t *testing.T) {
 	logStream := createTestLogStreamForChunks(ctx, t, testClient)
 
 	created, err := testClient.client.LogStreamChunks.CreateLogStreamChunk(ctx, &models.LogStreamChunk{
-		LogStreamID: logStream.Metadata.ID,
-		ChunkIndex:  0,
-		StartOffset: 0,
-		Size:        4,
-		ObjectKey:   "logstreams/x/0.txt",
+		LogStreamID:    logStream.Metadata.ID,
+		ChunkIndex:     0,
+		StartOffset:    0,
+		Size:           4,
+		ObjectStoreKey: "logstreams/x/0.txt",
 	})
 	require.Nil(t, err)
 	assert.NotEmpty(t, created.Metadata.ID)
 	assert.Equal(t, 1, created.Metadata.Version)
-	assert.Equal(t, "logstreams/x/0.txt", created.ObjectKey)
+	assert.Equal(t, "logstreams/x/0.txt", created.ObjectStoreKey)
 
 	chunks, err := testClient.client.LogStreamChunks.GetOverlappingChunks(ctx, logStream.Metadata.ID, 0, 4)
 	require.Nil(t, err)
@@ -97,9 +97,9 @@ func TestLogStreamChunks_CreateNonExistentStream(t *testing.T) {
 	defer testClient.close(ctx)
 
 	_, err := testClient.client.LogStreamChunks.CreateLogStreamChunk(ctx, &models.LogStreamChunk{
-		LogStreamID: "00000000-0000-0000-0000-000000000000",
-		ChunkIndex:  0,
-		ObjectKey:   "k",
+		LogStreamID:    "00000000-0000-0000-0000-000000000000",
+		ChunkIndex:     0,
+		ObjectStoreKey: "k",
 	})
 	require.NotNil(t, err)
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
@@ -119,11 +119,11 @@ func TestLogStreamChunks_GetActiveChunk(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		_, err = testClient.client.LogStreamChunks.CreateLogStreamChunk(ctx, &models.LogStreamChunk{
-			LogStreamID: logStream.Metadata.ID,
-			ChunkIndex:  i,
-			StartOffset: i * 10,
-			Size:        10,
-			ObjectKey:   "k",
+			LogStreamID:    logStream.Metadata.ID,
+			ChunkIndex:     i,
+			StartOffset:    i * 10,
+			Size:           10,
+			ObjectStoreKey: "k",
 		})
 		require.Nil(t, err)
 	}
@@ -153,11 +153,11 @@ func TestLogStreamChunks_GetOverlappingChunks(t *testing.T) {
 	}
 	for _, s := range specs {
 		_, err := testClient.client.LogStreamChunks.CreateLogStreamChunk(ctx, &models.LogStreamChunk{
-			LogStreamID: logStream.Metadata.ID,
-			ChunkIndex:  s.index,
-			StartOffset: s.startOffset,
-			Size:        s.size,
-			ObjectKey:   "k",
+			LogStreamID:    logStream.Metadata.ID,
+			ChunkIndex:     s.index,
+			StartOffset:    s.startOffset,
+			Size:           s.size,
+			ObjectStoreKey: "k",
 		})
 		require.Nil(t, err)
 	}
@@ -201,10 +201,10 @@ func TestLogStreamChunks_UpdateOptimisticLock(t *testing.T) {
 	logStream := createTestLogStreamForChunks(ctx, t, testClient)
 
 	created, err := testClient.client.LogStreamChunks.CreateLogStreamChunk(ctx, &models.LogStreamChunk{
-		LogStreamID: logStream.Metadata.ID,
-		ChunkIndex:  0,
-		Size:        4,
-		ObjectKey:   "k",
+		LogStreamID:    logStream.Metadata.ID,
+		ChunkIndex:     0,
+		Size:           4,
+		ObjectStoreKey: "k",
 	})
 	require.Nil(t, err)
 

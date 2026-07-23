@@ -11,17 +11,20 @@ var _ Model = (*TerraformProviderVersion)(nil)
 
 // TerraformProviderVersion represents a version of a terraform provider
 type TerraformProviderVersion struct {
-	GPGASCIIArmor            *string
-	GPGKeyID                 *uint64
-	CreatedBy                string
-	ProviderID               string
-	SemanticVersion          string
-	Metadata                 ResourceMetadata
-	Protocols                []string
-	SHASumsUploaded          bool
-	SHASumsSignatureUploaded bool
-	ReadmeUploaded           bool
-	Latest                   bool
+	GPGASCIIArmor                  *string
+	GPGKeyID                       *uint64
+	CreatedBy                      string
+	ProviderID                     string
+	SemanticVersion                string
+	ReadmeObjectStoreKey           *string
+	SHASumsObjectStoreKey          *string
+	SHASumsSignatureObjectStoreKey *string
+	Metadata                       ResourceMetadata
+	Protocols                      []string
+	SHASumsUploaded                bool
+	SHASumsSignatureUploaded       bool
+	ReadmeUploaded                 bool
+	Latest                         bool
 }
 
 // GetID returns the Metadata ID.

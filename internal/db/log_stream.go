@@ -81,7 +81,7 @@ type LogStreams interface {
 	ClaimLogStreamsForCompaction(ctx context.Context, limit int, claimableBefore time.Time) ([]models.LogStream, error)
 }
 
-var logStreamFieldList = append(metadataFieldList, "size", "job_id", "runner_session_id", "completed", "truncated", "compacted", "compaction_started_at")
+var logStreamFieldList = append(metadataFieldList, "size", "job_id", "runner_session_id", "completed", "truncated", "compacted", "compaction_started_at", "object_store_key")
 
 type logStreams struct {
 	dbClient *Client
@@ -199,6 +199,7 @@ func (l *logStreams) CreateLogStream(ctx context.Context, logStream *models.LogS
 		"truncated":             logStream.Truncated,
 		"compacted":             logStream.Compacted,
 		"compaction_started_at": logStream.CompactionStartedAt,
+		"object_store_key":      nullableString(logStream.ObjectStoreKey),
 	}
 
 	sql, args, err := dialect.Insert("log_streams").
@@ -255,6 +256,7 @@ func (l *logStreams) UpdateLogStream(ctx context.Context, logStream *models.LogS
 				"truncated":             logStream.Truncated,
 				"compacted":             logStream.Compacted,
 				"compaction_started_at": logStream.CompactionStartedAt,
+				"object_store_key":      nullableString(logStream.ObjectStoreKey),
 			},
 		).Where(goqu.Ex{"id": logStream.Metadata.ID, "version": logStream.Metadata.Version}).
 		Returning(logStreamFieldList...))
@@ -376,6 +378,7 @@ func (*logStreams) getSelectFields() []interface{} {
 }
 
 func scanLogStream(row scanner) (*models.LogStream, error) {
+	var consolidatedKey *string
 	logStream := &models.LogStream{}
 
 	fields := []interface{}{
@@ -390,10 +393,15 @@ func scanLogStream(row scanner) (*models.LogStream, error) {
 		&logStream.Truncated,
 		&logStream.Compacted,
 		&logStream.CompactionStartedAt,
+		&consolidatedKey,
 	}
 
 	if err := row.Scan(fields...); err != nil {
 		return nil, err
+	}
+
+	if consolidatedKey != nil {
+		logStream.ObjectStoreKey = *consolidatedKey
 	}
 
 	logStream.Metadata.TRN = trn.TypeLogStream.Build(logStream.GetGlobalID())

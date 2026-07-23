@@ -1175,8 +1175,13 @@ func (s *service) SetVariablesIncludedInTFConfig(ctx context.Context, input *Set
 		return errors.Wrap(err, "failed to marshal variables", errors.WithSpan(span))
 	}
 
-	if err = s.artifactStore.UploadRunVariables(ctx, run, bytes.NewReader(data)); err != nil {
+	retainFn, _, err := s.artifactStore.UploadRunVariables(ctx, run, bytes.NewReader(data))
+	if err != nil {
 		return errors.Wrap(err, "failed to upload run variables", errors.WithSpan(span))
+	}
+
+	if err := retainFn(ctx, run.Metadata.ID); err != nil {
+		return errors.Wrap(err, "failed to link run variables object store ref", errors.WithSpan(span))
 	}
 
 	return nil
@@ -1208,12 +1213,38 @@ func (s *service) UploadPlanBinary(ctx context.Context, planID string, reader io
 		return errors.New("plan with ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	if err := s.artifactStore.UploadPlanCache(ctx, run, reader); err != nil {
-		tracing.RecordError(span, err, "Failed to write plan cache to object storage")
-		return errors.Wrap(
-			err,
-			"Failed to write plan cache to object storage",
-		)
+	retainFn, cacheKey, err := s.artifactStore.UploadPlanCache(ctx, run, reader)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to upload plan cache")
+		return errors.Wrap(err, "failed to upload plan cache")
+	}
+
+	txCtx, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to begin transaction")
+		return errors.Wrap(err, "failed to begin transaction")
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txCtx); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback UploadPlanBinary tx: %v", txErr)
+		}
+	}()
+
+	run.Plan.CacheObjectStoreKey = &cacheKey
+	if _, err = s.dbClient.Runs.UpdateRun(txCtx, run, run.Plan.GetID()); err != nil {
+		tracing.RecordError(span, err, "failed to update run")
+		return errors.Wrap(err, "failed to update run")
+	}
+
+	if err = retainFn(txCtx, run.Metadata.ID); err != nil {
+		tracing.RecordError(span, err, "failed to link plan cache object store ref")
+		return errors.Wrap(err, "failed to link plan cache object store ref")
+	}
+
+	if err = s.dbClient.Transactions.CommitTx(txCtx); err != nil {
+		tracing.RecordError(span, err, "failed to commit transaction")
+		return errors.Wrap(err, "failed to commit transaction")
 	}
 
 	return nil
@@ -1278,11 +1309,15 @@ func (s *service) GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, e
 		return nil, err
 	}
 
+	if run.Plan.DiffObjectStoreKey == nil {
+		return nil, errors.New("plan diff not available yet", errors.WithErrorCode(errors.ENotFound))
+	}
+
 	reader, err := s.artifactStore.GetPlanDiff(ctx, run)
 	if err != nil {
 		return nil, errors.Wrap(
 			err,
-			"Failed to get plan diff from artifact store",
+			"failed to get plan diff from artifact store",
 		)
 	}
 	defer reader.Close()
@@ -1320,6 +1355,10 @@ func (s *service) GetPlanCheckResults(ctx context.Context, planID string) ([]cor
 	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
 		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	}
+
+	if run.Plan.JSONObjectStoreKey == nil {
+		return nil, errors.New("plan JSON not available yet", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	reader, err := s.artifactStore.GetPlanJSON(ctx, run)

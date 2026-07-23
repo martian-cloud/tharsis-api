@@ -345,6 +345,7 @@ func TestCreateAgentSession(t *testing.T) {
 
 			mockSessions := db.NewMockAgentSessions(t)
 			mockTx := db.NewMockTransactions(t)
+			mockStore := agent.NewMockStore(t)
 
 			if test.caller != nil {
 				if uc, ok := test.caller.(*auth.UserCaller); ok {
@@ -359,8 +360,9 @@ func TestCreateAgentSession(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 			svc := &service{aiEnabled: true,
-				logger:   testLogger,
-				dbClient: &db.Client{AgentSessions: mockSessions, Transactions: mockTx},
+				logger:     testLogger,
+				dbClient:   &db.Client{AgentSessions: mockSessions, Transactions: mockTx},
+				agentStore: mockStore,
 			}
 
 			result, err := svc.CreateAgentSession(ctx)

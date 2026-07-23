@@ -15,34 +15,35 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
-func newTestPersister(t *testing.T) (*messagePersister, *db.MockAgentSessionMessages, *db.MockAgentSessionRuns, *db.MockTransactions, *MockStore) {
+func newTestPersister(t *testing.T) (*messagePersister, *db.MockAgentSessionMessages, *db.MockAgentSessionRuns, *db.MockTransactions, *MockStore, *db.MockObjectStoreRefs) {
 	t.Helper()
 
 	mockMessages := db.NewMockAgentSessionMessages(t)
 	mockRuns := db.NewMockAgentSessionRuns(t)
 	mockTx := db.NewMockTransactions(t)
 	mockStore := NewMockStore(t)
+	mockRefs := db.NewMockObjectStoreRefs(t)
 	testLogger, _ := logger.NewForTest()
 
 	dbClient := &db.Client{
 		AgentSessionMessages: mockMessages,
 		AgentSessionRuns:     mockRuns,
 		Transactions:         mockTx,
+		ObjectStoreRefs:      mockRefs,
 	}
 
 	p := newMessagePersister(dbClient, mockStore, testLogger, "session-1", "run-1", nil, nil)
-	return p, mockMessages, mockRuns, mockTx, mockStore
+	return p, mockMessages, mockRuns, mockTx, mockStore, mockRefs
 }
 
 // setupSaveMocks sets up the standard mock expectations for a successful save.
-func setupSaveMocks(mockMessages *db.MockAgentSessionMessages, mockRuns *db.MockAgentSessionRuns, mockTx *db.MockTransactions, msgID string) {
+func setupSaveMocks(mockMessages *db.MockAgentSessionMessages, mockRuns *db.MockAgentSessionRuns, mockTx *db.MockTransactions) {
+	mockMessages.On("CreateAgentSessionMessage", mock.Anything, mock.Anything).Return(
+		&models.AgentSessionMessage{Metadata: models.ResourceMetadata{ID: "test-msg-id"}}, nil).Once()
+
 	mockTx.On("BeginTx", mock.Anything).Return(context.Background(), nil).Once()
 	mockTx.On("RollbackTx", mock.Anything).Return(nil).Once()
 	mockTx.On("CommitTx", mock.Anything).Return(nil).Once()
-
-	mockMessages.On("CreateAgentSessionMessage", mock.Anything, mock.Anything).Return(&models.AgentSessionMessage{
-		Metadata: models.ResourceMetadata{ID: msgID},
-	}, nil).Once()
 
 	mockRuns.On("GetAgentSessionRunByID", mock.Anything, "run-1").Return(&models.AgentSessionRun{
 		Metadata:  models.ResourceMetadata{ID: "run-1", Version: 1},
@@ -54,13 +55,13 @@ func setupSaveMocks(mockMessages *db.MockAgentSessionMessages, mockRuns *db.Mock
 }
 
 func TestPersister_SaveUserInput(t *testing.T) {
-	p, mockMessages, mockRuns, mockTx, _ := newTestPersister(t)
+	p, mockMessages, mockRuns, mockTx, _, _ := newTestPersister(t)
 
-	setupSaveMocks(mockMessages, mockRuns, mockTx, "msg-1")
+	setupSaveMocks(mockMessages, mockRuns, mockTx)
 
 	err := p.saveUserInput(context.Background(), "hello world")
 	require.Nil(t, err)
-	assert.Equal(t, "msg-1", *p.lastMessageID)
+	assert.NotEmpty(t, *p.lastMessageID)
 
 	// Verify the message was created with user role
 	call := mockMessages.Calls[0]
@@ -72,38 +73,44 @@ func TestPersister_SaveUserInput(t *testing.T) {
 }
 
 func TestPersister_SaveChainsSetsParentID(t *testing.T) {
-	p, mockMessages, mockRuns, mockTx, _ := newTestPersister(t)
+	p, mockMessages, mockRuns, mockTx, _, _ := newTestPersister(t)
 
 	// First save
-	setupSaveMocks(mockMessages, mockRuns, mockTx, "msg-1")
+	setupSaveMocks(mockMessages, mockRuns, mockTx)
 	err := p.saveUserInput(context.Background(), "first")
 	require.Nil(t, err)
+	firstMsgID := *p.lastMessageID
 
-	// Second save should have parent = msg-1
-	setupSaveMocks(mockMessages, mockRuns, mockTx, "msg-2")
+	// Second save should have parent = first message's ID
+	setupSaveMocks(mockMessages, mockRuns, mockTx)
 	err = p.saveUserInput(context.Background(), "second")
 	require.Nil(t, err)
 
 	call := mockMessages.Calls[1]
 	msg := call.Arguments[1].(*models.AgentSessionMessage)
 	require.NotNil(t, msg.ParentID)
-	assert.Equal(t, "msg-1", *msg.ParentID)
+	assert.Equal(t, firstMsgID, *msg.ParentID)
 }
 
 func TestPersister_ToolContentUploadedToStore(t *testing.T) {
-	p, mockMessages, mockRuns, mockTx, mockStore := newTestPersister(t)
+	p, mockMessages, mockRuns, mockTx, mockStore, mockRefs := newTestPersister(t)
+
+	const testKey = "agent-sessions/session-1/tool-content/test-uuid"
+	mockStore.On("UploadToolContent", mock.Anything, "session-1", mock.Anything).
+		Return(db.RetainObjectRefFunc(func(ctx context.Context, ownerID string) error {
+			return mockRefs.LinkRef(ctx, testKey, db.ObjectStoreRefOwnerAgentSession, ownerID)
+		}), testKey, nil).Once()
+
+	mockRefs.On("LinkRef", mock.Anything, testKey, db.ObjectStoreRefOwnerAgentSession, "session-1").Return(nil).Once()
 
 	mockTx.On("BeginTx", mock.Anything).Return(context.Background(), nil).Once()
 	mockTx.On("RollbackTx", mock.Anything).Return(nil).Once()
 	mockTx.On("CommitTx", mock.Anything).Return(nil).Once()
 
 	mockMessages.On("CreateAgentSessionMessage", mock.Anything, mock.MatchedBy(func(msg *models.AgentSessionMessage) bool {
-		return msg.Role == "tool" && msg.Content == nil // tool content should be nil in DB
-	})).Return(&models.AgentSessionMessage{
-		Metadata: models.ResourceMetadata{ID: "tool-msg-1"},
-	}, nil).Once()
-
-	mockStore.On("UploadToolContent", mock.Anything, "session-1", "tool-msg-1", mock.Anything).Return(nil).Once()
+		return msg.Role == "tool" && msg.Content == nil && // tool content stored in object store
+			msg.ToolContentObjectStoreKey == testKey
+	})).Return(&models.AgentSessionMessage{Metadata: models.ResourceMetadata{ID: "tool-msg-1"}}, nil).Once()
 
 	mockRuns.On("GetAgentSessionRunByID", mock.Anything, "run-1").Return(&models.AgentSessionRun{
 		Metadata: models.ResourceMetadata{ID: "run-1", Version: 1},
@@ -118,9 +125,9 @@ func TestPersister_ToolContentUploadedToStore(t *testing.T) {
 }
 
 func TestPersister_ContentBlockMiddleware_SavesAssistantText(t *testing.T) {
-	p, mockMessages, mockRuns, mockTx, _ := newTestPersister(t)
+	p, mockMessages, mockRuns, mockTx, _, _ := newTestPersister(t)
 
-	setupSaveMocks(mockMessages, mockRuns, mockTx, "assistant-msg-1")
+	setupSaveMocks(mockMessages, mockRuns, mockTx)
 
 	mw := p.ContentBlockMiddleware()
 	handler := mw(func(_ context.Context, _ *gollem.ContentRequest) (*gollem.ContentResponse, error) {
@@ -134,13 +141,13 @@ func TestPersister_ContentBlockMiddleware_SavesAssistantText(t *testing.T) {
 	resp, err := handler(context.Background(), &gollem.ContentRequest{})
 	require.Nil(t, err)
 	assert.Equal(t, []string{"hello from assistant"}, resp.Texts)
-	assert.Equal(t, "assistant-msg-1", *p.lastMessageID)
+	assert.NotEmpty(t, *p.lastMessageID)
 }
 
 func TestPersister_ContentBlockMiddleware_SavesFunctionCalls(t *testing.T) {
-	p, mockMessages, mockRuns, mockTx, _ := newTestPersister(t)
+	p, mockMessages, mockRuns, mockTx, _, _ := newTestPersister(t)
 
-	setupSaveMocks(mockMessages, mockRuns, mockTx, "fc-msg-1")
+	setupSaveMocks(mockMessages, mockRuns, mockTx)
 
 	mw := p.ContentBlockMiddleware()
 	handler := mw(func(_ context.Context, _ *gollem.ContentRequest) (*gollem.ContentResponse, error) {
@@ -185,7 +192,7 @@ func TestPersister_ContentBlockMiddleware_SkipsExcludedTools(t *testing.T) {
 }
 
 func TestPersister_ContentBlockMiddleware_PassesThroughErrors(t *testing.T) {
-	p, _, _, _, _ := newTestPersister(t)
+	p, _, _, _, _, _ := newTestPersister(t)
 
 	mw := p.ContentBlockMiddleware()
 	handler := mw(func(_ context.Context, _ *gollem.ContentRequest) (*gollem.ContentResponse, error) {
@@ -198,16 +205,19 @@ func TestPersister_ContentBlockMiddleware_PassesThroughErrors(t *testing.T) {
 }
 
 func TestPersister_ToolMiddleware_SavesToolResult(t *testing.T) {
-	p, mockMessages, mockRuns, mockTx, mockStore := newTestPersister(t)
+	p, mockMessages, mockRuns, mockTx, mockStore, mockRefs := newTestPersister(t)
 
-	// Tool role triggers object store upload
+	const testKey = "agent-sessions/session-1/tool-content/test-uuid"
+	mockStore.On("UploadToolContent", mock.Anything, "session-1", mock.Anything).
+		Return(db.RetainObjectRefFunc(func(ctx context.Context, ownerID string) error {
+			return mockRefs.LinkRef(ctx, testKey, db.ObjectStoreRefOwnerAgentSession, ownerID)
+		}), testKey, nil).Once()
+	mockRefs.On("LinkRef", mock.Anything, testKey, db.ObjectStoreRefOwnerAgentSession, "session-1").Return(nil).Once()
 	mockTx.On("BeginTx", mock.Anything).Return(context.Background(), nil).Once()
 	mockTx.On("RollbackTx", mock.Anything).Return(nil).Once()
 	mockTx.On("CommitTx", mock.Anything).Return(nil).Once()
-	mockMessages.On("CreateAgentSessionMessage", mock.Anything, mock.Anything).Return(&models.AgentSessionMessage{
-		Metadata: models.ResourceMetadata{ID: "tool-result-1"},
-	}, nil).Once()
-	mockStore.On("UploadToolContent", mock.Anything, "session-1", "tool-result-1", mock.Anything).Return(nil).Once()
+	mockMessages.On("CreateAgentSessionMessage", mock.Anything, mock.Anything).Return(
+		&models.AgentSessionMessage{Metadata: models.ResourceMetadata{ID: "tool-msg-1"}}, nil).Once()
 	mockRuns.On("GetAgentSessionRunByID", mock.Anything, "run-1").Return(&models.AgentSessionRun{
 		Metadata: models.ResourceMetadata{ID: "run-1", Version: 1},
 	}, nil).Once()
@@ -250,7 +260,7 @@ func TestPersister_ToolMiddleware_SkipsExcludedTools(t *testing.T) {
 }
 
 func TestPersister_ToolMiddleware_PassesThroughErrors(t *testing.T) {
-	p, _, _, _, _ := newTestPersister(t)
+	p, _, _, _, _, _ := newTestPersister(t)
 
 	mw := p.ToolMiddleware()
 	handler := mw(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
@@ -265,15 +275,19 @@ func TestPersister_ToolMiddleware_PassesThroughErrors(t *testing.T) {
 }
 
 func TestPersister_ToolMiddleware_SavesToolError(t *testing.T) {
-	p, mockMessages, mockRuns, mockTx, mockStore := newTestPersister(t)
+	p, mockMessages, mockRuns, mockTx, mockStore, mockRefs := newTestPersister(t)
 
+	const testKey = "agent-sessions/session-1/tool-content/test-uuid"
+	mockStore.On("UploadToolContent", mock.Anything, "session-1", mock.Anything).
+		Return(db.RetainObjectRefFunc(func(ctx context.Context, ownerID string) error {
+			return mockRefs.LinkRef(ctx, testKey, db.ObjectStoreRefOwnerAgentSession, ownerID)
+		}), testKey, nil).Once()
+	mockRefs.On("LinkRef", mock.Anything, testKey, db.ObjectStoreRefOwnerAgentSession, "session-1").Return(nil).Once()
 	mockTx.On("BeginTx", mock.Anything).Return(context.Background(), nil).Once()
 	mockTx.On("RollbackTx", mock.Anything).Return(nil).Once()
 	mockTx.On("CommitTx", mock.Anything).Return(nil).Once()
-	mockMessages.On("CreateAgentSessionMessage", mock.Anything, mock.Anything).Return(&models.AgentSessionMessage{
-		Metadata: models.ResourceMetadata{ID: "tool-err-1"},
-	}, nil).Once()
-	mockStore.On("UploadToolContent", mock.Anything, "session-1", "tool-err-1", mock.Anything).Return(nil).Once()
+	mockMessages.On("CreateAgentSessionMessage", mock.Anything, mock.Anything).Return(
+		&models.AgentSessionMessage{Metadata: models.ResourceMetadata{ID: "tool-msg-1"}}, nil).Once()
 	mockRuns.On("GetAgentSessionRunByID", mock.Anything, "run-1").Return(&models.AgentSessionRun{
 		Metadata: models.ResourceMetadata{ID: "run-1", Version: 1},
 	}, nil).Once()
@@ -309,7 +323,7 @@ func TestPersister_ContentBlockMiddleware_SavesTextButSkipsExcludedToolCall(t *t
 	)
 
 	// Text content should still be saved even though the tool call is excluded
-	setupSaveMocks(mockMessages, mockRuns, mockTx, "mixed-msg-1")
+	setupSaveMocks(mockMessages, mockRuns, mockTx)
 
 	mw := p.ContentBlockMiddleware()
 	handler := mw(func(_ context.Context, _ *gollem.ContentRequest) (*gollem.ContentResponse, error) {
@@ -324,11 +338,11 @@ func TestPersister_ContentBlockMiddleware_SavesTextButSkipsExcludedToolCall(t *t
 	resp, err := handler(context.Background(), &gollem.ContentRequest{})
 	require.Nil(t, err)
 	assert.Equal(t, []string{"some text"}, resp.Texts)
-	assert.Equal(t, "mixed-msg-1", *p.lastMessageID)
+	assert.NotEmpty(t, *p.lastMessageID)
 }
 
 func TestPersister_ContentBlockMiddleware_SkipsOnResponseError(t *testing.T) {
-	p, _, _, _, _ := newTestPersister(t)
+	p, _, _, _, _, _ := newTestPersister(t)
 
 	mw := p.ContentBlockMiddleware()
 	handler := mw(func(_ context.Context, _ *gollem.ContentRequest) (*gollem.ContentResponse, error) {

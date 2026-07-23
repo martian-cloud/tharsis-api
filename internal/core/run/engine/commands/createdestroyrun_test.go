@@ -47,10 +47,15 @@ func TestCreateDestroyRun_Prepare(t *testing.T) {
 	require.NoError(t, err)
 	artifactStore.On("GetRunVariables", ctx, source).Return(io.NopCloser(bytes.NewReader(data)), nil)
 
+	var uploadedVars []runvariables.Variable
 	cmd := &CreateDestroyRun{
 		dbClient:         dbClient,
 		variablesBuilder: runvariables.NewBuilder(dbClient, secret.NewMockManager(t), artifactStore),
-		in:               &CreateDestroyRunInput{Subject: "u", WorkspaceID: "ws-1"},
+		uploadRunVariables: func(_ context.Context, _ string, variables []runvariables.Variable) (db.RetainObjectRefFunc, string, error) {
+			uploadedVars = variables
+			return nil, "vars-key", nil
+		},
+		in: &CreateDestroyRunInput{Subject: "u", WorkspaceID: "ws-1"},
 	}
 
 	require.NoError(t, cmd.Prepare(ctx))
@@ -58,8 +63,9 @@ func TestCreateDestroyRun_Prepare(t *testing.T) {
 	assert.True(t, cmd.createInput.IsDestroy)
 	assert.True(t, cmd.createInput.Refresh)
 	assert.Equal(t, "1.4.0", cmd.createInput.TerraformVersion)
-	require.Len(t, cmd.createInput.Variables, 1)
-	assert.Nil(t, cmd.createInput.Variables[0].NamespacePath, "inherited namespace path must be cleared")
+	assert.Equal(t, "vars-key", cmd.createInput.VariablesObjectStoreKey)
+	require.Len(t, uploadedVars, 1)
+	assert.Nil(t, uploadedVars[0].NamespacePath, "inherited namespace path must be cleared")
 }
 
 func TestCreateDestroyRun_Execute(t *testing.T) {
@@ -68,6 +74,7 @@ func TestCreateDestroyRun_Execute(t *testing.T) {
 
 	var gotInput *corerun.CreateRunInput
 	cmd := &CreateDestroyRun{
+		dbClient: &db.Client{},
 		createRun: func(_ context.Context, in *corerun.CreateRunInput) (*models.Run, error) {
 			gotInput = in
 			return &models.Run{
@@ -76,7 +83,8 @@ func TestCreateDestroyRun_Execute(t *testing.T) {
 				Plan:     models.Plan{Status: models.PlanCreated},
 			}, nil
 		},
-		createInput: input,
+		variablesRetainFn: func(_ context.Context, _ string) error { return nil },
+		createInput:       input,
 	}
 
 	runStore := store.NewRunStore(&db.Client{})

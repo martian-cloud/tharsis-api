@@ -45,13 +45,15 @@ type NewRunInput struct {
 // inherited variables with the caller's variables in Prepare, then creates the run
 // via createRun and enqueues it in Execute.
 type CreateRun struct {
-	dbClient         *db.Client
-	variablesBuilder *runvariables.Builder
-	moduleResolver   registry.ModuleResolver
-	createRun        createRunFunc
+	dbClient           *db.Client
+	variablesBuilder   *runvariables.Builder
+	moduleResolver     registry.ModuleResolver
+	createRun          createRunFunc
+	uploadRunVariables uploadRunVariablesFunc
 
-	in          *NewRunInput
-	createInput *corerun.CreateRunInput
+	in                *NewRunInput
+	createInput       *corerun.CreateRunInput
+	variablesRetainFn db.RetainObjectRefFunc
 
 	// Created is populated with the persisted run once Execute succeeds.
 	Created *models.Run
@@ -77,24 +79,30 @@ func (c *CreateRun) Prepare(ctx context.Context) error {
 		refresh = *c.in.Refresh
 	}
 
+	variablesRetainFn, variablesObjectKey, err := c.uploadRunVariables(ctx, c.in.WorkspaceID, variables)
+	if err != nil {
+		return errors.Wrap(err, "failed to upload run variables")
+	}
+	c.variablesRetainFn = variablesRetainFn
+
 	c.createInput = &corerun.CreateRunInput{
-		Subject:                c.in.Subject,
-		WorkspaceID:            c.in.WorkspaceID,
-		TerraformVersion:       c.in.TerraformVersion,
-		ConfigurationVersionID: c.in.ConfigurationVersionID,
-		ModuleSource:           c.in.ModuleSource,
-		ModuleVersion:          resolvedModule.Version,
-		ModuleDigest:           resolvedModule.Digest,
-		ModuleRegistrySource:   resolvedModule.Source,
-		Comment:                c.in.Comment,
-		Speculative:            c.in.Speculative,
-		AutoApply:              c.in.AutoApply,
-		TargetAddresses:        c.in.TargetAddresses,
-		IsDestroy:              c.in.IsDestroy,
-		Refresh:                refresh,
-		RefreshOnly:            c.in.RefreshOnly,
-		IsAssessmentRun:        c.in.IsAssessmentRun,
-		Variables:              variables,
+		Subject:                 c.in.Subject,
+		WorkspaceID:             c.in.WorkspaceID,
+		TerraformVersion:        c.in.TerraformVersion,
+		ConfigurationVersionID:  c.in.ConfigurationVersionID,
+		ModuleSource:            c.in.ModuleSource,
+		ModuleVersion:           resolvedModule.Version,
+		ModuleDigest:            resolvedModule.Digest,
+		ModuleRegistrySource:    resolvedModule.Source,
+		Comment:                 c.in.Comment,
+		Speculative:             c.in.Speculative,
+		AutoApply:               c.in.AutoApply,
+		TargetAddresses:         c.in.TargetAddresses,
+		IsDestroy:               c.in.IsDestroy,
+		Refresh:                 refresh,
+		RefreshOnly:             c.in.RefreshOnly,
+		IsAssessmentRun:         c.in.IsAssessmentRun,
+		VariablesObjectStoreKey: variablesObjectKey,
 	}
 	return nil
 }
@@ -104,6 +112,10 @@ func (c *CreateRun) Execute(ctx context.Context, input *types.ExecuteInput) erro
 	created, err := c.createRun(ctx, c.createInput)
 	if err != nil {
 		return err
+	}
+
+	if err = c.variablesRetainFn(ctx, created.Metadata.ID); err != nil {
+		return errors.Wrap(err, "failed to link run variables object store ref")
 	}
 
 	input.RunStore.AddRun(created)

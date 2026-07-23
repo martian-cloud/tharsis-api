@@ -459,9 +459,10 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 	if input.ParentID == "" {
 		// Create namespace membership for caller with owner access level
 		namespaceMembershipInput := &namespacemembership.CreateNamespaceMembershipInput{
-			NamespacePath: group.FullPath,
-			RoleID:        models.OwnerRoleID.String(),
-			User:          caller.(*auth.UserCaller).User,
+			NamespacePath:    group.FullPath,
+			RoleID:           models.OwnerRoleID.String(),
+			User:             caller.(*auth.UserCaller).User,
+			SkipNotification: true,
 		}
 
 		// This call to CreateNamespaceMembership creates the activity event for the namespace membership,

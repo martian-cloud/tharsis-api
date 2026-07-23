@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 )
@@ -20,67 +21,43 @@ type RegistryStore interface {
 		providerVersion *models.TerraformProviderVersion,
 		provider *models.TerraformProvider,
 		body io.Reader,
-	) error
+	) (db.RetainObjectRefFunc, string, error)
 	UploadProviderVersionReadme(
 		ctx context.Context,
 		providerVersion *models.TerraformProviderVersion,
 		provider *models.TerraformProvider,
 		body io.Reader,
-	) error
+	) (db.RetainObjectRefFunc, string, error)
 	UploadProviderVersionSHASums(
 		ctx context.Context,
 		providerVersion *models.TerraformProviderVersion,
 		provider *models.TerraformProvider,
 		body io.Reader,
-	) error
+	) (db.RetainObjectRefFunc, string, error)
 	UploadProviderVersionSHASumsSignature(
 		ctx context.Context,
 		providerVersion *models.TerraformProviderVersion,
 		provider *models.TerraformProvider,
 		body io.Reader,
-	) error
-	GetProviderVersionReadme(
-		ctx context.Context,
-		providerVersion *models.TerraformProviderVersion,
-		provider *models.TerraformProvider,
-	) (io.ReadCloser, error)
-	GetProviderPlatformBinaryPresignedURL(
-		ctx context.Context,
-		providerPlatform *models.TerraformProviderPlatform,
-		providerVersion *models.TerraformProviderVersion,
-		provider *models.TerraformProvider,
-	) (string, error)
-	GetProviderVersionSHASumsPresignedURL(
-		ctx context.Context,
-		providerVersion *models.TerraformProviderVersion,
-		provider *models.TerraformProvider,
-	) (string, error)
-	GetProviderVersionSHASumsSignaturePresignedURL(
-		ctx context.Context,
-		providerVersion *models.TerraformProviderVersion,
-		provider *models.TerraformProvider,
-	) (string, error)
+	) (db.RetainObjectRefFunc, string, error)
+	GetProviderVersionReadme(ctx context.Context, objectKey string) (io.ReadCloser, error)
+	GetProviderPlatformBinaryPresignedURL(ctx context.Context, objectKey string) (string, error)
+	GetProviderVersionSHASumsPresignedURL(ctx context.Context, objectKey string) (string, error)
+	GetProviderVersionSHASumsSignaturePresignedURL(ctx context.Context, objectKey string) (string, error)
 }
 
 type registryStore struct {
-	objectStore objectstore.ObjectStore
+	objectStore     objectstore.ObjectStore
+	objectStoreRefs db.ObjectStoreRefs
 }
 
 // NewRegistryStore creates an instance of the RegistryStore interface
-func NewRegistryStore(objectStore objectstore.ObjectStore) RegistryStore {
-	return &registryStore{objectStore: objectStore}
+func NewRegistryStore(objectStore objectstore.ObjectStore, objectStoreRefs db.ObjectStoreRefs) RegistryStore {
+	return &registryStore{objectStore: objectStore, objectStoreRefs: objectStoreRefs}
 }
 
-func (r *registryStore) GetProviderVersionReadme(
-	ctx context.Context,
-	providerVersion *models.TerraformProviderVersion,
-	provider *models.TerraformProvider,
-) (io.ReadCloser, error) {
-	result, err := r.objectStore.GetObjectStream(
-		ctx,
-		getProviderVersionReadmeObjectKey(providerVersion, provider),
-		nil,
-	)
+func (r *registryStore) GetProviderVersionReadme(ctx context.Context, objectKey string) (io.ReadCloser, error) {
+	result, err := r.objectStore.GetObjectStream(ctx, objectKey, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -93,8 +70,15 @@ func (r *registryStore) UploadProviderPlatformBinary(
 	providerVersion *models.TerraformProviderVersion,
 	provider *models.TerraformProvider,
 	body io.Reader,
-) error {
-	return r.upload(ctx, getProviderPlatformObjectKey(providerPlatform, providerVersion, provider), body)
+) (db.RetainObjectRefFunc, string, error) {
+	key := providerPlatformObjectKey(providerPlatform, providerVersion, provider)
+	if err := r.objectStore.UploadObject(ctx, key, body); err != nil {
+		return nil, "", err
+	}
+
+	return func(ctx context.Context, ownerID string) error {
+		return r.objectStoreRefs.LinkRef(ctx, key, db.ObjectStoreRefOwnerProviderPlatform, ownerID)
+	}, key, nil
 }
 
 func (r *registryStore) UploadProviderVersionReadme(
@@ -102,8 +86,15 @@ func (r *registryStore) UploadProviderVersionReadme(
 	providerVersion *models.TerraformProviderVersion,
 	provider *models.TerraformProvider,
 	body io.Reader,
-) error {
-	return r.upload(ctx, getProviderVersionReadmeObjectKey(providerVersion, provider), body)
+) (db.RetainObjectRefFunc, string, error) {
+	key := providerVersionReadmeObjectKey(providerVersion, provider)
+	if err := r.objectStore.UploadObject(ctx, key, body); err != nil {
+		return nil, "", err
+	}
+
+	return func(ctx context.Context, ownerID string) error {
+		return r.objectStoreRefs.LinkRef(ctx, key, db.ObjectStoreRefOwnerProviderVersion, ownerID)
+	}, key, nil
 }
 
 func (r *registryStore) UploadProviderVersionSHASums(
@@ -111,8 +102,15 @@ func (r *registryStore) UploadProviderVersionSHASums(
 	providerVersion *models.TerraformProviderVersion,
 	provider *models.TerraformProvider,
 	body io.Reader,
-) error {
-	return r.upload(ctx, getProviderVersionSHASumsObjectKey(providerVersion, provider), body)
+) (db.RetainObjectRefFunc, string, error) {
+	key := providerVersionSHASumsObjectKey(providerVersion, provider)
+	if err := r.objectStore.UploadObject(ctx, key, body); err != nil {
+		return nil, "", err
+	}
+
+	return func(ctx context.Context, ownerID string) error {
+		return r.objectStoreRefs.LinkRef(ctx, key, db.ObjectStoreRefOwnerProviderVersion, ownerID)
+	}, key, nil
 }
 
 func (r *registryStore) UploadProviderVersionSHASumsSignature(
@@ -120,52 +118,42 @@ func (r *registryStore) UploadProviderVersionSHASumsSignature(
 	providerVersion *models.TerraformProviderVersion,
 	provider *models.TerraformProvider,
 	body io.Reader,
-) error {
-	return r.upload(ctx, getProviderVersionSHASumsSignatureObjectKey(providerVersion, provider), body)
+) (db.RetainObjectRefFunc, string, error) {
+	key := providerVersionSHASumsSignatureObjectKey(providerVersion, provider)
+	if err := r.objectStore.UploadObject(ctx, key, body); err != nil {
+		return nil, "", err
+	}
+
+	return func(ctx context.Context, ownerID string) error {
+		return r.objectStoreRefs.LinkRef(ctx, key, db.ObjectStoreRefOwnerProviderVersion, ownerID)
+	}, key, nil
 }
 
-func (r *registryStore) GetProviderPlatformBinaryPresignedURL(
-	ctx context.Context,
-	providerPlatform *models.TerraformProviderPlatform,
-	providerVersion *models.TerraformProviderVersion,
-	provider *models.TerraformProvider,
-) (string, error) {
-	return r.objectStore.GetPresignedURL(ctx, getProviderPlatformObjectKey(providerPlatform, providerVersion, provider))
+func (r *registryStore) GetProviderPlatformBinaryPresignedURL(ctx context.Context, objectKey string) (string, error) {
+	return r.objectStore.GetPresignedURL(ctx, objectKey)
 }
 
-func (r *registryStore) GetProviderVersionSHASumsPresignedURL(
-	ctx context.Context,
-	providerVersion *models.TerraformProviderVersion,
-	provider *models.TerraformProvider,
-) (string, error) {
-	return r.objectStore.GetPresignedURL(ctx, getProviderVersionSHASumsObjectKey(providerVersion, provider))
+func (r *registryStore) GetProviderVersionSHASumsPresignedURL(ctx context.Context, objectKey string) (string, error) {
+	return r.objectStore.GetPresignedURL(ctx, objectKey)
 }
 
-func (r *registryStore) GetProviderVersionSHASumsSignaturePresignedURL(
-	ctx context.Context,
-	providerVersion *models.TerraformProviderVersion,
-	provider *models.TerraformProvider,
-) (string, error) {
-	return r.objectStore.GetPresignedURL(ctx, getProviderVersionSHASumsSignatureObjectKey(providerVersion, provider))
+func (r *registryStore) GetProviderVersionSHASumsSignaturePresignedURL(ctx context.Context, objectKey string) (string, error) {
+	return r.objectStore.GetPresignedURL(ctx, objectKey)
 }
 
-func (r *registryStore) upload(ctx context.Context, key string, body io.Reader) error {
-	return r.objectStore.UploadObject(ctx, key, body)
-}
-
-func getProviderVersionReadmeObjectKey(providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
+func providerVersionReadmeObjectKey(providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
 	return fmt.Sprintf("registry/providers/%s/%s/README", provider.Metadata.ID, providerVersion.Metadata.ID)
 }
 
-func getProviderVersionSHASumsObjectKey(providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
+func providerVersionSHASumsObjectKey(providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
 	return fmt.Sprintf("registry/providers/%s/%s/SHA256SUMS", provider.Metadata.ID, providerVersion.Metadata.ID)
 }
 
-func getProviderVersionSHASumsSignatureObjectKey(providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
+func providerVersionSHASumsSignatureObjectKey(providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
 	return fmt.Sprintf("registry/providers/%s/%s/SHA256SUMS.sig", provider.Metadata.ID, providerVersion.Metadata.ID)
 }
 
-func getProviderPlatformObjectKey(providerPlatform *models.TerraformProviderPlatform, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
+func providerPlatformObjectKey(providerPlatform *models.TerraformProviderPlatform, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
 	return fmt.Sprintf(
 		"registry/providers/%s/%s/platforms/%s_%s/terraform-provider-%s_%s_%s_%s.zip",
 		provider.Metadata.ID,
