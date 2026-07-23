@@ -3,6 +3,7 @@ package moduleregistry
 import (
 	"context"
 	"crypto/sha256"
+	"fmt"
 	io "io"
 	"strings"
 	"testing"
@@ -2157,6 +2158,7 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 
 			mockRegistryStore := NewMockRegistryStore(t)
 			mockTaskManager := asynctask.NewMockManager(t)
+			mockObjectStoreRefs := db.NewMockObjectStoreRefs(t)
 
 			if test.expectErrCode == "" {
 				mockRegistryStore.
@@ -2176,19 +2178,15 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 						_ *models.TerraformModuleVersion,
 						_ *models.TerraformModule,
 						body io.Reader,
-					) error {
+					) (db.RetainObjectRefFunc, string, error) {
 						// Read all input to calculate checksum
 						_, err := io.ReadAll(body)
-						return err
+						return db.RetainObjectRefFunc(func(_ context.Context, _ string) error { return nil }), "registry/modules/module-1/1/package.tar.gz", err
 					})
 
 				if test.expectStatus != models.TerraformModuleVersionStatusErrored {
 					mockTaskManager.On("StartTask", mock.Anything)
 				}
-
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
 				argMatcherFunc := mock.MatchedBy(func(mv *models.TerraformModuleVersion) bool {
 					return mv.Status == models.TerraformModuleVersionStatusUploadInProgress
@@ -2201,6 +2199,10 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 						Status:   test.expectStatus,
 						SHASum:   test.shaSum,
 					}, nil)
+
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
 				if test.expectStatus == models.TerraformModuleVersionStatusErrored {
 					mockModuleVersions.
@@ -2224,6 +2226,7 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 				Transactions:            mockTransactions,
 				TerraformModules:        mockModules,
 				TerraformModuleVersions: mockModuleVersions,
+				ObjectStoreRefs:         mockObjectStoreRefs,
 			}
 
 			testLogger, _ := logger.NewForTest()
@@ -2259,8 +2262,9 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 		{
 			name: "get download url for private module",
 			input: &models.TerraformModuleVersion{
-				Metadata: models.ResourceMetadata{ID: moduleVersionID},
-				ModuleID: moduleID,
+				Metadata:              models.ResourceMetadata{ID: moduleVersionID},
+				ModuleID:              moduleID,
+				PackageObjectStoreKey: ptr.String(fmt.Sprintf("registry/modules/%s/%s/package.tar.gz", moduleID, moduleVersionID)),
 			},
 			module: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{ID: moduleID},
@@ -2273,8 +2277,9 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 		{
 			name: "get download url for public module",
 			input: &models.TerraformModuleVersion{
-				Metadata: models.ResourceMetadata{ID: moduleVersionID},
-				ModuleID: moduleID,
+				Metadata:              models.ResourceMetadata{ID: moduleVersionID},
+				ModuleID:              moduleID,
+				PackageObjectStoreKey: ptr.String(fmt.Sprintf("registry/modules/%s/%s/package.tar.gz", moduleID, moduleVersionID)),
 			},
 			module: &models.TerraformModule{
 				Metadata: models.ResourceMetadata{ID: moduleID},
@@ -2327,7 +2332,7 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 
 			if test.expectErrCode == "" {
 				mockRegistryStore.
-					On("GetModulePackagePresignedURL", mock.Anything, test.input, test.module).
+					On("GetModulePackagePresignedURL", mock.Anything, ptr.ToString(test.input.PackageObjectStoreKey)).
 					Return(test.expectURL, nil)
 			}
 

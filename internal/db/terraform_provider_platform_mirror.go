@@ -83,6 +83,7 @@ var terraformProviderPlatformMirrorsFieldList = append(
 	"os",
 	"architecture",
 	"version_mirror_id",
+	"object_store_key",
 )
 
 // NewTerraformProviderPlatformMirrors returns a new instance of TerraformProviderPlatformMirrors
@@ -221,6 +222,7 @@ func (t *terraformProviderPlatformMirrors) CreatePlatformMirror(ctx context.Cont
 					"os":                platformMirror.OS,
 					"architecture":      platformMirror.Architecture,
 					"version_mirror_id": platformMirror.VersionMirrorID,
+					"object_store_key":  nullableString(platformMirror.ObjectStoreKey),
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_provider_version_mirrors"), goqu.On(goqu.I("terraform_provider_platform_mirrors.version_mirror_id").Eq(goqu.I("terraform_provider_version_mirrors.id")))).
@@ -331,6 +333,7 @@ func (*terraformProviderPlatformMirrors) getSelectFields() []interface{} {
 
 func scanPlatformMirror(row scanner) (*models.TerraformProviderPlatformMirror, error) {
 	var namespacePath, registryHostname, registryNamespace, providerType, providerSemVersion string
+	var objectStoreKey *string
 	platformMirror := &models.TerraformProviderPlatformMirror{}
 
 	fields := []interface{}{
@@ -341,6 +344,7 @@ func scanPlatformMirror(row scanner) (*models.TerraformProviderPlatformMirror, e
 		&platformMirror.OS,
 		&platformMirror.Architecture,
 		&platformMirror.VersionMirrorID,
+		&objectStoreKey,
 		&registryHostname,
 		&registryNamespace,
 		&providerType,
@@ -351,6 +355,10 @@ func scanPlatformMirror(row scanner) (*models.TerraformProviderPlatformMirror, e
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
+	}
+
+	if objectStoreKey != nil {
+		platformMirror.ObjectStoreKey = *objectStoreKey
 	}
 
 	platformMirror.Metadata.TRN = trn.TypeTerraformProviderPlatformMirror.Build(

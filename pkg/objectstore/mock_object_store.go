@@ -14,6 +14,24 @@ type MockObjectStore struct {
 	mock.Mock
 }
 
+// DeleteObjects provides a mock function with given fields: ctx, keys
+func (_m *MockObjectStore) DeleteObjects(ctx context.Context, keys []string) error {
+	ret := _m.Called(ctx, keys)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteObjects")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) error); ok {
+		r0 = rf(ctx, keys)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DoesObjectExist provides a mock function with given fields: ctx, key
 func (_m *MockObjectStore) DoesObjectExist(ctx context.Context, key string) (bool, error) {
 	ret := _m.Called(ctx, key)

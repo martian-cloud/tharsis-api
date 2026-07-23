@@ -406,8 +406,47 @@ func (f *ObjectStore) VerifyPresignedURL(ctx context.Context, urlStr string) (st
 	return key, nil
 }
 
+// DeleteObjects removes each key in turn. Missing keys are not errors.
+func (f *ObjectStore) DeleteObjects(ctx context.Context, keys []string) error {
+	// The local filesystem has no batch delete, so remove each key individually.
+	for _, key := range keys {
+		if err := f.deleteObject(ctx, key); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// deleteObject deletes a single object from the filesystem. Returns nil if the object does not exist.
+// After removing the file, empty parent directories up to basePath are pruned.
+func (f *ObjectStore) deleteObject(_ context.Context, key string) error {
+	fullPath, err := f.sanitizeKey(key)
+	if err != nil {
+		return err
+	}
+
+	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	// Prune empty parent directories up to basePath. os.Remove fails on a
+	// non-empty directory (ENOTEMPTY), so the loop stops naturally.
+	for dir := filepath.Dir(fullPath); dir != f.basePath && strings.HasPrefix(dir, f.basePath); dir = filepath.Dir(dir) {
+		if err := os.Remove(dir); err != nil {
+			break
+		}
+	}
+
+	return nil
+}
+
 // sanitizeKey validates and sanitizes the key to prevent path traversal
 func (f *ObjectStore) sanitizeKey(key string) (string, error) {
+	if key == "" {
+		return "", te.New("object key cannot be empty", te.WithErrorCode(te.EInvalid))
+	}
+
 	fullPath := filepath.Join(f.basePath, filepath.Clean("/"+key))
 
 	// Validate symlinks resolve within base (only if path exists)
@@ -419,6 +458,7 @@ func (f *ObjectStore) sanitizeKey(key string) (string, error) {
 		}
 		return "", err
 	}
+
 	if !safe {
 		return "", te.New("invalid key", te.WithErrorCode(te.EInvalid))
 	}

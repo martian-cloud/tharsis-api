@@ -218,7 +218,7 @@ func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, sta
 	switch {
 	case activeChunk != nil && !activeChunk.Sealed:
 		cur = &openChunk{
-			key:         activeChunk.ObjectKey,
+			key:         activeChunk.ObjectStoreKey,
 			index:       activeChunk.ChunkIndex,
 			startOffset: activeChunk.StartOffset,
 			size:        activeChunk.Size,
@@ -244,12 +244,12 @@ func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, sta
 			// LogStream.Size on every write, so the object's byte length equals logStream.Size here, and
 			// reads of chunk 0 never run past the object's end.
 			chunkCreates = append(chunkCreates, &models.LogStreamChunk{
-				LogStreamID: logStreamID,
-				ChunkIndex:  0,
-				StartOffset: 0,
-				Size:        logStream.Size,
-				ObjectKey:   consolidatedObjectKey(logStreamID),
-				Sealed:      true,
+				LogStreamID:    logStreamID,
+				ChunkIndex:     0,
+				StartOffset:    0,
+				Size:           logStream.Size,
+				ObjectStoreKey: consolidatedObjectKey(logStreamID),
+				Sealed:         true,
 			})
 			cur = &openChunk{
 				key:         chunkObjectKey(logStreamID),
@@ -272,12 +272,12 @@ func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, sta
 			return
 		}
 		chunkCreates = append(chunkCreates, &models.LogStreamChunk{
-			LogStreamID: logStreamID,
-			ChunkIndex:  c.index,
-			StartOffset: c.startOffset,
-			Size:        c.size,
-			ObjectKey:   c.key,
-			Sealed:      sealed,
+			LogStreamID:    logStreamID,
+			ChunkIndex:     c.index,
+			StartOffset:    c.startOffset,
+			Size:           c.size,
+			ObjectStoreKey: c.key,
+			Sealed:         sealed,
 		})
 	}
 
@@ -306,11 +306,24 @@ func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, sta
 	}
 	finalize(cur, cur.size >= maxChunkSize)
 
+	// Track which keys belong to new chunks so we call their retainFns in the TX.
+	newChunkKeys := make(map[string]struct{}, len(chunkCreates))
+	for _, c := range chunkCreates {
+		newChunkKeys[c.ObjectStoreKey] = struct{}{}
+	}
+
 	// Write objects BEFORE touching the database. A failure here leaves the DB untouched.
+	// The store registers a pending ref and returns a linkFunc; we invoke it for new chunks only.
+	retainFns := make(map[string]db.RetainObjectRefFunc, len(newChunkKeys))
 	for i := range objectWrites {
 		w := &objectWrites[i]
-		if err = s.store.WriteChunk(ctx, w.key, w.byteOffset, w.data); err != nil {
-			return nil, err
+		linkFunc, wErr := s.store.WriteChunk(ctx, w.key, w.byteOffset, w.data)
+		if wErr != nil {
+			return nil, wErr
+		}
+
+		if _, isNew := newChunkKeys[w.key]; isNew {
+			retainFns[w.key] = linkFunc
 		}
 	}
 
@@ -326,8 +339,15 @@ func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, sta
 	}()
 
 	for _, c := range chunkCreates {
-		if _, err = s.dbClient.LogStreamChunks.CreateLogStreamChunk(txContext, c); err != nil {
-			return nil, err
+		createdChunk, crErr := s.dbClient.LogStreamChunks.CreateLogStreamChunk(txContext, c)
+		if crErr != nil {
+			return nil, crErr
+		}
+
+		if lf := retainFns[c.ObjectStoreKey]; lf != nil {
+			if crErr = lf(txContext, createdChunk.Metadata.ID); crErr != nil {
+				return nil, crErr
+			}
 		}
 	}
 	for _, c := range chunkUpdates {
@@ -379,6 +399,7 @@ func (s *stream) CompactStream(ctx context.Context, logStream *models.LogStream)
 
 	// Only write an object if there is log data. A completed stream that logged nothing has no
 	// chunks; reads of it return empty via readConsolidated, so just set the flag.
+	var consolidatedRetainFn db.RetainObjectRefFunc
 	if logStream.Size > 0 {
 		// logStream.Compacted is false here, so readLogs streams from the chunk objects.
 		reader, err := s.readLogs(ctx, logStream, 0, logStream.Size)
@@ -387,13 +408,29 @@ func (s *stream) CompactStream(ctx context.Context, logStream *models.LogStream)
 		}
 		defer reader.Close()
 
-		if err := s.store.WriteObject(ctx, consolidatedObjectKey(logStream.Metadata.ID), reader); err != nil {
+		consolidatedKey := consolidatedObjectKey(logStream.Metadata.ID)
+		consolidatedRetainFn, err = s.store.WriteConsolidated(ctx, consolidatedKey, reader)
+		if err != nil {
 			return err
 		}
+
+		logStream.ObjectStoreKey = consolidatedKey
 	}
 
 	logStream.Compacted = true
-	if _, err := s.dbClient.LogStreams.UpdateLogStream(ctx, logStream); err != nil {
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to begin transaction for CompactStream")
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CompactStream: %v", txErr)
+		}
+	}()
+
+	if _, err := s.dbClient.LogStreams.UpdateLogStream(txContext, logStream); err != nil {
 		if errors.ErrorCode(err) == errors.EOptimisticLock {
 			// A concurrent update raced with this mark. Completed streams reject further WriteLogs and
 			// the SKIP LOCKED claim keeps other instances off this stream, so the consolidated object we
@@ -401,7 +438,18 @@ func (s *stream) CompactStream(ctx context.Context, logStream *models.LogStream)
 			// path and a later run recompacts, harmlessly overwriting the same consolidated object.
 			return nil
 		}
-		return err
+		return errors.Wrap(err, "failed to update log stream in CompactStream")
+	}
+
+	// Link the consolidated object's ref to the stream (skipped for empty streams, which write no object).
+	if consolidatedRetainFn != nil {
+		if err := consolidatedRetainFn(txContext, logStream.Metadata.ID); err != nil {
+			return errors.Wrap(err, "failed to link consolidated object store ref in CompactStream")
+		}
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return errors.Wrap(err, "failed to commit transaction for CompactStream")
 	}
 
 	return nil
@@ -483,7 +531,7 @@ func (s *stream) readLogs(ctx context.Context, logStream *models.LogStream, star
 			continue
 		}
 
-		slices = append(slices, chunkSlice{key: c.ObjectKey, offset: sliceStart, length: sliceEnd - sliceStart})
+		slices = append(slices, chunkSlice{key: c.ObjectStoreKey, offset: sliceStart, length: sliceEnd - sliceStart})
 	}
 
 	return &chunkReader{ctx: ctx, store: s.store, slices: slices}, nil

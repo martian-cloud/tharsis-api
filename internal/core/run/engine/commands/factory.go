@@ -24,20 +24,24 @@ import (
 // collaborator corerun.Create touches.
 type createRunFunc func(ctx context.Context, input *corerun.CreateRunInput) (*models.Run, error)
 
+// uploadRunVariablesFunc uploads the run variables, returns the object key and a link func. Commands
+// call it from Prepare so the upload stays out of the transaction; the factory binds the artifact store.
+type uploadRunVariablesFunc func(ctx context.Context, workspaceID string, variables []runvariables.Variable) (db.RetainObjectRefFunc, string, error)
+
 // Factory builds run commands with their shared dependencies pre-wired, so callers
 // (the run service, job service, and work item consumer) construct commands by passing only
 // request data.
 type Factory struct {
-	logger                        logger.Logger
-	dbClient                      *db.Client
-	admitter                      *admission.Admitter
-	variablesBuilder              *runvariables.Builder
-	moduleResolver                registry.ModuleResolver
-	terraformCLIVersionConstraint string
-	ruleEnforcer                  rules.RuleEnforcer
-	limitChecker                  limits.LimitChecker
-	artifactStore                 workspace.ArtifactStore
-	planParser                    plan.Parser
+	logger             logger.Logger
+	dbClient           *db.Client
+	admitter           *admission.Admitter
+	variablesBuilder   *runvariables.Builder
+	moduleResolver     registry.ModuleResolver
+	ruleEnforcer       rules.RuleEnforcer
+	artifactStore      workspace.ArtifactStore
+	planParser         plan.Parser
+	createRunFn        createRunFunc
+	uploadRunVariables uploadRunVariablesFunc
 }
 
 // NewFactory creates a run command Factory. The rule enforcer and plan parser are
@@ -52,70 +56,70 @@ func NewFactory(
 	limitChecker limits.LimitChecker,
 	artifactStore workspace.ArtifactStore,
 ) *Factory {
+	ruleEnforcer := rules.NewRuleEnforcer(dbClient)
 	return &Factory{
-		logger:                        logger,
-		dbClient:                      dbClient,
-		admitter:                      admitter,
-		variablesBuilder:              variablesBuilder,
-		moduleResolver:                moduleResolver,
-		terraformCLIVersionConstraint: terraformCLIVersionConstraint,
-		ruleEnforcer:                  rules.NewRuleEnforcer(dbClient),
-		limitChecker:                  limitChecker,
-		artifactStore:                 artifactStore,
-		planParser:                    plan.NewParser(),
-	}
-}
-
-// createRun returns a createRunFunc bound to the factory's shared collaborators, so a
-// run-creation command depends only on the input it passes (and tests can substitute a stub).
-func (f *Factory) createRun() createRunFunc {
-	return func(ctx context.Context, input *corerun.CreateRunInput) (*models.Run, error) {
-		return corerun.Create(ctx, f.dbClient, f.terraformCLIVersionConstraint,
-			f.ruleEnforcer, f.limitChecker, f.artifactStore, input)
+		logger:           logger,
+		dbClient:         dbClient,
+		admitter:         admitter,
+		variablesBuilder: variablesBuilder,
+		moduleResolver:   moduleResolver,
+		ruleEnforcer:     ruleEnforcer,
+		artifactStore:    artifactStore,
+		planParser:       plan.NewParser(),
+		createRunFn: func(ctx context.Context, input *corerun.CreateRunInput) (*models.Run, error) {
+			return corerun.Create(ctx, dbClient, terraformCLIVersionConstraint, ruleEnforcer, limitChecker, input)
+		},
+		uploadRunVariables: func(ctx context.Context, workspaceID string, variables []runvariables.Variable) (db.RetainObjectRefFunc, string, error) {
+			return corerun.UploadRunVariables(ctx, artifactStore, workspaceID, variables)
+		},
 	}
 }
 
 // NewRun creates a user-initiated CreateRun command.
 func (f *Factory) NewRun(in *NewRunInput) *CreateRun {
 	return &CreateRun{
-		dbClient:         f.dbClient,
-		variablesBuilder: f.variablesBuilder,
-		moduleResolver:   f.moduleResolver,
-		createRun:        f.createRun(),
-		in:               in,
+		dbClient:           f.dbClient,
+		variablesBuilder:   f.variablesBuilder,
+		moduleResolver:     f.moduleResolver,
+		createRun:          f.createRunFn,
+		uploadRunVariables: f.uploadRunVariables,
+		in:                 in,
 	}
 }
 
 // NewCreateDestroyRun creates a CreateDestroyRun command.
 func (f *Factory) NewCreateDestroyRun(in *CreateDestroyRunInput) *CreateDestroyRun {
 	return &CreateDestroyRun{
-		dbClient:         f.dbClient,
-		variablesBuilder: f.variablesBuilder,
-		moduleResolver:   f.moduleResolver,
-		createRun:        f.createRun(),
-		in:               in,
+		dbClient:           f.dbClient,
+		variablesBuilder:   f.variablesBuilder,
+		moduleResolver:     f.moduleResolver,
+		createRun:          f.createRunFn,
+		uploadRunVariables: f.uploadRunVariables,
+		in:                 in,
 	}
 }
 
 // NewCreateReconcileRun creates a CreateReconcileRun command.
 func (f *Factory) NewCreateReconcileRun(in *CreateReconcileRunInput) *CreateReconcileRun {
 	return &CreateReconcileRun{
-		dbClient:         f.dbClient,
-		variablesBuilder: f.variablesBuilder,
-		moduleResolver:   f.moduleResolver,
-		createRun:        f.createRun(),
-		in:               in,
+		dbClient:           f.dbClient,
+		variablesBuilder:   f.variablesBuilder,
+		moduleResolver:     f.moduleResolver,
+		createRun:          f.createRunFn,
+		uploadRunVariables: f.uploadRunVariables,
+		in:                 in,
 	}
 }
 
 // NewCreateAssessmentRun creates a CreateAssessmentRun command.
 func (f *Factory) NewCreateAssessmentRun(in *CreateAssessmentRunInput) *CreateAssessmentRun {
 	return &CreateAssessmentRun{
-		dbClient:         f.dbClient,
-		variablesBuilder: f.variablesBuilder,
-		moduleResolver:   f.moduleResolver,
-		createRun:        f.createRun(),
-		in:               in,
+		dbClient:           f.dbClient,
+		variablesBuilder:   f.variablesBuilder,
+		moduleResolver:     f.moduleResolver,
+		createRun:          f.createRunFn,
+		uploadRunVariables: f.uploadRunVariables,
+		in:                 in,
 	}
 }
 

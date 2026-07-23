@@ -6,6 +6,8 @@ import (
 	context "context"
 	json "encoding/json"
 
+	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -14,29 +16,29 @@ type MockStore struct {
 	mock.Mock
 }
 
-// GetToolContent provides a mock function with given fields: ctx, sessionID, messageID
-func (_m *MockStore) GetToolContent(ctx context.Context, sessionID string, messageID string) (json.RawMessage, error) {
-	ret := _m.Called(ctx, sessionID, messageID)
+// GetToolContentForMessage provides a mock function with given fields: ctx, storedKey
+func (_m *MockStore) GetToolContentForMessage(ctx context.Context, storedKey string) (json.RawMessage, error) {
+	ret := _m.Called(ctx, storedKey)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetToolContent")
+		panic("no return value specified for GetToolContentForMessage")
 	}
 
 	var r0 json.RawMessage
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (json.RawMessage, error)); ok {
-		return rf(ctx, sessionID, messageID)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (json.RawMessage, error)); ok {
+		return rf(ctx, storedKey)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) json.RawMessage); ok {
-		r0 = rf(ctx, sessionID, messageID)
+	if rf, ok := ret.Get(0).(func(context.Context, string) json.RawMessage); ok {
+		r0 = rf(ctx, storedKey)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(json.RawMessage)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, sessionID, messageID)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, storedKey)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -105,57 +107,114 @@ func (_m *MockStore) LoadHistory(ctx context.Context, sessionID string) ([]byte,
 }
 
 // SaveHistory provides a mock function with given fields: ctx, sessionID, data
-func (_m *MockStore) SaveHistory(ctx context.Context, sessionID string, data []byte) error {
+func (_m *MockStore) SaveHistory(ctx context.Context, sessionID string, data []byte) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, sessionID, data)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SaveHistory")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []byte) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []byte) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, sessionID, data)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, []byte) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, sessionID, data)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, []byte) string); ok {
+		r1 = rf(ctx, sessionID, data)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, []byte) error); ok {
+		r2 = rf(ctx, sessionID, data)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// UploadToolContent provides a mock function with given fields: ctx, sessionID, messageID, content
-func (_m *MockStore) UploadToolContent(ctx context.Context, sessionID string, messageID string, content json.RawMessage) error {
-	ret := _m.Called(ctx, sessionID, messageID, content)
+// UploadToolContent provides a mock function with given fields: ctx, sessionID, content
+func (_m *MockStore) UploadToolContent(ctx context.Context, sessionID string, content json.RawMessage) (db.RetainObjectRefFunc, string, error) {
+	ret := _m.Called(ctx, sessionID, content)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadToolContent")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, json.RawMessage) error); ok {
-		r0 = rf(ctx, sessionID, messageID, content)
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, json.RawMessage) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, sessionID, content)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, json.RawMessage) db.RetainObjectRefFunc); ok {
+		r0 = rf(ctx, sessionID, content)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, json.RawMessage) string); ok {
+		r1 = rf(ctx, sessionID, content)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, json.RawMessage) error); ok {
+		r2 = rf(ctx, sessionID, content)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UploadTrace provides a mock function with given fields: ctx, sessionID, traceID, data
-func (_m *MockStore) UploadTrace(ctx context.Context, sessionID string, traceID string, data []byte) error {
+func (_m *MockStore) UploadTrace(ctx context.Context, sessionID string, traceID string, data []byte) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, sessionID, traceID, data)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadTrace")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, []byte) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, []byte) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, sessionID, traceID, data)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, []byte) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, sessionID, traceID, data)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, []byte) string); ok {
+		r1 = rf(ctx, sessionID, traceID, data)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, string, []byte) error); ok {
+		r2 = rf(ctx, sessionID, traceID, data)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // NewMockStore creates a new instance of MockStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

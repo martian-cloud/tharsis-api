@@ -80,7 +80,7 @@ type terraformProviderPlatforms struct {
 	dbClient *Client
 }
 
-var providerPlatformFieldList = append(metadataFieldList, "provider_version_id", "os", "arch", "sha_sum", "filename", "binary_uploaded", "created_by")
+var providerPlatformFieldList = append(metadataFieldList, "provider_version_id", "os", "arch", "sha_sum", "filename", "binary_uploaded", "created_by", "binary_object_store_key")
 
 // NewTerraformProviderPlatforms returns an instance of the TerraformProviderPlatforms interface
 func NewTerraformProviderPlatforms(dbClient *Client) TerraformProviderPlatforms {
@@ -224,17 +224,18 @@ func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context,
 		With("terraform_provider_platforms",
 			dialect.Insert("terraform_provider_platforms").
 				Rows(goqu.Record{
-					"id":                  newResourceID(),
-					"version":             initialResourceVersion,
-					"created_at":          timestamp,
-					"updated_at":          timestamp,
-					"provider_version_id": providerPlatform.ProviderVersionID,
-					"os":                  providerPlatform.OperatingSystem,
-					"arch":                providerPlatform.Architecture,
-					"sha_sum":             providerPlatform.SHASum,
-					"filename":            providerPlatform.Filename,
-					"binary_uploaded":     providerPlatform.BinaryUploaded,
-					"created_by":          providerPlatform.CreatedBy,
+					"id":                      newResourceID(),
+					"version":                 initialResourceVersion,
+					"created_at":              timestamp,
+					"updated_at":              timestamp,
+					"provider_version_id":     providerPlatform.ProviderVersionID,
+					"os":                      providerPlatform.OperatingSystem,
+					"arch":                    providerPlatform.Architecture,
+					"sha_sum":                 providerPlatform.SHASum,
+					"filename":                providerPlatform.Filename,
+					"binary_uploaded":         providerPlatform.BinaryUploaded,
+					"created_by":              providerPlatform.CreatedBy,
+					"binary_object_store_key": providerPlatform.BinaryObjectStoreKey,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_provider_versions"), goqu.On(goqu.Ex{"terraform_provider_platforms.provider_version_id": goqu.I("terraform_provider_versions.id")})).
@@ -278,9 +279,10 @@ func (t *terraformProviderPlatforms) UpdateProviderPlatform(ctx context.Context,
 			dialect.Update("terraform_provider_platforms").
 				Set(
 					goqu.Record{
-						"version":         goqu.L("? + ?", goqu.C("version"), 1),
-						"updated_at":      timestamp,
-						"binary_uploaded": providerPlatform.BinaryUploaded,
+						"version":                 goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":              timestamp,
+						"binary_uploaded":         providerPlatform.BinaryUploaded,
+						"binary_object_store_key": providerPlatform.BinaryObjectStoreKey,
 					},
 				).Where(goqu.Ex{"id": providerPlatform.Metadata.ID, "version": providerPlatform.Metadata.Version}).
 				Returning("*"),
@@ -393,6 +395,7 @@ func (t *terraformProviderPlatforms) getSelectFields() []interface{} {
 
 func scanTerraformProviderPlatform(row scanner) (*models.TerraformProviderPlatform, error) {
 	var groupPath, providerName, providerSemVersion string
+	var binaryKey *string
 	providerPlatform := &models.TerraformProviderPlatform{}
 
 	fields := []interface{}{
@@ -407,6 +410,7 @@ func scanTerraformProviderPlatform(row scanner) (*models.TerraformProviderPlatfo
 		&providerPlatform.Filename,
 		&providerPlatform.BinaryUploaded,
 		&providerPlatform.CreatedBy,
+		&binaryKey,
 		&groupPath,
 		&providerName,
 		&providerSemVersion,
@@ -416,6 +420,8 @@ func scanTerraformProviderPlatform(row scanner) (*models.TerraformProviderPlatfo
 	if err != nil {
 		return nil, err
 	}
+
+	providerPlatform.BinaryObjectStoreKey = binaryKey
 
 	providerPlatform.Metadata.TRN = trn.TypeTerraformProviderPlatform.Build(
 		groupPath,

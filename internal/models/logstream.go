@@ -16,6 +16,7 @@ type LogStream struct {
 	// CompactionStartedAt is set when an instance begins compacting this stream. It gates compaction so
 	// multiple horizontally-scaled instances don't compact the same stream concurrently.
 	CompactionStartedAt *time.Time
+	ObjectStoreKey      string
 	Metadata            ResourceMetadata
 	Size                int
 	Completed           bool

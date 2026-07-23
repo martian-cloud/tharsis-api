@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -74,7 +75,7 @@ type agentSessionMessages struct {
 	dbClient *Client
 }
 
-var agentSessionMessageFieldList = append(metadataFieldList, "session_id", "run_id", "parent_id", "role", "content")
+var agentSessionMessageFieldList = append(metadataFieldList, "session_id", "run_id", "parent_id", "role", "content", "tool_content_object_store_key")
 
 // NewAgentSessionMessages returns an instance of the AgentSessionMessages interface
 func NewAgentSessionMessages(dbClient *Client) AgentSessionMessages {
@@ -185,15 +186,16 @@ func (a *agentSessionMessages) CreateAgentSessionMessage(ctx context.Context, ms
 
 	sql, args, err := toSQLWithTag("agent_session_message.CreateAgentSessionMessage", dialect.Insert("agent_session_messages").Prepared(true).Rows(
 		goqu.Record{
-			"id":         newResourceID(),
-			"version":    initialResourceVersion,
-			"created_at": timestamp,
-			"updated_at": timestamp,
-			"session_id": msg.SessionID,
-			"run_id":     msg.RunID,
-			"parent_id":  msg.ParentID,
-			"role":       msg.Role,
-			"content":    nullableRawJSON(msg.Content),
+			"id":                            newResourceID(),
+			"version":                       initialResourceVersion,
+			"created_at":                    timestamp,
+			"updated_at":                    timestamp,
+			"session_id":                    msg.SessionID,
+			"run_id":                        msg.RunID,
+			"parent_id":                     msg.ParentID,
+			"role":                          msg.Role,
+			"content":                       nullableRawJSON(msg.Content),
+			"tool_content_object_store_key": nullableString(msg.ToolContentObjectStoreKey),
 		},
 	).Returning(agentSessionMessageFieldList...))
 	if err != nil {
@@ -227,6 +229,8 @@ func (*agentSessionMessages) getSelectFields() []interface{} {
 func scanAgentSessionMessage(row scanner) (*models.AgentSessionMessage, error) {
 	msg := &models.AgentSessionMessage{}
 
+	var toolContentObjectStoreKey sql.NullString
+
 	fields := []interface{}{
 		&msg.Metadata.ID,
 		&msg.Metadata.CreationTimestamp,
@@ -237,11 +241,16 @@ func scanAgentSessionMessage(row scanner) (*models.AgentSessionMessage, error) {
 		&msg.ParentID,
 		&msg.Role,
 		&msg.Content,
+		&toolContentObjectStoreKey,
 	}
 
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
+	}
+
+	if toolContentObjectStoreKey.Valid {
+		msg.ToolContentObjectStoreKey = toolContentObjectStoreKey.String
 	}
 
 	msg.Metadata.TRN = trn.TypeAgentSessionMessage.Build(

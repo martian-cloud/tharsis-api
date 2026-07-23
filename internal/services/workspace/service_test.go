@@ -847,6 +847,7 @@ func TestCV_UploadConfigurationVersion(t *testing.T) {
 		name            string
 		status          models.ConfigurationStatus
 		authError       error
+		linkRefErr      error
 		expectErrorCode errors.CodeType
 	}{
 		{
@@ -869,6 +870,12 @@ func TestCV_UploadConfigurationVersion(t *testing.T) {
 			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
+		{
+			name:            "retainFn error is propagated",
+			status:          models.ConfigurationPending,
+			linkRefErr:      errors.New("link failed", errors.WithErrorCode(errors.EInternal)),
+			expectErrorCode: errors.EInternal,
+		},
 	}
 
 	for _, test := range tests {
@@ -889,13 +896,26 @@ func TestCV_UploadConfigurationVersion(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.ViewConfigurationVersionPermission, mock.Anything).Return(nil)
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateConfigurationVersionPermission, mock.Anything).Return(test.authError)
 
+			mockObjectStoreRefs := db.NewMockObjectStoreRefs(t)
+			mockTransactions := db.NewMockTransactions(t)
+
 			if test.authError == nil && test.status == models.ConfigurationPending {
-				mockArtifactStore.On("UploadConfigurationVersion", mock.Anything, cv, mock.Anything).Return(nil)
-				mockConfigVersions.On("UpdateConfigurationVersion", mock.Anything, mock.Anything).Return(cv, nil)
+				mockObjectStoreRefs.On("LinkRef", mock.Anything, mock.Anything, db.ObjectStoreRefOwnerConfigurationVersion, cv.Metadata.ID).Return(test.linkRefErr)
+				mockArtifactStore.On("UploadConfigurationVersion", mock.Anything, cv, mock.Anything).
+					Return(db.RetainObjectRefFunc(func(ctx context.Context, ownerID string) error {
+						return mockObjectStoreRefs.LinkRef(ctx, "workspaces/workspace-1/configuration_versions/some-uuid", db.ObjectStoreRefOwnerConfigurationVersion, ownerID)
+					}), "workspaces/workspace-1/configuration_versions/some-uuid", nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				if test.linkRefErr == nil {
+					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				}
+				mockConfigVersions.On("UpdateConfigurationVersion", mock.Anything, mock.Anything).Return(cv, nil).Maybe()
 			}
 
 			dbClient := &db.Client{
 				ConfigurationVersions: mockConfigVersions,
+				Transactions:          mockTransactions,
 			}
 
 			testLogger, _ := logger.NewForTest()
@@ -1736,6 +1756,7 @@ func TestCreateStateVersion(t *testing.T) {
 		workspacePermissionError error
 		dataUnmarshalError       error
 		uploadError              error
+		linkRefErr               error
 		createError              error
 		dataDecodeError          error
 		toCreate                 *models.StateVersion
@@ -1842,6 +1863,21 @@ func TestCreateStateVersion(t *testing.T) {
 			expectErrorCode:       errors.EInternal,
 		},
 		{
+			name:     "retainFn error is propagated",
+			toCreate: toCreate,
+			data:     goodData,
+			injectCreated: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+					ID:                stateVersionID,
+				},
+			},
+			limit:                 4,
+			injectSVsPerWorkspace: 4,
+			linkRefErr:            errors.New("link failed", errors.WithErrorCode(errors.EInternal)),
+			expectErrorCode:       errors.EInternal,
+		},
+		{
 			name:     "successfully created",
 			toCreate: toCreate,
 			data:     goodData,
@@ -1917,8 +1953,13 @@ func TestCreateStateVersion(t *testing.T) {
 			mockArtifactStore := coreworkspace.MockArtifactStore{}
 			mockArtifactStore.Test(t)
 
+			mockObjectStoreRefs := db.NewMockObjectStoreRefs(t)
+			mockObjectStoreRefs.On("LinkRef", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.linkRefErr).Maybe()
+
 			mockArtifactStore.On("UploadStateVersion", mock.Anything, mock.Anything, mock.Anything).
-				Return(test.uploadError)
+				Return(db.RetainObjectRefFunc(func(ctx context.Context, ownerID string) error {
+					return mockObjectStoreRefs.LinkRef(ctx, "workspaces/ws/state_versions/uuid", db.ObjectStoreRefOwnerStateVersion, ownerID)
+				}), "workspaces/ws/state_versions/uuid", test.uploadError).Maybe()
 
 			testLogger, _ := logger.NewForTest()
 			dbClient := &db.Client{

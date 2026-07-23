@@ -247,9 +247,10 @@ func TestCreateTopLevelGroup(t *testing.T) {
 			caller := auth.NewUserCaller(test.user, nil, dbClient, nil, nil)
 
 			createNamespaceMembershipInput := &namespacemembership.CreateNamespaceMembershipInput{
-				NamespacePath: test.input.FullPath,
-				RoleID:        models.OwnerRoleID.String(),
-				User:          test.user,
+				NamespacePath:    test.input.FullPath,
+				RoleID:           models.OwnerRoleID.String(),
+				User:             test.user,
+				SkipNotification: true,
 			}
 
 			if test.expectErrorCode == "" {

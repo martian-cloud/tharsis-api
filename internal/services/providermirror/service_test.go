@@ -1405,26 +1405,34 @@ func TestUploadInstallationPackage(t *testing.T) {
 				}
 			}
 
+			mockObjectStoreRefs := db.NewMockObjectStoreRefs(t)
+
 			if test.expectErrorCode == "" {
+				// The store sets *key and returns a retain func; the service uses the key for the DB record.
+				const fakeKey = "provider-mirror/providers/some-uuid.zip"
+				mockObjectStoreRefs.On("LinkRef", mock.Anything, fakeKey, db.ObjectStoreRefOwnerProviderMirrorPlatform, "platform-mirror-id").
+					Return(nil)
+				retainFn := db.RetainObjectRefFunc(func(ctx context.Context, ownerID string) error {
+					return mockObjectStoreRefs.LinkRef(ctx, fakeKey, db.ObjectStoreRefOwnerProviderMirrorPlatform, ownerID)
+				})
+				mockStore.On("UploadProviderPlatformPackage", mock.Anything, mock.Anything).
+					Return(retainFn, fakeKey, nil)
+
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 
-				toCreate := &models.TerraformProviderPlatformMirror{
-					VersionMirrorID: versionMirrorID,
-					OS:              test.input.OS,
-					Architecture:    test.input.Architecture,
-				}
-
-				createdPlatformMirror := &models.TerraformProviderPlatformMirror{
+				// The DB assigns the ID; the service sets ObjectStoreKey to the key the store wrote.
+				mockPlatformMirrors.On("CreatePlatformMirror", mock.Anything, mock.MatchedBy(func(m *models.TerraformProviderPlatformMirror) bool {
+					return m.VersionMirrorID == versionMirrorID &&
+						m.OS == test.input.OS &&
+						m.Architecture == test.input.Architecture &&
+						m.ObjectStoreKey == fakeKey
+				})).Return(&models.TerraformProviderPlatformMirror{
 					Metadata:        models.ResourceMetadata{ID: "platform-mirror-id"},
 					VersionMirrorID: versionMirrorID,
 					OS:              test.input.OS,
 					Architecture:    test.input.Architecture,
-				}
-
-				mockPlatformMirrors.On("CreatePlatformMirror", mock.Anything, toCreate).Return(createdPlatformMirror, nil)
-
-				mockStore.On("UploadProviderPlatformPackage", mock.Anything, "platform-mirror-id", mock.Anything).Return(nil)
+				}, nil)
 
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}

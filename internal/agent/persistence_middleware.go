@@ -49,8 +49,18 @@ func (p *messagePersister) save(ctx context.Context, role string, content json.R
 		dbContent = nil
 	}
 
-	var createdID string
+	// For tool messages, upload content before the TX so the TX stays fast.
+	var retainFn db.RetainObjectRefFunc
+	var toolContentKey string
+	if isTool {
+		var err error
+		retainFn, toolContentKey, err = p.agentStore.UploadToolContent(ctx, p.sessionID, content)
+		if err != nil {
+			return fmt.Errorf("failed to upload tool content to object store: %w", err)
+		}
+	}
 
+	var created *models.AgentSessionMessage
 	if err := p.dbClient.RetryOnOLE(ctx, func() error {
 		txCtx, err := p.dbClient.Transactions.BeginTx(ctx)
 		if err != nil {
@@ -63,20 +73,21 @@ func (p *messagePersister) save(ctx context.Context, role string, content json.R
 			}
 		}()
 
-		created, err := p.dbClient.AgentSessionMessages.CreateAgentSessionMessage(txCtx, &models.AgentSessionMessage{
-			SessionID: p.sessionID,
-			RunID:     p.runID,
-			ParentID:  parentID,
-			Role:      role,
-			Content:   dbContent,
+		created, err = p.dbClient.AgentSessionMessages.CreateAgentSessionMessage(txCtx, &models.AgentSessionMessage{
+			SessionID:                 p.sessionID,
+			RunID:                     p.runID,
+			ParentID:                  parentID,
+			Role:                      role,
+			Content:                   dbContent,
+			ToolContentObjectStoreKey: toolContentKey,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to save session message: %w", err)
 		}
 
 		if isTool {
-			if err := p.agentStore.UploadToolContent(txCtx, p.sessionID, created.Metadata.ID, content); err != nil {
-				return fmt.Errorf("failed to upload tool content to object store: %w", err)
+			if err = retainFn(txCtx, p.sessionID); err != nil {
+				return fmt.Errorf("failed to link tool content object store ref: %w", err)
 			}
 		}
 
@@ -94,13 +105,12 @@ func (p *messagePersister) save(ctx context.Context, role string, content json.R
 			return fmt.Errorf("failed to commit tx for save message: %w", err)
 		}
 
-		createdID = created.Metadata.ID
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	p.lastMessageID = &createdID
+	p.lastMessageID = &created.Metadata.ID
 
 	return nil
 }

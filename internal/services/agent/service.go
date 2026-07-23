@@ -582,18 +582,19 @@ func (s *service) replayRun(ctx context.Context, sessionID string, run *models.A
 		return nil, nil, errors.Wrap(err, "failed to query messages for run replay")
 	}
 
-	toolContentLoader := func(msgID string) (json.RawMessage, error) {
-		return s.agentStore.GetToolContent(ctx, sessionID, msgID)
-	}
-
 	var messageIDs []string
 	for i := range result.AgentSessionMessages {
 		msg := &result.AgentSessionMessages[i]
 		messageIDs = append(messageIDs, msg.Metadata.ID)
+		toolContentLoader := func(_ string) (json.RawMessage, error) {
+			return s.agentStore.GetToolContentForMessage(ctx, msg.ToolContentObjectStoreKey)
+		}
+
 		msgEvents, err := agent.EventsFromMessage(msg, toolContentLoader, false)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to convert message to events for run replay")
 		}
+
 		evts = append(evts, msgEvents...)
 	}
 
@@ -684,9 +685,10 @@ func (s *service) handleMessageEvent(ctx context.Context, sessionID, messageID s
 		return nil, nil
 	}
 
-	evts, err := agent.EventsFromMessage(msg, func(msgID string) (json.RawMessage, error) {
-		return s.agentStore.GetToolContent(ctx, sessionID, msgID)
-	}, includeReasoning)
+	toolContentLoader := func(_ string) (json.RawMessage, error) {
+		return s.agentStore.GetToolContentForMessage(ctx, msg.ToolContentObjectStoreKey)
+	}
+	evts, err := agent.EventsFromMessage(msg, toolContentLoader, includeReasoning)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to convert message to events")
 	}

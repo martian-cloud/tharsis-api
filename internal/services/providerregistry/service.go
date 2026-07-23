@@ -603,7 +603,7 @@ func (s *service) GetProviderVersionReadme(ctx context.Context, providerVersion 
 		}
 	}
 
-	reader, err := s.registryStore.GetProviderVersionReadme(ctx, providerVersion, provider)
+	reader, err := s.registryStore.GetProviderVersionReadme(ctx, ptr.ToString(providerVersion.ReadmeObjectStoreKey))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get provider version readme")
 		return "", err
@@ -1332,6 +1332,16 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 		return errors.New("binary already uploaded", errors.WithErrorCode(errors.EConflict))
 	}
 
+	// Upload before, and outside, the DB update so the slow write doesn't hold a transaction open.
+	binaryRetainFn, binaryKey, err := s.registryStore.UploadProviderPlatformBinary(ctx, providerPlatform, providerVersion, provider, reader)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to upload provider platform binary")
+		return err
+	}
+
+	providerPlatform.BinaryUploaded = true
+	providerPlatform.BinaryObjectStoreKey = &binaryKey
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin DB transaction")
@@ -1340,20 +1350,18 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for UploadProviderPlatformBinary: %v", txErr)
 		}
 	}()
 
-	// Update DB before object storage. If the object storage write fails, the DB transaction will be rolled back
-	providerPlatform.BinaryUploaded = true
 	if _, err := s.dbClient.TerraformProviderPlatforms.UpdateProviderPlatform(txContext, providerPlatform); err != nil {
-		tracing.RecordError(span, err, "failed to update provider platform")
-		return err
+		tracing.RecordError(span, err, "failed to store provider binary key")
+		return errors.Wrap(err, "failed to store provider binary key")
 	}
 
-	if err := s.registryStore.UploadProviderPlatformBinary(ctx, providerPlatform, providerVersion, provider, reader); err != nil {
-		tracing.RecordError(span, err, "failed to upload provider platform binary")
-		return err
+	if err := binaryRetainFn(txContext, providerPlatform.Metadata.ID); err != nil {
+		tracing.RecordError(span, err, "failed to link provider binary object store ref")
+		return errors.Wrap(err, "failed to link provider binary object store ref")
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
@@ -1402,6 +1410,16 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 		return errors.New("README file already uploaded", errors.WithErrorCode(errors.EConflict))
 	}
 
+	// Upload before, and outside, the DB update so the slow write doesn't hold a transaction open.
+	readmeRetainFn, readmeKey, err := s.registryStore.UploadProviderVersionReadme(ctx, providerVersion, provider, reader)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to upload provider version readme")
+		return err
+	}
+
+	providerVersion.ReadmeUploaded = true
+	providerVersion.ReadmeObjectStoreKey = &readmeKey
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin DB transaction")
@@ -1410,20 +1428,18 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for UploadProviderVersionReadme: %v", txErr)
 		}
 	}()
 
-	// Update DB before object storage. If the object storage write fails, the DB transaction will be rolled back
-	providerVersion.ReadmeUploaded = true
 	if _, err := s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, providerVersion); err != nil {
-		tracing.RecordError(span, err, "failed to update provider version")
-		return err
+		tracing.RecordError(span, err, "failed to store provider readme key")
+		return errors.Wrap(err, "failed to store provider readme key")
 	}
 
-	if err := s.registryStore.UploadProviderVersionReadme(ctx, providerVersion, provider, reader); err != nil {
-		tracing.RecordError(span, err, "failed to upload provider version readme")
-		return err
+	if err := readmeRetainFn(txContext, providerVersion.Metadata.ID); err != nil {
+		tracing.RecordError(span, err, "failed to link provider readme object store ref")
+		return errors.Wrap(err, "failed to link provider readme object store ref")
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
@@ -1472,6 +1488,16 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 		return errors.New("shasums file already uploaded", errors.WithErrorCode(errors.EConflict))
 	}
 
+	// Upload before, and outside, the DB update so the slow write doesn't hold a transaction open.
+	sumsRetainFn, sumsKey, err := s.registryStore.UploadProviderVersionSHASums(ctx, providerVersion, provider, reader)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to upload provider version SHA sums")
+		return err
+	}
+
+	providerVersion.SHASumsUploaded = true
+	providerVersion.SHASumsObjectStoreKey = &sumsKey
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin DB transaction")
@@ -1480,20 +1506,18 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for UploadProviderVersionSHA256Sums: %v", txErr)
 		}
 	}()
 
-	// Update DB before object storage. If the object storage write fails, the DB transaction will be rolled back
-	providerVersion.SHASumsUploaded = true
 	if _, err := s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, providerVersion); err != nil {
-		tracing.RecordError(span, err, "failed to update provider version")
-		return err
+		tracing.RecordError(span, err, "failed to store provider SHA sums key")
+		return errors.Wrap(err, "failed to store provider SHA sums key")
 	}
 
-	if err := s.registryStore.UploadProviderVersionSHASums(ctx, providerVersion, provider, reader); err != nil {
-		tracing.RecordError(span, err, "failed to upload provider version SHA sums")
-		return err
+	if err := sumsRetainFn(txContext, providerVersion.Metadata.ID); err != nil {
+		tracing.RecordError(span, err, "failed to link provider SHA sums object store ref")
+		return errors.Wrap(err, "failed to link provider SHA sums object store ref")
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
@@ -1542,18 +1566,6 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 		return errors.New("shasums signature file already uploaded", errors.WithErrorCode(errors.EConflict))
 	}
 
-	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
-	}
-
-	defer func() {
-		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
-		}
-	}()
-
 	var sigBuffer bytes.Buffer
 
 	// Use Tee reader to read signature to get GPG key id
@@ -1600,18 +1612,38 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 
 	gpgKey := searchKeyResult.GPGKeys[0]
 
-	// Update DB before object storage. If the object storage write fails, the DB transaction will be rolled back
-	providerVersion.GPGKeyID = &gpgKey.GPGKeyID
-	providerVersion.GPGASCIIArmor = &gpgKey.ASCIIArmor
-	providerVersion.SHASumsSignatureUploaded = true
-	if _, err := s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, providerVersion); err != nil {
-		tracing.RecordError(span, err, "failed to update provider version")
+	// Upload before, and outside, the DB update so the slow write doesn't hold a transaction open.
+	sigRetainFn, sigKey, err := s.registryStore.UploadProviderVersionSHASumsSignature(ctx, providerVersion, provider, &sigBuffer)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to upload provider version SHA sums signature")
 		return err
 	}
 
-	if err := s.registryStore.UploadProviderVersionSHASumsSignature(ctx, providerVersion, provider, &sigBuffer); err != nil {
-		tracing.RecordError(span, err, "failed to upload provider version SHA sums signature")
+	providerVersion.GPGKeyID = &gpgKey.GPGKeyID
+	providerVersion.GPGASCIIArmor = &gpgKey.ASCIIArmor
+	providerVersion.SHASumsSignatureUploaded = true
+	providerVersion.SHASumsSignatureObjectStoreKey = &sigKey
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for UploadProviderVersionSHA256SumsSignature: %v", txErr)
+		}
+	}()
+
+	if _, err := s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, providerVersion); err != nil {
+		tracing.RecordError(span, err, "failed to store provider SHA sums signature key")
+		return errors.Wrap(err, "failed to store provider SHA sums signature key")
+	}
+
+	if err := sigRetainFn(txContext, providerVersion.Metadata.ID); err != nil {
+		tracing.RecordError(span, err, "failed to link provider SHA sums signature object store ref")
+		return errors.Wrap(err, "failed to link provider SHA sums signature object store ref")
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
@@ -1658,19 +1690,19 @@ func (s *service) GetProviderPlatformDownloadURLs(ctx context.Context, providerP
 		}
 	}
 
-	downloadURL, err := s.registryStore.GetProviderPlatformBinaryPresignedURL(ctx, providerPlatform, providerVersion, provider)
+	downloadURL, err := s.registryStore.GetProviderPlatformBinaryPresignedURL(ctx, ptr.ToString(providerPlatform.BinaryObjectStoreKey))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get provider platform binary presigned URL")
 		return nil, err
 	}
 
-	shaSumsURL, err := s.registryStore.GetProviderVersionSHASumsPresignedURL(ctx, providerVersion, provider)
+	shaSumsURL, err := s.registryStore.GetProviderVersionSHASumsPresignedURL(ctx, ptr.ToString(providerVersion.SHASumsObjectStoreKey))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get provider version SHA sums presigned URL")
 		return nil, err
 	}
 
-	shaSumsSignatureURL, err := s.registryStore.GetProviderVersionSHASumsSignaturePresignedURL(ctx, providerVersion, provider)
+	shaSumsSignatureURL, err := s.registryStore.GetProviderVersionSHASumsSignaturePresignedURL(ctx, ptr.ToString(providerVersion.SHASumsSignatureObjectStoreKey))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get provider version SHA sums signature presigned URL")
 		return nil, err

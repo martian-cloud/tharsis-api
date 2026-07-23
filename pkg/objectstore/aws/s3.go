@@ -29,6 +29,9 @@ const (
 	// defaultAWSPartitionID is used when nothing is specified
 	// for the AWS partition ID in the endpoint resolver.
 	defaultAWSPartitionID = "aws"
+
+	// s3DeleteBatchLimit is the maximum number of keys S3's DeleteObjects accepts in one request.
+	s3DeleteBatchLimit = 1000
 )
 
 // ObjectStore implementation for AWS S3
@@ -226,4 +229,34 @@ func (s *ObjectStore) GetPresignedURL(ctx context.Context, key string) (string, 
 // VerifyPresignedURL is not supported for AWS S3 object store
 func (s *ObjectStore) VerifyPresignedURL(context.Context, string) (string, error) {
 	return "", errors.New("verifying presigned URLs is not supported for AWS S3 object store")
+}
+
+// DeleteObjects deletes objects in batches of up to the S3 per-request limit. Missing keys are not errors.
+func (s *ObjectStore) DeleteObjects(ctx context.Context, keys []string) error {
+	for start := 0; start < len(keys); start += s3DeleteBatchLimit {
+		end := min(start+s3DeleteBatchLimit, len(keys))
+
+		identifiers := make([]types.ObjectIdentifier, 0, end-start)
+		for _, key := range keys[start:end] {
+			identifiers = append(identifiers, types.ObjectIdentifier{Key: aws.String(key)})
+		}
+
+		output, err := s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(s.bucket),
+			Delete: &types.Delete{Objects: identifiers, Quiet: aws.Bool(true)},
+		})
+		if err != nil {
+			s.logger.WithContextFields(ctx).Errorf("Failed to delete objects: %v", err)
+			return err
+		}
+
+		// With Quiet=true, only errors are returned. Missing keys are not errors.
+		if len(output.Errors) > 0 {
+			for _, e := range output.Errors {
+				s.logger.WithContextFields(ctx).Errorf("Failed to delete object at key %s: %s", aws.ToString(e.Key), aws.ToString(e.Message))
+			}
+			return te.New("failed to delete %d object(s) from object storage", len(output.Errors))
+		}
+	}
+	return nil
 }

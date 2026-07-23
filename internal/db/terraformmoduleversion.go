@@ -103,6 +103,7 @@ var moduleVersionFieldList = append(
 	"examples",
 	"latest",
 	"created_by",
+	"package_object_store_key",
 )
 
 // NewTerraformModuleVersions returns an instance of the TerraformModuleVersions interface
@@ -258,21 +259,22 @@ func (t *terraformModuleVersions) CreateModuleVersion(ctx context.Context, modul
 	}
 
 	record := goqu.Record{
-		"id":                newResourceID(),
-		"version":           initialResourceVersion,
-		"created_at":        timestamp,
-		"updated_at":        timestamp,
-		"module_id":         moduleVersion.ModuleID,
-		"semantic_version":  moduleVersion.SemanticVersion,
-		"sha_sum":           moduleVersion.SHASum,
-		"status":            moduleVersion.Status,
-		"error":             nullableString(moduleVersion.Error),
-		"diagnostics":       nullableString(moduleVersion.Diagnostics),
-		"upload_started_at": moduleVersion.UploadStartedTimestamp,
-		"submodules":        submodules,
-		"examples":          examples,
-		"created_by":        moduleVersion.CreatedBy,
-		"latest":            moduleVersion.Latest,
+		"id":                       newResourceID(),
+		"version":                  initialResourceVersion,
+		"created_at":               timestamp,
+		"updated_at":               timestamp,
+		"module_id":                moduleVersion.ModuleID,
+		"semantic_version":         moduleVersion.SemanticVersion,
+		"sha_sum":                  moduleVersion.SHASum,
+		"status":                   moduleVersion.Status,
+		"error":                    nullableString(moduleVersion.Error),
+		"diagnostics":              nullableString(moduleVersion.Diagnostics),
+		"upload_started_at":        moduleVersion.UploadStartedTimestamp,
+		"submodules":               submodules,
+		"examples":                 examples,
+		"created_by":               moduleVersion.CreatedBy,
+		"latest":                   moduleVersion.Latest,
+		"package_object_store_key": moduleVersion.PackageObjectStoreKey,
 	}
 
 	sql, args, err := toSQLWithTag("terraformmoduleversion.CreateModuleVersion", dialect.From("terraform_module_versions").
@@ -336,16 +338,17 @@ func (t *terraformModuleVersions) UpdateModuleVersion(ctx context.Context, modul
 	}
 
 	record := goqu.Record{
-		"version":           goqu.L("? + ?", goqu.C("version"), 1),
-		"updated_at":        timestamp,
-		"sha_sum":           moduleVersion.SHASum,
-		"status":            moduleVersion.Status,
-		"error":             nullableString(moduleVersion.Error),
-		"diagnostics":       nullableString(moduleVersion.Diagnostics),
-		"upload_started_at": moduleVersion.UploadStartedTimestamp,
-		"submodules":        submodules,
-		"examples":          examples,
-		"latest":            moduleVersion.Latest,
+		"version":                  goqu.L("? + ?", goqu.C("version"), 1),
+		"updated_at":               timestamp,
+		"sha_sum":                  moduleVersion.SHASum,
+		"status":                   moduleVersion.Status,
+		"error":                    nullableString(moduleVersion.Error),
+		"diagnostics":              nullableString(moduleVersion.Diagnostics),
+		"upload_started_at":        moduleVersion.UploadStartedTimestamp,
+		"submodules":               submodules,
+		"examples":                 examples,
+		"latest":                   moduleVersion.Latest,
+		"package_object_store_key": moduleVersion.PackageObjectStoreKey,
 	}
 
 	sql, args, err := toSQLWithTag("terraformmoduleversion.UpdateModuleVersion", dialect.From("terraform_module_versions").
@@ -482,6 +485,7 @@ func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, er
 	var groupPath string
 	var moduleName string
 	var moduleSystem string
+	var packageKey *string
 
 	fields := []interface{}{
 		&moduleVersion.Metadata.ID,
@@ -499,6 +503,7 @@ func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, er
 		&moduleVersion.Examples,
 		&moduleVersion.Latest,
 		&moduleVersion.CreatedBy,
+		&packageKey,
 		&groupPath,
 		&moduleName,
 		&moduleSystem,
@@ -520,6 +525,8 @@ func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, er
 	if uploadStartedAt.Valid {
 		moduleVersion.UploadStartedTimestamp = &uploadStartedAt.Time
 	}
+
+	moduleVersion.PackageObjectStoreKey = packageKey
 
 	moduleVersion.Metadata.TRN = trn.TypeTerraformModuleVersion.Build(
 		groupPath,

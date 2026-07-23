@@ -27,4 +27,5 @@ type ObjectStore interface {
 	GetPresignedURL(ctx context.Context, key string) (string, error)
 	DoesObjectExist(ctx context.Context, key string) (bool, error)
 	VerifyPresignedURL(ctx context.Context, urlStr string) (string, error)
+	DeleteObjects(ctx context.Context, keys []string) error
 }

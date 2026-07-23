@@ -23,13 +23,15 @@ type CreateDestroyRunInput struct {
 // CreateDestroyRun creates a destroy run from the workspace's current state,
 // re-running the configuration that produced it.
 type CreateDestroyRun struct {
-	dbClient         *db.Client
-	variablesBuilder *runvariables.Builder
-	moduleResolver   registry.ModuleResolver
-	createRun        createRunFunc
+	dbClient           *db.Client
+	variablesBuilder   *runvariables.Builder
+	moduleResolver     registry.ModuleResolver
+	createRun          createRunFunc
+	uploadRunVariables uploadRunVariablesFunc
 
-	in          *CreateDestroyRunInput
-	createInput *corerun.CreateRunInput
+	in                *CreateDestroyRunInput
+	createInput       *corerun.CreateRunInput
+	variablesRetainFn db.RetainObjectRefFunc
 
 	// Created is populated with the persisted run once Execute succeeds.
 	Created *models.Run
@@ -59,18 +61,24 @@ func (c *CreateDestroyRun) Prepare(ctx context.Context) error {
 		return err
 	}
 
+	variablesRetainFn, variablesObjectKey, err := c.uploadRunVariables(ctx, c.in.WorkspaceID, variables)
+	if err != nil {
+		return errors.Wrap(err, "failed to upload run variables")
+	}
+	c.variablesRetainFn = variablesRetainFn
+
 	c.createInput = &corerun.CreateRunInput{
-		Subject:                c.in.Subject,
-		WorkspaceID:            c.in.WorkspaceID,
-		ConfigurationVersionID: source.ConfigurationVersionID,
-		ModuleSource:           source.ModuleSource,
-		ModuleVersion:          resolvedModule.Version,
-		ModuleDigest:           resolvedModule.Digest,
-		ModuleRegistrySource:   resolvedModule.Source,
-		TerraformVersion:       source.TerraformVersion,
-		IsDestroy:              true,
-		Refresh:                true,
-		Variables:              variables,
+		Subject:                 c.in.Subject,
+		WorkspaceID:             c.in.WorkspaceID,
+		ConfigurationVersionID:  source.ConfigurationVersionID,
+		ModuleSource:            source.ModuleSource,
+		ModuleVersion:           resolvedModule.Version,
+		ModuleDigest:            resolvedModule.Digest,
+		ModuleRegistrySource:    resolvedModule.Source,
+		TerraformVersion:        source.TerraformVersion,
+		IsDestroy:               true,
+		Refresh:                 true,
+		VariablesObjectStoreKey: variablesObjectKey,
 	}
 	return nil
 }
@@ -80,6 +88,10 @@ func (c *CreateDestroyRun) Execute(ctx context.Context, input *types.ExecuteInpu
 	created, err := c.createRun(ctx, c.createInput)
 	if err != nil {
 		return err
+	}
+
+	if err = c.variablesRetainFn(ctx, created.Metadata.ID); err != nil {
+		return errors.Wrap(err, "failed to link run variables object store ref")
 	}
 
 	input.RunStore.AddRun(created)

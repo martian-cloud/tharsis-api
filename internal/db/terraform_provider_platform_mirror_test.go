@@ -106,6 +106,7 @@ func TestTerraformProviderPlatformMirrors_DeleteTerraformProviderPlatformMirror(
 
 	// Create a platform mirror to delete
 	createdPlatformMirror, err := testClient.client.TerraformProviderPlatformMirrors.CreatePlatformMirror(ctx, &models.TerraformProviderPlatformMirror{
+		Metadata:        models.ResourceMetadata{ID: newResourceID()},
 		OS:              "linux",
 		Architecture:    "amd64",
 		VersionMirrorID: versionMirror.Metadata.ID,
@@ -173,6 +174,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrorByID(t *testing.T) {
 
 	// Create a platform mirror for testing
 	createdPlatformMirror, err := testClient.client.TerraformProviderPlatformMirrors.CreatePlatformMirror(ctx, &models.TerraformProviderPlatformMirror{
+		Metadata:        models.ResourceMetadata{ID: newResourceID()},
 		VersionMirrorID: terraformProviderVersionMirror.Metadata.ID,
 		OS:              "linux",
 		Architecture:    "amd64",
@@ -250,11 +252,13 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrors(t *testing.T) {
 	// Create test platform mirrors
 	platformMirrors := []models.TerraformProviderPlatformMirror{
 		{
+			Metadata:        models.ResourceMetadata{ID: newResourceID()},
 			VersionMirrorID: terraformProviderVersionMirror.Metadata.ID,
 			OS:              "linux",
 			Architecture:    "amd64",
 		},
 		{
+			Metadata:        models.ResourceMetadata{ID: newResourceID()},
 			VersionMirrorID: terraformProviderVersionMirror.Metadata.ID,
 			OS:              "darwin",
 			Architecture:    "amd64",
@@ -369,6 +373,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrorsWithPaginationAndSor
 	resourceCount := len(osArchCombinations)
 	for i := 0; i < resourceCount; i++ {
 		_, err := testClient.client.TerraformProviderPlatformMirrors.CreatePlatformMirror(ctx, &models.TerraformProviderPlatformMirror{
+			Metadata:        models.ResourceMetadata{ID: newResourceID()},
 			VersionMirrorID: terraformProviderVersionMirror.Metadata.ID,
 			OS:              osArchCombinations[i].os,
 			Architecture:    osArchCombinations[i].arch,
@@ -429,6 +434,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrorByTRN(t *testing.T) {
 
 	// Create a platform mirror for testing
 	createdPlatformMirror, err := testClient.client.TerraformProviderPlatformMirrors.CreatePlatformMirror(ctx, &models.TerraformProviderPlatformMirror{
+		Metadata:        models.ResourceMetadata{ID: newResourceID()},
 		VersionMirrorID: terraformProviderVersionMirror.Metadata.ID,
 		OS:              "linux",
 		Architecture:    "amd64",

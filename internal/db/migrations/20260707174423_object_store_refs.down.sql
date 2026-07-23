@@ -1,0 +1,16 @@
+ALTER TABLE agent_session_messages DROP COLUMN IF EXISTS tool_content_object_store_key;
+ALTER TABLE log_streams DROP COLUMN IF EXISTS object_store_key;
+ALTER TABLE terraform_provider_platform_mirrors DROP COLUMN IF EXISTS object_store_key;
+ALTER TABLE terraform_provider_platforms DROP COLUMN IF EXISTS binary_object_store_key;
+ALTER TABLE terraform_provider_versions DROP COLUMN IF EXISTS shasums_signature_object_store_key;
+ALTER TABLE terraform_provider_versions DROP COLUMN IF EXISTS shasums_object_store_key;
+ALTER TABLE terraform_provider_versions DROP COLUMN IF EXISTS readme_object_store_key;
+ALTER TABLE terraform_module_versions DROP COLUMN IF EXISTS package_object_store_key;
+ALTER TABLE run_nodes DROP COLUMN IF EXISTS plan_diff_object_store_key;
+ALTER TABLE run_nodes DROP COLUMN IF EXISTS plan_json_object_store_key;
+ALTER TABLE run_nodes DROP COLUMN IF EXISTS plan_cache_object_store_key;
+ALTER TABLE runs DROP COLUMN IF EXISTS variables_object_store_key;
+ALTER TABLE state_versions DROP COLUMN IF EXISTS object_store_key;
+ALTER TABLE configuration_versions DROP COLUMN IF EXISTS object_store_key;
+ALTER TABLE log_stream_chunks RENAME COLUMN object_store_key TO object_key;
+DROP TABLE IF EXISTS object_store_refs;

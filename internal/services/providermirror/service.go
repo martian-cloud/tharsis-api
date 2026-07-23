@@ -793,7 +793,15 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 		return fmt.Errorf("failed to seek package file: %w", err)
 	}
 
-	// Start transaction for DB operations and upload
+	// Upload before the TX -- S3 writes must not run inside a DB transaction. trackedStore creates a
+	// pending ref (null FK + grace window) before writing to S3; we link that ref to the mirror below,
+	// inside the same TX as the row insert so the two commit atomically.
+	retainMirrorRef, mirrorKey, err := s.mirrorStore.UploadProviderPlatformPackage(ctx, packageFile)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to upload provider platform package to object store")
+		return fmt.Errorf("failed to upload provider platform package to object store: %w", err)
+	}
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin DB transaction")
@@ -806,20 +814,20 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 		}
 	}()
 
-	// Create DB records first before uploading
 	platformMirror, err := s.dbClient.TerraformProviderPlatformMirrors.CreatePlatformMirror(txContext, &models.TerraformProviderPlatformMirror{
 		VersionMirrorID: versionMirror.Metadata.ID,
 		OS:              input.OS,
 		Architecture:    input.Architecture,
+		ObjectStoreKey:  mirrorKey,
 	})
 	if err != nil {
 		tracing.RecordError(span, err, "failed to create provider platform mirror")
 		return errors.Wrap(err, "failed to create provider platform mirror")
 	}
 
-	if err = s.mirrorStore.UploadProviderPlatformPackage(txContext, platformMirror.Metadata.ID, packageFile); err != nil {
-		tracing.RecordError(span, err, "failed to upload provider platform package to object store")
-		return fmt.Errorf("failed to upload provider platform package to object store: %w", err)
+	if err := retainMirrorRef(txContext, platformMirror.Metadata.ID); err != nil {
+		tracing.RecordError(span, err, "failed to link provider platform mirror object store ref")
+		return err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
@@ -1033,7 +1041,7 @@ func (s *service) GetInstallationPackage(ctx context.Context, input *GetInstalla
 		return nil, fmt.Errorf("digest not found for provider package: %s", digestKey)
 	}
 
-	presignedURL, err := s.mirrorStore.GetProviderPlatformPackagePresignedURL(ctx, platformMirror.Metadata.ID)
+	presignedURL, err := s.mirrorStore.GetProviderPlatformPackagePresignedURL(ctx, platformMirror.ObjectStoreKey)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get presigned URL")
 		return nil, err
@@ -1064,7 +1072,7 @@ func (s *service) buildSupportedPackages(
 		}
 
 		// Get the presignedURL for downloading this provider package.
-		presignedURL, err := s.mirrorStore.GetProviderPlatformPackagePresignedURL(ctx, mirror.Metadata.ID)
+		presignedURL, err := s.mirrorStore.GetProviderPlatformPackagePresignedURL(ctx, mirror.ObjectStoreKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get provider platform package presigned URL: %w", err)
 		}

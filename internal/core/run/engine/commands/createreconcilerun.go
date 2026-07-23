@@ -23,13 +23,15 @@ type CreateReconcileRunInput struct {
 // CreateReconcileRun creates a reconcile run from the workspace's current state,
 // re-running the configuration that produced it.
 type CreateReconcileRun struct {
-	dbClient         *db.Client
-	variablesBuilder *runvariables.Builder
-	moduleResolver   registry.ModuleResolver
-	createRun        createRunFunc
+	dbClient           *db.Client
+	variablesBuilder   *runvariables.Builder
+	moduleResolver     registry.ModuleResolver
+	createRun          createRunFunc
+	uploadRunVariables uploadRunVariablesFunc
 
-	in          *CreateReconcileRunInput
-	createInput *corerun.CreateRunInput
+	in                *CreateReconcileRunInput
+	createInput       *corerun.CreateRunInput
+	variablesRetainFn db.RetainObjectRefFunc
 
 	// Created is populated with the persisted run once Execute succeeds.
 	Created *models.Run
@@ -59,16 +61,22 @@ func (c *CreateReconcileRun) Prepare(ctx context.Context) error {
 		return err
 	}
 
+	variablesRetainFn, variablesObjectKey, err := c.uploadRunVariables(ctx, c.in.WorkspaceID, variables)
+	if err != nil {
+		return errors.Wrap(err, "failed to upload run variables")
+	}
+	c.variablesRetainFn = variablesRetainFn
+
 	c.createInput = &corerun.CreateRunInput{
-		Subject:                c.in.Subject,
-		WorkspaceID:            c.in.WorkspaceID,
-		ConfigurationVersionID: source.ConfigurationVersionID,
-		ModuleSource:           source.ModuleSource,
-		ModuleVersion:          resolvedModule.Version,
-		ModuleDigest:           resolvedModule.Digest,
-		ModuleRegistrySource:   resolvedModule.Source,
-		Refresh:                true,
-		Variables:              variables,
+		Subject:                 c.in.Subject,
+		WorkspaceID:             c.in.WorkspaceID,
+		ConfigurationVersionID:  source.ConfigurationVersionID,
+		ModuleSource:            source.ModuleSource,
+		ModuleVersion:           resolvedModule.Version,
+		ModuleDigest:            resolvedModule.Digest,
+		ModuleRegistrySource:    resolvedModule.Source,
+		Refresh:                 true,
+		VariablesObjectStoreKey: variablesObjectKey,
 	}
 	return nil
 }
@@ -78,6 +86,10 @@ func (c *CreateReconcileRun) Execute(ctx context.Context, input *types.ExecuteIn
 	created, err := c.createRun(ctx, c.createInput)
 	if err != nil {
 		return err
+	}
+
+	if err = c.variablesRetainFn(ctx, created.Metadata.ID); err != nil {
+		return errors.Wrap(err, "failed to link run variables object store ref")
 	}
 
 	input.RunStore.AddRun(created)

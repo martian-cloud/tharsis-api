@@ -6,6 +6,8 @@ import (
 	context "context"
 	io "io"
 
+	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+
 	mock "github.com/stretchr/testify/mock"
 
 	models "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -16,9 +18,9 @@ type MockRegistryStore struct {
 	mock.Mock
 }
 
-// GetProviderPlatformBinaryPresignedURL provides a mock function with given fields: ctx, providerPlatform, providerVersion, provider
-func (_m *MockRegistryStore) GetProviderPlatformBinaryPresignedURL(ctx context.Context, providerPlatform *models.TerraformProviderPlatform, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) (string, error) {
-	ret := _m.Called(ctx, providerPlatform, providerVersion, provider)
+// GetProviderPlatformBinaryPresignedURL provides a mock function with given fields: ctx, objectKey
+func (_m *MockRegistryStore) GetProviderPlatformBinaryPresignedURL(ctx context.Context, objectKey string) (string, error) {
+	ret := _m.Called(ctx, objectKey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetProviderPlatformBinaryPresignedURL")
@@ -26,17 +28,17 @@ func (_m *MockRegistryStore) GetProviderPlatformBinaryPresignedURL(ctx context.C
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderPlatform, *models.TerraformProviderVersion, *models.TerraformProvider) (string, error)); ok {
-		return rf(ctx, providerPlatform, providerVersion, provider)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, objectKey)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderPlatform, *models.TerraformProviderVersion, *models.TerraformProvider) string); ok {
-		r0 = rf(ctx, providerPlatform, providerVersion, provider)
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, objectKey)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderPlatform, *models.TerraformProviderVersion, *models.TerraformProvider) error); ok {
-		r1 = rf(ctx, providerPlatform, providerVersion, provider)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, objectKey)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -44,9 +46,9 @@ func (_m *MockRegistryStore) GetProviderPlatformBinaryPresignedURL(ctx context.C
 	return r0, r1
 }
 
-// GetProviderVersionReadme provides a mock function with given fields: ctx, providerVersion, provider
-func (_m *MockRegistryStore) GetProviderVersionReadme(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) (io.ReadCloser, error) {
-	ret := _m.Called(ctx, providerVersion, provider)
+// GetProviderVersionReadme provides a mock function with given fields: ctx, objectKey
+func (_m *MockRegistryStore) GetProviderVersionReadme(ctx context.Context, objectKey string) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, objectKey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetProviderVersionReadme")
@@ -54,19 +56,19 @@ func (_m *MockRegistryStore) GetProviderVersionReadme(ctx context.Context, provi
 
 	var r0 io.ReadCloser
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) (io.ReadCloser, error)); ok {
-		return rf(ctx, providerVersion, provider)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (io.ReadCloser, error)); ok {
+		return rf(ctx, objectKey)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) io.ReadCloser); ok {
-		r0 = rf(ctx, providerVersion, provider)
+	if rf, ok := ret.Get(0).(func(context.Context, string) io.ReadCloser); ok {
+		r0 = rf(ctx, objectKey)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(io.ReadCloser)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) error); ok {
-		r1 = rf(ctx, providerVersion, provider)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, objectKey)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -74,9 +76,9 @@ func (_m *MockRegistryStore) GetProviderVersionReadme(ctx context.Context, provi
 	return r0, r1
 }
 
-// GetProviderVersionSHASumsPresignedURL provides a mock function with given fields: ctx, providerVersion, provider
-func (_m *MockRegistryStore) GetProviderVersionSHASumsPresignedURL(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) (string, error) {
-	ret := _m.Called(ctx, providerVersion, provider)
+// GetProviderVersionSHASumsPresignedURL provides a mock function with given fields: ctx, objectKey
+func (_m *MockRegistryStore) GetProviderVersionSHASumsPresignedURL(ctx context.Context, objectKey string) (string, error) {
+	ret := _m.Called(ctx, objectKey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetProviderVersionSHASumsPresignedURL")
@@ -84,17 +86,17 @@ func (_m *MockRegistryStore) GetProviderVersionSHASumsPresignedURL(ctx context.C
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) (string, error)); ok {
-		return rf(ctx, providerVersion, provider)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, objectKey)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) string); ok {
-		r0 = rf(ctx, providerVersion, provider)
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, objectKey)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) error); ok {
-		r1 = rf(ctx, providerVersion, provider)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, objectKey)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -102,9 +104,9 @@ func (_m *MockRegistryStore) GetProviderVersionSHASumsPresignedURL(ctx context.C
 	return r0, r1
 }
 
-// GetProviderVersionSHASumsSignaturePresignedURL provides a mock function with given fields: ctx, providerVersion, provider
-func (_m *MockRegistryStore) GetProviderVersionSHASumsSignaturePresignedURL(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) (string, error) {
-	ret := _m.Called(ctx, providerVersion, provider)
+// GetProviderVersionSHASumsSignaturePresignedURL provides a mock function with given fields: ctx, objectKey
+func (_m *MockRegistryStore) GetProviderVersionSHASumsSignaturePresignedURL(ctx context.Context, objectKey string) (string, error) {
+	ret := _m.Called(ctx, objectKey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetProviderVersionSHASumsSignaturePresignedURL")
@@ -112,17 +114,17 @@ func (_m *MockRegistryStore) GetProviderVersionSHASumsSignaturePresignedURL(ctx 
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) (string, error)); ok {
-		return rf(ctx, providerVersion, provider)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, objectKey)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) string); ok {
-		r0 = rf(ctx, providerVersion, provider)
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, objectKey)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) error); ok {
-		r1 = rf(ctx, providerVersion, provider)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, objectKey)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -131,75 +133,151 @@ func (_m *MockRegistryStore) GetProviderVersionSHASumsSignaturePresignedURL(ctx 
 }
 
 // UploadProviderPlatformBinary provides a mock function with given fields: ctx, providerPlatform, providerVersion, provider, body
-func (_m *MockRegistryStore) UploadProviderPlatformBinary(ctx context.Context, providerPlatform *models.TerraformProviderPlatform, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, body io.Reader) error {
+func (_m *MockRegistryStore) UploadProviderPlatformBinary(ctx context.Context, providerPlatform *models.TerraformProviderPlatform, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, providerPlatform, providerVersion, provider, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadProviderPlatformBinary")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderPlatform, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderPlatform, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, providerPlatform, providerVersion, provider, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderPlatform, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, providerPlatform, providerVersion, provider, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderPlatform, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) string); ok {
+		r1 = rf(ctx, providerPlatform, providerVersion, provider, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.TerraformProviderPlatform, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) error); ok {
+		r2 = rf(ctx, providerPlatform, providerVersion, provider, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UploadProviderVersionReadme provides a mock function with given fields: ctx, providerVersion, provider, body
-func (_m *MockRegistryStore) UploadProviderVersionReadme(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, body io.Reader) error {
+func (_m *MockRegistryStore) UploadProviderVersionReadme(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, providerVersion, provider, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadProviderVersionReadme")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, providerVersion, provider, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, providerVersion, provider, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) string); ok {
+		r1 = rf(ctx, providerVersion, provider, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) error); ok {
+		r2 = rf(ctx, providerVersion, provider, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UploadProviderVersionSHASums provides a mock function with given fields: ctx, providerVersion, provider, body
-func (_m *MockRegistryStore) UploadProviderVersionSHASums(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, body io.Reader) error {
+func (_m *MockRegistryStore) UploadProviderVersionSHASums(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, providerVersion, provider, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadProviderVersionSHASums")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, providerVersion, provider, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, providerVersion, provider, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) string); ok {
+		r1 = rf(ctx, providerVersion, provider, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) error); ok {
+		r2 = rf(ctx, providerVersion, provider, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UploadProviderVersionSHASumsSignature provides a mock function with given fields: ctx, providerVersion, provider, body
-func (_m *MockRegistryStore) UploadProviderVersionSHASumsSignature(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, body io.Reader) error {
+func (_m *MockRegistryStore) UploadProviderVersionSHASumsSignature(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, providerVersion, provider, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadProviderVersionSHASumsSignature")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) error); ok {
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, providerVersion, provider, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) db.RetainObjectRefFunc); ok {
 		r0 = rf(ctx, providerVersion, provider, body)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) string); ok {
+		r1 = rf(ctx, providerVersion, provider, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) error); ok {
+		r2 = rf(ctx, providerVersion, provider, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // NewMockRegistryStore creates a new instance of MockRegistryStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

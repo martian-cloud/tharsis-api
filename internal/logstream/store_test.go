@@ -96,7 +96,7 @@ func TestReadRange(t *testing.T) {
 				)
 			}
 
-			logStore := NewLogStore(&mockObjectStore)
+			logStore := NewLogStore(&mockObjectStore, nil)
 
 			reader, err := logStore.ReadRange(ctx, "logstreams/stream-1/chunk-1.txt", test.offset, test.length)
 			if err != nil {
@@ -198,9 +198,9 @@ func TestWriteChunk(t *testing.T) {
 			})
 			mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, bodyMatcher).Return(test.retErr).Maybe()
 
-			logStore := NewLogStore(&mockObjectStore)
+			logStore := NewLogStore(&mockObjectStore, nil)
 
-			err := logStore.WriteChunk(ctx, "logstreams/stream-1/chunk-1.txt", test.byteOffset, []byte(test.logsToUpload))
+			_, err := logStore.WriteChunk(ctx, "logstreams/stream-1/chunk-1.txt", test.byteOffset, []byte(test.logsToUpload))
 			if err != nil {
 				assert.True(t, test.expectErr, "Error was not expected %v", err)
 				if test.expectedCode != "" {
@@ -215,36 +215,6 @@ func TestWriteChunk(t *testing.T) {
 	}
 }
 
-func TestWriteObject(t *testing.T) {
-	t.Run("streams the reader through to the object store", func(t *testing.T) {
-		ctx := context.Background()
-
-		mockObjectStore := objectstore.MockObjectStore{}
-		bodyMatcher := mock.MatchedBy(func(r io.Reader) bool {
-			body, _ := io.ReadAll(r)
-			return string(body) == "consolidated logs"
-		})
-		mockObjectStore.On("UploadObject", mock.Anything, "logstreams/stream-1.txt", bodyMatcher).Return(nil)
-
-		logStore := NewLogStore(&mockObjectStore)
-		err := logStore.WriteObject(ctx, "logstreams/stream-1.txt", strings.NewReader("consolidated logs"))
-		require.NoError(t, err)
-		mockObjectStore.AssertExpectations(t)
-	})
-
-	t.Run("propagates an upload error", func(t *testing.T) {
-		ctx := context.Background()
-
-		mockObjectStore := objectstore.MockObjectStore{}
-		mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, mock.Anything).
-			Return(errors.New("object store down"))
-
-		logStore := NewLogStore(&mockObjectStore)
-		err := logStore.WriteObject(ctx, "logstreams/stream-1.txt", strings.NewReader("data"))
-		require.Error(t, err)
-	})
-}
-
 func TestWriteChunkEdgeCases(t *testing.T) {
 	t.Run("a zero-length write at offset 0 uploads an empty object without reading a prefix", func(t *testing.T) {
 		ctx := context.Background()
@@ -256,8 +226,8 @@ func TestWriteChunkEdgeCases(t *testing.T) {
 		})
 		mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, bodyMatcher).Return(nil)
 
-		logStore := NewLogStore(&mockObjectStore)
-		err := logStore.WriteChunk(ctx, "logstreams/stream-1/c0.txt", 0, []byte{})
+		logStore := NewLogStore(&mockObjectStore, nil)
+		_, err := logStore.WriteChunk(ctx, "logstreams/stream-1/c0.txt", 0, []byte{})
 		require.NoError(t, err)
 		// byteOffset 0 skips the prefix read entirely.
 		mockObjectStore.AssertNotCalled(t, "GetObjectStream", mock.Anything, mock.Anything, mock.Anything)
@@ -275,8 +245,8 @@ func TestWriteChunkEdgeCases(t *testing.T) {
 		})
 		mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, bodyMatcher).Return(nil)
 
-		logStore := NewLogStore(&mockObjectStore)
-		err := logStore.WriteChunk(ctx, "logstreams/stream-1/c0.txt", 0, []byte("fresh"))
+		logStore := NewLogStore(&mockObjectStore, nil)
+		_, err := logStore.WriteChunk(ctx, "logstreams/stream-1/c0.txt", 0, []byte("fresh"))
 		require.NoError(t, err)
 		mockObjectStore.AssertNotCalled(t, "GetObjectStream", mock.Anything, mock.Anything, mock.Anything)
 		mockObjectStore.AssertExpectations(t)
@@ -288,7 +258,7 @@ func TestReadRangeNegativeArgs(t *testing.T) {
 
 	t.Run("negative offset is rejected without touching the object store", func(t *testing.T) {
 		mockObjectStore := objectstore.MockObjectStore{}
-		logStore := NewLogStore(&mockObjectStore)
+		logStore := NewLogStore(&mockObjectStore, nil)
 
 		_, err := logStore.ReadRange(ctx, "logstreams/stream-1/c0.txt", -1, 10)
 		require.Error(t, err)
@@ -298,7 +268,7 @@ func TestReadRangeNegativeArgs(t *testing.T) {
 
 	t.Run("negative length is rejected without touching the object store", func(t *testing.T) {
 		mockObjectStore := objectstore.MockObjectStore{}
-		logStore := NewLogStore(&mockObjectStore)
+		logStore := NewLogStore(&mockObjectStore, nil)
 
 		_, err := logStore.ReadRange(ctx, "logstreams/stream-1/c0.txt", 0, -1)
 		require.Error(t, err)

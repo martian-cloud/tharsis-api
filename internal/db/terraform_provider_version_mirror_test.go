@@ -242,6 +242,7 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrors(t *testing.T) {
 
 	// Create a platform mirror for the first version mirror to test HasPackages filter
 	_, err = testClient.client.TerraformProviderPlatformMirrors.CreatePlatformMirror(ctx, &models.TerraformProviderPlatformMirror{
+		Metadata:        models.ResourceMetadata{ID: newResourceID()},
 		VersionMirrorID: createdMirrors[0].Metadata.ID,
 		OS:              "linux",
 		Architecture:    "amd64",

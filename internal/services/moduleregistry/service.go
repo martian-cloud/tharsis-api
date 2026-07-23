@@ -1502,6 +1502,23 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 		return errors.New("module package already uploaded", errors.WithErrorCode(errors.EConflict))
 	}
 
+	checksum := sha256.New()
+
+	// Create Tee reader which will writer to the multi writer
+	teeReader := io.TeeReader(reader, checksum)
+
+	// Upload before, and outside, the DB update so the slow write doesn't hold a transaction open.
+	retainFn, pkgKey, err := s.registryStore.UploadModulePackage(ctx, moduleVersion, module, teeReader)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to upload module package")
+		return err
+	}
+	moduleVersion.PackageObjectStoreKey = &pkgKey
+
+	currentTime := time.Now()
+	moduleVersion.UploadStartedTimestamp = &currentTime
+	moduleVersion.Status = models.TerraformModuleVersionStatusUploadInProgress
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin DB transaction")
@@ -1510,27 +1527,18 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for UploadModuleVersionPackage: %v", txErr)
 		}
 	}()
 
-	currentTime := time.Now()
-	// Update DB before object storage. If the object storage write fails, the DB transaction will be rolled back
-	moduleVersion.UploadStartedTimestamp = &currentTime
-	moduleVersion.Status = models.TerraformModuleVersionStatusUploadInProgress
 	updatedModuleVersion, err := s.dbClient.TerraformModuleVersions.UpdateModuleVersion(txContext, moduleVersion)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update module version")
-		return err
+		tracing.RecordError(span, err, "failed to store module package key")
+		return errors.Wrap(err, "failed to store module package key")
 	}
 
-	checksum := sha256.New()
-
-	// Create Tee reader which will writer to the multi writer
-	teeReader := io.TeeReader(reader, checksum)
-
-	if err = s.registryStore.UploadModulePackage(ctx, updatedModuleVersion, module, teeReader); err != nil {
-		tracing.RecordError(span, err, "failed to upload module package")
+	if err = retainFn(txContext, moduleVersion.Metadata.ID); err != nil {
+		tracing.RecordError(span, err, "failed to link module package object store ref")
 		return err
 	}
 
@@ -1588,7 +1596,7 @@ func (s *service) GetModuleVersionPackageDownloadURL(ctx context.Context, module
 		}
 	}
 
-	downloadURL, err := s.registryStore.GetModulePackagePresignedURL(ctx, moduleVersion, module)
+	downloadURL, err := s.registryStore.GetModulePackagePresignedURL(ctx, ptr.ToString(moduleVersion.PackageObjectStoreKey))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get module package presigned URL")
 		return "", err
@@ -1631,8 +1639,8 @@ func (s *service) uploadModuleMetadata(ctx context.Context, module *models.Terra
 	defer slugFile.Close()
 	defer os.Remove(slugFile.Name())
 
-	if err = s.registryStore.DownloadModulePackage(ctx, moduleVersion, module, slugFile); err != nil {
-		return err
+	if err = s.registryStore.DownloadModulePackage(ctx, ptr.ToString(moduleVersion.PackageObjectStoreKey), slugFile); err != nil {
+		return errors.Wrap(err, "failed to download module package")
 	}
 
 	moduleDir, err := os.MkdirTemp("", "unpacked-slug")
@@ -1653,17 +1661,33 @@ func (s *service) uploadModuleMetadata(ctx context.Context, module *models.Terra
 		return err
 	}
 
-	if err = s.registryStore.UploadModuleConfigurationDetails(ctx, parseResponse.Root, moduleVersion, module); err != nil {
-		return err
+	moduleVersionID := moduleVersion.Metadata.ID
+
+	rootRetainFn, _, err := s.registryStore.UploadModuleConfigurationDetails(ctx, parseResponse.Root, moduleVersion, module)
+	if err != nil {
+		return errors.Wrap(err, "failed to upload root module configuration")
 	}
 
+	if err = rootRetainFn(ctx, moduleVersionID); err != nil {
+		return errors.Wrap(err, "failed to link root module configuration object store ref")
+	}
+
+	// retainFn calls below run with plain ctx (not a TX). Interruption mid-loop leaves some refs
+	// unlinked (pending orphans) until their grace period expires -- intentional, not a bug.
+	// Wrapping in a TX would require the entire async task to be transactional, which is overkill
+	// for metadata that can safely be re-uploaded on retry.
 	moduleVersion.Submodules = []string{}
 	for _, submodule := range parseResponse.Submodules {
 		moduleVersion.Submodules = append(moduleVersion.Submodules, strings.Split(submodule.Path, "/")[1])
 
 		submoduleCopy := submodule
-		if err = s.registryStore.UploadModuleConfigurationDetails(ctx, &submoduleCopy, moduleVersion, module); err != nil {
-			return err
+		subRetainFn, _, err := s.registryStore.UploadModuleConfigurationDetails(ctx, &submoduleCopy, moduleVersion, module)
+		if err != nil {
+			return errors.Wrap(err, "failed to upload submodule configuration")
+		}
+
+		if err = subRetainFn(ctx, moduleVersionID); err != nil {
+			return errors.Wrap(err, "failed to link submodule configuration object store ref")
 		}
 	}
 
@@ -1672,8 +1696,12 @@ func (s *service) uploadModuleMetadata(ctx context.Context, module *models.Terra
 		moduleVersion.Examples = append(moduleVersion.Examples, strings.Split(example.Path, "/")[1])
 
 		exampleCopy := example
-		if err = s.registryStore.UploadModuleConfigurationDetails(ctx, &exampleCopy, moduleVersion, module); err != nil {
-			return err
+		exRetainFn, _, err := s.registryStore.UploadModuleConfigurationDetails(ctx, &exampleCopy, moduleVersion, module)
+		if err != nil {
+			return errors.Wrap(err, "failed to upload example configuration")
+		}
+		if err = exRetainFn(ctx, moduleVersionID); err != nil {
+			return errors.Wrap(err, "failed to link example configuration object store ref")
 		}
 	}
 
@@ -1695,7 +1723,7 @@ func (s *service) uploadModuleMetadata(ctx context.Context, module *models.Terra
 
 	_, err = s.dbClient.TerraformModuleVersions.UpdateModuleVersion(ctx, moduleVersion)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to update module version")
 	}
 
 	return nil

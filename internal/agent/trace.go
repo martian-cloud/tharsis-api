@@ -22,5 +22,11 @@ func (r *traceRepository) Save(ctx context.Context, t *trace.Trace) error {
 	if err != nil {
 		return err
 	}
-	return r.store.UploadTrace(ctx, r.sessionID, t.TraceID, data)
+
+	retainFn, _, err := r.store.UploadTrace(ctx, r.sessionID, t.TraceID, data)
+	if err != nil {
+		return err
+	}
+
+	return retainFn(ctx, r.sessionID)
 }

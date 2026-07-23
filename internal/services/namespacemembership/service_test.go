@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/builder"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -748,6 +749,152 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateNamespaceMembership_SkipNotification(t *testing.T) {
+	// When SkipNotification=true, CreateNamespaceMembership must not kick off an email task.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	const userID = "user1"
+
+	mockNamespaceMemberships := db.MockNamespaceMemberships{}
+	mockNamespaceMemberships.Test(t)
+	mockTransactions := db.MockTransactions{}
+	mockTransactions.Test(t)
+	mockRoles := db.MockRoles{}
+	mockRoles.Test(t)
+	mockUsers := db.MockUsers{}
+	mockUsers.Test(t)
+	mockServiceAccounts := db.MockServiceAccounts{}
+	mockServiceAccounts.Test(t)
+
+	mockCaller := auth.MockCaller{}
+	mockCaller.Test(t)
+	mockCaller.On("RequirePermission", mock.Anything, models.CreateNamespaceMembershipPermission, mock.Anything).Return(nil)
+
+	expectedMembership := &models.NamespaceMembership{
+		Namespace: models.MembershipNamespace{Path: "ns1", GroupID: ptr.String("group1")},
+		RoleID:    models.DeployerRoleID.String(),
+		UserID:    ptr.String(userID),
+	}
+
+	mockNamespaceMemberships.On("CreateNamespaceMembership", mock.Anything, mock.Anything).Return(expectedMembership, nil)
+	mockNamespaceMemberships.On("GetNamespaceMemberships", mock.Anything, mock.Anything).
+		Return(&db.NamespaceMembershipResult{}, nil).Maybe()
+	mockRoles.On("GetRoleByID", mock.Anything, models.DeployerRoleID.String()).Return(&models.Role{Name: "deployer"}, nil)
+	mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
+	mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+	mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+	mockUsers.On("GetUserByID", mock.Anything, mock.Anything).Return(&models.User{Username: "u", Email: "u@example.invalid"}, nil)
+	mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, mock.Anything).
+		Return(&models.ServiceAccount{Metadata: models.ResourceMetadata{TRN: trn.TypeServiceAccount.Build("ns1/sa")}}, nil)
+
+	mockEmailClient := email.NewMockClient(t)
+	mockNotifMgr := namespace.MockNotificationManager{}
+	mockNotifMgr.Test(t)
+	// No StartTask expectation -- it must NOT be called.
+	mockTaskManager := asynctask.MockManager{}
+	mockTaskManager.Test(t)
+
+	testLogger, _ := logger.NewForTest()
+	svc := NewService(testLogger, &db.Client{
+		NamespaceMemberships: &mockNamespaceMemberships,
+		Transactions:         &mockTransactions,
+		Roles:                &mockRoles,
+		Users:                &mockUsers,
+		ServiceAccounts:      &mockServiceAccounts,
+	}, mockEmailClient, &mockNotifMgr, &mockTaskManager)
+
+	_, err := svc.CreateNamespaceMembership(auth.WithCaller(ctx, &mockCaller), &CreateNamespaceMembershipInput{
+		NamespacePath:    "ns1",
+		RoleID:           models.DeployerRoleID.String(),
+		User:             &models.User{Metadata: models.ResourceMetadata{ID: userID}},
+		SkipNotification: true,
+	})
+	require.NoError(t, err)
+	mockTaskManager.AssertNotCalled(t, "StartTask")
+}
+
+func TestCreateNamespaceMembership_CallerIsSubject(t *testing.T) {
+	// When the caller's user ID matches the membership subject, no email task should be started.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	const userID = "user1"
+
+	mockNamespaceMemberships := db.MockNamespaceMemberships{}
+	mockNamespaceMemberships.Test(t)
+	mockTransactions := db.MockTransactions{}
+	mockTransactions.Test(t)
+	mockRoles := db.MockRoles{}
+	mockRoles.Test(t)
+	mockUsers := db.MockUsers{}
+	mockUsers.Test(t)
+	mockServiceAccounts := db.MockServiceAccounts{}
+	mockServiceAccounts.Test(t)
+
+	expectedMembership := &models.NamespaceMembership{
+		Namespace: models.MembershipNamespace{Path: "ns1", GroupID: ptr.String("group1")},
+		RoleID:    models.DeployerRoleID.String(),
+		UserID:    ptr.String(userID),
+	}
+
+	mockNamespaceMemberships.On("CreateNamespaceMembership", mock.Anything, mock.Anything).Return(expectedMembership, nil)
+	mockNamespaceMemberships.On("GetNamespaceMemberships", mock.Anything, mock.Anything).
+		Return(&db.NamespaceMembershipResult{}, nil).Maybe()
+	mockRoles.On("GetRoleByID", mock.Anything, models.DeployerRoleID.String()).Return(&models.Role{Name: "deployer"}, nil)
+	mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+	mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+	mockUsers.On("GetUserByID", mock.Anything, mock.Anything).Return(&models.User{Username: "u", Email: "u@example.invalid"}, nil)
+	mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, mock.Anything).
+		Return(&models.ServiceAccount{Metadata: models.ResourceMetadata{TRN: trn.TypeServiceAccount.Build("ns1/sa")}}, nil)
+
+	mockActivityEvents := db.NewMockActivityEvents(t)
+	mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
+		Return(&models.ActivityEvent{}, nil)
+
+	mockAuthorizer := auth.NewMockAuthorizer(t)
+	mockAuthorizer.On("RequireAccess", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+	mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+
+	// Caller's user ID matches the membership subject.
+	userCaller := auth.NewUserCaller(
+		&models.User{Metadata: models.ResourceMetadata{ID: userID}},
+		mockAuthorizer,
+		&db.Client{},
+		mockMaintenanceMonitor,
+		nil,
+	)
+	callerCtx := auth.WithCaller(ctx, userCaller)
+
+	mockTransactions.On("BeginTx", mock.Anything).Return(callerCtx, nil)
+
+	mockEmailClient := email.NewMockClient(t)
+	mockNotifMgr := namespace.MockNotificationManager{}
+	mockNotifMgr.Test(t)
+	// No StartTask expectation -- it must NOT be called.
+	mockTaskManager := asynctask.MockManager{}
+	mockTaskManager.Test(t)
+
+	testLogger, _ := logger.NewForTest()
+	svc := NewService(testLogger, &db.Client{
+		NamespaceMemberships: &mockNamespaceMemberships,
+		Transactions:         &mockTransactions,
+		Roles:                &mockRoles,
+		Users:                &mockUsers,
+		ServiceAccounts:      &mockServiceAccounts,
+		ActivityEvents:       mockActivityEvents,
+	}, mockEmailClient, &mockNotifMgr, &mockTaskManager)
+
+	_, err := svc.CreateNamespaceMembership(callerCtx, &CreateNamespaceMembershipInput{
+		NamespacePath: "ns1",
+		RoleID:        models.DeployerRoleID.String(),
+		User:          &models.User{Metadata: models.ResourceMetadata{ID: userID}},
+	})
+	require.NoError(t, err)
+	mockTaskManager.AssertNotCalled(t, "StartTask")
 }
 
 func TestDeleteNamespaceMembership(t *testing.T) {
