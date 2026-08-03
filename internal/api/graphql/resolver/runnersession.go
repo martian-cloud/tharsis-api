@@ -238,8 +238,15 @@ func handleCreateRunnerSessionMutationProblem(e error,
 
 func createRunnerSessionMutation(ctx context.Context,
 	input *CreateRunnerSessionInput) (*CreateRunnerSessionMutationPayloadResolver, error) {
-	createdRunnerSession, err := getServiceCatalog(ctx).RunnerService.CreateRunnerSession(ctx, &runner.CreateRunnerSessionInput{
-		RunnerID: trn.TypeRunner.Build(input.RunnerPath),
+	serviceCatalog := getServiceCatalog(ctx)
+
+	runnerID, err := serviceCatalog.FetchModelID(ctx, trn.TypeRunner.Build(input.RunnerPath))
+	if err != nil {
+		return nil, err
+	}
+
+	createdRunnerSession, err := serviceCatalog.RunnerService.CreateRunnerSession(ctx, &runner.CreateRunnerSessionInput{
+		RunnerID: runnerID,
 	})
 	if err != nil {
 		return nil, err
