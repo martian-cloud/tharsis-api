@@ -154,6 +154,99 @@ func TestGetProviderMirrorEnabled(t *testing.T) {
 	})
 }
 
+func TestGetOutputVisibility(t *testing.T) {
+	rootGroup := &models.Group{FullPath: "root", Metadata: models.ResourceMetadata{ID: "root-id"}}
+	childGroup := &models.Group{FullPath: "root/child", ParentID: "root-id", Metadata: models.ResourceMetadata{ID: "child-id"}}
+
+	t.Run("returns value from namespace when set", func(t *testing.T) {
+		v := models.OutputVisibilityBlockAccess
+		group := &models.Group{
+			FullPath:         "root/child",
+			OutputVisibility: &v,
+		}
+
+		resolver := NewInheritedSettingResolver(&db.Client{})
+		result, err := resolver.GetOutputVisibility(t.Context(), group)
+
+		require.NoError(t, err)
+		assert.False(t, result.Inherited)
+		assert.Equal(t, "root/child", result.NamespacePath)
+		assert.Equal(t, models.OutputVisibilityBlockAccess, result.Value)
+	})
+
+	t.Run("returns default for root group without setting", func(t *testing.T) {
+		resolver := NewInheritedSettingResolver(&db.Client{})
+		result, err := resolver.GetOutputVisibility(t.Context(), rootGroup)
+
+		require.NoError(t, err)
+		assert.False(t, result.Inherited)
+		assert.Equal(t, "root", result.NamespacePath)
+		assert.Equal(t, models.DefaultOutputVisibility, result.Value)
+	})
+
+	t.Run("inherits value from parent group", func(t *testing.T) {
+		v := models.OutputVisibilityDirectGroupOnly
+		mockGroups := db.NewMockGroups(t)
+		mockGroups.On("GetGroups", t.Context(), mock.MatchedBy(func(input *db.GetGroupsInput) bool {
+			return input.Filter != nil && len(input.Filter.GroupPaths) == 1 && input.Filter.GroupPaths[0] == "root"
+		})).Return(&db.GroupsResult{
+			Groups: []models.Group{{FullPath: "root", OutputVisibility: &v}},
+		}, nil)
+
+		resolver := NewInheritedSettingResolver(&db.Client{Groups: mockGroups})
+		result, err := resolver.GetOutputVisibility(t.Context(), childGroup)
+
+		require.NoError(t, err)
+		assert.True(t, result.Inherited)
+		assert.Equal(t, "root", result.NamespacePath)
+		assert.Equal(t, models.OutputVisibilityDirectGroupOnly, result.Value)
+	})
+
+	t.Run("returns default when no ancestor has setting", func(t *testing.T) {
+		mockGroups := db.NewMockGroups(t)
+		mockGroups.On("GetGroups", t.Context(), mock.MatchedBy(func(input *db.GetGroupsInput) bool {
+			return input.Filter != nil && len(input.Filter.GroupPaths) == 1 && input.Filter.GroupPaths[0] == "root"
+		})).Return(&db.GroupsResult{
+			Groups: []models.Group{{FullPath: "root"}},
+		}, nil)
+
+		resolver := NewInheritedSettingResolver(&db.Client{Groups: mockGroups})
+		result, err := resolver.GetOutputVisibility(t.Context(), childGroup)
+
+		require.NoError(t, err)
+		assert.True(t, result.Inherited)
+		assert.Equal(t, "root", result.NamespacePath)
+		assert.Equal(t, models.DefaultOutputVisibility, result.Value)
+	})
+
+	t.Run("workspace inherits from parent group", func(t *testing.T) {
+		v := models.OutputVisibilityGlobal
+		workspace := &models.Workspace{
+			FullPath: "root/child/my-ws",
+			GroupID:  "child-id",
+			Metadata: models.ResourceMetadata{ID: "ws-id"},
+		}
+
+		mockGroups := db.NewMockGroups(t)
+		mockGroups.On("GetGroups", t.Context(), mock.MatchedBy(func(input *db.GetGroupsInput) bool {
+			return input.Filter != nil && len(input.Filter.GroupPaths) == 2
+		})).Return(&db.GroupsResult{
+			Groups: []models.Group{
+				{FullPath: "root/child", ParentID: "root-id", OutputVisibility: &v},
+				{FullPath: "root"},
+			},
+		}, nil)
+
+		resolver := NewInheritedSettingResolver(&db.Client{Groups: mockGroups})
+		result, err := resolver.GetOutputVisibility(t.Context(), workspace)
+
+		require.NoError(t, err)
+		assert.True(t, result.Inherited)
+		assert.Equal(t, "root/child", result.NamespacePath)
+		assert.Equal(t, models.OutputVisibilityGlobal, result.Value)
+	})
+}
+
 func TestGetNotificationPreferences(t *testing.T) {
 
 	type testCase struct {

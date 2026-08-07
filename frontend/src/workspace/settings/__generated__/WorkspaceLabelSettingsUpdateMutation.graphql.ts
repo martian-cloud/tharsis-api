@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e5daaa3736e0a8d279fd9d4056523693>>
+ * @generated SignedSource<<9382dc34e6a3b501fe317bfdbd294785>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,6 +9,7 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
+export type NamespaceOutputVisibilityLevel = "block_access" | "direct_group_and_subgroups" | "direct_group_only" | "global" | "root_group" | "%future added value";
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type UpdateWorkspaceInput = {
   clientMutationId?: string | null | undefined;
@@ -18,6 +19,7 @@ export type UpdateWorkspaceInput = {
   labels?: ReadonlyArray<WorkspaceLabelInput> | null | undefined;
   maxJobDuration?: number | null | undefined;
   metadata?: ResourceMetadataInput | null | undefined;
+  outputVisibility?: NamespaceOutputVisibilityInput | null | undefined;
   preventDestroyPlan?: boolean | null | undefined;
   providerMirrorEnabled?: NamespaceProviderMirrorEnabledInput | null | undefined;
   runnerTags?: NamespaceRunnerTagsInput | null | undefined;
@@ -34,6 +36,10 @@ export type WorkspaceLabelInput = {
 };
 export type ResourceMetadataInput = {
   version: string;
+};
+export type NamespaceOutputVisibilityInput = {
+  inherit: boolean;
+  visibility?: NamespaceOutputVisibilityLevel | null | undefined;
 };
 export type NamespaceProviderMirrorEnabledInput = {
   enabled?: boolean | null | undefined;

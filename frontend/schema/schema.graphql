@@ -692,6 +692,7 @@ input CreateGroupInput {
   description: String!
   driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
   name: String!
+  outputVisibility: NamespaceOutputVisibilityInput
   parentId: String
   parentPath: String
   providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
@@ -1072,6 +1073,7 @@ input CreateWorkspaceInput {
   labels: [WorkspaceLabelInput!]
   maxJobDuration: Int
   name: String!
+  outputVisibility: NamespaceOutputVisibilityInput
   preventDestroyPlan: Boolean
   providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
   runnerTags: NamespaceRunnerTagsInput
@@ -1516,6 +1518,7 @@ type Group implements Namespace & Node {
   memberships: [NamespaceMembership!]!
   metadata: ResourceMetadata!
   name: String!
+  outputVisibility: NamespaceOutputVisibility!
   parent: Group
   providerMirrorEnabled: NamespaceProviderMirrorEnabled!
   runnerTags: NamespaceRunnerTags!
@@ -1969,6 +1972,7 @@ interface Namespace {
   memberships: [NamespaceMembership!]!
   metadata: ResourceMetadata!
   name: String!
+  outputVisibility: NamespaceOutputVisibility!
   providerMirrorEnabled: NamespaceProviderMirrorEnabled!
   runnerTags: NamespaceRunnerTags!
   serviceAccounts(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String): ServiceAccountConnection!
@@ -2046,6 +2050,25 @@ type NamespaceMembershipMutationPayload {
 enum NamespaceMembershipSort {
   UPDATED_AT_ASC
   UPDATED_AT_DESC
+}
+
+type NamespaceOutputVisibility {
+  inherited: Boolean!
+  namespacePath: String!
+  value: NamespaceOutputVisibilityLevel!
+}
+
+input NamespaceOutputVisibilityInput {
+  inherit: Boolean!
+  visibility: NamespaceOutputVisibilityLevel
+}
+
+enum NamespaceOutputVisibilityLevel {
+  block_access
+  direct_group_and_subgroups
+  direct_group_only
+  global
+  root_group
 }
 
 type NamespaceProviderMirrorEnabled {
@@ -3233,6 +3256,7 @@ input UpdateGroupInput {
   groupPath: String
   id: String
   metadata: ResourceMetadataInput
+  outputVisibility: NamespaceOutputVisibilityInput
   providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
   runnerTags: NamespaceRunnerTagsInput
 }
@@ -3449,6 +3473,7 @@ input UpdateWorkspaceInput {
   labels: [WorkspaceLabelInput!]
   maxJobDuration: Int
   metadata: ResourceMetadataInput
+  outputVisibility: NamespaceOutputVisibilityInput
   preventDestroyPlan: Boolean
   providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
   runnerTags: NamespaceRunnerTagsInput
@@ -3700,6 +3725,7 @@ type Workspace implements Namespace & Node {
   memberships: [NamespaceMembership!]!
   metadata: ResourceMetadata!
   name: String!
+  outputVisibility: NamespaceOutputVisibility!
   preventDestroyPlan: Boolean!
   providerMirrorEnabled: NamespaceProviderMirrorEnabled!
   runnerTags: NamespaceRunnerTags!

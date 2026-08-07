@@ -180,7 +180,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	inheritedSettingsResolver := namespace.NewInheritedSettingResolver(dbClient)
 
-	authenticator := auth.NewAuthenticator(userAuth, federatedRegistryAuth, signingKeyManager, dbClient, maintenanceMonitor, cfg.JWTIssuerURL)
+	authenticator := auth.NewAuthenticator(userAuth, federatedRegistryAuth, signingKeyManager, dbClient, maintenanceMonitor, inheritedSettingsResolver, cfg.JWTIssuerURL)
 	userSessionManager, err := auth.NewUserSessionManager(
 		dbClient,
 		signingKeyManager,

@@ -44,11 +44,19 @@ type NotificationPreferenceSetting struct {
 	CustomEvents  *models.NotificationPreferenceCustomEvents
 }
 
+// OutputVisibilitySetting contains the inherited setting for workspace output visibility
+type OutputVisibilitySetting struct {
+	Inherited     bool
+	NamespacePath string
+	Value         models.NamespaceOutputVisibilityLevel
+}
+
 // InheritedSettingResolver is used to resolve inherited settings by searching the group hierarchy
 type InheritedSettingResolver interface {
 	GetRunnerTags(ctx context.Context, namespace Namespace) (*RunnerTagsSetting, error)
 	GetDriftDetectionEnabled(ctx context.Context, namespace Namespace) (*DriftDetectionEnabledSetting, error)
 	GetProviderMirrorEnabled(ctx context.Context, namespace Namespace) (*ProviderMirrorEnabledSetting, error)
+	GetOutputVisibility(ctx context.Context, namespace Namespace) (*OutputVisibilitySetting, error)
 	GetNotificationPreference(ctx context.Context, userID string, namespacePath *string) (*NotificationPreferenceSetting, error)
 	GetNotificationPreferences(ctx context.Context, userIDs []string, namespacePath *string) (map[string]*NotificationPreferenceSetting, error)
 }
@@ -229,6 +237,33 @@ func (r *inheritedSettingsResolver) GetProviderMirrorEnabled(ctx context.Context
 	}
 
 	return &ProviderMirrorEnabledSetting{
+		Inherited:     response.inherited,
+		NamespacePath: response.namespacePath,
+		Value:         value,
+	}, nil
+}
+
+func (r *inheritedSettingsResolver) GetOutputVisibility(ctx context.Context, namespace Namespace) (*OutputVisibilitySetting, error) {
+	response, err := r.getInheritedSetting(ctx, namespace, func(namespace Namespace) (any, bool) {
+		v := namespace.GetOutputVisibility()
+		if v == nil {
+			return nil, false
+		}
+		return *v, true
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// The migration backfills root_group on all existing root groups, and CreateGroup
+	// auto-sets the default for new root groups, so value should always be non-nil.
+	// If somehow nil (defensive), use the default output visibility.
+	value := models.DefaultOutputVisibility
+	if response.value != nil {
+		value = response.value.(models.NamespaceOutputVisibilityLevel)
+	}
+
+	return &OutputVisibilitySetting{
 		Inherited:     response.inherited,
 		NamespacePath: response.namespacePath,
 		Value:         value,

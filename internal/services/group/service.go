@@ -69,6 +69,8 @@ type Service interface {
 	GetDriftDetectionEnabledSetting(ctx context.Context, group *models.Group) (*namespace.DriftDetectionEnabledSetting, error)
 	// GetProviderMirrorEnabledSetting returns the (inherited or direct) provider mirror enabled setting for a group.
 	GetProviderMirrorEnabledSetting(ctx context.Context, group *models.Group) (*namespace.ProviderMirrorEnabledSetting, error)
+	// GetOutputVisibilitySetting returns the (inherited or direct) output visibility setting for a group.
+	GetOutputVisibilitySetting(ctx context.Context, group *models.Group) (*namespace.OutputVisibilitySetting, error)
 }
 
 type service struct {
@@ -408,6 +410,12 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 	}
 
 	input.CreatedBy = caller.GetSubject()
+
+	// Auto-default output visibility for new root groups
+	if input.ParentID == "" && input.OutputVisibility == nil {
+		v := models.DefaultOutputVisibility
+		input.OutputVisibility = &v
+	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
@@ -785,6 +793,29 @@ func (s *service) GetProviderMirrorEnabledSetting(ctx context.Context, group *mo
 	}
 
 	return s.inheritedSettingsResolver.GetProviderMirrorEnabled(ctx, group)
+}
+
+// GetOutputVisibilitySetting returns the (inherited or direct) output visibility setting for a group.
+func (s *service) GetOutputVisibilitySetting(ctx context.Context, group *models.Group) (*namespace.OutputVisibilitySetting, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetOutputVisibilitySetting")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
+	if err != nil {
+		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	}
+
+	setting, err := s.inheritedSettingsResolver.GetOutputVisibility(ctx, group)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get output visibility setting", errors.WithSpan(span))
+	}
+
+	return setting, nil
 }
 
 // checkParentSubgroupLimit checks whether the parent subgroup limit has just been violated.

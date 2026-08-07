@@ -1535,3 +1535,55 @@ func TestDeleteGroup(t *testing.T) {
 		})
 	}
 }
+
+func TestGetOutputVisibilitySetting(t *testing.T) {
+	group := models.Group{
+		FullPath: "group1",
+	}
+
+	tests := []struct {
+		name          string
+		expectSetting *namespace.OutputVisibilitySetting
+		authError     error
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "get setting",
+			expectSetting: &namespace.OutputVisibilitySetting{
+				Value: models.OutputVisibilityDirectGroupOnly,
+			},
+		},
+		{
+			name:          "unauthorized",
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			testLogger, _ := logger.NewForTest()
+
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewGroupPermission, mock.Anything).Return(test.authError)
+
+			mockInheritedSettingsResolver.On("GetOutputVisibility", mock.Anything, &group).Return(test.expectSetting, nil).Maybe()
+
+			service := NewService(testLogger, nil, nil, nil, mockInheritedSettingsResolver)
+
+			setting, err := service.GetOutputVisibilitySetting(auth.WithCaller(ctx, mockCaller), &group)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectSetting, setting)
+		})
+	}
+}

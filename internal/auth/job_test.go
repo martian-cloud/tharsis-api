@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -57,6 +58,12 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 		WorkspaceID: jobWorkspace.Metadata.ID,
 		RunID:       "run1",
 	}
+
+	mockResolver := namespace.NewMockInheritedSettingResolver(t)
+	mockResolver.On("GetOutputVisibility", mock.Anything, mock.Anything).Return(&namespace.OutputVisibilitySetting{
+		Value: models.OutputVisibilityRootGroup,
+	}, nil).Maybe()
+	caller.inheritedSettingResolver = mockResolver
 
 	ctx := WithCaller(context.Background(), &caller)
 
@@ -436,4 +443,496 @@ func TestJobCaller_RequireRole(t *testing.T) {
 	caller := JobCaller{WorkspaceID: "ws-1", dbClient: &db.Client{Workspaces: mockWorkspaces}}
 	err := caller.RequireRole(WithCaller(t.Context(), &caller), models.OwnerRoleID.String())
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+}
+
+func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
+	requestingWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{ID: "requesting-ws"},
+		FullPath: "cloud/networking/ws-requester",
+		GroupID:  "networking-group-id",
+	}
+
+	t.Run("self-access is always allowed", func(t *testing.T) {
+		targetWSID := "requesting-ws"
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWSID})
+		require.NoError(t, err)
+	})
+
+	t.Run("BLOCK_ACCESS denies all access", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/networking/ws-target",
+			GroupID:  "networking-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityBlockAccess,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.Error(t, err)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+	})
+
+	t.Run("DIRECT_GROUP_ONLY allows same group", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/networking/ws-target",
+			GroupID:  "networking-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityDirectGroupOnly,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.NoError(t, err)
+	})
+
+	t.Run("DIRECT_GROUP_ONLY denies different group", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/applications/ws-target",
+			GroupID:  "applications-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityDirectGroupOnly,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.Error(t, err)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+	})
+
+	t.Run("DIRECT_GROUP_AND_SUBGROUPS allows same group", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/networking/ws-target",
+			GroupID:  "networking-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityDirectGroupAndSubgroups,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.NoError(t, err)
+	})
+
+	t.Run("DIRECT_GROUP_AND_SUBGROUPS allows child subgroup", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/networking/ws-target",
+			GroupID:  "networking-group-id",
+		}
+
+		// Requesting workspace is in a child subgroup of networking
+		childWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "requesting-ws"},
+			FullPath: "cloud/networking/inner/ws-deep",
+			GroupID:  "inner-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(childWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityDirectGroupAndSubgroups,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.NoError(t, err)
+	})
+
+	t.Run("DIRECT_GROUP_AND_SUBGROUPS denies different group branch", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/networking/ws-target",
+			GroupID:  "networking-group-id",
+		}
+
+		// Requesting workspace is in a completely different branch (applications)
+		differentBranchWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "requesting-ws"},
+			FullPath: "cloud/applications/ws-frontend",
+			GroupID:  "applications-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(differentBranchWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityDirectGroupAndSubgroups,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.Error(t, err)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+	})
+
+	t.Run("ROOT_GROUP allows same root group", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/applications/ws-target",
+			GroupID:  "applications-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityRootGroup,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.NoError(t, err)
+	})
+
+	t.Run("ROOT_GROUP denies different root group", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "operations/monitoring/ws-target",
+			GroupID:  "monitoring-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityRootGroup,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.Error(t, err)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+	})
+
+	t.Run("GLOBAL allows any workspace", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "operations/monitoring/ws-target",
+			GroupID:  "monitoring-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityGlobal,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.NoError(t, err)
+	})
+
+	t.Run("nil perm falls back to existing root namespace check", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/applications/ws-target",
+			GroupID:  "applications-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		// nil perm — should use existing root namespace logic (same root group = allowed)
+		err := caller.requireAccessToWorkspacesInGroupHierarchy(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.NoError(t, err)
+	})
+
+	t.Run("non-output perm uses existing check", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/applications/ws-target",
+			GroupID:  "applications-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		// ViewConfigurationVersionPermission should use existing root namespace check, not output visibility
+		err := caller.requireAccessToWorkspacesInGroupHierarchy(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.NoError(t, err) // same root group = allowed
+	})
+
+	t.Run("ViewWorkspacePermission uses visibility check for cross-root access", func(t *testing.T) {
+		// A workspace in a different root group — would be denied by old root namespace check,
+		// but allowed because target has GLOBAL.
+		// This verifies ViewWorkspacePermission goes through the visibility path.
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "operations/monitoring/ws-target",
+			GroupID:  "monitoring-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "target-ws").Return(targetWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityGlobal,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		// ViewWorkspacePermission with GLOBAL allows cross-root access
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
+		require.NoError(t, err)
+	})
+}
+
+func TestJobCaller_OutputVisibilityAccess_NamespacePaths(t *testing.T) {
+	requestingWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{ID: "requesting-ws"},
+		FullPath: "cloud/networking/ws-requester",
+		GroupID:  "networking-group-id",
+	}
+
+	t.Run("namespacePath resolves to workspace and visibility allows", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/networking/ws-target",
+			GroupID:  "networking-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, "trn:workspace:cloud/networking/ws-target").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityDirectGroupOnly,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{namespacePaths: []string{"cloud/networking/ws-target"}})
+		require.NoError(t, err)
+	})
+
+	t.Run("namespacePath resolves to workspace and visibility denies", func(t *testing.T) {
+		targetWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "target-ws"},
+			FullPath: "cloud/applications/ws-target",
+			GroupID:  "applications-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, "trn:workspace:cloud/applications/ws-target").Return(targetWorkspace, nil)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+		mockResolver.On("GetOutputVisibility", mock.Anything, targetWorkspace).Return(&namespace.OutputVisibilitySetting{
+			Value: models.OutputVisibilityDirectGroupOnly,
+		}, nil)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{namespacePaths: []string{"cloud/applications/ws-target"}})
+		require.Error(t, err)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+	})
+
+	t.Run("namespacePath does not resolve to workspace — returns unauthorized", func(t *testing.T) {
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		// GetWorkspaceByTRN returns nil — path doesn't resolve to a workspace
+		mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, "trn:workspace:cloud/networking").Return(nil, nil)
+		// UnauthorizedError needs to load the requesting workspace for the error message
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "requesting-ws").Return(requestingWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{namespacePaths: []string{"cloud/networking"}})
+		require.Error(t, err)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+	})
+
+	t.Run("namespacePath matches requesting workspace — self-access", func(t *testing.T) {
+		// The target path resolves to a workspace with the same ID as the requester
+		selfWorkspace := &models.Workspace{
+			Metadata: models.ResourceMetadata{ID: "requesting-ws"},
+			FullPath: "cloud/networking/ws-requester",
+			GroupID:  "networking-group-id",
+		}
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, "trn:workspace:cloud/networking/ws-requester").Return(selfWorkspace, nil)
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{namespacePaths: []string{"cloud/networking/ws-requester"}})
+		require.NoError(t, err)
+	})
+
+	t.Run("namespacePath DB error propagates instead of falling back", func(t *testing.T) {
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		// GetWorkspaceByTRN returns a DB error — should propagate, not fall back
+		mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, "trn:workspace:cloud/networking/ws-target").Return(nil, errors.New("connection refused", errors.WithErrorCode(errors.EInternal)))
+
+		mockResolver := namespace.NewMockInheritedSettingResolver(t)
+
+		caller := &JobCaller{
+			WorkspaceID:              "requesting-ws",
+			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
+			inheritedSettingResolver: mockResolver,
+		}
+
+		ctx := WithCaller(t.Context(), caller)
+		err := caller.requireWorkspaceOutputVisibility(ctx, nil, &constraints{namespacePaths: []string{"cloud/networking/ws-target"}})
+		require.Error(t, err)
+		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	})
 }

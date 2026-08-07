@@ -430,6 +430,11 @@ func (r *GroupResolver) ProviderMirrorEnabled(ctx context.Context) (*namespace.P
 	return getServiceCatalog(ctx).GroupService.GetProviderMirrorEnabledSetting(ctx, r.group)
 }
 
+// OutputVisibility resolver
+func (r *GroupResolver) OutputVisibility(ctx context.Context) (*namespace.OutputVisibilitySetting, error) {
+	return getServiceCatalog(ctx).GroupService.GetOutputVisibilitySetting(ctx, r.group)
+}
+
 // CreatedBy resolver
 func (r *GroupResolver) CreatedBy() string {
 	return r.group.CreatedBy
@@ -607,6 +612,7 @@ type CreateGroupInput struct {
 	RunnerTags            *NamespaceRunnerTagsInput
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
 	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput
+	OutputVisibility      *NamespaceOutputVisibilityInput
 	Description           string
 }
 
@@ -620,6 +626,7 @@ type UpdateGroupInput struct {
 	RunnerTags            *NamespaceRunnerTagsInput
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
 	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput
+	OutputVisibility      *NamespaceOutputVisibilityInput
 }
 
 // DeleteGroupInput contains the input for deleting a group
@@ -682,6 +689,16 @@ func createGroupMutation(ctx context.Context, input *CreateGroupInput) (*GroupMu
 
 		if input.ProviderMirrorEnabled.Enabled != nil {
 			groupCreateOptions.EnableProviderMirror = input.ProviderMirrorEnabled.Enabled
+		}
+	}
+
+	if input.OutputVisibility != nil {
+		if err := input.OutputVisibility.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.OutputVisibility.Visibility != nil {
+			groupCreateOptions.OutputVisibility = input.OutputVisibility.Visibility
 		}
 	}
 
@@ -782,6 +799,20 @@ func updateGroupMutation(ctx context.Context, input *UpdateGroupInput) (*GroupMu
 
 		if input.ProviderMirrorEnabled.Inherit {
 			group.EnableProviderMirror = nil
+		}
+	}
+
+	if input.OutputVisibility != nil {
+		if err = input.OutputVisibility.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.OutputVisibility.Visibility != nil {
+			group.OutputVisibility = input.OutputVisibility.Visibility
+		}
+
+		if input.OutputVisibility.Inherit {
+			group.OutputVisibility = nil
 		}
 	}
 

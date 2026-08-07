@@ -7,6 +7,7 @@ import WorkspaceGeneralSettings from './WorkspaceGeneralSettings';
 import WorkspaceRunSettings from './WorkspaceRunSettings';
 import WorkspaceDriftDetectionSettings from './WorkspaceDriftDetectionSettings';
 import WorkspaceProviderMirrorSettings from './WorkspaceProviderMirrorSettings';
+import WorkspaceOutputVisibilitySettings from './WorkspaceOutputVisibilitySettings';
 import WorkspaceAdvancedSettings from './WorkspaceAdvancedSettings';
 import WorkspaceVCSProviderSettings from './vcsprovider/WorkspaceVCSProviderSettings';
 import WorkspaceStateSettings from './WorkspaceStateSettings';
@@ -37,6 +38,7 @@ function WorkspaceSettings(props: Props) {
             ...WorkspaceRunSettingsFragment_workspace
             ...WorkspaceDriftDetectionSettingsFragment_workspace
             ...WorkspaceProviderMirrorSettingsFragment_workspace
+            ...WorkspaceOutputVisibilitySettingsFragment_workspace
             ...WorkspaceAdvancedSettingsFragment_workspace
             ...WorkspaceVCSProviderSettingsFragment_workspace
             ...WorkspaceStateSettingsFragment_workspace
@@ -63,6 +65,8 @@ function WorkspaceSettings(props: Props) {
             <WorkspaceDriftDetectionSettings fragmentRef={data} />
             <StyledDivider />
             <WorkspaceProviderMirrorSettings fragmentRef={data} />
+            <StyledDivider />
+            <WorkspaceOutputVisibilitySettings fragmentRef={data} />
             <StyledDivider />
             <WorkspaceStateSettings fragmentRef={data} />
             <StyledDivider />

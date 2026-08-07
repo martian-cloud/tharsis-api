@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a965013ea4a66572335fcdca95dd45a5>>
+ * @generated SignedSource<<47e9ab7e87849cdaf3123eb6297b050a>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,6 +10,7 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
+export type NamespaceOutputVisibilityLevel = "block_access" | "direct_group_and_subgroups" | "direct_group_only" | "global" | "root_group" | "%future added value";
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type UpdateGroupInput = {
   clientMutationId?: string | null | undefined;
@@ -18,6 +19,7 @@ export type UpdateGroupInput = {
   groupPath?: string | null | undefined;
   id?: string | null | undefined;
   metadata?: ResourceMetadataInput | null | undefined;
+  outputVisibility?: NamespaceOutputVisibilityInput | null | undefined;
   providerMirrorEnabled?: NamespaceProviderMirrorEnabledInput | null | undefined;
   runnerTags?: NamespaceRunnerTagsInput | null | undefined;
 };
@@ -27,6 +29,10 @@ export type NamespaceDriftDetectionEnabledInput = {
 };
 export type ResourceMetadataInput = {
   version: string;
+};
+export type NamespaceOutputVisibilityInput = {
+  inherit: boolean;
+  visibility?: NamespaceOutputVisibilityLevel | null | undefined;
 };
 export type NamespaceProviderMirrorEnabledInput = {
   enabled?: boolean | null | undefined;

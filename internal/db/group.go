@@ -111,7 +111,7 @@ type GroupsResult struct {
 	Groups   []models.Group
 }
 
-var groupFieldList = append(metadataFieldList, "name", "description", "parent_id", "created_by", "runner_tags", "drift_detection_enabled", "provider_mirror_enabled")
+var groupFieldList = append(metadataFieldList, "name", "description", "parent_id", "created_by", "runner_tags", "drift_detection_enabled", "provider_mirror_enabled", "output_visibility")
 
 type groups struct {
 	dbClient *Client
@@ -319,6 +319,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 			"runner_tags":             runnerTags,
 			"drift_detection_enabled": group.EnableDriftDetection,
 			"provider_mirror_enabled": group.EnableProviderMirror,
+			"output_visibility":       group.OutputVisibility,
 		}).
 		Returning(groupFieldList...))
 	if err != nil {
@@ -403,6 +404,7 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 						"runner_tags":             runnerTags,
 						"drift_detection_enabled": group.EnableDriftDetection,
 						"provider_mirror_enabled": group.EnableProviderMirror,
+						"output_visibility":       group.OutputVisibility,
 					},
 				).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).
 				Returning("*"),
@@ -940,6 +942,7 @@ func scanGroup(row scanner, withFullPath bool) (*models.Group, error) {
 		&group.RunnerTags,
 		&group.EnableDriftDetection,
 		&group.EnableProviderMirror,
+		&group.OutputVisibility,
 	}
 
 	if withFullPath {

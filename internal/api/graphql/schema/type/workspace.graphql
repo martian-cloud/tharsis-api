@@ -189,6 +189,7 @@ type Workspace implements Node, Namespace {
   runnerTags: NamespaceRunnerTags!
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
   providerMirrorEnabled: NamespaceProviderMirrorEnabled!
+  outputVisibility: NamespaceOutputVisibility!
 }
 
 input CreateWorkspaceInput {
@@ -206,6 +207,7 @@ input CreateWorkspaceInput {
   runnerTags: NamespaceRunnerTagsInput
   driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
   providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
+  outputVisibility: NamespaceOutputVisibilityInput
   labels: [WorkspaceLabelInput!]
 }
 
@@ -224,6 +226,7 @@ input UpdateWorkspaceInput {
   runnerTags: NamespaceRunnerTagsInput
   driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
   providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
+  outputVisibility: NamespaceOutputVisibilityInput
   labels: [WorkspaceLabelInput!]
 }
 

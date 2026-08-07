@@ -565,6 +565,11 @@ func (r *WorkspaceResolver) ProviderMirrorEnabled(ctx context.Context) (*namespa
 	return getServiceCatalog(ctx).WorkspaceService.GetProviderMirrorEnabledSetting(ctx, r.workspace)
 }
 
+// OutputVisibility resolver
+func (r *WorkspaceResolver) OutputVisibility(ctx context.Context) (*namespace.OutputVisibilitySetting, error) {
+	return getServiceCatalog(ctx).WorkspaceService.GetOutputVisibilitySetting(ctx, r.workspace)
+}
+
 // DEPRECATED: use node query instead
 func workspaceQuery(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceResolver, error) {
 	ws, err := getServiceCatalog(ctx).WorkspaceService.GetWorkspaceByTRN(ctx, trn.TypeWorkspace.Build(args.FullPath))
@@ -667,6 +672,7 @@ type CreateWorkspaceInput struct {
 	Description           string
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
 	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput
+	OutputVisibility      *NamespaceOutputVisibilityInput
 	Labels                *[]WorkspaceLabelInput
 }
 
@@ -685,6 +691,7 @@ type UpdateWorkspaceInput struct {
 	RunnerTags            *NamespaceRunnerTagsInput
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
 	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput
+	OutputVisibility      *NamespaceOutputVisibilityInput
 	Labels                *[]WorkspaceLabelInput
 }
 
@@ -814,6 +821,16 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 		}
 	}
 
+	if input.OutputVisibility != nil {
+		if err = input.OutputVisibility.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.OutputVisibility.Visibility != nil {
+			wsCreateOptions.OutputVisibility = input.OutputVisibility.Visibility
+		}
+	}
+
 	createdWorkspace, err := getServiceCatalog(ctx).WorkspaceService.CreateWorkspace(ctx, &wsCreateOptions)
 	if err != nil {
 		return nil, err
@@ -904,6 +921,20 @@ func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (
 
 		if input.ProviderMirrorEnabled.Inherit {
 			ws.EnableProviderMirror = nil
+		}
+	}
+
+	if input.OutputVisibility != nil {
+		if err = input.OutputVisibility.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.OutputVisibility.Visibility != nil {
+			ws.OutputVisibility = input.OutputVisibility.Visibility
+		}
+
+		if input.OutputVisibility.Inherit {
+			ws.OutputVisibility = nil
 		}
 	}
 
