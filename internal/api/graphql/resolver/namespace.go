@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	graphql "github.com/graph-gophers/graphql-go"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -244,6 +245,20 @@ func (r *NamespaceProviderMirrorEnabledInput) Validate() error {
 	return nil
 }
 
+// NamespaceOutputVisibilityInput represents the settings for output visibility
+type NamespaceOutputVisibilityInput struct {
+	Visibility *models.NamespaceOutputVisibilityLevel
+	Inherit    bool
+}
+
+// Validate returns an error if the input is not valid.
+func (r *NamespaceOutputVisibilityInput) Validate() error {
+	if r != nil && r.Visibility != nil && r.Inherit {
+		return errors.New("cannot specify both visibility and inherit", errors.WithErrorCode(errors.EInvalid))
+	}
+	return nil
+}
+
 // DriftDetectionEnabled resolver
 func (r *NamespaceResolver) DriftDetectionEnabled(ctx context.Context) (*namespace.DriftDetectionEnabledSetting, error) {
 	switch v := r.result.(type) {
@@ -262,6 +277,17 @@ func (r *NamespaceResolver) ProviderMirrorEnabled(ctx context.Context) (*namespa
 		return v.ProviderMirrorEnabled(ctx)
 	case *WorkspaceResolver:
 		return v.ProviderMirrorEnabled(ctx)
+	}
+	return nil, r.invalidNamespaceType()
+}
+
+// OutputVisibility resolver
+func (r *NamespaceResolver) OutputVisibility(ctx context.Context) (*namespace.OutputVisibilitySetting, error) {
+	switch v := r.result.(type) {
+	case *GroupResolver:
+		return v.OutputVisibility(ctx)
+	case *WorkspaceResolver:
+		return v.OutputVisibility(ctx)
 	}
 	return nil, r.invalidNamespaceType()
 }

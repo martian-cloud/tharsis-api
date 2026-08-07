@@ -103,6 +103,7 @@ func TestNewAuthenticator(t *testing.T) {
 			mockIDP,
 			mockDBClient,
 			mockMaintenanceMonitor,
+			nil, // inheritedSettingResolver - not needed for this test
 			issuerURL,
 		)
 

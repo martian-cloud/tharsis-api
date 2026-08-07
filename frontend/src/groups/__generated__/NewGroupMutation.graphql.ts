@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ec652e742eaf8625d1fc7c5f8dbc7ee1>>
+ * @generated SignedSource<<760f84d6506c908bfa603c49fe125976>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,12 +10,14 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
+export type NamespaceOutputVisibilityLevel = "block_access" | "direct_group_and_subgroups" | "direct_group_only" | "global" | "root_group" | "%future added value";
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type CreateGroupInput = {
   clientMutationId?: string | null | undefined;
   description: string;
   driftDetectionEnabled?: NamespaceDriftDetectionEnabledInput | null | undefined;
   name: string;
+  outputVisibility?: NamespaceOutputVisibilityInput | null | undefined;
   parentId?: string | null | undefined;
   parentPath?: string | null | undefined;
   providerMirrorEnabled?: NamespaceProviderMirrorEnabledInput | null | undefined;
@@ -24,6 +26,10 @@ export type CreateGroupInput = {
 export type NamespaceDriftDetectionEnabledInput = {
   enabled?: boolean | null | undefined;
   inherit: boolean;
+};
+export type NamespaceOutputVisibilityInput = {
+  inherit: boolean;
+  visibility?: NamespaceOutputVisibilityLevel | null | undefined;
 };
 export type NamespaceProviderMirrorEnabledInput = {
   enabled?: boolean | null | undefined;

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d1a7a2ca51f720637e15c30c526205fd>>
+ * @generated SignedSource<<0ee291f811d12de2bf4c094c4dadf789>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,6 +9,7 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
+export type NamespaceOutputVisibilityLevel = "block_access" | "direct_group_and_subgroups" | "direct_group_only" | "global" | "root_group" | "%future added value";
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type CreateWorkspaceInput = {
   clientMutationId?: string | null | undefined;
@@ -19,6 +20,7 @@ export type CreateWorkspaceInput = {
   labels?: ReadonlyArray<WorkspaceLabelInput> | null | undefined;
   maxJobDuration?: number | null | undefined;
   name: string;
+  outputVisibility?: NamespaceOutputVisibilityInput | null | undefined;
   preventDestroyPlan?: boolean | null | undefined;
   providerMirrorEnabled?: NamespaceProviderMirrorEnabledInput | null | undefined;
   runnerTags?: NamespaceRunnerTagsInput | null | undefined;
@@ -31,6 +33,10 @@ export type NamespaceDriftDetectionEnabledInput = {
 export type WorkspaceLabelInput = {
   key: string;
   value: string;
+};
+export type NamespaceOutputVisibilityInput = {
+  inherit: boolean;
+  visibility?: NamespaceOutputVisibilityLevel | null | undefined;
 };
 export type NamespaceProviderMirrorEnabledInput = {
   enabled?: boolean | null | undefined;

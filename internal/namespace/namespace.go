@@ -1,6 +1,8 @@
 package namespace
 
-import "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+import (
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+)
 
 // Type represents the type of namespace
 type Type string
@@ -21,4 +23,5 @@ type Namespace interface {
 	GetRunnerTags() []string
 	DriftDetectionEnabled() *bool
 	ProviderMirrorEnabled() *bool
+	GetOutputVisibility() *models.NamespaceOutputVisibilityLevel
 }

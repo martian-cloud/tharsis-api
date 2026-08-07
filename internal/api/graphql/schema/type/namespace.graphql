@@ -61,6 +61,7 @@ interface Namespace {
   runnerTags: NamespaceRunnerTags!
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
   providerMirrorEnabled: NamespaceProviderMirrorEnabled!
+  outputVisibility: NamespaceOutputVisibility!
 }
 
 input NamespaceRunnerTagsInput {
@@ -94,4 +95,23 @@ type NamespaceProviderMirrorEnabled {
 input NamespaceProviderMirrorEnabledInput {
   inherit: Boolean!
   enabled: Boolean
+}
+
+enum NamespaceOutputVisibilityLevel {
+  block_access
+  direct_group_only
+  direct_group_and_subgroups
+  root_group
+  global
+}
+
+type NamespaceOutputVisibility {
+  inherited: Boolean!
+  namespacePath: String!
+  value: NamespaceOutputVisibilityLevel!
+}
+
+input NamespaceOutputVisibilityInput {
+  inherit: Boolean!
+  visibility: NamespaceOutputVisibilityLevel
 }

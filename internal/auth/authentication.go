@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -63,15 +64,17 @@ func NewAuthenticator(
 	signingKeyManager SigningKeyManager,
 	dbClient *db.Client,
 	maintenanceMonitor maintenance.Monitor,
+	inheritedSettingResolver namespace.InheritedSettingResolver,
 	issuerURL string,
 ) Authenticator {
 	return newAuthenticator(
 		[]tokenAuthenticator{
 			&tharsisIDPTokenAuthenticator{
-				issuerURL:          issuerURL,
-				signingKeyManager:  signingKeyManager,
-				dbClient:           dbClient,
-				maintenanceMonitor: maintenanceMonitor,
+				issuerURL:                issuerURL,
+				signingKeyManager:        signingKeyManager,
+				dbClient:                 dbClient,
+				maintenanceMonitor:       maintenanceMonitor,
+				inheritedSettingResolver: inheritedSettingResolver,
 			},
 			userAuth,
 			federatedRegistryAuth,
@@ -113,10 +116,11 @@ func (a *authenticator) Authenticate(ctx context.Context, tokenString string, us
 }
 
 type tharsisIDPTokenAuthenticator struct {
-	issuerURL          string
-	signingKeyManager  SigningKeyManager
-	dbClient           *db.Client
-	maintenanceMonitor maintenance.Monitor
+	issuerURL                string
+	signingKeyManager        SigningKeyManager
+	dbClient                 *db.Client
+	maintenanceMonitor       maintenance.Monitor
+	inheritedSettingResolver namespace.InheritedSettingResolver
 }
 
 func (t *tharsisIDPTokenAuthenticator) Use(token jwt.Token) bool {
@@ -170,11 +174,12 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 		), nil
 	case JobTokenType:
 		return &JobCaller{
-			JobID:       gid.FromGlobalID(output.PrivateClaims["job_id"]),
-			JobTRN:      output.PrivateClaims["job_trn"],
-			RunID:       gid.FromGlobalID(output.PrivateClaims["run_id"]),
-			WorkspaceID: gid.FromGlobalID(output.PrivateClaims["workspace_id"]),
-			dbClient:    t.dbClient,
+			JobID:                    gid.FromGlobalID(output.PrivateClaims["job_id"]),
+			JobTRN:                   output.PrivateClaims["job_trn"],
+			RunID:                    gid.FromGlobalID(output.PrivateClaims["run_id"]),
+			WorkspaceID:              gid.FromGlobalID(output.PrivateClaims["workspace_id"]),
+			dbClient:                 t.dbClient,
+			inheritedSettingResolver: t.inheritedSettingResolver,
 		}, nil
 	case SCIMTokenType:
 		if sErr := t.verifySCIMTokenClaim(ctx, output.Token); sErr != nil {

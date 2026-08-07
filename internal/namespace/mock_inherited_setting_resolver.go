@@ -103,6 +103,36 @@ func (_m *MockInheritedSettingResolver) GetNotificationPreferences(ctx context.C
 	return r0, r1
 }
 
+// GetOutputVisibility provides a mock function with given fields: ctx, namespace
+func (_m *MockInheritedSettingResolver) GetOutputVisibility(ctx context.Context, namespace Namespace) (*OutputVisibilitySetting, error) {
+	ret := _m.Called(ctx, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOutputVisibility")
+	}
+
+	var r0 *OutputVisibilitySetting
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, Namespace) (*OutputVisibilitySetting, error)); ok {
+		return rf(ctx, namespace)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, Namespace) *OutputVisibilitySetting); ok {
+		r0 = rf(ctx, namespace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*OutputVisibilitySetting)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, Namespace) error); ok {
+		r1 = rf(ctx, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetProviderMirrorEnabled provides a mock function with given fields: ctx, namespace
 func (_m *MockInheritedSettingResolver) GetProviderMirrorEnabled(ctx context.Context, namespace Namespace) (*ProviderMirrorEnabledSetting, error) {
 	ret := _m.Called(ctx, namespace)

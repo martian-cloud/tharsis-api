@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<db32d59b068d07b51b1f9b7666717d9c>>
+ * @generated SignedSource<<4b09bc072931440a007153b74fe89d21>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -42,14 +42,14 @@ export type NamespaceRunnerTagsInput = {
   inherit: boolean;
   tags?: ReadonlyArray<string> | null | undefined;
 };
-export type GroupDriftDetectionSettingsMutation$variables = {
+export type GroupOutputVisibilitySettingsMutation$variables = {
   input: UpdateGroupInput;
 };
-export type GroupDriftDetectionSettingsMutation$data = {
+export type GroupOutputVisibilitySettingsMutation$data = {
   readonly updateGroup: {
     readonly group: {
-      readonly driftDetectionEnabled: {
-        readonly " $fragmentSpreads": FragmentRefs<"DriftDetectionSettingsFormFragment_driftDetectionEnabled">;
+      readonly outputVisibility: {
+        readonly " $fragmentSpreads": FragmentRefs<"OutputVisibilitySettingsFormFragment_outputVisibility">;
       };
     } | null | undefined;
     readonly problems: ReadonlyArray<{
@@ -59,9 +59,9 @@ export type GroupDriftDetectionSettingsMutation$data = {
     }>;
   };
 };
-export type GroupDriftDetectionSettingsMutation = {
-  response: GroupDriftDetectionSettingsMutation$data;
-  variables: GroupDriftDetectionSettingsMutation$variables;
+export type GroupOutputVisibilitySettingsMutation = {
+  response: GroupOutputVisibilitySettingsMutation$data;
+  variables: GroupOutputVisibilitySettingsMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -116,7 +116,7 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "GroupDriftDetectionSettingsMutation",
+    "name": "GroupOutputVisibilitySettingsMutation",
     "selections": [
       {
         "alias": null,
@@ -137,15 +137,15 @@ return {
               {
                 "alias": null,
                 "args": null,
-                "concreteType": "NamespaceDriftDetectionEnabled",
+                "concreteType": "NamespaceOutputVisibility",
                 "kind": "LinkedField",
-                "name": "driftDetectionEnabled",
+                "name": "outputVisibility",
                 "plural": false,
                 "selections": [
                   {
                     "args": null,
                     "kind": "FragmentSpread",
-                    "name": "DriftDetectionSettingsFormFragment_driftDetectionEnabled"
+                    "name": "OutputVisibilitySettingsFormFragment_outputVisibility"
                   }
                 ],
                 "storageKey": null
@@ -165,7 +165,7 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "GroupDriftDetectionSettingsMutation",
+    "name": "GroupOutputVisibilitySettingsMutation",
     "selections": [
       {
         "alias": null,
@@ -186,9 +186,9 @@ return {
               {
                 "alias": null,
                 "args": null,
-                "concreteType": "NamespaceDriftDetectionEnabled",
+                "concreteType": "NamespaceOutputVisibility",
                 "kind": "LinkedField",
-                "name": "driftDetectionEnabled",
+                "name": "outputVisibility",
                 "plural": false,
                 "selections": [
                   {
@@ -232,16 +232,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "e8410333f81ccbd15e06bb28b7829408",
+    "cacheID": "b64eb6a9ea16b3376679a09ee167d4f3",
     "id": null,
     "metadata": {},
-    "name": "GroupDriftDetectionSettingsMutation",
+    "name": "GroupOutputVisibilitySettingsMutation",
     "operationKind": "mutation",
-    "text": "mutation GroupDriftDetectionSettingsMutation(\n  $input: UpdateGroupInput!\n) {\n  updateGroup(input: $input) {\n    group {\n      driftDetectionEnabled {\n        ...DriftDetectionSettingsFormFragment_driftDetectionEnabled\n      }\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment DriftDetectionSettingsFormFragment_driftDetectionEnabled on NamespaceDriftDetectionEnabled {\n  inherited\n  namespacePath\n  value\n}\n"
+    "text": "mutation GroupOutputVisibilitySettingsMutation(\n  $input: UpdateGroupInput!\n) {\n  updateGroup(input: $input) {\n    group {\n      outputVisibility {\n        ...OutputVisibilitySettingsFormFragment_outputVisibility\n      }\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment OutputVisibilitySettingsFormFragment_outputVisibility on NamespaceOutputVisibility {\n  inherited\n  namespacePath\n  value\n}\n"
   }
 };
 })();
 
-(node as any).hash = "71fa5ee2d45ae16e6473c6e0c0332760";
+(node as any).hash = "a8da0a162b3e3cc9d279ff87add11705";
 
 export default node;

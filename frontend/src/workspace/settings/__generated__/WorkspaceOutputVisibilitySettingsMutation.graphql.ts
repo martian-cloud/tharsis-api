@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<db32d59b068d07b51b1f9b7666717d9c>>
+ * @generated SignedSource<<859ffd4068095e30253915cb4e8d8685>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,20 +12,28 @@ import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type NamespaceOutputVisibilityLevel = "block_access" | "direct_group_and_subgroups" | "direct_group_only" | "global" | "root_group" | "%future added value";
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
-export type UpdateGroupInput = {
+export type UpdateWorkspaceInput = {
   clientMutationId?: string | null | undefined;
   description?: string | null | undefined;
   driftDetectionEnabled?: NamespaceDriftDetectionEnabledInput | null | undefined;
-  groupPath?: string | null | undefined;
   id?: string | null | undefined;
+  labels?: ReadonlyArray<WorkspaceLabelInput> | null | undefined;
+  maxJobDuration?: number | null | undefined;
   metadata?: ResourceMetadataInput | null | undefined;
   outputVisibility?: NamespaceOutputVisibilityInput | null | undefined;
+  preventDestroyPlan?: boolean | null | undefined;
   providerMirrorEnabled?: NamespaceProviderMirrorEnabledInput | null | undefined;
   runnerTags?: NamespaceRunnerTagsInput | null | undefined;
+  terraformVersion?: string | null | undefined;
+  workspacePath?: string | null | undefined;
 };
 export type NamespaceDriftDetectionEnabledInput = {
   enabled?: boolean | null | undefined;
   inherit: boolean;
+};
+export type WorkspaceLabelInput = {
+  key: string;
+  value: string;
 };
 export type ResourceMetadataInput = {
   version: string;
@@ -42,26 +50,26 @@ export type NamespaceRunnerTagsInput = {
   inherit: boolean;
   tags?: ReadonlyArray<string> | null | undefined;
 };
-export type GroupDriftDetectionSettingsMutation$variables = {
-  input: UpdateGroupInput;
+export type WorkspaceOutputVisibilitySettingsMutation$variables = {
+  input: UpdateWorkspaceInput;
 };
-export type GroupDriftDetectionSettingsMutation$data = {
-  readonly updateGroup: {
-    readonly group: {
-      readonly driftDetectionEnabled: {
-        readonly " $fragmentSpreads": FragmentRefs<"DriftDetectionSettingsFormFragment_driftDetectionEnabled">;
-      };
-    } | null | undefined;
+export type WorkspaceOutputVisibilitySettingsMutation$data = {
+  readonly updateWorkspace: {
     readonly problems: ReadonlyArray<{
       readonly field: ReadonlyArray<string> | null | undefined;
       readonly message: string;
       readonly type: ProblemType;
     }>;
+    readonly workspace: {
+      readonly outputVisibility: {
+        readonly " $fragmentSpreads": FragmentRefs<"OutputVisibilitySettingsFormFragment_outputVisibility">;
+      };
+    } | null | undefined;
   };
 };
-export type GroupDriftDetectionSettingsMutation = {
-  response: GroupDriftDetectionSettingsMutation$data;
-  variables: GroupDriftDetectionSettingsMutation$variables;
+export type WorkspaceOutputVisibilitySettingsMutation = {
+  response: WorkspaceOutputVisibilitySettingsMutation$data;
+  variables: WorkspaceOutputVisibilitySettingsMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -116,36 +124,36 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "GroupDriftDetectionSettingsMutation",
+    "name": "WorkspaceOutputVisibilitySettingsMutation",
     "selections": [
       {
         "alias": null,
         "args": (v1/*: any*/),
-        "concreteType": "UpdateGroupPayload",
+        "concreteType": "UpdateWorkspacePayload",
         "kind": "LinkedField",
-        "name": "updateGroup",
+        "name": "updateWorkspace",
         "plural": false,
         "selections": [
           {
             "alias": null,
             "args": null,
-            "concreteType": "Group",
+            "concreteType": "Workspace",
             "kind": "LinkedField",
-            "name": "group",
+            "name": "workspace",
             "plural": false,
             "selections": [
               {
                 "alias": null,
                 "args": null,
-                "concreteType": "NamespaceDriftDetectionEnabled",
+                "concreteType": "NamespaceOutputVisibility",
                 "kind": "LinkedField",
-                "name": "driftDetectionEnabled",
+                "name": "outputVisibility",
                 "plural": false,
                 "selections": [
                   {
                     "args": null,
                     "kind": "FragmentSpread",
-                    "name": "DriftDetectionSettingsFormFragment_driftDetectionEnabled"
+                    "name": "OutputVisibilitySettingsFormFragment_outputVisibility"
                   }
                 ],
                 "storageKey": null
@@ -165,30 +173,30 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "GroupDriftDetectionSettingsMutation",
+    "name": "WorkspaceOutputVisibilitySettingsMutation",
     "selections": [
       {
         "alias": null,
         "args": (v1/*: any*/),
-        "concreteType": "UpdateGroupPayload",
+        "concreteType": "UpdateWorkspacePayload",
         "kind": "LinkedField",
-        "name": "updateGroup",
+        "name": "updateWorkspace",
         "plural": false,
         "selections": [
           {
             "alias": null,
             "args": null,
-            "concreteType": "Group",
+            "concreteType": "Workspace",
             "kind": "LinkedField",
-            "name": "group",
+            "name": "workspace",
             "plural": false,
             "selections": [
               {
                 "alias": null,
                 "args": null,
-                "concreteType": "NamespaceDriftDetectionEnabled",
+                "concreteType": "NamespaceOutputVisibility",
                 "kind": "LinkedField",
-                "name": "driftDetectionEnabled",
+                "name": "outputVisibility",
                 "plural": false,
                 "selections": [
                   {
@@ -232,16 +240,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "e8410333f81ccbd15e06bb28b7829408",
+    "cacheID": "85557a0bc80a2a68f44044521847181b",
     "id": null,
     "metadata": {},
-    "name": "GroupDriftDetectionSettingsMutation",
+    "name": "WorkspaceOutputVisibilitySettingsMutation",
     "operationKind": "mutation",
-    "text": "mutation GroupDriftDetectionSettingsMutation(\n  $input: UpdateGroupInput!\n) {\n  updateGroup(input: $input) {\n    group {\n      driftDetectionEnabled {\n        ...DriftDetectionSettingsFormFragment_driftDetectionEnabled\n      }\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment DriftDetectionSettingsFormFragment_driftDetectionEnabled on NamespaceDriftDetectionEnabled {\n  inherited\n  namespacePath\n  value\n}\n"
+    "text": "mutation WorkspaceOutputVisibilitySettingsMutation(\n  $input: UpdateWorkspaceInput!\n) {\n  updateWorkspace(input: $input) {\n    workspace {\n      outputVisibility {\n        ...OutputVisibilitySettingsFormFragment_outputVisibility\n      }\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment OutputVisibilitySettingsFormFragment_outputVisibility on NamespaceOutputVisibility {\n  inherited\n  namespacePath\n  value\n}\n"
   }
 };
 })();
 
-(node as any).hash = "71fa5ee2d45ae16e6473c6e0c0332760";
+(node as any).hash = "bd289b31dacd73130c1af1deb8539815";
 
 export default node;

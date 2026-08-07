@@ -126,6 +126,7 @@ var workspaceFieldList = append(
 	"drift_detection_enabled",
 	"provider_mirror_enabled",
 	"labels",
+	"output_visibility",
 )
 
 // NewWorkspaces returns an instance of the Workspaces interface
@@ -362,6 +363,7 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 						"drift_detection_enabled":  workspace.EnableDriftDetection,
 						"provider_mirror_enabled":  workspace.EnableProviderMirror,
 						"labels":                   labelsJSON,
+						"output_visibility":        workspace.OutputVisibility,
 					},
 				).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).
 				Returning("*"),
@@ -448,6 +450,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"drift_detection_enabled":  workspace.EnableDriftDetection,
 			"provider_mirror_enabled":  workspace.EnableProviderMirror,
 			"labels":                   labelsJSON,
+			"output_visibility":        workspace.OutputVisibility,
 		}).
 		Returning(workspaceFieldList...))
 	if err != nil {
@@ -790,6 +793,7 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 		&ws.EnableDriftDetection,
 		&ws.EnableProviderMirror,
 		&labelsJSON,
+		&ws.OutputVisibility,
 	}
 
 	if withFullPath {

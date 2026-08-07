@@ -308,6 +308,36 @@ func (_m *MockService) GetDriftDetectionEnabledSetting(ctx context.Context, work
 	return r0, r1
 }
 
+// GetOutputVisibilitySetting provides a mock function with given fields: ctx, workspace
+func (_m *MockService) GetOutputVisibilitySetting(ctx context.Context, workspace *models.Workspace) (*namespace.OutputVisibilitySetting, error) {
+	ret := _m.Called(ctx, workspace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOutputVisibilitySetting")
+	}
+
+	var r0 *namespace.OutputVisibilitySetting
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Workspace) (*namespace.OutputVisibilitySetting, error)); ok {
+		return rf(ctx, workspace)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Workspace) *namespace.OutputVisibilitySetting); ok {
+		r0 = rf(ctx, workspace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*namespace.OutputVisibilitySetting)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Workspace) error); ok {
+		r1 = rf(ctx, workspace)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetProviderMirrorEnabledSetting provides a mock function with given fields: ctx, workspace
 func (_m *MockService) GetProviderMirrorEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.ProviderMirrorEnabledSetting, error) {
 	ret := _m.Called(ctx, workspace)

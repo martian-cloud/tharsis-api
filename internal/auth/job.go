@@ -9,16 +9,20 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // JobCaller represents a job subject
 type JobCaller struct {
-	dbClient    *db.Client
-	JobID       string
-	JobTRN      string
-	WorkspaceID string
-	RunID       string
+	dbClient                 *db.Client
+	inheritedSettingResolver namespace.InheritedSettingResolver
+	JobID                    string
+	JobTRN                   string
+	WorkspaceID              string
+	RunID                    string
 }
 
 // GetSubject returns the subject identifier for this caller
@@ -175,7 +179,48 @@ func (j *JobCaller) requireAccessToInheritedNamespaceResource(ctx context.Contex
 	return nil
 }
 
-// requireAccessToWorkspacesInGroupHierarchy delegates the appropriate workspace check based on the Constraints.
+// requireWorkspaceOutputVisibility enforces the output visibility setting when a job attempts
+// to view another workspace or its state. ViewWorkspacePermission is included because the
+// Terraform provider resolves the workspace (GetWorkspaceByTRN) before reading its outputs.
+func (j *JobCaller) requireWorkspaceOutputVisibility(ctx context.Context, _ *models.Permission, checks *constraints) error {
+	if checks.workspaceID != nil {
+		if j.WorkspaceID == *checks.workspaceID {
+			return nil // self-access is always allowed
+		}
+		workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, *checks.workspaceID)
+		if err != nil {
+			return err
+		}
+		if workspace == nil {
+			return j.UnauthorizedError(ctx, false)
+		}
+		return j.checkOutputVisibility(ctx, workspace)
+	}
+
+	if len(checks.namespacePaths) > 0 {
+		for _, nsPath := range checks.namespacePaths {
+			ws, err := j.dbClient.Workspaces.GetWorkspaceByTRN(ctx, trn.TypeWorkspace.Build(nsPath))
+			if err != nil {
+				return err
+			}
+			if ws == nil {
+				return j.UnauthorizedError(ctx, false)
+			}
+			if j.WorkspaceID == ws.Metadata.ID {
+				continue // self-access is always allowed
+			}
+			if err := j.checkOutputVisibility(ctx, ws); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	return errMissingConstraints
+}
+
+// requireAccessToWorkspacesInGroupHierarchy checks that the job has access to a workspace
+// within the same root namespace (group hierarchy).
 func (j *JobCaller) requireAccessToWorkspacesInGroupHierarchy(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.workspaceID != nil {
 		return j.requireAccessToWorkspace(ctx, *checks.workspaceID)
@@ -336,6 +381,57 @@ func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePat
 	return nil
 }
 
+// checkOutputVisibility checks if the job's workspace is allowed to read outputs from the target workspace
+// based on the target workspace's output visibility setting.
+func (j *JobCaller) checkOutputVisibility(ctx context.Context, targetWorkspace *models.Workspace) error {
+	setting, err := j.inheritedSettingResolver.GetOutputVisibility(ctx, targetWorkspace)
+	if err != nil {
+		return err
+	}
+
+	switch setting.Value {
+	case models.OutputVisibilityGlobal:
+		return nil
+	case models.OutputVisibilityBlockAccess:
+		return j.UnauthorizedError(ctx, false)
+	case models.OutputVisibilityRootGroup,
+		models.OutputVisibilityDirectGroupOnly,
+		models.OutputVisibilityDirectGroupAndSubgroups:
+		// These cases require loading the requesting workspace
+		requestingWS, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+		if err != nil {
+			return err
+		}
+		if requestingWS == nil {
+			return j.UnauthorizedError(ctx, false)
+		}
+
+		switch setting.Value {
+		case models.OutputVisibilityRootGroup:
+			// Same root group
+			if requestingWS.GetRootGroupPath() != targetWorkspace.GetRootGroupPath() {
+				return j.UnauthorizedError(ctx, false)
+			}
+		case models.OutputVisibilityDirectGroupOnly:
+			// Same immediate parent group
+			if requestingWS.GroupID != targetWorkspace.GroupID {
+				return j.UnauthorizedError(ctx, false)
+			}
+		case models.OutputVisibilityDirectGroupAndSubgroups:
+			// Same group or any descendant subgroup
+			targetGroupPath := targetWorkspace.GetGroupPath()
+			requestingGroupPath := requestingWS.GetGroupPath()
+			if requestingGroupPath != targetGroupPath && !utils.IsDescendantOfPath(requestingGroupPath, targetGroupPath) {
+				return j.UnauthorizedError(ctx, false)
+			}
+		}
+		return nil
+	default:
+		// Unknown value — deny by default
+		return j.UnauthorizedError(ctx, false)
+	}
+}
+
 // requireProviderMirrorAccess allows creating provider mirrors if the workspace has provider mirror enabled.
 func (j *JobCaller) requireProviderMirrorAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.groupID == nil && len(checks.namespacePaths) == 0 {
@@ -408,9 +504,9 @@ func (j *JobCaller) requireProviderMirrorAccess(ctx context.Context, _ *models.P
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
 func (j *JobCaller) getPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
 	handlerMap := map[models.Permission]permissionTypeHandler{
-		models.ViewWorkspacePermission:                 j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewWorkspacePermission:                 j.requireWorkspaceOutputVisibility,
 		models.ViewConfigurationVersionPermission:      j.requireAccessToWorkspacesInGroupHierarchy,
-		models.ViewStateVersionPermission:              j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewStateVersionPermission:              j.requireWorkspaceOutputVisibility,
 		models.ViewManagedIdentityPermission:           j.requireAccessToWorkspacesInGroupHierarchy,
 		models.ViewVariablePermission:                  j.requireAccessToWorkspacesInGroupHierarchy,
 		models.ViewStateVersionDataPermission:          j.requireAccessToJobWorkspace,

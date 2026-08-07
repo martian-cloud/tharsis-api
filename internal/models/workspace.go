@@ -9,6 +9,34 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
+// NamespaceOutputVisibilityLevel represents the visibility level for workspace outputs
+type NamespaceOutputVisibilityLevel string
+
+const (
+	// OutputVisibilityBlockAccess means no workspace can read this workspace's outputs
+	OutputVisibilityBlockAccess NamespaceOutputVisibilityLevel = "block_access"
+	// OutputVisibilityDirectGroupOnly means only workspaces in the same immediate parent group can read outputs
+	OutputVisibilityDirectGroupOnly NamespaceOutputVisibilityLevel = "direct_group_only"
+	// OutputVisibilityDirectGroupAndSubgroups means any workspace within the parent group's subtree can read outputs
+	OutputVisibilityDirectGroupAndSubgroups NamespaceOutputVisibilityLevel = "direct_group_and_subgroups"
+	// OutputVisibilityRootGroup means any workspace sharing the same root group can read outputs
+	OutputVisibilityRootGroup NamespaceOutputVisibilityLevel = "root_group"
+	// OutputVisibilityGlobal means any workspace in the system can read outputs
+	OutputVisibilityGlobal NamespaceOutputVisibilityLevel = "global"
+)
+
+// DefaultOutputVisibility is the default output visibility for new root groups
+const DefaultOutputVisibility = OutputVisibilityDirectGroupOnly
+
+// ValidOutputVisibilities contains all valid output visibility values
+var ValidOutputVisibilities = []NamespaceOutputVisibilityLevel{
+	OutputVisibilityBlockAccess,
+	OutputVisibilityDirectGroupOnly,
+	OutputVisibilityDirectGroupAndSubgroups,
+	OutputVisibilityRootGroup,
+	OutputVisibilityGlobal,
+}
+
 const (
 	// maxLabelsPerWorkspace is the maximum number of labels per workspace
 	maxLabelsPerWorkspace = 10
@@ -36,6 +64,7 @@ type Workspace struct {
 	RunnerTags            []string
 	EnableDriftDetection  *bool
 	EnableProviderMirror  *bool
+	OutputVisibility      *NamespaceOutputVisibilityLevel
 	Labels                map[string]string
 }
 
@@ -86,6 +115,11 @@ func (w *Workspace) Validate() error {
 		return err
 	}
 
+	// Validate output visibility if set
+	if err := validateOutputVisibility(w.OutputVisibility); err != nil {
+		return err
+	}
+
 	// Validate labels
 	return validateLabels(w.Labels)
 }
@@ -113,6 +147,11 @@ func (w *Workspace) DriftDetectionEnabled() *bool {
 // ProviderMirrorEnabled returns the provider mirror enabled setting
 func (w *Workspace) ProviderMirrorEnabled() *bool {
 	return w.EnableProviderMirror
+}
+
+// GetOutputVisibility returns the output visibility setting
+func (w *Workspace) GetOutputVisibility() *NamespaceOutputVisibilityLevel {
+	return w.OutputVisibility
 }
 
 // GetGroupPath returns the group path
@@ -196,4 +235,28 @@ func validateLabels(labels map[string]string) error {
 	}
 
 	return nil
+}
+
+// validateOutputVisibility validates that the output visibility value is valid if set
+func validateOutputVisibility(v *NamespaceOutputVisibilityLevel) error {
+	if v == nil {
+		return nil
+	}
+	for _, valid := range ValidOutputVisibilities {
+		if *v == valid {
+			return nil
+		}
+	}
+
+	validNames := make([]string, len(ValidOutputVisibilities))
+	for i, vis := range ValidOutputVisibilities {
+		validNames[i] = string(vis)
+	}
+
+	return errors.New(
+		"invalid output visibility value %q, must be one of: %s",
+		*v,
+		strings.Join(validNames, ", "),
+		errors.WithErrorCode(errors.EInvalid),
+	)
 }

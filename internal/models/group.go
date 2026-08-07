@@ -21,6 +21,7 @@ type Group struct {
 	RunnerTags           []string
 	EnableDriftDetection *bool
 	EnableProviderMirror *bool
+	OutputVisibility     *NamespaceOutputVisibilityLevel
 }
 
 // GetID returns the Metadata ID.
@@ -66,7 +67,12 @@ func (g *Group) Validate() error {
 	}
 
 	// Check for duplicate tags, too-long tags, and too many tags.
-	return verifyValidRunnerTags(g.RunnerTags)
+	if err := verifyValidRunnerTags(g.RunnerTags); err != nil {
+		return err
+	}
+
+	// Validate output visibility if set
+	return validateOutputVisibility(g.OutputVisibility)
 }
 
 // GetRootGroupPath returns the root path for the group
@@ -100,6 +106,11 @@ func (g *Group) DriftDetectionEnabled() *bool {
 // ProviderMirrorEnabled returns the provider mirror enabled setting
 func (g *Group) ProviderMirrorEnabled() *bool {
 	return g.EnableProviderMirror
+}
+
+// GetOutputVisibility returns the output visibility setting
+func (g *Group) GetOutputVisibility() *NamespaceOutputVisibilityLevel {
+	return g.OutputVisibility
 }
 
 // GetParentPath returns the path for the group's immediate parent.

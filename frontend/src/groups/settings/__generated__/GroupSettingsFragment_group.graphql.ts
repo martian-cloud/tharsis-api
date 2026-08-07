@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<18bc9cdf7d9777165214c3529059cbd5>>
+ * @generated SignedSource<<c39c150ebb4c6627e72498843de71c00>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,7 +12,7 @@ import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type GroupSettingsFragment_group$data = {
   readonly fullPath: string;
-  readonly " $fragmentSpreads": FragmentRefs<"GroupAdvancedSettingsFragment_group" | "GroupDriftDetectionSettingsFragment_group" | "GroupGeneralSettingsFragment_group" | "GroupProviderMirrorSettingsFragment_group" | "GroupRunnerSettingsFragment_group">;
+  readonly " $fragmentSpreads": FragmentRefs<"GroupAdvancedSettingsFragment_group" | "GroupDriftDetectionSettingsFragment_group" | "GroupGeneralSettingsFragment_group" | "GroupOutputVisibilitySettingsFragment_group" | "GroupProviderMirrorSettingsFragment_group" | "GroupRunnerSettingsFragment_group">;
   readonly " $fragmentType": "GroupSettingsFragment_group";
 };
 export type GroupSettingsFragment_group$key = {
@@ -57,12 +57,17 @@ const node: ReaderFragment = {
       "args": null,
       "kind": "FragmentSpread",
       "name": "GroupProviderMirrorSettingsFragment_group"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "GroupOutputVisibilitySettingsFragment_group"
     }
   ],
   "type": "Group",
   "abstractKey": null
 };
 
-(node as any).hash = "1f39da762584e55170e189aa569e77f8";
+(node as any).hash = "d759479f88061013ca5108f9c5e79931";
 
 export default node;

@@ -2624,6 +2624,61 @@ func TestGetDriftDetectionEnabledSetting(t *testing.T) {
 	}
 }
 
+func TestGetOutputVisibilitySetting(t *testing.T) {
+	workspace := models.Workspace{
+		Metadata: models.ResourceMetadata{ID: "ws-1"},
+	}
+	// Test cases
+	tests := []struct {
+		expectSetting *namespace.OutputVisibilitySetting
+		name          string
+		authError     error
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "get setting",
+			expectSetting: &namespace.OutputVisibilitySetting{
+				Value: models.OutputVisibilityDirectGroupOnly,
+			},
+		},
+		{
+			name:          "unauthorized",
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			testLogger, _ := logger.NewForTest()
+
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+
+			mockInheritedSettingsResolver.On("GetOutputVisibility", mock.Anything, &workspace).Return(test.expectSetting, nil).Maybe()
+
+			svc := service{
+				logger:                    testLogger,
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
+			}
+
+			setting, err := svc.GetOutputVisibilitySetting(auth.WithCaller(ctx, mockCaller), &workspace)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectSetting, setting)
+		})
+	}
+}
+
 func TestGetWorkspaceAssessmentByID(t *testing.T) {
 	assessmentID := "assessment-1"
 

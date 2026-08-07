@@ -209,6 +209,7 @@ type Service interface {
 	GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*namespace.RunnerTagsSetting, error)
 	GetDriftDetectionEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.DriftDetectionEnabledSetting, error)
 	GetProviderMirrorEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.ProviderMirrorEnabledSetting, error)
+	GetOutputVisibilitySetting(ctx context.Context, workspace *models.Workspace) (*namespace.OutputVisibilitySetting, error)
 }
 
 type handleCallerFunc func(
@@ -2028,6 +2029,29 @@ func (s *service) GetProviderMirrorEnabledSetting(ctx context.Context, workspace
 	}
 
 	return s.inheritedSettingsResolver.GetProviderMirrorEnabled(ctx, workspace)
+}
+
+// GetOutputVisibilitySetting returns the (inherited or direct) output visibility setting for a workspace.
+func (s *service) GetOutputVisibilitySetting(ctx context.Context, workspace *models.Workspace) (*namespace.OutputVisibilitySetting, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetOutputVisibilitySetting")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(workspace.FullPath))
+	if err != nil {
+		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	}
+
+	setting, err := s.inheritedSettingsResolver.GetOutputVisibility(ctx, workspace)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get output visibility setting", errors.WithSpan(span))
+	}
+
+	return setting, nil
 }
 
 func (s *service) getWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error) {

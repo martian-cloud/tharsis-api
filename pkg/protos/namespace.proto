@@ -25,3 +25,4 @@ message NamespaceProviderMirrorEnabledInput {
     bool enabled = 2;
   }
 }
+
