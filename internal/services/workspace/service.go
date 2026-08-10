@@ -8,8 +8,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -40,6 +42,10 @@ const (
 
 	// lowerLimitMaxJobDuration is the lowest value MaxJobDuration field can be assigned.
 	lowerLimitMaxJobDuration = time.Minute
+
+	// maxStateVersionOutputSizeBytes is the maximum allowed size in bytes of a single
+	// Terraform state version output value.
+	maxStateVersionOutputSizeBytes = 2 * 1024 * 1024 // 2 MiB
 
 	tharsisTerraformProviderConfig        = "provider[\"registry.terraform.io/martian-cloud/tharsis\"]"
 	tharsisWorkspaceOutputsDatasourceName = "tharsis_workspace_outputs"
@@ -1191,6 +1197,101 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		return nil, err
 	}
 
+	// Decode and validate the state, and pre-compute which outputs to persist,
+	// before opening the DB transaction. Filtering ahead of time keeps the
+	// transaction short: only the already-approved outputs are written inside
+	// it, rather than decoding and enforcing limits while holding a DB
+	// connection.
+	var state stateV4
+	if err = json.Unmarshal(decoded, &state); err != nil {
+		tracing.RecordError(span, nil, "failed to unmarshal decoded data: %s", err)
+		return nil, fmt.Errorf("failed to unmarshal decoded data: %s", err)
+	}
+	if state.Version != version4 {
+		tracing.RecordError(span, nil, "expected stateVersionV4, got %d", state.Version)
+		return nil, fmt.Errorf("expected stateVersionV4, got %d", state.Version)
+	}
+
+	// Collect limit violations. Outputs that violate a limit are not persisted
+	// as individually fetchable outputs, but the full state blob is still
+	// uploaded below. Failing to upload the state would corrupt the workspace
+	// because infrastructure changes have already been applied at this point.
+	var limitErrors error
+
+	// Look up the max-outputs-per-state-version limit value. This is a read, so
+	// it does not need the transaction. We fetch the value directly (rather than
+	// using limitChecker.CheckLimit) because enforcement keeps up to that many
+	// outputs, so we need the number itself. If this lookup fails, we log it and
+	// treat it as "no limit configured" rather than aborting: a failure here
+	// usually indicates a broader DB issue, in which case the subsequent writes
+	// in this function (state version, workspace update, outputs) will likely
+	// fail too and surface a real error; aborting early here would only pay off
+	// in the narrower case where this lookup fails but every later DB write
+	// still succeeds. This is an intentional deviation from limitChecker.CheckLimit's
+	// fail-closed pattern — fail-open is acceptable here because state must always
+	// be persisted after an apply.
+	outputCountLimit, limitErr := s.dbClient.ResourceLimits.GetResourceLimit(ctx, string(limits.ResourceLimitOutputsPerStateVersion))
+	if limitErr != nil {
+		tracing.RecordError(span, limitErr, "failed to look up output count limit; skipping count enforcement")
+		s.logger.WithContextFields(ctx).Errorf(
+			"failed to look up %s; skipping output count enforcement for this state version: %v",
+			limits.ResourceLimitOutputsPerStateVersion, limitErr,
+		)
+		outputCountLimit = nil
+	}
+
+	// Sort output names so enforcement is deterministic: map iteration order in
+	// Go is randomized, so without sorting, "the first N outputs" would be a
+	// different set on every run. Sorting by name guarantees the same outputs
+	// are kept each time.
+	outputNames := make([]string, 0, len(state.RootOutputs))
+	for outputName := range state.RootOutputs {
+		outputNames = append(outputNames, outputName)
+	}
+	sort.Strings(outputNames)
+
+	// Build the filtered list of outputs to persist. StateVersionID is filled in
+	// later, once the state version has been created inside the transaction.
+	outputsToStore := make([]models.StateVersionOutput, 0, len(outputNames))
+	for _, outputName := range outputNames {
+		outputInfo := state.RootOutputs[outputName]
+
+		// Skip an output that exceeds the size limit. The value is still present
+		// in the uploaded state blob; it is only omitted from the individually
+		// fetchable outputs returned over the size-limited gRPC transport.
+		// Oversized outputs do not consume a slot toward the count limit.
+		if len(outputInfo.ValueRaw) > maxStateVersionOutputSizeBytes {
+			limitErrors = goerrors.Join(limitErrors, fmt.Errorf(
+				"output %q size %d exceeds maximum allowed size of %d bytes", outputName, len(outputInfo.ValueRaw), maxStateVersionOutputSizeBytes,
+			))
+			continue
+		}
+
+		// Enforce the count limit: keep up to outputCountLimit.Value size-valid
+		// outputs (in sorted order) and skip the rest. The skipped values remain
+		// in the uploaded state blob; they are only omitted from the individually
+		// fetchable outputs.
+		if outputCountLimit != nil && len(outputsToStore) >= outputCountLimit.Value {
+			continue
+		}
+
+		outputsToStore = append(outputsToStore, models.StateVersionOutput{
+			Name:      outputName,
+			Value:     outputInfo.ValueRaw,
+			Type:      outputInfo.ValueTypeRaw,
+			Sensitive: outputInfo.Sensitive,
+		})
+	}
+
+	// Report a count-limit violation if the total number of outputs (including
+	// oversized ones) exceeds the configured limit.
+	if outputCountLimit != nil && len(state.RootOutputs) > outputCountLimit.Value {
+		limitErrors = goerrors.Join(limitErrors, fmt.Errorf(
+			"state version has %d outputs, exceeding the limit of %d; kept the first %d sorted by name",
+			len(state.RootOutputs), outputCountLimit.Value, len(outputsToStore),
+		))
+	}
+
 	// Upload before the transaction so the pending ref is committed immediately.
 	// If the TX rolls back, the janitor will clean up the orphaned S3 object.
 	svRetainFn, svKey, err := s.artifactStore.UploadStateVersion(ctx, stateVersion, bytes.NewBuffer(decoded))
@@ -1265,35 +1366,17 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		return nil, err
 	}
 
-	// Attempt to unmarshal to a stateV4:
-	var state stateV4
-	err = json.Unmarshal(decoded, &state)
-	if err != nil {
-		tracing.RecordError(span, nil, "failed to unmarshal decoded data: %s", err)
-		return nil, fmt.Errorf("failed to unmarshal decoded data: %s", err)
-	}
-	if state.Version != version4 {
-		tracing.RecordError(span, nil, "expected stateVersionV4, got %d", state.Version)
-		return nil, fmt.Errorf("expected stateVersionV4, got %d", state.Version)
-	}
-
-	for outputName, outputInfo := range state.RootOutputs {
-
-		newOutput := models.StateVersionOutput{
-			Name:           outputName,
-			Value:          outputInfo.ValueRaw,
-			Type:           outputInfo.ValueTypeRaw,
-			Sensitive:      outputInfo.Sensitive,
-			StateVersionID: createdStateVersion.Metadata.ID,
-		}
+	// Persist the pre-filtered outputs. All decoding and limit enforcement was
+	// done before the transaction was opened; here we only write the approved
+	// outputs, keeping the transaction short.
+	for i := range outputsToStore {
+		outputsToStore[i].StateVersionID = createdStateVersion.Metadata.ID
 
 		// There's nothing that needs to be done with the stored new output, so ignore it.
-		_, err = s.dbClient.StateVersionOutputs.CreateStateVersionOutput(txContext, &newOutput)
-		if err != nil {
+		if _, err = s.dbClient.StateVersionOutputs.CreateStateVersionOutput(txContext, &outputsToStore[i]); err != nil {
 			tracing.RecordError(span, err, "failed to create state version output")
 			return nil, err
 		}
-
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -1318,6 +1401,20 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		"workspaceID", createdStateVersion.WorkspaceID,
 		"workspaceFullPath", workspace.FullPath,
 	)
+
+	// Return limit violations after the state version is safely persisted. The
+	// state version is not returned here (unlike other successful paths) even
+	// though it was created: the gRPC server handler and generated client stub
+	// both discard the response value whenever err is non-nil, so no caller can
+	// ever observe a non-nil value on this path. Returning it would only be
+	// meaningful if a caller could receive both a value and an error together,
+	// which isn't supported without a proto/API change (see MR discussion).
+	if limitErrors != nil {
+		return nil, errors.New(
+			"%s: %s", coreworkspace.StateVersionOutputLimitViolationMsg, limitErrors.Error(),
+			errors.WithErrorCode(errors.EInvalid),
+		)
+	}
 
 	return createdStateVersion, nil
 }

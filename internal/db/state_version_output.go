@@ -1,5 +1,7 @@
 package db
 
+//go:generate go tool mockery --name StateVersionOutputs --inpackage --case underscore
+
 import (
 	"context"
 	"fmt"

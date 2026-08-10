@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"google.golang.org/grpc/status"
 )
 
 // ApplyHandler handles an apply job
@@ -145,6 +146,17 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 		// Create new state version
 		sv, csvErr := a.client.CreateStateVersion(ctx, a.run.Metadata.Id, stateFile)
 		if csvErr != nil {
+			if isOutputLimitViolation(csvErr) {
+				// The state version was created successfully server-side; only some
+				// outputs were rejected for exceeding configured size/count limits.
+				// The full state is safely persisted (nothing to recover), so skip
+				// the raw-state dump below and report accurately that the state
+				// version exists rather than implying its creation failed. The job
+				// still ends in error: not every output was stored, which can break
+				// other workspaces that depend on them via remote state.
+				return fmt.Errorf("state version was created, but some outputs were not saved: %s", status.Convert(csvErr).Message())
+			}
+
 			// Log the raw state data so it can be recovered from job logs if needed.
 			if stateData, readErr := os.ReadFile(stateOutputPath); readErr == nil {
 				a.jobLogger.Errorf("State data for recovery (run %s):\n%s", a.run.Metadata.Id, string(stateData))

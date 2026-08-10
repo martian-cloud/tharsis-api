@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -1751,6 +1753,33 @@ func TestCreateStateVersion(t *testing.T) {
 		RunID:       &runID,
 	}
 
+	// Helpers for the output-limit test cases.
+	//
+	// smallValue is a small, valid JSON output value; oversizedValue is a JSON
+	// string whose raw form exceeds the per-output size limit. buildState encodes
+	// a stateV4 document containing the given outputs (name -> raw JSON value).
+	smallValue := `"small"`
+	oversizedValue := `"` + strings.Repeat("a", maxStateVersionOutputSizeBytes+1) + `"`
+	buildState := func(outputs map[string]string) []byte {
+		parts := make([]string, 0, len(outputs))
+		for name, val := range outputs {
+			parts = append(parts, fmt.Sprintf(`%q: {"value": %s, "type": "string"}`, name, val))
+		}
+		return buildEncodedData(fmt.Sprintf(`{"version": 4, "outputs": {%s}}`, strings.Join(parts, ",")))
+	}
+
+	// outputStateVersion is the created state version returned for the
+	// output-limit cases (they all need a non-nil created version so outputs can
+	// be attached and the state can be uploaded).
+	outputStateVersion := &models.StateVersion{
+		Metadata: models.ResourceMetadata{
+			CreationTimestamp: &currentTime,
+			ID:                stateVersionID,
+		},
+		WorkspaceID: workspaceID,
+		RunID:       &runID,
+	}
+
 	type testCase struct {
 		authFail                 bool
 		workspacePermissionError error
@@ -1759,6 +1788,7 @@ func TestCreateStateVersion(t *testing.T) {
 		linkRefErr               error
 		createError              error
 		dataDecodeError          error
+		outputLimitLookupErr     error
 		toCreate                 *models.StateVersion
 		injectCreated            *models.StateVersion
 		expectResult             *models.StateVersion
@@ -1767,6 +1797,8 @@ func TestCreateStateVersion(t *testing.T) {
 		expectErrorCode          errors.CodeType
 		limit                    int
 		injectSVsPerWorkspace    int32
+		outputLimit              int
+		expectStoredOutputs      []string
 	}
 
 	/*
@@ -1902,6 +1934,51 @@ func TestCreateStateVersion(t *testing.T) {
 				RunID:       &runID,
 			},
 		},
+		{
+			name:     "output exceeding size limit is skipped while smaller outputs are still stored",
+			toCreate: toCreate,
+			data: buildState(map[string]string{
+				"big":   oversizedValue,
+				"small": smallValue,
+			}),
+			injectCreated:         outputStateVersion,
+			limit:                 1000,
+			injectSVsPerWorkspace: 0,
+			outputLimit:           400,
+			expectStoredOutputs:   []string{"small"},
+			expectErrorCode:       errors.EInvalid,
+		},
+		{
+			name:     "outputs exceeding count limit are truncated deterministically by sorted name",
+			toCreate: toCreate,
+			data: buildState(map[string]string{
+				"a": smallValue,
+				"b": smallValue,
+				"c": smallValue,
+				"d": smallValue,
+			}),
+			injectCreated:         outputStateVersion,
+			limit:                 1000,
+			injectSVsPerWorkspace: 0,
+			outputLimit:           2,
+			expectStoredOutputs:   []string{"a", "b"},
+			expectErrorCode:       errors.EInvalid,
+		},
+		{
+			name:     "fail-safe: all outputs stored when the output limit lookup fails",
+			toCreate: toCreate,
+			data: buildState(map[string]string{
+				"a": smallValue,
+				"b": smallValue,
+				"c": smallValue,
+			}),
+			injectCreated:         outputStateVersion,
+			limit:                 1000,
+			injectSVsPerWorkspace: 0,
+			outputLimitLookupErr:  errors.New("db unavailable", errors.WithErrorCode(errors.EInternal)),
+			expectStoredOutputs:   []string{"a", "b", "c"},
+			expectResult:          outputStateVersion,
+		},
 	}
 
 	for _, test := range tests {
@@ -1933,8 +2010,22 @@ func TestCreateStateVersion(t *testing.T) {
 				}, nil).Maybe()
 
 			mockResourceLimits := db.NewMockResourceLimits(t)
-			mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+			// The state-versions-per-workspace-per-time-period check and the
+			// output-count check both call GetResourceLimit; key the mock by name
+			// so the fail-safe case can fail only the output lookup.
+			mockResourceLimits.On("GetResourceLimit", mock.Anything, string(limits.ResourceLimitStateVersionsPerWorkspacePerTimePeriod)).
 				Return(&models.ResourceLimit{Value: test.limit}, nil).Maybe()
+			mockResourceLimits.On("GetResourceLimit", mock.Anything, string(limits.ResourceLimitOutputsPerStateVersion)).
+				Return(&models.ResourceLimit{Value: test.outputLimit}, test.outputLimitLookupErr).Maybe()
+
+			var storedOutputNames []string
+			mockStateVersionOutputs := db.NewMockStateVersionOutputs(t)
+			mockStateVersionOutputs.On("CreateStateVersionOutput", mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) {
+					o := args.Get(1).(*models.StateVersionOutput)
+					storedOutputNames = append(storedOutputNames, o.Name)
+				}).
+				Return(&models.StateVersionOutput{}, nil).Maybe()
 
 			mockWorkspaces := db.NewMockWorkspaces(t)
 			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, mock.Anything).
@@ -1963,10 +2054,11 @@ func TestCreateStateVersion(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 			dbClient := &db.Client{
-				Transactions:   mockTransactions,
-				StateVersions:  mockStateVersions,
-				ResourceLimits: mockResourceLimits,
-				Workspaces:     mockWorkspaces,
+				Transactions:        mockTransactions,
+				StateVersions:       mockStateVersions,
+				StateVersionOutputs: mockStateVersionOutputs,
+				ResourceLimits:      mockResourceLimits,
+				Workspaces:          mockWorkspaces,
 			}
 
 			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), &mockArtifactStore, nil, "", nil)
@@ -1980,14 +2072,30 @@ func TestCreateStateVersion(t *testing.T) {
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, test.expectResult, result)
 			}
 
-			if err != nil {
-				t.Fatal(err)
-			}
+			// For output-limit cases, verify exactly which outputs were persisted.
+			// This runs even when an error is expected, because size/count
+			// violations are partial failures: the state is still saved and the
+			// non-violating outputs are still stored.
+			if test.expectStoredOutputs != nil {
+				sort.Strings(storedOutputNames)
+				assert.Equal(t, test.expectStoredOutputs, storedOutputNames)
 
-			assert.Equal(t, test.expectResult, result)
+				// This is the core safety property the partial-failure design
+				// depends on: the full state blob must still be uploaded even
+				// when some outputs are rejected, since the infrastructure
+				// changes it describes have already been applied. Assert this
+				// explicitly rather than relying on the mock's .Maybe() default,
+				// so a regression that skips or short-circuits the upload on a
+				// limit violation is caught here instead of only in production.
+				mockArtifactStore.AssertCalled(t, "UploadStateVersion", mock.Anything, mock.Anything, mock.Anything)
+			}
 		})
 	}
 }
