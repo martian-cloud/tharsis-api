@@ -49,6 +49,7 @@ const (
 	ResourceLimitFederatedRegistriesPerGroup                    ResourceLimitName = "ResourceLimitFederatedRegistriesPerGroup"
 	ResourceLimitAgentCreditsPerUserPerMonth                    ResourceLimitName = "ResourceLimitAgentCreditsPerUserPerMonth"
 	ResourceLimitAgentSessionRunsPerSession                     ResourceLimitName = "ResourceLimitAgentSessionRunsPerSession"
+	ResourceLimitOutputsPerStateVersion                         ResourceLimitName = "ResourceLimitOutputsPerStateVersion"
 )
 
 // LimitChecker implements functionality related to resource limits.
