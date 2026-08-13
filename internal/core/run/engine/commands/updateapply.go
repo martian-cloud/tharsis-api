@@ -25,7 +25,7 @@ type UpdateApply struct {
 	Updated *models.Apply
 }
 
-// Prepare resolves the run owning the apply node and sanitizes the error message.
+// Prepare resolves the run owning the apply node and truncates and sanitizes the error message.
 // It runs before the transaction is opened.
 func (c *UpdateApply) Prepare(ctx context.Context) error {
 	run, err := c.dbClient.Runs.GetRunByNodeID(ctx, c.ApplyID)
@@ -38,7 +38,7 @@ func (c *UpdateApply) Prepare(ctx context.Context) error {
 
 	c.runID = run.Metadata.ID
 	if c.ErrorMessage != nil {
-		c.sanitizedMessage = corerun.SanitizeAndTruncateErrorMessage(*c.ErrorMessage)
+		c.sanitizedMessage = corerun.TruncateAndSanitizeErrorMessage(*c.ErrorMessage)
 	}
 	return nil
 }

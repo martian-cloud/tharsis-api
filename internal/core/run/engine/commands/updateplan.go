@@ -26,7 +26,7 @@ type UpdatePlan struct {
 	Updated *models.Plan
 }
 
-// Prepare resolves the run owning the plan node and sanitizes the error message.
+// Prepare resolves the run owning the plan node and truncates and sanitizes the error message.
 // It runs before the transaction is opened.
 func (c *UpdatePlan) Prepare(ctx context.Context) error {
 	run, err := c.dbClient.Runs.GetRunByNodeID(ctx, c.PlanID)
@@ -39,7 +39,7 @@ func (c *UpdatePlan) Prepare(ctx context.Context) error {
 
 	c.runID = run.Metadata.ID
 	if c.ErrorMessage != nil {
-		c.sanitizedMessage = corerun.SanitizeAndTruncateErrorMessage(*c.ErrorMessage)
+		c.sanitizedMessage = corerun.TruncateAndSanitizeErrorMessage(*c.ErrorMessage)
 	}
 	return nil
 }
