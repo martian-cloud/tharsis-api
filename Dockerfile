@@ -21,7 +21,7 @@ COPY . .
 # Download credential helper
 RUN curl --fail --silent --show-error -L \
     --output iamoidccredhelper \
-    https://gitlab.com/api/v4/projects/44551702/packages/generic/iam-oidc-credential-helper/v0.1.1/iamoidccredhelper_v0.1.1_linux_amd64 && \
+    https://gitlab.com/api/v4/projects/44551702/packages/generic/iam-oidc-credential-helper/v0.2.0/iamoidccredhelper_v0.2.0_linux_amd64 && \
     chmod +x iamoidccredhelper
 
 # Build binaries
