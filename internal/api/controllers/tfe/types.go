@@ -491,9 +491,33 @@ const (
 	RunPolicyChecking     RunStatus = "policy_checking"
 	RunPolicyOverride     RunStatus = "policy_override"
 	RunPolicySoftFailed   RunStatus = "policy_soft_failed"
-	RunQueuing            RunStatus = "queuing"
-	RunQueuingApply       RunStatus = "queuing_apply"
+
+	RunPostPlanAwaitingDecision RunStatus = "post_plan_awaiting_decision"
+	RunPostPlanCompleted        RunStatus = "post_plan_completed"
+	RunPostPlanRunning          RunStatus = "post_plan_running"
+	// go-tfe v1.51.0 defines pre_apply_running/pre_apply_completed but no
+	// pre_apply_awaiting_decision — a pre-apply override gate is reported as policy_override, the same
+	// way a pre-plan one is. (post_apply_* run statuses only arrive in go-tfe v1.105.0.)
+	RunPreApplyCompleted RunStatus = "pre_apply_completed"
+	RunPreApplyRunning   RunStatus = "pre_apply_running"
+	RunPrePlanCompleted  RunStatus = "pre_plan_completed"
+	RunPrePlanRunning    RunStatus = "pre_plan_running"
+
+	RunQueuing      RunStatus = "queuing"
+	RunQueuingApply RunStatus = "queuing_apply"
 )
+
+// allRunStatuses is every TFE run status this API may surface. It backs the test asserting that the
+// Tharsis-to-TFE mapping only ever returns a value the Terraform CLI understands — a Tharsis status
+// leaking through as a raw string is what breaks the CLI (see tharsisRunStatusToTFE).
+var allRunStatuses = []RunStatus{
+	RunApplied, RunApplyQueued, RunApplying, RunCanceled, RunConfirmed, RunCostEstimated,
+	RunCostEstimating, RunDiscarded, RunErrored, RunPending, RunPlanQueued, RunPlanned,
+	RunPlannedAndFinished, RunPlanning, RunPolicyChecked, RunPolicyChecking, RunPolicyOverride,
+	RunPolicySoftFailed, RunPostPlanAwaitingDecision, RunPostPlanCompleted, RunPostPlanRunning,
+	RunPreApplyCompleted, RunPreApplyRunning, RunPrePlanCompleted, RunPrePlanRunning,
+	RunQueuing, RunQueuingApply,
+}
 
 // RunSource represents a source type of a run.
 type RunSource string
@@ -531,6 +555,7 @@ type Run struct {
 
 	// Relation
 	PolicyChecks []*gotfe.PolicyCheck `jsonapi:"relation,policy-checks"`
+	TaskStages   []*TaskStage         `jsonapi:"relation,task-stages"`
 	// End of Relation
 
 	PositionInQueue int  `jsonapi:"attr,position-in-queue"`
@@ -577,4 +602,63 @@ type RunStatusTimestamps struct {
 	PlanningAt           time.Time `jsonapi:"attr,planning-at,rfc3339"`
 	PolicyCheckedAt      time.Time `jsonapi:"attr,policy-checked-at,rfc3339"`
 	PolicySoftFailedAt   time.Time `jsonapi:"attr,policy-soft-failed-at,rfc3339"`
+}
+
+// TaskStage mirrors the go-tfe task-stage type. Its scalar attributes serialize fine as the go-tfe
+// type, but the nested PolicyEvaluation.ResultCount does not (see PolicyEvaluation), so we own the
+// shape and give the count `json` tags.
+type TaskStage struct {
+	ID                string              `jsonapi:"primary,task-stages"`
+	Stage             string              `jsonapi:"attr,stage"`
+	Status            string              `jsonapi:"attr,status"`
+	PolicyEvaluations []*PolicyEvaluation `jsonapi:"relation,policy-evaluations"`
+}
+
+// PolicyEvaluation mirrors the go-tfe policy-evaluation type. ResultCount is a nested struct
+// attribute, and marshaling the go-tfe type emits its fields by Go field name (e.g. "Passed") instead
+// of the jsonapi tag the client reads ("passed"/"advisory-failed"), so the CLI decodes it as zero —
+// the cause of the "0 policies evaluated" line even when a policy has failed. The json tags on
+// PolicyResultCount make the nested count round-trip.
+type PolicyEvaluation struct {
+	ID          string             `jsonapi:"primary,policy-evaluations"`
+	Status      string             `jsonapi:"attr,status"`
+	PolicyKind  string             `jsonapi:"attr,policy-kind"`
+	ResultCount *PolicyResultCount `jsonapi:"attr,result-count"`
+}
+
+// PolicySetOutcome mirrors the go-tfe policy-set-outcome type. The go-tfe policy-set-outcome types
+// (PolicySetOutcome/Outcome/PolicyResultCount) carry only `jsonapi` tags on their nested fields.
+// github.com/hashicorp/jsonapi, however, is asymmetric for a nested struct attribute: it MARSHALS the
+// value with encoding/json (by `json` tag / Go field name) but UNMARSHALS it by the `jsonapi` tag.
+// Marshaling the go-tfe structs directly therefore emits keys like "PolicyName"/"AdvisoryFailed",
+// which the go-tfe client (reading nested attributes by their jsonapi tag, e.g.
+// "policy_name"/"advisory-failed") decodes as empty/zero — the CLI then prints "0 policies evaluated"
+// with blank policy names. These local mirror types carry `json` tags matching the wire names the
+// client expects, so the nested outcomes and counts round-trip. (Real TFE emits those snake/kebab-case
+// keys directly, which is why the client works against it.)
+type PolicySetOutcome struct {
+	ID                   string            `jsonapi:"primary,policy-set-outcomes"`
+	Outcomes             []Outcome         `jsonapi:"attr,outcomes"`
+	Error                string            `jsonapi:"attr,error"`
+	Overridable          *bool             `jsonapi:"attr,overridable"`
+	PolicySetName        string            `jsonapi:"attr,policy-set-name"`
+	PolicySetDescription string            `jsonapi:"attr,policy-set-description"`
+	ResultCount          PolicyResultCount `jsonapi:"attr,result_count"`
+}
+
+// Outcome is a single policy's result within a PolicySetOutcome.
+type Outcome struct {
+	EnforcementLevel string `json:"enforcement_level"`
+	Query            string `json:"query"`
+	Status           string `json:"status"`
+	PolicyName       string `json:"policy_name"`
+	Description      string `json:"description"`
+}
+
+// PolicyResultCount tallies policy results by enforcement outcome.
+type PolicyResultCount struct {
+	AdvisoryFailed  int `json:"advisory-failed"`
+	MandatoryFailed int `json:"mandatory-failed"`
+	Passed          int `json:"passed"`
+	Errored         int `json:"errored"`
 }

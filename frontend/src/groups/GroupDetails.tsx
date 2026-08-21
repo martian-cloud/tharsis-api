@@ -34,9 +34,12 @@ import ProviderMirrors from '../namespace/providermirror/ProviderMirrors';
 import NamespaceActivity from '../namespace/activity/NamespaceActivity';
 import GroupNotificationPreference from '../notifications/GroupNotificationPreference';
 import TerraformModules from './terraformmodule/TerraformModules';
+import GroupPackages from './package/GroupPackages';
+import GroupPolicies from '../namespace/policies/GroupPolicies';
 import GroupRuns from './GroupRuns';
 import NamespaceFavoriteButton from '../common/NamespaceFavoriteButton';
 import { useAgentCopilot } from '../ai/AgentCopilotProvider';
+import { PageLayoutProvider } from '../layout/PageLayoutContext';
 
 const TABS = ['workspaces', 'subgroups'];
 
@@ -69,6 +72,8 @@ function GroupDetails(props: Props) {
             ...GroupRunsFragment_group
             ...ServiceAccountsFragment_group
             ...TerraformModulesFragment_group
+            ...GroupPackagesFragment_group
+            ...GroupPoliciesFragment_group
             ...VCSProvidersFragment_group
             ...FederatedRegistriesFragment_group
             ...VariablesFragment_variables
@@ -98,7 +103,7 @@ function GroupDetails(props: Props) {
                     >
                         <CircularProgress />
                     </Box>}>
-                    <Box maxWidth={1200} margin="auto" padding={2}>
+                    <PageLayoutProvider>
                         <Routes>
                             <Route path={`${groupPath}/*`} element={<GroupDetailsIndex route={route} fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/activity/*`} element={<NamespaceActivity fragmentRef={data} />} />
@@ -107,6 +112,8 @@ function GroupDetails(props: Props) {
                             <Route path={`${groupPath}/-/runners/*`} element={<GroupRunners fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/service_accounts/*`} element={<ServiceAccounts fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/terraform_modules/*`} element={<TerraformModules fragmentRef={data} />} />
+                            <Route path={`${groupPath}/-/packages/*`} element={<GroupPackages fragmentRef={data} />} />
+                            <Route path={`${groupPath}/-/policies/*`} element={<GroupPolicies fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/vcs_providers/*`} element={<VCSProviders fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/federated_registries/*`} element={<FederatedRegistries fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/provider_mirror/*`} element={<ProviderMirrors fragmentRef={data} />} />
@@ -115,7 +122,7 @@ function GroupDetails(props: Props) {
                             <Route path={`${groupPath}/-/keys/*`} element={<GPGKeys fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/settings/*`} element={<GroupSettings fragmentRef={data} />} />
                         </Routes>
-                    </Box>
+                    </PageLayoutProvider>
                 </Suspense>
             </Box>
         </Box>

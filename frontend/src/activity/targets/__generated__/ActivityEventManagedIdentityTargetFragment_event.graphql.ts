@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e1b16cf905933e591e855530a64f6720>>
+ * @generated SignedSource<<9945c90c7de0aeabe77f01fe93cfe910>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -27,7 +27,7 @@ export type ActivityEventManagedIdentityTargetFragment_event$data = {
     readonly id?: string;
     readonly name?: string;
     readonly resourcePath?: string;
-  };
+  } | null | undefined;
   readonly " $fragmentSpreads": FragmentRefs<"ActivityEventListItemFragment_event">;
   readonly " $fragmentType": "ActivityEventManagedIdentityTargetFragment_event";
 };

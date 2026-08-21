@@ -33,9 +33,11 @@ function RunnerList({ fragmentRef, loadNext, hasNext, hideNewRunnerButton, group
         }
     `, fragmentRef);
 
+    const edges = data?.edges ?? [];
+
     return (
         <Box>
-            {data.edges?.length !== 0 ? <Box>
+            {edges.length !== 0 ? <Box>
                 <Box>
                     <Box sx={{
                         display: 'flex',
@@ -67,7 +69,7 @@ function RunnerList({ fragmentRef, loadNext, hasNext, hideNewRunnerButton, group
                     </Box>
                 </Box>
                 <InfiniteScroll
-                    dataLength={data.edges?.length ?? 0}
+                    dataLength={edges.length}
                     next={() => loadNext(20)}
                     hasMore={hasNext}
                     loader={<ListSkeleton rowCount={3} />}
@@ -77,7 +79,7 @@ function RunnerList({ fragmentRef, loadNext, hasNext, hideNewRunnerButton, group
                         minWidth={650}
                         columns={[{ label: 'Name' }, { label: 'Status' }, { label: 'Created' }, { label: 'Last Updated' }]}
                     >
-                        {data.edges?.map((edge: any) => (
+                        {edges.map((edge: any) => (
                             <RunnerListItem key={edge.node.id} fragmentRef={edge.node} inherited={!!groupPath && groupPath !== edge.node.groupPath} />
                         ))}
                     </ResponsiveTable>

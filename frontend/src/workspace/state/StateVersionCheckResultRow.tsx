@@ -17,7 +17,7 @@ function StateVersionCheckResultRow(props: Props) {
     const { fragmentRef } = props;
     const data = useFragment<StateVersionCheckResultRowFragment_checkResult$key>(
         graphql`
-        fragment StateVersionCheckResultRowFragment_checkResult on CheckResult
+        fragment StateVersionCheckResultRowFragment_checkResult on TerraformCheckResult
         {
             name
             status

@@ -145,56 +145,95 @@ func enforceEligiblePrincipalsRuleType(
 	if err := auth.HandleCaller(
 		ctx,
 		func(ctx context.Context, c *auth.UserCaller) error {
-			found := false
-			for _, userID := range rule.AllowedUserIDs {
-				if c.User.Metadata.ID == userID {
-					found = true
-					break
-				}
-			}
-
-			// Check whether there is an intersection between the
-			// calling user's teams and this access rule's allowed teams.
-			userCallerTeams, err := c.GetTeams(ctx)
+			eligible, err := userIsEligiblePrincipal(ctx, c, rule.AllowedUserIDs, rule.AllowedTeamIDs)
 			if err != nil {
 				return err
 			}
-			// The time spent converting from slice to map is expected to be minor.
-			userCallerTeamsMap := map[string]bool{}
-			for _, callerTeamID := range userCallerTeams {
-				userCallerTeamsMap[callerTeamID.Metadata.ID] = true
-			}
-			for _, teamID := range rule.AllowedTeamIDs {
-				if _, ok := userCallerTeamsMap[teamID]; ok {
-					found = true
-					break
-				}
-			}
-
-			if !found {
+			if !eligible {
 				return fmt.Errorf("user %s is not an eligible principal", c.User.Username)
 			}
-
 			return nil
 		},
 		func(_ context.Context, c *auth.ServiceAccountCaller) error {
-			found := false
-			for _, serviceAccountID := range rule.AllowedServiceAccountIDs {
-				if c.ServiceAccountID == serviceAccountID {
-					found = true
-					break
-				}
-			}
-			if !found {
+			if !serviceAccountIsEligiblePrincipal(c, rule.AllowedServiceAccountIDs) {
 				return fmt.Errorf("service account %s is not an eligible principal", c.ServiceAccountPath)
 			}
-
 			return nil
 		},
 	); err != nil {
 		return err.Error(), nil
 	}
 	return "", nil
+}
+
+// userIsEligiblePrincipal reports whether the user caller matches one of the allowed user IDs
+// directly, or has live membership in one of the allowed teams. Team membership is resolved
+// live via GetTeams so a subject removed from a team loses eligibility immediately.
+func userIsEligiblePrincipal(ctx context.Context, c *auth.UserCaller, allowedUserIDs, allowedTeamIDs []string) (bool, error) {
+	for _, userID := range allowedUserIDs {
+		if c.User.Metadata.ID == userID {
+			return true, nil
+		}
+	}
+
+	if len(allowedTeamIDs) == 0 {
+		return false, nil
+	}
+
+	// Check whether there is an intersection between the calling user's teams and the allowed teams.
+	userCallerTeams, err := c.GetTeams(ctx)
+	if err != nil {
+		return false, err
+	}
+	userCallerTeamsMap := map[string]bool{}
+	for _, callerTeam := range userCallerTeams {
+		userCallerTeamsMap[callerTeam.Metadata.ID] = true
+	}
+	for _, teamID := range allowedTeamIDs {
+		if userCallerTeamsMap[teamID] {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// serviceAccountIsEligiblePrincipal reports whether the service account caller matches one of
+// the allowed service account IDs.
+func serviceAccountIsEligiblePrincipal(c *auth.ServiceAccountCaller, allowedServiceAccountIDs []string) bool {
+	for _, serviceAccountID := range allowedServiceAccountIDs {
+		if c.ServiceAccountID == serviceAccountID {
+			return true
+		}
+	}
+	return false
+}
+
+// EligiblePrincipal reports whether the caller (a user or service account) is an eligible
+// principal against the given allowed principal ID sets: a user matches by user ID or by live
+// membership in one of the allowed teams; a service account matches by service account ID.
+// It reuses the same matching logic as the managed-identity eligible-principals rule so run
+// gate approval authorization stays consistent with rule enforcement.
+func EligiblePrincipal(ctx context.Context, allowedUserIDs, allowedServiceAccountIDs, allowedTeamIDs []string) (bool, error) {
+	eligible := false
+	if err := auth.HandleCaller(
+		ctx,
+		func(ctx context.Context, c *auth.UserCaller) error {
+			ok, err := userIsEligiblePrincipal(ctx, c, allowedUserIDs, allowedTeamIDs)
+			if err != nil {
+				return err
+			}
+			eligible = ok
+			return nil
+		},
+		func(_ context.Context, c *auth.ServiceAccountCaller) error {
+			eligible = serviceAccountIsEligiblePrincipal(c, allowedServiceAccountIDs)
+			return nil
+		},
+	); err != nil {
+		return false, err
+	}
+	return eligible, nil
 }
 
 func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, rule *models.ManagedIdentityAccessRule, input *RunDetails) (string, error) {

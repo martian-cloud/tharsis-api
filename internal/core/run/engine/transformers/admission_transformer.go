@@ -8,15 +8,13 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/admission"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/statemachine"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // AdmissionTransformer queues a plan or apply node as soon as it enters the
-// pending state. Pending means "ready to run, waiting on the workspace", so this
-// is the single place that turns that readiness into a queue attempt via the
-// admitter. Commands and the state machine only need to move a node to pending;
+// pending state, provided doing so does not jump the workspace's queue. Pending
+// means "ready to run, waiting on the workspace", so this is the single place that
+// turns that readiness into a queue attempt via the admitter. Commands and the state machine only need to move a node to pending;
 // they no longer call the admitter directly. (Re-evaluating an already-pending
 // node, e.g. when the work item consumer advances a parked run, has no pending transition
 // to react to and is still driven explicitly by the QueueRun command.)
@@ -29,8 +27,14 @@ func NewAdmissionTransformer(admitter *admission.Admitter) *AdmissionTransformer
 	return &AdmissionTransformer{admitter: admitter}
 }
 
-// Transform attempts to queue any plan or apply node that just transitioned to
-// pending.
+// Transform attempts to queue any run node in the queuing state
+//
+// It admits through the admitter's order-preserving entry point, because reacting to one run's own
+// transition says nothing about the workspace's other waiting runs: a run whose transition commits
+// while the workspace is momentarily free would otherwise jump ahead of runs parked in *_queuing since
+// before it existed. When this run is not next in line the admitter declines, leaving the node pending
+// for the work item consumer to admit in order. That inline admission remains worthwhile for the common
+// uncontended case, where it saves the run a round trip through the work-items queue.
 //
 // An optimistic-lock error from the admitter means another instance changed the
 // workspace concurrently while we were acquiring it. That is swallowed rather than
@@ -41,42 +45,23 @@ func NewAdmissionTransformer(admitter *admission.Admitter) *AdmissionTransformer
 func (t *AdmissionTransformer) Transform(ctx context.Context, changeList []types.RunChange, runStore types.RunStore) error {
 	for _, change := range changeList {
 		run := change.Run
-		for _, sc := range change.NodeStatusChanges {
-			switch c := sc.(type) {
-			case statemachine.PlanStatusChange:
-				if c.NewStatus != models.PlanPending {
-					continue
-				}
-				queued, changes, err := t.admitter.TryQueuePlan(ctx, run)
-				if err != nil {
-					// Ignore OLE here since a work item will be queued in the ws lock manager event handler
-					if isOptimisticLock(err) {
-						continue
-					}
-					return err
-				}
-				if queued {
-					if err := runStore.AddRunChanges(run, changes...); err != nil {
-						return err
-					}
-				}
-			case statemachine.ApplyStatusChange:
-				if c.NewStatus != models.ApplyPending {
-					continue
-				}
-				queued, changes, err := t.admitter.TryQueueApply(ctx, run)
-				if err != nil {
-					// Ignore OLE here since a work item will be queued in the ws lock manager event handler
-					if isOptimisticLock(err) {
-						continue
-					}
-					return err
-				}
-				if queued {
-					if err := runStore.AddRunChanges(run, changes...); err != nil {
-						return err
-					}
-				}
+		// Only react to a fresh transition into a workspace-waiting state — a parked node (already
+		// pending, no new transition) is advanced explicitly by the QueueRun command instead. When
+		// one is present, let the admitter determine and perform the run's next transition.
+		if !admission.TransitionedToQueuing(change.NodeStatusChanges) {
+			continue
+		}
+		started, changes, err := t.admitter.TryStartNextRunTransitionIfNextInLine(ctx, run)
+		if err != nil {
+			// Ignore OLE here since a work item will be queued in the ws lock manager event handler.
+			if isOptimisticLock(err) {
+				continue
+			}
+			return err
+		}
+		if started {
+			if err := runStore.AddRunChanges(run, changes...); err != nil {
+				return err
 			}
 		}
 	}

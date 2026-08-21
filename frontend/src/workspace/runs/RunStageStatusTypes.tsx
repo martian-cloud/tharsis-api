@@ -4,7 +4,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import PendingIcon from '@mui/icons-material/PauseCircleOutline';
 import InProgressIcon from '@mui/icons-material/TimelapseOutlined';
 import WarningIcon from '@mui/icons-material/Warning';
-import SkippedIcon from 'mdi-material-ui/SkipForward';
+import SkippedIcon from 'mdi-material-ui/MinusCircleOutline';
 import { SxProps, Theme } from '@mui/material';
 
 interface IconProps {
@@ -84,17 +84,31 @@ export default {
         icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.plan_queued' }} />,
         tooltip: 'is queued'
     },
-    queuing: {
-        label: 'Queuing',
-        color: 'runStatus.queuing',
-        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.queuing' }} />,
-        tooltip: 'is waiting to be queued'
+    // The *_QUEUING statuses all mean the same thing to a user — the run is waiting for the workspace —
+    // so they share a label and differ only by which phase's colour they carry.
+    plan_queuing: {
+        label: 'Waiting to be queued',
+        color: 'runStatus.plan_queuing',
+        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.plan_queuing' }} />,
+        tooltip: 'is waiting for the workspace to become available'
     },
-    queuing_apply: {
-        label: 'Apply Queuing',
-        color: 'runStatus.queuing_apply',
-        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.queuing_apply' }} />,
-        tooltip: 'is waiting to be queued'
+    apply_queuing: {
+        label: 'Waiting to be queued',
+        color: 'runStatus.apply_queuing',
+        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.apply_queuing' }} />,
+        tooltip: 'is waiting for the workspace to become available'
+    },
+    pre_plan_queuing: {
+        label: 'Waiting to be queued',
+        color: 'runStatus.pre_plan_queuing',
+        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.pre_plan_queuing' }} />,
+        tooltip: 'is waiting for the workspace to become available'
+    },
+    pre_apply_queuing: {
+        label: 'Waiting to be queued',
+        color: 'runStatus.pre_apply_queuing',
+        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.pre_apply_queuing' }} />,
+        tooltip: 'is waiting for the workspace to become available'
     },
     planned: {
         label: 'Applying',
@@ -113,5 +127,37 @@ export default {
         color: 'runStatus.planning',
         icon: ({sx}: IconProps) => <InProgressIcon sx={{ ...sx, color: 'runStatus.planning' }} />,
         tooltip: 'is planning'
+    },
+    passed: {
+        label: 'Passed',
+        color: 'runStatus.finished',
+        icon: ({sx}: IconProps) => <CheckCircleIcon sx={{ ...sx, color: 'runStatus.finished' }} />,
+        tooltip: 'passed'
+    },
+    soft_failed: {
+        label: 'Awaiting Override',
+        color: 'runStatus.awaiting_decision',
+        icon: ({sx}: IconProps) => <WarningIcon sx={{ ...sx, color: 'runStatus.awaiting_decision' }} />,
+        tooltip: 'is awaiting an override decision'
+    },
+    overridden: {
+        label: 'Overridden',
+        color: 'runStatus.finished',
+        icon: ({sx}: IconProps) => <CheckCircleIcon sx={{ ...sx, color: 'runStatus.finished' }} />,
+        tooltip: 'was overridden'
+    },
+    // Task stage aggregate statuses (TaskStageStatus). CREATED/RUNNING/ERRORED/CANCELED/SKIPPED
+    // reuse the entries above; these two are stage-specific.
+    completed: {
+        label: 'Completed',
+        color: 'runStatus.finished',
+        icon: ({sx}: IconProps) => <CheckCircleIcon sx={{ ...sx, color: 'runStatus.finished' }} />,
+        tooltip: 'has completed'
+    },
+    awaiting_override: {
+        label: 'Awaiting Override',
+        color: 'runStatus.awaiting_decision',
+        icon: ({sx}: IconProps) => <WarningIcon sx={{ ...sx, color: 'runStatus.awaiting_decision' }} />,
+        tooltip: 'is awaiting an override decision'
     }
 } as any;

@@ -10,7 +10,7 @@ interface Props {
 function CheckStatusChip({ status, withBackground = false }: Props) {
     const theme = useTheme();
     const colorMap = theme.palette.checkResult;
-    const color = colorMap[status as keyof typeof colorMap] ?? colorMap.unknown;
+    const color = colorMap[status as keyof typeof colorMap] ?? colorMap.UNKNOWN;
 
     return (
         <Chip

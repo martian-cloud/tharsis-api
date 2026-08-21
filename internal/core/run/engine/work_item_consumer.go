@@ -175,18 +175,23 @@ func (s *WorkItemConsumer) handleWorkItem(ctx context.Context, item *db.WorkItem
 }
 
 func (s *WorkItemConsumer) handleQueuePendingRunsForWorkspace(ctx context.Context, payload *db.QueuePendingRunsForWorkspacePayload) error {
-	// Only queuing and queuing_apply runs are actionable here: a queuing run's plan
-	// is pending admission (speculative runs start immediately, non-speculative when
-	// the workspace is free) and a queuing_apply run holds an approved apply parked
-	// waiting for the workspace. Runs in any other status are no-ops for this
-	// handler, so filter them out DB-side rather than fetching the workspace's
-	// entire run history.
-	sort := db.RunSortableFieldCreatedAtAsc
+	// Only runs waiting on the workspace are actionable here: one of their workspace-gated nodes (a
+	// pre-plan or pre-apply stage, the plan, or the apply) is pending admission, which the run reports as
+	// one of models.QueuingRunStatuses. Runs that are not waiting are no-ops for this handler, so filter
+	// them out DB-side rather than fetching the workspace's entire run history.
+	//
+	// Sorting by updated_at makes the queue order "first to start waiting, first admitted": a queuing
+	// run's last update is the transition that put it in the queue, so this is its queue-entry time. It
+	// also keeps this order consistent with the admitter's own ordering check
+	// (TryStartNextRunTransitionIfNextInLine), which bounds its query by the run's updated_at — sorting
+	// by created_at here would let the two disagree about which run is next whenever a run re-enters the
+	// queue after being parked (e.g. a manual apply approved long after the run was created).
+	sort := db.RunSortableFieldUpdatedAtAsc
 	result, err := s.dbClient.Runs.GetRuns(ctx, &db.GetRunsInput{
 		Sort: &sort,
 		Filter: &db.RunFilter{
 			WorkspaceID: &payload.WorkspaceID,
-			Statuses:    []models.RunStatus{models.RunQueuing, models.RunQueuingApply},
+			Statuses:    models.QueuingRunStatuses,
 		},
 	})
 	if err != nil {
@@ -213,12 +218,15 @@ func (s *WorkItemConsumer) handleQueuePendingRunsForWorkspace(ctx context.Contex
 			continue
 		}
 
-		if run.Status == models.RunQueuing || run.Status == models.RunQueuingApply {
+		// Re-check the status rather than trusting the DB-side filter alone, so a run that moved on
+		// between the query and here can't make us issue a command the admitter would only no-op on.
+		if run.Status.IsQueuing() {
 			if err := s.processor.ProcessCommand(ctx, s.factory.NewQueueRun(run.Metadata.ID)); err != nil {
-				s.logger.Errorf("failed to resume apply for run %s: %v", run.Metadata.ID, err)
+				s.logger.Errorf("failed to queue run %s: %v", run.Metadata.ID, err)
 				return err
 			}
-			// Return here since we only want to queue one run per work item to ensure runs are queued in order
+			// Return here since we only want to queue one run per work item to ensure runs are queued in
+			// queue-entry order (see the sort above)
 			return nil
 		}
 	}
@@ -236,8 +244,15 @@ func (s *WorkItemConsumer) handleDiscardStalePlannedRunsForWorkspace(ctx context
 	updatedBefore := payload.ApplyCompletedAt
 	result, err := s.dbClient.Runs.GetRuns(ctx, &db.GetRunsInput{
 		Filter: &db.RunFilter{
-			WorkspaceID:   &payload.WorkspaceID,
-			Statuses:      []models.RunStatus{models.RunPlanned},
+			WorkspaceID: &payload.WorkspaceID,
+			// Also discard runs blocked at a post-plan or pre-apply gate: like planned runs, their plan
+			// was computed against pre-apply state and is now stale. A run blocked at a *pre-plan* gate
+			// is deliberately not included — it has no plan yet, so there is nothing stale about it.
+			Statuses: []models.RunStatus{
+				models.RunPlanned,
+				models.RunPostPlanAwaitingDecision,
+				models.RunPreApplyAwaitingDecision,
+			},
 			UpdatedBefore: &updatedBefore,
 		},
 	})

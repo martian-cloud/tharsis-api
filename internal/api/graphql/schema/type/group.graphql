@@ -107,6 +107,29 @@ type Group implements Node, Namespace {
     sort: TerraformModuleSort
     labelFilter: TerraformModuleLabelsFilter
   ): TerraformModuleConnection!
+  packages(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+    includeInherited: Boolean
+    sort: PackageSort
+  ): PackageConnection!
+  """
+  visiblePackages returns every package this group may reference, which is a superset of
+  packages(includeInherited: true): packages owned by the group or one of its ancestors, packages
+  with root_group visibility that share this group's root group, and packages with global
+  visibility anywhere. search matches the fully-qualified "<groupPath>/<name>" package source.
+  """
+  visiblePackages(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+    sort: PackageSort
+  ): PackageConnection!
   runners(
     after: String
     before: String
@@ -121,6 +144,14 @@ type Group implements Node, Namespace {
   outputVisibility: NamespaceOutputVisibility!
   memberships: [NamespaceMembership!]!
   variables: [NamespaceVariable!]!
+  policies(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: PolicySort
+    includeInherited: Boolean
+  ): PolicyConnection!
   activityEvents(
     after: String
     before: String

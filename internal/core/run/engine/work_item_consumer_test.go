@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -41,6 +42,22 @@ func runsResult(runs ...*models.Run) *db.RunsResult {
 	return &db.RunsResult{PageInfo: &pagination.PageInfo{}, Runs: runs}
 }
 
+// matchAwaitingAdmissionForWorkspace matches the handler's DB-side pre-filter: the workspace's runs in a
+// queuing status (their next workspace-gated node is pending), in queue-entry order. It matches against
+// QueuingRunStatuses itself rather than a copy, so the assertion stays honest if a gated phase is added.
+//
+// The updated_at sort is pinned deliberately: a queuing run's last update is when it joined the queue,
+// and the admitter's ordering check bounds its own query by updated_at, so the two must agree on which
+// run is next.
+func matchAwaitingAdmissionForWorkspace(wsID string) any {
+	return mock.MatchedBy(func(in *db.GetRunsInput) bool {
+		return in.Filter != nil &&
+			in.Filter.WorkspaceID != nil && *in.Filter.WorkspaceID == wsID &&
+			slices.Equal(in.Filter.Statuses, models.QueuingRunStatuses) &&
+			in.Sort != nil && *in.Sort == db.RunSortableFieldUpdatedAtAsc
+	})
+}
+
 func TestHandleQueuePendingRunsForWorkspace_SkipsSpeculativeRuns(t *testing.T) {
 	ctx := context.Background()
 
@@ -49,7 +66,7 @@ func TestHandleQueuePendingRunsForWorkspace_SkipsSpeculativeRuns(t *testing.T) {
 	// even on a free workspace.
 	specRun := &models.Run{
 		Metadata: models.ResourceMetadata{ID: "spec-run"},
-		Status:   models.RunQueuing,
+		Status:   models.RunPlanQueued,
 	}
 
 	freeWS := &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}}
@@ -57,14 +74,10 @@ func TestHandleQueuePendingRunsForWorkspace_SkipsSpeculativeRuns(t *testing.T) {
 	mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "ws-1").Return(freeWS, nil)
 
 	mockRuns := db.NewMockRuns(t)
-	// The query is restricted DB-side to the only statuses this handler acts on, so the
-	// workspace's run history isn't fetched wholesale.
-	mockRuns.On("GetRuns", mock.Anything, mock.MatchedBy(func(in *db.GetRunsInput) bool {
-		return in.Filter != nil &&
-			len(in.Filter.Statuses) == 2 &&
-			in.Filter.Statuses[0] == models.RunQueuing &&
-			in.Filter.Statuses[1] == models.RunQueuingApply
-	})).Return(runsResult(specRun), nil)
+	// The query is restricted DB-side to runs awaiting workspace admission — the only ones this handler
+	// acts on — so the workspace's run history isn't fetched wholesale.
+	mockRuns.On("GetRuns", mock.Anything, matchAwaitingAdmissionForWorkspace("ws-1")).
+		Return(runsResult(specRun), nil)
 
 	// No queue attempt: the speculative run is not this handler's responsibility.
 	mockProcessor := NewMockCmdProcessor(t)
@@ -83,7 +96,7 @@ func TestHandleQueuePendingRunsForWorkspace_LockedWorkspaceStopsNonSpeculative(t
 	// Non-speculative queuing run (has an apply node).
 	nonSpec := &models.Run{
 		Metadata: models.ResourceMetadata{ID: "run-1"},
-		Status:   models.RunQueuing,
+		Status:   models.RunPlanQueued,
 		Apply:    &models.Apply{Status: models.ApplyCreated},
 	}
 
@@ -111,7 +124,7 @@ func TestHandleQueuePendingRunsForWorkspace_OccupiedWorkspaceStopsNonSpeculative
 
 	nonSpec := &models.Run{
 		Metadata: models.ResourceMetadata{ID: "run-1"},
-		Status:   models.RunQueuing,
+		Status:   models.RunPlanQueued,
 		Apply:    &models.Apply{Status: models.ApplyCreated},
 	}
 
@@ -139,7 +152,7 @@ func TestHandleQueuePendingRunsForWorkspace_ResumesParkedApply(t *testing.T) {
 	// A non-speculative run with an approved apply that was parked waiting for the workspace.
 	parkedApply := &models.Run{
 		Metadata: models.ResourceMetadata{ID: "run-apply"},
-		Status:   models.RunQueuingApply,
+		Status:   models.RunApplyQueuing,
 		Apply:    &models.Apply{Status: models.ApplyPending},
 	}
 
@@ -166,10 +179,12 @@ func TestHandleQueuePendingRunsForWorkspace_ResumesParkedApply(t *testing.T) {
 func TestHandleQueuePendingRunsForWorkspace_StartsNextPendingPlan(t *testing.T) {
 	ctx := context.Background()
 
-	// A queuing non-speculative run whose plan should be started on a free workspace.
+	// A non-speculative run whose plan is ready but unadmitted, so it is awaiting the workspace slot and
+	// should be queued on a free workspace.
 	pending := &models.Run{
 		Metadata: models.ResourceMetadata{ID: "run-1"},
-		Status:   models.RunQueuing,
+		Status:   models.RunPlanQueuing,
+		Plan:     models.Plan{Status: models.PlanPending},
 		Apply:    &models.Apply{Status: models.ApplyCreated},
 	}
 
@@ -226,13 +241,18 @@ func TestHandleDiscardStalePlannedRunsForWorkspace_DiscardsPlanned(t *testing.T)
 	}
 
 	mockRuns := db.NewMockRuns(t)
-	// The handler restricts the query to planned runs in the workspace last updated (i.e.
-	// that entered planned) before the apply completed (DB-side filters), so non-planned
-	// and newer runs are never discarded.
+	// The handler restricts the query to runs in the workspace whose plan is now stale — parked at planned
+	// or at a post-plan/pre-apply gate — and last updated (i.e. that entered that state) before the apply
+	// completed, so non-stale and newer runs are never discarded. A run at a *pre-plan* gate is
+	// deliberately absent: it has no plan yet, so nothing about it is stale.
 	mockRuns.On("GetRuns", mock.Anything, mock.MatchedBy(func(in *db.GetRunsInput) bool {
 		return in.Filter != nil &&
 			in.Filter.WorkspaceID != nil && *in.Filter.WorkspaceID == "ws-1" &&
-			len(in.Filter.Statuses) == 1 && in.Filter.Statuses[0] == models.RunPlanned &&
+			len(in.Filter.Statuses) == 3 &&
+			slices.Contains(in.Filter.Statuses, models.RunPlanned) &&
+			slices.Contains(in.Filter.Statuses, models.RunPostPlanAwaitingDecision) &&
+			slices.Contains(in.Filter.Statuses, models.RunPreApplyAwaitingDecision) &&
+			!slices.Contains(in.Filter.Statuses, models.RunPrePlanAwaitingDecision) &&
 			in.Filter.UpdatedBefore != nil && in.Filter.UpdatedBefore.Equal(applyCompletedAt)
 	})).Return(runsResult(planned), nil)
 

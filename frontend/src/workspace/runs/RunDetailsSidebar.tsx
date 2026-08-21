@@ -1,11 +1,8 @@
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import { Chip, List, Stack, Tooltip, Typography } from '@mui/material';
+import { Chip, Stack, Tooltip, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
 import graphql from 'babel-plugin-relay/macro';
 import React, { useContext, useMemo, useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
@@ -22,6 +19,7 @@ import { RunDetailsSidebarFragment_details$key } from './__generated__/RunDetail
 import { RunDetailsSidebarSetRunAutoApplyMutation } from './__generated__/RunDetailsSidebarSetRunAutoApplyMutation.graphql';
 import RunStageStatusTypes from './RunStageStatusTypes';
 import RunStatusChip from './RunStatusChip';
+import { taskStagePath } from './runStageNavigation';
 
 interface Props {
     fragmentRef: RunDetailsSidebarFragment_details$key
@@ -48,6 +46,7 @@ function RunDetailsSidebar(props: Props) {
         isDestroy
         assessment
         autoApply
+        hasAdvisoryFailures
         moduleSource
         moduleVersion
         workspace {
@@ -68,6 +67,14 @@ function RunDetailsSidebar(props: Props) {
           currentJob {
             runnerPath
             cancelRequested
+          }
+        }
+        taskStages {
+          stageName
+          status
+          policyChecks {
+            status
+            stageName
           }
         }
         apply {
@@ -101,10 +108,15 @@ function RunDetailsSidebar(props: Props) {
     const [editingAutoApply, setEditingAutoApply] = useState(false);
 
     // Auto-apply only takes effect when the plan finishes, so it can only be changed while the
-    // run is still planning and its apply phase has not started.
+    // run is still planning and its apply phase has not started. The pre-plan policy stage runs
+    // before the plan, so it counts too. Mirrors the server-side guard in SetRunAutoApply.
     const canEditAutoApply = !!data.apply
         && data.apply.status === 'created'
-        && ['pending', 'queuing', 'plan_queued', 'planning'].includes(data.status);
+        && [
+            'pending',
+            'pre_plan_queuing', 'pre_plan_running', 'pre_plan_awaiting_decision', 'pre_plan_completed',
+            'plan_queuing', 'plan_queued', 'planning', 'post_plan_running', 'post_plan_awaiting_decision',
+        ].includes(data.status);
 
     const confirmAutoApply = () => {
         commitSetAutoApply({
@@ -141,8 +153,15 @@ function RunDetailsSidebar(props: Props) {
 
     const isTharsisModule = useMemo(() => moduleSource && moduleSource.length != data.moduleSource?.length, [moduleSource, data.moduleSource]);
 
-    const PlanStatusIcon = RunStageStatusTypes[data.plan.status].icon;
-    const ApplyStatusIcon = data.apply ? RunStageStatusTypes[data.apply.status].icon : null;
+    // Stage-nav entries reflect the aggregate task stage status (the pre-plan stage runs before the
+    // plan, the post-plan stage after it). Each stage is its own route, so `stage` alone says which
+    // entry is active.
+    const prePlanStage = data.taskStages.find(s => s.stageName === 'PRE_PLAN');
+    const postPlanStage = data.taskStages.find(s => s.stageName === 'POST_PLAN');
+    const PlanStatusIcon = RunStageStatusTypes[data.plan.status.toLowerCase()].icon;
+    const PrePlanStatusIcon = prePlanStage ? RunStageStatusTypes[prePlanStage.status.toLowerCase()].icon : null;
+    const PolicyStatusIcon = postPlanStage ? RunStageStatusTypes[postPlanStage.status.toLowerCase()].icon : null;
+    const ApplyStatusIcon = data.apply ? RunStageStatusTypes[data.apply.status.toLowerCase()].icon : null;
 
     return (
         <Drawer
@@ -161,7 +180,7 @@ function RunDetailsSidebar(props: Props) {
                 </Box>
                 <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Status</Typography>
-                    <RunStatusChip status={data.status} />
+                    <RunStatusChip status={data.status} hasAdvisoryFailures={data.hasAdvisoryFailures} />
                 </Box>
                 <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Type</Typography>
@@ -250,7 +269,7 @@ function RunDetailsSidebar(props: Props) {
                     <Typography sx={{ marginBottom: 1 }}>Module Version</Typography>
                     <Chip size="small" label={data.moduleVersion} />
                 </Box>}
-                {(data as any)[stage].currentJob?.runnerPath && <Box marginBottom={3}>
+                {(data as any)[stage]?.currentJob?.runnerPath && <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Runner</Typography>
                     <Tooltip title={(data as any)[stage].currentJob.runnerPath} >
                         <Chip size="small" label={(data as any)[stage].currentJob.runnerPath} />
@@ -258,20 +277,66 @@ function RunDetailsSidebar(props: Props) {
                 </Box>}
                 <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Stages</Typography>
-                    <List>
-                        <ListItemButton selected={stage === 'plan'} component={LinkRouter} replace to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/plan`}>
-                            <ListItemIcon>
-                                <PlanStatusIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Plan" />
-                        </ListItemButton>
-                        {data.apply && <ListItemButton selected={stage === 'apply'} component={LinkRouter} replace to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/apply`}>
-                            <ListItemIcon>
-                                <ApplyStatusIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Apply" />
-                        </ListItemButton>}
-                    </List>
+                    <Box sx={{ py: 0.5 }}>
+                        {/* Pre-Plan Policy (runs before the plan) */}
+                        {prePlanStage && PrePlanStatusIcon && <>
+                            <Box
+                                component={LinkRouter}
+                                to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/${taskStagePath(prePlanStage.stageName)}`}
+                                replace
+                                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === taskStagePath(prePlanStage.stageName) ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
+                            >
+                                <PrePlanStatusIcon sx={{ flexShrink: 0 }} />
+                                <Typography variant="body2" color="text.primary">Pre-Plan</Typography>
+                            </Box>
+                            <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
+                        </>}
+
+                        {/* Plan */}
+                        <Box
+                            component={LinkRouter}
+                            to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/plan`}
+                            replace
+                            sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === 'plan' ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
+                        >
+                            <PlanStatusIcon sx={{ flexShrink: 0 }} />
+                            <Typography variant="body2" color="text.primary">Plan</Typography>
+                        </Box>
+
+                        {/* Connector: Plan → Policy (or Plan → Apply if no policy) */}
+                        {(postPlanStage || data.apply) && (
+                            <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
+                        )}
+
+                        {/* Policy (post-plan) */}
+                        {postPlanStage && PolicyStatusIcon && <>
+                            <Box
+                                component={LinkRouter}
+                                to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/${taskStagePath(postPlanStage.stageName)}`}
+                                replace
+                                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === taskStagePath(postPlanStage.stageName) ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
+                            >
+                                <PolicyStatusIcon sx={{ flexShrink: 0 }} />
+                                <Typography variant="body2" color="text.primary">Post-Plan</Typography>
+                            </Box>
+                            {data.apply && (
+                                <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
+                            )}
+                        </>}
+
+                        {/* Apply */}
+                        {data.apply && ApplyStatusIcon && (
+                            <Box
+                                component={LinkRouter}
+                                to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/apply`}
+                                replace
+                                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === 'apply' ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
+                            >
+                                <ApplyStatusIcon sx={{ flexShrink: 0 }} />
+                                <Typography variant="body2" color="text.primary">Apply</Typography>
+                            </Box>
+                        )}
+                    </Box>
                 </Box>
             </Box>
             {editingAutoApply && <ConfirmationDialog

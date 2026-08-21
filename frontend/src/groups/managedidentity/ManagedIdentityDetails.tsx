@@ -27,6 +27,7 @@ import { GetConnections } from './ManagedIdentityList';
 import ManagedIdentityTypeChip from './ManagedIdentityTypeChip';
 import MoveManagedIdentityDialog from './MoveManagedIdentityDialog';
 import ManagedIdentityRules from './rules/ManagedIdentityRules';
+import ManagedIdentityPolicies from './policies/ManagedIdentityPolicies';
 import ManagedIdentityWorkspaceList from './ManagedIdentityWorkspaceList';
 
 const ISSUER = config.apiUrl;
@@ -155,6 +156,7 @@ function ManagedIdentityDetails(props: Props) {
                 }
                 ...ManagedIdentityAliasesFragment_managedIdentity
                 ...ManagedIdentityRulesFragment_managedIdentity
+                ...ManagedIdentityPoliciesFragment_managedIdentity
                 ...MoveManagedIdentityDialogFragment_managedIdentity
             }
         }
@@ -351,6 +353,7 @@ function ManagedIdentityDetails(props: Props) {
                     <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
                         <Tab label="Details" value="details" />
                         <Tab label="Rules" value="rules" />
+                        <Tab label="Policies" value="policies" />
                         <Tab label="Workspaces" value="workspaces" />
                         {!data.managedIdentity.isAlias && <Tab label="Aliases" value="aliases" />}
                     </Tabs>
@@ -428,6 +431,11 @@ function ManagedIdentityDetails(props: Props) {
                         <ManagedIdentityRules
                             fragmentRef={data.managedIdentity}
                             groupPath={group.fullPath}
+                        />
+                    </Box>}
+                    {tab === 'policies' && <Box>
+                        <ManagedIdentityPolicies
+                            fragmentRef={data.managedIdentity}
                         />
                     </Box>}
                     {tab === 'workspaces' && <Box>

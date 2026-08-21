@@ -1,4 +1,5 @@
-import { Box, Paper, Typography } from '@mui/material';
+import NoResults from '@/common/NoResults';
+import { Box } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { useFragment, useLazyLoadQuery, usePaginationFragment } from 'react-relay';
@@ -58,10 +59,12 @@ function StateVersionList({ fragmentRef }: Props) {
         }
         `, queryData.node);
 
+    const edges = data?.stateVersions?.edges ?? [];
+
     return (
         <Box>
-            {data?.stateVersions.edges && data?.stateVersions.edges.length > 0 && <InfiniteScroll
-                dataLength={data?.stateVersions.edges?.length ?? 0}
+            {edges.length > 0 && <InfiniteScroll
+                dataLength={edges.length}
                 next={() => loadNext(20)}
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
@@ -76,16 +79,14 @@ function StateVersionList({ fragmentRef }: Props) {
                         { label: 'Created By' },
                     ]}
                 >
-                    {data.stateVersions.edges.map((edge: any) => (
+                    {edges.map((edge: any) => (
                         <StateVersionListItem key={edge.node.id} stateVersionKey={edge.node} workspacePath={workspace.fullPath} />
                     ))}
                 </ResponsiveTable>
             </InfiniteScroll>}
-            {data?.stateVersions.edges?.length === 0 && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                    <Typography variant="h6" color="textSecondary" align="center">No state versions have been created in this workspace</Typography>
-                </Box>
-            </Paper>}
+            {edges.length === 0 && <NoResults sx={{ mt: 4 }}>
+                No state versions have been created in this workspace
+            </NoResults>}
         </Box>
     );
 }

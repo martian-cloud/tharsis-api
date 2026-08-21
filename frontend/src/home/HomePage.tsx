@@ -6,6 +6,7 @@ import { useAgentCopilot } from '../ai/AgentCopilotProvider';
 import { ApiConfigContext } from '../ApiConfigContext';
 import config from '../common/config';
 import HomeActivityFeed from './HomeActivityFeed';
+import HomeApprovalsPanel from './HomeApprovalsPanel';
 import HomeDrawer from './HomeDrawer';
 import HomeRunList from './HomeRunList';
 
@@ -51,16 +52,7 @@ function HomePage() {
                             maxWidth: 400,
                         }
                     }}>
-                        <Paper sx={{ mb: 3 }}>
-                            <ListItemButton component={Link} target='_blank' rel='noopener noreferrer' href={config.docsUrl}>
-                                <RocketLaunchIcon sx={{ mr: 2 }} />
-                                <Box>
-                                    <Typography variant="subtitle1" fontWeight={600}>Getting Started</Typography>
-                                    <Typography variant="body2">Learn how to use Tharsis</Typography>
-                                </Box>
-                            </ListItemButton>
-                        </Paper>
-                        {apiConfig.tharsisSupportUrl !== '' && <Paper sx={{ mb: 3 }}>
+                        {apiConfig.tharsisSupportUrl !== '' && <Paper sx={{ mb: 3 }} variant="outlined">
                             <ListItemButton component={Link} target='_blank' rel='noopener noreferrer' href={apiConfig.tharsisSupportUrl}>
                                 <HelpIcon sx={{ mr: 2 }} />
                                 <Box>
@@ -69,7 +61,21 @@ function HomePage() {
                                 </Box>
                             </ListItemButton>
                         </Paper>}
-                        <Paper sx={{ padding: 2 }}>
+                        <Paper sx={{ mb: 3 }} variant="outlined">
+                            <ListItemButton component={Link} target='_blank' rel='noopener noreferrer' href={config.docsUrl}>
+                                <RocketLaunchIcon sx={{ mr: 2, width: 28, height: 28 }} />
+                                <Box>
+                                    <Typography variant="subtitle1" fontWeight={600}>Getting Started</Typography>
+                                    <Typography variant="body2">Learn how to use Tharsis</Typography>
+                                </Box>
+                            </ListItemButton>
+                        </Paper>
+                        <Paper sx={{ mb: 3 }} variant="outlined">
+                            <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}><CircularProgress /></Box>}>
+                                <HomeApprovalsPanel />
+                            </Suspense>
+                        </Paper>
+                        <Paper sx={{ padding: 2 }} variant="outlined">
                             <HomeRunList />
                         </Paper>
                     </Box>}

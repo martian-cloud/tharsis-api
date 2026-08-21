@@ -103,13 +103,24 @@ func TestAssessmentRunHandler_AssessmentRun_DriftUpdates(t *testing.T) {
 			expectRunIDSet:             true,
 		},
 		{
-			name: "errored assessment run clears stale verdict and links the run",
-			// Not RunPlannedAndFinished: the run produced no fresh verdict, so a previously
-			// recorded drift is cleared rather than presented as this run's result, and the
-			// errored run is still linked.
+			name: "errored assessment run retains the previous verdict and links the run",
+			// Not RunPlannedAndFinished: the run produced no fresh verdict, so the recorded drift is
+			// left as it was rather than cleared -- reporting the workspace as clean because the
+			// assessment could not complete would be a false negative. The errored run is still
+			// linked, which is what says this attempt produced no result.
 			resourceDrift:              5,
 			runStatus:                  models.RunErrored,
 			assessmentHasDrift:         true,
+			expectHasDrift:             true,
+			expectRequiresNotification: false,
+			expectRunIDSet:             true,
+		},
+		{
+			// The mirror of the case above: a failed run must not invent a verdict either.
+			name:                       "errored assessment run leaves an undrifted workspace undrifted",
+			resourceDrift:              5,
+			runStatus:                  models.RunErrored,
+			assessmentHasDrift:         false,
 			expectHasDrift:             false,
 			expectRequiresNotification: false,
 			expectRunIDSet:             true,

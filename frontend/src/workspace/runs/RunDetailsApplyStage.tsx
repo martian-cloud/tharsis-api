@@ -50,10 +50,15 @@ function getApplyDescription(applyStatus: string, runStatus: string, jobStatus?:
     if (applyStatus === 'created' || applyStatus === 'skipped') {
         switch (runStatus) {
             case 'pending':
-            case 'queuing':
+            case 'pre_plan_queuing':
+            case 'plan_queuing':
             case 'plan_queued':
             case 'planning':
                 return 'The apply can be started after all previous stages have completed';
+            case 'pre_apply_queuing':
+            case 'pre_apply_running':
+            case 'pre_apply_awaiting_decision':
+                return 'The apply starts once its pre-apply policy checks have completed';
             case 'planned':
                 return 'All previous stages have completed and the apply is ready to be started';
             case 'planned_and_finished':
@@ -295,7 +300,7 @@ function RunDetailsApplyStage(props: Props) {
     const jobPending = apply.currentJob?.status === 'pending';
     const logsAvailable = !!jobId || ['running', 'finished', 'errored', 'canceled'].includes(apply.status);
 
-    const applyStatusType = RunStageStatusTypes[apply.status] ?? { label: 'unknown', color: 'runStatus.unknown' };
+    const applyStatusType = RunStageStatusTypes[apply.status.toLowerCase()] ?? { label: 'unknown', color: 'runStatus.unknown' };
     const StatusIcon = applyStatusType.icon;
 
     const description = getApplyDescription(apply.status, data.status, apply.currentJob?.status);

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<723ee33b456d978dacc5fa7f313fc346>>
+ * @generated SignedSource<<e1ca1f04bd3395b5266a79c5938a2f5f>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,12 +9,12 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type CheckResultStatus = "error" | "fail" | "pass" | "unknown" | "%future added value";
+export type TerraformCheckResultStatus = "ERROR" | "FAIL" | "PASS" | "UNKNOWN" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type StateVersionCheckResultsFragment_checkResults$data = {
   readonly checkResults: ReadonlyArray<{
     readonly name: string;
-    readonly status: CheckResultStatus;
+    readonly status: TerraformCheckResultStatus;
     readonly " $fragmentSpreads": FragmentRefs<"StateVersionCheckResultRowFragment_checkResult">;
   }>;
   readonly " $fragmentType": "StateVersionCheckResultsFragment_checkResults";
@@ -33,7 +33,7 @@ const node: ReaderFragment = {
     {
       "alias": null,
       "args": null,
-      "concreteType": "CheckResult",
+      "concreteType": "TerraformCheckResult",
       "kind": "LinkedField",
       "name": "checkResults",
       "plural": true,

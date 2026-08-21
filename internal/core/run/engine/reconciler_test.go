@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,11 +20,14 @@ func newReconcilerForTest(dbClient *db.Client) *Reconciler {
 	return NewReconciler(log, dbClient, &fakeMaintenanceMonitor{})
 }
 
+// queuingRun builds a run whose plan is ready but not yet admitted, so it reports plan_queuing — the
+// status the reconciler sweeps for.
 func queuingRun(wsID string) *models.Run {
 	return &models.Run{
 		Metadata:    models.ResourceMetadata{ID: "run-" + wsID},
 		WorkspaceID: wsID,
-		Status:      models.RunQueuing,
+		Status:      models.RunPlanQueuing,
+		Plan:        models.Plan{Status: models.PlanPending},
 	}
 }
 
@@ -40,13 +44,13 @@ func TestReconcile_DedupesWorkspacesAndFiltersStaleQueuingRuns(t *testing.T) {
 	ctx := context.Background()
 
 	mockRuns := db.NewMockRuns(t)
-	// The sweep queries both queuing statuses with a staleness cutoff and no workspace filter.
+	// The sweep queries runs in a queuing status with a staleness cutoff and no workspace filter. Matching
+	// on QueuingRunStatuses itself (rather than a copy of the list) keeps the assertion honest if a gated
+	// phase is added.
 	mockRuns.On("GetRuns", mock.Anything, mock.MatchedBy(func(in *db.GetRunsInput) bool {
 		return in.Filter != nil &&
 			in.Filter.WorkspaceID == nil &&
-			len(in.Filter.Statuses) == 2 &&
-			in.Filter.Statuses[0] == models.RunQueuing &&
-			in.Filter.Statuses[1] == models.RunQueuingApply &&
+			slices.Equal(in.Filter.Statuses, models.QueuingRunStatuses) &&
 			in.Filter.UpdatedBefore != nil
 	})).Return(&db.RunsResult{
 		PageInfo: &pagination.PageInfo{HasNextPage: false},

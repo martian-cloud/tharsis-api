@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b78f22c1569e8b64ea8d007b4de1cb6a>>
+ * @generated SignedSource<<78f8978fa49a17dd42c6f8fdfecd3919>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,7 +18,7 @@ export type ActivityEventTerraformProviderVersionMirrorTargetFragment_event$data
     readonly id?: string;
     readonly providerAddress?: string;
     readonly version?: string;
-  };
+  } | null | undefined;
   readonly " $fragmentSpreads": FragmentRefs<"ActivityEventListItemFragment_event">;
   readonly " $fragmentType": "ActivityEventTerraformProviderVersionMirrorTargetFragment_event";
 };

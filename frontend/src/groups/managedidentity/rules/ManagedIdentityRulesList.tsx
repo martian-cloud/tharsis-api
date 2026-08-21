@@ -26,8 +26,8 @@ const StyledAvatar = styled(
 }));
 
 const ACCESS_RULE_TYPE_LABELS = {
-    eligible_principals: 'Eligible Principals',
-    module_attestation: 'Module Attestation'
+    ELIGIBLE_PRINCIPALS: 'Eligible Principals',
+    MODULE_ATTESTATION: 'Module Attestation'
 } as any;
 
 function buildPrincipals(rule: any) {

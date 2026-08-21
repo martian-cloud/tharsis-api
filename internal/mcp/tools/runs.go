@@ -15,7 +15,7 @@ import (
 type run struct {
 	RunID                  string           `json:"run_id" jsonschema:"Unique identifier for this run"`
 	TRN                    string           `json:"trn" jsonschema:"Tharsis Resource Name (e.g. trn:run:group/workspace/run-id)"`
-	Status                 models.RunStatus `json:"status" jsonschema:"Overall run status: pending, queuing, plan_queued, planning, planned, queuing_apply, apply_queued, applying, applied, planned_and_finished, errored, canceled, or discarded"`
+	Status                 models.RunStatus `json:"status" jsonschema:"Overall run status: pending, pre_plan_queuing, pre_plan_running, pre_plan_awaiting_decision, pre_plan_completed, plan_queuing, plan_queued, planning, post_plan_running, post_plan_awaiting_decision, post_plan_completed, planned, pre_apply_queuing, pre_apply_running, pre_apply_awaiting_decision, pre_apply_completed, apply_queuing, apply_queued, applying, applied, planned_and_finished, errored, canceled, or discarded. A *_queuing status means the run is waiting for the workspace slot (only one run holds a workspace at a time); *_queued means it holds the slot and is waiting for a runner"`
 	CreatedBy              string           `json:"created_by" jsonschema:"Email address of the user or service account that created this run"`
 	TerraformVersion       string           `json:"terraform_version" jsonschema:"Terraform CLI version used (e.g. 1.5.0)"`
 	Plan                   *plan            `json:"plan,omitempty" jsonschema:"Planning phase: the proposed changes Terraform computed and their status"`
@@ -35,6 +35,7 @@ type run struct {
 	AutoApply              bool             `json:"auto_apply,omitempty" jsonschema:"True if changes will be automatically applied after planning"`
 	Refresh                bool             `json:"refresh,omitempty" jsonschema:"True if state will be refreshed before planning"`
 	RefreshOnly            bool             `json:"refresh_only,omitempty" jsonschema:"True if this run only refreshes state without planning changes"`
+	HasAdvisoryFailures    bool             `json:"has_advisory_failures,omitempty" jsonschema:"True if an advisory policy failed for this run; advisory failures report findings but never block the run, so its status does not reflect them"`
 }
 
 // plan describes the planning phase of a run: the changes Terraform proposes to make.
@@ -123,6 +124,7 @@ func GetRun(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getRunInput, getRunOu
 				AutoApply:              r.AutoApply,
 				Refresh:                r.Refresh,
 				RefreshOnly:            r.RefreshOnly,
+				HasAdvisoryFailures:    r.HasAdvisoryFailures,
 			},
 		}
 

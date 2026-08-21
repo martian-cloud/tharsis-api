@@ -1,3 +1,4 @@
+import NoResults from '@/common/NoResults';
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import StateIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import { Alert, AlertTitle, Avatar, Box, Button, Chip, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography, useTheme } from '@mui/material';
@@ -92,6 +93,7 @@ function WorkspaceDetailsIndex(props: Props) {
                 ...StateVersionInputVariablesFragment_variables
                 id
                 status
+                hasAdvisoryFailures
                 createdBy
                 isDestroy
                 moduleSource
@@ -364,7 +366,7 @@ function WorkspaceDetailsIndex(props: Props) {
             {error && <Alert sx={{ marginTop: 2, mb: 2 }} severity={error.severity}>
                 {error.message}
             </Alert>}
-            {data.currentStateVersion && <Paper sx={{ marginBottom: 2, padding: 2 }}>
+            {data.currentStateVersion && <Paper sx={{ marginBottom: 2, padding: 2 }} variant="outlined">
                 <Box display="flex" justifyContent="space-between" alignItems="center">
                     <Stack direction="row" spacing={2}>
                         <StateIcon />
@@ -385,13 +387,14 @@ function WorkspaceDetailsIndex(props: Props) {
                         <RunStatusChip
                             to={`/groups/${data.fullPath}/-/runs/${data.currentStateVersion.run.id}`}
                             status={data.currentStateVersion.run.status}
+                            hasAdvisoryFailures={data.currentStateVersion.run.hasAdvisoryFailures}
                         />
                     </React.Fragment>}
                 </Box>
             </Paper>}
 
             {data.currentStateVersion?.run?.moduleSource &&
-                <Paper sx={{ marginBottom: 2, padding: 2 }}>
+                <Paper sx={{ marginBottom: 2, padding: 2 }} variant="outlined">
                     <Stack direction="row" spacing={2}>
                         <ModuleIcon />
                         <Stack direction="row" spacing={1} alignItems="center">
@@ -411,7 +414,7 @@ function WorkspaceDetailsIndex(props: Props) {
                 </Paper>}
 
             {data.currentStateVersion?.run?.configurationVersion &&
-                <Paper sx={{ marginBottom: 2, padding: 2 }}>
+                <Paper sx={{ marginBottom: 2, padding: 2 }} variant="outlined">
                     <Stack direction="row" spacing={2}>
                         <ModuleIcon />
                         <Stack direction="row" spacing={1} alignItems="center">
@@ -441,13 +444,9 @@ function WorkspaceDetailsIndex(props: Props) {
                 {tab === 'resources' && <StateVersionResources fragmentRef={data.currentStateVersion.inventory} destroyed={workspaceDestroyed} />}
                 {tab === 'inputs' && <React.Fragment>
                     {data.currentStateVersion.run && <StateVersionInputVariables fragmentRef={data.currentStateVersion.run} />}
-                    {!data.currentStateVersion.run && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                        <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                            <Typography color="textSecondary" align="center">
-                                Input variables are not available for manually updated state versions
-                            </Typography>
-                        </Box>
-                    </Paper>}
+                    {!data.currentStateVersion.run && <NoResults sx={{ mt: 4 }}>
+                        Input variables are not available for manually updated state versions
+                    </NoResults>}
                 </React.Fragment>}
                 {tab === 'outputs' && <StateVersionOutputs fragmentRef={data.currentStateVersion} />}
                 {tab === 'dependencies' && <StateVersionDependencies fragmentRef={data.currentStateVersion.inventory} />}

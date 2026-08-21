@@ -68,7 +68,7 @@ function ModuleAutocomplete({ onSelected, workspacePath }: Props) {
                             `,
                         { search: request.input }, { fetchPolicy: 'network-only' }
                     ).toPromise().then(async (response: any) => {
-                        const options = response?.terraformModules.edges.map((edge: { node: any }) => {
+                        const options = response?.terraformModules?.edges?.map((edge: { node: any }) => {
                             return {
                                 id: edge.node.id,
                                 label: `${edge.node.registryNamespace}/${edge.node.name}/${edge.node.system}`,

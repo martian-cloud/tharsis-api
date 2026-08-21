@@ -11,6 +11,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -363,6 +364,66 @@ func TestUploadStateVersion(t *testing.T) {
 			assert.NotNil(t, retainFn)
 			assert.NotEmpty(t, key)
 			assert.NoError(t, retainFn(ctx, sv.Metadata.ID))
+		})
+	}
+}
+
+// TestUploadPolicyCheckPolicyMessages verifies a policy's violation messages land under the run's
+// policy_messages prefix with a fresh key per upload, retained against the run so they are collected
+// with it.
+func TestUploadPolicyCheckPolicyMessages(t *testing.T) {
+	tests := []struct {
+		name          string
+		retErr        error
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "success",
+		},
+		{
+			name:          "internal error",
+			retErr:        errInternal,
+			expectErrCode: errors.EInternal,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			run := models.Run{
+				Metadata:    models.ResourceMetadata{ID: "1"},
+				WorkspaceID: "ws-1",
+			}
+			prefix := fmt.Sprintf("workspaces/%s/runs/%s/policy_messages/", run.WorkspaceID, run.Metadata.ID)
+
+			buf := bytes.NewBufferString(`["denied by rule X"]`)
+			mockObjectStore := objectstore.MockObjectStore{}
+			mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, mock.Anything).Return(test.retErr)
+
+			mockRefs := db.NewMockObjectStoreRefs(t)
+			if test.retErr == nil {
+				mockRefs.On("LinkRef", mock.Anything, mock.Anything, db.ObjectStoreRefOwnerRun, run.Metadata.ID).Return(nil)
+			}
+
+			store := NewArtifactStore(&mockObjectStore, mockRefs)
+			retainFn, key, err := store.UploadPolicyCheckPolicyMessages(ctx, &run, buf)
+			if err != nil {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err), "Unexpected error occurred")
+				return
+			}
+
+			assert.NotNil(t, retainFn)
+			assert.True(t, strings.HasPrefix(key, prefix), "key %q should be under %q", key, prefix)
+			assert.True(t, strings.HasSuffix(key, ".json"), "key %q should be a .json object", key)
+			assert.NoError(t, retainFn(ctx, run.Metadata.ID))
+
+			// A second upload for the same run gets its own object, so a re-evaluated check cannot
+			// overwrite messages a reader may still be streaming.
+			_, secondKey, err := store.UploadPolicyCheckPolicyMessages(ctx, &run, bytes.NewBufferString("[]"))
+			require.NoError(t, err)
+			assert.NotEqual(t, key, secondKey)
 		})
 	}
 }

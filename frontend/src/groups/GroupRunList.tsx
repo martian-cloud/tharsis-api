@@ -1,4 +1,5 @@
-import { Box, Paper, Typography } from '@mui/material';
+import NoResults from '@/common/NoResults';
+import { Box } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';
 import { useLazyLoadQuery, usePaginationFragment, useSubscription } from "react-relay/hooks";
@@ -142,13 +143,9 @@ function GroupRunList({ groupPath, includeAssessmentRuns }: Props) {
     return (
         <Box>
             {data.group?.runs && runs.length > 0 && <RunList fragmentRef={data.group?.runs} hasNext={hasNext} loadNext={loadNext} displayWorkspacePath />}
-            {runs.length === 0 && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                    <Typography variant="h6" color="textSecondary" align="center">
-                        No runs have been created in this group or its subgroups
-                    </Typography>
-                </Box>
-            </Paper>}
+            {runs.length === 0 && <NoResults sx={{ mt: 4 }}>
+                No runs have been created in this group or its subgroups
+            </NoResults>}
         </Box>
     );
 }

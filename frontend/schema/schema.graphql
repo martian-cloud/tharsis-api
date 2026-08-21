@@ -10,7 +10,7 @@ type ActivityEvent implements Node {
   metadata: ResourceMetadata!
   namespacePath: String
   payload: ActivityEventPayload
-  target: Node!
+  target: Node
   targetType: ActivityEventTargetType!
 }
 
@@ -81,7 +81,7 @@ type ActivityEventMoveManagedIdentityPayload {
   previousGroupPath: String!
 }
 
-union ActivityEventPayload = ActivityEventAddTeamMemberPayload | ActivityEventCreateNamespaceMembershipPayload | ActivityEventCreateTerraformModulePayload | ActivityEventCreateWorkspacePayload | ActivityEventDeleteChildResourcePayload | ActivityEventMigrateGroupPayload | ActivityEventMigrateWorkspacePayload | ActivityEventMoveManagedIdentityPayload | ActivityEventRemoveNamespaceMembershipPayload | ActivityEventRemoveTeamMemberPayload | ActivityEventUpdateNamespaceMembershipPayload | ActivityEventUpdateRunPayload | ActivityEventUpdateTeamMemberPayload | ActivityEventUpdateTerraformModulePayload | ActivityEventUpdateWorkspacePayload
+union ActivityEventPayload = ActivityEventAddTeamMemberPayload | ActivityEventCreateNamespaceMembershipPayload | ActivityEventCreateTerraformModulePayload | ActivityEventCreateWorkspacePayload | ActivityEventDeleteChildResourcePayload | ActivityEventMigrateGroupPayload | ActivityEventMigrateWorkspacePayload | ActivityEventMoveManagedIdentityPayload | ActivityEventRemoveNamespaceMembershipPayload | ActivityEventRemoveTeamMemberPayload | ActivityEventUpdateNamespaceMembershipPayload | ActivityEventUpdateRunGatePayload | ActivityEventUpdateRunPayload | ActivityEventUpdateTeamMemberPayload | ActivityEventUpdateTerraformModulePayload | ActivityEventUpdateWorkspacePayload
 
 type ActivityEventRemoveNamespaceMembershipPayload {
   member: Member
@@ -107,9 +107,13 @@ enum ActivityEventTargetType {
   MANAGED_IDENTITY
   MANAGED_IDENTITY_ACCESS_RULE
   NAMESPACE_MEMBERSHIP
+  PACKAGE
+  PACKAGE_VERSION
+  POLICY
   ROLE
   RUN
   RUNNER
+  RUN_GATE
   SERVICE_ACCOUNT
   STATE_VERSION
   TEAM
@@ -127,6 +131,17 @@ enum ActivityEventTargetType {
 type ActivityEventUpdateNamespaceMembershipPayload {
   newRole: String!
   prevRole: String!
+}
+
+type ActivityEventUpdateRunGatePayload {
+  comment: String
+  type: ActivityEventUpdateRunGatePayloadType!
+}
+
+enum ActivityEventUpdateRunGatePayloadType {
+  APPROVE
+  OVERRIDE
+  REJECT
 }
 
 type ActivityEventUpdateRunPayload {
@@ -428,6 +443,13 @@ enum ApplyStatus {
   skipped
 }
 
+input ApproveRunGateInput {
+  clientMutationId: String
+  comment: String
+  decision: RunGateDecision!
+  gateId: String!
+}
+
 input AssessWorkspaceInput {
   clientMutationId: String
   workspaceId: String
@@ -497,23 +519,23 @@ input CancelRunInput {
   runId: String!
 }
 
-type CheckResult {
+type TerraformCheckResult {
   name: String!
-  objects: [CheckResultObject!]!
-  status: CheckResultStatus!
+  objects: [TerraformCheckResultObject!]!
+  status: TerraformCheckResultStatus!
 }
 
-type CheckResultObject {
+type TerraformCheckResultObject {
   address: String!
   failureMessages: [String!]!
-  status: CheckResultStatus!
+  status: TerraformCheckResultStatus!
 }
 
-enum CheckResultStatus {
-  error
-  fail
-  pass
-  unknown
+enum TerraformCheckResultStatus {
+  ERROR
+  FAIL
+  PASS
+  UNKNOWN
 }
 
 input ClaimJobInput {
@@ -780,6 +802,37 @@ input CreateNamespaceVariableInput {
   namespacePath: String!
   sensitive: Boolean
   value: String!
+}
+
+input CreatePackageInput {
+  allowMutableVersions: Boolean
+  clientMutationId: String
+  description: String
+  groupId: String!
+  kind: PackageKind!
+  name: String!
+  visibility: PackageVisibility!
+}
+
+input CreatePackageVersionInput {
+  clientMutationId: String
+  packageId: String!
+  shaSum: String!
+  version: String!
+}
+
+input CreatePolicyInput {
+  allowedServiceAccounts: [String!]
+  allowedTeams: [String!]
+  allowedUsers: [String!]
+  clientMutationId: String
+  description: String
+  groupId: String!
+  kind: PolicyKind!
+  name: String!
+  opaData: OPAPolicyDataInput
+  requiredApprovals: Int
+  scope: [PolicyScopeRuleInput!]
 }
 
 input CreateRoleInput {
@@ -1197,6 +1250,22 @@ input DeleteNamespaceVariableInput {
   id: String!
 }
 
+input DeletePackageInput {
+  clientMutationId: String
+  force: Boolean
+  id: String!
+}
+
+input DeletePackageVersionInput {
+  clientMutationId: String
+  id: String!
+}
+
+input DeletePolicyInput {
+  clientMutationId: String
+  id: String!
+}
+
 input DeleteRoleInput {
   clientMutationId: String
   force: Boolean
@@ -1519,7 +1588,9 @@ type Group implements Namespace & Node {
   metadata: ResourceMetadata!
   name: String!
   outputVisibility: NamespaceOutputVisibility!
+  packages(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: PackageSort): PackageConnection!
   parent: Group
+  policies(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: PolicySort): PolicyConnection!
   providerMirrorEnabled: NamespaceProviderMirrorEnabled!
   runnerTags: NamespaceRunnerTags!
   runners(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: RunnerSort): RunnerConnection!
@@ -1530,6 +1601,7 @@ type Group implements Namespace & Node {
   terraformProviders(after: String, before: String, first: Int, last: Int, search: String): TerraformProviderConnection!
   variables: [NamespaceVariable!]!
   vcsProviders(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: VCSProviderSort): VCSProviderConnection!
+  visiblePackages(after: String, before: String, first: Int, last: Int, search: String, sort: PackageSort): PackageConnection!
   workspaces(after: String, before: String, first: Int, last: Int, sort: WorkspaceSort): WorkspaceConnection!
 }
 
@@ -1720,6 +1792,7 @@ type ManagedIdentity implements Node {
   isAlias: Boolean!
   metadata: ResourceMetadata!
   name: String!
+  referencingPolicies: [Policy!]!
   resourcePath: String!
   type: String!
   workspaces(after: String, before: String, first: Int, last: Int, sort: WorkspaceSort): WorkspaceConnection!
@@ -1844,6 +1917,7 @@ type Mutation {
   activateAdminMode(input: ActivateAdminModeInput!): UpdateUserAdminStatusPayload!
   addUserToTeam(input: AddUserToTeamInput): AddUserToTeamPayload!
   applyRun(input: ApplyRunInput!): RunMutationPayload!
+  approveRunGate(input: ApproveRunGateInput!): RunGateMutationPayload!
   assessWorkspace(input: AssessWorkspaceInput!): AssessWorkspacePayload!
   assignManagedIdentity(input: AssignManagedIdentityInput!): AssignManagedIdentityPayload!
   assignServiceAccountToRunner(input: AssignServiceAccountToRunnerInput!): AssignServiceAccountToRunnerPayload!
@@ -1864,6 +1938,9 @@ type Mutation {
   createManagedIdentityCredentials(input: CreateManagedIdentityCredentialsInput!): CreateManagedIdentityCredentialsPayload! @deprecated(reason: "Use the gRPC API instead.")
   createNamespaceMembership(input: CreateNamespaceMembershipInput!): NamespaceMembershipMutationPayload!
   createNamespaceVariable(input: CreateNamespaceVariableInput!): NamespaceVariableMutationPayload!
+  createPackage(input: CreatePackageInput!): PackageMutationPayload!
+  createPackageVersion(input: CreatePackageVersionInput!): PackageVersionMutationPayload!
+  createPolicy(input: CreatePolicyInput!): PolicyMutationPayload!
   createRole(input: CreateRoleInput!): CreateRolePayload!
   createRun(input: CreateRunInput!): RunMutationPayload!
   createRunner(input: CreateRunnerInput!): CreateRunnerPayload!
@@ -1896,6 +1973,9 @@ type Mutation {
   deleteManagedIdentityAlias(input: DeleteManagedIdentityAliasInput!): DeleteManagedIdentityAliasPayload!
   deleteNamespaceMembership(input: DeleteNamespaceMembershipInput!): NamespaceMembershipMutationPayload!
   deleteNamespaceVariable(input: DeleteNamespaceVariableInput!): NamespaceVariableMutationPayload!
+  deletePackage(input: DeletePackageInput!): PackageMutationPayload!
+  deletePackageVersion(input: DeletePackageVersionInput!): PackageVersionMutationPayload!
+  deletePolicy(input: DeletePolicyInput!): PolicyMutationPayload!
   deleteRole(input: DeleteRoleInput!): DeleteRolePayload!
   deleteRunner(input: DeleteRunnerInput!): DeleteRunnerPayload!
   deleteServiceAccount(input: DeleteServiceAccountInput!): DeleteServiceAccountPayload!
@@ -1921,6 +2001,7 @@ type Mutation {
   migrateGroup(input: MigrateGroupInput!): MigrateGroupPayload!
   migrateWorkspace(input: MigrateWorkspaceInput!): MigrateWorkspacePayload!
   moveManagedIdentity(input: MoveManagedIdentityInput!): MoveManagedIdentityPayload!
+  overrideRunGate(input: OverrideRunGateInput!): RunGateMutationPayload!
   reconcileWorkspace(input: ReconcileWorkspaceInput!): ReconcileWorkspacePayload!
   removeUserFromTeam(input: RemoveUserFromTeamInput): RemoveUserFromTeamPayload!
   resetServiceAccountClientCredentials(input: ResetServiceAccountClientCredentialsInput!): ResetServiceAccountClientCredentialsPayload!
@@ -1947,6 +2028,8 @@ type Mutation {
   updateManagedIdentityAccessRule(input: UpdateManagedIdentityAccessRuleInput!): ManagedIdentityAccessRuleMutationPayload!
   updateNamespaceMembership(input: UpdateNamespaceMembershipInput!): NamespaceMembershipMutationPayload!
   updateNamespaceVariable(input: UpdateNamespaceVariableInput!): NamespaceVariableMutationPayload!
+  updatePackage(input: UpdatePackageInput!): PackageMutationPayload!
+  updatePolicy(input: UpdatePolicyInput!): PolicyMutationPayload!
   updateResourceLimit(input: UpdateResourceLimitInput!): UpdateResourceLimitPayload!
   updateRole(input: UpdateRoleInput!): UpdateRolePayload!
   updateRunner(input: UpdateRunnerInput!): UpdateRunnerPayload!
@@ -2169,10 +2252,129 @@ input OIDCTrustPolicyInput {
   issuer: String!
 }
 
+type OPAPolicyData {
+  enforcementLevel: PolicyEnforcementLevel!
+  packageDigest: String
+  packageSource: String!
+  packageVersionConstraint: String
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
+  stage: PolicyStage!
+}
+
+input OPAPolicyDataInput {
+  enforcementLevel: PolicyEnforcementLevel!
+  packageDigest: String
+  packageSource: String!
+  packageVersionConstraint: String
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
+  stage: PolicyStage!
+}
+
 type OidcAuthSettings {
   clientId: String!
   issuerUrl: String!
   scope: String!
+}
+
+input OverrideRunGateInput {
+  clientMutationId: String
+  comment: String
+  gateId: String!
+}
+
+type Package implements Node {
+  allowMutableVersions: Boolean!
+  createdBy: String!
+  description: String!
+  group: Group!
+  groupPath: String!
+  id: ID!
+  kind: PackageKind!
+  latestVersion: PackageVersion
+  metadata: ResourceMetadata!
+  name: String!
+  versions(after: String, before: String, first: Int, last: Int, search: String, sort: PackageVersionSort): PackageVersionConnection!
+  visibility: PackageVisibility!
+}
+
+type PackageConnection {
+  edges: [PackageEdge]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PackageEdge {
+  cursor: String!
+  node: Package
+}
+
+enum PackageKind {
+  OPA_POLICY
+}
+
+type PackageMutationPayload {
+  clientMutationId: String
+  package: Package
+  problems: [Problem!]!
+}
+
+enum PackageSort {
+  GROUP_LEVEL_ASC
+  GROUP_LEVEL_DESC
+  NAME_ASC
+  NAME_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type PackageVersion implements Node {
+  createdBy: String!
+  error: String
+  id: ID!
+  latest: Boolean!
+  metadata: ResourceMetadata!
+  package: Package!
+  shaSum: String!
+  size: Int!
+  status: PackageVersionStatus!
+  version: String!
+}
+
+type PackageVersionConnection {
+  edges: [PackageVersionEdge]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PackageVersionEdge {
+  cursor: String!
+  node: PackageVersion
+}
+
+type PackageVersionMutationPayload {
+  clientMutationId: String
+  packageVersion: PackageVersion
+  problems: [Problem!]!
+}
+
+enum PackageVersionSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+enum PackageVersionStatus {
+  ERRORED
+  PENDING
+  UPLOADED
+  UPLOAD_IN_PROGRESS
+}
+
+enum PackageVisibility {
+  GLOBAL
+  PRIVATE
+  ROOT_GROUP
 }
 
 type PageInfo {
@@ -2184,7 +2386,7 @@ type PageInfo {
 
 type Plan {
   changes: PlanChanges
-  checkResults: [CheckResult!]!
+  checkResults: [TerraformCheckResult!]!
   currentJob: Job
   diffSize: Int!
   errorMessage: String
@@ -2257,6 +2459,7 @@ enum PlanStatus {
   pending
   queued
   running
+  skipped
 }
 
 type PlanSummary {
@@ -2268,6 +2471,133 @@ type PlanSummary {
   resourceDestructions: Int!
   resourceDrift: Int!
   resourceImports: Int!
+}
+
+type Policy implements Node {
+  allowedServiceAccounts: [ServiceAccount!]!
+  allowedTeams: [Team!]!
+  allowedUsers: [User!]!
+  createdBy: String!
+  description: String!
+  group: Group!
+  groupPath: String!
+  id: ID!
+  kind: PolicyKind!
+  metadata: ResourceMetadata!
+  name: String!
+  opaData: OPAPolicyData
+  requiredApprovals: Int!
+  scope: [PolicyScopeRule!]!
+}
+
+type PolicyCheck {
+  checkType: String!
+  currentJob: Job
+  id: String!
+  jobs(after: String, before: String, first: Int, last: Int, sort: JobSort): JobConnection!
+  messagesSummary: PolicyCheckMessagesSummary!
+  nodePath: String!
+  policies: [PolicyCheckPolicy!]!
+  runGate: RunGate
+  stageName: RunTaskStageName!
+  status: PolicyCheckStatus!
+}
+
+type PolicyCheckMessagesSummary {
+  messages: [String!]!
+  truncated: Boolean!
+}
+
+type PolicyCheckPolicy {
+  description: String!
+  enforcementLevel: PolicyEnforcementLevel!
+  id: String!
+  messages: [String!]!
+  name: String!
+  packageSource: String!
+  packageVersionConstraint: String!
+  policy: Policy
+  provenance: PolicyCheckPolicyProvenance!
+  status: String!
+}
+
+type PolicyCheckPolicyProvenance {
+  groupId: String!
+  policyTrn: String!
+}
+
+enum PolicyCheckStatus {
+  CANCELED
+  CREATED
+  ERRORED
+  OVERRIDDEN
+  PASSED
+  PENDING
+  QUEUED
+  RUNNING
+  SKIPPED
+  SOFT_FAILED
+}
+
+type PolicyConnection {
+  edges: [PolicyEdge]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PolicyEdge {
+  cursor: String!
+  node: Policy
+}
+
+enum PolicyEnforcementLevel {
+  ADVISORY
+  HARD_MANDATORY
+  SOFT_MANDATORY
+}
+
+enum PolicyKind {
+  OPA
+}
+
+type PolicyMutationPayload {
+  clientMutationId: String
+  policy: Policy
+  problems: [Problem!]!
+}
+
+type PolicyScopeRule {
+  action: PolicyScopeRuleAction!
+  pattern: String!
+  type: PolicyScopeRuleType!
+}
+
+enum PolicyScopeRuleAction {
+  EXCLUDE
+  INCLUDE
+}
+
+input PolicyScopeRuleInput {
+  action: PolicyScopeRuleAction!
+  pattern: String!
+  type: PolicyScopeRuleType!
+}
+
+enum PolicyScopeRuleType {
+  GROUP
+  MANAGED_IDENTITY
+  WORKSPACE
+}
+
+enum PolicySort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+enum PolicyStage {
+  POST_APPLY
+  POST_PLAN
+  PRE_PLAN
 }
 
 type Problem {
@@ -2305,10 +2635,13 @@ type Query {
   namespace(fullPath: String!): Namespace
   namespaceVariableVersion(id: String!, includeSensitiveValue: Boolean): NamespaceVariableVersion
   node(id: String!): Node
+  packages(after: String, before: String, first: Int, last: Int, search: String, sort: PackageSort): PackageConnection!
   resourceLimits: [ResourceLimit!]!
   role(name: String!): Role @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
   roles(after: String, before: String, first: Int, last: Int, search: String, sort: RoleSort): RoleConnection!
   run(id: String!): Run @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
+  runGatesAwaitingMyDecision(after: String, before: String, first: Int, last: Int, sort: RunGateSort): RunGateConnection!
+  runNode(nodePath: String!, runId: String!): RunNode
   runs(after: String, before: String, first: Int, last: Int, sort: RunSort, workspaceAssessment: Boolean, workspaceId: String, workspacePath: String): RunConnection!
   search(query: String!): SearchResponse!
   serviceAccount(id: String!): ServiceAccount @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
@@ -2449,6 +2782,7 @@ type Run implements Node {
   forceCancelAvailableAt: Time
   forceCanceled: Boolean!
   forceCanceledBy: String
+  hasAdvisoryFailures: Boolean!
   id: ID!
   isDestroy: Boolean!
   metadata: ResourceMetadata!
@@ -2463,6 +2797,7 @@ type Run implements Node {
   stateVersion: StateVersion
   status: RunStatus!
   targetAddresses: [String!]!
+  taskStages: [RunTaskStage!]!
   terraformVersion: String!
   variables: [RunVariable!]!
   workspace: Workspace!
@@ -2484,11 +2819,83 @@ type RunEvent {
   run: Run!
 }
 
+type RunGate implements Node {
+  approvalRules: [RunGateApprovalRule!]!
+  approvals: [RunGateApproval!]!
+  id: ID!
+  metadata: ResourceMetadata!
+  overriddenBy: String
+  overrideComment: String!
+  policyCheck: PolicyCheck!
+  run: Run!
+  status: RunGateStatus!
+  type: RunGateType!
+}
+
+type RunGateApproval implements Node {
+  comment: String!
+  coveredRules: [String!]!
+  createdBy: String!
+  decision: RunGateDecision!
+  id: ID!
+  metadata: ResourceMetadata!
+  serviceAccount: ServiceAccount
+  user: User
+}
+
+type RunGateApprovalRule {
+  allowedServiceAccounts: [ServiceAccount!]!
+  allowedTeams: [Team!]!
+  allowedUsers: [User!]!
+  name: String!
+  requiredApprovals: Int!
+}
+
+type RunGateConnection {
+  edges: [RunGateEdge]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+enum RunGateDecision {
+  APPROVE
+  REJECT
+}
+
+type RunGateEdge {
+  cursor: String!
+  node: RunGate
+}
+
+type RunGateMutationPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  runGate: RunGate
+}
+
+enum RunGateSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+enum RunGateStatus {
+  APPROVED
+  CANCELED
+  OVERRIDDEN
+  PENDING
+}
+
+enum RunGateType {
+  OPA_POLICY
+}
+
 type RunMutationPayload {
   clientMutationId: String
   problems: [Problem!]!
   run: Run
 }
+
+union RunNode = Apply | Plan | PolicyCheck | RunTaskStage
 
 enum RunSort {
   CREATED_AT_ASC
@@ -2500,17 +2907,28 @@ enum RunSort {
 enum RunStatus {
   applied
   apply_queued
+  apply_queuing
   applying
   canceled
   discarded
   errored
   pending
   plan_queued
+  plan_queuing
   planned
   planned_and_finished
   planning
-  queuing
-  queuing_apply
+  post_plan_awaiting_decision
+  post_plan_completed
+  post_plan_running
+  pre_apply_awaiting_decision
+  pre_apply_completed
+  pre_apply_queuing
+  pre_apply_running
+  pre_plan_awaiting_decision
+  pre_plan_completed
+  pre_plan_queuing
+  pre_plan_running
 }
 
 input RunSubscriptionInput {
@@ -2518,6 +2936,31 @@ input RunSubscriptionInput {
   runId: String
   workspaceId: String
   workspacePath: String
+}
+
+type RunTaskStage {
+  id: String!
+  policyChecks: [PolicyCheck!]!
+  stageName: RunTaskStageName!
+  status: RunTaskStageStatus!
+}
+
+enum RunTaskStageName {
+  POST_APPLY
+  POST_PLAN
+  PRE_APPLY
+  PRE_PLAN
+}
+
+enum RunTaskStageStatus {
+  AWAITING_OVERRIDE
+  CANCELED
+  COMPLETED
+  CREATED
+  ERRORED
+  PENDING
+  RUNNING
+  SKIPPED
 }
 
 type RunVariable {
@@ -2777,6 +3220,11 @@ type SetVariablesIncludedInTFConfigPayload {
   run: Run
 }
 
+enum SpeculativeRunEnforcementLevel {
+  ADVISORY
+  HARD_MANDATORY
+}
+
 type StateVersion implements Node {
   createdBy: String!
   data: String!
@@ -2805,7 +3253,7 @@ type StateVersionEdge {
 }
 
 type StateVersionInventory {
-  checkResults: [CheckResult!]!
+  checkResults: [TerraformCheckResult!]!
   dependencies: [StateVersionDependency!]!
   resources: [StateVersionResource!]!
 }
@@ -3310,6 +3758,26 @@ input UpdateNamespaceVariableInput {
   value: String!
 }
 
+input UpdatePackageInput {
+  allowMutableVersions: Boolean
+  clientMutationId: String
+  description: String
+  id: String!
+  visibility: PackageVisibility
+}
+
+input UpdatePolicyInput {
+  allowedServiceAccounts: [String!]
+  allowedTeams: [String!]
+  allowedUsers: [String!]
+  clientMutationId: String
+  description: String
+  id: String!
+  opaData: OPAPolicyDataInput
+  requiredApprovals: Int
+  scope: [PolicyScopeRuleInput!]
+}
+
 input UpdateResourceLimitInput {
   clientMutationId: String
   metadata: ResourceMetadataInput
@@ -3706,6 +4174,7 @@ type Workspace implements Namespace & Node {
   activityEvents(actions: [ActivityEventAction!], after: String, before: String, first: Int, includeNested: Boolean, last: Int, serviceAccountId: String, serviceAccountPath: String, sort: ActivityEventSort, targetTypes: [ActivityEventTargetType!], timeRangeEnd: Time, timeRangeStart: Time, userId: String, username: String): ActivityEventConnection!
   assessment: WorkspaceAssessment
   assignedManagedIdentities: [ManagedIdentity!]!
+  assignedPolicies: [Policy!]!
   createdBy: String!
   currentApplyRun: Run
   currentJob: Job @deprecated(reason: "The workspace no longer tracks a current job after the run refactor; this is always null. Use currentApplyRun instead.")

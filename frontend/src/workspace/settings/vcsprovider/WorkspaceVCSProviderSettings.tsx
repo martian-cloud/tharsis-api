@@ -108,6 +108,8 @@ function WorkspaceVCSProviderSettings({ fragmentRef }: Props) {
         setOpenDialog(confirm)
     }
 
+    const edges = data?.vcsProviders?.edges ?? [];
+
     return (
         <Box>
             <SettingsToggleButton
@@ -122,9 +124,9 @@ function WorkspaceVCSProviderSettings({ fragmentRef }: Props) {
             >
                 <Box>
                     {data.workspaceVcsProviderLink && <EditVCSProviderLink fragmentRef={data} handleWebhookDialog={(confirm: boolean, data: WebhooksData) => handleWebhookDialog(confirm, data)} />}
-                    {!data.workspaceVcsProviderLink && data.vcsProviders.edges && data.vcsProviders.edges.length > 0 && <NewVCSProviderLink fragmentRef={data}
+                    {!data.workspaceVcsProviderLink && edges.length > 0 && <NewVCSProviderLink fragmentRef={data}
                         handleWebhookDialog={(confirm: boolean, data: WebhooksData) => handleWebhookDialog(confirm, data)} />}
-                    {!data.workspaceVcsProviderLink && data.vcsProviders.edges && data.vcsProviders.edges.length === 0 && <Box>
+                    {!data.workspaceVcsProviderLink && edges.length === 0 && <Box>
                         <Box sx={{ marginTop: 2, display: "flex", marginBottom: 2 }}>
                             <Box display="flex" flexDirection="column">
                                 <Typography variant="subtitle1" gutterBottom>

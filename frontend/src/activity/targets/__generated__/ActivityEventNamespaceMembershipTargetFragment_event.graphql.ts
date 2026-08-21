@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6f21ae774e2e867424868129a4690431>>
+ * @generated SignedSource<<5ac4d7969f57bb5d89b5a84a7791d812>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -38,7 +38,7 @@ export type ActivityEventNamespaceMembershipTargetFragment_event$data = {
       // value in case none of the concrete values match.
       readonly __typename: "%other";
     } | null | undefined;
-  };
+  } | null | undefined;
   readonly " $fragmentSpreads": FragmentRefs<"ActivityEventListItemFragment_event">;
   readonly " $fragmentType": "ActivityEventNamespaceMembershipTargetFragment_event";
 };

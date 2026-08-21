@@ -211,6 +211,7 @@ func BuildRouter(
 		requireAuthenticatedCallerMiddleware,
 		signingKeyManager,
 		serviceCatalog.RunService,
+		serviceCatalog.JobService,
 		cfg.TharsisAPIURL,
 	))
 	AddRoutes(tfeVersionRouter, tfecontrollers.NewOrgController(
@@ -297,6 +298,12 @@ func BuildRouter(
 			requireAuthenticatedCallerMiddleware,
 			serviceCatalog.TerraformModuleRegistryService,
 			cfg.ModuleRegistryMaxUploadSize,
+		))
+		AddRoutes(r, controllers.NewPackageRegistryController(
+			logger,
+			respWriter,
+			requireAuthenticatedCallerMiddleware,
+			serviceCatalog.PackageService,
 		))
 		AddRoutes(r, controllers.NewSCIMController(
 			logger,

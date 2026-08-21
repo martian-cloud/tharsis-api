@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e02f45e5309bffc2e9071afe5382a3b6>>
+ * @generated SignedSource<<98d85fe224f5ed138a523f4009d89702>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,8 +16,8 @@ export type ActivityEventListFragment_connection$data = {
       readonly id: string;
       readonly target: {
         readonly __typename: string;
-      };
-      readonly " $fragmentSpreads": FragmentRefs<"ActivityEventFederatedRegistryTargetFragment_event" | "ActivityEventGPGKeyTargetFragment_event" | "ActivityEventGroupTargetFragment_event" | "ActivityEventManagedIdentityAccessRuleTargetFragment_event" | "ActivityEventManagedIdentityTargetFragment_event" | "ActivityEventNamespaceMembershipTargetFragment_event" | "ActivityEventRoleTargetFragment_event" | "ActivityEventRunTargetFragment_event" | "ActivityEventRunnerTargetFragment_event" | "ActivityEventServiceAccountTargetFragment_event" | "ActivityEventStateVersionTargetFragment_event" | "ActivityEventTeamTargetFragment_event" | "ActivityEventTerraformModuleTargetFragment_event" | "ActivityEventTerraformModuleVersionTargetFragment_event" | "ActivityEventTerraformProviderTargetFragment_event" | "ActivityEventTerraformProviderVersionMirrorTargetFragment_event" | "ActivityEventVCSProviderTargetFragment_event" | "ActivityEventVariableTargetFragment_event" | "ActivityEventWorkspaceTargetFragment_event">;
+      } | null | undefined;
+      readonly " $fragmentSpreads": FragmentRefs<"ActivityEventFederatedRegistryTargetFragment_event" | "ActivityEventGPGKeyTargetFragment_event" | "ActivityEventGroupTargetFragment_event" | "ActivityEventManagedIdentityAccessRuleTargetFragment_event" | "ActivityEventManagedIdentityTargetFragment_event" | "ActivityEventNamespaceMembershipTargetFragment_event" | "ActivityEventPackageTargetFragment_event" | "ActivityEventPackageVersionTargetFragment_event" | "ActivityEventPolicyTargetFragment_event" | "ActivityEventRoleTargetFragment_event" | "ActivityEventRunGateTargetFragment_event" | "ActivityEventRunTargetFragment_event" | "ActivityEventRunnerTargetFragment_event" | "ActivityEventServiceAccountTargetFragment_event" | "ActivityEventStateVersionTargetFragment_event" | "ActivityEventTargetNotFoundFragment_event" | "ActivityEventTeamTargetFragment_event" | "ActivityEventTerraformModuleTargetFragment_event" | "ActivityEventTerraformModuleVersionTargetFragment_event" | "ActivityEventTerraformProviderTargetFragment_event" | "ActivityEventTerraformProviderVersionMirrorTargetFragment_event" | "ActivityEventVCSProviderTargetFragment_event" | "ActivityEventVariableTargetFragment_event" | "ActivityEventWorkspaceTargetFragment_event">;
     } | null | undefined;
   } | null | undefined> | null | undefined;
   readonly " $fragmentType": "ActivityEventListFragment_connection";
@@ -168,6 +168,31 @@ const node: ReaderFragment = {
               "args": null,
               "kind": "FragmentSpread",
               "name": "ActivityEventTerraformProviderVersionMirrorTargetFragment_event"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActivityEventRunGateTargetFragment_event"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActivityEventPackageTargetFragment_event"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActivityEventPackageVersionTargetFragment_event"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActivityEventPolicyTargetFragment_event"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActivityEventTargetNotFoundFragment_event"
             }
           ],
           "storageKey": null
@@ -180,6 +205,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "70c2919294a65dc0d1d96927d07e87a2";
+(node as any).hash = "bc0f71617fa01e98d0ce390e259d6cf7";
 
 export default node;

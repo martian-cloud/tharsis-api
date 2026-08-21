@@ -7,6 +7,7 @@ import { fetchQuery, useLazyLoadQuery, usePaginationFragment, useRelayEnvironmen
 import SearchInput from '../common/SearchInput';
 import ListSkeleton from '../skeletons/ListSkeleton';
 import TeamListItem from './TeamListItem';
+import { PageLayoutProvider } from '../layout/PageLayoutContext';
 import { TeamsFragment_teams$key } from './__generated__/TeamsFragment_teams.graphql';
 import { TeamsPaginationQuery } from './__generated__/TeamsPaginationQuery.graphql';
 import { TeamsQuery } from './__generated__/TeamsQuery.graphql';
@@ -78,7 +79,7 @@ function TeamList() {
     const edges = data.teams?.edges ?? [];
 
     return (
-        <Box maxWidth={1200} margin="auto" padding={2}>
+        <Box>
             <Typography variant="h5" sx={{ marginBottom: 2 }}>Teams</Typography>
             <SearchInput
                 sx={{ marginBottom: 2 }}
@@ -127,11 +128,11 @@ function TeamList() {
 
 function Teams() {
     return (
-        <Suspense fallback={<Box maxWidth={1200} margin="auto" padding={2}>
-            <ListSkeleton rowCount={5} />
-        </Box>}>
-            <TeamList />
-        </Suspense>
+        <PageLayoutProvider>
+            <Suspense fallback={<ListSkeleton rowCount={5} />}>
+                <TeamList />
+            </Suspense>
+        </PageLayoutProvider>
     );
 }
 

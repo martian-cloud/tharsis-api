@@ -1,0 +1,132 @@
+enum RunGateStatus {
+  PENDING
+  APPROVED
+  CANCELED
+  OVERRIDDEN
+}
+
+enum RunGateType {
+  OPA_POLICY
+}
+
+enum RunGateDecision {
+  APPROVE
+  REJECT
+}
+
+enum RunGateSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+"""
+RunGateApproval is a single approve/reject decision recorded against a run gate. The approver
+is resolved from the nullable user/serviceAccount fields; when the principal has been deleted
+those are null and createdBy carries the original subject string. coveredRules lists the names of
+the gate's approval rules the decision counts toward (the rules the approver was eligible for).
+"""
+type RunGateApproval implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  decision: RunGateDecision!
+  comment: String!
+  createdBy: String!
+  coveredRules: [String!]!
+  user: User
+  serviceAccount: ServiceAccount
+}
+
+"""
+RunGateApprovalRule is the approval requirement for a single soft-failed policy governed by a run
+gate. name is the run's PolicyCheckPolicy ID; look up the policy's display info from the run's
+policy check by matching this name. The rule is met once it reaches requiredApprovals from its
+allowed subjects. The allowed subject lists are resolved from the gate's durable snapshot and
+tolerate deleted subjects (a deleted subject is omitted).
+"""
+type RunGateApprovalRule {
+  name: String!
+  requiredApprovals: Int!
+  allowedUsers: [User!]!
+  allowedServiceAccounts: [ServiceAccount!]!
+  allowedTeams: [Team!]!
+}
+
+"""
+RunGate is the block on a single run policy check that parked at awaiting_override because one or
+more soft-mandatory policies failed. Every such check has exactly one gate, and clearing the gate is
+what clears the check.
+
+approvalRules carries one rule per soft-failed policy that declared approvers, and the gate is
+satisfied once every rule reaches its required number of approvals. Rejection is advisory: a reject
+decision is recorded but the gate stays pending and the run stays blocked, so other eligible approvers
+can still approve it. A gate whose failed policies declared no approvers has no rules at all — nobody
+is eligible to approve it, and overrideRunGate is the only thing that can clear it.
+
+A gate is cleared one of two ways, distinguished by overriddenBy: it either collected the approvals
+every rule required (status APPROVED, overriddenBy null, the decisions listed under approvals), or
+someone cleared it without them (status OVERRIDDEN, overriddenBy set, no approval row written).
+metadata.updatedAt is the time the gate was cleared — both APPROVED and OVERRIDDEN are terminal, so
+nothing updates a gate afterwards.
+"""
+type RunGate implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  status: RunGateStatus!
+  type: RunGateType!
+  approvalRules: [RunGateApprovalRule!]!
+  approvals: [RunGateApproval!]!
+  """
+  The subject that bypassed this gate's approval requirements — a user's email or a service
+  account's resource path. Null unless status is OVERRIDDEN; a gate that reached APPROVED by
+  collecting its approvals was not overridden by anyone.
+  """
+  overriddenBy: String
+  """
+  The reason given for the override. Empty when no reason was supplied, or when the gate was not
+  overridden.
+  """
+  overrideComment: String!
+  """
+  The policy check this gate governs. One gate is created per check, so this is the inverse of
+  PolicyCheck.runGate — read the failed policies and their messages from here to show what the
+  approval is actually for.
+  """
+  policyCheck: PolicyCheck!
+  run: Run!
+}
+
+type RunGateEdge {
+  cursor: String!
+  node: RunGate
+}
+
+type RunGateConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [RunGateEdge]
+}
+
+type RunGateMutationPayload {
+  clientMutationId: String
+  runGate: RunGate
+  problems: [Problem!]!
+}
+
+input ApproveRunGateInput {
+  clientMutationId: String
+  gateId: String!
+  decision: RunGateDecision!
+  comment: String
+}
+
+"""
+OverrideRunGateInput clears a pending run gate, and with it the soft-failed policy check the gate
+blocks, without collecting the approvals its rules require. A gate with no rules had no approvals to
+collect, so this is the only way to clear it. Requires the permission to update every policy the
+override lifts, in the group where that policy is defined.
+"""
+input OverrideRunGateInput {
+  clientMutationId: String
+  gateId: String!
+  comment: String
+}

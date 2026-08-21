@@ -212,6 +212,23 @@ func (r *ActivityEventUpdateTeamMemberPayloadResolver) Maintainer() bool {
 	return r.payload.Maintainer
 }
 
+// ActivityEventUpdateRunGatePayloadResolver resolves the run gate update payload. It wraps the model
+// so the typed Type enum is exposed to GraphQL as a String (graphql-go binds the String scalar only
+// to a plain Go string, not to a named string type).
+type ActivityEventUpdateRunGatePayloadResolver struct {
+	payload *models.ActivityEventUpdateRunGatePayload
+}
+
+// Type resolver
+func (r *ActivityEventUpdateRunGatePayloadResolver) Type() string {
+	return toGraphqlEnum(string(r.payload.Type))
+}
+
+// Comment resolver
+func (r *ActivityEventUpdateRunGatePayloadResolver) Comment() *string {
+	return r.payload.Comment
+}
+
 // ActivityEventPayloadResolver resolves the Payload union type
 type ActivityEventPayloadResolver struct {
 	result interface{}
@@ -232,6 +249,12 @@ func (r *ActivityEventPayloadResolver) ToActivityEventUpdateNamespaceMembershipP
 // ToActivityEventUpdateRunPayload resolves the custom payload for a run update.
 func (r *ActivityEventPayloadResolver) ToActivityEventUpdateRunPayload() (*models.ActivityEventUpdateRunPayload, bool) {
 	res, ok := r.result.(*models.ActivityEventUpdateRunPayload)
+	return res, ok
+}
+
+// ToActivityEventUpdateRunGatePayload resolves the custom payload for a run gate update.
+func (r *ActivityEventPayloadResolver) ToActivityEventUpdateRunGatePayload() (*ActivityEventUpdateRunGatePayloadResolver, bool) {
+	res, ok := r.result.(*ActivityEventUpdateRunGatePayloadResolver)
 	return res, ok
 }
 
@@ -359,6 +382,18 @@ func (r *ActivityEventResolver) Action() string {
 
 // Target resolver
 func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, error) {
+	resolver, err := r.loadTarget(ctx)
+	if err != nil {
+		// Return nil if the target has been deleted since the event was recorded.
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return resolver, nil
+}
+
+func (r *ActivityEventResolver) loadTarget(ctx context.Context) (*NodeResolver, error) {
 	// Query for target based on type
 	// (sorted by type)
 
@@ -494,6 +529,30 @@ func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, erro
 			return nil, err
 		}
 		return &NodeResolver{result: &FederatedRegistryResolver{federatedRegistry: federatedRegistry}}, nil
+	case models.TargetPackage:
+		pkg, err := loadPackage(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &PackageResolver{pkg: pkg}}, nil
+	case models.TargetPackageVersion:
+		pkgVersion, err := loadPackageVersion(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &PackageVersionResolver{pkgVersion: pkgVersion}}, nil
+	case models.TargetPolicy:
+		policy, err := loadPolicy(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &PolicyResolver{policy: policy}}, nil
+	case models.TargetRunGate:
+		runGate, err := loadRunGate(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &RunGateResolver{runGate: runGate}}, nil
 	default:
 		return nil, errors.New("valid TargetType must be specified", errors.WithErrorCode(errors.EInvalid))
 	}
@@ -532,6 +591,14 @@ func (r *ActivityEventResolver) Payload() (*ActivityEventPayloadResolver, error)
 				return nil, err
 			}
 			return &ActivityEventPayloadResolver{result: &payload}, nil
+
+		case (r.activityEvent.Action == models.ActionUpdate) &&
+			(r.activityEvent.TargetType == models.TargetRunGate):
+			var payload models.ActivityEventUpdateRunGatePayload
+			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return &ActivityEventPayloadResolver{result: &ActivityEventUpdateRunGatePayloadResolver{payload: &payload}}, nil
 
 		case r.activityEvent.Action == models.ActionRemoveMembership:
 			var payload models.ActivityEventRemoveNamespaceMembershipPayload

@@ -36,6 +36,7 @@ var fieldOverrides = map[string]int{
 	"readme":                   1,
 	"runnerAvailabilityStatus": 5,
 	"inventory":                5,
+	"messages":                 5, // override for policyCheck.policy.messages
 }
 
 type queryComplexityResult struct {
@@ -95,6 +96,8 @@ func NewGraphQL(
 	resolver.RegisterConfigurationVersionLoader(loaderCollection)
 	resolver.RegisterStateVersionLoader(loaderCollection)
 	resolver.RegisterRunLoader(loaderCollection)
+	resolver.RegisterRunGateByPolicyCheckLoader(loaderCollection)
+	resolver.RegisterRunGateLoader(loaderCollection)
 	resolver.RegisterJobLoader(loaderCollection)
 	resolver.RegisterTeamLoader(loaderCollection)
 	resolver.RegisterTerraformProviderLoader(loaderCollection)
@@ -115,6 +118,9 @@ func NewGraphQL(
 	resolver.RegisterJobLogStreamLoader(loaderCollection)
 	resolver.RegisterRunStateVersionLoader(loaderCollection)
 	resolver.RegisterFederatedRegistryLoader(loaderCollection)
+	resolver.RegisterPolicyLoader(loaderCollection)
+	resolver.RegisterPackageLoader(loaderCollection)
+	resolver.RegisterPackageVersionLoader(loaderCollection)
 
 	schema := graphql.MustParseSchema(schemaStr, resolver.NewRootResolver(), graphql.UseFieldResolvers(),
 		graphql.Tracer(&otel.Tracer{

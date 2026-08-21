@@ -9,6 +9,7 @@ import WorkspaceForm, { FormData } from './WorkspaceForm';
 import { NewWorkspaceMutation } from './__generated__/NewWorkspaceMutation.graphql';
 import { GetConnections } from '../groups/WorkspaceList';
 import { sanitizeLabels } from './labels/labelErrorHandling';
+import { PageLayoutProvider } from '../layout/PageLayoutContext';
 
 function NewWorkspace(){
     const navigate = useNavigate();
@@ -83,7 +84,7 @@ function NewWorkspace(){
     };
 
     return(
-        <Box maxWidth={1200} margin="auto" padding={2}>
+        <PageLayoutProvider>
             <NamespaceBreadcrumbs
                 namespacePath={parentGroupPath}
                 childRoutes={[{
@@ -109,7 +110,7 @@ function NewWorkspace(){
                 </Button>
                 <Button color="inherit" onClick={()=>(navigate(parentGroupPath ? `../groups/${parentGroupPath}` : '..'))}>Cancel</Button>
             </Box>
-        </Box>
+        </PageLayoutProvider>
     )
 
 }

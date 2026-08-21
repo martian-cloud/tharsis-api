@@ -28,6 +28,7 @@ function RegistryMenu() {
             >
                 <MenuItem component={Link} to="/module-registry" onClick={onMenuClose}>Modules</MenuItem>
                 <MenuItem component={Link} to="/provider-registry" onClick={onMenuClose}>Providers</MenuItem>
+                <MenuItem component={Link} to="/package-registry" onClick={onMenuClose}>Packages</MenuItem>
             </Menu>
         </Box>
     );

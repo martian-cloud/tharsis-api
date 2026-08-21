@@ -1,14 +1,12 @@
+import MiddleDot from '@/common/MiddleDot';
 import {
     Avatar,
-    Box,
-    Link,
+    Box, alpha, Chip, Link,
     ListItem,
-    ListItemIcon,
     ListItemSecondaryAction,
     ListItemText,
     Stack,
-    Tooltip,
-    Typography
+    Tooltip, useTheme
 } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';
@@ -30,23 +28,20 @@ interface Props {
 }
 
 function HomeRunListItem({ fragmentRef, last }: Props) {
+    const theme = useTheme();
 
     const data = useFragment(graphql`
         fragment HomeRunListItemFragment_run on Run {
             id
             createdBy
+            isDestroy
             metadata {
                 createdAt
-            }
-            plan {
-                status
-            }
-            apply {
-                status
             }
             workspace {
                 fullPath
             }
+            ...RunStageIconsFragment_run
         }
     `, fragmentRef);
 
@@ -81,22 +76,23 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
         <ListItem
             divider={!last}
         >
-            <ListItemIcon sx={{ minWidth: 60 }}>
-                <RunStageIcons planStatus={data.plan.status} applyStatus={data.apply?.status} runPath={runPath} />
-            </ListItemIcon>
             <ListItemText
                 primary={
                     <Stack>
-                        <Link
-                            to={runPath}
-                            component={LinkRouter}
-                            underline="hover"
-                            fontWeight={500}
-                            variant="body2"
-                            color="textPrimary"
-                        >
-                            {`${data.id.substring(0, 8)}...`}
-                        </Link>
+                        <Box display="flex" alignItems="center">
+                            <Link
+                                to={runPath}
+                                component={LinkRouter}
+                                underline="hover"
+                                fontWeight={500}
+                                variant="body2"
+                                color="textPrimary"
+                            >
+                                {`${data.id.substring(0, 8)}`}
+                            </Link>
+                            <MiddleDot />
+                            <Timestamp variant="body2" sx={{ color: alpha(theme.palette.text.primary, 0.5) }} timestamp={data.metadata.createdAt} />
+                        </Box>
                         <Tooltip title={data.workspace.fullPath}>
                             <Link
                                 sx={{ mb: 0.5, wordWrap: 'break-word' }}
@@ -108,11 +104,14 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
                                 {formattedWorkspacePath}
                             </Link>
                         </Tooltip>
-                        <Typography variant="body2" color="textSecondary">
-                            created <Timestamp variant="inherit" color="inherit" timestamp={data.metadata.createdAt} />
-                        </Typography>
+                        <Box mt={0.5}>
+                            <RunStageIcons fragmentRef={data} />
+                        </Box>
                     </Stack>}
             />
+            {data.isDestroy && (
+                <Chip size="small" label="Destroy" sx={{ position: 'absolute', top: 12, right: 16, color: 'runStatus.destroy' }} />
+            )}
             <ListItemSecondaryAction>
                 <Tooltip title={data.createdBy}>
                     <Box>

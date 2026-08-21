@@ -5,7 +5,6 @@ package namespacemembership
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
@@ -134,29 +133,7 @@ func (s *service) GetNamespaceMembershipsForNamespace(ctx context.Context, names
 		return nil, err
 	}
 
-	namespaceMemberships := []models.NamespaceMembership{}
-
-	seen := map[string]bool{}
-	for _, m := range result.NamespaceMemberships {
-		var keyAndCategory string
-		// Exactly one of these should take effect.
-		switch {
-		case m.UserID != nil:
-			keyAndCategory = fmt.Sprintf("user::%s", *m.UserID)
-		case m.ServiceAccountID != nil:
-			keyAndCategory = fmt.Sprintf("service-account::%s", *m.ServiceAccountID)
-		case m.TeamID != nil:
-			keyAndCategory = fmt.Sprintf("team::%s", *m.TeamID)
-		}
-
-		if _, ok := seen[keyAndCategory]; !ok {
-			namespaceMemberships = append(namespaceMemberships, m)
-
-			seen[keyAndCategory] = true
-		}
-	}
-
-	return namespaceMemberships, nil
+	return result.NamespaceMemberships, nil
 }
 
 func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,

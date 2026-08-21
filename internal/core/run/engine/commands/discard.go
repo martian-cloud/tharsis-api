@@ -72,8 +72,17 @@ func (c *DiscardRun) Execute(ctx context.Context, input *types.ExecuteInput) err
 		return err
 	}
 
-	if run.Status != models.RunPlanned {
-		return errors.New("run can only be discarded when it is in the planned state", errors.WithErrorCode(errors.EConflict))
+	// A run can be discarded when it is parked at planned, or when it is blocked awaiting a policy
+	// override at either the pre-plan or post-plan stage — all are states where the run is waiting on
+	// a human decision and discarding is the way to abandon it. Setting the run to discarded fires the
+	// state machine's handleRunTerminated listener, which skips every node that never started (the
+	// unstarted plan/apply and any not-yet-run stage) and cancels the gate the run was blocked at —
+	// its stage and the checks under it — so nothing is left reporting a decision the discard just
+	// abandoned. An undiscard revives the run by re-running that gate.
+	if run.Status != models.RunPlanned &&
+		run.Status != models.RunPrePlanAwaitingDecision &&
+		run.Status != models.RunPostPlanAwaitingDecision {
+		return errors.New("run can only be discarded when it is in the planned state or awaiting a policy override", errors.WithErrorCode(errors.EConflict))
 	}
 
 	changes, err := statemachine.SetRunStatus(run, models.RunDiscarded)

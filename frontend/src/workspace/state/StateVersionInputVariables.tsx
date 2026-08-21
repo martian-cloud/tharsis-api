@@ -1,14 +1,14 @@
+import NoResults from '@/common/NoResults';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { IconButton, Menu, MenuItem } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import React, { useMemo, useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { ResponsiveTable } from '../../common/ResponsiveTable';
 import SearchInput from '../../common/SearchInput';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { IconButton, Menu, MenuItem } from '@mui/material';
 import StateVersionInputVariableListItem from './StateVersionInputVariableListItem';
 import { StateVersionInputVariablesFragment_variables$key } from './__generated__/StateVersionInputVariablesFragment_variables.graphql';
 
@@ -112,13 +112,9 @@ function StateVersionInputVariables(props: Props) {
             {(filteredVariables.length === 0 && search !== '') && <Typography sx={{ padding: 2, marginTop: 4 }} align="center" color="textSecondary">
                 No variables matching search <strong>{search}</strong>
             </Typography>}
-            {(filteredVariables.length === 0 && search === '') && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                    <Typography color="textSecondary" align="center">
-                        This workspace does not have any input variables
-                    </Typography>
-                </Box>
-            </Paper>}
+            {(filteredVariables.length === 0 && search === '') && <NoResults sx={{ mt: 4 }}>
+                This workspace does not have any input variables
+            </NoResults>}
             {filteredVariables.length > 0 && <Box sx={{ mt: 2 }}>
                 <ResponsiveTable
                     ariaLabel="input variables"

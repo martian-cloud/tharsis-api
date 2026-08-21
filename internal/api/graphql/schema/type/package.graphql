@@ -1,0 +1,81 @@
+enum PackageKind {
+  OPA_POLICY
+}
+
+enum PackageVisibility {
+  PRIVATE
+  ROOT_GROUP
+  GLOBAL
+}
+
+enum PackageSort {
+  NAME_ASC
+  NAME_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+  GROUP_LEVEL_ASC
+  GROUP_LEVEL_DESC
+}
+
+type PackageConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [PackageEdge]
+}
+
+type PackageEdge {
+  cursor: String!
+  node: Package
+}
+
+type PackageMutationPayload {
+  clientMutationId: String
+  package: Package
+  problems: [Problem!]!
+}
+
+type Package implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  createdBy: String!
+  name: String!
+  description: String!
+  kind: PackageKind!
+  visibility: PackageVisibility!
+  allowMutableVersions: Boolean!
+  group: Group!
+  groupPath: String!
+  latestVersion: PackageVersion
+  versions(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+    sort: PackageVersionSort
+  ): PackageVersionConnection!
+}
+
+input CreatePackageInput {
+  clientMutationId: String
+  groupId: String!
+  name: String!
+  description: String
+  kind: PackageKind!
+  visibility: PackageVisibility!
+  allowMutableVersions: Boolean
+}
+
+input UpdatePackageInput {
+  clientMutationId: String
+  id: String!
+  description: String
+  visibility: PackageVisibility
+  allowMutableVersions: Boolean
+}
+
+input DeletePackageInput {
+  clientMutationId: String
+  id: String!
+  force: Boolean
+}

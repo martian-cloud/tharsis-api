@@ -30,7 +30,10 @@ const RESOURCE_TYPES = {
     VCS_PROVIDER: 'VCS Provider',
     MODULE: 'Module',
     RUNNER: 'Runner agent',
-    FEDERATED_REGISTRY: 'Federated Registry'
+    FEDERATED_REGISTRY: 'Federated Registry',
+    PACKAGE: 'Package',
+    PACKAGE_VERSION: 'Package version',
+    POLICY: 'Policy'
 } as any;
 
 const MEMBER_TYPES = {

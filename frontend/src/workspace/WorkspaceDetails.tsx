@@ -1,5 +1,6 @@
 import { CircularProgress } from '@mui/material';
 import Box from '@mui/material/Box';
+import { PageLayoutProvider } from '../layout/PageLayoutContext';
 import graphql from 'babel-plugin-relay/macro';
 import { Suspense, useMemo } from 'react';
 import { useFragment, useSubscription } from 'react-relay/hooks';
@@ -11,6 +12,7 @@ import Variables from '../namespace/variables/Variables';
 import ProviderMirrors from '../namespace/providermirror/ProviderMirrors';
 import WorkspaceSettings from './settings/WorkspaceSettings';
 import AssignedManagedIdentityList from './managedidentity/AssignedManagedIdentityList';
+import AssignedPolicyList from './AssignedPolicyList';
 import ConfigurationVersionDetails from './runs/ConfigurationVersionDetails';
 import { GetConnections } from './runs/WorkspaceRunList';
 import Runs from './runs/Runs';
@@ -29,6 +31,7 @@ const runSubscription = graphql`subscription WorkspaceDetailsRunSubscription($in
       ...RunListItemFragment_run
       ...RunDetailsSidebarFragment_details
       ...RunDetailsPlanStageFragment_plan
+      ...RunDetailsRunTaskStageFragment_taskStage
       ...RunDetailsApplyStageFragment_apply
     }
   }
@@ -60,6 +63,7 @@ function WorkspaceDetails(props: Props) {
       description
       fullPath
       ...WorkspaceDetailsIndexFragment_workspace
+      ...AssignedPolicyListFragment_workspace
       ...AssignedManagedIdentityListFragment_assignedManagedIdentities
       ...RunsFragment_runs
       ...ConfigurationVersionDetailsFragment_workspace
@@ -145,7 +149,7 @@ function WorkspaceDetails(props: Props) {
         >
           <CircularProgress />
         </Box>}>
-          <Box maxWidth={1200} margin="auto" padding={2}>
+          <PageLayoutProvider>
             <Routes>
               <Route path={`${workspacePath}/*`} element={<WorkspaceDetailsIndex fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/activity/*`} element={<NamespaceActivity fragmentRef={data} />} />
@@ -153,12 +157,13 @@ function WorkspaceDetails(props: Props) {
               <Route path={`${workspacePath}/-/configuration_versions/:id/*`} element={<ConfigurationVersionDetails fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/state_versions/*`} element={<StateVersions fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/managed_identities/*`} element={<AssignedManagedIdentityList fragmentRef={data} />} />
+              <Route path={`${workspacePath}/-/policies/*`} element={<AssignedPolicyList fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/variables/*`} element={<Variables fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/members/*`} element={<NamespaceMemberships fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/provider_mirror/*`} element={<ProviderMirrors fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/settings/*`} element={<WorkspaceSettings fragmentRef={data} />} />
             </Routes>
-          </Box>
+          </PageLayoutProvider>
         </Suspense>
       </Box>
     </Box>

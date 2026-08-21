@@ -37,10 +37,9 @@ var (
 	ViewRunPermission                       = registerPermission(types.RunModelType, ViewAction, true)
 	CreateRunPermission                     = registerPermission(types.RunModelType, CreateAction, true)
 	ViewJobPermission                       = registerPermission(types.JobModelType, ViewAction, true)
-	ClaimJobPermission                      = registerPermission(types.JobModelType, ClaimAction, false)    // Specifically for claiming jobs.
-	UpdateJobPermission                     = registerPermission(types.JobModelType, UpdateAction, false)   // Write job perm.
-	UpdatePlanPermission                    = registerPermission(types.PlanModelType, UpdateAction, false)  // Write plan perm.
-	UpdateApplyPermission                   = registerPermission(types.ApplyModelType, UpdateAction, false) // Write apply perm.
+	ClaimJobPermission                      = registerPermission(types.JobModelType, ClaimAction, false)  // Specifically for claiming jobs.
+	UpdateJobPermission                     = registerPermission(types.JobModelType, UpdateAction, false) // Write job perm.
+	UpdateRunPermission                     = registerPermission(types.RunModelType, UpdateAction, false) // Write run perm (job-only): authorizes a run's job to update its plan, apply, or policy check node.
 	ViewRunnerPermission                    = registerPermission(types.RunnerModelType, ViewAction, true)
 	CreateRunnerPermission                  = registerPermission(types.RunnerModelType, CreateAction, true)
 	UpdateRunnerPermission                  = registerPermission(types.RunnerModelType, UpdateAction, true)
@@ -89,6 +88,14 @@ var (
 	UpdateFederatedRegistryPermission       = registerPermission(types.FederatedRegistryModelType, UpdateAction, true)
 	DeleteFederatedRegistryPermission       = registerPermission(types.FederatedRegistryModelType, DeleteAction, true)
 	IssueFederatedRegistryTokenPermission   = registerPermission(types.FederatedRegistryModelType, IssueTokenAction, false)
+	ViewPackagePermission                   = registerPermission(types.PackageModelType, ViewAction, true)
+	CreatePackagePermission                 = registerPermission(types.PackageModelType, CreateAction, true)
+	UpdatePackagePermission                 = registerPermission(types.PackageModelType, UpdateAction, true)
+	DeletePackagePermission                 = registerPermission(types.PackageModelType, DeleteAction, true)
+	ViewPolicyPermission                    = registerPermission(types.PolicyModelType, ViewAction, true)
+	CreatePolicyPermission                  = registerPermission(types.PolicyModelType, CreateAction, true)
+	UpdatePolicyPermission                  = registerPermission(types.PolicyModelType, UpdateAction, true)
+	DeletePolicyPermission                  = registerPermission(types.PolicyModelType, DeleteAction, true)
 )
 
 // Action is an enum representing a CRUD action.

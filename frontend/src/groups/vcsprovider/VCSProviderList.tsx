@@ -129,6 +129,8 @@ function VCSProviderList(props: Props) {
         }
     };
 
+    const edges = data?.vcsProviders?.edges ?? [];
+
     return (
         <Box>
             <NamespaceBreadcrumbs
@@ -137,7 +139,7 @@ function VCSProviderList(props: Props) {
                     { title: "vcs providers", path: "vcs_providers" }
                 ]}
             />
-            {(search !== '' || data?.vcsProviders.edges?.length !== 0) && <Box>
+            {(search !== '' || edges.length !== 0) && <Box>
                 <Box>
                     <Box sx={{
                         display: 'flex',
@@ -176,7 +178,7 @@ function VCSProviderList(props: Props) {
                         </Typography>
                     </Box>
                 </Paper>
-                {(data?.vcsProviders.edges?.length === 0) && search !== '' && <Typography
+                {(edges.length === 0) && search !== '' && <Typography
                     sx={{
                         padding: 4,
                         borderBottom: `1px solid ${theme.palette.divider}`,
@@ -191,13 +193,13 @@ function VCSProviderList(props: Props) {
                     No VCS providers matching search <strong>{search}</strong>
                 </Typography>}
                 <InfiniteScroll
-                    dataLength={data?.vcsProviders.edges?.length ?? 0}
+                    dataLength={edges.length}
                     next={() => loadNext(20)}
                     hasMore={hasNext}
                     loader={<ListSkeleton rowCount={3} />}
                 >
                     <List sx={isRefreshing ? { opacity: 0.5 } : null} disablePadding>
-                        {data?.vcsProviders.edges?.map((edge: any) => <VCSProviderListItem
+                        {edges.map((edge: any) => <VCSProviderListItem
                             key={edge.node.id}
                             fragmentRef={edge.node}
                             inherited={group.fullPath !== edge.node.groupPath}
@@ -205,7 +207,7 @@ function VCSProviderList(props: Props) {
                     </List>
                 </InfiniteScroll>
             </Box>}
-            {search === '' && data?.vcsProviders.edges?.length === 0 && <Box sx={{ mt: 4 }} display="flex" justifyContent="center">
+            {search === '' && edges.length === 0 && <Box sx={{ mt: 4 }} display="flex" justifyContent="center">
                 <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
                     <Typography variant="h6">Get started with VCS providers</Typography>
                     <Typography color="textSecondary" align="center" sx={{ mb: 2 }}>{DESCRIPTION}</Typography>

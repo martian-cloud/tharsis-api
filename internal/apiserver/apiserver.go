@@ -25,6 +25,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	packageregistrycore "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/packageregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/admission"
@@ -61,6 +62,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/packageregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/policy"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/resourcelimit"
@@ -203,6 +206,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	artifactStore := coreworkspace.NewArtifactStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 	providerRegistryStore := providerregistry.NewRegistryStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 	moduleRegistryStore := moduleregistry.NewRegistryStore(trackedObjectStore, dbClient.ObjectStoreRefs)
+	packageStore := packageregistrycore.NewPackageStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 	cliStore := cli.NewCLIStore(pluginCatalog.ObjectStore)
 	mirrorStore := providermirror.NewProviderMirrorStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 
@@ -235,6 +239,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 			runeventhandlers.NewWorkspaceLockManager(logger, dbClient),
 			runeventhandlers.NewAssessmentRunHandler(logger, dbClient),
 			runeventhandlers.NewStalePlannedRunDiscarder(logger, dbClient),
+			runeventhandlers.NewRunGateManager(logger, dbClient),
 		},
 		[]runtypes.RunChangeHandler{
 			runeventhandlers.NewFailedRunEmailHandler(logger, dbClient, taskManager, emailClient, notificationManager),
@@ -246,8 +251,8 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	runWorkItemConsumer := engine.NewWorkItemConsumer(logger, dbClient, eventManager, runCmdProcessor, runCmdFactory, maintenanceMonitor)
 	runWorkItemConsumer.Start(ctx)
 
-	// Start the run reconciler: a safety net that re-drives runs stranded in
-	// queuing/queuing_apply when their work item was never enqueued or processed.
+	// Start the run reconciler: a safety net that re-drives runs stranded awaiting workspace
+	// admission when their work item was never enqueued or processed.
 	engine.NewReconciler(logger, dbClient, maintenanceMonitor).Start(ctx)
 
 	objectstoregc.NewJanitor(logger, dbClient, pluginCatalog.ObjectStore, maintenanceMonitor).Start(ctx)
@@ -269,6 +274,8 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		teamService                = team.NewService(logger, dbClient)
 		providerRegistryService    = providerregistry.NewService(logger, dbClient, limits, providerRegistryStore)
 		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, taskManager)
+		packageRegistryService     = packageregistry.NewService(logger, dbClient, limits, packageStore)
+		policySetService           = policy.NewService(logger, dbClient, limits)
 		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits)
 		scimService                = scim.NewService(logger, dbClient, signingKeyManager, cfg.OauthProviders)
 		federatedRegistryService   = federatedregistry.NewService(logger, dbClient, limits, signingKeyManager)
@@ -315,6 +322,8 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		MaintenanceModeService:           maintenanceModeService,
 		ManagedIdentityService:           managedIdentityService,
 		NamespaceMembershipService:       namespaceMembershipService,
+		PackageService:                   packageRegistryService,
+		PolicyService:                    policySetService,
 		ResourceLimitService:             resourceLimitService,
 		RoleService:                      roleService,
 		RunnerService:                    runnerService,

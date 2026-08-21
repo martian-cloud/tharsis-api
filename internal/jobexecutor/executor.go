@@ -240,6 +240,11 @@ func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, 
 		if err != nil {
 			return nil, err
 		}
+	case pb.JobType_opa.String():
+		handler, err = NewPolicyEvalHandler(j.cancellableCtx, ws, run, job, j.logger, jobLogger, j.client)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("invalid job type %s", job.Type)
 	}

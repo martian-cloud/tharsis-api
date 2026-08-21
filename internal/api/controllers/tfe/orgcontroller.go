@@ -87,6 +87,9 @@ func (c *orgController) GetRunQueue(w http.ResponseWriter, r *http.Request) {
 
 	var tfeRuns []*Run
 	for _, run := range result.Runs {
+		// The TFE run queue means "queued for execution capacity", which is exactly what the *_queued
+		// statuses say: the run holds the workspace slot and its job exists. A run still waiting for the
+		// slot has its own *_queuing status, so this filter excludes it without a second condition.
 		if run.Status == models.RunPlanQueued || run.Status == models.RunApplyQueued {
 			tfeRuns = append(tfeRuns, TharsisRunToRun(run))
 		}

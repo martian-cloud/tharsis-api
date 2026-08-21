@@ -30,25 +30,29 @@ func TestStateMachine_GetStatusChangesOrdering(t *testing.T) {
 	run.SetApplyNode(NewApplyNode("apply", models.ApplyCreated, false))
 	sm := New(run)
 
-	// Drive the plan through its lifecycle to queued; the pending and queued
-	// transitions both advance the run, and collected changes are run-first then plan.
+	// Drive the plan through its lifecycle to queued. Each half of the plan's wait — ready but unadmitted
+	// (pending), then admitted with its job queued (queued) — projects onto a run status of its own, so
+	// both record a run change. That second run change, plan_queuing -> plan_queued, is the moment the run
+	// won the workspace slot; it is why the two waits are separate statuses rather than one status plus a
+	// flag, which would make admission invisible in the run's history. Collected changes are run-first,
+	// then plan.
 	require.NoError(t, sm.GetRunNode().Plan().SetStatus(models.PlanPending))
 	require.NoError(t, sm.GetRunNode().Plan().SetStatus(models.PlanQueued))
 
 	changes := sm.GetStatusChanges()
-	// run: pending -> queuing -> plan_queued; plan: created -> pending -> queued.
+	// run: pending -> plan_queuing -> plan_queued; plan: created -> pending -> queued.
 	require.Len(t, changes, 4)
 
 	runChange1, ok := changes[0].(RunStatusChange)
 	require.True(t, ok)
 	assert.Equal(t, models.RunPending, runChange1.OldStatus)
-	assert.Equal(t, models.RunQueuing, runChange1.NewStatus)
+	assert.Equal(t, models.RunPlanQueuing, runChange1.NewStatus)
 	assert.Equal(t, RunNodeType, runChange1.GetNodeType())
 
 	runChange2, ok := changes[1].(RunStatusChange)
 	require.True(t, ok)
-	assert.Equal(t, models.RunQueuing, runChange2.OldStatus)
-	assert.Equal(t, models.RunPlanQueued, runChange2.NewStatus)
+	assert.Equal(t, models.RunPlanQueuing, runChange2.OldStatus)
+	assert.Equal(t, models.RunPlanQueued, runChange2.NewStatus, "admission is recorded as its own run transition")
 
 	planChange1, ok := changes[2].(PlanStatusChange)
 	require.True(t, ok)

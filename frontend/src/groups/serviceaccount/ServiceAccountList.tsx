@@ -130,6 +130,8 @@ function ServiceAccountList({ fragmentRef }: Props) {
         }
     };
 
+    const edges = data?.serviceAccounts?.edges ?? [];
+
     return (
         <Box>
             <NamespaceBreadcrumbs
@@ -138,7 +140,7 @@ function ServiceAccountList({ fragmentRef }: Props) {
                     { title: "service accounts", path: 'service_accounts' }
                 ]}
             />
-            {(search !== '' || data?.serviceAccounts.edges?.length !== 0) && <Box>
+            {(search !== '' || edges.length !== 0) && <Box>
                 <Box>
                     <Box sx={{
                         display: 'flex',
@@ -177,7 +179,7 @@ function ServiceAccountList({ fragmentRef }: Props) {
                         </Typography>
                     </Box>
                 </Paper>
-                {(data?.serviceAccounts.edges?.length === 0) && search !== '' && <Typography
+                {(edges.length === 0) && search !== '' && <Typography
                     sx={{
                         padding: 4,
                         borderBottom: `1px solid ${theme.palette.divider}`,
@@ -192,13 +194,13 @@ function ServiceAccountList({ fragmentRef }: Props) {
                     No service accounts matching search <strong>{search}</strong>
                 </Typography>}
                 <InfiniteScroll
-                    dataLength={data?.serviceAccounts.edges?.length ?? 0}
+                    dataLength={edges.length}
                     next={() => loadNext(20)}
                     hasMore={hasNext}
                     loader={<ListSkeleton rowCount={3} />}
                 >
                     <List sx={isRefreshing ? { opacity: 0.5 } : null} disablePadding>
-                        {data?.serviceAccounts.edges?.map((edge: any) => <ServiceAccountListItem
+                        {edges.map((edge: any) => <ServiceAccountListItem
                             key={edge.node.id}
                             fragmentRef={edge.node}
                             inherited={edge.node.groupPath !== group.fullPath}
@@ -206,7 +208,7 @@ function ServiceAccountList({ fragmentRef }: Props) {
                     </List>
                 </InfiniteScroll>
             </Box>}
-            {search === '' && data?.serviceAccounts.edges?.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+            {search === '' && edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
                 <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
                     <Typography variant="h6">Get started with service accounts</Typography>
                     <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>

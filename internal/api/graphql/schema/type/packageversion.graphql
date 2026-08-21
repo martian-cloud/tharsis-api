@@ -1,0 +1,55 @@
+enum PackageVersionStatus {
+  PENDING
+  UPLOAD_IN_PROGRESS
+  UPLOADED
+  ERRORED
+}
+
+enum PackageVersionSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type PackageVersionConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [PackageVersionEdge]
+}
+
+type PackageVersionEdge {
+  cursor: String!
+  node: PackageVersion
+}
+
+type PackageVersionMutationPayload {
+  clientMutationId: String
+  packageVersion: PackageVersion
+  problems: [Problem!]!
+}
+
+type PackageVersion implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  package: Package!
+  version: String!
+  status: PackageVersionStatus!
+  error: String
+  shaSum: String!
+  size: Int!
+  latest: Boolean!
+  createdBy: String!
+}
+
+input CreatePackageVersionInput {
+  clientMutationId: String
+  packageId: String!
+  version: String!
+  shaSum: String!
+}
+
+input DeletePackageVersionInput {
+  clientMutationId: String
+  id: String!
+}

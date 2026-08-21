@@ -128,6 +128,8 @@ function GPGKeyList(props: Props) {
     };
 
 
+    const edges = data?.gpgKeys?.edges ?? [];
+
     return (
         <Box>
             <NamespaceBreadcrumbs
@@ -136,7 +138,7 @@ function GPGKeyList(props: Props) {
                     { title: "keys", path: 'keys' }
                 ]}
             />
-            {data?.gpgKeys.edges?.length !== 0 && <Box>
+            {edges.length !== 0 && <Box>
                 <Box marginBottom={2}>
                     <Box sx={{
                         display: 'flex',
@@ -169,13 +171,13 @@ function GPGKeyList(props: Props) {
                     </Box>
                 </Paper>
                 <InfiniteScroll
-                    dataLength={data?.gpgKeys.edges?.length ?? 0}
+                    dataLength={edges.length}
                     next={() => loadNext(20)}
                     hasMore={hasNext}
                     loader={<ListSkeleton rowCount={3} />}
                 >
                     <List disablePadding>
-                        {data?.gpgKeys.edges?.map((edge: any) => <GPGKeyListItem
+                        {edges.map((edge: any) => <GPGKeyListItem
                             key={edge.node.id}
                             fragmentRef={edge.node}
                             onDelete={() => setGPGKeyToDelete(edge.node)}
@@ -184,7 +186,7 @@ function GPGKeyList(props: Props) {
                     </List>
                 </InfiniteScroll>
             </Box>}
-            {data?.gpgKeys.edges?.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+            {edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
                 <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
                     <Typography variant="h6">This group does not have any GPG Keys</Typography>
                     <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>

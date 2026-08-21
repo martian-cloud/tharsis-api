@@ -140,6 +140,12 @@ func (c *CancelRun) Execute(ctx context.Context, input *types.ExecuteInput) erro
 // the normal job-status sync.
 func cancelActivePhase(ctx context.Context, dbClient *db.Client, run *models.Run, force bool) ([]statemachine.NodeStatusChange, error) {
 	switch {
+	case anyNonFinalCheckAtStage(run, models.RunTaskStageNamePrePlan):
+		// One or more pre-plan policy checks are the run's active phase (the plan has not yet
+		// started — it is still in created). This branch must come before the plan branch so a
+		// cancel during pre_plan_running cancels the checks' jobs rather than the not-yet-started
+		// plan (which would orphan a check's job).
+		return cancelStageChecks(ctx, dbClient, run, models.RunTaskStageNamePrePlan, force)
 	case !run.Plan.Status.IsFinalStatus():
 		cancelNode, err := cancelLatestJob(ctx, dbClient, run.Plan.LatestJobID, force)
 		if err != nil {
@@ -153,6 +159,12 @@ func cancelActivePhase(ctx context.Context, dbClient *db.Client, run *models.Run
 			return nil, errors.Wrap(err, "failed to cancel run plan")
 		}
 		return changes, nil
+	case anyNonFinalCheckAtStage(run, models.RunTaskStageNamePostPlan):
+		// One or more post-plan policy checks are the run's active phase (plan finished,
+		// apply not yet started). This branch must come before the apply branch so a cancel
+		// during post_plan_running does not wrongly cancel the not-yet-started apply and orphan
+		// a check's job.
+		return cancelStageChecks(ctx, dbClient, run, models.RunTaskStageNamePostPlan, force)
 	case run.Apply != nil && !run.Apply.Status.IsFinalStatus():
 		cancelNode, err := cancelLatestJob(ctx, dbClient, run.Apply.LatestJobID, force)
 		if err != nil {
@@ -228,6 +240,50 @@ func cancelLatestJob(ctx context.Context, dbClient *db.Client, jobID *string, fo
 		}
 	}
 	return cancelNode, nil
+}
+
+// anyNonFinalCheckAtStage reports whether the run has at least one policy check at the given
+// stage that has not yet reached a final status. Pre-plan checks are always final before the
+// plan starts and post-plan checks only become active after the plan finishes, so a non-final
+// check at a stage reliably identifies that the run is in that stage's policy phase.
+func anyNonFinalCheckAtStage(run *models.Run, stage models.RunTaskStageName) bool {
+	for _, check := range run.AllPolicyChecks() {
+		if check.StageName == stage && !check.Status.IsFinalStatus() {
+			return true
+		}
+	}
+	return false
+}
+
+// cancelStageChecks cancels the jobs of every non-final policy check at the given stage during a
+// run cancellation. Once at least one check's work has actually stopped (job gone/final, or a
+// force cancel), it sets the run to canceled, which fires the state machine's handleRunTerminated
+// listener to cancel all remaining non-final check nodes (including any still gracefully
+// canceling). If every running job is only being gracefully canceled it waits for the runner to
+// confirm before transitioning the run.
+func cancelStageChecks(ctx context.Context, dbClient *db.Client, run *models.Run, stage models.RunTaskStageName, force bool) ([]statemachine.NodeStatusChange, error) {
+	anyImmediate := false
+	for _, check := range run.AllPolicyChecks() {
+		if check.StageName != stage || check.Status.IsFinalStatus() {
+			continue
+		}
+		cancelNode, err := cancelLatestJob(ctx, dbClient, check.LatestJobID, force)
+		if err != nil {
+			return nil, err
+		}
+		if cancelNode {
+			anyImmediate = true
+		}
+	}
+	if !anyImmediate {
+		// All running jobs are being gracefully canceled; wait for runner confirmation.
+		return nil, nil
+	}
+	changes, err := statemachine.SetRunStatus(run, models.RunCanceled)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to cancel run")
+	}
+	return changes, nil
 }
 
 // completeJobLogStream marks the job's log stream as completed, if one exists.

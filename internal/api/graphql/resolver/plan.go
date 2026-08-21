@@ -36,6 +36,28 @@ func jobConnectionForRunNode(ctx context.Context, run *models.Run, jobType model
 	return NewJobConnectionResolver(ctx, &input)
 }
 
+// jobConnectionForPolicyCheck resolves the connection of jobs associated with a policy check node
+// (its OPA evaluation jobs, including retries), matched by the policy check ID (index-backed by
+// index_jobs_on_policy_check_id). The workspaceID gates the query on workspace view permission.
+func jobConnectionForPolicyCheck(ctx context.Context, workspaceID, policyCheckID string, args *ConnectionQueryArgs) (*JobConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := job.GetJobsInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		WorkspaceID:       &workspaceID,
+		PolicyCheckID:     &policyCheckID,
+	}
+
+	if args.Sort != nil {
+		sort := db.JobSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewJobConnectionResolver(ctx, &input)
+}
+
 /* Plan Query Resolvers */
 
 // PlanChangesResolver resolves plan changes
@@ -44,14 +66,112 @@ type PlanChangesResolver struct {
 }
 
 // Resources resolver
-func (r *PlanChangesResolver) Resources() []*plan.ResourceDiff {
-	return r.planDiff.Resources
+func (r *PlanChangesResolver) Resources() []*PlanResourceChangeResolver {
+	resolvers := make([]*PlanResourceChangeResolver, len(r.planDiff.Resources))
+	for i, d := range r.planDiff.Resources {
+		resolvers[i] = &PlanResourceChangeResolver{diff: d}
+	}
+	return resolvers
 }
 
 // Outputs resolver
-func (r *PlanChangesResolver) Outputs() []*plan.OutputDiff {
-	return r.planDiff.Outputs
+func (r *PlanChangesResolver) Outputs() []*PlanOutputChangeResolver {
+	resolvers := make([]*PlanOutputChangeResolver, len(r.planDiff.Outputs))
+	for i, d := range r.planDiff.Outputs {
+		resolvers[i] = &PlanOutputChangeResolver{diff: d}
+	}
+	return resolvers
 }
+
+// PlanResourceChangeResolver wraps plan.ResourceDiff
+type PlanResourceChangeResolver struct {
+	diff *plan.ResourceDiff
+}
+
+// Action resolver
+func (r *PlanResourceChangeResolver) Action() string { return string(r.diff.Action) }
+
+// Address resolver
+func (r *PlanResourceChangeResolver) Address() string { return r.diff.Address }
+
+// Mode resolver
+func (r *PlanResourceChangeResolver) Mode() string { return r.diff.Mode }
+
+// ProviderName resolver
+func (r *PlanResourceChangeResolver) ProviderName() string { return r.diff.ProviderName }
+
+// ResourceType resolver
+func (r *PlanResourceChangeResolver) ResourceType() string { return r.diff.ResourceType }
+
+// ResourceName resolver
+func (r *PlanResourceChangeResolver) ResourceName() string { return r.diff.ResourceName }
+
+// ModuleAddress resolver
+func (r *PlanResourceChangeResolver) ModuleAddress() string { return r.diff.ModuleAddress }
+
+// UnifiedDiff resolver
+func (r *PlanResourceChangeResolver) UnifiedDiff() string { return r.diff.UnifiedDiff }
+
+// OriginalSource resolver
+func (r *PlanResourceChangeResolver) OriginalSource() string { return r.diff.OriginalSource }
+
+// Imported resolver
+func (r *PlanResourceChangeResolver) Imported() bool { return r.diff.Imported }
+
+// Drifted resolver
+func (r *PlanResourceChangeResolver) Drifted() bool { return r.diff.Drifted }
+
+// Moved resolver
+func (r *PlanResourceChangeResolver) Moved() bool { return r.diff.Moved }
+
+// Warnings resolver
+func (r *PlanResourceChangeResolver) Warnings() []*PlanChangeWarningResolver {
+	resolvers := make([]*PlanChangeWarningResolver, len(r.diff.Warnings))
+	for i, w := range r.diff.Warnings {
+		resolvers[i] = &PlanChangeWarningResolver{warning: w}
+	}
+	return resolvers
+}
+
+// PlanOutputChangeResolver wraps plan.OutputDiff to apply enum casing for GraphQL output.
+type PlanOutputChangeResolver struct {
+	diff *plan.OutputDiff
+}
+
+// Action resolver
+func (r *PlanOutputChangeResolver) Action() string { return string(r.diff.Action) }
+
+// OutputName resolver
+func (r *PlanOutputChangeResolver) OutputName() string { return r.diff.OutputName }
+
+// UnifiedDiff resolver
+func (r *PlanOutputChangeResolver) UnifiedDiff() string { return r.diff.UnifiedDiff }
+
+// OriginalSource resolver
+func (r *PlanOutputChangeResolver) OriginalSource() string { return r.diff.OriginalSource }
+
+// Warnings resolver
+func (r *PlanOutputChangeResolver) Warnings() []*PlanChangeWarningResolver {
+	resolvers := make([]*PlanChangeWarningResolver, len(r.diff.Warnings))
+	for i, w := range r.diff.Warnings {
+		resolvers[i] = &PlanChangeWarningResolver{warning: w}
+	}
+	return resolvers
+}
+
+// PlanChangeWarningResolver wraps plan.ChangeWarning to apply enum casing for GraphQL output.
+type PlanChangeWarningResolver struct {
+	warning *plan.ChangeWarning
+}
+
+// ChangeType resolver
+func (r *PlanChangeWarningResolver) ChangeType() string { return r.warning.ChangeType }
+
+// Line resolver
+func (r *PlanChangeWarningResolver) Line() int32 { return r.warning.Line }
+
+// Message resolver
+func (r *PlanChangeWarningResolver) Message() string { return r.warning.Message }
 
 // PlanResolver resolves a plan resource
 type PlanResolver struct {
@@ -143,19 +263,19 @@ func (r *PlanResolver) Changes(ctx context.Context) (*PlanChangesResolver, error
 }
 
 // CheckResults resolver
-func (r *PlanResolver) CheckResults(ctx context.Context) ([]*CheckResultResolver, error) {
+func (r *PlanResolver) CheckResults(ctx context.Context) ([]*TerraformCheckResultResolver, error) {
 	results, err := getServiceCatalog(ctx).RunService.GetPlanCheckResults(ctx, r.run.Plan.ID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
-			return []*CheckResultResolver{}, nil
+			return []*TerraformCheckResultResolver{}, nil
 		}
 		return nil, err
 	}
 
-	resolvers := []*CheckResultResolver{}
+	resolvers := []*TerraformCheckResultResolver{}
 	for _, result := range results {
 		resultCopy := result
-		resolvers = append(resolvers, &CheckResultResolver{checkResult: &resultCopy})
+		resolvers = append(resolvers, &TerraformCheckResultResolver{checkResult: &resultCopy})
 	}
 
 	return resolvers, nil

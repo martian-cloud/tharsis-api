@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5ddf2d0e1686e86237b959389f27030b>>
+ * @generated SignedSource<<754fc47b101366547604f6d4303f7e5a>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -62,14 +62,15 @@ v3 = {
   "name": "id",
   "storageKey": null
 },
-v4 = [
-  {
-    "alias": null,
-    "args": null,
-    "kind": "ScalarField",
-    "name": "status",
-    "storageKey": null
-  },
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "status",
+  "storageKey": null
+},
+v5 = [
+  (v4/*: any*/),
   (v3/*: any*/)
 ];
 return {
@@ -135,6 +136,13 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "kind": "ScalarField",
+                    "name": "isDestroy",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "concreteType": "ResourceMetadata",
                     "kind": "LinkedField",
                     "name": "metadata",
@@ -148,26 +156,6 @@ return {
                         "storageKey": null
                       }
                     ],
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "concreteType": "Plan",
-                    "kind": "LinkedField",
-                    "name": "plan",
-                    "plural": false,
-                    "selections": (v4/*: any*/),
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "concreteType": "Apply",
-                    "kind": "LinkedField",
-                    "name": "apply",
-                    "plural": false,
-                    "selections": (v4/*: any*/),
                     "storageKey": null
                   },
                   {
@@ -187,6 +175,53 @@ return {
                       },
                       (v3/*: any*/)
                     ],
+                    "storageKey": null
+                  },
+                  (v4/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "hasAdvisoryFailures",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "Plan",
+                    "kind": "LinkedField",
+                    "name": "plan",
+                    "plural": false,
+                    "selections": (v5/*: any*/),
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "RunTaskStage",
+                    "kind": "LinkedField",
+                    "name": "taskStages",
+                    "plural": true,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "stageName",
+                        "storageKey": null
+                      },
+                      (v4/*: any*/)
+                    ],
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "Apply",
+                    "kind": "LinkedField",
+                    "name": "apply",
+                    "plural": false,
+                    "selections": (v5/*: any*/),
                     "storageKey": null
                   },
                   {
@@ -252,12 +287,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "2c9b08089cd692c260e94f6d58ff4bb5",
+    "cacheID": "9d818b3cea69c488971ef37f40a90cb4",
     "id": null,
     "metadata": {},
     "name": "HomeRunListQuery",
     "operationKind": "query",
-    "text": "query HomeRunListQuery(\n  $first: Int!\n  $after: String\n) {\n  ...HomeRunListFragment_runs\n}\n\nfragment HomeRunListFragment_runs on Query {\n  runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: false) {\n    edges {\n      node {\n        id\n        ...HomeRunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  metadata {\n    createdAt\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
+    "text": "query HomeRunListQuery(\n  $first: Int!\n  $after: String\n) {\n  ...HomeRunListFragment_runs\n}\n\nfragment HomeRunListFragment_runs on Query {\n  runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: false) {\n    edges {\n      node {\n        id\n        ...HomeRunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  isDestroy\n  metadata {\n    createdAt\n  }\n  workspace {\n    fullPath\n    id\n  }\n  ...RunStageIconsFragment_run\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
   }
 };
 })();

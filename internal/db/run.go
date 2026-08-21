@@ -26,6 +26,7 @@ type Runs interface {
 	GetRunByID(ctx context.Context, id string) (*models.Run, error)
 	GetRunByTRN(ctx context.Context, trnValue string) (*models.Run, error)
 	GetRunByNodeID(ctx context.Context, nodeID string) (*models.Run, error)
+	GetWorkspaceIDForRun(ctx context.Context, id string) (string, error)
 	CreateRun(ctx context.Context, run *models.Run) (*models.Run, error)
 	UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string) (*models.Run, error)
 	GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, error)
@@ -111,6 +112,10 @@ type runNode struct {
 	ErrorMessage         *string
 	TriggeredBy          *string
 	Comment              *string
+	CheckType            *string
+	StageName            *string
+	Policies             []byte
+	MessagesSummary      []byte
 	CacheObjectStoreKey  *string
 	JSONObjectStoreKey   *string
 	DiffObjectStoreKey   *string
@@ -128,65 +133,75 @@ type runNode struct {
 	RunID                string
 	Type                 string
 	Status               string
-	SortOrder            int
+}
+
+// runNodeInstance represents a single run_nodes row of a given kind on a run. A kind may yield
+// zero, one, or many instances (a run has at most one plan/apply, but any number of policy
+// checks), which is how the single run_nodes table backs both singleton and collection nodes.
+type runNodeInstance struct {
+	// id is the instance's current node id ("" if not yet assigned).
+	id string
+	// ensureID assigns a new id if the instance has none and returns the id (create path).
+	ensureID func() string
+	// contentColumns returns all writable content columns for this instance (status,
+	// latest_job_id, error_message and the type-specific columns). Structural columns (id,
+	// run_id, type, sort_order) are added by the caller.
+	contentColumns func() goqu.Record
+	// sortOrder is the row's persisted position, written once on create (it never changes). It
+	// places a run's task stages and their checks in execution order so hydration can return them
+	// correctly ordered via a single ORDER BY, without an in-memory re-sort.
+	sortOrder int
 }
 
 // runNodeKind centralizes everything the db layer needs to persist and load one run-node
 // type. Adding a node type means adding one entry here; the create/update/read/hydrate paths
-// all dispatch through this table instead of per-type branches. The closures operate on the
-// concrete run.Plan / run.Apply fields directly (no models.RunNode interface, no type
-// assertions), so a misconfigured kind is a compile error rather than a runtime panic.
+// all dispatch through this table instead of per-type branches. instances enumerates the run's
+// nodes of this kind (0, 1, or many) operating on the concrete run.Plan / run.Apply /
+// run.TaskStages (and the checks they own) fields directly (no models.RunNode interface, no type assertions);
+// load builds a model node from a scanned wide row and assigns/appends it onto the run.
 type runNodeKind struct {
 	typeName  string
-	sortOrder int
-	// present reports whether the run has a node of this kind.
-	present func(run *models.Run) bool
-	// id returns this kind's node id on the run.
-	id func(run *models.Run) string
-	// ensureID assigns a new id if the node has none and returns the id (create path).
-	ensureID func(run *models.Run) string
-	// contentColumns returns all writable content columns for this run's node of this kind (status,
-	// latest_job_id, error_message and the type-specific columns). Structural columns (id, run_id,
-	// type, sort_order, created_at, updated_at) are added by the caller.
-	contentColumns func(run *models.Run) goqu.Record
-	// load builds the model node from a scanned wide row and assigns it onto the run.
-	load func(run *models.Run, n *runNode)
+	instances func(run *models.Run) []runNodeInstance
+	load      func(run *models.Run, n *runNode) error
 }
 
 var runNodeKinds = []runNodeKind{
 	{
-		typeName:  "plan",
-		sortOrder: 0,
-		present:   func(_ *models.Run) bool { return true },
-		id:        func(run *models.Run) string { return run.Plan.ID },
-		ensureID: func(run *models.Run) string {
-			if run.Plan.ID == "" {
-				run.Plan.ID = newResourceID()
-			}
-			return run.Plan.ID
-		},
-		contentColumns: func(run *models.Run) goqu.Record {
+		typeName: "plan",
+		instances: func(run *models.Run) []runNodeInstance {
 			p := &run.Plan
-			return goqu.Record{
-				"status":                      string(p.Status),
-				"latest_job_id":               p.LatestJobID,
-				"error_message":               p.ErrorMessage,
-				"plan_has_changes":            p.HasChanges,
-				"plan_diff_size":              p.DiffSize,
-				"plan_resource_additions":     p.Summary.ResourceAdditions,
-				"plan_resource_changes":       p.Summary.ResourceChanges,
-				"plan_resource_destructions":  p.Summary.ResourceDestructions,
-				"plan_resource_imports":       p.Summary.ResourceImports,
-				"plan_resource_drift":         p.Summary.ResourceDrift,
-				"plan_output_additions":       p.Summary.OutputAdditions,
-				"plan_output_changes":         p.Summary.OutputChanges,
-				"plan_output_destructions":    p.Summary.OutputDestructions,
-				"plan_cache_object_store_key": p.CacheObjectStoreKey,
-				"plan_json_object_store_key":  p.JSONObjectStoreKey,
-				"plan_diff_object_store_key":  p.DiffObjectStoreKey,
-			}
+			return []runNodeInstance{{
+				id: p.ID,
+				ensureID: func() string {
+					if p.ID == "" {
+						p.ID = newResourceID()
+					}
+					return p.ID
+				},
+				contentColumns: func() goqu.Record {
+					return goqu.Record{
+						"status":                      string(p.Status),
+						"latest_job_id":               p.LatestJobID,
+						"error_message":               p.ErrorMessage,
+						"plan_has_changes":            p.HasChanges,
+						"plan_diff_size":              p.DiffSize,
+						"plan_resource_additions":     p.Summary.ResourceAdditions,
+						"plan_resource_changes":       p.Summary.ResourceChanges,
+						"plan_resource_destructions":  p.Summary.ResourceDestructions,
+						"plan_resource_imports":       p.Summary.ResourceImports,
+						"plan_resource_drift":         p.Summary.ResourceDrift,
+						"plan_output_additions":       p.Summary.OutputAdditions,
+						"plan_output_changes":         p.Summary.OutputChanges,
+						"plan_output_destructions":    p.Summary.OutputDestructions,
+						"plan_cache_object_store_key": p.CacheObjectStoreKey,
+						"plan_json_object_store_key":  p.JSONObjectStoreKey,
+						"plan_diff_object_store_key":  p.DiffObjectStoreKey,
+					}
+				},
+				sortOrder: sortOrderPlan,
+			}}
 		},
-		load: func(run *models.Run, n *runNode) {
+		load: func(run *models.Run, n *runNode) error {
 			plan := models.Plan{
 				ID:           n.ID,
 				Status:       models.PlanStatus(n.Status),
@@ -213,30 +228,37 @@ var runNodeKinds = []runNodeKind{
 			plan.JSONObjectStoreKey = n.JSONObjectStoreKey
 			plan.DiffObjectStoreKey = n.DiffObjectStoreKey
 			run.Plan = plan
+			return nil
 		},
 	},
 	{
-		typeName:  "apply",
-		sortOrder: 1,
-		present:   func(run *models.Run) bool { return run.Apply != nil },
-		id:        func(run *models.Run) string { return run.Apply.ID },
-		ensureID: func(run *models.Run) string {
-			if run.Apply.ID == "" {
-				run.Apply.ID = newResourceID()
+		typeName: "apply",
+		instances: func(run *models.Run) []runNodeInstance {
+			if run.Apply == nil {
+				return nil
 			}
-			return run.Apply.ID
-		},
-		contentColumns: func(run *models.Run) goqu.Record {
 			a := run.Apply
-			return goqu.Record{
-				"status":             string(a.Status),
-				"latest_job_id":      a.LatestJobID,
-				"error_message":      a.ErrorMessage,
-				"apply_triggered_by": nullableString(a.TriggeredBy),
-				"apply_comment":      nullableString(a.Comment),
-			}
+			return []runNodeInstance{{
+				id: a.ID,
+				ensureID: func() string {
+					if a.ID == "" {
+						a.ID = newResourceID()
+					}
+					return a.ID
+				},
+				contentColumns: func() goqu.Record {
+					return goqu.Record{
+						"status":             string(a.Status),
+						"latest_job_id":      a.LatestJobID,
+						"error_message":      a.ErrorMessage,
+						"apply_triggered_by": nullableString(a.TriggeredBy),
+						"apply_comment":      nullableString(a.Comment),
+					}
+				},
+				sortOrder: sortOrderApply,
+			}}
 		},
-		load: func(run *models.Run, n *runNode) {
+		load: func(run *models.Run, n *runNode) error {
 			apply := &models.Apply{
 				ID:           n.ID,
 				Status:       models.ApplyStatus(n.Status),
@@ -250,9 +272,131 @@ var runNodeKinds = []runNodeKind{
 				apply.Comment = *n.Comment
 			}
 			run.Apply = apply
+			return nil
+		},
+	},
+	{
+		typeName: "task_stage",
+		instances: func(run *models.Run) []runNodeInstance {
+			out := make([]runNodeInstance, 0, len(run.TaskStages))
+			for _, stage := range run.TaskStages {
+				stage := stage
+				out = append(out, runNodeInstance{
+					id: stage.ID,
+					ensureID: func() string {
+						if stage.ID == "" {
+							stage.ID = newResourceID()
+						}
+						return stage.ID
+					},
+					contentColumns: func() goqu.Record {
+						return goqu.Record{
+							"status":     string(stage.Status),
+							"stage_name": string(stage.StageName),
+						}
+					},
+					sortOrder: sortOrderTaskStage,
+				})
+			}
+			return out
+		},
+		load: func(run *models.Run, n *runNode) error {
+			var stageName models.RunTaskStageName
+			if n.StageName != nil {
+				stageName = models.RunTaskStageName(*n.StageName)
+			}
+			run.TaskStages = append(run.TaskStages, &models.RunTaskStage{
+				StageName: stageName,
+				ID:        n.ID,
+				Status:    models.RunTaskStageStatus(n.Status),
+			})
+			return nil
+		},
+	},
+	{
+		typeName: "policy_check",
+		instances: func(run *models.Run) []runNodeInstance {
+			checks := run.AllPolicyChecks()
+			out := make([]runNodeInstance, 0, len(checks))
+			for _, check := range checks {
+				check := check
+				out = append(out, runNodeInstance{
+					id: check.ID,
+					ensureID: func() string {
+						if check.ID == "" {
+							check.ID = newResourceID()
+						}
+						return check.ID
+					},
+					contentColumns: func() goqu.Record {
+						// PolicyCheckPolicy fields are all strings/enums and the summary is
+						// strings and a bool, so marshal cannot fail; a nil result (empty
+						// slice) is written as SQL NULL.
+						var policies []byte
+						if len(check.Policies) > 0 {
+							policies, _ = json.Marshal(check.Policies)
+						}
+						var messagesSummary []byte
+						if check.MessagesSummary != nil {
+							messagesSummary, _ = json.Marshal(check.MessagesSummary)
+						}
+						return goqu.Record{
+							"status":                        string(check.Status),
+							"latest_job_id":                 check.LatestJobID,
+							"policy_check_type":             string(check.CheckType),
+							"stage_name":                    string(check.StageName),
+							"policy_check_policies":         policies,
+							"policy_check_messages_summary": messagesSummary,
+						}
+					},
+					sortOrder: sortOrderPolicyCheck,
+				})
+			}
+			return out
+		},
+		load: func(run *models.Run, n *runNode) error {
+			check := &models.PolicyCheck{
+				ID:          n.ID,
+				Status:      models.PolicyCheckStatus(n.Status),
+				LatestJobID: n.LatestJobID,
+			}
+			if n.CheckType != nil {
+				check.CheckType = models.PolicyKind(*n.CheckType)
+			}
+			if n.StageName != nil {
+				check.StageName = models.RunTaskStageName(*n.StageName)
+			}
+			if len(n.Policies) > 0 {
+				_ = json.Unmarshal(n.Policies, &check.Policies)
+			}
+			if len(n.MessagesSummary) > 0 {
+				_ = json.Unmarshal(n.MessagesSummary, &check.MessagesSummary)
+			}
+			// The load order guarantees every task_stage row hydrates before any policy_check row (see
+			// sortOrder constants), so the owning stage should already be present. A missing stage means
+			// an inconsistent run graph (e.g. a check row whose stage row was lost); fail loudly rather
+			// than dereferencing nil and panicking while reading the run.
+			stage := run.TaskStageByStageName(check.StageName)
+			if stage == nil {
+				return errors.New("policy check %s references task stage %q that is not present on run %s",
+					check.ID, check.StageName, run.Metadata.ID)
+			}
+			stage.PolicyChecks = append(stage.PolicyChecks, check)
+			return nil
 		},
 	},
 }
+
+// run_nodes.sort_order positions. All task_stage rows share sortOrderTaskStage — the only
+// invariant is that every task_stage row hydrates before every policy_check row (so that
+// ensureTaskStage can find the stage when a check's load path runs). Plan and apply have no
+// children, so their positions relative to task stages don't matter for correctness.
+const (
+	sortOrderTaskStage   = 0
+	sortOrderPlan        = 1
+	sortOrderApply       = 2
+	sortOrderPolicyCheck = 3
+)
 
 var runNodeKindByType = func() map[string]runNodeKind {
 	m := make(map[string]runNodeKind, len(runNodeKinds))
@@ -283,6 +427,7 @@ var runFieldList = append(
 	"refresh_only",
 	"is_assessment_run",
 	"variables_object_store_key",
+	"has_advisory_failures",
 )
 
 // runNodeColumns is the single ordered source of truth for run_nodes columns, shared by the SELECT
@@ -296,7 +441,6 @@ var runNodeColumns = []struct {
 	{"run_id", func(n *runNode) any { return &n.RunID }},
 	{"type", func(n *runNode) any { return &n.Type }},
 	{"status", func(n *runNode) any { return &n.Status }},
-	{"sort_order", func(n *runNode) any { return &n.SortOrder }},
 	{"latest_job_id", func(n *runNode) any { return &n.LatestJobID }},
 	{"error_message", func(n *runNode) any { return &n.ErrorMessage }},
 	{"plan_has_changes", func(n *runNode) any { return &n.HasChanges }},
@@ -311,6 +455,10 @@ var runNodeColumns = []struct {
 	{"plan_output_destructions", func(n *runNode) any { return &n.OutputDestructions }},
 	{"apply_triggered_by", func(n *runNode) any { return &n.TriggeredBy }},
 	{"apply_comment", func(n *runNode) any { return &n.Comment }},
+	{"policy_check_type", func(n *runNode) any { return &n.CheckType }},
+	{"stage_name", func(n *runNode) any { return &n.StageName }},
+	{"policy_check_policies", func(n *runNode) any { return &n.Policies }},
+	{"policy_check_messages_summary", func(n *runNode) any { return &n.MessagesSummary }},
 	{"plan_cache_object_store_key", func(n *runNode) any { return &n.CacheObjectStoreKey }},
 	{"plan_json_object_store_key", func(n *runNode) any { return &n.JSONObjectStoreKey }},
 	{"plan_diff_object_store_key", func(n *runNode) any { return &n.DiffObjectStoreKey }},
@@ -332,6 +480,37 @@ func (r *runs) GetRunByID(ctx context.Context, id string) (*models.Run, error) {
 	defer span.End()
 
 	return r.getRun(ctx, goqu.Ex{"runs.id": id})
+}
+
+// GetWorkspaceIDForRun returns only the workspace_id for a run. It is faster than GetRunByID
+// because it selects a single column and skips the namespaces join and run_nodes hydration.
+func (r *runs) GetWorkspaceIDForRun(ctx context.Context, id string) (string, error) {
+	ctx, span := tracer.Start(ctx, "db.GetWorkspaceIDForRun")
+	defer span.End()
+
+	sql, args, err := toSQLWithTag("run.GetWorkspaceIDForRun", dialect.From("runs").
+		Prepared(true).
+		Select(goqu.C("workspace_id")).
+		Where(goqu.Ex{"id": id}))
+	if err != nil {
+		return "", errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	var workspaceID string
+	if err = r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...).Scan(&workspaceID); err != nil {
+		if err == pgx.ErrNoRows {
+			return "", errors.New("run with id %s not found", id,
+				errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+		}
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return "", ErrInvalidID
+			}
+		}
+		return "", errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+
+	return workspaceID, nil
 }
 
 func (r *runs) GetRunByTRN(ctx context.Context, trnValue string) (*models.Run, error) {
@@ -573,6 +752,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 					"refresh_only":               run.RefreshOnly,
 					"is_assessment_run":          run.IsAssessmentRun,
 					"variables_object_store_key": run.VariablesObjectStoreKey,
+					"has_advisory_failures":      run.HasAdvisoryFailures,
 				}).Returning("*"),
 		).Select(r.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})))
@@ -652,6 +832,7 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string
 						"force_cancel_available_at":  run.ForceCancelAvailableAt,
 						"force_canceled":             run.ForceCanceled,
 						"variables_object_store_key": run.VariablesObjectStoreKey,
+						"has_advisory_failures":      run.HasAdvisoryFailures,
 					},
 				).Where(goqu.Ex{"id": run.Metadata.ID, "version": run.Metadata.Version}).
 				Returning("*"),
@@ -740,11 +921,14 @@ func (r *runs) hydrateRunNodes(ctx context.Context, con connection, runs []*mode
 		idList = append(idList, run.Metadata.ID)
 	}
 
+	// Order by sort_order so each run's task stages load in canonical execution order and every
+	// task_stage row is seen before every policy_check row (id breaks ties deterministically, e.g.
+	// among sibling checks that share the policy-check slot).
 	query, args, err := dialect.From(goqu.T("run_nodes")).
 		Prepared(true).
 		Select(r.getRunNodeSelectFields()...).
 		Where(goqu.I("run_id").In(idList)).
-		Order(goqu.I("sort_order").Asc()).
+		Order(goqu.I("run_nodes.sort_order").Asc(), goqu.I("run_nodes.id").Asc()).
 		ToSQL()
 	if err != nil {
 		return err
@@ -780,7 +964,9 @@ func (r *runs) hydrateRunNodes(ctx context.Context, con connection, runs []*mode
 			return errors.New("failed to find run %s while hydrating run nodes", node.RunID)
 		}
 
-		kind.load(run, node)
+		if err := kind.load(run, node); err != nil {
+			return err
+		}
 	}
 
 	if err := rows.Err(); err != nil {
@@ -794,26 +980,25 @@ func (r *runs) hydrateRunNodes(ctx context.Context, con connection, runs []*mode
 // whose ID is in nodeIDs are updated.
 func (r *runs) updateRunNodes(ctx context.Context, con connection, run *models.Run, nodeIDs nodeIDFilterSet) error {
 	for _, kind := range runNodeKinds {
-		if !kind.present(run) {
-			continue
-		}
-		id := kind.id(run)
-		if !nodeIDs.includes(id) {
-			continue
-		}
+		for _, inst := range kind.instances(run) {
+			id := inst.id
+			if id == "" || !nodeIDs.includes(id) {
+				continue
+			}
 
-		record := kind.contentColumns(run)
+			record := inst.contentColumns()
 
-		query, args, err := dialect.Update("run_nodes").
-			Prepared(true).
-			Set(record).
-			Where(goqu.Ex{"id": id}).
-			ToSQL()
-		if err != nil {
-			return err
-		}
-		if _, err := con.Exec(ctx, query, args...); err != nil {
-			return err
+			query, args, err := dialect.Update("run_nodes").
+				Prepared(true).
+				Set(record).
+				Where(goqu.Ex{"id": id}).
+				ToSQL()
+			if err != nil {
+				return err
+			}
+			if _, err := con.Exec(ctx, query, args...); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -828,18 +1013,16 @@ func (r *runs) createRunNodes(ctx context.Context, con connection, run *models.R
 	var records []goqu.Record
 
 	for _, kind := range runNodeKinds {
-		if !kind.present(run) {
-			continue
+		for _, inst := range kind.instances(run) {
+			record := goqu.Record{
+				"id":         inst.ensureID(),
+				"run_id":     run.Metadata.ID,
+				"type":       kind.typeName,
+				"sort_order": inst.sortOrder,
+			}
+			maps.Copy(record, inst.contentColumns())
+			records = append(records, record)
 		}
-
-		record := goqu.Record{
-			"id":         kind.ensureID(run),
-			"run_id":     run.Metadata.ID,
-			"type":       kind.typeName,
-			"sort_order": kind.sortOrder,
-		}
-		maps.Copy(record, kind.contentColumns(run))
-		records = append(records, record)
 	}
 
 	allColumns := map[string]struct{}{}
@@ -934,6 +1117,7 @@ func scanRun(row scanner) (*models.Run, error) {
 		&run.RefreshOnly,
 		&run.IsAssessmentRun,
 		&variablesObjectStoreKey,
+		&run.HasAdvisoryFailures,
 		&workspacePath,
 	)
 	if err != nil {

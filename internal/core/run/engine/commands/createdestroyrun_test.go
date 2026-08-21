@@ -91,5 +91,5 @@ func TestCreateDestroyRun_Execute(t *testing.T) {
 	require.NoError(t, cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore}))
 	require.NotNil(t, cmd.Created)
 	assert.Same(t, input, gotInput)
-	assert.Equal(t, models.RunQueuing, cmd.Created.Status)
+	assert.Equal(t, models.RunPlanQueuing, cmd.Created.Status)
 }

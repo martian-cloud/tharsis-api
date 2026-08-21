@@ -614,3 +614,299 @@ func TestRuns_GetRunByNodeID(t *testing.T) {
 		})
 	}
 }
+
+func TestRunGates_GetRunGates_Eligibility(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	approver, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "gate-eligibility-approver",
+		Email:    "gate-eligibility-approver@example.com",
+	})
+	require.NoError(t, err)
+
+	other, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "gate-eligibility-other",
+		Email:    "gate-eligibility-other@example.com",
+	})
+	require.NoError(t, err)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-gate-eligibility",
+		FullPath:  "test-group-gate-eligibility",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-gate-eligibility",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	createRun := func() *models.Run {
+		run, rErr := testClient.client.Runs.CreateRun(ctx, &models.Run{
+			WorkspaceID: workspace.Metadata.ID,
+			Status:      models.RunPending,
+			CreatedBy:   "db-integration-tests",
+		})
+		require.NoError(t, rErr)
+		return run
+	}
+
+	// A gate is one-to-one with the policy-check node it governs, enforced by the unique index
+	// index_run_gates_on_policy_check_id, so every gate here needs its own check ID. The rule name is
+	// unique per gate in this test, so it doubles as the check identity.
+	createGate := func(runID, ruleName string, status models.RunGateStatus, allowedUserIDs []string) *models.RunGate {
+		subjects := make([]*models.RunGateAllowedSubject, len(allowedUserIDs))
+		for i, id := range allowedUserIDs {
+			subjects[i] = &models.RunGateAllowedSubject{ID: id, Type: models.RunGateSubjectUser}
+		}
+		gate, gErr := testClient.client.RunGates.CreateRunGate(ctx, &models.RunGate{
+			RunID:         runID,
+			WorkspaceID:   workspace.Metadata.ID,
+			PolicyCheckID: "check-" + ruleName,
+			Type:          models.RunGateTypeOPAPolicy,
+			Status:        status,
+			ApprovalRules: []*models.RunGateApprovalRule{
+				{Name: ruleName, RequiredApprovals: 1, AllowedSubjects: subjects},
+			},
+		})
+		require.NoError(t, gErr)
+		return gate
+	}
+
+	createTeamGate := func(runID, ruleName string, allowedTeamIDs []string) *models.RunGate {
+		subjects := make([]*models.RunGateAllowedSubject, len(allowedTeamIDs))
+		for i, id := range allowedTeamIDs {
+			subjects[i] = &models.RunGateAllowedSubject{ID: id, Type: models.RunGateSubjectTeam}
+		}
+		gate, gErr := testClient.client.RunGates.CreateRunGate(ctx, &models.RunGate{
+			RunID:         runID,
+			WorkspaceID:   workspace.Metadata.ID,
+			PolicyCheckID: "check-" + ruleName,
+			Type:          models.RunGateTypeOPAPolicy,
+			Status:        models.RunGatePending,
+			ApprovalRules: []*models.RunGateApprovalRule{
+				{Name: ruleName, RequiredApprovals: 1, AllowedSubjects: subjects},
+			},
+		})
+		require.NoError(t, gErr)
+		return gate
+	}
+
+	// gateA: pending and the approver is eligible -> included.
+	runA := createRun()
+	gateA := createGate(runA.Metadata.ID, "policy-a1", models.RunGatePending, []string{approver.Metadata.ID})
+
+	// gateB: pending but already decided by the approver -> excluded.
+	runB := createRun()
+	decidedGate := createGate(runB.Metadata.ID, "policy-b1", models.RunGatePending, []string{approver.Metadata.ID})
+	_, err = testClient.client.RunGateApprovals.CreateRunGateApproval(ctx, &models.RunGateApproval{
+		RunGateID:    decidedGate.Metadata.ID,
+		UserID:       &approver.Metadata.ID,
+		CreatedBy:    approver.Email,
+		Decision:     models.RunGateDecisionReject,
+		CoveredRules: []string{"policy-b1"},
+	})
+	require.NoError(t, err)
+
+	// gateC: allowed only to a different user -> the approver is not eligible, excluded.
+	runC := createRun()
+	createGate(runC.Metadata.ID, "policy-c1", models.RunGatePending, []string{other.Metadata.ID})
+
+	// gateD: the approver is eligible but the gate is already approved (not pending) -> excluded
+	// by the status filter.
+	runD := createRun()
+	createGate(runD.Metadata.ID, "policy-d1", models.RunGateApproved, []string{approver.Metadata.ID})
+
+	// Two teams: the approver belongs to memberTeam only. Team eligibility is resolved by the db
+	// layer from the approver's team_members rows (a subquery), not passed in the filter.
+	memberTeam, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{Name: "gate-eligibility-member-team"})
+	require.NoError(t, err)
+	nonMemberTeam, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{Name: "gate-eligibility-nonmember-team"})
+	require.NoError(t, err)
+	_, err = testClient.client.TeamMembers.AddUserToTeam(ctx, &models.TeamMember{
+		UserID: approver.Metadata.ID,
+		TeamID: memberTeam.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	// gateE: pending and allowed via a team the approver belongs to -> included via the subquery.
+	runE := createRun()
+	gateE := createTeamGate(runE.Metadata.ID, "policy-e1", []string{memberTeam.Metadata.ID})
+
+	// gateF: pending but allowed only via a team the approver is not in -> excluded.
+	runF := createRun()
+	createTeamGate(runF.Metadata.ID, "policy-f1", []string{nonMemberTeam.Metadata.ID})
+
+	result, err := testClient.client.RunGates.GetRunGates(ctx, &GetRunGatesInput{
+		PaginationOptions: &pagination.Options{First: ptr.Int32(100)},
+		Filter: &RunGateFilter{
+			Statuses:    []models.RunGateStatus{models.RunGatePending},
+			Eligibility: &RunGateEligibilityFilter{UserID: &approver.Metadata.ID},
+		},
+	})
+	require.NoError(t, err)
+
+	ids := []string{}
+	for _, gate := range result.RunGates {
+		ids = append(ids, gate.Metadata.ID)
+	}
+	// gateA (direct user) and gateE (via the approver's team) are eligible; the rest are excluded.
+	assert.ElementsMatch(t, []string{gateA.Metadata.ID, gateE.Metadata.ID}, ids)
+}
+
+func TestRunGates_GetRunGates_RootNamespaceMembershipsFilter(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-gate-membership",
+		FullPath:  "test-group-gate-membership",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-gate-membership",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	gate, err := testClient.client.RunGates.CreateRunGate(ctx, &models.RunGate{
+		RunID:         run.Metadata.ID,
+		WorkspaceID:   workspace.Metadata.ID,
+		PolicyCheckID: "check-gate-membership",
+		Type:          models.RunGateTypeOPAPolicy,
+		Status:        models.RunGatePending,
+		ApprovalRules: []*models.RunGateApprovalRule{{Name: "policy-1", RequiredApprovals: 1}},
+	})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		memberships []models.MembershipNamespace
+		wantGate    bool
+	}{
+		{
+			name:        "membership at the gate's root group includes it",
+			memberships: []models.MembershipNamespace{{Path: "test-group-gate-membership"}},
+			wantGate:    true,
+		},
+		{
+			name:        "membership in an unrelated namespace excludes it",
+			memberships: []models.MembershipNamespace{{Path: "some-other-group"}},
+			wantGate:    false,
+		},
+		{
+			name:        "empty memberships match nothing",
+			memberships: []models.MembershipNamespace{},
+			wantGate:    false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, rErr := testClient.client.RunGates.GetRunGates(ctx, &GetRunGatesInput{
+				PaginationOptions: &pagination.Options{First: ptr.Int32(100)},
+				Filter: &RunGateFilter{
+					RootNamespaceMemberships: test.memberships,
+				},
+			})
+			require.NoError(t, rErr)
+
+			ids := []string{}
+			for _, g := range result.RunGates {
+				ids = append(ids, g.Metadata.ID)
+			}
+			if test.wantGate {
+				assert.Equal(t, []string{gate.Metadata.ID}, ids)
+			} else {
+				assert.Empty(t, ids)
+			}
+		})
+	}
+}
+
+func TestRuns_GetWorkspaceIDForRun(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-run-workspace-id",
+		Description: "test group for run workspace id",
+		FullPath:    "test-group-run-workspace-id",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-run-workspace-id",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	createdRun, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode errors.CodeType
+		name            string
+		id              string
+		expectWorkspace bool
+	}
+
+	testCases := []testCase{
+		{
+			name:            "get workspace id for run",
+			id:              createdRun.Metadata.ID,
+			expectWorkspace: true,
+		},
+		{
+			name:            "run does not exist",
+			id:              nonExistentID,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "get workspace id with invalid id will return an error",
+			id:              invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			workspaceID, err := testClient.client.Runs.GetWorkspaceIDForRun(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectWorkspace {
+				assert.Equal(t, workspace.Metadata.ID, workspaceID)
+			}
+		})
+	}
+}

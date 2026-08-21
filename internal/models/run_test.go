@@ -1,15 +1,21 @@
 package models
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunStatus_IsFinalStatus(t *testing.T) {
 	final := []RunStatus{RunApplied, RunPlannedAndFinished, RunErrored, RunCanceled, RunDiscarded}
-	nonFinal := []RunStatus{RunPending, RunQueuing, RunPlanQueued, RunPlanning, RunPlanned, RunQueuingApply, RunApplyQueued, RunApplying}
+	nonFinal := []RunStatus{
+		RunPending,
+		RunPrePlanQueuing, RunPlanQueuing, RunPlanQueued, RunPlanning, RunPlanned,
+		RunPreApplyQueuing, RunApplyQueuing, RunApplyQueued, RunApplying,
+	}
 
 	for _, s := range final {
 		assert.Truef(t, s.IsFinalStatus(), "%s should be final", s)
@@ -163,6 +169,39 @@ func TestRun_Copy_SlicesAreIndependent(t *testing.T) {
 	assert.False(t, orig.ShallowCompare(cp))
 }
 
+// TestPolicyCheck_MessagesSummary_CopyAndCompare covers the summary through the two paths the run
+// engine relies on: a copy must not share the message slice with its original (the engine diffs a
+// copy against the live run), and ShallowCompare must see a changed summary so the row is written.
+func TestPolicyCheck_MessagesSummary_CopyAndCompare(t *testing.T) {
+	orig := &PolicyCheck{
+		ID:              "check-1",
+		StageName:       RunTaskStageNamePostPlan,
+		CheckType:       PolicyKindOPA,
+		MessagesSummary: &PolicyCheckMessagesSummary{Messages: []string{"denied by rule X"}},
+	}
+
+	cp, ok := orig.Copy().(*PolicyCheck)
+	require.True(t, ok)
+	require.True(t, orig.ShallowCompare(cp), "a fresh copy should compare equal")
+
+	cp.MessagesSummary.Messages[0] = "denied by rule Y"
+	assert.Equal(t, []string{"denied by rule X"}, orig.MessagesSummary.Messages)
+	assert.False(t, orig.ShallowCompare(cp), "a changed message should be detected")
+
+	// Truncation is part of the comparison too: the flag alone changes what the UI renders.
+	truncated, ok := orig.Copy().(*PolicyCheck)
+	require.True(t, ok)
+	truncated.MessagesSummary.Truncated = true
+	assert.False(t, orig.ShallowCompare(truncated))
+
+	// A check that has never reported is distinct from one that reported nothing, so that the
+	// difference survives a round trip rather than both reading as "no messages".
+	empty, ok := orig.Copy().(*PolicyCheck)
+	require.True(t, ok)
+	empty.MessagesSummary = nil
+	assert.False(t, orig.ShallowCompare(empty))
+}
+
 func TestRun_HasChanges(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -186,5 +225,160 @@ func TestRun_HasChanges(t *testing.T) {
 			r := &Run{Plan: Plan{HasChanges: tt.planHasChanges}}
 			assert.Equal(t, tt.want, r.HasChanges())
 		})
+	}
+}
+
+// TestRun_ComputeHasAdvisoryFailures covers the rule behind the run's stored flag: only a *failed*
+// *advisory* policy counts, wherever on the run it sits, and the recompute is what lets the flag go back
+// to false once those failures are gone.
+func TestRun_ComputeHasAdvisoryFailures(t *testing.T) {
+	policy := func(level PolicyEnforcementLevel, status PolicyCheckPolicyStatus) *PolicyCheckPolicy {
+		return &PolicyCheckPolicy{ID: "policy-1", EnforcementLevel: level, Status: status}
+	}
+	// runWithStages wraps each group of policies in its own task stage, so a case can put failures on a
+	// stage other than the first.
+	runWithStages := func(stages ...[]*PolicyCheckPolicy) *Run {
+		r := &Run{Metadata: ResourceMetadata{ID: "run-1"}}
+		for i, policies := range stages {
+			r.TaskStages = append(r.TaskStages, &RunTaskStage{
+				ID:           "stage-" + strconv.Itoa(i),
+				PolicyChecks: []*PolicyCheck{{ID: "check-" + strconv.Itoa(i), Policies: policies}},
+			})
+		}
+		return r
+	}
+
+	tests := []struct {
+		name string
+		run  *Run
+		want bool
+	}{
+		{
+			name: "no policy checks at all",
+			run:  &Run{Metadata: ResourceMetadata{ID: "run-1"}},
+		},
+		{
+			name: "advisory policy failed",
+			run:  runWithStages([]*PolicyCheckPolicy{policy(PolicyEnforcementAdvisory, PolicyCheckPolicyFailed)}),
+			want: true,
+		},
+		{
+			name: "advisory policy passed",
+			run:  runWithStages([]*PolicyCheckPolicy{policy(PolicyEnforcementAdvisory, PolicyCheckPolicyPassed)}),
+		},
+		{
+			name: "advisory policy not evaluated yet",
+			run:  runWithStages([]*PolicyCheckPolicy{policy(PolicyEnforcementAdvisory, PolicyCheckPolicyPending)}),
+		},
+		{
+			// The distinction the flag exists for: a mandatory failure is already visible in the run's
+			// status, so it must not set this.
+			name: "soft-mandatory policy failed",
+			run:  runWithStages([]*PolicyCheckPolicy{policy(PolicyEnforcementSoftMandatory, PolicyCheckPolicyFailed)}),
+		},
+		{
+			name: "hard-mandatory policy failed",
+			run:  runWithStages([]*PolicyCheckPolicy{policy(PolicyEnforcementHardMandatory, PolicyCheckPolicyFailed)}),
+		},
+		{
+			// Every stage is walked, not just the first — a pre-plan check's findings still count once
+			// the run has moved on to post-plan.
+			name: "advisory failure on the second stage",
+			run: runWithStages(
+				[]*PolicyCheckPolicy{policy(PolicyEnforcementHardMandatory, PolicyCheckPolicyPassed)},
+				[]*PolicyCheckPolicy{policy(PolicyEnforcementAdvisory, PolicyCheckPolicyFailed)},
+			),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Seeded to the opposite of the expectation to prove the result comes from the checks and
+			// not from the stored flag. That the caller's assignment then clears a stale true is covered
+			// by the retry command's tests.
+			tt.run.HasAdvisoryFailures = !tt.want
+			assert.Equal(t, tt.want, tt.run.ComputeHasAdvisoryFailures())
+		})
+	}
+}
+
+// TestRun_HasAdvisoryFailures_CopyAndCompare verifies the flag is carried by Copy and noticed by
+// ShallowCompare — the comparison Diff uses to decide the run row needs writing, which is the only thing
+// that persists the field.
+func TestRun_HasAdvisoryFailures_CopyAndCompare(t *testing.T) {
+	orig := &Run{
+		Metadata:            ResourceMetadata{ID: "run-1"},
+		Plan:                Plan{ID: "plan-1"},
+		HasAdvisoryFailures: true,
+	}
+
+	cp := orig.Copy()
+	assert.True(t, cp.HasAdvisoryFailures)
+	require.True(t, orig.ShallowCompare(cp), "a fresh copy should compare equal")
+
+	cp.HasAdvisoryFailures = false
+	assert.False(t, orig.ShallowCompare(cp), "a changed flag should be detected")
+	assert.Equal(t, []string{orig.Metadata.ID}, orig.Diff(cp), "the change belongs to the run row")
+}
+
+// TestRun_NodeByPath verifies every kind of run node is reachable by the same run-relative path it
+// reports from GetPath — the paths the runNode query and the retryRunNode mutation address nodes by.
+// A path is checked against the node's own GetPath rather than a literal so the two cannot drift.
+func TestRun_NodeByPath(t *testing.T) {
+	check := &PolicyCheck{ID: "check-1", StageName: RunTaskStageNamePostPlan, CheckType: PolicyKindOPA}
+	stage := &RunTaskStage{ID: "stage-1", StageName: RunTaskStageNamePostPlan, PolicyChecks: []*PolicyCheck{check}}
+	run := &Run{
+		Metadata:   ResourceMetadata{ID: "run-1"},
+		Plan:       Plan{ID: "plan-1"},
+		Apply:      &Apply{ID: "apply-1"},
+		TaskStages: []*RunTaskStage{stage},
+	}
+
+	for _, node := range []RunNode{&run.Plan, run.Apply, stage, check} {
+		assert.Samef(t, node, run.NodeByPath(node.GetPath()), "NodeByPath(%q)", node.GetPath())
+	}
+
+	// A stage path and a policy check path share a prefix, so neither may resolve to the other.
+	assert.NotSame(t, stage, run.NodeByPath(check.GetPath()))
+
+	assert.Nil(t, run.NodeByPath("pre_plan"), "a stage the run does not have")
+	assert.Nil(t, run.NodeByPath("post_plan.sentinel"), "a check the stage does not have")
+	assert.Nil(t, run.NodeByPath(""))
+
+	// A speculative run has no apply node, and asking for it must not hand back a typed nil.
+	speculative := &Run{Metadata: ResourceMetadata{ID: "run-2"}, Plan: Plan{ID: "plan-2"}}
+	assert.Nil(t, speculative.NodeByPath(ApplyNodePath))
+}
+
+// TestRunStatus_IsQueuing verifies exactly the workspace-gated phases report as queuing — the condition
+// the admitter acts on, the work item consumer and reconciler filter on, the admission indexes are scoped
+// to, and the TFE controller collapses onto TFE's queuing / queuing_apply.
+//
+// It is driven off AllRunStatuses rather than a hand-written list of negatives, so a status added to the
+// enum has to be classified deliberately: a new gated phase must be added to QueuingRunStatuses (and to
+// both partial indexes in the add_policy_enforcement migration), and any other new status must not be.
+func TestRunStatus_IsQueuing(t *testing.T) {
+	queuing := map[RunStatus]struct{}{
+		RunPrePlanQueuing:  {},
+		RunPlanQueuing:     {},
+		RunPreApplyQueuing: {},
+		RunApplyQueuing:    {},
+	}
+
+	require.Len(t, QueuingRunStatuses, len(queuing), "QueuingRunStatuses and this test disagree on how many gated phases exist")
+	for _, status := range QueuingRunStatuses {
+		assert.Contains(t, queuing, status, "QueuingRunStatuses has unexpected status %q", status)
+	}
+
+	for _, status := range AllRunStatuses {
+		_, want := queuing[status]
+		assert.Equalf(t, want, status.IsQueuing(), "IsQueuing(%q)", status)
+	}
+
+	// The *_queued statuses are the other half of each gated node's wait: admitted, waiting for a runner.
+	// Reporting them as queuing would put an already-admitted run back into the admission sweeps.
+	for _, status := range []RunStatus{RunPlanQueued, RunApplyQueued} {
+		assert.Falsef(t, status.IsQueuing(), "%q holds the workspace slot, so it is not queuing", status)
 	}
 }

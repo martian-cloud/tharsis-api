@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/avast/retry-go"
@@ -104,6 +105,11 @@ type Client struct {
 	TerraformModules                 TerraformModules
 	TerraformModuleVersions          TerraformModuleVersions
 	TerraformModuleAttestations      TerraformModuleAttestations
+	Packages                         Packages
+	PackageVersions                  PackageVersions
+	Policies                         Policies
+	RunGates                         RunGates
+	RunGateApprovals                 RunGateApprovals
 	GPGKeys                          GPGKeys
 	SCIMTokens                       SCIMTokens
 	VCSProviders                     VCSProviders
@@ -227,6 +233,11 @@ func NewClient(
 	dbClient.TerraformModules = NewTerraformModules(dbClient)
 	dbClient.TerraformModuleVersions = NewTerraformModuleVersions(dbClient)
 	dbClient.TerraformModuleAttestations = NewTerraformModuleAttestations(dbClient)
+	dbClient.Packages = NewPackages(dbClient)
+	dbClient.PackageVersions = NewPackageVersions(dbClient)
+	dbClient.Policies = NewPolicies(dbClient)
+	dbClient.RunGates = NewRunGates(dbClient)
+	dbClient.RunGateApprovals = NewRunGateApprovals(dbClient)
 	dbClient.GPGKeys = NewGPGKeys(dbClient)
 	dbClient.SCIMTokens = NewSCIMTokens(dbClient)
 	dbClient.VCSProviders = NewVCSProviders(dbClient)
@@ -348,7 +359,7 @@ func asPgError(err error) *pgconn.PgError {
 }
 
 func newResourceID() string {
-	return uuid.New().String()
+	return uuid.Must(uuid.NewV7()).String()
 }
 
 func nullableString(val string) sql.NullString {
@@ -364,4 +375,18 @@ func nullableString(val string) sql.NullString {
 // before storing it.
 func currentTime() time.Time {
 	return time.Now().UTC().Round(time.Microsecond)
+}
+
+// escapeLikePattern escapes the LIKE metacharacters in s so it can be used as a
+// literal prefix in a LIKE pattern. Namespace path segments may contain '_'
+// (a LIKE single-char wildcard), so an unescaped prefix like "team_a/%" would
+// also match sibling trees such as "teamXa/...". PostgreSQL's LIKE treats '\' as
+// the default escape character, so escaping '\', '%' and '_' makes the prefix
+// match literally. The trailing "/%" the caller appends is intentionally left as
+// a wildcard.
+func escapeLikePattern(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
 }

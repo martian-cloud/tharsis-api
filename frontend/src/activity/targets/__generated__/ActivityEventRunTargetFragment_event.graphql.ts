@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<fc77f51bc251b47f2e915c943f119c88>>
+ * @generated SignedSource<<2db9bfbed06b939855896b0b70a51c66>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,7 @@ export type ActivityEventRunTargetFragment_event$data = {
   readonly payload: {
     readonly __typename: "ActivityEventUpdateRunPayload";
     readonly nodePath: string | null | undefined;
-    readonly type: string;
+    readonly runUpdateType: string;
   } | {
     // This will never be '%other', but we need some
     // value in case none of the concrete values match.
@@ -25,7 +25,7 @@ export type ActivityEventRunTargetFragment_event$data = {
   } | null | undefined;
   readonly target: {
     readonly id?: string;
-  };
+  } | null | undefined;
   readonly " $fragmentSpreads": FragmentRefs<"ActivityEventListItemFragment_event">;
   readonly " $fragmentType": "ActivityEventRunTargetFragment_event";
 };
@@ -98,7 +98,7 @@ const node: ReaderFragment = {
           "kind": "InlineFragment",
           "selections": [
             {
-              "alias": null,
+              "alias": "runUpdateType",
               "args": null,
               "kind": "ScalarField",
               "name": "type",
@@ -128,6 +128,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "b54a5ba08e984f5ccb205594f9d3db26";
+(node as any).hash = "ab405b5ae22b93c853ba3d0f5af23436";
 
 export default node;

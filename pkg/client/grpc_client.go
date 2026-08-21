@@ -42,6 +42,7 @@ const retryPolicy = `{
 			{"service": "martiancloud.tharsis.api.managed_identity.ManagedIdentities"},
 			{"service": "martiancloud.tharsis.api.namespace_membership.NamespaceMemberships"},
 			{"service": "martiancloud.tharsis.api.namespace_variable.NamespaceVariables"},
+			{"service": "martiancloud.tharsis.api.package.Packages"},
 			{"service": "martiancloud.tharsis.api.resource_limit.ResourceLimits"},
 			{"service": "martiancloud.tharsis.api.role.Roles"},
 			{"service": "martiancloud.tharsis.api.run.Runs"},
@@ -127,6 +128,7 @@ type GRPCClient struct {
 	ManagedIdentitiesClient        pb.ManagedIdentitiesClient
 	NamespaceMembershipsClient     pb.NamespaceMembershipsClient
 	NamespaceVariablesClient       pb.NamespaceVariablesClient
+	PackagesClient                 pb.PackagesClient
 	ResourceLimitsClient           pb.ResourceLimitsClient
 	RolesClient                    pb.RolesClient
 	RunsClient                     pb.RunsClient
@@ -296,6 +298,7 @@ func NewGRPCClient(ctx context.Context, c *GRPCClientConfig) (*GRPCClient, error
 		ManagedIdentitiesClient:        pb.NewManagedIdentitiesClient(clientConn),
 		NamespaceMembershipsClient:     pb.NewNamespaceMembershipsClient(clientConn),
 		NamespaceVariablesClient:       pb.NewNamespaceVariablesClient(clientConn),
+		PackagesClient:                 pb.NewPackagesClient(clientConn),
 		ResourceLimitsClient:           pb.NewResourceLimitsClient(clientConn),
 		RolesClient:                    pb.NewRolesClient(clientConn),
 		RunsClient:                     pb.NewRunsClient(clientConn),

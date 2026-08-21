@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<689f22f1626e54af1605129d502020dc>>
+ * @generated SignedSource<<fdae1db9bd51405df292a6ba7b38784a>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -218,6 +218,13 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "kind": "ScalarField",
+                    "name": "hasAdvisoryFailures",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "concreteType": "Workspace",
                     "kind": "LinkedField",
                     "name": "workspace",
@@ -237,6 +244,16 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "concreteType": "Apply",
+                    "kind": "LinkedField",
+                    "name": "apply",
+                    "plural": false,
+                    "selections": (v4/*: any*/),
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "concreteType": "Plan",
                     "kind": "LinkedField",
                     "name": "plan",
@@ -247,11 +264,20 @@ return {
                   {
                     "alias": null,
                     "args": null,
-                    "concreteType": "Apply",
+                    "concreteType": "RunTaskStage",
                     "kind": "LinkedField",
-                    "name": "apply",
-                    "plural": false,
-                    "selections": (v4/*: any*/),
+                    "name": "taskStages",
+                    "plural": true,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "stageName",
+                        "storageKey": null
+                      },
+                      (v3/*: any*/)
+                    ],
                     "storageKey": null
                   }
                 ],
@@ -325,12 +351,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "cd46700cad7cf403c47ca49d1b80594a",
+    "cacheID": "72a0f8cc2fc0d340854dce8cdf58fd7b",
     "id": null,
     "metadata": {},
     "name": "WorkspaceRunListPaginationQuery",
     "operationKind": "query",
-    "text": "query WorkspaceRunListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $workspaceAssessment: Boolean\n  $workspaceId: String\n) {\n  ...WorkspaceRunListFragment_runs\n}\n\nfragment RunListFragment_runConnection on RunConnection {\n  edges {\n    node {\n      id\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n\nfragment WorkspaceRunListFragment_runs on Query {\n  runs(after: $after, before: $before, first: $first, last: $last, workspaceId: $workspaceId, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...RunListFragment_runConnection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
+    "text": "query WorkspaceRunListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $workspaceAssessment: Boolean\n  $workspaceId: String\n) {\n  ...WorkspaceRunListFragment_runs\n}\n\nfragment RunListFragment_runConnection on RunConnection {\n  edges {\n    node {\n      id\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  hasAdvisoryFailures\n  workspace {\n    fullPath\n    id\n  }\n  apply {\n    status\n    id\n  }\n  ...RunStageIconsFragment_run\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment WorkspaceRunListFragment_runs on Query {\n  runs(after: $after, before: $before, first: $first, last: $last, workspaceId: $workspaceId, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...RunListFragment_runConnection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
   }
 };
 })();

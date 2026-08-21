@@ -60,6 +60,8 @@ function RunnerSessionList() {
         `, queryData.node
     );
 
+    const edges = data?.sessions?.edges ?? [];
+
     return (
         <Box sx={{ border: 1, borderTop: 0, borderBottomLeftRadius: 4, borderBottomRightRadius: 4, borderColor: 'divider' }}>
             <Box sx={{
@@ -77,7 +79,7 @@ function RunnerSessionList() {
             }}>
                 <Typography color="textSecondary">Runner sessions are individual connections from this runner</Typography>
             </Box>
-            {(!data?.sessions.edges || data?.sessions.edges?.length === 0) ? (
+            {(edges.length === 0) ? (
                 <Paper sx={{ p: 2, m: 2 }}>
                     <Typography>This runner does not have any sessions.</Typography>
                 </Paper>
@@ -93,12 +95,12 @@ function RunnerSessionList() {
                             </Box>
                         </Paper>
                         <InfiniteScroll
-                            dataLength={(data?.sessions.edges && data?.sessions.edges.length) ?? 0}
+                            dataLength={edges.length}
                             next={() => loadNext(20)}
                             hasMore={hasNext}
                             loader={<ListSkeleton rowCount={3} />}
                         >
-                            <List disablePadding>{data?.sessions.edges?.map((edge: any) => <RunnerSessionListItem
+                            <List disablePadding>{edges.map((edge: any) => <RunnerSessionListItem
                                 key={edge.node.id}
                                 fragmentRef={edge.node}
                                 onClick={() => setSelectedSession(edge.node.id)}

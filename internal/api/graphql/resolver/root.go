@@ -241,6 +241,11 @@ func (r RootResolver) Run(ctx context.Context, args *RunQueryArgs) (*RunResolver
 	return runQuery(ctx, args)
 }
 
+// RunNode query returns a single node of a run by its run-relative path
+func (r RootResolver) RunNode(ctx context.Context, args *RunNodeQueryArgs) (*RunNodeResolver, error) {
+	return runNodeQuery(ctx, args)
+}
+
 // Runs query returns a run connection
 func (r RootResolver) Runs(ctx context.Context, args *RunConnectionQueryArgs) (*RunConnectionResolver, error) {
 	return runsQuery(ctx, args)
@@ -286,7 +291,8 @@ func (r RootResolver) CancelRun(ctx context.Context, args *struct{ Input CancelR
 	return response, nil
 }
 
-// RetryRunNode mutation retries a failed or canceled plan/apply node by resetting it to pending
+// RetryRunNode mutation retries a failed or canceled plan or apply node, or a failed, canceled, or
+// soft-failed policy check node, by resetting it to pending
 func (r RootResolver) RetryRunNode(ctx context.Context, args *struct{ Input RetryRunNodeInput }) (*RunMutationPayloadResolver, error) {
 	response, err := retryRunNodeMutation(ctx, &args.Input)
 	if err != nil {
@@ -1010,6 +1016,139 @@ func (r RootResolver) DeleteTerraformModuleVersion(ctx context.Context, args *st
 	response, err := deleteTerraformModuleVersionMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformModuleVersionMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Package Queries and Mutations */
+
+// Packages query returns a package connection for a global (cross-group) listing
+func (r RootResolver) Packages(ctx context.Context, args *PackageConnectionQueryArgs) (*PackageConnectionResolver, error) {
+	return packagesQuery(ctx, args)
+}
+
+// CreatePackage creates a new package
+func (r RootResolver) CreatePackage(ctx context.Context, args *struct{ Input CreatePackageInput }) (*PackageMutationPayloadResolver, error) {
+	response, err := createPackageMutation(ctx, &args.Input)
+	if err != nil {
+		return handlePackageMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdatePackage updates a package
+func (r RootResolver) UpdatePackage(ctx context.Context, args *struct{ Input UpdatePackageInput }) (*PackageMutationPayloadResolver, error) {
+	response, err := updatePackageMutation(ctx, &args.Input)
+	if err != nil {
+		return handlePackageMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeletePackage deletes a package
+func (r RootResolver) DeletePackage(ctx context.Context, args *struct{ Input DeletePackageInput }) (*PackageMutationPayloadResolver, error) {
+	response, err := deletePackageMutation(ctx, &args.Input)
+	if err != nil {
+		return handlePackageMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Package Version Queries and Mutations */
+
+// CreatePackageVersion creates a new package version
+func (r RootResolver) CreatePackageVersion(ctx context.Context, args *struct {
+	Input CreatePackageVersionInput
+},
+) (*PackageVersionMutationPayloadResolver, error) {
+	response, err := createPackageVersionMutation(ctx, &args.Input)
+	if err != nil {
+		return handlePackageVersionMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeletePackageVersion deletes a single version of a package
+func (r RootResolver) DeletePackageVersion(ctx context.Context, args *struct {
+	Input DeletePackageVersionInput
+},
+) (*PackageVersionMutationPayloadResolver, error) {
+	response, err := deletePackageVersionMutation(ctx, &args.Input)
+	if err != nil {
+		return handlePackageVersionMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Policy Mutations */
+
+// CreatePolicy creates an OPA policy attached to a group.
+func (r RootResolver) CreatePolicy(ctx context.Context, args *struct {
+	Input CreatePolicyInput
+},
+) (*PolicyMutationPayloadResolver, error) {
+	response, err := createPolicyMutation(ctx, &args.Input)
+	if err != nil {
+		return handlePolicyMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeletePolicy removes a policy.
+func (r RootResolver) DeletePolicy(ctx context.Context, args *struct {
+	Input DeletePolicyInput
+},
+) (*PolicyMutationPayloadResolver, error) {
+	response, err := deletePolicyMutation(ctx, &args.Input)
+	if err != nil {
+		return handlePolicyMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdatePolicy updates the mutable fields of an existing OPA policy.
+func (r RootResolver) UpdatePolicy(ctx context.Context, args *struct {
+	Input UpdatePolicyInput
+},
+) (*PolicyMutationPayloadResolver, error) {
+	response, err := updatePolicyMutation(ctx, &args.Input)
+	if err != nil {
+		return handlePolicyMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// RunGatesAwaitingMyDecision returns the caller's approvals inbox as a run gate connection: pending
+// gates the caller is an eligible, undecided approver for.
+func (r RootResolver) RunGatesAwaitingMyDecision(ctx context.Context, args *RunGateConnectionQueryArgs) (*RunGateConnectionResolver, error) {
+	return runGatesAwaitingMyDecisionQuery(ctx, args)
+}
+
+// ApproveRunGate records an approve/reject decision on a run gate
+func (r RootResolver) ApproveRunGate(ctx context.Context, args *struct{ Input ApproveRunGateInput }) (*RunGateMutationPayloadResolver, error) {
+	response, err := approveRunGateMutation(ctx, &args.Input)
+	if err != nil {
+		return handleRunGateMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// OverrideRunGate bypasses a pending run gate's approval requirements and advances the run.
+// Admin mode is required.
+func (r RootResolver) OverrideRunGate(ctx context.Context, args *struct{ Input OverrideRunGateInput }) (*RunGateMutationPayloadResolver, error) {
+	response, err := overrideRunGateMutation(ctx, &args.Input)
+	if err != nil {
+		return handleRunGateMutationProblem(err, args.Input.ClientMutationID)
 	}
 
 	return response, nil

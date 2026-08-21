@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<bb4cd98003b95126a2b192688974f865>>
+ * @generated SignedSource<<51bd0868e2e9bf24671447955c234455>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -21,7 +21,7 @@ export type ActivityEventStateVersionTargetFragment_event$data = {
     // This will never be '%other', but we need some
     // value in case none of the concrete values match.
     readonly __typename: "%other";
-  };
+  } | null | undefined;
   readonly " $fragmentSpreads": FragmentRefs<"ActivityEventListItemFragment_event">;
   readonly " $fragmentType": "ActivityEventStateVersionTargetFragment_event";
 };

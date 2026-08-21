@@ -16,6 +16,7 @@ function RunDetailsStageTabEmptyState({ message }: Props) {
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
+                background: 'inherit'
             }}
         >
             <Typography color="textSecondary" align="center">

@@ -16,7 +16,7 @@ interface Props {
 function CheckResultsPanel({ fragmentRefs }: Props) {
     const checkResults = useFragment(
         graphql`
-        fragment CheckResultsPanelFragment_checkResult on CheckResult @relay(plural: true)
+        fragment CheckResultsPanelFragment_checkResult on TerraformCheckResult @relay(plural: true)
         {
             name
             status

@@ -43,17 +43,35 @@ func TestWorkspaceLockManager_HandleRunChanges(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			name: "speculative run enqueues on transition to queuing",
+			// The enqueue trigger keys off the run transitioning into a queuing status. Each gated node
+			// projects onto its own *_queuing status when it becomes pending, so one run-status check
+			// covers every wait without enumerating node types.
+			name: "speculative run enqueues when it transitions to plan_queuing",
 			run: &models.Run{
 				Metadata:    models.ResourceMetadata{ID: wsTestRunID},
 				WorkspaceID: wsTestWorkspaceID,
 				Apply:       nil, // speculative
 				Plan:        models.Plan{Status: models.PlanPending},
-				Status:      models.RunQueuing,
+				Status:      models.RunPlanQueuing,
 			},
-			nodeChanges:        []statemachine.NodeStatusChange{statemachine.RunStatusChange{OldStatus: models.RunPending, NewStatus: models.RunQueuing}},
+			nodeChanges:        []statemachine.NodeStatusChange{statemachine.RunStatusChange{OldStatus: models.RunPending, NewStatus: models.RunPlanQueuing}},
 			expectGetWorkspace: false,
-			expectEnqueue:      true, // transitioned to queuing
+			expectEnqueue:      true,
+		},
+		{
+			// A retried plan re-enters the wait from a terminal status. It is still a transition into
+			// plan_queuing, so it enqueues — the retried run has released its slot and must be re-admitted.
+			name: "retried plan re-entering plan_queuing enqueues",
+			run: &models.Run{
+				Metadata:    models.ResourceMetadata{ID: wsTestRunID},
+				WorkspaceID: wsTestWorkspaceID,
+				Apply:       nil,
+				Plan:        models.Plan{Status: models.PlanPending},
+				Status:      models.RunPlanQueuing,
+			},
+			nodeChanges:        []statemachine.NodeStatusChange{statemachine.RunStatusChange{OldStatus: models.RunErrored, NewStatus: models.RunPlanQueuing}},
+			expectGetWorkspace: false,
+			expectEnqueue:      true,
 		},
 		{
 			name: "run that merely remains queuing without a transition does not enqueue",
@@ -61,25 +79,58 @@ func TestWorkspaceLockManager_HandleRunChanges(t *testing.T) {
 				Metadata:    models.ResourceMetadata{ID: wsTestRunID},
 				WorkspaceID: wsTestWorkspaceID,
 				Apply:       nil,
-				// Plan node is still pending, but no run-status transition occurred in
-				// this change set (e.g. a later no-op update) — must not re-enqueue.
+				// Still waiting for the slot, but nothing transitioned into a queuing status in this change
+				// set (e.g. a later no-op update) — must not re-enqueue.
 				Plan:   models.Plan{Status: models.PlanPending},
-				Status: models.RunQueuing,
+				Status: models.RunPlanQueuing,
 			},
 			nodeChanges:        nil,
 			expectGetWorkspace: false,
 			expectEnqueue:      false,
 		},
 		{
-			name: "apply transition to queuing_apply enqueues",
+			// Admission itself must not re-enqueue: plan_queuing -> plan_queued means the run already won
+			// the slot, so a work item asking the consumer to admit it again would be wasted.
+			name: "admitted run transitioning to plan_queued does not enqueue",
+			run: &models.Run{
+				Metadata:    models.ResourceMetadata{ID: wsTestRunID},
+				WorkspaceID: wsTestWorkspaceID,
+				Apply:       nil,
+				Plan:        models.Plan{Status: models.PlanQueued},
+				Status:      models.RunPlanQueued,
+			},
+			nodeChanges:        []statemachine.NodeStatusChange{statemachine.RunStatusChange{OldStatus: models.RunPlanQueuing, NewStatus: models.RunPlanQueued}},
+			expectGetWorkspace: false,
+			expectEnqueue:      false,
+		},
+		{
+			name: "apply transitioning to apply_queuing enqueues",
 			run: &models.Run{
 				Metadata:    models.ResourceMetadata{ID: wsTestRunID},
 				WorkspaceID: wsTestWorkspaceID,
 				Apply:       &models.Apply{Status: models.ApplyPending},
-				Status:      models.RunQueuingApply,
+				Status:      models.RunApplyQueuing,
 			},
-			nodeChanges:        []statemachine.NodeStatusChange{statemachine.RunStatusChange{OldStatus: models.RunPlanned, NewStatus: models.RunQueuingApply}},
+			nodeChanges:        []statemachine.NodeStatusChange{statemachine.RunStatusChange{OldStatus: models.RunPlanned, NewStatus: models.RunApplyQueuing}},
 			expectGetWorkspace: false, // not releasing (not complete, not planned)
+			expectEnqueue:      true,
+		},
+		{
+			// A workspace-gated task stage becoming pending is a wait too, and it reports its own queuing
+			// status — so it needs no special case here.
+			name: "gated task stage transitioning to pre_plan_queuing enqueues",
+			run: &models.Run{
+				Metadata:    models.ResourceMetadata{ID: wsTestRunID},
+				WorkspaceID: wsTestWorkspaceID,
+				Apply:       &models.Apply{Status: models.ApplyCreated},
+				Plan:        models.Plan{Status: models.PlanCreated},
+				Status:      models.RunPrePlanQueuing,
+				TaskStages: []*models.RunTaskStage{
+					{StageName: models.RunTaskStageNamePrePlan, Status: models.RunTaskStagePending},
+				},
+			},
+			nodeChanges:        []statemachine.NodeStatusChange{statemachine.RunStatusChange{OldStatus: models.RunPending, NewStatus: models.RunPrePlanQueuing}},
+			expectGetWorkspace: false,
 			expectEnqueue:      true,
 		},
 		{

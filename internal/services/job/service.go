@@ -88,6 +88,8 @@ type GetJobsInput struct {
 	RunnerID *string
 	// RunID filters the jobs by the specified run ID
 	RunID *string
+	// PolicyCheckID filters the jobs by the specified policy check node ID
+	PolicyCheckID *string
 }
 
 // ClaimJobResponse is returned when a runner claims a Job
@@ -295,18 +297,19 @@ func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsRes
 			return nil, rErr
 		}
 	} else if !caller.IsAdminModeActivated(ctx) {
-		return nil, errors.New("only admins with admin mode activated can subscribe to all job events without filters", errors.WithErrorCode(errors.EForbidden))
+		return nil, errors.New("only admins with admin mode activated can get all jobs without filters", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	dbInput := &db.GetJobsInput{
 		Sort:              input.Sort,
 		PaginationOptions: input.PaginationOptions,
 		Filter: &db.JobFilter{
-			JobStatus:   input.Status,
-			JobType:     input.Type,
-			WorkspaceID: input.WorkspaceID,
-			RunnerID:    input.RunnerID,
-			RunID:       input.RunID,
+			JobStatus:     input.Status,
+			JobType:       input.Type,
+			WorkspaceID:   input.WorkspaceID,
+			RunnerID:      input.RunnerID,
+			RunID:         input.RunID,
+			PolicyCheckID: input.PolicyCheckID,
 		},
 	}
 
@@ -395,7 +398,7 @@ func (s *service) SetJobStatus(ctx context.Context, jobID string, status models.
 	// job inside the transaction so it stays correct if the command is retried on an
 	// optimistic-lock conflict (e.g. a concurrent cancellation advancing the job row).
 	var updatedJob *models.Job
-	cmd := s.cmdFactory.NewSyncJobStatus(job.RunID, job.Type, jobID, status, func(txCtx context.Context) error {
+	cmd := s.cmdFactory.NewSyncJobStatus(job.RunID, job.Type, jobID, job.OPAData, status, func(txCtx context.Context) error {
 		current, err := s.dbClient.Jobs.GetJobByID(txCtx, jobID)
 		if err != nil {
 			return err

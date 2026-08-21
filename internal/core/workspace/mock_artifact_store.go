@@ -199,6 +199,36 @@ func (_m *MockArtifactStore) GetPlanJSON(ctx context.Context, run *models.Run) (
 	return r0, r1
 }
 
+// GetPolicyCheckPolicyMessages provides a mock function with given fields: ctx, policy
+func (_m *MockArtifactStore) GetPolicyCheckPolicyMessages(ctx context.Context, policy *models.PolicyCheckPolicy) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, policy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPolicyCheckPolicyMessages")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.PolicyCheckPolicy) (io.ReadCloser, error)); ok {
+		return rf(ctx, policy)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.PolicyCheckPolicy) io.ReadCloser); ok {
+		r0 = rf(ctx, policy)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.PolicyCheckPolicy) error); ok {
+		r1 = rf(ctx, policy)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRunVariables provides a mock function with given fields: ctx, run
 func (_m *MockArtifactStore) GetRunVariables(ctx context.Context, run *models.Run) (io.ReadCloser, error) {
 	ret := _m.Called(ctx, run)
@@ -376,6 +406,43 @@ func (_m *MockArtifactStore) UploadPlanJSON(ctx context.Context, run *models.Run
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadPlanJSON")
+	}
+
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, run, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) db.RetainObjectRefFunc); ok {
+		r0 = rf(ctx, run, body)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Run, io.Reader) string); ok {
+		r1 = rf(ctx, run, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.Run, io.Reader) error); ok {
+		r2 = rf(ctx, run, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// UploadPolicyCheckPolicyMessages provides a mock function with given fields: ctx, run, body
+func (_m *MockArtifactStore) UploadPolicyCheckPolicyMessages(ctx context.Context, run *models.Run, body io.Reader) (db.RetainObjectRefFunc, string, error) {
+	ret := _m.Called(ctx, run, body)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadPolicyCheckPolicyMessages")
 	}
 
 	var r0 db.RetainObjectRefFunc

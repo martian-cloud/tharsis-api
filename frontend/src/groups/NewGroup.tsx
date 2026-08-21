@@ -13,6 +13,7 @@ import { NewGroupMutation } from './__generated__/NewGroupMutation.graphql';
 import GroupForm, { FormData } from './GroupForm';
 import { GetConnections } from './GroupList';
 import { GetConnections as GetTopLevelConnections } from './tree/GroupTreeContainer';
+import { PageLayoutProvider } from '../layout/PageLayoutContext';
 
 function NewGroup() {
     const navigate = useNavigate();
@@ -78,7 +79,7 @@ function NewGroup() {
     };
 
     return (
-        <Box maxWidth={1200} margin="auto" padding={2}>
+        <PageLayoutProvider>
             {parentGroupPath ?
                 <NamespaceBreadcrumbs
                     namespacePath={parentGroupPath}
@@ -115,7 +116,7 @@ function NewGroup() {
                 </Button>
                 <Button color="inherit" onClick={() => (navigate(parentGroupPath ? `../groups/${parentGroupPath}` : '..'))}>Cancel</Button>
             </Box>
-        </Box>
+        </PageLayoutProvider>
     );
 }
 

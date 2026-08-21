@@ -5,7 +5,11 @@ package db
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -548,6 +552,487 @@ func TestGroups_GetGroupByTRN(t *testing.T) {
 			} else {
 				assert.Nil(t, group)
 			}
+		})
+	}
+}
+
+// TestGroups_MigrateGroup re-parents a group and checks the cleanup of the assignments the move puts
+// out of scope: policy approvers, managed identities, runner service accounts, service account
+// namespace memberships and workspace VCS provider links. The fixture is built and migrated once,
+// because each cleanup is a single statement over the whole tree: what they have to get right is the
+// several (namespace, principal) pairs each must judge differently in one pass.
+func TestGroups_MigrateGroup(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// origin                     old parent, does not move
+	// |-- src                    the group being migrated, to underneath dest
+	// |   |-- team
+	// |   |   |-- sub
+	// |   |   |-- ws-a
+	// |   |   `-- ws-b
+	// |   |-- teamwork           name-prefixed sibling of team
+	// |   |   `-- x
+	// |   |-- my_team            underscore is a single-character wildcard to LIKE
+	// |   `-- myzteam            which is what my_team would match
+	// |       `-- p
+	// `-- other
+	// |   `-- ws-c
+	// dest                       new parent
+	groups := map[string]*models.Group{}
+	for _, fullPath := range []string{
+		"origin",
+		"origin/src",
+		"origin/src/team",
+		"origin/src/team/sub",
+		"origin/src/teamwork",
+		"origin/src/teamwork/x",
+		"origin/src/my_team",
+		"origin/src/myzteam",
+		"origin/src/myzteam/p",
+		"origin/other",
+		"dest",
+	} {
+		name := fullPath
+		var parentID string
+		if i := strings.LastIndex(fullPath, "/"); i >= 0 {
+			parent, ok := groups[fullPath[:i]]
+			require.True(t, ok, "parent of %s must be created first", fullPath)
+			name = fullPath[i+1:]
+			parentID = parent.Metadata.ID
+		}
+
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Name:      name,
+			ParentID:  parentID,
+			FullPath:  fullPath,
+			CreatedBy: "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		groups[fullPath] = group
+	}
+
+	maxJobDuration := int32(forTestMaxJobDuration.Minutes())
+	workspaces := map[string]*models.Workspace{}
+	for _, fullPath := range []string{
+		"origin/src/team/ws-a",
+		"origin/src/team/ws-b",
+		"origin/other/ws-c",
+	} {
+		i := strings.LastIndex(fullPath, "/")
+		workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+			Name:           fullPath[i+1:],
+			GroupID:        groups[fullPath[:i]].Metadata.ID,
+			FullPath:       fullPath,
+			MaxJobDuration: &maxJobDuration,
+			CreatedBy:      "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		workspaces[fullPath] = workspace
+	}
+
+	// One service account per group any of the cases below draws from, keyed by the path of the group
+	// it lives in -- the only thing about it the cleanups look at.
+	serviceAccounts := map[string]*models.ServiceAccount{}
+	for _, groupPath := range []string{
+		"origin",
+		"origin/src",
+		"origin/src/team",
+		"origin/src/team/sub",
+		"origin/src/my_team",
+		"dest",
+	} {
+		serviceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+			Name:      "approver",
+			GroupID:   groups[groupPath].Metadata.ID,
+			CreatedBy: "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		serviceAccounts[groupPath] = serviceAccount
+	}
+
+	// assignmentCase describes one (namespace, principal) pair the cleanup has to judge. resourcePath
+	// is the namespace holding the assignment -- the group that owns the policy, membership or runner,
+	// or the workspace the identity or link is attached to. principalPath is the group the principal
+	// lives in, which is all the cleanup knows about it.
+	type assignmentCase struct {
+		name          string
+		resourcePath  string
+		principalPath string
+		expectKept    bool
+	}
+
+	// A policy per case, carrying only the approver that case is about, so a failure names one
+	// condition rather than a list difference. These cases cover the shape of the scope test itself;
+	// the tables that follow cover the wiring of the same test into the other four assignments.
+	policyCases := []assignmentCase{
+		{
+			name:          "policy approver in an ancestor group inside the migrated tree is kept",
+			resourcePath:  "origin/src/team/sub",
+			principalPath: "origin/src/team",
+			expectKept:    true,
+		},
+		{
+			name:          "policy approver in the migrated group itself is kept",
+			resourcePath:  "origin/src/team/sub",
+			principalPath: "origin/src",
+			expectKept:    true,
+		},
+		{
+			name:          "policy approver in the policy's own group is kept",
+			resourcePath:  "origin/src/team/sub",
+			principalPath: "origin/src/team/sub",
+			expectKept:    true,
+		},
+		{
+			name:          "policy approver in the old parent group is removed",
+			resourcePath:  "origin/src/team/sub",
+			principalPath: "origin",
+		},
+		{
+			// Scope is judged against where the tree landed, not where it came from, so an approver the
+			// move brings into scope is kept rather than swept up for having been out of scope before.
+			name:          "policy approver in the new parent group is kept",
+			resourcePath:  "origin/src/team/sub",
+			principalPath: "dest",
+			expectKept:    true,
+		},
+		{
+			// team is a string prefix of teamwork, so this row only goes away if the prefix test
+			// requires the path separator.
+			name:          "policy approver in a name-prefixed sibling of an ancestor is removed",
+			resourcePath:  "origin/src/teamwork/x",
+			principalPath: "origin/src/team",
+		},
+		{
+			// my_team matches myzteam under LIKE, where the underscore is a wildcard. This is the case
+			// that makes the prefix test starts_with rather than a LIKE against a column, which has no
+			// literal pattern to run through escapeLikePattern.
+			name:          "policy approver whose group name contains a LIKE wildcard is removed",
+			resourcePath:  "origin/src/myzteam/p",
+			principalPath: "origin/src/my_team",
+		},
+		{
+			name:          "policy approver in a group beneath the policy's group is removed",
+			resourcePath:  "origin/src/team",
+			principalPath: "origin/src/team/sub",
+		},
+		{
+			// The policy is owned by the migrated group itself, which the subtree test only reaches
+			// through its equals arm rather than the path prefix.
+			name:          "policy approver out of scope for a policy on the migrated group is removed",
+			resourcePath:  "origin/src",
+			principalPath: "origin",
+		},
+		{
+			name:          "policy approver of a policy outside the migrated tree is untouched",
+			resourcePath:  "origin/other",
+			principalPath: "origin",
+			expectKept:    true,
+		},
+	}
+
+	policyIDs := make([]string, len(policyCases))
+	for i, test := range policyCases {
+		policy, err := testClient.client.Policies.CreatePolicy(ctx, &models.Policy{
+			GroupID: groups[test.resourcePath].Metadata.ID,
+			Name:    fmt.Sprintf("test-policy-%d", i),
+			Kind:    models.PolicyKindOPA,
+			OPAData: &models.OPAPolicyData{
+				PackageSource:                  "trn:package_version:origin/test-package/1.0.0",
+				EnforcementLevel:               models.PolicyEnforcementSoftMandatory,
+				SpeculativeRunEnforcementLevel: models.PolicyEnforcementAdvisory,
+				Stage:                          models.RunTaskStageNamePostPlan,
+			},
+			RequiredApprovals:        1,
+			AllowedServiceAccountIDs: []string{serviceAccounts[test.principalPath].Metadata.ID},
+			CreatedBy:                "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		policyIDs[i] = policy.Metadata.ID
+	}
+
+	managedIdentityCases := []assignmentCase{
+		{
+			// The identity's group moved along with the workspace, so nothing about the assignment
+			// changed and it has to survive.
+			name:          "managed identity in an ancestor group inside the migrated tree stays assigned",
+			resourcePath:  "origin/src/team/ws-a",
+			principalPath: "origin/src/team",
+			expectKept:    true,
+		},
+		{
+			name:          "managed identity in the migrated group itself stays assigned",
+			resourcePath:  "origin/src/team/ws-a",
+			principalPath: "origin/src",
+			expectKept:    true,
+		},
+		{
+			name:          "managed identity in the old parent group is unassigned",
+			resourcePath:  "origin/src/team/ws-a",
+			principalPath: "origin",
+		},
+		{
+			name:          "managed identity assigned to a workspace outside the migrated tree is untouched",
+			resourcePath:  "origin/other/ws-c",
+			principalPath: "origin",
+			expectKept:    true,
+		},
+	}
+
+	managedIdentityIDs := make([]string, len(managedIdentityCases))
+	for i, test := range managedIdentityCases {
+		identity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+			Name:      fmt.Sprintf("test-identity-%d", i),
+			GroupID:   groups[test.principalPath].Metadata.ID,
+			Type:      models.ManagedIdentityAWSFederated,
+			Data:      []byte("test-identity-data"),
+			CreatedBy: "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx,
+			identity.Metadata.ID, workspaces[test.resourcePath].Metadata.ID))
+
+		managedIdentityIDs[i] = identity.Metadata.ID
+	}
+
+	runnerCases := []assignmentCase{
+		{
+			name:          "runner service account in an ancestor group inside the migrated tree stays assigned",
+			resourcePath:  "origin/src/team/sub",
+			principalPath: "origin/src/team",
+			expectKept:    true,
+		},
+		{
+			name:          "runner service account in the runner's own group stays assigned",
+			resourcePath:  "origin/src/team/sub",
+			principalPath: "origin/src/team/sub",
+			expectKept:    true,
+		},
+		{
+			name:          "runner service account in the old parent group is unassigned",
+			resourcePath:  "origin/src/team/sub",
+			principalPath: "origin",
+		},
+	}
+
+	// Runners are keyed by the group they belong to, so the cases above share one where they can.
+	runners := map[string]*models.Runner{}
+	for _, test := range runnerCases {
+		runner, ok := runners[test.resourcePath]
+		if !ok {
+			groupID := groups[test.resourcePath].Metadata.ID
+			created, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+				Name:      fmt.Sprintf("test-runner-%d", len(runners)),
+				GroupID:   &groupID,
+				Type:      models.GroupRunnerType,
+				CreatedBy: "db-integration-tests",
+			})
+			require.NoError(t, err)
+
+			runners[test.resourcePath] = created
+			runner = created
+		}
+
+		require.NoError(t, testClient.client.ServiceAccounts.AssignServiceAccountToRunner(ctx,
+			serviceAccounts[test.principalPath].Metadata.ID, runner.Metadata.ID))
+	}
+
+	membershipCases := []assignmentCase{
+		{
+			name:          "service account membership of a group, from an ancestor inside the migrated tree, is kept",
+			resourcePath:  "origin/src/team/sub",
+			principalPath: "origin/src/team",
+			expectKept:    true,
+		},
+		{
+			name:          "service account membership of a group, from the old parent group, is removed",
+			resourcePath:  "origin/src/team/sub",
+			principalPath: "origin",
+		},
+		{
+			// A workspace namespace reaches the subtree test through its path prefix only, never the
+			// equals arm, since a workspace and a group never share a path.
+			name:          "service account membership of a workspace, from an ancestor inside the migrated tree, is kept",
+			resourcePath:  "origin/src/team/ws-a",
+			principalPath: "origin/src/team",
+			expectKept:    true,
+		},
+		{
+			name:          "service account membership of a workspace, from the old parent group, is removed",
+			resourcePath:  "origin/src/team/ws-a",
+			principalPath: "origin",
+		},
+	}
+
+	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name:      "test-role",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	membershipIDs := make([]string, len(membershipCases))
+	for i, test := range membershipCases {
+		serviceAccountID := serviceAccounts[test.principalPath].Metadata.ID
+		membership, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+			NamespacePath:    test.resourcePath,
+			ServiceAccountID: &serviceAccountID,
+			RoleID:           role.Metadata.ID,
+		})
+		require.NoError(t, err)
+
+		membershipIDs[i] = membership.Metadata.ID
+	}
+
+	// A user membership in the migrated tree has no group to be out of scope of. It is only spared
+	// because the cleanup joins through service_accounts, which a membership held by a user cannot
+	// match, so it is worth pinning down.
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-migrate",
+		Email:    "test-user-migrate@test.com",
+	})
+	require.NoError(t, err)
+
+	userMembership, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath: "origin/src/team/sub",
+		UserID:        &user.Metadata.ID,
+		RoleID:        role.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	// A workspace holds at most one VCS provider link, so each case needs its own workspace.
+	linkCases := []assignmentCase{
+		{
+			name:          "VCS provider link from an ancestor group inside the migrated tree is kept",
+			resourcePath:  "origin/src/team/ws-a",
+			principalPath: "origin/src/team",
+			expectKept:    true,
+		},
+		{
+			name:          "VCS provider link from the old parent group is removed",
+			resourcePath:  "origin/src/team/ws-b",
+			principalPath: "origin",
+		},
+	}
+
+	linkIDs := make([]string, len(linkCases))
+	for i, test := range linkCases {
+		provider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+			Name:      fmt.Sprintf("test-provider-%d", i),
+			GroupID:   groups[test.principalPath].Metadata.ID,
+			Type:      models.GitLabProviderType,
+			URL:       url.URL{Scheme: "https", Host: "gitlab.example.com"},
+			CreatedBy: "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+			WorkspaceID:    workspaces[test.resourcePath].Metadata.ID,
+			ProviderID:     provider.Metadata.ID,
+			TokenNonce:     uuid.New().String(),
+			RepositoryPath: "test-org/test-repo",
+			Branch:         "main",
+			CreatedBy:      "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		linkIDs[i] = link.Metadata.ID
+	}
+
+	migratedGroup, err := testClient.client.Groups.MigrateGroup(ctx, groups["origin/src"], groups["dest"])
+	require.NoError(t, err)
+	require.NotNil(t, migratedGroup)
+
+	assert.Equal(t, "dest/src", migratedGroup.FullPath)
+	assert.Equal(t, groups["dest"].Metadata.ID, migratedGroup.ParentID)
+	assert.Equal(t, groups["origin/src"].Metadata.Version+1, migratedGroup.Metadata.Version)
+
+	// Every path comparison in the cleanups runs after the subtree has been re-pathed, so the cases
+	// below mean nothing unless this holds.
+	descendant, err := testClient.client.Groups.GetGroupByID(ctx, groups["origin/src/team/sub"].Metadata.ID)
+	require.NoError(t, err)
+	require.NotNil(t, descendant)
+	assert.Equal(t, "dest/src/team/sub", descendant.FullPath)
+
+	for i, test := range policyCases {
+		t.Run(test.name, func(t *testing.T) {
+			policy, err := testClient.client.Policies.GetPolicyByID(ctx, policyIDs[i])
+			require.NoError(t, err)
+			require.NotNil(t, policy)
+
+			expectIDs := []string{}
+			if test.expectKept {
+				expectIDs = append(expectIDs, serviceAccounts[test.principalPath].Metadata.ID)
+			}
+
+			assert.ElementsMatch(t, expectIDs, policy.AllowedServiceAccountIDs)
+		})
+	}
+
+	for i, test := range managedIdentityCases {
+		t.Run(test.name, func(t *testing.T) {
+			identities, err := testClient.client.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx,
+				workspaces[test.resourcePath].Metadata.ID)
+			require.NoError(t, err)
+
+			assigned := false
+			for _, identity := range identities {
+				if identity.Metadata.ID == managedIdentityIDs[i] {
+					assigned = true
+				}
+			}
+
+			assert.Equal(t, test.expectKept, assigned)
+		})
+	}
+
+	for _, test := range runnerCases {
+		t.Run(test.name, func(t *testing.T) {
+			runnerID := runners[test.resourcePath].Metadata.ID
+			result, err := testClient.client.ServiceAccounts.GetServiceAccounts(ctx, &GetServiceAccountsInput{
+				Filter: &ServiceAccountFilter{RunnerID: &runnerID},
+			})
+			require.NoError(t, err)
+
+			assigned := false
+			for _, serviceAccount := range result.ServiceAccounts {
+				if serviceAccount.Metadata.ID == serviceAccounts[test.principalPath].Metadata.ID {
+					assigned = true
+				}
+			}
+
+			assert.Equal(t, test.expectKept, assigned)
+		})
+	}
+
+	for i, test := range membershipCases {
+		t.Run(test.name, func(t *testing.T) {
+			membership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, membershipIDs[i])
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectKept, membership != nil)
+		})
+	}
+
+	t.Run("user membership in the migrated tree is untouched", func(t *testing.T) {
+		membership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, userMembership.Metadata.ID)
+		require.NoError(t, err)
+
+		assert.NotNil(t, membership)
+	})
+
+	for i, test := range linkCases {
+		t.Run(test.name, func(t *testing.T) {
+			link, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByID(ctx, linkIDs[i])
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectKept, link != nil)
 		})
 	}
 }

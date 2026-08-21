@@ -39,6 +39,12 @@ type RunQueryArgs struct {
 	ID string
 }
 
+// RunNodeQueryArgs are used to query a single node of a run by its run-relative path
+type RunNodeQueryArgs struct {
+	RunID    string
+	NodePath string
+}
+
 // RunEdgeResolver resolves run edges
 type RunEdgeResolver struct {
 	edge Edge
@@ -78,6 +84,12 @@ func NewRunConnectionResolver(ctx context.Context, input *run.GetRunsInput) (*Ru
 		return nil, err
 	}
 
+	return newRunConnectionResolverFromResult(result)
+}
+
+// newRunConnectionResolverFromResult builds a RunConnectionResolver from an already-fetched runs
+// result, so callers backed by different service queries can share the edge/pageInfo assembly.
+func newRunConnectionResolverFromResult(result *db.RunsResult) (*RunConnectionResolver, error) {
 	runs := result.Runs
 
 	// Create edges
@@ -238,6 +250,245 @@ func (r *RunResolver) Plan() (*PlanResolver, error) {
 	return &PlanResolver{run: r.run}, nil
 }
 
+// TaskStages resolver returns the run's task stage nodes in canonical stage order (pre_plan,
+// post_plan; empty when the run has no policies). Each stage owns its policy checks.
+func (r *RunResolver) TaskStages() []*RunTaskStageResolver {
+	stages := r.run.TaskStages
+	resolvers := make([]*RunTaskStageResolver, len(stages))
+	for i, stage := range stages {
+		resolvers[i] = &RunTaskStageResolver{run: r.run, stage: stage}
+	}
+	return resolvers
+}
+
+// RunTaskStageResolver resolves a run's task stage node.
+type RunTaskStageResolver struct {
+	run   *models.Run
+	stage *models.RunTaskStage
+}
+
+// ID resolver returns the task stage node ID as a GID.
+func (r *RunTaskStageResolver) ID() string {
+	return string(r.stage.GetGlobalID())
+}
+
+// StageName resolver returns the run stage this task stage evaluates (e.g. PRE_PLAN, POST_PLAN).
+func (r *RunTaskStageResolver) StageName() string {
+	return toGraphqlEnum(string(r.stage.StageName))
+}
+
+// Status resolver returns the aggregate stage status.
+func (r *RunTaskStageResolver) Status() string {
+	return toGraphqlEnum(string(r.stage.Status))
+}
+
+// PolicyChecks resolver returns the policy checks owned by this stage.
+func (r *RunTaskStageResolver) PolicyChecks() []*PolicyCheckResolver {
+	resolvers := make([]*PolicyCheckResolver, len(r.stage.PolicyChecks))
+	for i, check := range r.stage.PolicyChecks {
+		resolvers[i] = &PolicyCheckResolver{run: r.run, check: check}
+	}
+	return resolvers
+}
+
+// PolicyCheckResolver resolves a run's policy check node.
+type PolicyCheckResolver struct {
+	run   *models.Run
+	check *models.PolicyCheck
+}
+
+// ID resolver returns the policy check ID
+func (r *PolicyCheckResolver) ID() string {
+	return string(r.check.GetGlobalID())
+}
+
+// CheckType resolver returns the policy engine (e.g. opa).
+func (r *PolicyCheckResolver) CheckType() string {
+	return toGraphqlEnum(string(r.check.CheckType))
+}
+
+// StageName resolver returns the run stage the check evaluates at (e.g. PRE_PLAN, POST_PLAN).
+func (r *PolicyCheckResolver) StageName() string {
+	return toGraphqlEnum(string(r.check.StageName))
+}
+
+// NodePath resolver returns the check's node path within the run (e.g. "post_plan.opa"), which is
+// what RetryRunNode takes to retry it. StageName and CheckType are upper-cased for the API, so a
+// client cannot reconstruct this path from them.
+func (r *PolicyCheckResolver) NodePath() string {
+	return r.check.GetPath()
+}
+
+// Status resolver.
+func (r *PolicyCheckResolver) Status() string {
+	return toGraphqlEnum(string(r.check.Status))
+}
+
+// RunGate resolver returns the approval gate governing this check, or nil when it has none. A check
+// only gets a gate when a soft-mandatory policy failed and declared approvers; an advisory or
+// hard-mandatory failure, or a soft failure with no approvers, leaves the check overridable by
+// permission alone.
+func (r *PolicyCheckResolver) RunGate(ctx context.Context) (*RunGateResolver, error) {
+	gate, err := loadRunGateForPolicyCheck(ctx, r.check.ID)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &RunGateResolver{runGate: gate}, nil
+}
+
+// CurrentJob returns the current job for the policy check, or nil when no job exists.
+func (r *PolicyCheckResolver) CurrentJob(ctx context.Context) (*JobResolver, error) {
+	if r.check.LatestJobID == nil {
+		return nil, nil
+	}
+
+	job, err := loadJob(ctx, *r.check.LatestJobID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &JobResolver{job: job}, nil
+}
+
+// Jobs returns the connection of jobs associated with the policy check (its OPA evaluation jobs,
+// including retries).
+func (r *PolicyCheckResolver) Jobs(ctx context.Context, args *ConnectionQueryArgs) (*JobConnectionResolver, error) {
+	return jobConnectionForPolicyCheck(ctx, r.run.WorkspaceID, r.check.ID, args)
+}
+
+// Policies resolver returns the per-policy-set snapshots the check evaluates, each with its result
+// (empty until evaluated) and the origins that contributed the package — all taken from the
+// check's own snapshot.
+func (r *PolicyCheckResolver) Policies() []*PolicyCheckPolicyResolver {
+	resolvers := make([]*PolicyCheckPolicyResolver, len(r.check.Policies))
+	for i := range r.check.Policies {
+		resolvers[i] = &PolicyCheckPolicyResolver{checkID: r.check.ID, policy: r.check.Policies[i]}
+	}
+
+	return resolvers
+}
+
+// MessagesSummary resolver returns the check's preview of the messages its policies reported. It is
+// served from the check's own row, so a caller rendering many checks can show what failed without a
+// read per policy from object storage.
+func (r *PolicyCheckResolver) MessagesSummary() *PolicyCheckMessagesSummaryResolver {
+	return &PolicyCheckMessagesSummaryResolver{summary: r.check.MessagesSummary}
+}
+
+// PolicyCheckMessagesSummaryResolver resolves a policy check's message summary. It tolerates a nil
+// summary — a check that has not reported yet — so the field can stay non-null.
+type PolicyCheckMessagesSummaryResolver struct {
+	summary *models.PolicyCheckMessagesSummary
+}
+
+// Messages resolver returns the previewed messages, empty when the check has reported none.
+func (r *PolicyCheckMessagesSummaryResolver) Messages() []string {
+	if r.summary == nil {
+		return []string{}
+	}
+	return r.summary.Messages
+}
+
+// Truncated resolver reports whether messages leaves some of what was reported out.
+func (r *PolicyCheckMessagesSummaryResolver) Truncated() bool {
+	return r.summary != nil && r.summary.Truncated
+}
+
+// PolicyCheckPolicyResolver resolves a single package the check evaluates, with its result. checkID
+// is the policy check node this snapshot belongs to, which the messages resolver needs to address it.
+type PolicyCheckPolicyResolver struct {
+	checkID string
+	policy  *models.PolicyCheckPolicy
+}
+
+// ID resolver returns the policy's ID within the run's policy check. It is the join key a run gate
+// approval rule references by name.
+func (r *PolicyCheckPolicyResolver) ID() string {
+	return r.policy.ID
+}
+
+// Name resolver returns the policy's name as it was when the run was created. Empty on checks
+// created before the name was snapshotted.
+func (r *PolicyCheckPolicyResolver) Name() string {
+	return r.policy.Name
+}
+
+// Description resolver returns the policy's description as it was when the run was created. Empty
+// on checks created before the description was snapshotted, and for policies without one.
+func (r *PolicyCheckPolicyResolver) Description() string {
+	return r.policy.Description
+}
+
+// PackageSource resolver.
+func (r *PolicyCheckPolicyResolver) PackageSource() string {
+	return r.policy.PackageSource
+}
+
+// PackageVersionConstraint resolver.
+func (r *PolicyCheckPolicyResolver) PackageVersionConstraint() string {
+	return r.policy.PackageVersionConstraint
+}
+
+// EnforcementLevel resolver returns the effective (strictest across sources) level.
+func (r *PolicyCheckPolicyResolver) EnforcementLevel() string {
+	return toGraphqlEnum(string(r.policy.EnforcementLevel))
+}
+
+// Status resolver returns the pass/fail result, empty until the check has been evaluated.
+func (r *PolicyCheckPolicyResolver) Status() string {
+	return toGraphqlEnum(string(r.policy.Status))
+}
+
+// Messages resolver returns every violation the policy reported, one entry each. The list is held in
+// object storage, so this reads it per policy — the check's messagesSummary is the cheap alternative
+// for anything rendering more than one check.
+func (r *PolicyCheckPolicyResolver) Messages(ctx context.Context) ([]string, error) {
+	return getServiceCatalog(ctx).RunService.GetPolicyCheckPolicyMessages(ctx, r.checkID, r.policy.ID)
+}
+
+// Provenance resolver returns the owner whose policy contributed this policy to the run.
+func (r *PolicyCheckPolicyResolver) Provenance() *PolicyCheckPolicyProvenanceResolver {
+	return &PolicyCheckPolicyProvenanceResolver{provenance: r.policy.Provenance}
+}
+
+// Policy resolver returns the policy resource this entry was snapshotted from. The snapshot's ID is
+// the policy's own ID (see createPolicyChecks), so this is a plain by-ID load.
+//
+// It resolves to null rather than erroring when the policy is gone or unreadable: a run's snapshot
+// outlives the policy it came from, and the caller may not hold ViewPolicy on the owning group. The
+// snapshot fields on this type render either way. Note the returned policy reflects its current
+// state, not its state when the run was created.
+func (r *PolicyCheckPolicyResolver) Policy(ctx context.Context) (*PolicyResolver, error) {
+	policy, err := loadPolicy(ctx, r.policy.ID)
+	if err != nil {
+		if code := errors.ErrorCode(err); code == errors.ENotFound || code == errors.EForbidden {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &PolicyResolver{policy: policy}, nil
+}
+
+// PolicyCheckPolicyProvenanceResolver resolves the provenance of a policy check's policy.
+type PolicyCheckPolicyProvenanceResolver struct {
+	provenance models.PolicyCheckPolicyProvenance
+}
+
+// GroupID resolver returns the ID of the group that owns this policy attachment.
+func (r *PolicyCheckPolicyProvenanceResolver) GroupID() string {
+	return r.provenance.GroupID
+}
+
+// PolicyTRN resolver returns the stable TRN of the policy attachment itself.
+func (r *PolicyCheckPolicyProvenanceResolver) PolicyTRN() string {
+	return r.provenance.PolicyTRN
+}
+
 // Variables resolver
 func (r *RunResolver) Variables(ctx context.Context) ([]*RunVariableResolver, error) {
 	resolvers := []*RunVariableResolver{}
@@ -308,6 +559,11 @@ func (r *RunResolver) ForceCanceledBy() *string {
 // ForceCanceled resolver
 func (r *RunResolver) ForceCanceled() bool {
 	return r.run.ForceCanceled
+}
+
+// HasAdvisoryFailures resolver
+func (r *RunResolver) HasAdvisoryFailures() bool {
+	return r.run.HasAdvisoryFailures
 }
 
 // ForceCancelAvailableAt resolver
@@ -402,6 +658,71 @@ func runQuery(ctx context.Context, args *RunQueryArgs) (*RunResolver, error) {
 	}
 
 	return &RunResolver{run: run}, nil
+}
+
+// runNodeQuery resolves a single node of a run by its run-relative path. The run's nodes are loaded
+// with the run itself, so fetching the run — which is what gates this on the workspace's view
+// permission — is the only lookup this does.
+func runNodeQuery(ctx context.Context, args *RunNodeQueryArgs) (*RunNodeResolver, error) {
+	model, err := getServiceCatalog(ctx).FetchModel(ctx, args.RunID)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	run, ok := model.(*models.Run)
+	if !ok {
+		return nil, fmt.Errorf("expected run model type, got %T", model)
+	}
+
+	node := run.NodeByPath(args.NodePath)
+	if node == nil {
+		return nil, nil
+	}
+
+	return &RunNodeResolver{run: run, node: node}, nil
+}
+
+// RunNodeResolver resolves the RunNode union: one of a run's typed nodes. Like NodeResolver, the
+// concrete type is selected by whichever ToX method matches the node the path resolved to; the
+// others report false so the client's inline fragments for them are skipped.
+type RunNodeResolver struct {
+	run  *models.Run
+	node models.RunNode
+}
+
+// ToPlan resolver
+func (r *RunNodeResolver) ToPlan() (*PlanResolver, bool) {
+	if _, ok := r.node.(*models.Plan); ok {
+		return &PlanResolver{run: r.run}, true
+	}
+	return nil, false
+}
+
+// ToApply resolver
+func (r *RunNodeResolver) ToApply() (*ApplyResolver, bool) {
+	if _, ok := r.node.(*models.Apply); ok {
+		return &ApplyResolver{run: r.run}, true
+	}
+	return nil, false
+}
+
+// ToRunTaskStage resolver
+func (r *RunNodeResolver) ToRunTaskStage() (*RunTaskStageResolver, bool) {
+	if stage, ok := r.node.(*models.RunTaskStage); ok {
+		return &RunTaskStageResolver{run: r.run, stage: stage}, true
+	}
+	return nil, false
+}
+
+// ToPolicyCheck resolver
+func (r *RunNodeResolver) ToPolicyCheck() (*PolicyCheckResolver, bool) {
+	if check, ok := r.node.(*models.PolicyCheck); ok {
+		return &PolicyCheckResolver{run: r.run, check: check}, true
+	}
+	return nil, false
 }
 
 func runsQuery(ctx context.Context, args *RunConnectionQueryArgs) (*RunConnectionResolver, error) {
@@ -522,8 +843,9 @@ type CancelRunInput struct {
 	RunID            string
 }
 
-// RetryRunNodeInput is the input for retrying a run's plan or apply node, identified
-// by RunID and NodePath ("plan"/"apply").
+// RetryRunNodeInput is the input for retrying a run's node, identified by RunID and NodePath ("plan",
+// "apply", or a policy check path such as "post_plan.opa"). A plan or apply must be failed or canceled;
+// a policy check may also be soft-failed.
 type RetryRunNodeInput struct {
 	ClientMutationID *string
 	RunID            string
@@ -955,27 +1277,71 @@ func runStateVersionBatchFunc(ctx context.Context, ids []string) (loader.DataBat
 	return batch, nil
 }
 
-// CheckResultResolver resolves a check result
-type CheckResultResolver struct {
+/* Run gate by policy check loader */
+
+const runGateByPolicyCheckLoaderKey = "runGateByPolicyCheck"
+
+// RegisterRunGateByPolicyCheckLoader registers a run gate by policy check loader function
+func RegisterRunGateByPolicyCheckLoader(collection *loader.Collection) {
+	collection.Register(runGateByPolicyCheckLoaderKey, runGateByPolicyCheckBatchFunc)
+}
+
+func loadRunGateForPolicyCheck(ctx context.Context, policyCheckID string) (*models.RunGate, error) {
+	ldr, err := loader.Extract(ctx, runGateByPolicyCheckLoaderKey)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ldr.Load(ctx, dataloader.StringKey(policyCheckID))()
+	if err != nil {
+		return nil, err
+	}
+
+	gate, ok := data.(*models.RunGate)
+	if !ok {
+		return nil, errors.New("Wrong type")
+	}
+
+	return gate, nil
+}
+
+func runGateByPolicyCheckBatchFunc(ctx context.Context, policyCheckIDs []string) (loader.DataBatch, error) {
+	gates, err := getServiceCatalog(ctx).RunService.GetRunGatesByPolicyCheckIDs(ctx, policyCheckIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build map of results, keyed by policy check ID since that is what was queried. A check with no
+	// gate is simply absent, and the resolver turns the loader's ENotFound into a null field.
+	batch := loader.DataBatch{}
+	for _, result := range gates {
+		batch[result.PolicyCheckID] = result
+	}
+
+	return batch, nil
+}
+
+// TerraformCheckResultResolver resolves a check result
+type TerraformCheckResultResolver struct {
 	checkResult *corerun.CheckResult
 }
 
 // Name resolver
-func (r *CheckResultResolver) Name() string {
+func (r *TerraformCheckResultResolver) Name() string {
 	return r.checkResult.Name
 }
 
 // Status resolver
-func (r *CheckResultResolver) Status() string {
-	return r.checkResult.Status
+func (r *TerraformCheckResultResolver) Status() string {
+	return toGraphqlEnum(r.checkResult.Status)
 }
 
 // Objects resolver
-func (r *CheckResultResolver) Objects() []*CheckResultObjectResolver {
-	resolvers := []*CheckResultObjectResolver{}
+func (r *TerraformCheckResultResolver) Objects() []*TerraformCheckResultObjectResolver {
+	resolvers := []*TerraformCheckResultObjectResolver{}
 	for _, obj := range r.checkResult.Objects {
 		objCopy := obj
-		resolvers = append(resolvers, &CheckResultObjectResolver{
+		resolvers = append(resolvers, &TerraformCheckResultObjectResolver{
 			address:         objCopy.Address,
 			status:          objCopy.Status,
 			failureMessages: objCopy.FailureMessages,
@@ -984,25 +1350,25 @@ func (r *CheckResultResolver) Objects() []*CheckResultObjectResolver {
 	return resolvers
 }
 
-// CheckResultObjectResolver resolves an individual checkable object within a check result
-type CheckResultObjectResolver struct {
+// TerraformCheckResultObjectResolver resolves an individual checkable object within a check result
+type TerraformCheckResultObjectResolver struct {
 	address         string
 	status          string
 	failureMessages []string
 }
 
 // Address resolver
-func (r *CheckResultObjectResolver) Address() string {
+func (r *TerraformCheckResultObjectResolver) Address() string {
 	return r.address
 }
 
 // Status resolver
-func (r *CheckResultObjectResolver) Status() string {
-	return r.status
+func (r *TerraformCheckResultObjectResolver) Status() string {
+	return toGraphqlEnum(r.status)
 }
 
 // FailureMessages resolver
-func (r *CheckResultObjectResolver) FailureMessages() []string {
+func (r *TerraformCheckResultObjectResolver) FailureMessages() []string {
 	if r.failureMessages == nil {
 		return []string{}
 	}

@@ -20,8 +20,9 @@ type SetRunAutoApplyInput struct {
 // SetRunAutoApply changes a run's auto-apply setting after creation, recording a run-update
 // activity event. Auto-apply is only consumed when the plan finishes (the state machine
 // decides whether to auto-advance the apply), so the change is only permitted before the plan
-// completes — while the run is still pending/queuing/plan_queued/planning with its apply node
-// not yet started. After that the setting no longer has any effect.
+// completes — while the run is still pending, in its pre-plan policy stage, or at
+// plan_queuing/plan_queued/planning, with its apply node not yet started. After that the setting no longer
+// has any effect.
 type SetRunAutoApply struct {
 	dbClient *db.Client
 	in       *SetRunAutoApplyInput
@@ -72,7 +73,12 @@ func (c *SetRunAutoApply) Execute(ctx context.Context, input *types.ExecuteInput
 		return errors.New("the apply phase has already started, so auto-apply can no longer be changed", errors.WithErrorCode(errors.EConflict))
 	}
 	switch run.Status {
-	case models.RunPending, models.RunQueuing, models.RunPlanQueued, models.RunPlanning:
+	case models.RunPending,
+		// The pre-plan policy stage runs before the plan, so auto-apply is still changeable throughout
+		// it — including while the stage waits for the workspace slot or for a human override.
+		models.RunPrePlanQueuing, models.RunPrePlanRunning,
+		models.RunPrePlanAwaitingDecision, models.RunPrePlanCompleted,
+		models.RunPlanQueuing, models.RunPlanQueued, models.RunPlanning, models.RunPostPlanRunning, models.RunPostPlanAwaitingDecision:
 		// Auto-apply still controls what happens when the plan finishes.
 	default:
 		return errors.New("auto-apply can only be changed before the plan completes", errors.WithErrorCode(errors.EConflict))

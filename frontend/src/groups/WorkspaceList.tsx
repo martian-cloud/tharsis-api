@@ -121,7 +121,8 @@ function WorkspaceList({ fragmentRef }: Props) {
         }
     };
 
-    const edgeCount = (data.workspaces?.edges?.length ?? 0) - 1
+    const edges = data?.workspaces?.edges ?? [];
+    const edgeCount = edges.length - 1
 
     return (
         <Box>
@@ -132,7 +133,7 @@ function WorkspaceList({ fragmentRef }: Props) {
                 onChange={onSearchChange}
                 onKeyPress={onKeyPress}
             />
-            {(data.workspaces?.edges?.length === 0) && search !== '' && <Typography
+            {(edges.length === 0) && search !== '' && <Typography
                 sx={{ p: 4 }}
                 align="center"
                 color="textSecondary"
@@ -140,13 +141,13 @@ function WorkspaceList({ fragmentRef }: Props) {
                 No workspaces matching search <strong>{search}</strong>
             </Typography>}
             <InfiniteScroll
-                dataLength={data.workspaces?.edges?.length ?? 0}
+                dataLength={edges.length}
                 next={() => loadNext(100)}
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
             >
                 <List sx={isRefreshing ? { opacity: 0.5 } : null} disablePadding>
-                    {data.workspaces?.edges?.map((edge: any, index: number) => <WorkspaceListItem key={edge.node.id} workspaceKey={edge.node} last={index === edgeCount} />)}
+                    {edges.map((edge: any, index: number) => <WorkspaceListItem key={edge.node.id} workspaceKey={edge.node} last={index === edgeCount} />)}
                 </List>
             </InfiniteScroll>
         </Box>

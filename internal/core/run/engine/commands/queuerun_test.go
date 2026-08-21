@@ -57,7 +57,7 @@ func TestQueueRun_Execute_PlanPending_WorkspaceBusy(t *testing.T) {
 	run := &models.Run{
 		Metadata:    models.ResourceMetadata{ID: "run-1"},
 		WorkspaceID: "ws-1",
-		Status:      models.RunQueuing,
+		Status:      models.RunPlanQueuing,
 		Plan:        models.Plan{Status: models.PlanPending},
 		Apply:       &models.Apply{Status: models.ApplyCreated}, // non-speculative, not yet pending
 	}
@@ -83,7 +83,7 @@ func TestQueueRun_Execute_PlanPending_WorkspaceFree_Queues(t *testing.T) {
 	run := &models.Run{
 		Metadata:    models.ResourceMetadata{ID: "run-1"},
 		WorkspaceID: "ws-1",
-		Status:      models.RunQueuing,
+		Status:      models.RunPlanQueuing,
 		Plan:        models.Plan{Status: models.PlanPending},
 		Apply:       &models.Apply{Status: models.ApplyCreated},
 	}
@@ -107,7 +107,7 @@ func TestQueueRun_Execute_ApplyPending_WorkspaceFree_Queues(t *testing.T) {
 	run := &models.Run{
 		Metadata:    models.ResourceMetadata{ID: "run-1"},
 		WorkspaceID: "ws-1",
-		Status:      models.RunQueuingApply,
+		Status:      models.RunApplyQueuing,
 		Plan:        models.Plan{Status: models.PlanFinished, HasChanges: true},
 		Apply:       &models.Apply{Status: models.ApplyPending},
 	}

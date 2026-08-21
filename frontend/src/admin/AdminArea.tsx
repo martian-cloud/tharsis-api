@@ -15,6 +15,7 @@ import AdminAreaSystemSettings from "./systemsettings/AdminAreaSystemSettings";
 import AdminAreaConfigurationPage from "./systemsettings/AdminAreaConfigurationPage";
 import AdminAreaResourceLimitsPage from "./systemsettings/AdminAreaResourceLimitsPage";
 import AdminAreaLogs from "./logs/AdminAreaLogs";
+import { PageLayoutProvider } from '../layout/PageLayoutContext';
 
 const query = graphql`
      query AdminAreaQuery {
@@ -77,7 +78,7 @@ function AdminArea({ queryRef }: Props) {
                     >
                         <CircularProgress />
                     </Box>}>
-                        <Box maxWidth={1200} margin="auto" padding={2}>
+                        <PageLayoutProvider>
                             <Routes>
                                 <Route index path={`users/*`} element={<AdminAreaUsers />} />
                                 <Route path={`runners/*`} element={<AdminAreaRunners />} />
@@ -89,7 +90,7 @@ function AdminArea({ queryRef }: Props) {
                                 <Route path={`resource_limits`} element={<AdminAreaResourceLimitsPage />} />
                                 <Route path={`logs`} element={<AdminAreaLogs />} />
                             </Routes>
-                        </Box>
+                        </PageLayoutProvider>
                     </Suspense>
                 </Box>
             </Box>

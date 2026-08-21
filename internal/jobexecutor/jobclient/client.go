@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -36,12 +37,23 @@ type UpdatePlanInput struct {
 	ErrorMessage *string
 }
 
+// RunPolicyOutcomeInput is a single policy's outcome reported for a run stage, keyed by the
+// PolicyCheckPolicy id it was evaluated from. Messages holds one entry per violation, in display
+// order, and is empty when the policy passed.
+type RunPolicyOutcomeInput struct {
+	PolicyID string
+	Messages []string
+	Passed   bool
+}
+
 // Client interface is used by the Job Executor to interface with the Tharsis API
 type Client interface {
 	GetRun(ctx context.Context, id string) (*pb.Run, error)
 	GetJob(ctx context.Context, id string) (*pb.Job, error)
 	GetWorkspace(ctx context.Context, id string) (*pb.Workspace, error)
-	GetRunVariables(ctx context.Context, runID string) ([]*pb.RunVariable, error)
+	GetRunVariables(ctx context.Context, runID string, includeSensitiveValues bool) ([]*pb.RunVariable, error)
+	GetPackageVersion(ctx context.Context, source, versionConstraint string) (*pb.PackageVersion, error)
+	DownloadPackage(ctx context.Context, packageVersionID string) (io.ReadCloser, error)
 	GetAssignedManagedIdentities(ctx context.Context, workspaceID string) ([]*pb.ManagedIdentity, error)
 	GetConfigurationVersion(ctx context.Context, id string) (*pb.ConfigurationVersion, error)
 	CreateStateVersion(ctx context.Context, runID string, body io.Reader) (*pb.StateVersion, error)
@@ -51,12 +63,14 @@ type Client interface {
 	SubscribeToJobCancellationEvent(ctx context.Context, jobID string) (pb.Jobs_SubscribeToJobCancellationEventClient, error)
 	UpdateApply(ctx context.Context, input *UpdateApplyInput) (*pb.Apply, error)
 	UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*pb.Plan, error)
+	ReportRunPolicyOutcomes(ctx context.Context, policyCheckID string, outcomes []RunPolicyOutcomeInput) error
 	SetJobStatus(ctx context.Context, jobID string, status pb.JobStatus, jobProtocolVersion string) (*pb.Job, error)
 	UploadPlanCache(ctx context.Context, planID string, body io.Reader) error
 	UploadPlanData(ctx context.Context, planID string, tfPlan *tfjson.Plan, tfProviderSchemas *tfjson.ProviderSchemas) error
 	DownloadConfigurationVersion(ctx context.Context, configVersionID string, writer io.Writer) error
 	DownloadStateVersion(ctx context.Context, stateVersionID string, writer io.Writer) error
 	DownloadPlanCache(ctx context.Context, planID string, writer io.Writer) error
+	DownloadPlanJSON(ctx context.Context, planID string, writer io.Writer) error
 	Close() error
 	CreateServiceAccountToken(ctx context.Context, serviceAccountPath string, token string) (string, *time.Duration, error)
 	SetVariablesIncludedInTFConfig(ctx context.Context, runID string, variableKeys []string) error
@@ -155,18 +169,49 @@ func (c *jobClient) GetRun(ctx context.Context, id string) (*pb.Run, error) {
 	return c.grpcClient.RunsClient.GetRunByID(ctx, &pb.GetRunByIDRequest{Id: id})
 }
 
-// GetRunVariables gets RunVariables for a run
-func (c *jobClient) GetRunVariables(ctx context.Context, runID string) ([]*pb.RunVariable, error) {
-	// Get run variables and include sensitive values since they will be needed to run the job
+// GetRunVariables gets RunVariables for a run. includeSensitiveValues controls whether sensitive
+// variable values are resolved and returned; callers that don't use the values themselves (e.g.
+// policy evaluation) should pass false.
+func (c *jobClient) GetRunVariables(ctx context.Context, runID string, includeSensitiveValues bool) ([]*pb.RunVariable, error) {
 	resp, err := c.grpcClient.RunsClient.GetRunVariables(ctx, &pb.GetRunVariablesRequest{
 		Id:                     runID,
-		IncludeSensitiveValues: true,
+		IncludeSensitiveValues: includeSensitiveValues,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return resp.Variables, nil
+}
+
+// GetPackageVersion resolves a package source and version constraint to the uploaded package version
+// satisfying it, returning that version (including its global id) so the caller can download it. An
+// empty constraint resolves to the latest uploaded version. A missing package, or a constraint no
+// uploaded version satisfies, surfaces as a NotFound gRPC error (status.Code(err) == codes.NotFound).
+func (c *jobClient) GetPackageVersion(ctx context.Context, source, versionConstraint string) (*pb.PackageVersion, error) {
+	return c.grpcClient.PackagesClient.GetPackageVersion(ctx, &pb.GetPackageVersionRequest{
+		Source:            source,
+		VersionConstraint: versionConstraint,
+	})
+}
+
+// DownloadPackage returns a reader over the tar.gz package for the given package version id. A
+// deleted or unavailable package version surfaces as a NotFound gRPC error, which the caller can
+// detect via status.Code(err) == codes.NotFound. The caller must Close the returned reader.
+func (c *jobClient) DownloadPackage(ctx context.Context, packageVersionID string) (io.ReadCloser, error) {
+	var buf bytes.Buffer
+	err := c.restClient.DownloadPackage(ctx, &client.DownloadPackageInput{
+		PackageVersionID: packageVersionID,
+		Writer:           &buf,
+	})
+	if err != nil {
+		if errors.Is(err, client.ErrPackageNotFound) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		return nil, fmt.Errorf("failed to download package: %w", err)
+	}
+
+	return io.NopCloser(&buf), nil
 }
 
 // GetJob returns a job by ID
@@ -219,6 +264,23 @@ func (c *jobClient) UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*pb
 	})
 }
 
+// ReportRunPolicyOutcomes reports the policy-set outcomes for a run's policy check node.
+func (c *jobClient) ReportRunPolicyOutcomes(ctx context.Context, policyCheckID string, outcomes []RunPolicyOutcomeInput) error {
+	pbOutcomes := make([]*pb.RunPolicyOutcomeInput, len(outcomes))
+	for i, o := range outcomes {
+		pbOutcomes[i] = &pb.RunPolicyOutcomeInput{
+			PolicyId: o.PolicyID,
+			Messages: o.Messages,
+			Passed:   o.Passed,
+		}
+	}
+	_, err := c.grpcClient.RunsClient.ReportRunPolicyOutcomes(ctx, &pb.ReportRunPolicyOutcomesRequest{
+		PolicyCheckId: policyCheckID,
+		Outcomes:      pbOutcomes,
+	})
+	return err
+}
+
 // SetJobStatus sets the status of a job via gRPC.
 func (c *jobClient) SetJobStatus(ctx context.Context, jobID string, status pb.JobStatus, jobProtocolVersion string) (*pb.Job, error) {
 	return c.grpcClient.JobsClient.SetJobStatus(ctx, &pb.SetJobStatusInput{
@@ -268,6 +330,14 @@ func (c *jobClient) DownloadStateVersion(ctx context.Context, stateVersionID str
 // DownloadPlanCache downloads a plan cache and returns any errors
 func (c *jobClient) DownloadPlanCache(ctx context.Context, planID string, writer io.Writer) error {
 	return c.restClient.DownloadPlanCache(ctx, &client.DownloadPlanCacheInput{
+		PlanID: planID,
+		Writer: writer,
+	})
+}
+
+// DownloadPlanJSON downloads a plan's JSON representation and returns any errors
+func (c *jobClient) DownloadPlanJSON(ctx context.Context, planID string, writer io.Writer) error {
+	return c.restClient.DownloadPlanJSON(ctx, &client.DownloadPlanJSONInput{
 		PlanID: planID,
 		Writer: writer,
 	})

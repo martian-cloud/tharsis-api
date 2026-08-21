@@ -31,7 +31,7 @@ func TestGetRunNodeLogs(t *testing.T) {
 		token  = "the-token"
 	)
 	runGID := gid.ToGlobalID(types.RunModelType, runID)
-	planGID := gid.ToGlobalID(types.PlanModelType, planID)
+	planGID := models.RunNodeGID(planID)
 
 	logData := []byte("hello logs")
 

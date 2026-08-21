@@ -505,34 +505,32 @@ func TestRequireAccessToGroup(t *testing.T) {
 			expectErrorCode:    errors.ENotFound,
 		},
 		{
-			name: "need CreateGPGKeyPermission, have dov: multiple namespaces, ensure lowest namespace membership wins",
+			name: "need CreateGPGKeyPermission, have dov: permissions aggregate, so the owner membership on the root grants it",
 			namespaceMemberships: []models.NamespaceMembership{
-				{RoleID: models.ViewerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1/ns2/ns11"}}, // This should win.
+				{RoleID: models.ViewerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1/ns2/ns11"}},
 				{RoleID: models.DeployerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1/ns2"}},
-				{RoleID: models.OwnerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1"}},
+				{RoleID: models.OwnerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1"}}, // This grants access.
 			},
 			group: &models.Group{
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns2/ns11",
 			},
 			requiredPermission: &models.CreateGPGKeyPermission,
-			expectErrorCode:    errors.EForbidden,
 		},
 		{
-			name: "need CreateManagedIdentityPermission, have do: multiple namespaces, ensure lowest membership wins",
+			name: "need CreateManagedIdentityPermission, have do: a narrower deployer membership does not shadow the inherited owner membership",
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: models.DeployerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1/ns11"}},
-				{RoleID: models.OwnerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1"}},
+				{RoleID: models.OwnerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1"}}, // This grants access.
 			},
 			group: &models.Group{
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &models.CreateManagedIdentityPermission,
-			expectErrorCode:    errors.EForbidden,
 		},
 		{
-			name: "need UpdateManagedIdentityPermission, have od: multiple namespaces, ensure lowest membership wins",
+			name: "need UpdateManagedIdentityPermission, have od: the direct owner membership grants it",
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: models.OwnerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1/ns11"}},
 				{RoleID: models.DeployerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1"}},
@@ -543,9 +541,8 @@ func TestRequireAccessToGroup(t *testing.T) {
 			},
 			requiredPermission: &models.UpdateManagedIdentityPermission,
 		},
-		// Need CreateGroupPermission, have 2 namespaces, ensure lowest membership wins.
 		{
-			name: "need CreateGroupPermission, have dv: multiple namespaces, ensure lowest membership wins",
+			name: "need CreateGroupPermission, have dv: the direct deployer membership grants it",
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: models.DeployerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1/ns11"}},
 				{RoleID: models.ViewerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1"}},
@@ -555,6 +552,19 @@ func TestRequireAccessToGroup(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &models.CreateGroupPermission,
+		},
+		{
+			name: "need CreateGPGKeyPermission, have vv: aggregating memberships still denies when no membership grants it",
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.ViewerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1/ns11"}},
+				{RoleID: models.ViewerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+			group: &models.Group{
+				Metadata: models.ResourceMetadata{ID: groupID},
+				FullPath: "ns1/ns11",
+			},
+			requiredPermission: &models.CreateGPGKeyPermission,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "negative: need UpdateManagedIdentityPermission, have deployer",
@@ -932,6 +942,7 @@ func TestRequireAccessToWorkspaceCachesWorkspaceLookup(t *testing.T) {
 func TestRequireAccessToNamespace(t *testing.T) {
 	userID := "user1"
 	serviceAccountID := "serviceAccount1"
+	teamID := "team1"
 	customRoleID := "custom-role-1"
 
 	// Test cases
@@ -1035,6 +1046,37 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			name: "user has lower access level than required in nested group",
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: models.DeployerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+			userID:             &userID,
+			requiredNamespace:  "ns1/ns2/ns3",
+			requiredPermission: &models.CreateManagedIdentityPermission,
+			expectErrorCode:    errors.EForbidden,
+		},
+		{
+			name: "user's permissions aggregate across every membership that applies to the namespace",
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.ViewerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1/ns2/ns3"}},
+				{RoleID: models.OwnerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+			userID:             &userID,
+			requiredNamespace:  "ns1/ns2/ns3",
+			requiredPermission: &models.CreateManagedIdentityPermission,
+		},
+		{
+			name: "a direct membership does not shadow a broader membership inherited via a team",
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.ViewerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1/ns2/ns3"}},
+				{RoleID: models.OwnerRoleID.String(), TeamID: &teamID, Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+			userID:             &userID,
+			requiredNamespace:  "ns1/ns2/ns3",
+			requiredPermission: &models.CreateManagedIdentityPermission,
+		},
+		{
+			name: "aggregating memberships still denies when none of them grant the permission",
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.ViewerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1/ns2/ns3"}},
+				{RoleID: models.DeployerRoleID.String(), TeamID: &teamID, Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
 			userID:             &userID,
 			requiredNamespace:  "ns1/ns2/ns3",

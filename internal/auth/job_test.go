@@ -189,85 +189,133 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 		},
 		{
 			name:        "job has permission to write to plan",
-			run:         &models.Run{Plan: models.Plan{ID: "plan1"}},
-			job:         &models.Job{Metadata: models.ResourceMetadata{ID: caller.JobID}},
-			perms:       models.UpdatePlanPermission,
-			constraints: []func(*constraints){WithPlanID("plan1")},
+			run:         &models.Run{Plan: models.Plan{ID: "plan1", LatestJobID: &caller.JobID}},
+			perms:       models.UpdateRunPermission,
+			constraints: []func(*constraints){WithRunID(caller.RunID), WithPlanID("plan1")},
 		},
 		{
 			name:            "access denied because requested plan ID does not match run plan ID",
-			run:             &models.Run{Plan: models.Plan{ID: "plan1"}},
-			perms:           models.UpdatePlanPermission,
-			constraints:     []func(*constraints){WithPlanID(invalid)},
+			run:             &models.Run{Plan: models.Plan{ID: "plan1", LatestJobID: &caller.JobID}},
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithPlanID(invalid)},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:            "access denied because job IDs do not match",
-			run:             &models.Run{Plan: models.Plan{ID: "plan1"}},
-			job:             &models.Job{Metadata: models.ResourceMetadata{ID: invalid}},
-			perms:           models.UpdatePlanPermission,
-			constraints:     []func(*constraints){WithPlanID("plan1")},
+			name:            "access denied because run ID does not match caller run ID (plan)",
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(invalid), WithPlanID("plan1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:            "access denied because run doesn't exist",
-			perms:           models.UpdatePlanPermission,
-			constraints:     []func(*constraints){WithPlanID("plan1")},
+			name:            "access denied because plan latest job is not the caller's job",
+			run:             &models.Run{Plan: models.Plan{ID: "plan1", LatestJobID: &invalid}},
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithPlanID("plan1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:            "access denied because latest plan job doesn't exist",
+			name:            "access denied because run doesn't exist (plan)",
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithPlanID("plan1")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "access denied because plan has no latest job",
 			run:             &models.Run{Plan: models.Plan{ID: "plan1"}},
-			perms:           models.UpdatePlanPermission,
-			constraints:     []func(*constraints){WithPlanID("plan1")},
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithPlanID("plan1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name: "job has permission to write to apply",
 			run: &models.Run{
 				Plan:  models.Plan{ID: "plan1"},
-				Apply: &models.Apply{ID: "apply1"},
+				Apply: &models.Apply{ID: "apply1", LatestJobID: &caller.JobID},
 			},
-			job:         &models.Job{Metadata: models.ResourceMetadata{ID: caller.JobID}},
-			perms:       models.UpdateApplyPermission,
-			constraints: []func(*constraints){WithApplyID("apply1")},
+			perms:       models.UpdateRunPermission,
+			constraints: []func(*constraints){WithRunID(caller.RunID), WithApplyID("apply1")},
 		},
 		{
 			name: "access denied because requested apply ID does not match run apply ID",
 			run: &models.Run{
 				Plan:  models.Plan{ID: "plan1"},
-				Apply: &models.Apply{ID: "apply1"},
+				Apply: &models.Apply{ID: "apply1", LatestJobID: &caller.JobID},
 			},
-			perms:           models.UpdateApplyPermission,
-			constraints:     []func(*constraints){WithApplyID(invalid)},
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithApplyID(invalid)},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name: "access denied because job IDs do not match",
+			name: "access denied because apply latest job is not the caller's job",
+			run: &models.Run{
+				Plan:  models.Plan{ID: "plan1"},
+				Apply: &models.Apply{ID: "apply1", LatestJobID: &invalid},
+			},
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithApplyID("apply1")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "access denied because run doesn't exist (apply)",
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithApplyID("apply1")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "access denied because apply has no latest job",
 			run: &models.Run{
 				Plan:  models.Plan{ID: "plan1"},
 				Apply: &models.Apply{ID: "apply1"},
 			},
-			job:             &models.Job{Metadata: models.ResourceMetadata{ID: invalid}},
-			perms:           models.UpdateApplyPermission,
-			constraints:     []func(*constraints){WithApplyID("apply1")},
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithApplyID("apply1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:            "access denied because run doesn't exist",
-			perms:           models.UpdateApplyPermission,
-			constraints:     []func(*constraints){WithApplyID("apply1")},
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name: "access denied because latest apply job doesn't exist",
+			name: "job has permission to write to policy check",
 			run: &models.Run{
-				Plan:  models.Plan{ID: "plan1"},
-				Apply: &models.Apply{ID: "apply1"},
+				Plan:       models.Plan{ID: "plan1"},
+				TaskStages: []*models.RunTaskStage{{StageName: models.RunTaskStageNamePostPlan, PolicyChecks: []*models.PolicyCheck{{ID: "pc1", LatestJobID: &caller.JobID}}}},
 			},
-			perms:           models.UpdateApplyPermission,
-			constraints:     []func(*constraints){WithApplyID("apply1")},
+			perms:       models.UpdateRunPermission,
+			constraints: []func(*constraints){WithRunID(caller.RunID), WithPolicyCheckID("pc1")},
+		},
+		{
+			name: "access denied because requested policy check ID is not on the run",
+			run: &models.Run{
+				Plan:       models.Plan{ID: "plan1"},
+				TaskStages: []*models.RunTaskStage{{StageName: models.RunTaskStageNamePostPlan, PolicyChecks: []*models.PolicyCheck{{ID: "pc1", LatestJobID: &caller.JobID}}}},
+			},
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithPolicyCheckID(invalid)},
 			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "access denied because policy check latest job is not the caller's job",
+			run: &models.Run{
+				Plan:       models.Plan{ID: "plan1"},
+				TaskStages: []*models.RunTaskStage{{StageName: models.RunTaskStageNamePostPlan, PolicyChecks: []*models.PolicyCheck{{ID: "pc1", LatestJobID: &invalid}}}},
+			},
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithPolicyCheckID("pc1")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "access denied because policy check has no latest job",
+			run: &models.Run{
+				Plan:       models.Plan{ID: "plan1"},
+				TaskStages: []*models.RunTaskStage{{StageName: models.RunTaskStageNamePostPlan, PolicyChecks: []*models.PolicyCheck{{ID: "pc1"}}}},
+			},
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID), WithPolicyCheckID("pc1")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "access denied because no resource constraint specified with run ID",
+			run:             &models.Run{Plan: models.Plan{ID: "plan1"}},
+			perms:           models.UpdateRunPermission,
+			constraints:     []func(*constraints){WithRunID(caller.RunID)},
+			expectErrorCode: errors.EInternal,
 		},
 		{
 			name:            "access denied because no permissions specified",
@@ -374,14 +422,8 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 
 			constraints := getConstraints(test.constraints...)
 
-			stage := models.JobPlanType
-			if constraints.applyID != nil {
-				stage = models.JobApplyType
-			}
-
 			mockRuns.On("GetRunByID", mock.Anything, caller.RunID).Return(test.run, nil).Maybe()
 
-			mockJobs.On("GetLatestJobByType", mock.Anything, caller.RunID, stage).Return(test.job, nil).Maybe()
 			mockJobs.On("GetJobByID", mock.Anything, caller.JobID).Return(test.job, nil).Maybe()
 
 			if constraints.workspaceID != nil {

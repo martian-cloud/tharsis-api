@@ -208,7 +208,7 @@ func TestUserCaller_RequireInheritedPermissions(t *testing.T) {
 		},
 		{
 			name:            "access denied by the authorizer because a permission is not satisfied",
-			modelType:       types.ApplyModelType, // Just using an invalid resource here to deny access.
+			modelType:       types.RunModelType, // Just using an arbitrary non-inheritable resource here to deny access.
 			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
 			expectErrorCode: errors.ENotFound,
 			withAuthorizer:  true,

@@ -119,6 +119,10 @@ var activityEventFieldList = append(metadataFieldList,
 	"runner_target_id",
 	"terraform_provider_version_mirror_target_id",
 	"federated_registry_target_id",
+	"package_target_id",
+	"package_version_target_id",
+	"policy_target_id",
+	"run_gate_target_id",
 )
 
 // NewActivityEvents returns an instance of the ActivityEvents interface
@@ -283,6 +287,10 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		runnerTargetID                         *string
 		terraformProviderVersionMirrorTargetID *string
 		federatedRegistryTargetID              *string
+		packageTargetID                        *string
+		packageVersionTargetID                 *string
+		policyTargetID                         *string
+		runGateTargetID                        *string
 	)
 
 	switch input.TargetType {
@@ -326,6 +334,14 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		terraformProviderVersionMirrorTargetID = &input.TargetID
 	case models.TargetFederatedRegistry:
 		federatedRegistryTargetID = &input.TargetID
+	case models.TargetPackage:
+		packageTargetID = &input.TargetID
+	case models.TargetPackageVersion:
+		packageVersionTargetID = &input.TargetID
+	case models.TargetPolicy:
+		policyTargetID = &input.TargetID
+	case models.TargetRunGate:
+		runGateTargetID = &input.TargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
 		tracing.RecordError(span, nil, "invalid target type: %s", input.TargetType)
@@ -369,6 +385,10 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		"runner_target_id":                     runnerTargetID,
 		"terraform_provider_version_mirror_target_id": terraformProviderVersionMirrorTargetID,
 		"federated_registry_target_id":                federatedRegistryTargetID,
+		"package_target_id":                           packageTargetID,
+		"package_version_target_id":                   packageVersionTargetID,
+		"policy_target_id":                            policyTargetID,
+		"run_gate_target_id":                          runGateTargetID,
 	}
 
 	sql, args, err := toSQLWithTag("activity_event.CreateActivityEvent", dialect.Insert("activity_events").
@@ -453,6 +473,18 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 					return nil, errors.New("terraform provider version mirror does not exist", errors.WithErrorCode(errors.ENotFound))
 				case "fk_activity_events_federated_registry_target_id":
 					return nil, errors.New("federated registry does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+				case "fk_activity_events_package_target_id":
+					tracing.RecordError(span, nil, "package does not exist")
+					return nil, errors.New("package does not exist", errors.WithErrorCode(errors.ENotFound))
+				case "fk_activity_events_package_version_target_id":
+					tracing.RecordError(span, nil, "package version does not exist")
+					return nil, errors.New("package version does not exist", errors.WithErrorCode(errors.ENotFound))
+				case "fk_activity_events_policy_target_id":
+					tracing.RecordError(span, nil, "policy does not exist")
+					return nil, errors.New("policy does not exist", errors.WithErrorCode(errors.ENotFound))
+				case "fk_activity_events_run_gate_target_id":
+					tracing.RecordError(span, nil, "run gate does not exist")
+					return nil, errors.New("run gate does not exist", errors.WithErrorCode(errors.ENotFound))
 				}
 			}
 		}
@@ -505,6 +537,10 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		runnerTargetID                         *string
 		terraformProviderVersionMirrorTargetID *string
 		federatedRegistryTargetID              *string
+		packageTargetID                        *string
+		packageVersionTargetID                 *string
+		policyTargetID                         *string
+		runGateTargetID                        *string
 	)
 
 	fields := []interface{}{
@@ -537,6 +573,10 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		&runnerTargetID,
 		&terraformProviderVersionMirrorTargetID,
 		&federatedRegistryTargetID,
+		&packageTargetID,
+		&packageVersionTargetID,
+		&policyTargetID,
+		&runGateTargetID,
 	}
 
 	// Balance the number of selected fields and fields to scan out.
@@ -592,6 +632,14 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		activityEvent.TargetID = *terraformProviderVersionMirrorTargetID
 	case models.TargetFederatedRegistry:
 		activityEvent.TargetID = *federatedRegistryTargetID
+	case models.TargetPackage:
+		activityEvent.TargetID = *packageTargetID
+	case models.TargetPackageVersion:
+		activityEvent.TargetID = *packageVersionTargetID
+	case models.TargetPolicy:
+		activityEvent.TargetID = *policyTargetID
+	case models.TargetRunGate:
+		activityEvent.TargetID = *runGateTargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
 		return nil, fmt.Errorf("invalid target type: %s", activityEvent.TargetType)

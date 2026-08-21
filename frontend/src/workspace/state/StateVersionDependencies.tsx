@@ -1,3 +1,4 @@
+import NoResults from '@/common/NoResults';
 import Box from '@mui/material/Box';
 import List from '@mui/material/List';
 import Paper from '@mui/material/Paper';
@@ -49,13 +50,9 @@ function StateVersionDependencies(props: Props) {
             {(filteredDependencies.length === 0 && search !== '') && <Typography sx={{ padding: 2, marginTop: 4 }} align="center" color="textSecondary">
                 No dependencies matching search <strong>{search}</strong>
             </Typography>}
-            {(filteredDependencies.length === 0 && search === '') && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                    <Typography color="textSecondary" align="center">
-                        This workspace does not have any workspace dependencies
-                    </Typography>
-                </Box>
-            </Paper>}
+            {(filteredDependencies.length === 0 && search === '') && <NoResults sx={{ mt: 4 }}>
+                This workspace does not have any workspace dependencies
+            </NoResults>}
             {filteredDependencies.length > 0 && <Box marginTop={2}>
                 <Paper>
                     <Box padding={'8px 16px'} display="flex" alignItems="center">

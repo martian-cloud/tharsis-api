@@ -1,8 +1,8 @@
 package controllers
 
 import (
+	stderrors "errors"
 	"net/http"
-	"strings"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/go-chi/chi/v5"
@@ -83,7 +83,8 @@ func (c *moduleRegistryController) UploadModuleVersionPackage(w http.ResponseWri
 	defer limitReader.Close()
 
 	if err := c.moduleRegistryService.UploadModuleVersionPackage(r.Context(), moduleVersion, limitReader); err != nil {
-		if strings.Contains(err.Error(), "read multipart upload data failed, http: request body too large") {
+		var maxBytesErr *http.MaxBytesError
+		if stderrors.As(err, &maxBytesErr) {
 			c.respWriter.RespondWithError(r.Context(), w, terrors.New("upload failed, module size exceeds maximum size of %d bytes", c.moduleRegistryMaxUploadSize, terrors.WithErrorCode(errors.ETooLarge)))
 		} else {
 			c.respWriter.RespondWithError(r.Context(), w, err)

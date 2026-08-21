@@ -12,10 +12,12 @@ import (
 
 // SyncJobStatus maps a job status change to the corresponding run node.
 type SyncJobStatus struct {
-	logger    logger.Logger
-	RunID     string
-	JobType   models.JobType
-	JobID     string
+	logger  logger.Logger
+	RunID   string
+	JobType models.JobType
+	JobID   string
+	// JobData carries type-specific job payload. Nil for plan/apply jobs.
+	JobData   *models.OPAJobData
 	NewStatus models.JobStatus
 
 	// PersistJob is responsible for persisting the job status change (and any log-stream completion) within the command transaction.
@@ -89,6 +91,34 @@ func (c *SyncJobStatus) Execute(ctx context.Context, input *types.ExecuteInput) 
 			return nil
 		}
 		changes, err = statemachine.SetApplyStatus(run, applyStatus)
+	case models.JobOPAType:
+		// Look up the check directly by ID. The job carries the policy check ID in its
+		// OPAJobData payload, so no scan across LatestJobID is needed.
+		if c.JobData == nil {
+			return errors.New("run %s %s job has no OPA job data", c.RunID, c.JobType, errors.WithErrorCode(errors.EInvalid))
+		}
+		check := run.PolicyCheckByID(c.JobData.PolicyCheckID)
+		if check == nil {
+			return errors.New("run %s has no matching policy check node %s for %s job", c.RunID, c.JobData.PolicyCheckID, c.JobType, errors.WithErrorCode(errors.ENotFound))
+		}
+		if c.isStaleJob(check.LatestJobID) {
+			return nil
+		}
+		// Only a check still awaiting its verdict (created/queued/running) is driven by the
+		// job status. Once a verdict is set — including awaiting_override, and notably by
+		// ReportRunPolicyOutcomes which is the sole verdict writer — the job's terminal status is
+		// a no-op: JobFinished never transitions the node, and a late JobFailed/JobCanceled
+		// must not overturn a recorded verdict.
+		switch check.Status {
+		case models.PolicyCheckCreated, models.PolicyCheckQueued, models.PolicyCheckRunning:
+		default:
+			return nil
+		}
+		checkStatus, ok := mapJobStatusToPolicyCheckStatus(c.NewStatus)
+		if !ok {
+			return nil
+		}
+		changes, err = statemachine.SetPolicyCheckStatus(run, check.GetPath(), checkStatus)
 	default:
 		return errors.New("unknown job type %s for run %s", c.JobType, c.RunID)
 	}
@@ -133,6 +163,24 @@ func mapJobStatusToApplyStatus(jobStatus models.JobStatus) (models.ApplyStatus, 
 		return models.ApplyErrored, true
 	case models.JobCanceled:
 		return models.ApplyCanceled, true
+	}
+	return "", false
+}
+
+// mapJobStatusToPolicyCheckStatus maps a policy-eval job status to a policy check node status.
+// JobFinished (and JobPending) produce no node change: the check verdict is set by
+// ReportRunPolicyOutcomes, not by the job finishing. A failed or canceled job errors/cancels the
+// check, and JobRunning starts it.
+func mapJobStatusToPolicyCheckStatus(jobStatus models.JobStatus) (models.PolicyCheckStatus, bool) {
+	switch jobStatus {
+	case models.JobQueued:
+		return models.PolicyCheckQueued, true
+	case models.JobRunning:
+		return models.PolicyCheckRunning, true
+	case models.JobFailed:
+		return models.PolicyCheckErrored, true
+	case models.JobCanceled:
+		return models.PolicyCheckCanceled, true
 	}
 	return "", false
 }

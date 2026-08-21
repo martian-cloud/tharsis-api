@@ -31,6 +31,24 @@ func (_m *MockRESTClient) DownloadConfigurationVersion(ctx context.Context, inpu
 	return r0
 }
 
+// DownloadPackage provides a mock function with given fields: ctx, input
+func (_m *MockRESTClient) DownloadPackage(ctx context.Context, input *DownloadPackageInput) error {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DownloadPackage")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *DownloadPackageInput) error); ok {
+		r0 = rf(ctx, input)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DownloadPlanCache provides a mock function with given fields: ctx, input
 func (_m *MockRESTClient) DownloadPlanCache(ctx context.Context, input *DownloadPlanCacheInput) error {
 	ret := _m.Called(ctx, input)
@@ -41,6 +59,24 @@ func (_m *MockRESTClient) DownloadPlanCache(ctx context.Context, input *Download
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *DownloadPlanCacheInput) error); ok {
+		r0 = rf(ctx, input)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DownloadPlanJSON provides a mock function with given fields: ctx, input
+func (_m *MockRESTClient) DownloadPlanJSON(ctx context.Context, input *DownloadPlanJSONInput) error {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DownloadPlanJSON")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *DownloadPlanJSONInput) error); ok {
 		r0 = rf(ctx, input)
 	} else {
 		r0 = ret.Error(0)

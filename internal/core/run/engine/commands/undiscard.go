@@ -67,7 +67,7 @@ func (c *UndiscardRun) Execute(ctx context.Context, input *types.ExecuteInput) e
 		return errors.New("run can only be undiscarded when it is in the discarded state", errors.WithErrorCode(errors.EConflict))
 	}
 
-	changes, err := statemachine.SetRunStatus(run, models.RunPlanned)
+	changes, err := statemachine.UndiscardRun(run)
 	if err != nil {
 		return err
 	}

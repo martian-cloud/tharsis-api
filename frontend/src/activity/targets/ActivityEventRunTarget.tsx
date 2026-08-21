@@ -45,7 +45,10 @@ function ActivityEventRunTarget({ fragmentRef }: Props) {
             payload {
                 __typename
                 ...on ActivityEventUpdateRunPayload {
-                    type
+                    # Aliased because ActivityEventUpdateRunGatePayload also has a "type", of a
+                    # different GraphQL type, and both payload fragments are spread into the same
+                    # ActivityEvent.payload selection in ActivityEventList.
+                    runUpdateType: type
                     nodePath
                 }
             }
@@ -56,7 +59,7 @@ function ActivityEventRunTarget({ fragmentRef }: Props) {
     const payload = data.payload;
     const isRunUpdatePayload = payload?.__typename === 'ActivityEventUpdateRunPayload';
     let actionText = (data.action === 'UPDATE' && isRunUpdatePayload)
-        ? (RUN_UPDATE_TYPE_TEXT[payload.type] ?? 'updated')
+        ? (RUN_UPDATE_TYPE_TEXT[payload.runUpdateType] ?? 'updated')
         : (ACTION_TEXT[data.action] ?? 'updated');
     // Node-scoped updates (e.g. retry) carry the node path so we can name the node acted on.
     if (isRunUpdatePayload && payload.nodePath) {
@@ -70,8 +73,8 @@ function ActivityEventRunTarget({ fragmentRef }: Props) {
             icon={<RunIcon />}
             primary={<React.Fragment>
                 Run <ActivityEventLink
-                    to={`/groups/${data.namespacePath}/-/runs/${run.id}`}>{run.id.substring(0, 8)}...
-                </ActivityEventLink> {actionText} in <ActivityEventLink to={`/groups/${data.namespacePath}`}>{data.namespacePath}</ActivityEventLink>
+                    to={`/groups/${data.namespacePath}/-/runs/${run.id}`}>{run.id.substring(0, 8)}
+                </ActivityEventLink> {actionText} in <ActivityEventLink color="inherit" to={`/groups/${data.namespacePath}`}>{data.namespacePath}</ActivityEventLink>
             </React.Fragment>}
         />
     );

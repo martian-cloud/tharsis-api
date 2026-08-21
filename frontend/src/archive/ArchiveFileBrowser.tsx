@@ -1,5 +1,6 @@
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DownloadIcon from '@mui/icons-material/Download';
-import { Alert, Box, Button, CircularProgress, Typography, useTheme } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Menu, MenuItem, Typography, useTheme } from '@mui/material';
 import { RichTreeView } from '@mui/x-tree-view/RichTreeView';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -15,9 +16,13 @@ interface Props {
     // downloadName maps a file path to the saved filename; defaults to the path's basename.
     downloadName?: (path: string) => string;
     preferredFile?: string;
+    // filePicker chooses how files are selected. 'tree' keeps a persistent nested tree beside the
+    // content, which suits archives of deeply nested sources. 'dropdown' collapses the picker into the
+    // content's header bar, for small archives or for a narrow column that can't spare 250px.
+    filePicker?: 'tree' | 'dropdown';
 }
 
-function ArchiveFileBrowser({ load, downloadName, preferredFile }: Props) {
+function ArchiveFileBrowser({ load, downloadName, preferredFile, filePicker = 'tree' }: Props) {
     const theme = useTheme();
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -112,6 +117,31 @@ function ArchiveFileBrowser({ load, downloadName, preferredFile }: Props) {
         );
     }
 
+    if (filePicker === 'dropdown') {
+        return (
+            <Box width="100%" minWidth={0}>
+                <FilePickerBar files={files} selected={selected} onSelectFile={onSelectFile} />
+                {/* Joined to the bar above: square top corners and no top border, so the two read as
+                    one panel. */}
+                <Box
+                    sx={{
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderTop: 0,
+                        borderRadius: '0 0 8px 8px',
+                        overflow: 'hidden',
+                    }}
+                >
+                    {selectedFile && <FileContent
+                        file={selectedFile}
+                        activeLine={activeLine}
+                        onSelectLine={onSelectLine}
+                        onDownload={onDownloadFile}
+                    />}
+                </Box>
+            </Box>
+        );
+    }
+
     return (
         <Box
             display="flex"
@@ -159,6 +189,84 @@ function ArchiveFileBrowser({ load, downloadName, preferredFile }: Props) {
     );
 }
 
+interface FilePickerBarProps {
+    files: ArchiveFile[];
+    selected?: string;
+    onSelectFile: (path: string) => void;
+}
+
+// FilePickerBar is the header of the dropdown layout: the current file opens a menu of every file in
+// the archive, next to the position of that file in the archive. Menu entries carry the full path, so
+// a nested archive is still unambiguous without a tree.
+function FilePickerBar({ files, selected, onSelectFile }: FilePickerBarProps) {
+    const theme = useTheme();
+    const [anchorEl, setAnchorEl] = useState<Element | null>(null);
+
+    const position = files.findIndex((file) => file.path === selected);
+
+    return (
+        <Box
+            sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+                background: theme.palette.background.paper,
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: '8px 8px 0 0',
+                padding: '8px 12px',
+            }}
+        >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                <Button
+                    size="small"
+                    color="inherit"
+                    variant="outlined"
+                    endIcon={<ArrowDropDownIcon />}
+                    onClick={(event) => setAnchorEl(event.currentTarget)}
+                    sx={{
+                        ...theme.typography.code,
+                        textTransform: 'none',
+                        borderColor: theme.palette.divider,
+                        minWidth: 0,
+                        '& .MuiButton-endIcon': { marginLeft: '4px' },
+                    }}
+                >
+                    <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {selected}
+                    </Box>
+                </Button>
+                <Typography variant="body2" color="textSecondary" noWrap>
+                    {position >= 0 ? `${position + 1} of ` : ''}{files.length} file{files.length === 1 ? '' : 's'}
+                </Typography>
+            </Box>
+            <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={() => setAnchorEl(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                slotProps={{ paper: { sx: { maxHeight: 400 } } }}
+            >
+                {files.map((file) => (
+                    <MenuItem
+                        key={file.path}
+                        dense
+                        selected={file.path === selected}
+                        onClick={() => {
+                            setAnchorEl(null);
+                            onSelectFile(file.path);
+                        }}
+                        sx={{ ...theme.typography.code }}
+                    >
+                        {file.path}
+                    </MenuItem>
+                ))}
+            </Menu>
+        </Box>
+    );
+}
+
 interface FileContentProps {
     file: ArchiveFile;
     activeLine?: number;
@@ -167,6 +275,7 @@ interface FileContentProps {
 }
 
 const FileContent = memo(function FileContent({ file, activeLine, onSelectLine, onDownload }: FileContentProps) {
+    const theme = useTheme();
     const decoded = useMemo(() => decodeText(file.data), [file]);
 
     const activeLineRef = useRef(activeLine);
@@ -214,7 +323,7 @@ const FileContent = memo(function FileContent({ file, activeLine, onSelectLine, 
                             backgroundColor: lineNumber === activeLine ? 'rgba(255, 255, 255, 0.1)' : undefined,
                         },
                     })}
-                    customStyle={{ fontSize: 14, margin: 0 }}
+                    customStyle={{ fontSize: theme.typography.code.fontSize, margin: 0 }}
                     language={languageForFile(file.path)}
                     style={prismTheme}
                 >

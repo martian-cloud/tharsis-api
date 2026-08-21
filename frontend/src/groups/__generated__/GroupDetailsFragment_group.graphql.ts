@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5aa27cb0bebf984441aa07fc46eede5d>>
+ * @generated SignedSource<<cc1818a11422ffaf522fafff887ae3b7>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,7 +14,7 @@ export type GroupDetailsFragment_group$data = {
   readonly fullPath: string;
   readonly id: string;
   readonly name: string;
-  readonly " $fragmentSpreads": FragmentRefs<"FederatedRegistriesFragment_group" | "GPGKeysFragment_group" | "GroupDetailsIndexFragment_group" | "GroupRunnersFragment_group" | "GroupRunsFragment_group" | "GroupSettingsFragment_group" | "ManagedIdentitiesFragment_group" | "NamespaceActivityFragment_activity" | "NamespaceMembershipsFragment_memberships" | "ProviderMirrorsFragment_namespace" | "ServiceAccountsFragment_group" | "TerraformModulesFragment_group" | "VCSProvidersFragment_group" | "VariablesFragment_variables">;
+  readonly " $fragmentSpreads": FragmentRefs<"FederatedRegistriesFragment_group" | "GPGKeysFragment_group" | "GroupDetailsIndexFragment_group" | "GroupPackagesFragment_group" | "GroupPoliciesFragment_group" | "GroupRunnersFragment_group" | "GroupRunsFragment_group" | "GroupSettingsFragment_group" | "ManagedIdentitiesFragment_group" | "NamespaceActivityFragment_activity" | "NamespaceMembershipsFragment_memberships" | "ProviderMirrorsFragment_namespace" | "ServiceAccountsFragment_group" | "TerraformModulesFragment_group" | "VCSProvidersFragment_group" | "VariablesFragment_variables">;
   readonly " $fragmentType": "GroupDetailsFragment_group";
 };
 export type GroupDetailsFragment_group$key = {
@@ -82,6 +82,16 @@ const node: ReaderFragment = {
     {
       "args": null,
       "kind": "FragmentSpread",
+      "name": "GroupPackagesFragment_group"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "GroupPoliciesFragment_group"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
       "name": "VCSProvidersFragment_group"
     },
     {
@@ -124,6 +134,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "c8806f3c91ce9fe20428afc622ee1a8c";
+(node as any).hash = "ab8092f516db1218039b5ebc03bf80ae";
 
 export default node;

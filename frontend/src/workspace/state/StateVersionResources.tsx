@@ -1,3 +1,4 @@
+import NoResults from '@/common/NoResults';
 import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -64,13 +65,9 @@ function StateVersionResources(props: Props) {
                     </Typography>
                 </Box>
             </Paper>}
-            {(filteredOutputs.length === 0 && search === '' && !destroyed) && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                    <Typography color="textSecondary" align="center">
-                        This workspace does not have any resources
-                    </Typography>
-                </Box>
-            </Paper>}
+            {(filteredOutputs.length === 0 && search === '' && !destroyed) && <NoResults sx={{ mt: 4 }}>
+                This workspace does not have any resources
+            </NoResults>}
             {filteredOutputs.length > 0 && <Box sx={{ mt: 2 }}>
                 <ResponsiveTable
                     ariaLabel="resources"

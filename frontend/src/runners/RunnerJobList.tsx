@@ -69,6 +69,8 @@ function RunnerJobList() {
 
     useSubscription<RunnerJobListEventsSubscription>(jobSubscriptionConfig);
 
+    const edges = data?.jobs?.edges ?? [];
+
     return (
         <Box sx={{ border: 1, borderTop: 0, borderBottomLeftRadius: 4, borderBottomRightRadius: 4, borderColor: 'divider' }}>
             <Box sx={{
@@ -86,7 +88,7 @@ function RunnerJobList() {
             }}>
                 <Typography color="textSecondary">The following jobs have been claimed by this runner</Typography>
             </Box>
-            {(!data?.jobs.edges || data?.jobs.edges?.length === 0) ? <Paper sx={{ p: 2, m: 2 }}>
+            {(edges.length === 0) ? <Paper sx={{ p: 2, m: 2 }}>
                 <Typography>This runner does not have any jobs.</Typography>
             </Paper>
                 :
@@ -94,12 +96,12 @@ function RunnerJobList() {
                     <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
                         <Box padding={2}>
                             <Typography variant="subtitle1">
-                                {data?.jobs.edges?.length} job{data?.jobs.edges?.length !== 1 && 's'}
+                                {edges.length} job{edges.length !== 1 && 's'}
                             </Typography>
                         </Box>
                     </Paper>
                     <InfiniteScroll
-                        dataLength={(data?.jobs.edges && data?.jobs.edges.length) ?? 0}
+                        dataLength={edges.length}
                         next={() => loadNext(20)}
                         hasMore={hasNext}
                         loader={<ListSkeleton rowCount={3} />}
@@ -109,7 +111,7 @@ function RunnerJobList() {
                             minWidth={650}
                             columns={[{ label: 'Status' }, { label: 'ID' }, { label: 'Stage' }, { label: 'Workspace' }, { label: 'Duration' }, { label: 'Created' }]}
                         >
-                            {data.jobs.edges?.map((edge: any) => (
+                            {edges.map((edge: any) => (
                                 <RunnerJobListItem
                                     key={edge.node.id}
                                     fragmentRef={edge.node}

@@ -31,6 +31,9 @@ service Runs {
   rpc GetApplyByID(apply.GetApplyByIDRequest) returns (apply.Apply);
   // UpdatePlan updates a Plan.
   rpc UpdatePlan(plan.UpdatePlanRequest) returns (plan.Plan);
+  // ReportRunPolicyOutcomes records the policy-set outcomes for a run's post-plan stage node
+  // and sets the stage verdict.
+  rpc ReportRunPolicyOutcomes(ReportRunPolicyOutcomesRequest) returns (google.protobuf.Empty);
   // UpdateApply updates an Apply.
   rpc UpdateApply(apply.UpdateApplyRequest) returns (apply.Apply);
   // SetVariablesIncludedInTFConfig updates which variables are included in the Terraform config.
@@ -57,14 +60,86 @@ enum RunStatus {
   PLANNING             = 3;
   PLANNED              = 4;
   PLANNED_AND_FINISHED = 5;
-  QUEUING              = 6;
-  QUEUING_APPLY        = 7;
+  PLAN_QUEUING         = 6;
+  APPLY_QUEUING        = 7;
   APPLY_QUEUED         = 8;
   APPLYING             = 9;
   APPLIED              = 10;
   CANCELED             = 11;
   DISCARDED            = 12;
   ERRORED              = 13;
+  PRE_PLAN_QUEUING              = 14;
+  PRE_PLAN_RUNNING              = 15;
+  PRE_PLAN_AWAITING_DECISION    = 16;
+  PRE_PLAN_COMPLETED            = 17;
+  POST_PLAN_RUNNING             = 18;
+  POST_PLAN_AWAITING_DECISION   = 19;
+  POST_PLAN_COMPLETED           = 20;
+  PRE_APPLY_QUEUING             = 21;
+  PRE_APPLY_RUNNING             = 22;
+  PRE_APPLY_AWAITING_DECISION   = 23;
+  PRE_APPLY_COMPLETED           = 24;
+}
+
+// PolicyCheckType identifies the policy engine a check runs.
+enum PolicyCheckType {
+  POLICY_CHECK_TYPE_UNSPECIFIED = 0;
+  POLICY_CHECK_TYPE_OPA         = 1;
+}
+
+// RunTaskStageName identifies which stage of a run a policy check evaluates at.
+enum RunTaskStageName {
+  RUN_TASK_STAGE_NAME_UNSPECIFIED = 0;
+  RUN_TASK_STAGE_NAME_PRE_PLAN    = 1;
+  RUN_TASK_STAGE_NAME_POST_PLAN   = 2;
+  RUN_TASK_STAGE_NAME_PRE_APPLY   = 3;
+  RUN_TASK_STAGE_NAME_POST_APPLY  = 4;
+}
+
+// RunTaskStageStatus represents the aggregate status of a task stage node.
+enum RunTaskStageStatus {
+  RUN_TASK_STAGE_STATUS_UNSPECIFIED       = 0;
+  RUN_TASK_STAGE_STATUS_CREATED           = 1;
+  RUN_TASK_STAGE_STATUS_RUNNING           = 2;
+  RUN_TASK_STAGE_STATUS_AWAITING_OVERRIDE = 3;
+  RUN_TASK_STAGE_STATUS_COMPLETED         = 4;
+  RUN_TASK_STAGE_STATUS_ERRORED           = 5;
+  RUN_TASK_STAGE_STATUS_CANCELED          = 6;
+  RUN_TASK_STAGE_STATUS_SKIPPED           = 7;
+  // Ready, but still waiting for the workspace slot. Only the workspace-gated stages
+  // (pre_plan, pre_apply) reach this.
+  RUN_TASK_STAGE_STATUS_PENDING           = 8;
+}
+
+// PolicyCheckStatus represents the status of a policy check node.
+enum PolicyCheckStatus {
+  POLICY_CHECK_STATUS_UNSPECIFIED       = 0;
+  POLICY_CHECK_STATUS_CREATED           = 1;
+  POLICY_CHECK_STATUS_QUEUED            = 2;
+  POLICY_CHECK_STATUS_RUNNING           = 3;
+  POLICY_CHECK_STATUS_PASSED            = 4;
+  POLICY_CHECK_STATUS_SOFT_FAILED = 5;
+  POLICY_CHECK_STATUS_OVERRIDDEN        = 6;
+  POLICY_CHECK_STATUS_ERRORED           = 7;
+  POLICY_CHECK_STATUS_CANCELED          = 8;
+  POLICY_CHECK_STATUS_SKIPPED           = 9;
+  POLICY_CHECK_STATUS_PENDING           = 10;
+}
+
+// PolicyCheckPolicyStatus is the pass/fail result the evaluator reported for a single policy.
+enum PolicyCheckPolicyStatus {
+  POLICY_CHECK_POLICY_STATUS_UNSPECIFIED = 0;
+  POLICY_CHECK_POLICY_STATUS_PASSED      = 1;
+  POLICY_CHECK_POLICY_STATUS_FAILED      = 2;
+  POLICY_CHECK_POLICY_STATUS_PENDING     = 3;
+}
+
+// PolicyEnforcementLevel controls how a policy failure affects a run.
+enum PolicyEnforcementLevel {
+  POLICY_ENFORCEMENT_LEVEL_UNSPECIFIED    = 0;
+  POLICY_ENFORCEMENT_LEVEL_ADVISORY       = 1;
+  POLICY_ENFORCEMENT_LEVEL_SOFT_MANDATORY = 2;
+  POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY = 3;
 }
 
 // GetRunByIDRequest is the input for retrieving a Run by its ID.
@@ -175,6 +250,73 @@ message Run {
   // Not set for speculative runs, which have no apply stage.
   optional apply.Apply               apply                     = 23;
   RunStatus                          status                    = 24;
+  repeated RunTaskStage              task_stages               = 25;
+  bool                               is_assessment_run         = 26;
+}
+
+// RunTaskStage is a stage of a run (pre_plan, post_plan, ...), mirroring the run model's
+// RunTaskStage. It owns the policy checks evaluated at that stage; its status is their aggregate
+// verdict.
+message RunTaskStage {
+  string               id            = 1;
+  RunTaskStageName     stage_name    = 2;
+  RunTaskStageStatus   status        = 3;
+  repeated PolicyCheck policy_checks = 4;
+}
+
+// PolicyCheck is a policy-evaluation node of a run, mirroring the run model's PolicyCheck. It owns
+// the per-policy-set policies it evaluates (with their results) and the check verdict.
+message PolicyCheck {
+  string            id            = 1;
+  PolicyCheckType   check_type    = 2;
+  PolicyCheckStatus status        = 3;
+  optional string   latest_job_id = 4;
+  repeated PolicyCheckPolicy policies      = 5;
+  RunTaskStageName           stage_name    = 6;
+}
+
+// PolicyCheckPolicy is one policy attachment a check evaluates, with its result. There is one entry
+// per valid attachment (no de-duplication); id is the stable per-attachment identity the evaluator
+// echoes when reporting outcomes. package_version_constraint is resolved to a concrete package
+// version by the evaluator when the check runs — an empty constraint means the latest uploaded
+// version. package_digest, when set, is the hex sha256 the package must match. status is empty
+// until the check is evaluated. (Approver fields live server-side only.)
+//
+// The violation messages a previous evaluation reported are deliberately absent: the runner never
+// read them, and they are held in object storage, so carrying them here would cost a fetch per
+// policy on every run sent to a runner.
+message PolicyCheckPolicy {
+  string id             = 1;
+  string package_source = 2;
+  string package_version_constraint = 3;
+  PolicyEnforcementLevel enforcement_level = 4;
+  PolicyCheckPolicyStatus status           = 5;
+  optional string package_digest   = 6;
+  PolicyCheckPolicyProvenance provenance = 7;
+}
+
+// PolicyCheckPolicyProvenance records the group that owns a policy attachment and the stable TRN
+// of the attachment itself. Policies are always group-scoped.
+message PolicyCheckPolicyProvenance {
+  string group_id   = 1;
+  string policy_trn = 2;
+}
+
+// RunPolicyOutcomeInput is a single policy's outcome reported by the policy evaluator, keyed by the
+// PolicyCheckPolicy id it received. The enforcement level is taken server-side from the pinned
+// policy, not supplied here. messages holds one entry per violation the policy reported, in the
+// order it should be displayed; the server bounds how much of it is kept.
+message RunPolicyOutcomeInput {
+  string policy_id = 1;
+  bool   passed    = 2;
+  repeated string messages = 3;
+}
+
+// ReportRunPolicyOutcomesRequest reports the per-policy-set outcomes for a run's policy check
+// node, identified by its RunNode GID
+message ReportRunPolicyOutcomesRequest {
+  string                     policy_check_id = 1;
+  repeated RunPolicyOutcomeInput outcomes        = 2;
 }
 
 // RunVariable represents a variable used in a run.

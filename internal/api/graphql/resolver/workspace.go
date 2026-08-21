@@ -246,6 +246,22 @@ func (r *WorkspaceResolver) AssignedManagedIdentities(ctx context.Context) ([]*M
 	return resolvers, nil
 }
 
+// AssignedPolicies resolver
+func (r *WorkspaceResolver) AssignedPolicies(ctx context.Context) ([]*PolicyResolver, error) {
+	policies, err := getServiceCatalog(ctx).PolicyService.GetWorkspaceAssignedPolicies(ctx, r.workspace.Metadata.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvers := make([]*PolicyResolver, len(policies))
+	for i := range policies {
+		p := policies[i]
+		resolvers[i] = &PolicyResolver{policy: &p}
+	}
+
+	return resolvers, nil
+}
+
 // Labels resolver - converts JSONB labels to GraphQL label array
 func (r *WorkspaceResolver) Labels() ([]*WorkspaceLabelResolver, error) {
 	if len(r.workspace.Labels) == 0 {

@@ -1,7 +1,7 @@
 import AutoScrollIcon from '@mui/icons-material/ArrowCircleDown';
 import { Alert, Box, darken, LinearProgress, Paper, ToggleButton, Tooltip, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useFragment, useLazyLoadQuery, useSubscription } from 'react-relay/hooks';
 import { GraphQLSubscriptionConfig, RecordSourceProxy } from 'relay-runtime';
 import Timestamp from '../../common/Timestamp';
@@ -33,6 +33,11 @@ const subscription = graphql`subscription JobLogsSubscription($input: JobLogStre
 
 interface Props {
     jobId: string
+    // By default the logs scroll with the window and grow the page. Pass scrollMode="container"
+    // with a height to render them as a bounded, self-scrolling box instead — used when the logs
+    // are embedded inside a card rather than filling a tab.
+    scrollMode?: 'window' | 'container'
+    height?: number | string
 }
 
 const bytes = (str: string) => {
@@ -50,10 +55,23 @@ function JobLogs(props: Props) {
     // the logs aren't cached yet. The jobLogStreamEvents subscription keeps the tail live.
     const queryData = useLazyLoadQuery<JobLogsQuery>(query, { id: props.jobId, startOffset: 0, limit: LOG_LIMIT }, { fetchPolicy: 'store-or-network' });
 
-    return queryData.node ? <JobLogsContent fragmentRef={queryData.node} /> : <Alert severity="error">Job not found</Alert>;
+    return queryData.node
+        // Keyed on the job so a change of job remounts rather than reusing this instance. Every
+        // piece of streaming state here — the log buffer, the sizes, the completed flag, the
+        // auto-scroll default and the loaded-size high-water mark that dedupes subscription
+        // events — is derived from the job on mount, and a retry swaps the job in place. Resetting
+        // them from an effect instead is what let the high-water mark survive a retry, which
+        // silently discarded every event for the new job until it outgrew the previous one.
+        ? <JobLogsContent
+            key={props.jobId}
+            fragmentRef={queryData.node}
+            scrollMode={props.scrollMode}
+            height={props.height}
+        />
+        : <Alert severity="error">Job not found</Alert>;
 }
 
-function JobLogsContent(props: { fragmentRef: JobLogsFragment_logs$key }) {
+function JobLogsContent(props: { fragmentRef: JobLogsFragment_logs$key, scrollMode?: 'window' | 'container', height?: number | string }) {
     const theme = useTheme();
     const data = useFragment<JobLogsFragment_logs$key>(
         graphql`
@@ -74,7 +92,8 @@ function JobLogsContent(props: { fragmentRef: JobLogsFragment_logs$key }) {
     const [completed, setCompleted] = useState(data.completed);
     const [autoScroll, setAutoScroll] = useState(!FINAL_JOB_STATES.includes(data.status));
     // Tracks the byte size already appended so we can dedupe events without re-measuring
-    // the whole accumulated buffer on every event.
+    // the whole accumulated buffer on every event. Only valid for this job, which is why the
+    // component is keyed on the job id by its caller.
     const loadedSizeRef = useRef(bytes(data.logs));
 
     const config = useMemo<GraphQLSubscriptionConfig<JobLogsSubscription>>(() => ({
@@ -98,17 +117,6 @@ function JobLogsContent(props: { fragmentRef: JobLogsFragment_logs$key }) {
         }
     }), [data.id]);
     useSubscription<JobLogsSubscription>(config);
-
-    // Reset log state when the job changes so switching jobs shows the new job's logs
-    // instead of the previously rendered job's cached logs.
-    useEffect(() => {
-        setLogs(data.logs);
-        setCurrentLogSize(bytes(data.logs));
-        setActualLogSize(data.logSize);
-        setCompleted(data.completed);
-        setAutoScroll(!FINAL_JOB_STATES.includes(data.status));
-    }, [data.id]);
-
 
     const loadedPercent = useMemo(() => (currentLogSize / actualLogSize) * 100, [currentLogSize, actualLogSize]);
 
@@ -144,12 +152,16 @@ function JobLogsContent(props: { fragmentRef: JobLogsFragment_logs$key }) {
                 logs={logs}
                 loading={!completed}
                 followOutput={autoScroll}
+                scrollMode={props.scrollMode}
                 sx={{
                     backgroundColor: darken(theme.palette.background.default, 0.5),
                     paddingTop: 1,
                     paddingBottom: 2,
                     paddingRight: 1,
-                    minHeight: 120
+                    minHeight: 120,
+                    // ContainerLogViewer defaults to height:100%, which collapses outside a sized
+                    // parent — an explicit height is what makes it a bounded scrolling box.
+                    ...(props.height !== undefined && { height: props.height })
                 }}
             />
         </Box>

@@ -22,7 +22,7 @@ function JobStatusChip({ to, status, onClick }: Props) {
     const theme = useTheme();
     const entry = JOB_STATUS_MAP[status];
     const color = entry
-        ? theme.palette.jobStatus[status as keyof typeof theme.palette.jobStatus]
+        ? theme.palette.jobStatus[status.toLowerCase() as keyof typeof theme.palette.jobStatus]
         : theme.palette.runStatus.unknown;
     const label = entry?.label ?? 'Unknown';
 

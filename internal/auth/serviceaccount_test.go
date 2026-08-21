@@ -125,7 +125,7 @@ func TestServiceAccountCaller_RequireInheritedAccess(t *testing.T) {
 		},
 		{
 			name:            "access is denied by the authorizer",
-			modelType:       types.ApplyModelType,
+			modelType:       types.RunModelType,
 			constraints:     []func(*constraints){WithGroupID("group-1")},
 			expectErrorCode: errors.ENotFound,
 			withAuthorizer:  true,
@@ -182,8 +182,8 @@ func requireInheritedAccessAuthorizerFunc(_ context.Context, modelTypes []types.
 	}
 
 	for _, mt := range modelTypes {
-		if mt.Equals(types.ApplyModelType) {
-			// Don't allow access to apply resource for sake of making testing easier.
+		if mt.Equals(types.RunModelType) {
+			// Don't allow access to run resource for sake of making testing easier.
 			return errors.New("unauthorized", errors.WithErrorCode(errors.ENotFound))
 		}
 	}

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<09c35abb2f49026bb1add787f1074d7a>>
+ * @generated SignedSource<<d2c386948caac1eff1cc9b5edd1a5adf>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,16 +9,16 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type CheckResultStatus = "error" | "fail" | "pass" | "unknown" | "%future added value";
+export type TerraformCheckResultStatus = "ERROR" | "FAIL" | "PASS" | "UNKNOWN" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type StateVersionCheckResultRowFragment_checkResult$data = {
   readonly name: string;
   readonly objects: ReadonlyArray<{
     readonly address: string;
     readonly failureMessages: ReadonlyArray<string>;
-    readonly status: CheckResultStatus;
+    readonly status: TerraformCheckResultStatus;
   }>;
-  readonly status: CheckResultStatus;
+  readonly status: TerraformCheckResultStatus;
   readonly " $fragmentType": "StateVersionCheckResultRowFragment_checkResult";
 };
 export type StateVersionCheckResultRowFragment_checkResult$key = {
@@ -51,7 +51,7 @@ return {
     {
       "alias": null,
       "args": null,
-      "concreteType": "CheckResultObject",
+      "concreteType": "TerraformCheckResultObject",
       "kind": "LinkedField",
       "name": "objects",
       "plural": true,
@@ -75,11 +75,11 @@ return {
       "storageKey": null
     }
   ],
-  "type": "CheckResult",
+  "type": "TerraformCheckResult",
   "abstractKey": null
 };
 })();
 
-(node as any).hash = "513b6f122e6ef5e42b9567d27d939e08";
+(node as any).hash = "7dbbd3a105a3a0beb57c528c28656134";
 
 export default node;

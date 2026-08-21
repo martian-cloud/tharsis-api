@@ -94,6 +94,7 @@ const languageByExtension: Record<string, string> = {
     ts: 'typescript',
     go: 'go',
     toml: 'toml',
+    rego: 'rego',
 };
 
 // languageForFile maps a file path to a Prism language for syntax highlighting.
