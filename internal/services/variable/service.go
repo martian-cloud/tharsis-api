@@ -134,12 +134,17 @@ func (s *service) GetVariableVersionByID(ctx context.Context, id string, include
 		return nil, errors.Wrap(err, "failed to get variable by ID", errors.WithSpan(span))
 	}
 
-	err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
+	err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
 		return nil, err
 	}
 
 	if variable.Sensitive && includeSensitiveValue {
+		// Sensitive values are only returned to callers that are allowed to view variable values.
+		if err = caller.RequirePermission(ctx, models.ViewSensitiveVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath)); err != nil {
+			return nil, err
+		}
+
 		// Get the secret value from the secret manager plugin
 		secret, err := s.secretManager.Get(ctx, version.Key, version.SecretData)
 		if err != nil {
@@ -174,12 +179,17 @@ func (s *service) GetVariableVersionByTRN(ctx context.Context, trn string, inclu
 		return nil, errors.Wrap(err, "failed to get variable by ID", errors.WithSpan(span))
 	}
 
-	err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
+	err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
 		return nil, err
 	}
 
 	if variable.Sensitive && includeSensitiveValue {
+		// Sensitive values are only returned to callers that are allowed to view variable values.
+		if err = caller.RequirePermission(ctx, models.ViewSensitiveVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath)); err != nil {
+			return nil, err
+		}
+
 		// Get the secret value from the secret manager plugin
 		secret, err := s.secretManager.Get(ctx, version.Key, version.SecretData)
 		if err != nil {
@@ -206,7 +216,7 @@ func (s *service) GetVariableVersions(ctx context.Context, input *GetVariableVer
 		return nil, errors.Wrap(err, "failed to get variable by ID", errors.WithSpan(span))
 	}
 
-	if err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath)); err != nil {
+	if err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(variable.NamespacePath)); err != nil {
 		return nil, err
 	}
 
@@ -236,11 +246,9 @@ func (s *service) GetVariables(ctx context.Context, namespacePath string) ([]mod
 		return nil, err
 	}
 
-	// Only include variable values if the caller has ViewVariableValuePermission on workspace.
-	hasViewVariableValuePerm := false
-	if err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(namespacePath)); err == nil {
-		hasViewVariableValuePerm = true
-	} else if err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(namespacePath)); err != nil {
+	// Sensitive values are never populated by the DB layer, so no masking is needed here.
+	// This just verifies the caller can view variables at all.
+	if err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(namespacePath)); err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
@@ -274,10 +282,6 @@ func (s *service) GetVariables(ctx context.Context, namespacePath string) ([]mod
 	seen := map[string]struct{}{}
 	for _, v := range result.Variables {
 		varCopy := v
-		// Clear values if caller can't view values for namespace.
-		if !hasViewVariableValuePerm {
-			varCopy.Value = nil
-		}
 
 		keyAndCategory := fmt.Sprintf("%s::%s", varCopy.Key, varCopy.Category)
 		if _, ok := seen[keyAndCategory]; !ok {
@@ -315,7 +319,7 @@ func (s *service) GetVariableByID(ctx context.Context, id string) (*models.Varia
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
+	err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -344,7 +348,7 @@ func (s *service) GetVariableByTRN(ctx context.Context, trn string) (*models.Var
 		return nil, errors.New("variable with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
-	err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
+	err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -380,25 +384,12 @@ func (s *service) GetVariablesByIDs(ctx context.Context, ids []string) ([]models
 		namespacePaths = append(namespacePaths, variable.NamespacePath)
 	}
 
-	namespacesAllowedToViewValue := map[string]struct{}{}
-
+	// Sensitive values are never populated by the DB layer, so no masking is needed here.
+	// This just verifies the caller can view variables in every namespace involved.
 	for _, namespacePath := range namespacePaths {
-		err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(namespacePath))
-		if err != nil {
-			err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(namespacePath))
-			if err != nil {
-				tracing.RecordError(span, err, "permission check failed")
-				return nil, err
-			}
-		} else {
-			namespacesAllowedToViewValue[namespacePath] = struct{}{}
-		}
-	}
-
-	// Filter out variable values that the caller is not allowed to view
-	for i := range resp.Variables {
-		if _, ok := namespacesAllowedToViewValue[resp.Variables[i].NamespacePath]; !ok {
-			resp.Variables[i].Value = nil
+		if err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(namespacePath)); err != nil {
+			tracing.RecordError(span, err, "permission check failed")
+			return nil, err
 		}
 	}
 

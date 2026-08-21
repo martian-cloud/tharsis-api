@@ -1,6 +1,8 @@
-import { Box, CircularProgress, Link, Typography } from '@mui/material';
+import { Box, CircularProgress, Link, Tooltip, Typography } from '@mui/material';
+import LockIcon from '@mui/icons-material/LockOutlined';
 import graphql from 'babel-plugin-relay/macro';
 import { Suspense, useEffect, useState } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useLazyLoadQuery } from 'react-relay/hooks';
 import CopyButton from '../../common/CopyButton';
 import { SensitiveVariableValueQuery } from './__generated__/SensitiveVariableValueQuery.graphql';
@@ -55,16 +57,27 @@ function SensitiveVariableValueContainer({ variableVersionId }: Props) {
     const [showValue, setShowValue] = useState(false);
     return (
         <Box minWidth={100}>
-            <Suspense fallback={<CircularProgress size={18} />}>
-                {!showValue && <Link
-                    onClick={() => setShowValue(true)}
-                    underline="hover"
-                    color="secondary"
-                    sx={{ cursor: 'pointer' }}>
-                    View Secret
-                </Link>}
-                {showValue && <SensitiveVariableValue variableVersionId={variableVersionId} />}
-            </Suspense>
+            <ErrorBoundary fallbackRender={({ error }) => {
+                if (!error?.codes?.includes('FORBIDDEN')) {
+                    throw error;
+                }
+                return (
+                    <Tooltip title="You do not have permission to view this sensitive value" placement="top">
+                        <LockIcon color="disabled" />
+                    </Tooltip>
+                );
+            }}>
+                <Suspense fallback={<CircularProgress size={18} />}>
+                    {!showValue && <Link
+                        onClick={() => setShowValue(true)}
+                        underline="hover"
+                        color="secondary"
+                        sx={{ cursor: 'pointer' }}>
+                        View Secret
+                    </Link>}
+                    {showValue && <SensitiveVariableValue variableVersionId={variableVersionId} />}
+                </Suspense>
+            </ErrorBoundary>
         </Box>
     );
 }

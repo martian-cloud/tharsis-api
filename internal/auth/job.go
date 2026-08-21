@@ -250,15 +250,34 @@ func (j *JobCaller) requireAccessToWorkspace(ctx context.Context, workspaceID st
 
 // requireAccessToJobWorkspace will return an error if the job caller isn't in the requested workspace
 func (j *JobCaller) requireAccessToJobWorkspace(ctx context.Context, _ *models.Permission, checks *constraints) error {
-	if checks.workspaceID == nil {
-		return errMissingConstraints
+	if checks.workspaceID != nil {
+		if *checks.workspaceID != j.WorkspaceID {
+			return j.UnauthorizedError(ctx, false)
+		}
+		return nil
 	}
 
-	if *checks.workspaceID != j.WorkspaceID {
-		return j.UnauthorizedError(ctx, false)
+	if len(checks.namespacePaths) > 0 {
+		workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+		if err != nil {
+			return err
+		}
+
+		if workspace == nil {
+			return j.UnauthorizedError(ctx, false)
+		}
+
+		for _, namespacePath := range checks.namespacePaths {
+			// Must match exactly, unlike requireAccessToWorkspacesInGroupHierarchy.
+			if namespacePath != workspace.FullPath {
+				return j.UnauthorizedError(ctx, false)
+			}
+		}
+
+		return nil
 	}
 
-	return nil
+	return errMissingConstraints
 }
 
 // requireRunAccess will return an error if the caller doesn't have permission to the run
@@ -504,14 +523,18 @@ func (j *JobCaller) requireProviderMirrorAccess(ctx context.Context, _ *models.P
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
 func (j *JobCaller) getPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
 	handlerMap := map[models.Permission]permissionTypeHandler{
-		models.ViewWorkspacePermission:                 j.requireWorkspaceOutputVisibility,
-		models.ViewConfigurationVersionPermission:      j.requireAccessToWorkspacesInGroupHierarchy,
-		models.ViewStateVersionPermission:              j.requireWorkspaceOutputVisibility,
-		models.ViewManagedIdentityPermission:           j.requireAccessToWorkspacesInGroupHierarchy,
-		models.ViewVariablePermission:                  j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewWorkspacePermission:    j.requireWorkspaceOutputVisibility,
+		models.ViewStateVersionPermission: j.requireWorkspaceOutputVisibility,
+		// ViewVariablePermission now also governs non-sensitive variable value visibility,
+		// not just listing. Narrowed to job's own workspace only.
+		models.ViewVariablePermission: j.requireAccessToJobWorkspace,
+		// Narrowed for the same reason: no legitimate case for a job to read these
+		// outside its own workspace. Identity aliasing is unaffected (separate check).
+		models.ViewManagedIdentityPermission:           j.requireAccessToJobWorkspace,
+		models.ViewConfigurationVersionPermission:      j.requireAccessToJobWorkspace,
 		models.ViewStateVersionDataPermission:          j.requireAccessToJobWorkspace,
 		models.CreateStateVersionPermission:            j.requireAccessToJobWorkspace,
-		models.ViewVariableValuePermission:             j.requireAccessToJobWorkspace,
+		models.ViewSensitiveVariableValuePermission:    j.requireAccessToJobWorkspace,
 		models.ViewRunPermission:                       j.requireRunAccess, // View is automatically granted if action != View.
 		models.ViewJobPermission:                       j.requireJobAccess, // View is automatically granted if action != View.
 		models.UpdateJobPermission:                     j.requireJobAccess,

@@ -50,7 +50,7 @@ var (
 	CreateUserPermission                    = registerPermission(types.UserModelType, CreateAction, true)
 	UpdateUserPermission                    = registerPermission(types.UserModelType, UpdateAction, true)
 	DeleteUserPermission                    = registerPermission(types.UserModelType, DeleteAction, true)
-	ViewVariableValuePermission             = registerPermission(types.VariableModelType, ViewValueAction, true) // Viewing variable values.
+	ViewSensitiveVariableValuePermission    = registerPermission(types.VariableModelType, ViewValueAction, true) // Viewing sensitive variable values.
 	ViewVariablePermission                  = registerPermission(types.VariableModelType, ViewAction, true)
 	CreateVariablePermission                = registerPermission(types.VariableModelType, CreateAction, true)
 	UpdateVariablePermission                = registerPermission(types.VariableModelType, UpdateAction, true)
