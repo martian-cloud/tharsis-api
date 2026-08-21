@@ -1069,16 +1069,17 @@ func (s *service) GetRunVariables(ctx context.Context, runID string, includeSens
 		return nil, errors.New("run with ID %s not found", runID, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	// Only include variable values if the caller has UpdateRunPermission or ViewVariableValuePermission on workspace.
-	includeValues := false
-	if err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithWorkspaceID(run.WorkspaceID)); err == nil {
-		includeValues = true
+	// Sensitive variable values are only included if the caller has ViewSensitiveVariableValuePermission
+	// on the workspace. Non-sensitive values are visible to any caller that can view variables.
+	hasPermissionToViewSensitiveValues := false
+	if err = caller.RequirePermission(ctx, models.ViewSensitiveVariableValuePermission, auth.WithWorkspaceID(run.WorkspaceID)); err == nil {
+		hasPermissionToViewSensitiveValues = true
 	} else if err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithWorkspaceID(run.WorkspaceID)); err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
-	if !includeValues && includeSensitiveValues {
+	if !hasPermissionToViewSensitiveValues && includeSensitiveValues {
 		return nil, errors.New("caller does not have permission to view sensitive variable values", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
@@ -1087,9 +1088,11 @@ func (s *service) GetRunVariables(ctx context.Context, runID string, includeSens
 		return nil, err
 	}
 
-	if !includeValues {
+	if !includeSensitiveValues {
 		for i := range variables {
-			variables[i].Value = nil
+			if variables[i].Sensitive {
+				variables[i].Value = nil
+			}
 		}
 	}
 

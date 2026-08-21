@@ -317,17 +317,17 @@ func TestGetRunVariables(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                            string
-		includeSensitiveValues          bool
-		expectedVariables               []runvariables.Variable
-		hasViewVariableValuePermissions bool
-		authError                       error
-		expectedErrorCode               errors.CodeType
+		name                                     string
+		includeSensitiveValues                   bool
+		expectedVariables                        []runvariables.Variable
+		hasViewSensitiveVariableValuePermissions bool
+		authError                                error
+		expectedErrorCode                        errors.CodeType
 	}{
 		{
-			name:                            "include sensitive values for caller with view variable value permission",
-			includeSensitiveValues:          true,
-			hasViewVariableValuePermissions: true,
+			name:                                     "include sensitive values for caller with view variable value permission",
+			includeSensitiveValues:                   true,
+			hasViewSensitiveVariableValuePermissions: true,
 			expectedVariables: []runvariables.Variable{
 				{
 					Key:       "var1",
@@ -345,9 +345,9 @@ func TestGetRunVariables(t *testing.T) {
 			},
 		},
 		{
-			name:                            "don't include sensitive values for caller with view variable value permission",
-			includeSensitiveValues:          false,
-			hasViewVariableValuePermissions: true,
+			name:                                     "don't include sensitive values for caller with view variable value permission",
+			includeSensitiveValues:                   false,
+			hasViewSensitiveVariableValuePermissions: true,
 			expectedVariables: []runvariables.Variable{
 				{
 					Key:       "var1",
@@ -364,12 +364,13 @@ func TestGetRunVariables(t *testing.T) {
 			},
 		},
 		{
-			name:                            "don't include any values for caller without view variable value permission",
-			includeSensitiveValues:          false,
-			hasViewVariableValuePermissions: false,
+			name:                                     "include non-sensitive values for caller without view variable value permission",
+			includeSensitiveValues:                   false,
+			hasViewSensitiveVariableValuePermissions: false,
 			expectedVariables: []runvariables.Variable{
 				{
 					Key:       "var1",
+					Value:     ptr.String("value1"),
 					Category:  models.TerraformVariableCategory,
 					Sensitive: false,
 				},
@@ -382,16 +383,16 @@ func TestGetRunVariables(t *testing.T) {
 			},
 		},
 		{
-			name:                            "return error if caller without view variable value permission requests sensitive values",
-			includeSensitiveValues:          true,
-			hasViewVariableValuePermissions: false,
-			expectedErrorCode:               errors.EForbidden,
+			name:                                     "return error if caller without view variable value permission requests sensitive values",
+			includeSensitiveValues:                   true,
+			hasViewSensitiveVariableValuePermissions: false,
+			expectedErrorCode:                        errors.EForbidden,
 		},
 		{
-			name:                            "return error if caller doesn't have view variable permission",
-			hasViewVariableValuePermissions: false,
-			authError:                       errors.New("no permission", errors.WithErrorCode(errors.EForbidden)),
-			expectedErrorCode:               errors.EForbidden,
+			name:                                     "return error if caller doesn't have view variable permission",
+			hasViewSensitiveVariableValuePermissions: false,
+			authError:                                errors.New("no permission", errors.WithErrorCode(errors.EForbidden)),
+			expectedErrorCode:                        errors.EForbidden,
 		},
 	}
 
@@ -408,10 +409,10 @@ func TestGetRunVariables(t *testing.T) {
 				variablesBuilder: runvariables.NewBuilder(mockDBClient.Client, mockSecretManager, mockArtifactStore),
 			}
 
-			if test.hasViewVariableValuePermissions {
-				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(nil)
+			if test.hasViewSensitiveVariableValuePermissions {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewSensitiveVariableValuePermission, mock.Anything).Return(nil)
 			} else {
-				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(errors.New("no permission", errors.WithErrorCode(errors.EForbidden)))
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewSensitiveVariableValuePermission, mock.Anything).Return(errors.New("no permission", errors.WithErrorCode(errors.EForbidden)))
 				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariablePermission, mock.Anything).Return(test.authError)
 			}
 

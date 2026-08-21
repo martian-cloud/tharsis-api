@@ -109,6 +109,68 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			expectErrorCode: errors.ENotFound,
 		},
 		{
+			// See getPermissionHandler: ViewVariablePermission is now scoped to the job's own workspace.
+			name:            "access denied because job cannot view variables for a sibling workspace in the same root namespace",
+			workspace:       &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws2"}, FullPath: "a/ws-2"},
+			perms:           models.ViewVariablePermission,
+			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:        "job can view variables for its own workspace",
+			perms:       models.ViewVariablePermission,
+			constraints: []func(*constraints){WithWorkspaceID(jobWorkspace.Metadata.ID)},
+		},
+		{
+			// Regression test: requireAccessToJobWorkspace previously ignored namespace-path
+			// constraints, which is what the variable service actually uses.
+			name:        "job can view variables for its own workspace via namespace path",
+			perms:       models.ViewVariablePermission,
+			constraints: []func(*constraints){WithNamespacePath(jobWorkspace.FullPath)},
+		},
+		{
+			name:            "access denied because job cannot view variables for a sibling workspace's namespace path",
+			perms:           models.ViewVariablePermission,
+			constraints:     []func(*constraints){WithNamespacePath("a/ws-2")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:        "job can view managed identities for its own workspace",
+			perms:       models.ViewManagedIdentityPermission,
+			constraints: []func(*constraints){WithWorkspaceID(jobWorkspace.Metadata.ID)},
+		},
+		{
+			name:        "job can view managed identities for its own workspace via namespace path",
+			perms:       models.ViewManagedIdentityPermission,
+			constraints: []func(*constraints){WithNamespacePath(jobWorkspace.FullPath)},
+		},
+		{
+			name:            "access denied because job cannot view managed identities for a sibling workspace",
+			perms:           models.ViewManagedIdentityPermission,
+			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
+			workspace:       &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws2"}, FullPath: "a/ws-2"},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "access denied because job cannot view managed identities for a sibling workspace's namespace path",
+			perms:           models.ViewManagedIdentityPermission,
+			constraints:     []func(*constraints){WithNamespacePath("a/ws-2")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			// ViewConfigurationVersionPermission only uses WithWorkspaceID in the service layer.
+			name:        "job can view configuration versions for its own workspace",
+			perms:       models.ViewConfigurationVersionPermission,
+			constraints: []func(*constraints){WithWorkspaceID(jobWorkspace.Metadata.ID)},
+		},
+		{
+			name:            "access denied because job cannot view configuration versions for a sibling workspace",
+			perms:           models.ViewConfigurationVersionPermission,
+			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
+			workspace:       &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws2"}, FullPath: "a/ws-2"},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
 			name:            "access denied because workspace doesn't exist",
 			perms:           models.ViewWorkspacePermission,
 			constraints:     []func(*constraints){WithWorkspaceID(invalid)},
@@ -774,7 +836,9 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}
 
 		ctx := WithCaller(t.Context(), caller)
-		// ViewConfigurationVersionPermission should use existing root namespace check, not output visibility
+		// Exercises requireAccessToWorkspacesInGroupHierarchy directly (same root group = allowed).
+		// No permission currently routes here via getPermissionHandler that also has an output
+		// visibility variant; kept as a standalone test of the function's own behavior.
 		err := caller.requireAccessToWorkspacesInGroupHierarchy(ctx, nil, &constraints{workspaceID: &targetWorkspace.Metadata.ID})
 		require.NoError(t, err) // same root group = allowed
 	})

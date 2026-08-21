@@ -68,7 +68,7 @@ func TestGetVariableByID(t *testing.T) {
 			mockVariables.On("GetVariableByID", mock.Anything, sampleVariable.Metadata.ID).Return(test.variable, nil)
 
 			if test.variable != nil {
-				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariablePermission, mock.Anything).Return(test.authError)
 			}
 
 			dbClient := &db.Client{
@@ -145,7 +145,7 @@ func TestGetVariableByTRN(t *testing.T) {
 			mockVariables.On("GetVariableByTRN", mock.Anything, variableTRN).Return(test.variable, nil)
 
 			if test.variable != nil {
-				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariablePermission, mock.Anything).Return(test.authError)
 			}
 
 			dbClient := &db.Client{
@@ -176,6 +176,7 @@ func TestGetVariableVersionByID(t *testing.T) {
 	// Test cases
 	tests := []struct {
 		authError             error
+		valueAuthError        error
 		variableVersion       *models.VariableVersion
 		expectVariableVersion *models.VariableVersion
 		sensitive             bool
@@ -233,6 +234,19 @@ func TestGetVariableVersionByID(t *testing.T) {
 			},
 		},
 		{
+			name:                  "authorization error requesting sensitive value",
+			sensitive:             true,
+			includeSensitiveValue: true,
+			valueAuthError:        errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode:         errors.EForbidden,
+			variableVersion: &models.VariableVersion{
+				Metadata:   models.ResourceMetadata{ID: variableVersionID},
+				VariableID: variableID,
+				Key:        "key1",
+				SecretData: []byte("test-value-cipher"),
+			},
+		},
+		{
 			name:          "authorization error",
 			authError:     errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
@@ -256,11 +270,15 @@ func TestGetVariableVersionByID(t *testing.T) {
 
 			mockVariableVersions.On("GetVariableVersionByID", mock.Anything, variableVersionID).Return(test.variableVersion, nil)
 
-			mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewVariablePermission, mock.Anything).Return(test.authError)
 			mockVariables.On("GetVariableByID", mock.Anything, variableID).Return(&models.Variable{Metadata: models.ResourceMetadata{ID: variableID}, Sensitive: test.sensitive}, nil)
 
 			if test.sensitive && test.includeSensitiveValue {
-				mockSecretManager.On("Get", mock.Anything, test.variableVersion.Key, test.variableVersion.SecretData).Return(*test.expectVariableVersion.Value, nil)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewSensitiveVariableValuePermission, mock.Anything).Return(test.valueAuthError).Maybe()
+
+				if test.valueAuthError == nil {
+					mockSecretManager.On("Get", mock.Anything, test.variableVersion.Key, test.variableVersion.SecretData).Return(*test.expectVariableVersion.Value, nil)
+				}
 			}
 
 			dbClient := db.Client{
@@ -298,6 +316,7 @@ func TestGetVariableVersionByTRN(t *testing.T) {
 		isSensitive           bool
 		includeSensitiveValue bool
 		authError             error
+		valueAuthError        error
 		variableVersion       *models.VariableVersion
 		expectErrorCode       errors.CodeType
 	}
@@ -347,6 +366,22 @@ func TestGetVariableVersionByTRN(t *testing.T) {
 			},
 		},
 		{
+			name:                  "subject is not authorized to view sensitive variable value",
+			isSensitive:           true,
+			includeSensitiveValue: true,
+			variableVersion: &models.VariableVersion{
+				Metadata: models.ResourceMetadata{
+					ID:  variableVersionID,
+					TRN: variableVersionTRN,
+				},
+				VariableID: variableID,
+				Key:        "key1",
+				SecretData: []byte("secret-data"),
+			},
+			valueAuthError:  errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
 			name: "subject is not authorized to view variable version",
 			variableVersion: &models.VariableVersion{
 				Metadata: models.ResourceMetadata{
@@ -382,10 +417,14 @@ func TestGetVariableVersionByTRN(t *testing.T) {
 					Sensitive:     test.isSensitive,
 				}, nil)
 
-				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariablePermission, mock.Anything).Return(test.authError)
 
 				if test.isSensitive && test.includeSensitiveValue {
-					mockSecretsManager.On("Get", mock.Anything, test.variableVersion.Key, test.variableVersion.SecretData).Return(secretValue, nil)
+					mockCaller.On("RequirePermission", mock.Anything, models.ViewSensitiveVariableValuePermission, mock.Anything).Return(test.valueAuthError).Maybe()
+
+					if test.valueAuthError == nil {
+						mockSecretsManager.On("Get", mock.Anything, test.variableVersion.Key, test.variableVersion.SecretData).Return(secretValue, nil)
+					}
 				}
 			}
 
@@ -458,7 +497,7 @@ func TestGetVariableVersions(t *testing.T) {
 			mockVariables := db.NewMockVariables(t)
 			mockVariableVersions := db.NewMockVariableVersions(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewVariablePermission, mock.Anything).Return(test.authError)
 			mockVariables.On("GetVariableByID", mock.Anything, variableID).Return(&models.Variable{Metadata: models.ResourceMetadata{ID: variableID}}, nil)
 
 			if test.authError == nil {
@@ -493,6 +532,178 @@ func TestGetVariableVersions(t *testing.T) {
 			assert.Equal(t, test.variableVersions, result.VariableVersions)
 		})
 	}
+}
+
+func TestGetVariables(t *testing.T) {
+	namespacePath := "my-group/my-workspace"
+
+	nonSensitiveVariable := models.Variable{
+		Metadata:      models.ResourceMetadata{ID: "var-1"},
+		NamespacePath: namespacePath,
+		Category:      models.TerraformVariableCategory,
+		Key:           "key1",
+		Value:         ptr.String("value1"),
+	}
+
+	// The value of a sensitive variable is stored in the secret manager, so the value
+	// field is never populated by the DB layer.
+	sensitiveVariable := models.Variable{
+		Metadata:      models.ResourceMetadata{ID: "var-2"},
+		NamespacePath: namespacePath,
+		Category:      models.TerraformVariableCategory,
+		Key:           "key2",
+		Sensitive:     true,
+		SecretData:    []byte("secret-data"),
+	}
+
+	type testCase struct {
+		name            string
+		viewAuthError   error
+		variables       []models.Variable
+		expectVariables []models.Variable
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "caller with view permission sees all values",
+			variables:       []models.Variable{nonSensitiveVariable, sensitiveVariable},
+			expectVariables: []models.Variable{nonSensitiveVariable, sensitiveVariable},
+		},
+		{
+			name:            "subject is not authorized to view variables",
+			viewAuthError:   errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockVariables := db.NewMockVariables(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewVariablePermission, mock.Anything).Return(test.viewAuthError)
+
+			if test.expectErrorCode == "" {
+				mockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
+					Variables: test.variables,
+				}, nil)
+			}
+
+			service := &service{
+				dbClient: &db.Client{Variables: mockVariables},
+			}
+
+			actualVariables, err := service.GetVariables(auth.WithCaller(ctx, mockCaller), namespacePath)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectVariables, actualVariables)
+		})
+	}
+}
+
+func TestGetVariablesByIDs(t *testing.T) {
+	groupPath := "my-group"
+	workspacePath := "my-group/my-workspace"
+
+	// Sensitive variables never have Value populated by the DB layer; the value lives
+	// in the secret manager, and variables from different namespaces are all returned
+	// as-is once the caller has ViewVariablePermission everywhere.
+	workspaceSensitiveVariable := models.Variable{
+		Metadata:      models.ResourceMetadata{ID: "var-1"},
+		NamespacePath: workspacePath,
+		Category:      models.TerraformVariableCategory,
+		Key:           "key1",
+		Sensitive:     true,
+		SecretData:    []byte("workspace-secret-data"),
+	}
+
+	groupSensitiveVariable := models.Variable{
+		Metadata:      models.ResourceMetadata{ID: "var-2"},
+		NamespacePath: groupPath,
+		Category:      models.TerraformVariableCategory,
+		Key:           "key2",
+		Sensitive:     true,
+		SecretData:    []byte("group-secret-data"),
+	}
+
+	groupNonSensitiveVariable := models.Variable{
+		Metadata:      models.ResourceMetadata{ID: "var-3"},
+		NamespacePath: groupPath,
+		Category:      models.TerraformVariableCategory,
+		Key:           "key3",
+		Value:         ptr.String("group-value"),
+	}
+
+	ctx := t.Context()
+
+	mockCaller := auth.NewMockCaller(t)
+	mockVariables := db.NewMockVariables(t)
+
+	mockCaller.On("RequirePermission", mock.Anything, models.ViewVariablePermission, mock.Anything).Return(nil)
+
+	mockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
+		Variables: []models.Variable{
+			workspaceSensitiveVariable,
+			groupSensitiveVariable,
+			groupNonSensitiveVariable,
+		},
+	}, nil)
+
+	service := &service{
+		dbClient: &db.Client{Variables: mockVariables},
+	}
+
+	ids := []string{
+		workspaceSensitiveVariable.Metadata.ID,
+		groupSensitiveVariable.Metadata.ID,
+		groupNonSensitiveVariable.Metadata.ID,
+	}
+
+	actualVariables, err := service.GetVariablesByIDs(auth.WithCaller(ctx, mockCaller), ids)
+	require.NoError(t, err)
+
+	// Variables are returned as stored: sensitive values are already absent, and the
+	// non-sensitive value is visible because the caller can view variables.
+	assert.Equal(t, []models.Variable{
+		workspaceSensitiveVariable,
+		groupSensitiveVariable,
+		groupNonSensitiveVariable,
+	}, actualVariables)
+}
+
+func TestGetVariablesByIDsWithoutViewPermission(t *testing.T) {
+	forbidden := errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden))
+
+	mockCaller := auth.NewMockCaller(t)
+	mockVariables := db.NewMockVariables(t)
+
+	mockCaller.On("RequirePermission", mock.Anything, models.ViewVariablePermission, mock.Anything).Return(forbidden)
+
+	mockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
+		Variables: []models.Variable{
+			{
+				Metadata:      models.ResourceMetadata{ID: "var-1"},
+				NamespacePath: "my-group/my-workspace",
+				Key:           "key1",
+				Value:         ptr.String("value1"),
+			},
+		},
+	}, nil)
+
+	service := &service{
+		dbClient: &db.Client{Variables: mockVariables},
+	}
+
+	_, err := service.GetVariablesByIDs(auth.WithCaller(t.Context(), mockCaller), []string{"var-1"})
+	assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
 }
 
 func TestSetVariables(t *testing.T) {
