@@ -14,6 +14,7 @@ import (
 	version "github.com/hashicorp/go-version"
 	tfjson "github.com/hashicorp/terraform-json"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/commands"
 	runvariables "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/variables"
@@ -50,6 +51,26 @@ type EventSubscriptionOptions struct {
 type SetVariablesIncludedInTFConfigInput struct {
 	RunID        string
 	VariableKeys []string
+}
+
+// ApproveRunGateInput is the input for recording an approve/reject decision on a run gate.
+type ApproveRunGateInput struct {
+	GateID   string
+	Decision models.RunGateDecision
+	Comment  *string
+}
+
+// GetRunGatesInput is the input for querying a list of run gates.
+type GetRunGatesInput struct {
+	Sort              *db.RunGateSortableField
+	PaginationOptions *pagination.Options
+	RunID             string
+}
+
+// GetRunGatesAwaitingDecisionInput is the input for the caller's approvals inbox.
+type GetRunGatesAwaitingDecisionInput struct {
+	Sort              *db.RunGateSortableField
+	PaginationOptions *pagination.Options
 }
 
 // GetRunsInput is the input for querying a list of runs
@@ -174,8 +195,9 @@ type CancelRunInput struct {
 	Force   bool
 }
 
-// RetryRunNodeInput is the input for retrying a run's plan or apply node, identified
-// by RunID and NodePath ("plan" or "apply").
+// RetryRunNodeInput is the input for retrying a run's node, identified by RunID and NodePath ("plan",
+// "apply", or a policy check path such as "post_plan.opa"). A plan or apply must be failed or canceled;
+// a policy check may also be soft-failed.
 type RetryRunNodeInput struct {
 	RunID    string
 	NodePath string
@@ -206,6 +228,21 @@ type UpdatePlanInput struct {
 	PlanID          string
 }
 
+// PolicyOutcome is a single policy's reported result for a policy check, keyed by its
+// PolicyCheckPolicy id. Messages holds one entry per violation, in display order, and is empty when
+// the policy passed.
+type PolicyOutcome struct {
+	PolicyID string
+	Messages []string
+	Passed   bool
+}
+
+// ReportRunPolicyOutcomesInput is the input for reporting a policy check's per-policy-set outcomes.
+type ReportRunPolicyOutcomesInput struct {
+	PolicyCheckID string
+	Outcomes      []*PolicyOutcome
+}
+
 // Service encapsulates Terraform Enterprise Support
 type Service interface {
 	GetRunByID(ctx context.Context, runID string) (*models.Run, error)
@@ -227,13 +264,27 @@ type Service interface {
 	SetVariablesIncludedInTFConfig(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) error
 	GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, error)
 	GetPlanCheckResults(ctx context.Context, planID string) ([]corerun.CheckResult, error)
+	GetPolicyCheckPolicyMessages(ctx context.Context, policyCheckID string, policyID string) ([]string, error)
 	UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*models.Plan, error)
+	ReportRunPolicyOutcomes(ctx context.Context, input *ReportRunPolicyOutcomesInput) error
 	DownloadPlan(ctx context.Context, planID string) (io.ReadCloser, error)
+	DownloadPlanJSON(ctx context.Context, planID string) (io.ReadCloser, error)
 	UploadPlanBinary(ctx context.Context, planID string, reader io.Reader) error
 	ProcessPlanData(ctx context.Context, planID string, plan *tfjson.Plan, providerSchemas *tfjson.ProviderSchemas) error
 	UpdateApply(ctx context.Context, input *UpdateApplyInput) (*models.Apply, error)
 	SubscribeToRunEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error)
 	GetStateVersionsByRunIDs(ctx context.Context, idList []string) ([]models.StateVersion, error)
+	GetRunGateByID(ctx context.Context, id string) (*models.RunGate, error)
+	GetRunGateByTRN(ctx context.Context, trn string) (*models.RunGate, error)
+	GetRunGates(ctx context.Context, input *GetRunGatesInput) (*db.RunGatesResult, error)
+	GetRunGatesByIDs(ctx context.Context, ids []string) ([]*models.RunGate, error)
+	GetRunGatesByPolicyCheckIDs(ctx context.Context, policyCheckIDs []string) ([]*models.RunGate, error)
+	GetRunGateApprovalByID(ctx context.Context, id string) (*models.RunGateApproval, error)
+	GetRunGateApprovalByTRN(ctx context.Context, trn string) (*models.RunGateApproval, error)
+	GetRunGateApprovalsByGateID(ctx context.Context, gateID string) ([]models.RunGateApproval, error)
+	GetRunGatesAwaitingDecision(ctx context.Context, input *GetRunGatesAwaitingDecisionInput) (*db.RunGatesResult, error)
+	ApproveRunGate(ctx context.Context, input *ApproveRunGateInput) (*models.RunGate, error)
+	OverrideRunGate(ctx context.Context, gateID string, comment *string) (*models.RunGate, error)
 }
 
 type service struct {
@@ -988,7 +1039,16 @@ func (s *service) UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*mode
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdatePlanPermission, auth.WithPlanID(input.PlanID))
+	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, input.PlanID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run by plan node ID")
+		return nil, err
+	}
+	if run == nil {
+		return nil, errors.New("plan with ID %s not found", input.PlanID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithPlanID(input.PlanID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1005,6 +1065,54 @@ func (s *service) UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*mode
 		"planStatus", cmd.Updated.Status,
 	)
 	return cmd.Updated, nil
+}
+
+func (s *service) ReportRunPolicyOutcomes(ctx context.Context, input *ReportRunPolicyOutcomesInput) error {
+	ctx, span := tracer.Start(ctx, "svc.ReportRunPolicyOutcomes")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return err
+	}
+
+	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, input.PolicyCheckID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run by policy check node ID")
+		return err
+	}
+	if run == nil || run.PolicyCheckByID(input.PolicyCheckID) == nil {
+		return errors.New("policy check node with ID %s not found", input.PolicyCheckID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithPolicyCheckID(input.PolicyCheckID)); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return err
+	}
+
+	outcomes := make([]commands.RunPolicyOutcome, 0, len(input.Outcomes))
+	for _, o := range input.Outcomes {
+		outcomes = append(outcomes, commands.RunPolicyOutcome{
+			PolicyID: o.PolicyID,
+			Messages: o.Messages,
+			Passed:   o.Passed,
+		})
+	}
+
+	cmd := s.cmdFactory.NewReportRunPolicyOutcomes(input.PolicyCheckID, outcomes)
+	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
+		tracing.RecordError(span, err, "failed to report stage outcomes")
+		return err
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Reported policy check outcomes.",
+		"runID", run.Metadata.ID,
+		"runTRN", run.Metadata.TRN,
+		"policyCheckID", input.PolicyCheckID,
+		"outcomeCount", len(input.Outcomes),
+	)
+	return nil
 }
 
 func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadCloser, error) {
@@ -1041,6 +1149,41 @@ func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadClose
 			err,
 			"Failed to get plan cache from artifact store",
 		)
+	}
+
+	return result, nil
+}
+
+func (s *service) DownloadPlanJSON(ctx context.Context, planID string) (io.ReadCloser, error) {
+	ctx, span := tracer.Start(ctx, "svc.DownloadPlanJSON")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, planID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run by plan ID")
+		return nil, err
+	}
+
+	if run == nil {
+		return nil, errors.New("plan with ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	result, err := s.artifactStore.GetPlanJSON(ctx, run)
+	if err != nil {
+		tracing.RecordError(span, err, "Failed to get plan JSON from artifact store")
+		return nil, errors.Wrap(err, "Failed to get plan JSON from artifact store")
 	}
 
 	return result, nil
@@ -1138,7 +1281,7 @@ func (s *service) SetVariablesIncludedInTFConfig(ctx context.Context, input *Set
 	}
 
 	// Since variables should only be updated during the plan operation, we're requiring that permission here.
-	if err = caller.RequirePermission(ctx, models.UpdatePlanPermission, auth.WithPlanID(run.Plan.GetID())); err != nil {
+	if err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithPlanID(run.Plan.GetID())); err != nil {
 		return errors.Wrap(err, "permission check failed", errors.WithSpan(span))
 	}
 
@@ -1200,12 +1343,6 @@ func (s *service) UploadPlanBinary(ctx context.Context, planID string, reader io
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdatePlanPermission, auth.WithPlanID(planID))
-	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
-		return err
-	}
-
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, planID)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get run by plan ID")
@@ -1214,6 +1351,12 @@ func (s *service) UploadPlanBinary(ctx context.Context, planID string, reader io
 
 	if run == nil {
 		return errors.New("plan with ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithPlanID(planID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return err
 	}
 
 	retainFn, cacheKey, err := s.artifactStore.UploadPlanCache(ctx, run, reader)
@@ -1263,7 +1406,16 @@ func (s *service) ProcessPlanData(ctx context.Context, planID string, tfPlan *tf
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdatePlanPermission, auth.WithPlanID(planID))
+	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, planID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run by plan node ID")
+		return err
+	}
+	if run == nil {
+		return errors.New("plan with ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithPlanID(planID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1399,6 +1551,66 @@ func (s *service) GetPlanCheckResults(ctx context.Context, planID string) ([]cor
 	return results, nil
 }
 
+// GetPolicyCheckPolicyMessages returns the violation messages one policy of a policy check reported.
+// The full list lives in object storage, so this is a read per policy — a view showing many checks
+// should use the check's MessagesSummary instead.
+func (s *service) GetPolicyCheckPolicyMessages(ctx context.Context, policyCheckID string, policyID string) ([]string, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetPolicyCheckPolicyMessages")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, policyCheckID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get run by policy check node ID", errors.WithSpan(span))
+	}
+	if run == nil {
+		return nil, errors.New("policy check with ID %s not found", policyCheckID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID)); err != nil {
+		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	}
+
+	check := run.PolicyCheckByID(policyCheckID)
+	if check == nil {
+		return nil, errors.New("policy check with ID %s not found", policyCheckID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	var policy *models.PolicyCheckPolicy
+	for _, p := range check.Policies {
+		if p.ID == policyID {
+			policy = p
+			break
+		}
+	}
+	if policy == nil {
+		return nil, errors.New("policy check %s has no policy %s", policyCheckID, policyID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// No key means the policy reported nothing: it passed, or the check has not been evaluated. That
+	// is an empty list rather than an error, and it costs no object-storage read.
+	if policy.MessagesObjectStoreKey == nil {
+		return []string{}, nil
+	}
+
+	reader, err := s.artifactStore.GetPolicyCheckPolicyMessages(ctx, policy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get policy messages from artifact store", errors.WithSpan(span))
+	}
+	defer reader.Close()
+
+	messages := []string{}
+	if err := json.NewDecoder(reader).Decode(&messages); err != nil {
+		return nil, errors.Wrap(err, "failed to decode policy messages", errors.WithSpan(span))
+	}
+
+	return messages, nil
+}
+
 func (s *service) UpdateApply(ctx context.Context, input *UpdateApplyInput) (*models.Apply, error) {
 	ctx, span := tracer.Start(ctx, "svc.UpdateApply")
 	defer span.End()
@@ -1409,7 +1621,16 @@ func (s *service) UpdateApply(ctx context.Context, input *UpdateApplyInput) (*mo
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdateApplyPermission, auth.WithApplyID(input.ApplyID))
+	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, input.ApplyID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run by apply node ID")
+		return nil, err
+	}
+	if run == nil {
+		return nil, errors.New("apply with ID %s not found", input.ApplyID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithApplyID(input.ApplyID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1483,4 +1704,563 @@ func (s *service) getRun(ctx context.Context, runID string) (*models.Run, error)
 	}
 
 	return run, nil
+}
+
+func (s *service) GetRunGateByID(ctx context.Context, id string) (*models.RunGate, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunGateByID")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, id)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gate by ID")
+		return nil, err
+	}
+	if gate == nil {
+		return nil, errors.New("run gate with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return gate, nil
+}
+
+func (s *service) GetRunGateByTRN(ctx context.Context, trnValue string) (*models.RunGate, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunGateByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	gate, err := s.dbClient.RunGates.GetRunGateByTRN(ctx, trnValue)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gate by TRN")
+		return nil, err
+	}
+	if gate == nil {
+		return nil, errors.New("run gate with TRN %s not found", trnValue, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return gate, nil
+}
+
+func (s *service) GetRunGates(ctx context.Context, input *GetRunGatesInput) (*db.RunGatesResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunGates")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	if err = s.requireRunViewAccess(ctx, caller, input.RunID); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return s.dbClient.RunGates.GetRunGates(ctx, &db.GetRunGatesInput{
+		Sort:              input.Sort,
+		PaginationOptions: input.PaginationOptions,
+		Filter: &db.RunGateFilter{
+			RunID: &input.RunID,
+		},
+	})
+}
+
+// GetRunGatesByIDs returns the run gates with the given IDs. Permission checks are deduplicated per
+// run since a batch usually holds several gates from the same run.
+func (s *service) GetRunGatesByIDs(ctx context.Context, ids []string) ([]*models.RunGate, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunGatesByIDs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	result, err := s.dbClient.RunGates.GetRunGates(ctx, &db.GetRunGatesInput{
+		Filter: &db.RunGateFilter{
+			RunGateIDs: ids,
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gates")
+		return nil, err
+	}
+
+	gates := make([]*models.RunGate, len(result.RunGates))
+	checkedRuns := map[string]struct{}{}
+	for i := range result.RunGates {
+		gate := &result.RunGates[i]
+		if _, checked := checkedRuns[gate.RunID]; !checked {
+			if err = caller.RequirePermission(ctx, models.ViewRunPermission,
+				auth.WithRunID(gate.RunID), auth.WithWorkspaceID(gate.WorkspaceID)); err != nil {
+				tracing.RecordError(span, err, "permission check failed")
+				return nil, err
+			}
+			checkedRuns[gate.RunID] = struct{}{}
+		}
+		gates[i] = gate
+	}
+
+	return gates, nil
+}
+
+// GetRunGatesByPolicyCheckIDs returns the gates governing the given policy-check nodes, at most one
+// per check. Unlike the other batched getters this authorizes after the fetch: a policy check ID is a
+// run-node ID that cannot be resolved back to its run without a query, so the view check is made
+// against each gate's denormalized run and workspace IDs. Nothing is returned until every distinct
+// run has passed.
+func (s *service) GetRunGatesByPolicyCheckIDs(ctx context.Context, policyCheckIDs []string) ([]*models.RunGate, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunGatesByPolicyCheckIDs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	result, err := s.dbClient.RunGates.GetRunGates(ctx, &db.GetRunGatesInput{
+		Filter: &db.RunGateFilter{
+			PolicyCheckIDs: policyCheckIDs,
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gates")
+		return nil, err
+	}
+
+	gates := make([]*models.RunGate, len(result.RunGates))
+	checkedRuns := map[string]struct{}{}
+	for i := range result.RunGates {
+		gate := &result.RunGates[i]
+		if _, checked := checkedRuns[gate.RunID]; !checked {
+			if err = caller.RequirePermission(ctx, models.ViewRunPermission,
+				auth.WithRunID(gate.RunID), auth.WithWorkspaceID(gate.WorkspaceID)); err != nil {
+				tracing.RecordError(span, err, "permission check failed")
+				return nil, err
+			}
+			checkedRuns[gate.RunID] = struct{}{}
+		}
+		gates[i] = gate
+	}
+
+	return gates, nil
+}
+
+func (s *service) GetRunGateApprovalByID(ctx context.Context, id string) (*models.RunGateApproval, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunGateApprovalByID")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	approval, err := s.dbClient.RunGateApprovals.GetRunGateApprovalByID(ctx, id)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gate approval by ID")
+		return nil, err
+	}
+	if approval == nil {
+		return nil, errors.New("run gate approval with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, approval.RunGateID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gate by ID")
+		return nil, err
+	}
+	if gate == nil {
+		return nil, errors.New("run gate with id %s not found", approval.RunGateID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return approval, nil
+}
+
+func (s *service) GetRunGateApprovalByTRN(ctx context.Context, trnValue string) (*models.RunGateApproval, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunGateApprovalByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	approval, err := s.dbClient.RunGateApprovals.GetRunGateApprovalByTRN(ctx, trnValue)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gate approval by TRN")
+		return nil, err
+	}
+	if approval == nil {
+		return nil, errors.New("run gate approval with TRN %s not found", trnValue, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, approval.RunGateID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gate by ID")
+		return nil, err
+	}
+	if gate == nil {
+		return nil, errors.New("run gate with id %s not found", approval.RunGateID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return approval, nil
+}
+
+func (s *service) GetRunGateApprovalsByGateID(ctx context.Context, gateID string) ([]models.RunGateApproval, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunGateApprovalsByGateID")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, gateID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gate by ID")
+		return nil, err
+	}
+	if gate == nil {
+		return nil, errors.New("run gate with id %s not found", gateID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return s.dbClient.RunGateApprovals.GetRunGateApprovalsByGateID(ctx, gateID)
+}
+
+// GetRunGatesAwaitingDecision returns the caller's approvals inbox: pending run gates the caller is
+// an eligible approver for (a directly allowed user or service account, or a member of an allowed
+// team) and has not already recorded a decision on. Because one gate is created per policy check and
+// the RunGateManager closes out pending gates when a run reaches a terminal status, a pending gate
+// maps one-to-one to a run awaiting the caller's decision. Both user and service-account callers are
+// supported.
+func (s *service) GetRunGatesAwaitingDecision(ctx context.Context, input *GetRunGatesAwaitingDecisionInput) (*db.RunGatesResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunGatesAwaitingDecision")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	eligibility := &db.RunGateEligibilityFilter{}
+	if err := auth.HandleCaller(
+		ctx,
+		func(_ context.Context, c *auth.UserCaller) error {
+			// Only the user ID is needed; the db layer derives team eligibility from the user's
+			// team memberships via a subquery.
+			userID := c.User.Metadata.ID
+			eligibility.UserID = &userID
+			return nil
+		},
+		func(_ context.Context, c *auth.ServiceAccountCaller) error {
+			saID := c.ServiceAccountID
+			eligibility.ServiceAccountID = &saID
+			return nil
+		},
+	); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	// Being a valid approver on a gate does not by itself grant access to the gate's workspace, so
+	// additionally scope the inbox to the caller's root member namespaces (and their descendants).
+	// A nil slice means no membership filter (an admin sees all); a non-nil (possibly empty) slice
+	// restricts to those namespaces.
+	var rootNamespaceMemberships []models.MembershipNamespace
+	if !caller.IsAdminModeActivated(ctx) {
+		rootNamespaces, rErr := caller.GetRootNamespaceMemberships(ctx)
+		if rErr != nil {
+			tracing.RecordError(span, rErr, "failed to get root namespaces")
+			return nil, rErr
+		}
+		rootNamespaceMemberships = rootNamespaces
+	}
+
+	sort := db.RunGateSortableFieldCreatedAtDesc
+	if input.Sort != nil {
+		sort = *input.Sort
+	}
+
+	return s.dbClient.RunGates.GetRunGates(ctx, &db.GetRunGatesInput{
+		Sort:              &sort,
+		PaginationOptions: input.PaginationOptions,
+		Filter: &db.RunGateFilter{
+			Statuses:                 []models.RunGateStatus{models.RunGatePending},
+			Eligibility:              eligibility,
+			RootNamespaceMemberships: rootNamespaceMemberships,
+		},
+	})
+}
+
+// ApproveRunGate records an approve/reject decision on a run gate by an eligible approver.
+//
+// The caller must both be able to view the run and be an eligible approver. Eligibility is decided
+// per approval rule: for each of the gate's rules, the caller is eligible if they are a directly
+// allowed user/service account or a member of an allowed team (matched against the caller's LIVE
+// team memberships), reusing the same eligible-principal logic as managed-identity rule
+// enforcement. The decision covers every rule the caller is eligible for, and the caller must be
+// eligible for at least one rule.
+//
+// A reject is advisory: it records the decision and leaves the gate pending and the run parked at
+// awaiting_override, so other eligible approvers can still approve the gate. An approve records the
+// decision and, once the gate reaches its required number of approvals, marks the gate approved;
+// when that approval satisfies the last outstanding gate on the run, the run's blocked post-plan
+// stage is auto-overridden (awaiting_override -> overridden) in the same transaction, so no
+// separate override call is needed. Both decisions are dispatched as run engine commands.
+func (s *service) ApproveRunGate(ctx context.Context, input *ApproveRunGateInput) (*models.RunGate, error) {
+	ctx, span := tracer.Start(ctx, "svc.ApproveRunGate")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	var decision commands.GateDecision
+	switch input.Decision {
+	case models.RunGateDecisionApprove:
+		decision = commands.GateDecisionApprove
+	case models.RunGateDecisionReject:
+		decision = commands.GateDecisionReject
+	default:
+		return nil, errors.New("run gate decision %s is not supported", input.Decision, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	// Eligibility is not access. A policy's approvers are arbitrary users and teams — only approver
+	// service accounts are checked against the owning group — so being named on a rule says nothing
+	// about the caller's rights in the workspace the gate belongs to. Deciding on a run therefore
+	// requires being able to see it, the same view check every run gate read in this service makes:
+	// otherwise a gate the caller cannot fetch, and which never appears in their awaiting-decision
+	// inbox, could still be approved by ID.
+	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, input.GateID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gate")
+		return nil, err
+	}
+	if gate == nil {
+		return nil, errors.New("run gate with id %s not found", input.GateID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	cmd := s.cmdFactory.NewSetRunGateDecision(&commands.SetRunGateDecisionInput{
+		GateID:   input.GateID,
+		Decision: decision,
+		Comment:  input.Comment,
+		Caller:   caller,
+	})
+	if err = s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
+		tracing.RecordError(span, err, "failed to set run gate decision")
+		return nil, err
+	}
+
+	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, cmd.UpdatedGate.WorkspaceID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspace for activity event")
+		return nil, err
+	}
+	if ws != nil {
+		if _, err = activity.CreateActivityEvent(ctx, s.dbClient, &activity.CreateActivityEventInput{
+			NamespacePath: &ws.FullPath,
+			Action:        models.ActionUpdate,
+			TargetType:    models.TargetRunGate,
+			TargetID:      cmd.UpdatedGate.Metadata.ID,
+			Payload: &models.ActivityEventUpdateRunGatePayload{
+				Type:    models.ActivityEventRunGateUpdateType(input.Decision),
+				Comment: input.Comment,
+			},
+		}); err != nil {
+			tracing.RecordError(span, err, "failed to create activity event")
+			return nil, err
+		}
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Set a run gate decision.",
+		"runGateID", input.GateID,
+		"runGateTRN", cmd.UpdatedGate.Metadata.TRN,
+		"decision", input.Decision,
+		"gateStatus", cmd.UpdatedGate.Status,
+	)
+	return cmd.UpdatedGate, nil
+}
+
+// OverrideRunGate clears a pending run gate, and with it the policy check the gate blocks. Every
+// soft-failed check has exactly one gate, so this is the only way to clear one by fiat: a gate with
+// approval rules is being bypassed ahead of its approvals, and a gate with none never had approvals to
+// collect. The caller must be able to view the run, and — unless admin mode is active — hold
+// UpdatePolicyPermission in every group defining a soft-mandatory policy that failed on the check.
+func (s *service) OverrideRunGate(ctx context.Context, gateID string, comment *string) (*models.RunGate, error) {
+	ctx, span := tracer.Start(ctx, "svc.OverrideRunGate")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to authorize caller")
+		return nil, err
+	}
+
+	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, gateID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run gate")
+		return nil, err
+	}
+	if gate == nil {
+		return nil, errors.New("run gate with id %s not found", gateID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	// Checked before anything about the gate's state is resolved, so a caller who cannot see the run
+	// learns nothing about it — not the gate's status, not whether its policy check is awaiting an
+	// override. The override permission below is held in the group owning the policy, which is an
+	// ancestor of the workspace, so it says the caller may lift that policy's requirement; it does not
+	// say they may read this run. Both are required.
+	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	if gate.Status != models.RunGatePending {
+		return nil, errors.New("run gate is not pending a decision", errors.WithErrorCode(errors.EConflict))
+	}
+
+	run, err := s.dbClient.Runs.GetRunByID(ctx, gate.RunID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run")
+		return nil, err
+	}
+
+	check := run.PolicyCheckByID(gate.PolicyCheckID)
+	if check == nil || check.Status != models.PolicyCheckSoftFailed {
+		return nil, errors.New("run does not have a policy check awaiting override", errors.WithErrorCode(errors.EConflict))
+	}
+
+	if !caller.IsAdminModeActivated(ctx) {
+		if err = requireGateOverridePermission(ctx, caller, check); err != nil {
+			tracing.RecordError(span, err, "permission check failed")
+			return nil, err
+		}
+	}
+
+	cmd := s.cmdFactory.NewSetRunGateDecision(&commands.SetRunGateDecisionInput{
+		GateID:   gateID,
+		Decision: commands.GateDecisionOverride,
+		Comment:  comment,
+		Caller:   caller,
+	})
+	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
+		tracing.RecordError(span, err, "failed to override run gate")
+		return nil, err
+	}
+
+	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, gate.WorkspaceID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspace for activity event")
+		return nil, err
+	}
+	if ws != nil {
+		if _, err = activity.CreateActivityEvent(ctx, s.dbClient, &activity.CreateActivityEventInput{
+			NamespacePath: &ws.FullPath,
+			Action:        models.ActionUpdate,
+			TargetType:    models.TargetRunGate,
+			TargetID:      cmd.UpdatedGate.Metadata.ID,
+			Payload: &models.ActivityEventUpdateRunGatePayload{
+				Type:    models.RunGateUpdateTypeOverride,
+				Comment: comment,
+			},
+		}); err != nil {
+			tracing.RecordError(span, err, "failed to create activity event")
+			return nil, err
+		}
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Overrode a run gate.",
+		"runGateID", gateID,
+		"runGateTRN", cmd.UpdatedGate.Metadata.TRN,
+	)
+	return cmd.UpdatedGate, nil
+}
+
+// requireGateOverridePermission checks that the caller has UpdatePolicyPermission in every group
+// defining a soft-mandatory policy that failed on the gate's check — the policies whose requirement
+// the override lifts. It is keyed on the check's failed policies rather than the gate's approval
+// rules: a policy that declared no approvers produces no rule, so keying on rules would wave through
+// exactly the rule-less gate that has no approvers to answer to.
+func requireGateOverridePermission(ctx context.Context, caller auth.Caller, check *models.PolicyCheck) error {
+	checkedGroups := map[string]struct{}{}
+	matched := false
+	for i := range check.Policies {
+		policy := check.Policies[i]
+		if policy.Status != models.PolicyCheckPolicyFailed ||
+			policy.EnforcementLevel != models.PolicyEnforcementSoftMandatory {
+			continue
+		}
+		matched = true
+		groupID := policy.Provenance.GroupID
+		if _, checked := checkedGroups[groupID]; checked {
+			continue
+		}
+		if err := caller.RequirePermission(ctx, models.UpdatePolicyPermission, auth.WithGroupID(groupID)); err != nil {
+			return errors.New("a run gate can only be overridden by callers that have the 'UpdatePolicyPermission' in the groups where the failed soft-mandatory policies are defined", errors.WithErrorCode(errors.EForbidden))
+		}
+		checkedGroups[groupID] = struct{}{}
+	}
+	// Fail closed: a gate parks a run precisely because a soft-mandatory policy failed, so an override
+	// request against a check with no such policy is an inconsistent state, not a free pass. Granting it
+	// would bypass the permission check entirely, so refuse instead.
+	if !matched {
+		return errors.New("a run gate can only be overridden when a soft-mandatory policy has failed on its check", errors.WithErrorCode(errors.EForbidden))
+	}
+	return nil
+}
+
+func (s *service) requireRunViewAccess(ctx context.Context, caller auth.Caller, runID string) error {
+	workspaceID, err := s.dbClient.Runs.GetWorkspaceIDForRun(ctx, runID)
+	if err != nil {
+		return err
+	}
+	return caller.RequirePermission(ctx, models.ViewRunPermission,
+		auth.WithRunID(runID), auth.WithWorkspaceID(workspaceID))
 }

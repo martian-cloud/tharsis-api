@@ -51,6 +51,10 @@ enum ActivityEventTargetType {
   ROLE
   RUNNER
   FEDERATED_REGISTRY
+  PACKAGE
+  PACKAGE_VERSION
+  POLICY
+  RUN_GATE
 }
 
 type ActivityEventConnection {
@@ -137,6 +141,17 @@ type ActivityEventUpdateRunPayload {
   nodePath: String
 }
 
+enum ActivityEventUpdateRunGatePayloadType {
+  APPROVE
+  REJECT
+  OVERRIDE
+}
+
+type ActivityEventUpdateRunGatePayload {
+  type: ActivityEventUpdateRunGatePayloadType!
+  comment: String
+}
+
 union ActivityEventPayload =
     ActivityEventCreateNamespaceMembershipPayload
   | ActivityEventUpdateNamespaceMembershipPayload
@@ -153,6 +168,7 @@ union ActivityEventPayload =
   | ActivityEventCreateTerraformModulePayload
   | ActivityEventUpdateTerraformModulePayload
   | ActivityEventUpdateRunPayload
+  | ActivityEventUpdateRunGatePayload
 
 type ActivityEvent implements Node {
   id: ID!
@@ -160,7 +176,7 @@ type ActivityEvent implements Node {
   initiator: Initiator!
   namespacePath: String
   action: ActivityEventAction!
-  target: Node!
+  target: Node
   targetType: ActivityEventTargetType!
   payload: ActivityEventPayload
 }

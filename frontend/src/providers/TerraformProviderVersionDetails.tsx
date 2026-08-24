@@ -19,6 +19,7 @@ import { TerraformProviderVersionDetailsIndexFragment_details$key } from './__ge
 import { TerraformProviderVersionDetailsQuery } from './__generated__/TerraformProviderVersionDetailsQuery.graphql';
 import TerraformProviderVersionDetailsSidebar, { SidebarWidth } from './TerraformProviderVersionDetailsSidebar';
 import TerraformProviderVersionList from './TerraformProviderVersionList';
+import { PageLayoutProvider } from '@/layout/PageLayoutContext';
 
 const query = graphql`
     query TerraformProviderVersionDetailsQuery($registryNamespace: String!, $providerName: String!, $version: String) {
@@ -67,14 +68,14 @@ function TerraformProviderVersionDetails(props: Props) {
         >
           <CircularProgress />
         </Box>}>
-          <Box maxWidth={1400} margin="auto" padding={2}>
+          <PageLayoutProvider size="wide">
             {queryData.terraformProviderVersion && <TerraformProviderVersionDetailsIndex fragmentRef={queryData.terraformProviderVersion} />}
             {!queryData.terraformProviderVersion && <Box display="flex" justifyContent="center" marginTop={4}>
               <Typography variant="h6" color="textSecondary">
                 version <strong>{version || 'latest'}</strong> not found for provider <strong>{registryNamespace}/{providerName}</strong>
               </Typography>
             </Box>}
-          </Box>
+          </PageLayoutProvider>
         </Suspense>
       </Box>
     </Box>

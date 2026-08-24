@@ -68,14 +68,14 @@ func (s *JobServer) GetJobLogs(ctx context.Context, req *pb.GetJobLogsRequest) (
 
 // GetLatestJobForPlan retrieves the latest job for a plan ID.
 func (s *JobServer) GetLatestJobForPlan(ctx context.Context, req *pb.GetLatestJobForPlanRequest) (*pb.Job, error) {
-	model, err := s.serviceCatalog.FetchModel(ctx, req.PlanId)
+	parsedGID, err := gid.ParseGlobalID(req.PlanId)
 	if err != nil {
 		return nil, err
 	}
 
-	run, ok := model.(*models.Run)
-	if !ok {
-		return nil, errors.New("expected run model, got %T", model)
+	run, err := s.serviceCatalog.RunService.GetRunByNodeID(ctx, parsedGID.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	if run.Plan.LatestJobID == nil {
@@ -92,14 +92,14 @@ func (s *JobServer) GetLatestJobForPlan(ctx context.Context, req *pb.GetLatestJo
 
 // GetLatestJobForApply retrieves the latest job for an apply ID.
 func (s *JobServer) GetLatestJobForApply(ctx context.Context, req *pb.GetLatestJobForApplyRequest) (*pb.Job, error) {
-	model, err := s.serviceCatalog.FetchModel(ctx, req.ApplyId)
+	parsedGID, err := gid.ParseGlobalID(req.ApplyId)
 	if err != nil {
 		return nil, err
 	}
 
-	run, ok := model.(*models.Run)
-	if !ok {
-		return nil, errors.New("expected run model, got %T", model)
+	run, err := s.serviceCatalog.RunService.GetRunByNodeID(ctx, parsedGID.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	apply := run.Apply
@@ -283,7 +283,7 @@ func (s *JobServer) SubscribeToJobCancellationEvent(req *pb.SubscribeToJobCancel
 
 // toPBJob converts from Job model to ProtoBuf model.
 func toPBJob(j *models.Job) *pb.Job {
-	return &pb.Job{
+	pbJob := &pb.Job{
 		Metadata:                   toPBMetadata(&j.Metadata, types.JobModelType),
 		WorkspaceId:                gid.ToGlobalID(types.WorkspaceModelType, j.WorkspaceID),
 		RunId:                      gid.ToGlobalID(types.RunModelType, j.RunID),
@@ -295,4 +295,10 @@ func toPBJob(j *models.Job) *pb.Job {
 		ForceCanceled:              j.ForceCanceled,
 		OutdatedJobProtocolVersion: j.OutdatedJobProtocolVersion,
 	}
+	if j.OPAData != nil {
+		pbJob.JobData = &pb.Job_OpaData{
+			OpaData: &pb.OPAJobData{PolicyCheckId: models.RunNodeGID(j.OPAData.PolicyCheckID)},
+		}
+	}
+	return pbJob
 }

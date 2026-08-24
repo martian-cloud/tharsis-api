@@ -4,7 +4,7 @@ import Gravatar from '../../common/Gravatar';
 import Timestamp from '../../common/Timestamp';
 
 interface Props {
-    stage: 'Plan' | 'Apply';
+    stage: 'Plan' | 'Post-Plan' | 'Pre-Plan' | 'Apply';
     triggeredAt?: string | null;
     triggeredBy?: string | null;
 }

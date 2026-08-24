@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -61,6 +62,151 @@ func TestMapJobStatusToApplyStatus(t *testing.T) {
 			assert.Equal(t, tt.wantStatus, got)
 		})
 	}
+}
+
+func TestMapJobStatusToPolicyCheckStatus(t *testing.T) {
+	tests := []struct {
+		jobStatus  models.JobStatus
+		wantStatus models.PolicyCheckStatus
+		wantOK     bool
+	}{
+		{models.JobQueued, models.PolicyCheckQueued, true},
+		{models.JobRunning, models.PolicyCheckRunning, true},
+		{models.JobFailed, models.PolicyCheckErrored, true},
+		{models.JobCanceled, models.PolicyCheckCanceled, true},
+		// JobFinished maps to no node change: the verdict is set by ReportRunPolicyOutcomes.
+		{models.JobFinished, "", false},
+		{models.JobPending, "", false},
+		{models.JobCanceling, "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.jobStatus), func(t *testing.T) {
+			got, ok := mapJobStatusToPolicyCheckStatus(tt.jobStatus)
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.wantStatus, got)
+		})
+	}
+}
+
+func TestSyncJobStatus_Execute_StageRunning(t *testing.T) {
+	ctx := context.Background()
+
+	// The policy-eval job starts running: the check node goes queued -> running while the
+	// run remains post_plan_running.
+	jobID := "job-1"
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{ID: "run-1"},
+		Status:   models.RunPostPlanRunning,
+		Plan:     models.Plan{ID: "plan-1", Status: models.PlanFinished, HasChanges: true},
+		Apply:    &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+		TaskStages: []*models.RunTaskStage{{
+			ID:           "ts-post",
+			StageName:    models.RunTaskStageNamePostPlan,
+			Status:       models.RunTaskStageRunning,
+			PolicyChecks: []*models.PolicyCheck{{ID: "stage-1", StageName: models.RunTaskStageNamePostPlan, CheckType: models.PolicyKindOPA, Status: models.PolicyCheckQueued, LatestJobID: &jobID}},
+		}},
+	}
+
+	runStore := store.NewRunStore(&db.Client{})
+	runStore.AddRun(run)
+
+	logr, _ := logger.NewForTest()
+	cmd := &SyncJobStatus{logger: logr, RunID: "run-1", JobType: models.JobOPAType, JobID: jobID, JobData: &models.OPAJobData{PolicyCheckID: "stage-1"}, NewStatus: models.JobRunning, PersistJob: func(context.Context) error { return nil }}
+
+	require.NoError(t, cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore}))
+	assert.Equal(t, models.PolicyCheckRunning, run.AllPolicyChecks()[0].Status)
+	assert.Equal(t, models.RunPostPlanRunning, run.Status)
+}
+
+func TestSyncJobStatus_Execute_OPAJobWithNilJobDataFailsGracefully(t *testing.T) {
+	ctx := context.Background()
+
+	// An OPA job must carry OPAJobData (the policy check ID). A nil JobData indicates a caller bug
+	// or an unpopulated job record; it must fail with EInvalid rather than panic on dereference.
+	jobID := "job-1"
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{ID: "run-1"},
+		Status:   models.RunPostPlanRunning,
+		Plan:     models.Plan{ID: "plan-1", Status: models.PlanFinished, HasChanges: true},
+		Apply:    &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+		TaskStages: []*models.RunTaskStage{{
+			ID:           "ts-post",
+			StageName:    models.RunTaskStageNamePostPlan,
+			Status:       models.RunTaskStageRunning,
+			PolicyChecks: []*models.PolicyCheck{{ID: "stage-1", StageName: models.RunTaskStageNamePostPlan, CheckType: models.PolicyKindOPA, Status: models.PolicyCheckQueued, LatestJobID: &jobID}},
+		}},
+	}
+
+	runStore := store.NewRunStore(&db.Client{})
+	runStore.AddRun(run)
+
+	logr, _ := logger.NewForTest()
+	cmd := &SyncJobStatus{logger: logr, RunID: "run-1", JobType: models.JobOPAType, JobID: jobID, JobData: nil, NewStatus: models.JobRunning, PersistJob: func(context.Context) error { return nil }}
+
+	err := cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore})
+	require.Error(t, err)
+	assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+	assert.Equal(t, models.PolicyCheckQueued, run.AllPolicyChecks()[0].Status, "the check node must be untouched on a failed sync")
+}
+
+func TestSyncJobStatus_Execute_StageFinishedIsNoOp(t *testing.T) {
+	ctx := context.Background()
+
+	// The policy-eval job finished, but the verdict is set by ReportRunPolicyOutcomes, not by the
+	// job finishing. JobFinished must be a no-op on the check node (never an illegal transition).
+	jobID := "job-1"
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{ID: "run-1"},
+		Status:   models.RunPostPlanRunning,
+		Plan:     models.Plan{ID: "plan-1", Status: models.PlanFinished, HasChanges: true},
+		Apply:    &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+		TaskStages: []*models.RunTaskStage{{
+			ID:           "ts-post",
+			StageName:    models.RunTaskStageNamePostPlan,
+			Status:       models.RunTaskStageRunning,
+			PolicyChecks: []*models.PolicyCheck{{ID: "stage-1", StageName: models.RunTaskStageNamePostPlan, CheckType: models.PolicyKindOPA, Status: models.PolicyCheckRunning, LatestJobID: &jobID}},
+		}},
+	}
+
+	runStore := store.NewRunStore(&db.Client{})
+	runStore.AddRun(run)
+
+	logr, _ := logger.NewForTest()
+	cmd := &SyncJobStatus{logger: logr, RunID: "run-1", JobType: models.JobOPAType, JobID: jobID, JobData: &models.OPAJobData{PolicyCheckID: "stage-1"}, NewStatus: models.JobFinished, PersistJob: func(context.Context) error { return nil }}
+
+	require.NoError(t, cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore}))
+	assert.Equal(t, models.PolicyCheckRunning, run.AllPolicyChecks()[0].Status, "JobFinished must not change the check node")
+	assert.Equal(t, models.RunPostPlanRunning, run.Status)
+}
+
+func TestSyncJobStatus_Execute_StageVerdictSetIsNoOp(t *testing.T) {
+	ctx := context.Background()
+
+	// The check already reported awaiting_override via ReportRunPolicyOutcomes. A late failed job
+	// status must not overturn the recorded verdict.
+	jobID := "job-1"
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{ID: "run-1"},
+		Status:   models.RunPostPlanAwaitingDecision,
+		Plan:     models.Plan{ID: "plan-1", Status: models.PlanFinished, HasChanges: true},
+		Apply:    &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+		TaskStages: []*models.RunTaskStage{{
+			ID:           "ts-post",
+			StageName:    models.RunTaskStageNamePostPlan,
+			Status:       models.RunTaskStageAwaitingOverride,
+			PolicyChecks: []*models.PolicyCheck{{ID: "stage-1", StageName: models.RunTaskStageNamePostPlan, CheckType: models.PolicyKindOPA, Status: models.PolicyCheckSoftFailed, LatestJobID: &jobID}},
+		}},
+	}
+
+	runStore := store.NewRunStore(&db.Client{})
+	runStore.AddRun(run)
+
+	logr, _ := logger.NewForTest()
+	cmd := &SyncJobStatus{logger: logr, RunID: "run-1", JobType: models.JobOPAType, JobID: jobID, JobData: &models.OPAJobData{PolicyCheckID: "stage-1"}, NewStatus: models.JobFailed, PersistJob: func(context.Context) error { return nil }}
+
+	require.NoError(t, cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore}))
+	assert.Equal(t, models.PolicyCheckSoftFailed, run.AllPolicyChecks()[0].Status, "a set verdict must not be overturned by a late job status")
 }
 
 func TestSyncJobStatus_Execute_PlanRunning(t *testing.T) {

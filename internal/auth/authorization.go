@@ -300,8 +300,16 @@ func (a *authorizer) requireAccessToNamespace(ctx context.Context, namespacePath
 		return nil
 	}
 
-	// Descending sort is used so we can traverse the namespace hierarchy from the bottom up
-	// Don't limit the query to one result, because team member relationships can result in many rows.
+	// A caller's effective permissions in a namespace are the union of every membership that
+	// applies to it: direct memberships plus those inherited from each ancestor namespace, held
+	// either directly or via a team. A membership deeper in the hierarchy does not shadow a
+	// broader one held higher up — a subject that is an Owner of a group is an Owner of
+	// everything beneath it regardless of any narrower membership added further down.
+	//
+	// Don't limit the query to one result, because team member relationships can result in many
+	// rows. The descending sort no longer affects the outcome; it is kept so the most specific
+	// memberships are evaluated first, which is the likeliest place to find a match and return
+	// early.
 	sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
 	resp, err := a.getNamespaceMemberships(ctx, &db.GetNamespaceMembershipsInput{
 		Sort: &sortBy,
@@ -313,30 +321,7 @@ func (a *authorizer) requireAccessToNamespace(ctx context.Context, namespacePath
 		return err
 	}
 
-	filteredMemberships := []models.NamespaceMembership{}
-	seen := map[string]struct{}{}
-	for _, nm := range resp.NamespaceMemberships {
-		var id string
-		switch {
-		case nm.UserID != nil:
-			id = *a.userID
-		case nm.TeamID != nil:
-			id = *nm.TeamID
-		case nm.ServiceAccountID != nil:
-			id = *nm.ServiceAccountID
-		}
-
-		if _, ok := seen[id]; ok {
-			// Skip any parent memberships for same user, team or service account
-			// since the lowest membership in the hierarchy should take precedence.
-			continue
-		}
-
-		seen[id] = struct{}{}
-		filteredMemberships = append(filteredMemberships, nm)
-	}
-
-	return a.requirePermission(ctx, filteredMemberships, perm)
+	return a.requirePermission(ctx, resp.NamespaceMemberships, perm)
 }
 
 func (a *authorizer) requireAccessToInheritedGroupResource(ctx context.Context, groupID string, perm *models.Permission) error {

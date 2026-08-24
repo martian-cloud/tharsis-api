@@ -10,6 +10,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
+	corepolicy "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/policy"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/rules"
 	runvariables "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/variables"
@@ -137,6 +138,37 @@ func Create(
 		}
 	}
 
+	// Resolve the policies that apply to this run BEFORE creating it, so the task stage nodes — and
+	// the policy check nodes they own, with their policy snapshots — can be attached at creation time
+	// (run nodes, including each check's policies JSONB, are inserted by CreateRun). Resolve every
+	// supported stage; each stage with ≥1 applicable policy gets its own task stage owning one OPA
+	// check (the state machine gates the pre-plan stage before the plan and the post-plan stage after
+	// it).
+	var taskStages []*models.RunTaskStage
+	for _, stageName := range []models.RunTaskStageName{
+		models.RunTaskStageNamePrePlan,
+		models.RunTaskStageNamePostPlan,
+	} {
+		// Only OPA is supported today, so each stage yields a single check; future policy types add
+		// sibling checks under the same task stage.
+		stagePolicies, err := resolveRunPolicies(ctx, dbClient, ws, managedIdentities, stageName, isSpeculative)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to resolve run policies")
+		}
+		if len(stagePolicies) > 0 {
+			taskStages = append(taskStages, &models.RunTaskStage{
+				StageName: stageName,
+				Status:    models.RunTaskStageCreated,
+				PolicyChecks: []*models.PolicyCheck{{
+					StageName: stageName,
+					CheckType: models.PolicyKindOPA,
+					Status:    models.PolicyCheckCreated,
+					Policies:  stagePolicies,
+				}},
+			})
+		}
+	}
+
 	runModel := &models.Run{
 		WorkspaceID:             input.WorkspaceID,
 		ConfigurationVersionID:  input.ConfigurationVersionID,
@@ -161,6 +193,7 @@ func Create(
 	if !isSpeculative {
 		runModel.Apply = &models.Apply{Status: models.ApplyCreated}
 	}
+	runModel.TaskStages = taskStages
 
 	created, err := dbClient.Runs.CreateRun(ctx, runModel)
 	if err != nil {
@@ -225,6 +258,103 @@ func UploadRunVariables(
 	}
 
 	return retainFn, varKey, nil
+}
+
+// resolveRunPolicies collects every policy at the given stage that applies to the run into a slice
+// of PolicyCheckPolicy snapshots, one entry per policy (no de-duplication). Policies are fetched
+// from the run's ancestor groups and filtered in application code using their JSONB scope rules.
+// Each entry carries the owning group as its Source, the policy's version constraint left
+// unresolved, the optional digest lock, and the policy's approver spec. The constraint is resolved
+// to a concrete package version by the policy-eval job when the check runs, so a policy tracking a
+// range picks up newly published versions without a new run; a constraint that matches no uploaded
+// version is that job's failed outcome, not a creation-time skip. The caller stores the result on
+// the stage's policy check node's Policies field; nil when nothing applies.
+// A run with no apply — a speculative plan, or an assessment run, which is created speculative — is
+// enforced at each policy's speculative level instead of its declared one, so what a failure does to a
+// plan nobody can apply is stated by the policy rather than decided here. That level can only be
+// advisory or hard_mandatory (models.ValidSpeculativeRunEnforcementLevel), so no run without an apply
+// can end up parked at a policy gate waiting for an approval that would unblock nothing.
+func resolveRunPolicies(
+	ctx context.Context,
+	dbClient *db.Client,
+	ws *models.Workspace,
+	managedIdentities []models.ManagedIdentity,
+	stage models.RunTaskStageName,
+	isSpeculative bool,
+) ([]*models.PolicyCheckPolicy, error) {
+	policies, err := corepolicy.GetWorkspaceAssignedPolicies(ctx, dbClient, ws, managedIdentities, &stage)
+	if err != nil {
+		return nil, err
+	}
+	if len(policies) == 0 {
+		return nil, nil
+	}
+
+	// One PolicyCheckPolicy per policy: snapshot the version constraint unresolved (empty ⇒ latest)
+	// along with the owner group, enforcement, digest, and approver spec.
+	checkPolicies := make([]*models.PolicyCheckPolicy, 0, len(policies))
+	for i := range policies {
+		a := &policies[i]
+
+		// A policy whose kind isn't OPA is legitimately skipped: only OPA is supported today, and a
+		// future policy type adds its own sibling check rather than being evaluated here.
+		if a.Kind != models.PolicyKindOPA {
+			continue
+		}
+
+		// An OPA-kind policy with no OPAData is a data-integrity violation, not something to skip. The
+		// policy exists and declares a mandatory gate, but the data needed to evaluate it failed to
+		// hydrate (a deserialization bug, a partial migration, a future regression). Skipping it would
+		// drop the gate silently and let the run proceed as if the policy never existed. Fail run
+		// creation instead so a dropped mandatory gate can't go unnoticed.
+		if a.OPAData == nil {
+			return nil, errors.New(
+				"policy %s (%s) is OPA kind but has no OPA data; refusing to create run with a dropped policy gate",
+				a.Name, a.Metadata.TRN, errors.WithErrorCode(errors.EInternal))
+		}
+
+		versionConstraint := ""
+		if a.OPAData.PackageVersionConstraint != nil {
+			versionConstraint = *a.OPAData.PackageVersionConstraint
+		}
+
+		provenance := models.PolicyCheckPolicyProvenance{
+			GroupID:   a.GroupID,
+			PolicyTRN: a.Metadata.TRN,
+		}
+
+		enforcementLevel := a.OPAData.EnforcementLevel
+		if isSpeculative {
+			enforcementLevel = a.OPAData.SpeculativeRunEnforcementLevel
+		}
+
+		description := ""
+		if a.Description != nil {
+			description = *a.Description
+		}
+
+		checkPolicies = append(checkPolicies, &models.PolicyCheckPolicy{
+			ID:                       a.Metadata.ID,
+			Name:                     a.Name,
+			Description:              description,
+			PackageSource:            a.OPAData.PackageSource,
+			PackageVersionConstraint: versionConstraint,
+			EnforcementLevel:         enforcementLevel,
+			Provenance:               provenance,
+			PackageDigest:            a.OPAData.PackageDigest,
+			RequiredApprovals:        a.RequiredApprovals,
+			AllowedUserIDs:           a.AllowedUserIDs,
+			AllowedServiceAccountIDs: a.AllowedServiceAccountIDs,
+			AllowedTeamIDs:           a.AllowedTeamIDs,
+			Status:                   models.PolicyCheckPolicyPending,
+		})
+	}
+
+	if len(checkPolicies) == 0 {
+		return nil, nil
+	}
+
+	return checkPolicies, nil
 }
 
 // GetFederatedRegistry returns a getter that searches the workspace's parent group paths for a

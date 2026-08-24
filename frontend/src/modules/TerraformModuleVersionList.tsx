@@ -58,23 +58,25 @@ function TerraformModuleVersionList(props: Props) {
       }
     `, queryData);
 
+    const edges = data?.node?.versions?.edges ?? [];
+
     return (
         <Box>
             <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
                 <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
                     <Typography variant="subtitle1">
-                        {data.node?.versions?.edges?.length} version{data.node?.versions?.edges?.length === 1 ? '' : 's'}
+                        {edges.length} version{edges.length === 1 ? '' : 's'}
                     </Typography>
                 </Box>
             </Paper>
             <InfiniteScroll
-                dataLength={data.node?.versions?.edges?.length ?? 0}
+                dataLength={edges.length}
                 next={() => loadNext(20)}
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
             >
                 <List disablePadding>
-                    {data.node?.versions?.edges?.map((edge: any) => <TerraformModuleVersionListItem
+                    {edges.map((edge: any) => <TerraformModuleVersionListItem
                         key={edge.node.id}
                         fragmentRef={edge.node}
                     />)}

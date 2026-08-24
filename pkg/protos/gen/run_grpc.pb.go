@@ -29,6 +29,7 @@ const (
 	Runs_GetPlanByID_FullMethodName                    = "/martiancloud.tharsis.api.run.Runs/GetPlanByID"
 	Runs_GetApplyByID_FullMethodName                   = "/martiancloud.tharsis.api.run.Runs/GetApplyByID"
 	Runs_UpdatePlan_FullMethodName                     = "/martiancloud.tharsis.api.run.Runs/UpdatePlan"
+	Runs_ReportRunPolicyOutcomes_FullMethodName        = "/martiancloud.tharsis.api.run.Runs/ReportRunPolicyOutcomes"
 	Runs_UpdateApply_FullMethodName                    = "/martiancloud.tharsis.api.run.Runs/UpdateApply"
 	Runs_SetVariablesIncludedInTFConfig_FullMethodName = "/martiancloud.tharsis.api.run.Runs/SetVariablesIncludedInTFConfig"
 	Runs_SubscribeToRunEvents_FullMethodName           = "/martiancloud.tharsis.api.run.Runs/SubscribeToRunEvents"
@@ -59,6 +60,9 @@ type RunsClient interface {
 	GetApplyByID(ctx context.Context, in *GetApplyByIDRequest, opts ...grpc.CallOption) (*Apply, error)
 	// UpdatePlan updates a Plan.
 	UpdatePlan(ctx context.Context, in *UpdatePlanRequest, opts ...grpc.CallOption) (*Plan, error)
+	// ReportRunPolicyOutcomes records the policy-set outcomes for a run's post-plan stage node
+	// and sets the stage verdict.
+	ReportRunPolicyOutcomes(ctx context.Context, in *ReportRunPolicyOutcomesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// UpdateApply updates an Apply.
 	UpdateApply(ctx context.Context, in *UpdateApplyRequest, opts ...grpc.CallOption) (*Apply, error)
 	// SetVariablesIncludedInTFConfig updates which variables are included in the Terraform config.
@@ -167,6 +171,16 @@ func (c *runsClient) UpdatePlan(ctx context.Context, in *UpdatePlanRequest, opts
 	return out, nil
 }
 
+func (c *runsClient) ReportRunPolicyOutcomes(ctx context.Context, in *ReportRunPolicyOutcomesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Runs_ReportRunPolicyOutcomes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *runsClient) UpdateApply(ctx context.Context, in *UpdateApplyRequest, opts ...grpc.CallOption) (*Apply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Apply)
@@ -240,6 +254,9 @@ type RunsServer interface {
 	GetApplyByID(context.Context, *GetApplyByIDRequest) (*Apply, error)
 	// UpdatePlan updates a Plan.
 	UpdatePlan(context.Context, *UpdatePlanRequest) (*Plan, error)
+	// ReportRunPolicyOutcomes records the policy-set outcomes for a run's post-plan stage node
+	// and sets the stage verdict.
+	ReportRunPolicyOutcomes(context.Context, *ReportRunPolicyOutcomesRequest) (*emptypb.Empty, error)
 	// UpdateApply updates an Apply.
 	UpdateApply(context.Context, *UpdateApplyRequest) (*Apply, error)
 	// SetVariablesIncludedInTFConfig updates which variables are included in the Terraform config.
@@ -284,6 +301,9 @@ func (UnimplementedRunsServer) GetApplyByID(context.Context, *GetApplyByIDReques
 }
 func (UnimplementedRunsServer) UpdatePlan(context.Context, *UpdatePlanRequest) (*Plan, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdatePlan not implemented")
+}
+func (UnimplementedRunsServer) ReportRunPolicyOutcomes(context.Context, *ReportRunPolicyOutcomesRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReportRunPolicyOutcomes not implemented")
 }
 func (UnimplementedRunsServer) UpdateApply(context.Context, *UpdateApplyRequest) (*Apply, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateApply not implemented")
@@ -480,6 +500,24 @@ func _Runs_UpdatePlan_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Runs_ReportRunPolicyOutcomes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReportRunPolicyOutcomesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunsServer).ReportRunPolicyOutcomes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Runs_ReportRunPolicyOutcomes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunsServer).ReportRunPolicyOutcomes(ctx, req.(*ReportRunPolicyOutcomesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Runs_UpdateApply_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateApplyRequest)
 	if err := dec(in); err != nil {
@@ -587,6 +625,10 @@ var Runs_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdatePlan",
 			Handler:    _Runs_UpdatePlan_Handler,
+		},
+		{
+			MethodName: "ReportRunPolicyOutcomes",
+			Handler:    _Runs_ReportRunPolicyOutcomes_Handler,
 		},
 		{
 			MethodName: "UpdateApply",

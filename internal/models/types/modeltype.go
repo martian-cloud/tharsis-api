@@ -19,7 +19,6 @@ var (
 	AgentSessionModelType                    = ModelType{trnType: trn.TypeAgentSession, gidCode: "AGS"}
 	AgentSessionRunModelType                 = ModelType{trnType: trn.TypeAgentSessionRun, gidCode: "ASR"}
 	AnnouncementModelType                    = ModelType{trnType: trn.TypeAnnouncement, gidCode: "AN"}
-	ApplyModelType                           = ModelType{trnType: trn.TypeApply, gidCode: "A"}
 	AsymSigningKeyModelType                  = ModelType{trnType: trn.TypeAsymSigningKey, gidCode: "ASK"}
 	ConfigurationVersionModelType            = ModelType{trnType: trn.TypeConfigurationVersion, gidCode: "C"}
 	FederatedRegistryModelType               = ModelType{trnType: trn.TypeFederatedRegistry, gidCode: "FR"}
@@ -32,12 +31,16 @@ var (
 	ManagedIdentityAccessRuleModelType       = ModelType{trnType: trn.TypeManagedIdentityAccessRule, gidCode: "MR"}
 	ManagedIdentityModelType                 = ModelType{trnType: trn.TypeManagedIdentity, gidCode: "M"}
 	NamespaceFavoriteModelType               = ModelType{trnType: trn.TypeNamespaceFavorite, gidCode: "NF"}
+	PolicyModelType                          = ModelType{trnType: trn.TypePolicy, gidCode: "POL"}
 	NamespaceMembershipModelType             = ModelType{trnType: trn.TypeNamespaceMembership, gidCode: "NM"}
 	NotificationPreferenceModelType          = ModelType{trnType: trn.TypeNotificationPreference, gidCode: "NP"}
-	PlanModelType                            = ModelType{trnType: trn.TypePlan, gidCode: "P"}
+	PackageModelType                         = ModelType{trnType: trn.TypePackage, gidCode: "PKG"}
+	PackageVersionModelType                  = ModelType{trnType: trn.TypePackageVersion, gidCode: "PKGV"}
 	ResourceLimitModelType                   = ModelType{trnType: trn.TypeResourceLimit, gidCode: "RLM"}
 	RoleModelType                            = ModelType{trnType: trn.TypeRole, gidCode: "RL"}
 	RunModelType                             = ModelType{trnType: trn.TypeRun, gidCode: "R"}
+	RunGateModelType                         = ModelType{trnType: trn.TypeRunGate, gidCode: "RG"}
+	RunGateApprovalModelType                 = ModelType{trnType: trn.TypeRunGateApproval, gidCode: "RGA"}
 	RunnerModelType                          = ModelType{trnType: trn.TypeRunner, gidCode: "RNR"}
 	RunnerSessionModelType                   = ModelType{trnType: trn.TypeRunnerSession, gidCode: "RS"}
 	SCIMTokenModelType                       = ModelType{trnType: trn.TypeSCIMToken, gidCode: "ST"}

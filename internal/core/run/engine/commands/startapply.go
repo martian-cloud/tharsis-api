@@ -111,22 +111,29 @@ func (c *StartApply) Execute(ctx context.Context, input *types.ExecuteInput) err
 		return errors.New("the apply phase has already been started for this run", errors.WithErrorCode(errors.EConflict))
 	}
 
-	if run.Status != models.RunPlanned {
-		return errors.New("run must be in planned state to start apply", errors.WithErrorCode(errors.EConflict))
-	}
-
 	applyNode.TriggeredBy = c.in.TriggeredBy
 	applyNode.Comment = c.in.Comment
 
-	// Mark the apply pending (approved, waiting). The admission transformer
-	// attempts to queue it; if the workspace is busy it stays pending and the
-	// work item consumer admits it when the workspace frees up.
-	changes, err := statemachine.SetApplyStatus(run, models.ApplyPending)
-	if err != nil {
-		return errors.Wrap(err, "failed to transition apply node to pending")
-	}
-	if err := input.RunStore.AddRunChanges(run, changes...); err != nil {
-		return err
+	switch run.Status {
+	case models.RunPostPlanRunning, models.RunPostPlanAwaitingDecision, models.RunPostPlanCompleted:
+		// To support backward compatibility with older clients which do not support task stages, we'll set the
+		// run to auto apply here which will result in the apply being automatically started after the task stages have completed
+		run.AutoApply = true
+	case models.RunPlanned:
+		// The human approval this run was parked at planned for has now been given, so advance it. The run
+		// node decides what that means: it readies a pre-apply policy stage if the run has one, and otherwise
+		// the apply itself — so a pre-apply gate cannot be bypassed here. Either way the admission transformer
+		// then attempts to acquire the workspace; if it is busy the readied node stays pending and the work
+		// item consumer admits it when the workspace frees up.
+		changes, err := statemachine.AdvanceRun(run)
+		if err != nil {
+			return errors.Wrap(err, "failed to advance run to its apply phase")
+		}
+		if err := input.RunStore.AddRunChanges(run, changes...); err != nil {
+			return err
+		}
+	default:
+		return errors.New("run must be in planned state to start apply", errors.WithErrorCode(errors.EConflict))
 	}
 
 	c.Updated = run

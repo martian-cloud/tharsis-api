@@ -548,17 +548,3 @@ func membershipFilterByRootNamespaces(rootNamespaces []models.MembershipNamespac
 
 	return goqu.Or(ors...)
 }
-
-// escapeLikePattern escapes the LIKE metacharacters in s so it can be used as a
-// literal prefix in a LIKE pattern. Namespace path segments may contain '_'
-// (a LIKE single-char wildcard), so an unescaped prefix like "team_a/%" would
-// also match sibling trees such as "teamXa/...". PostgreSQL's LIKE treats '\' as
-// the default escape character, so escaping '\', '%' and '_' makes the prefix
-// match literally. The trailing "/%" the caller appends is intentionally left as
-// a wildcard.
-func escapeLikePattern(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `%`, `\%`)
-	s = strings.ReplaceAll(s, `_`, `\_`)
-	return s
-}

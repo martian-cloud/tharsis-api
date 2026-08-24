@@ -14,6 +14,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/packageregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/policy"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
@@ -266,6 +268,11 @@ func (r *GroupResolver) Variables(ctx context.Context) ([]*NamespaceVariableReso
 	return getVariables(ctx, r.group.FullPath)
 }
 
+// Policies resolver
+func (r *GroupResolver) Policies(ctx context.Context, args *PolicyConnectionQueryArgs) (*PolicyConnectionResolver, error) {
+	return policyConnectionQuery(ctx, args, &policy.GetPoliciesInput{Group: r.group})
+}
+
 // GPGKeys resolver
 func (r *GroupResolver) GPGKeys(ctx context.Context, args *GPGKeysConnectionQueryArgs) (*GPGKeyConnectionResolver, error) {
 	input := &gpgkey.GetGPGKeysInput{
@@ -341,6 +348,64 @@ func (r *GroupResolver) TerraformModules(ctx context.Context, args *TerraformMod
 	}
 
 	return NewTerraformModuleConnectionResolver(ctx, input)
+}
+
+// Packages resolver
+func (r *GroupResolver) Packages(ctx context.Context, args *PackageConnectionQueryArgs) (*PackageConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := &packageregistry.GetPackagesInput{
+		PaginationOptions: &pagination.Options{
+			First:  args.First,
+			Last:   args.Last,
+			Before: args.Before,
+			After:  args.After,
+		},
+		Group:  r.group,
+		Search: args.Search,
+	}
+
+	if args.IncludeInherited != nil && *args.IncludeInherited {
+		input.IncludeInherited = true
+	}
+
+	if args.Sort != nil {
+		sort := db.PackageSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewPackageConnectionResolver(ctx, input)
+}
+
+// VisiblePackages resolver returns every package the group may reference, wherever it is owned. It is
+// a separate field rather than another argument on Packages because the visible set is defined by the
+// packages' own visibility, not by how far the caller opts into the group's ancestry. It shares
+// PackageConnectionQueryArgs; the schema does not declare includeInherited on this field, so that
+// member is always nil here and the visible scope is unconditional.
+func (r *GroupResolver) VisiblePackages(ctx context.Context, args *PackageConnectionQueryArgs) (*PackageConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := &packageregistry.GetVisiblePackagesInput{
+		PaginationOptions: &pagination.Options{
+			First:  args.First,
+			Last:   args.Last,
+			Before: args.Before,
+			After:  args.After,
+		},
+		Group:  r.group,
+		Search: args.Search,
+	}
+
+	if args.Sort != nil {
+		sort := db.PackageSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewVisiblePackageConnectionResolver(ctx, input)
 }
 
 // ServiceAccounts resolver

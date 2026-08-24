@@ -145,7 +145,7 @@ func TestVCSWorkspaceLinkCaller_RequireInheritedPermissions(t *testing.T) {
 			},
 		},
 	}
-	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.ApplyModelType, nil)
+	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.RunModelType, nil)
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 }
 

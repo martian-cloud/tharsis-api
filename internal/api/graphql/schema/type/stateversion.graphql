@@ -37,7 +37,7 @@ type StateVersionDependency {
 type StateVersionInventory {
   resources: [StateVersionResource!]!
   dependencies: [StateVersionDependency!]!
-  checkResults: [CheckResult!]!
+  checkResults: [TerraformCheckResult!]!
 }
 
 type StateVersion implements Node {

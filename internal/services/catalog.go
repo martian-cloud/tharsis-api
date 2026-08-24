@@ -20,6 +20,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/packageregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/policy"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/resourcelimit"
@@ -57,6 +59,8 @@ type Catalog struct {
 	MaintenanceModeService           maintenance.Service
 	ManagedIdentityService           managedidentity.Service
 	NamespaceMembershipService       namespacemembership.Service
+	PackageService                   packageregistry.Service
+	PolicyService                    policy.Service
 	ResourceLimitService             resourcelimit.Service
 	RoleService                      role.Service
 	RunnerService                    runner.Service
@@ -87,7 +91,7 @@ func (c *Catalog) FetchModel(ctx context.Context, value string) (models.Model, e
 
 		fetchByTRN, ok := c.getModelFetcherByTRNType(parsed.Type())
 		if !ok {
-			return nil, errors.New("unsupported resource type: TRN with model type '%s' cannot be resolved", parsed.Type())
+			return nil, errors.New("unsupported resource type: TRN with model type '%s' cannot be resolved", parsed.Type(), errors.WithErrorCode(errors.EInvalid))
 		}
 
 		return fetchByTRN(ctx, value)
@@ -101,7 +105,7 @@ func (c *Catalog) FetchModel(ctx context.Context, value string) (models.Model, e
 	// If the value is not a TRN, fetch it using the appropriate method
 	fetchByID, ok := c.getModelFetcherByGIDCode(parsedGID.Code)
 	if !ok {
-		return nil, errors.New("unsupported resource type: GID with code '%s' cannot be resolved", parsedGID.Code)
+		return nil, errors.New("unsupported resource type: GID with code '%s' cannot be resolved", parsedGID.Code, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return fetchByID(ctx, parsedGID.ID)
@@ -119,7 +123,7 @@ func (c *Catalog) FetchModelID(ctx context.Context, value string) (string, error
 
 		fetchByTRN, ok := c.getModelFetcherByTRNType(parsed.Type())
 		if !ok {
-			return "", errors.New("unsupported resource type: TRN with model type '%s' has no registered handler", parsed.Type())
+			return "", errors.New("unsupported resource type: TRN with model type '%s' has no registered handler", parsed.Type(), errors.WithErrorCode(errors.EInvalid))
 		}
 
 		model, err := fetchByTRN(ctx, value)
@@ -222,6 +226,35 @@ func (c *Catalog) Init() {
 		},
 	)
 
+	// Policy Service
+	c.addModelFetchers(types.PolicyModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.PolicyService.GetPolicyByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.PolicyService.GetPolicyByTRN(ctx, value)
+		},
+	)
+
+	// Package Service
+	c.addModelFetchers(types.PackageModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.PackageService.GetPackageByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.PackageService.GetPackageByTRN(ctx, value)
+		},
+	)
+
+	c.addModelFetchers(types.PackageVersionModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.PackageService.GetPackageVersionByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.PackageService.GetPackageVersionByTRN(ctx, value)
+		},
+	)
+
 	// Role Service
 	c.addModelFetchers(types.RoleModelType,
 		func(ctx context.Context, value string) (models.Model, error) {
@@ -241,55 +274,22 @@ func (c *Catalog) Init() {
 		},
 	)
 
-	c.addModelFetchers(types.PlanModelType,
+	// Run Gate Service (part of the Run Service)
+	c.addModelFetchers(types.RunGateModelType,
 		func(ctx context.Context, value string) (models.Model, error) {
-			return c.RunService.GetRunByNodeID(ctx, value)
+			return c.RunService.GetRunGateByID(ctx, value)
 		},
 		func(ctx context.Context, value string) (models.Model, error) {
-			// This is a temporary workaround to provide backward compatibility for the plan TRN query
-			// which is deprecated and will be removed in an upcoming release now that plan node is returned
-			// with the run
-			parsed, err := trn.ParseAny(value)
-			if err != nil {
-				return nil, err
-			}
-
-			parts := parsed.PathParts()
-			if len(parts) < 3 {
-				return nil, errors.New("invalid trn format for plan", errors.WithErrorCode(errors.EInvalid))
-			}
-
-			// TRN Format: trn:plan:workspace_path/run_id/plan
-			runID := parts[len(parts)-2]
-
-			// The run is returned instead of the plan type because the plan resolver references the run directly
-			return c.RunService.GetRunByID(ctx, gid.FromGlobalID(runID))
+			return c.RunService.GetRunGateByTRN(ctx, value)
 		},
 	)
 
-	c.addModelFetchers(types.ApplyModelType,
+	c.addModelFetchers(types.RunGateApprovalModelType,
 		func(ctx context.Context, value string) (models.Model, error) {
-			return c.RunService.GetRunByNodeID(ctx, value)
+			return c.RunService.GetRunGateApprovalByID(ctx, value)
 		},
 		func(ctx context.Context, value string) (models.Model, error) {
-			// This is a temporary workaround to provide backward compatibility for the apply TRN query
-			// which is deprecated and will be removed in an upcoming release now that apply node is returned
-			// with the run
-			parsed, err := trn.ParseAny(value)
-			if err != nil {
-				return nil, err
-			}
-
-			parts := parsed.PathParts()
-			if len(parts) < 3 {
-				return nil, errors.New("invalid trn format for apply", errors.WithErrorCode(errors.EInvalid))
-			}
-
-			// TRN Format: trn:apply:workspace_path/run_id/apply
-			runID := parts[len(parts)-2]
-
-			// The run is returned instead of the apply type because the apply resolver references the run directly
-			return c.RunService.GetRunByID(ctx, gid.FromGlobalID(runID))
+			return c.RunService.GetRunGateApprovalByTRN(ctx, value)
 		},
 	)
 

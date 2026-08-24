@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9f18eb884a48c846310146e73c7c8783>>
+ * @generated SignedSource<<915a6704099c24653e3587d069434047>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,8 +10,11 @@
 
 import { ReaderFragment } from 'relay-runtime';
 export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
-export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "queuing" | "queuing_apply" | "%future added value";
+export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
+export type PolicyCheckStatus = "CANCELED" | "CREATED" | "ERRORED" | "OVERRIDDEN" | "PASSED" | "PENDING" | "QUEUED" | "RUNNING" | "SKIPPED" | "SOFT_FAILED" | "%future added value";
+export type RunStatus = "applied" | "apply_queued" | "apply_queuing" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "plan_queuing" | "planned" | "planned_and_finished" | "planning" | "post_plan_awaiting_decision" | "post_plan_completed" | "post_plan_running" | "pre_apply_awaiting_decision" | "pre_apply_completed" | "pre_apply_queuing" | "pre_apply_running" | "pre_plan_awaiting_decision" | "pre_plan_completed" | "pre_plan_queuing" | "pre_plan_running" | "%future added value";
+export type RunTaskStageName = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_PLAN" | "%future added value";
+export type RunTaskStageStatus = "AWAITING_OVERRIDE" | "CANCELED" | "COMPLETED" | "CREATED" | "ERRORED" | "PENDING" | "RUNNING" | "SKIPPED" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunDetailsSidebarFragment_details$data = {
   readonly apply: {
@@ -30,6 +33,7 @@ export type RunDetailsSidebarFragment_details$data = {
     readonly id: string;
   } | null | undefined;
   readonly createdBy: string;
+  readonly hasAdvisoryFailures: boolean;
   readonly id: string;
   readonly isDestroy: boolean;
   readonly metadata: {
@@ -49,6 +53,14 @@ export type RunDetailsSidebarFragment_details$data = {
     readonly status: PlanStatus;
   };
   readonly status: RunStatus;
+  readonly taskStages: ReadonlyArray<{
+    readonly policyChecks: ReadonlyArray<{
+      readonly stageName: RunTaskStageName;
+      readonly status: PolicyCheckStatus;
+    }>;
+    readonly stageName: RunTaskStageName;
+    readonly status: RunTaskStageStatus;
+  }>;
   readonly workspace: {
     readonly fullPath: string;
   };
@@ -120,7 +132,14 @@ v3 = [
     ],
     "storageKey": null
   }
-];
+],
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "stageName",
+  "storageKey": null
+};
 return {
   "argumentDefinitions": [],
   "kind": "Fragment",
@@ -155,6 +174,13 @@ return {
       "args": null,
       "kind": "ScalarField",
       "name": "autoApply",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "hasAdvisoryFailures",
       "storageKey": null
     },
     {
@@ -233,6 +259,32 @@ return {
     {
       "alias": null,
       "args": null,
+      "concreteType": "RunTaskStage",
+      "kind": "LinkedField",
+      "name": "taskStages",
+      "plural": true,
+      "selections": [
+        (v4/*: any*/),
+        (v1/*: any*/),
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": "PolicyCheck",
+          "kind": "LinkedField",
+          "name": "policyChecks",
+          "plural": true,
+          "selections": [
+            (v1/*: any*/),
+            (v4/*: any*/)
+          ],
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
       "concreteType": "Apply",
       "kind": "LinkedField",
       "name": "apply",
@@ -246,6 +298,6 @@ return {
 };
 })();
 
-(node as any).hash = "8dbad14bb9091b72aa4bd9bd49896ed3";
+(node as any).hash = "c4ec184921e937ecfba1865e2b1493f6";
 
 export default node;

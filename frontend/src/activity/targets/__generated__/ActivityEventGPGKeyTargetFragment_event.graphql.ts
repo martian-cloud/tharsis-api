@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ba10626b8ea37e0e742672aa1678e9d5>>
+ * @generated SignedSource<<313cf9de7754adcbed0cb35e40d35c3d>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,7 @@ export type ActivityEventGPGKeyTargetFragment_event$data = {
   readonly target: {
     readonly gpgKeyId?: string;
     readonly id?: string;
-  };
+  } | null | undefined;
   readonly " $fragmentSpreads": FragmentRefs<"ActivityEventListItemFragment_event">;
   readonly " $fragmentType": "ActivityEventGPGKeyTargetFragment_event";
 };

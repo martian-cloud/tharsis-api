@@ -5,6 +5,7 @@ package client
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,6 +21,11 @@ import (
 const (
 	contentTypeOctetStream = "application/octet-stream"
 )
+
+// ErrPackageNotFound is returned by DownloadPackage when the requested package version cannot be
+// found (it has been deleted, is not fully uploaded, or the caller cannot view it). Callers can
+// detect it with errors.Is.
+var ErrPackageNotFound = errors.New("package not found")
 
 var _ RESTClient = (*restClient)(nil)
 
@@ -107,6 +113,18 @@ type DownloadPlanCacheInput struct {
 	Writer io.Writer
 }
 
+// DownloadPlanJSONInput is the input for downloading a plan's JSON representation.
+type DownloadPlanJSONInput struct {
+	PlanID string
+	Writer io.Writer
+}
+
+// DownloadPackageInput is the input for downloading a package version by its package version id.
+type DownloadPackageInput struct {
+	PackageVersionID string
+	Writer           io.Writer
+}
+
 // RESTClient is the interface for REST client operations.
 type RESTClient interface {
 	UploadConfigurationVersion(ctx context.Context, input *UploadConfigurationVersionInput) error
@@ -121,6 +139,8 @@ type RESTClient interface {
 	UploadPlanData(ctx context.Context, input *UploadPlanDataInput) error
 	DownloadStateVersion(ctx context.Context, input *DownloadStateVersionInput) error
 	DownloadPlanCache(ctx context.Context, input *DownloadPlanCacheInput) error
+	DownloadPlanJSON(ctx context.Context, input *DownloadPlanJSONInput) error
+	DownloadPackage(ctx context.Context, input *DownloadPackageInput) error
 }
 
 // restClient handles REST API calls to the upstream Terraform-compatible API.
@@ -364,6 +384,85 @@ func (c *restClient) DownloadPlanCache(ctx context.Context, input *DownloadPlanC
 	downloadURL := serviceURL.JoinPath("plans", input.PlanID, "content").String()
 
 	return c.doGet(ctx, downloadURL, input.Writer, contentTypeOctetStream)
+}
+
+// DownloadPlanJSON downloads a plan's JSON representation.
+func (c *restClient) DownloadPlanJSON(ctx context.Context, input *DownloadPlanJSONInput) error {
+	discovered, err := c.serviceDiscoverer.DiscoverTFEServices(ctx, c.baseURL.String())
+	if err != nil {
+		return fmt.Errorf("failed to discover tfe v2 service: %w", err)
+	}
+
+	serviceURL, ok := discovered.Services[provider.TFEServiceID]
+	if !ok {
+		return fmt.Errorf("service url for %q not found", provider.TFEServiceID)
+	}
+
+	downloadURL := serviceURL.JoinPath("plans", input.PlanID, "json-output").String()
+
+	return c.doGet(ctx, downloadURL, input.Writer, contentTypeOctetStream)
+}
+
+// DownloadPackage streams a package version's tar.gz content into the input writer. It uses the
+// package registry version-id download endpoint, which returns a presigned download URL in the
+// X-Download-Url header (authorization handled by the package registry service); this client then
+// fetches that URL directly. A version that cannot be found surfaces as ErrPackageNotFound.
+func (c *restClient) DownloadPackage(ctx context.Context, input *DownloadPackageInput) error {
+	endpoint := c.baseURL.JoinPath(
+		"v1", "package-registry", "versions", input.PackageVersionID, "download",
+	).String()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+
+	authToken, err := c.tokenResolver.Token(ctx)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+authToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("%w: %s", ErrPackageNotFound, string(bodyBytes))
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("failed to get package download URL, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	presignedURL := resp.Header.Get("X-Download-Url")
+	if presignedURL == "" {
+		return fmt.Errorf("package download response missing X-Download-Url header")
+	}
+
+	// The presigned URL is self-authorizing; fetch it without the bearer token.
+	dlReq, err := http.NewRequestWithContext(ctx, http.MethodGet, presignedURL, nil)
+	if err != nil {
+		return err
+	}
+
+	dlResp, err := c.httpClient.Do(dlReq)
+	if err != nil {
+		return err
+	}
+	defer dlResp.Body.Close()
+
+	if dlResp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(io.LimitReader(dlResp.Body, 1024))
+		return fmt.Errorf("package download failed with status code %d: %s", dlResp.StatusCode, string(bodyBytes))
+	}
+
+	_, err = io.Copy(input.Writer, dlResp.Body)
+
+	return err
 }
 
 func (c *restClient) doPut(ctx context.Context, url string, body io.Reader, length int64) error {

@@ -122,6 +122,44 @@ func TestDiscardRun_Execute(t *testing.T) {
 		assert.Equal(t, models.ApplySkipped, cmd.Updated.Apply.Status)
 	})
 
+	t.Run("discards a run awaiting a pre-plan override", func(t *testing.T) {
+		mockActivityEvents := db.NewMockActivityEvents(t)
+		mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
+		// A run blocked awaiting a pre-plan policy override (the plan has not run) is discardable —
+		// declining the override abandons the run, which is what the terraform CLI does.
+		run := &models.Run{
+			Metadata: models.ResourceMetadata{ID: "run-1"},
+			Status:   models.RunPrePlanAwaitingDecision,
+			Plan:     models.Plan{ID: "plan-1", Status: models.PlanCreated, HasChanges: true},
+			Apply:    &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+			TaskStages: []*models.RunTaskStage{
+				{ID: "stage-pre", StageName: models.RunTaskStageNamePrePlan, Status: models.RunTaskStageAwaitingOverride, PolicyChecks: []*models.PolicyCheck{
+					{ID: "check-1", StageName: models.RunTaskStageNamePrePlan, CheckType: models.PolicyKindOPA, Status: models.PolicyCheckSoftFailed},
+				}},
+			},
+		}
+		runStore := store.NewRunStore(&db.Client{})
+		runStore.AddRun(run)
+
+		cmd := &DiscardRun{
+			dbClient:      &db.Client{ActivityEvents: mockActivityEvents},
+			in:            &DiscardRunInput{RunID: "run-1"},
+			namespacePath: "groupA/ws",
+		}
+
+		require.NoError(t, cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore}))
+		require.NotNil(t, cmd.Updated)
+		assert.Equal(t, models.RunDiscarded, cmd.Updated.Status)
+		// The abandoned pre-plan gate is canceled, stage and check alike, so nothing is left reporting a
+		// decision the discard just gave up on; the never-run plan and the never-started apply are both
+		// skipped.
+		assert.Equal(t, models.RunTaskStageCanceled, cmd.Updated.TaskStages[0].Status)
+		assert.Equal(t, models.PolicyCheckCanceled, cmd.Updated.TaskStages[0].PolicyChecks[0].Status)
+		assert.Equal(t, models.PlanSkipped, cmd.Updated.Plan.Status)
+		assert.Equal(t, models.ApplySkipped, cmd.Updated.Apply.Status)
+	})
+
 	t.Run("discarding a non-planned run is a conflict and records no activity event", func(t *testing.T) {
 		// NewMockActivityEvents(t) asserts no unexpected calls, so a CreateActivityEvent
 		// here would fail the test.

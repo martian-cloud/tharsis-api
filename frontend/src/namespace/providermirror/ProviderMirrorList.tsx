@@ -95,7 +95,8 @@ function ProviderMirrorList(props: Props) {
         }
     };
 
-    const hasResults = data?.namespace?.terraformProviderMirrors?.edges?.length !== 0;
+    const edges = data?.namespace?.terraformProviderMirrors?.edges ?? [];
+    const hasResults = edges.length !== 0;
     const showList = hasResults || search;
     const mirrorDisabled = data?.namespace?.providerMirrorEnabled?.value === false;
     const settingsLink = `/groups/${namespacePath}/-/settings`;
@@ -126,13 +127,13 @@ function ProviderMirrorList(props: Props) {
                 </Paper>
                 {!hasResults && search && <Typography sx={{ mt: 2 }} color="textSecondary" align="center">No providers match your search</Typography>}
                 <InfiniteScroll
-                    dataLength={data?.namespace?.terraformProviderMirrors?.edges?.length ?? 0}
+                    dataLength={edges.length}
                     next={() => loadNext(20)}
                     hasMore={hasNext}
                     loader={<ListSkeleton rowCount={3} />}
                 >
                     <List disablePadding>
-                        {data?.namespace?.terraformProviderMirrors?.edges?.map((edge: any) => (
+                        {edges.map((edge: any) => (
                             <ProviderMirrorListItem
                                 key={edge.node.id}
                                 fragmentRef={edge.node}

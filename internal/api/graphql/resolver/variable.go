@@ -331,7 +331,7 @@ type DeleteNamespaceVariableInput struct {
 type SetNamespaceVariablesInput struct {
 	ClientMutationID *string
 	NamespacePath    string
-	Category         models.VariableCategory
+	Category         string
 	Variables        []struct {
 		Sensitive *bool
 		Key       string
@@ -369,7 +369,7 @@ func setNamespaceVariablesMutation(ctx context.Context, input *SetNamespaceVaria
 
 	if err := getServiceCatalog(ctx).VariableService.SetVariables(ctx, &variable.SetVariablesInput{
 		NamespacePath: input.NamespacePath,
-		Category:      input.Category,
+		Category:      models.VariableCategory(input.Category),
 		Variables:     variables,
 	}); err != nil {
 		return nil, err

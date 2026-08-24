@@ -226,6 +226,8 @@ function AssignedServiceAccountList({ fragmentRef }: Props) {
         }
     };
 
+    const edges = data?.assignedServiceAccounts?.edges ?? [];
+
     return (
         <Box sx={{ border: 1, borderTop: 0, borderBottomLeftRadius: 4, borderBottomRightRadius: 4, borderColor: 'divider' }}>
             <Box sx={{
@@ -252,7 +254,7 @@ function AssignedServiceAccountList({ fragmentRef }: Props) {
                     Assign Service Account
                 </Button>
             </Box>
-            {(!data?.assignedServiceAccounts?.edges || data?.assignedServiceAccounts?.edges?.length === 0) ? <Paper sx={{ p: 2, m: 2 }}>
+            {(edges.length === 0) ? <Paper sx={{ p: 2, m: 2 }}>
                 <Typography>No service accounts are assigned to this runner.</Typography>
             </Paper>
                 :
@@ -265,12 +267,12 @@ function AssignedServiceAccountList({ fragmentRef }: Props) {
                         </Box>
                     </Paper>
                     <InfiniteScroll
-                        dataLength={(data?.assignedServiceAccounts?.edges && data?.assignedServiceAccounts?.edges.length) ?? 0}
+                        dataLength={edges.length}
                         next={() => loadNext(20)}
                         hasMore={hasNext}
                         loader={<ListSkeleton rowCount={3} />}
                     >
-                        <List disablePadding>{data?.assignedServiceAccounts.edges?.map((edge: any) => <AssignedServiceAccountListItem
+                        <List disablePadding>{edges.map((edge: any) => <AssignedServiceAccountListItem
                             key={edge.node.id}
                             fragmentRef={edge.node}
                             onDelete={setServiceAccountToUnassignPath}

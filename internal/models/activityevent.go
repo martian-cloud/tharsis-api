@@ -59,6 +59,10 @@ const (
 	TargetWorkspace                      ActivityEventTargetType = "WORKSPACE"
 	TargetRole                           ActivityEventTargetType = "ROLE"
 	TargetFederatedRegistry              ActivityEventTargetType = "FEDERATED_REGISTRY"
+	TargetPackage                        ActivityEventTargetType = "PACKAGE"
+	TargetPackageVersion                 ActivityEventTargetType = "PACKAGE_VERSION"
+	TargetPolicy                         ActivityEventTargetType = "POLICY"
+	TargetRunGate                        ActivityEventTargetType = "RUN_GATE"
 )
 
 // ActivityEventCreateNamespaceMembershipPayload helps with custom
@@ -99,6 +103,23 @@ const (
 type ActivityEventUpdateRunPayload struct {
 	Type     string  `json:"type"`
 	NodePath *string `json:"nodePath,omitempty"`
+}
+
+// ActivityEventRunGateUpdateType identifies the kind of run gate update.
+type ActivityEventRunGateUpdateType string
+
+// ActivityEventRunGateUpdateType values.
+const (
+	RunGateUpdateTypeApprove  ActivityEventRunGateUpdateType = "approve"
+	RunGateUpdateTypeReject   ActivityEventRunGateUpdateType = "reject"
+	RunGateUpdateTypeOverride ActivityEventRunGateUpdateType = "override"
+)
+
+// ActivityEventUpdateRunGatePayload is the custom payload for a run gate update
+// activity event, recording the decision type and optional comment.
+type ActivityEventUpdateRunGatePayload struct {
+	Type    ActivityEventRunGateUpdateType `json:"type"`
+	Comment *string                        `json:"comment,omitempty"`
 }
 
 // ActivityEventRemoveNamespaceMembershipPayload helps with custom

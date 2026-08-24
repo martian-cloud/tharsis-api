@@ -1,6 +1,8 @@
 package servers
 
 import (
+	"strings"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
@@ -11,6 +13,15 @@ import (
 )
 
 var maxQueryLimit int32 = 100
+
+// enumToPB maps a snake_case domain enum value to its prefixed protobuf enum value.
+// Proto value names follow <PREFIX><UPPER_SNAKE> (the standard protobuf convention of
+// prefixing values with the enum name), e.g. POLICY_CHECK_STATUS_SOFT_FAILED. This lets a
+// new enum value flow through by convention instead of a per-value switch. Empty or unknown
+// values fall back to 0 (the enum's *_UNSPECIFIED zero value).
+func enumToPB[E ~int32](v string, valueMap map[string]int32, prefix string) E {
+	return E(valueMap[prefix+strings.ToUpper(v)])
+}
 
 /* Conversions from ProtoBuf models */
 
@@ -49,11 +60,29 @@ func fromPBPaginationOptions(opts *pb.PaginationOptions) (*pagination.Options, e
 
 // toPBMetadata converts from ResourceMetadata model to ProtoBuf model.
 func toPBMetadata(metadata *models.ResourceMetadata, idType types.ModelType) *pb.ResourceMetadata {
+	return toPBMetadataWithGID(metadata, gid.ToGlobalID(idType, metadata.ID))
+}
+
+// toPBMetadataWithGID builds pb metadata from a pre-computed global ID. Used for run nodes (plan,
+// apply, policy check) whose GID is a bare RunNode code with no ModelType.
+func toPBMetadataWithGID(metadata *models.ResourceMetadata, globalID string) *pb.ResourceMetadata {
 	return &pb.ResourceMetadata{
 		CreatedAt: timestamppb.New(*metadata.CreationTimestamp),
 		UpdatedAt: timestamppb.New(*metadata.LastUpdatedTimestamp),
 		Version:   int64(metadata.Version),
-		Id:        gid.ToGlobalID(idType, metadata.ID),
+		Id:        globalID,
 		Trn:       metadata.TRN,
+	}
+}
+
+// toPBPackageVersion converts from a PackageVersion model to its ProtoBuf representation. The
+// metadata id is the global id used to reference the version elsewhere (e.g. the download endpoint).
+func toPBPackageVersion(packageVersion *models.PackageVersion) *pb.PackageVersion {
+	return &pb.PackageVersion{
+		Metadata:  toPBMetadata(&packageVersion.Metadata, types.PackageVersionModelType),
+		PackageId: packageVersion.PackageID,
+		Version:   packageVersion.SemanticVersion,
+		Status:    string(packageVersion.Status),
+		ShaSum:    packageVersion.GetSHASumHex(),
 	}
 }

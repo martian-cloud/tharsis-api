@@ -14,6 +14,7 @@ import JobLogs from './JobLogs';
 import NoRunnerAlert from './NoRunnerAlert';
 import OutdatedProtocolAlert from './OutdatedProtocolAlert';
 import RunDetailsErrorSummary from './RunDetailsErrorSummary';
+import RunDetailsPlanFile from './RunDetailsPlanFile';
 import RunDetailsPlanSummary from './RunDetailsPlanSummary';
 import RunJobDialog from './RunJobDialog';
 import RunDetailsStageHeader from './RunDetailsStageHeader';
@@ -71,6 +72,7 @@ function RunDetailsPlanStage(props: Props) {
             status
             createdBy
             plan {
+                id
                 metadata {
                     createdAt
                 }
@@ -332,7 +334,7 @@ function RunDetailsPlanStage(props: Props) {
     const jobPending = data.plan.currentJob?.status === 'pending';
     const logsAvailable = !!jobId || ['running', 'finished', 'errored', 'canceled'].includes(data.plan.status);
 
-    const planStatusType = RunStageStatusTypes[data.plan.status] ?? { label: 'unknown', color: 'runStatus.unknown' };
+    const planStatusType = RunStageStatusTypes[data.plan.status.toLowerCase()] ?? { label: 'unknown', color: 'runStatus.unknown' };
     const StatusIcon = planStatusType.icon;
 
     const maxDiffSizeExceeded = useMemo(() => data.plan.diffSize > MaxDiffSize, [data.plan.diffSize]);
@@ -404,6 +406,7 @@ function RunDetailsPlanStage(props: Props) {
                         <Tab label="Logs" value="logs" />
                         <Tab label="Variables" value="variables" />
                         <Tab label="Changes" value="changes" />
+                        <Tab label="Plan JSON" value="planjson" />
                     </Tabs>
                 </Box>
                 {tab === 'logs' && <Box>
@@ -456,6 +459,12 @@ function RunDetailsPlanStage(props: Props) {
                     {data.plan.status !== 'finished' && <RunDetailsStageTabEmptyState
                         message={['pending', 'queued', 'running'].includes(data.plan.status) ?
                             'Changes will be displayed once the plan has completed' : 'This plan does not contain any changes'}
+                    />}
+                </Box>}
+                {tab === 'planjson' && <Box marginTop={2}>
+                    {data.plan.status === 'finished' ? <RunDetailsPlanFile planId={data.plan.id} /> : <RunDetailsStageTabEmptyState
+                        message={['pending', 'queued', 'running'].includes(data.plan.status) ?
+                            'The plan file will be available once the plan has completed' : 'The plan file is not available'}
                     />}
                 </Box>}
             </Box>

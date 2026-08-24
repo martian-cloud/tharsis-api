@@ -23,17 +23,28 @@ declare module '@mui/material/styles' {
         runStatus: {
             applied: string;
             apply_queued: string;
+            apply_queuing: string;
             applying: string;
             canceled: string;
             discarded: string;
             errored: string;
             pending: string;
             plan_queued: string;
+            plan_queuing: string;
             planned: string;
             planned_and_finished: string;
             planning: string;
-            queuing: string;
-            queuing_apply: string;
+            pre_plan_queuing: string;
+            pre_plan_running: string;
+            pre_plan_awaiting_decision: string;
+            pre_plan_completed: string;
+            post_plan_running: string;
+            post_plan_awaiting_decision: string;
+            post_plan_completed: string;
+            pre_apply_queuing: string;
+            pre_apply_running: string;
+            pre_apply_awaiting_decision: string;
+            pre_apply_completed: string;
             created: string;
             finished: string;
             running: string;
@@ -41,6 +52,7 @@ declare module '@mui/material/styles' {
             skipped: string;
             destroy: string;
             unknown: string;
+            awaiting_decision: string;
         };
         jobStatus: {
             queued: string;
@@ -60,10 +72,10 @@ declare module '@mui/material/styles' {
             read: string;
         };
         checkResult: {
-            pass: string;
-            fail: string;
-            error: string;
-            unknown: string;
+            PASS: string;
+            FAIL: string;
+            ERROR: string;
+            UNKNOWN: string;
         };
         avatar: {
             default: string;
@@ -116,29 +128,41 @@ export default createTheme({
         },
         runStatus: {
             applied: '#34d399',
-            apply_queued: '#fbbf24',
+            apply_queued: '#8ba3c7',
+            apply_queuing: '#8ba3c7',
             applying: '#60a5fa',
             canceled: '#f87171',
             discarded: '#cbd5e1',
             errored: '#f87171',
-            pending: '#fbbf24',
-            plan_queued: '#fbbf24',
+            pending: '#8ba3c7',
+            plan_queued: '#8ba3c7',
+            plan_queuing: '#8ba3c7',
             planned: '#c084fc',
             planned_and_finished: '#34d399',
             planning: '#60a5fa',
-            queuing: '#fbbf24',
-            queuing_apply: '#fbbf24',
-            created: '#94a3b8',
+            pre_plan_queuing: '#8ba3c7',
+            pre_plan_running: '#60a5fa',
+            pre_plan_awaiting_decision: '#fbbf24',
+            pre_plan_completed: '#34d399',
+            post_plan_running: '#60a5fa',
+            post_plan_awaiting_decision: '#fbbf24',
+            post_plan_completed: '#34d399',
+            pre_apply_queuing: '#8ba3c7',
+            pre_apply_running: '#60a5fa',
+            pre_apply_awaiting_decision: '#fbbf24',
+            pre_apply_completed: '#34d399',
+            created: '#8ba3c7',
             finished: '#34d399',
             running: '#60a5fa',
-            queued: '#fbbf24',
-            skipped: '#B3D966',
+            queued: '#8ba3c7',
+            skipped: '#cbd5e1',
             destroy: '#f87171',
             unknown: '#94a3b8',
+            awaiting_decision: '#fbbf24',
         },
         jobStatus: {
-            queued: '#fbbf24',
-            pending: '#fbbf24',
+            queued: '#8ba3c7',
+            pending: '#8ba3c7',
             running: '#60a5fa',
             failed: '#f87171',
             canceled: '#f87171',
@@ -154,10 +178,10 @@ export default createTheme({
             read: '#5eead4',
         },
         checkResult: {
-            pass: '#34d399',
-            fail: '#f87171',
-            error: '#fbbf24',
-            unknown: '#9ca3af',
+            PASS: '#34d399',
+            FAIL: '#f87171',
+            ERROR: '#fbbf24',
+            UNKNOWN: '#9ca3af',
         },
         avatar: {
             default: teal[200],
@@ -168,6 +192,10 @@ export default createTheme({
             error: { main: '#f44336', dark: '#d32f2f', light: '#e91e63' },
             warning: { main: '#ff6d00', dark: '#e65100', light: '#f9a825' },
             success: { main: '#0984e3', dark: '#1a73e8', light: '#6c5ce7' },
+        },
+        background: {
+            default: '#121212',
+            paper: '#1e1e1e',
         },
     },
     typography: {
@@ -189,6 +217,20 @@ export default createTheme({
         }
     },
     components: {
+        MuiAppBar: {
+            styleOverrides: {
+                root: ({ theme }) => ({
+                    backgroundColor: theme.palette.background.default,
+                }),
+            },
+        },
+        MuiDrawer: {
+            styleOverrides: {
+                paper: ({ theme }) => ({
+                    backgroundColor: theme.palette.background.default,
+                }),
+            },
+        },
         MuiChip: {
             variants: [
                 {

@@ -1,6 +1,6 @@
+import NoResults from '@/common/NoResults';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button'
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
@@ -62,13 +62,9 @@ function StateVersionOutputs(props: Props) {
             {(filteredOutputs.length === 0 && search !== '') && <Typography sx={{ padding: 2, marginTop: 4 }} align="center" color="textSecondary">
                 No outputs matching search <strong>{search}</strong>
             </Typography>}
-            {(filteredOutputs.length === 0 && search === '') && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                    <Typography color="textSecondary" align="center">
-                        This run does not have any Terraform outputs
-                    </Typography>
-                </Box>
-            </Paper>}
+            {(filteredOutputs.length === 0 && search === '') && <NoResults sx={{ mt: 4 }}>
+                This run does not have any Terraform outputs
+            </NoResults>}
             {filteredOutputs.length > 0 && <Box sx={{ mt: 2 }}>
                 <ResponsiveTable
                     ariaLabel="outputs"

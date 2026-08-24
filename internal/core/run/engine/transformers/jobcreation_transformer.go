@@ -40,7 +40,7 @@ func (t *JobCreationTransformer) Transform(ctx context.Context, changeList []typ
 				if c.NewStatus != models.PlanQueued {
 					continue
 				}
-				job, err := t.createJob(ctx, run, models.JobPlanType)
+				job, err := t.createJob(ctx, run, models.JobPlanType, nil)
 				if err != nil {
 					return err
 				}
@@ -49,11 +49,27 @@ func (t *JobCreationTransformer) Transform(ctx context.Context, changeList []typ
 				if c.NewStatus != models.ApplyQueued || run.Apply == nil {
 					continue
 				}
-				job, err := t.createJob(ctx, run, models.JobApplyType)
+				job, err := t.createJob(ctx, run, models.JobApplyType, nil)
 				if err != nil {
 					return err
 				}
 				run.Apply.LatestJobID = &job.Metadata.ID
+			case statemachine.PolicyCheckStatusChange:
+				// A policy check's job is created when the check node enters queued. The run
+				// already holds the workspace (it never reached planned), so no admission/
+				// TryQueue step is needed for the check.
+				if c.NewStatus != models.PolicyCheckQueued {
+					continue
+				}
+				check := run.PolicyCheckByPath(c.Path)
+				if check == nil {
+					continue
+				}
+				job, err := t.createJob(ctx, run, models.JobOPAType, &models.OPAJobData{PolicyCheckID: check.ID})
+				if err != nil {
+					return err
+				}
+				check.LatestJobID = &job.Metadata.ID
 			}
 		}
 	}
@@ -61,7 +77,7 @@ func (t *JobCreationTransformer) Transform(ctx context.Context, changeList []typ
 }
 
 // createJob creates a job and its log stream for a queued node.
-func (t *JobCreationTransformer) createJob(ctx context.Context, run *models.Run, jobType models.JobType) (*models.Job, error) {
+func (t *JobCreationTransformer) createJob(ctx context.Context, run *models.Run, jobType models.JobType, opaData *models.OPAJobData) (*models.Job, error) {
 	ws, err := t.dbClient.Workspaces.GetWorkspaceByID(ctx, run.WorkspaceID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get workspace")
@@ -96,6 +112,7 @@ func (t *JobCreationTransformer) createJob(ctx context.Context, run *models.Run,
 		Properties: map[string]string{
 			models.JobPropertyProviderMirrorEnabled: strconv.FormatBool(providerMirrorSetting.Value),
 		},
+		OPAData: opaData,
 	}
 	if err := job.SetStatus(models.JobQueued); err != nil {
 		return nil, errors.Wrap(err, "failed to set job status")

@@ -35,6 +35,7 @@ service Jobs {
 enum JobType {
   plan  = 0;
   apply = 1;
+  opa   = 2;
 }
 
 // JobStatus defines the status of a job.
@@ -106,6 +107,11 @@ message SaveJobLogsRequest {
   string logs         = 3;
 }
 
+// OPAJobData contains OPA-specific data associated with an OPA policy evaluation job.
+message OPAJobData {
+  string policy_check_id = 1; 
+}
+
 // Job represents a Terraform job.
 message Job {
   metadata.ResourceMetadata metadata                       = 1;
@@ -118,6 +124,9 @@ message Job {
   bool                      cancel_requested               = 8;
   bool                      force_canceled                 = 9;
   bool                      outdated_job_protocol_version  = 10;
+  oneof job_data {
+    OPAJobData opa_data = 11;
+  }
 }
 
 // JobLogStreamEventData contains the log data.

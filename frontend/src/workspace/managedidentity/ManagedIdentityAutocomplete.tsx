@@ -25,11 +25,13 @@ interface Props {
     namespacePath: string
     value: ManagedIdentityOption | null
     assignedManagedIdentityIDs: any
+    /** Defaults to medium, to match the button this sits beside when assigning to a workspace. */
+    size?: 'small' | 'medium'
     onSelected: (value: ManagedIdentityOption | null) => void
 }
 
 function ManagedIdentityAutocomplete(props: Props) {
-    const { namespacePath, value, assignedManagedIdentityIDs, onSelected } = props;
+    const { namespacePath, value, assignedManagedIdentityIDs, size, onSelected } = props;
 
     const [options, setOptions] = useState<ReadonlyArray<ManagedIdentityOption> | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -96,6 +98,7 @@ function ManagedIdentityAutocomplete(props: Props) {
     return (
         <Autocomplete
             fullWidth
+            size={size}
             value={value}
             onChange={(event: React.SyntheticEvent, value: ManagedIdentityOption | null) => onSelected(value)}
             onInputChange={(_, newInputValue: string) => setInputValue(newInputValue)}

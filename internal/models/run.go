@@ -10,27 +10,93 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
+// runNodeGIDCode is the GID code for run-node id handles (plan, apply, policy check). Run nodes are
+// not first-class models; this code exists only to encode/decode their ids as GIDs.
+const runNodeGIDCode = "RN"
+
+// RunNodeGID encodes a run node's raw node id as a RunNode GID handle.
+func RunNodeGID(nodeID string) string {
+	return gid.NewGlobalIDWithCode(runNodeGIDCode, nodeID).String()
+}
+
 // RunStatus represents the overall status of a run.
 type RunStatus string
 
-// RunStatus constants. The queuing/queuing_apply statuses mirror the TFE (go-tfe)
-// run statuses of the same names: queuing means the plan node is pending (waiting
-// to be queued/admitted), and queuing_apply means the apply node is pending.
+// RunStatus constants, listed in run execution order followed by the terminal statuses.
+//
+// Every workspace-gated node contributes two statuses, because the two waits it can be in are
+// different things and the run status names both: *_queuing means the node is ready but has not been
+// admitted to the workspace yet, and *_queued means it is admitted and its job is waiting for a
+// runner. Collapsing them would leave the run reporting plan_queued while its plan node is still
+// pending, and would erase the queuing -> queued transition, which is the moment the run won the
+// workspace slot.
 const (
+	RunPending RunStatus = "pending"
+	// The pre-plan policy stage. Gated on the workspace: the stage waits at pre_plan_queuing.
+	RunPrePlanQueuing          RunStatus = "pre_plan_queuing"
+	RunPrePlanRunning          RunStatus = "pre_plan_running"
+	RunPrePlanAwaitingDecision RunStatus = "pre_plan_awaiting_decision"
+	RunPrePlanCompleted        RunStatus = "pre_plan_completed"
+	// The plan. Gated on the workspace, then on a runner.
+	RunPlanQueuing RunStatus = "plan_queuing"
+	RunPlanQueued  RunStatus = "plan_queued"
+	RunPlanning    RunStatus = "planning"
+	// The post-plan policy stage. Not separately gated: it inherits the plan's workspace slot.
+	RunPostPlanRunning          RunStatus = "post_plan_running"
+	RunPostPlanAwaitingDecision RunStatus = "post_plan_awaiting_decision"
+	RunPostPlanCompleted        RunStatus = "post_plan_completed"
+	RunPlanned                  RunStatus = "planned"
+	// The pre-apply policy stage. Gated on the workspace, like the pre-plan stage.
+	RunPreApplyQueuing          RunStatus = "pre_apply_queuing"
+	RunPreApplyRunning          RunStatus = "pre_apply_running"
+	RunPreApplyAwaitingDecision RunStatus = "pre_apply_awaiting_decision"
+	RunPreApplyCompleted        RunStatus = "pre_apply_completed"
+	// The apply. Gated on the workspace, then on a runner.
+	RunApplyQueuing RunStatus = "apply_queuing"
+	RunApplyQueued  RunStatus = "apply_queued"
+	RunApplying     RunStatus = "applying"
+	// Terminal statuses.
 	RunApplied            RunStatus = "applied"
-	RunApplyQueued        RunStatus = "apply_queued"
-	RunApplying           RunStatus = "applying"
+	RunPlannedAndFinished RunStatus = "planned_and_finished"
 	RunCanceled           RunStatus = "canceled"
 	RunDiscarded          RunStatus = "discarded"
 	RunErrored            RunStatus = "errored"
-	RunPending            RunStatus = "pending"
-	RunPlanQueued         RunStatus = "plan_queued"
-	RunPlanned            RunStatus = "planned"
-	RunPlannedAndFinished RunStatus = "planned_and_finished"
-	RunPlanning           RunStatus = "planning"
-	RunQueuing            RunStatus = "queuing"
-	RunQueuingApply       RunStatus = "queuing_apply"
 )
+
+// AllRunStatuses is every run status, in the order declared above. It exists so exhaustiveness can be
+// asserted in tests — in particular that every status has an explicit mapping onto the TFE run status
+// the Terraform CLI understands, rather than leaking a raw Tharsis string to the CLI.
+var AllRunStatuses = []RunStatus{
+	RunPending,
+	RunPrePlanQueuing, RunPrePlanRunning, RunPrePlanAwaitingDecision, RunPrePlanCompleted,
+	RunPlanQueuing, RunPlanQueued, RunPlanning,
+	RunPostPlanRunning, RunPostPlanAwaitingDecision, RunPostPlanCompleted,
+	RunPlanned,
+	RunPreApplyQueuing, RunPreApplyRunning, RunPreApplyAwaitingDecision, RunPreApplyCompleted,
+	RunApplyQueuing, RunApplyQueued, RunApplying,
+	RunApplied, RunPlannedAndFinished, RunCanceled, RunDiscarded, RunErrored,
+}
+
+// QueuingRunStatuses are the statuses a run holds while it is waiting to be admitted to its workspace,
+// in run order — one per workspace-gated node. This is the single Go-side definition of "waiting for the
+// workspace slot": the admitter, the work item consumer, the reconciler and the TFE run queue all read
+// it, so adding a gated node means adding its status here and nowhere else.
+//
+// The partial indexes that make the admission queries cheap must list the same statuses in SQL, since a
+// predicate cannot call into Go. They are created in the add_policy_enforcement migration and named
+// index_runs_on_*_queuing; a new gated node needs a migration to extend them.
+var QueuingRunStatuses = []RunStatus{
+	RunPrePlanQueuing,
+	RunPlanQueuing,
+	RunPreApplyQueuing,
+	RunApplyQueuing,
+}
+
+// IsQueuing reports whether a run in this status is waiting for the workspace slot, as opposed to
+// waiting for a runner (the *_queued statuses) or running.
+func (s RunStatus) IsQueuing() bool {
+	return slices.Contains(QueuingRunStatuses, s)
+}
 
 // IsFinalStatus returns true if the status is a terminal state.
 func (s RunStatus) IsFinalStatus() bool {
@@ -42,7 +108,9 @@ type PlanStatus string
 
 // PlanStatus constants. The lifecycle is:
 // created -> pending (ready, awaiting workspace admission) -> queued (job created)
-// -> running -> finished/errored/canceled.
+// -> running -> finished/errored/canceled. A plan that never starts before the run reaches a final
+// state (a pre-plan policy gate errored, the run was canceled, or it was discarded while awaiting a
+// pre-plan override) moves from created to skipped instead, mirroring the apply.
 const (
 	PlanCreated  PlanStatus = "created"
 	PlanPending  PlanStatus = "pending"
@@ -51,11 +119,12 @@ const (
 	PlanFinished PlanStatus = "finished"
 	PlanErrored  PlanStatus = "errored"
 	PlanCanceled PlanStatus = "canceled"
+	PlanSkipped  PlanStatus = "skipped"
 )
 
 // IsFinalStatus returns true if the status is a terminal state.
 func (s PlanStatus) IsFinalStatus() bool {
-	return s == PlanFinished || s == PlanErrored || s == PlanCanceled
+	return s == PlanFinished || s == PlanErrored || s == PlanCanceled || s == PlanSkipped
 }
 
 // ApplyStatus represents the status of an apply node.
@@ -82,6 +151,166 @@ func (s ApplyStatus) IsFinalStatus() bool {
 	return s == ApplyFinished || s == ApplyErrored || s == ApplyCanceled || s == ApplySkipped
 }
 
+// RunTaskStageName identifies which stage of a run a node (policy check, future task, etc.) evaluates at.
+type RunTaskStageName string
+
+// RunTaskStageName constants, in run execution order.
+const (
+	RunTaskStageNamePrePlan   RunTaskStageName = "pre_plan"
+	RunTaskStageNamePostPlan  RunTaskStageName = "post_plan"
+	RunTaskStageNamePreApply  RunTaskStageName = "pre_apply"
+	RunTaskStageNamePostApply RunTaskStageName = "post_apply"
+)
+
+// WorkspaceGatedStages are the stages that must acquire the workspace slot before they start, in run
+// order. They evaluate against state another run could change underneath them: the pre-plan stage
+// gates the plan, and the pre-apply stage evaluates the plan it is about to apply. The post-plan stage
+// is not listed — it inherits the slot the plan already holds — and the post-apply stage runs after
+// state is written, so it gates nothing.
+var WorkspaceGatedStages = []RunTaskStageName{RunTaskStageNamePrePlan, RunTaskStageNamePreApply}
+
+// IsWorkspaceGated reports whether a stage must be admitted to the workspace before it starts. A gated
+// stage waits at RunTaskStagePending until the admitter acquires the slot; an ungated one goes straight
+// from created to running on the slot the plan already holds.
+func (s RunTaskStageName) IsWorkspaceGated() bool {
+	for _, gated := range WorkspaceGatedStages {
+		if s == gated {
+			return true
+		}
+	}
+	return false
+}
+
+// IsValid reports whether the stage name is one of the recognized run stages.
+func (s RunTaskStageName) IsValid() bool {
+	switch s {
+	case RunTaskStageNamePrePlan, RunTaskStageNamePostPlan, RunTaskStageNamePreApply, RunTaskStageNamePostApply:
+		return true
+	default:
+		return false
+	}
+}
+
+// RunTaskStageStatus represents the status of a task stage node. A task stage aggregates the verdict
+// of its child policy checks (and, in future, run task results): it is pending while it waits for the
+// workspace slot, running while any child is evaluating, awaiting_override when a child is blocked on
+// a human override, completed once every child has cleared, errored when a child failed a hard gate,
+// canceled when the run is canceled or discarded, and skipped when the stage never ran (e.g. a
+// post-plan stage on a no-change plan). awaiting_override mirrors go-tfe's TaskStageAwaitingOverride.
+//
+// pending is named to match PlanPending/ApplyPending: on every node it means "ready, but not yet
+// admitted to the workspace". A stage has no queued status because the job-created state lives one
+// level down, on its child policy checks (PolicyCheckQueued).
+type RunTaskStageStatus string
+
+// RunTaskStageStatus constants.
+const (
+	RunTaskStageCreated          RunTaskStageStatus = "created"
+	RunTaskStagePending          RunTaskStageStatus = "pending"
+	RunTaskStageRunning          RunTaskStageStatus = "running"
+	RunTaskStageAwaitingOverride RunTaskStageStatus = "awaiting_override"
+	RunTaskStageCompleted        RunTaskStageStatus = "completed"
+	RunTaskStageErrored          RunTaskStageStatus = "errored"
+	RunTaskStageCanceled         RunTaskStageStatus = "canceled"
+	RunTaskStageSkipped          RunTaskStageStatus = "skipped"
+)
+
+// IsFinalStatus returns true if the status is a terminal state.
+func (s RunTaskStageStatus) IsFinalStatus() bool {
+	return s == RunTaskStageCompleted || s == RunTaskStageErrored ||
+		s == RunTaskStageCanceled || s == RunTaskStageSkipped
+}
+
+// PolicyCheckStatus represents the status of a policy check node. The lifecycle is:
+// created -> queued -> running -> passed | soft_failed | errored | canceled, plus
+// soft_failed -> overridden. The check passes through queued (its policy-eval job
+// has been created and is awaiting a runner) before running. "soft_failed" is a
+// check-node status (it blocks the run at post_plan_awaiting_decision), matching go-tfe's
+// TaskStageAwaitingOverride.
+//
+// pending means "ready to run, but its stage is not running yet", and is how a retry re-enters the
+// lifecycle: a retried check goes errored/canceled/soft_failed -> pending, and its stage reacts by
+// restarting itself (waiting for the workspace slot first if the stage is gated). It matches
+// PlanPending/ApplyPending/RunTaskStagePending — on every node, pending is the pre-admission state.
+// A fresh check starts at created instead, because it has no stage to restart: the run reaches its
+// stage in the normal forward flow. A soft_failed check is retryable so that a policy which has since
+// been fixed can be re-evaluated rather than overridden; retrying discards the check's gate and any
+// approvals collected against the previous verdict.
+type PolicyCheckStatus string
+
+// PolicyCheckStatus constants.
+const (
+	PolicyCheckCreated    PolicyCheckStatus = "created"
+	PolicyCheckPending    PolicyCheckStatus = "pending"
+	PolicyCheckQueued     PolicyCheckStatus = "queued"
+	PolicyCheckRunning    PolicyCheckStatus = "running"
+	PolicyCheckPassed     PolicyCheckStatus = "passed"
+	PolicyCheckSoftFailed PolicyCheckStatus = "soft_failed"
+	PolicyCheckOverridden PolicyCheckStatus = "overridden"
+	PolicyCheckErrored    PolicyCheckStatus = "errored"
+	PolicyCheckCanceled   PolicyCheckStatus = "canceled"
+	PolicyCheckSkipped    PolicyCheckStatus = "skipped"
+)
+
+// IsFinalStatus returns true if the status is a terminal state.
+func (s PolicyCheckStatus) IsFinalStatus() bool {
+	return s == PolicyCheckPassed || s == PolicyCheckOverridden ||
+		s == PolicyCheckErrored || s == PolicyCheckCanceled || s == PolicyCheckSkipped
+}
+
+// NotStarted returns true if the policy check has not begun evaluation yet.
+func (s PolicyCheckStatus) NotStarted() bool {
+	return s == PolicyCheckCreated || s == PolicyCheckPending
+}
+
+// PolicyCheckPolicyStatus is the result the policy evaluator reported for a policy set within a
+// policy check. It starts as pending and transitions to passed or failed when the evaluator reports.
+type PolicyCheckPolicyStatus string
+
+// PolicyCheckPolicyStatus constants.
+const (
+	PolicyCheckPolicyPending PolicyCheckPolicyStatus = "pending"
+	PolicyCheckPolicyPassed  PolicyCheckPolicyStatus = "passed"
+	PolicyCheckPolicyFailed  PolicyCheckPolicyStatus = "failed"
+)
+
+// PolicyCheckPolicyProvenance records the group that owns a policy attachment and the stable TRN
+// of the attachment itself. Policies are always group-scoped.
+type PolicyCheckPolicyProvenance struct {
+	GroupID   string `json:"groupId"`
+	PolicyTRN string `json:"policyTrn"`
+}
+
+// PolicyCheckPolicy is the snapshot of a single policy a policy check evaluates, together
+// with its result. There is one entry per valid policy (no de-duplication), each with its own
+// stable ID, Source (owner), EnforcementLevel, optional PackageDigest lock, and — for soft-mandatory
+// policies — the approver snapshot (RequiredApprovals + allowed principal ids) used to gate an
+// override.
+// Name and Description are copied from the policy at run creation so the run keeps reporting the
+// policy as it was evaluated, even after the policy is renamed, re-described, or deleted.
+// PackageVersionConstraint is snapshotted unresolved (empty means the latest uploaded version): the
+// policy-eval job resolves it to a concrete package version when the check runs, and records that
+// version in its job log. Status is empty and MessagesObjectStoreKey nil until the policy-eval job
+// reports the result.
+// Entries are stored as elements of the check's Policies JSONB column, so adding a field here needs
+// no migration — it is simply absent (and therefore zero) on checks created before it existed.
+type PolicyCheckPolicy struct {
+	ID                       string                      `json:"id"`
+	Name                     string                      `json:"name,omitempty"`
+	Description              string                      `json:"description,omitempty"`
+	PackageSource            string                      `json:"packageSource"`
+	PackageVersionConstraint string                      `json:"packageVersionConstraint"`
+	EnforcementLevel         PolicyEnforcementLevel      `json:"enforcementLevel"`
+	Provenance               PolicyCheckPolicyProvenance `json:"provenance"`
+	PackageDigest            *string                     `json:"packageDigest,omitempty"`
+	RequiredApprovals        int                         `json:"requiredApprovals,omitempty"`
+	AllowedUserIDs           []string                    `json:"allowedUserIds,omitempty"`
+	AllowedServiceAccountIDs []string                    `json:"allowedServiceAccountIds,omitempty"`
+	AllowedTeamIDs           []string                    `json:"allowedTeamIds,omitempty"`
+	Status                   PolicyCheckPolicyStatus     `json:"status"`
+	MessagesObjectStoreKey   *string                     `json:"messagesObjectStoreKey,omitempty"`
+}
+
 var _ Model = (*Run)(nil)
 
 // PlanSummary contains a summary of the types of changes this plan includes
@@ -96,14 +325,14 @@ type PlanSummary struct {
 	OutputDestructions   int32
 }
 
-// Run-relative node paths identifying the plan and apply nodes within a run.
-// Used by RetryNode and the node GetPath implementations.
+// Run-relative node paths identifying the plan and apply nodes
+// within a run. Used by RetryNode and the node GetPath implementations.
 const (
 	PlanNodePath  = "plan"
 	ApplyNodePath = "apply"
 )
 
-// RunNode is the interface for typed run nodes (plan, apply)
+// RunNode is the interface for typed run nodes (plan, apply, policy check)
 type RunNode interface {
 	GetID() string
 	GetPath() string
@@ -131,9 +360,9 @@ func (n *Plan) GetID() string { return n.ID }
 // GetPath returns the run-relative path identifying this node within its run.
 func (n *Plan) GetPath() string { return PlanNodePath }
 
-// GetGlobalID returns the ID as a GID.
+// GetGlobalID returns the plan node's ID as a RunNode GID.
 func (n *Plan) GetGlobalID() string {
-	return gid.ToGlobalID(types.PlanModelType, n.ID)
+	return RunNodeGID(n.ID)
 }
 
 // Metadata returns the resource metadata for this plan node derived from the parent run.
@@ -174,9 +403,188 @@ func (n *Apply) Metadata(run *Run) *ResourceMetadata {
 	}
 }
 
-// GetGlobalID returns the ID as a GID.
+// GetGlobalID returns the apply node's ID as a RunNode GID.
 func (n *Apply) GetGlobalID() string {
-	return gid.ToGlobalID(types.ApplyModelType, n.ID)
+	return RunNodeGID(n.ID)
+}
+
+// PolicyCheckMessagesSummary is a capped copy of the violation messages the check's policies
+// reported, held on the check itself so a list of checks can show what failed without a read per
+// policy from object storage. Truncated says Messages is not the whole set — the full list for a
+// given policy is behind that policy's MessagesObjectStoreKey.
+type PolicyCheckMessagesSummary struct {
+	Messages  []string `json:"messages"`
+	Truncated bool     `json:"truncated"`
+}
+
+// PolicyCheck represents a policy-evaluation task within a run — one per policy engine/type
+// (only OPA today) at a given stage. It is a generic run node implementing the RunNode interface
+// and owns the policy-eval job, the per-policy-set policies it evaluates (with their results), and
+// its verdict.
+type PolicyCheck struct {
+	LatestJobID *string
+	ID          string
+	StageName   RunTaskStageName
+	CheckType   PolicyKind
+	Status      PolicyCheckStatus
+	Policies    []*PolicyCheckPolicy
+	// MessagesSummary previews the messages the policies above reported, and is nil until the check
+	// has reported (or when it reported none). It exists so a view showing many checks does not have
+	// to read every policy's messages out of object storage.
+	MessagesSummary *PolicyCheckMessagesSummary
+}
+
+// GetID returns the node ID.
+func (n *PolicyCheck) GetID() string { return n.ID }
+
+// GetPath returns the run-relative path identifying this node within its run. It appends the
+// check type so sibling checks under a run have distinct paths.
+func (n *PolicyCheck) GetPath() string { return string(n.StageName) + "." + string(n.CheckType) }
+
+// GetGlobalID returns the policy check node's ID as a RunNode GID.
+func (n *PolicyCheck) GetGlobalID() string {
+	return RunNodeGID(n.ID)
+}
+
+// Copy creates a deep copy of the PolicyCheck.
+func (n *PolicyCheck) Copy() RunNode {
+	return &PolicyCheck{
+		LatestJobID:     n.LatestJobID,
+		ID:              n.ID,
+		StageName:       n.StageName,
+		CheckType:       n.CheckType,
+		Status:          n.Status,
+		Policies:        clonePolicyCheckPolicies(n.Policies),
+		MessagesSummary: n.MessagesSummary.clone(),
+	}
+}
+
+// clone deep-copies the summary, including its message slice. Nil clones to nil.
+func (s *PolicyCheckMessagesSummary) clone() *PolicyCheckMessagesSummary {
+	if s == nil {
+		return nil
+	}
+	return &PolicyCheckMessagesSummary{
+		Messages:  slices.Clone(s.Messages),
+		Truncated: s.Truncated,
+	}
+}
+
+// policyCheckMessagesSummaryEqual reports whether two summaries hold the same messages. A nil
+// summary (never reported) is distinct from an empty one.
+func policyCheckMessagesSummaryEqual(a, b *PolicyCheckMessagesSummary) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Truncated == b.Truncated && slices.Equal(a.Messages, b.Messages)
+}
+
+// clonePolicyCheckPolicies deep-copies the policies slice, including each entry's approver id slices.
+func clonePolicyCheckPolicies(in []*PolicyCheckPolicy) []*PolicyCheckPolicy {
+	if in == nil {
+		return nil
+	}
+	out := make([]*PolicyCheckPolicy, len(in))
+	for i, p := range in {
+		cp := *p
+		cp.AllowedUserIDs = slices.Clone(p.AllowedUserIDs)
+		cp.AllowedServiceAccountIDs = slices.Clone(p.AllowedServiceAccountIDs)
+		cp.AllowedTeamIDs = slices.Clone(p.AllowedTeamIDs)
+		out[i] = &cp
+	}
+	return out
+}
+
+// ShallowCompare compares this PolicyCheck with another RunNode.
+func (n *PolicyCheck) ShallowCompare(other RunNode) bool {
+	if n == nil && other == nil {
+		return true
+	}
+	if n == nil || other == nil {
+		return false
+	}
+	o, ok := other.(*PolicyCheck)
+	if !ok {
+		return false
+	}
+	return n.StageName == o.StageName &&
+		n.CheckType == o.CheckType &&
+		n.Status == o.Status &&
+		ptrStringEqual(n.LatestJobID, o.LatestJobID) &&
+		policyCheckMessagesSummaryEqual(n.MessagesSummary, o.MessagesSummary) &&
+		slices.EqualFunc(n.Policies, o.Policies, policyCheckPolicyEqual)
+}
+
+// policyCheckPolicyEqual reports whether two PolicyCheckPolicy values are equal, including the
+// owner source and approver snapshot.
+func policyCheckPolicyEqual(a, b *PolicyCheckPolicy) bool {
+	return a.ID == b.ID &&
+		a.PackageSource == b.PackageSource &&
+		a.PackageVersionConstraint == b.PackageVersionConstraint &&
+		a.EnforcementLevel == b.EnforcementLevel &&
+		a.Provenance == b.Provenance &&
+		ptrStringEqual(a.PackageDigest, b.PackageDigest) &&
+		a.RequiredApprovals == b.RequiredApprovals &&
+		a.Status == b.Status &&
+		ptrStringEqual(a.MessagesObjectStoreKey, b.MessagesObjectStoreKey) &&
+		slices.Equal(a.AllowedUserIDs, b.AllowedUserIDs) &&
+		slices.Equal(a.AllowedServiceAccountIDs, b.AllowedServiceAccountIDs) &&
+		slices.Equal(a.AllowedTeamIDs, b.AllowedTeamIDs)
+}
+
+// RunTaskStage represents a stage of a run (pre_plan, post_plan, ...) as a generic run node. It
+// owns the policy checks evaluated at that stage (and, in future, run task results), and its Status
+// is the aggregate verdict of those children. There is at most one task stage per stage name on a run.
+type RunTaskStage struct {
+	ID           string
+	StageName    RunTaskStageName
+	Status       RunTaskStageStatus
+	PolicyChecks []*PolicyCheck
+}
+
+// GetID returns the node ID.
+func (n *RunTaskStage) GetID() string { return n.ID }
+
+// GetPath returns the run-relative path identifying this node within its run. The stage is unique
+// per run, so it doubles as the path.
+func (n *RunTaskStage) GetPath() string { return string(n.StageName) }
+
+// GetGlobalID returns the task stage node's ID as a RunNode GID.
+func (n *RunTaskStage) GetGlobalID() string {
+	return RunNodeGID(n.ID)
+}
+
+// Copy creates a deep copy of the RunTaskStage, including its child policy checks.
+func (n *RunTaskStage) Copy() RunNode {
+	cp := &RunTaskStage{
+		ID:        n.ID,
+		StageName: n.StageName,
+		Status:    n.Status,
+	}
+	if n.PolicyChecks != nil {
+		cp.PolicyChecks = make([]*PolicyCheck, len(n.PolicyChecks))
+		for i, check := range n.PolicyChecks {
+			cp.PolicyChecks[i] = check.Copy().(*PolicyCheck)
+		}
+	}
+	return cp
+}
+
+// ShallowCompare compares this task stage's own fields (id, stage, status) with another RunNode. It
+// deliberately excludes the child policy checks, which Diff compares separately and attributes to
+// their own node IDs.
+func (n *RunTaskStage) ShallowCompare(other RunNode) bool {
+	if n == nil && other == nil {
+		return true
+	}
+	if n == nil || other == nil {
+		return false
+	}
+	o, ok := other.(*RunTaskStage)
+	if !ok {
+		return false
+	}
+	return n.ID == o.ID && n.StageName == o.StageName && n.Status == o.Status
 }
 
 // Run represents a terraform run
@@ -191,6 +599,7 @@ type Run struct {
 	TargetAddresses         []string
 	Plan                    Plan
 	Apply                   *Apply
+	TaskStages              []*RunTaskStage
 	ModuleDigest            []byte // This is only set for modules stored in the Tharsis module registry
 	CreatedBy               string
 	WorkspaceID             string
@@ -205,6 +614,10 @@ type Run struct {
 	AutoApply               bool
 	Refresh                 bool
 	RefreshOnly             bool
+	// HasAdvisoryFailures says at least one advisory policy this run evaluated failed. Advisory
+	// failures never block a run — the check still reports passed — so the run's status cannot express
+	// them
+	HasAdvisoryFailures bool
 }
 
 // GetID returns the Metadata ID.
@@ -243,9 +656,103 @@ func (r *Run) HasChanges() bool {
 	return r.Plan.HasChanges
 }
 
+// ComputeHasAdvisoryFailures reports whether any advisory policy this run evaluated failed. A caller that
+// changes a policy's status assigns the result to HasAdvisoryFailures rather than deriving the flag from
+// the check it just wrote: the flag summarizes every check on the run, so a check being retried can only
+// clear it by recomputing across the others.
+func (r *Run) ComputeHasAdvisoryFailures() bool {
+	for _, check := range r.AllPolicyChecks() {
+		for _, policy := range check.Policies {
+			if policy.EnforcementLevel == PolicyEnforcementAdvisory && policy.Status == PolicyCheckPolicyFailed {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // IsComplete returns true if the run is in a completed state
 func (r *Run) IsComplete() bool {
 	return r.Status.IsFinalStatus()
+}
+
+// AllPolicyChecks returns every policy check across all of the run's task stages. The task stages
+// are kept in canonical stage order (pre_plan, post_plan, post_apply) by the DB layer at load time,
+// so this flattens them in that order.
+func (r *Run) AllPolicyChecks() []*PolicyCheck {
+	var checks []*PolicyCheck
+	for _, stage := range r.TaskStages {
+		checks = append(checks, stage.PolicyChecks...)
+	}
+	return checks
+}
+
+// TaskStageByStageName returns the task stage for the given run stage, or nil if the run has none.
+func (r *Run) TaskStageByStageName(stage RunTaskStageName) *RunTaskStage {
+	for _, s := range r.TaskStages {
+		if s.StageName == stage {
+			return s
+		}
+	}
+	return nil
+}
+
+// PolicyCheckByID returns the policy check with the given node ID, or nil.
+func (r *Run) PolicyCheckByID(id string) *PolicyCheck {
+	for _, check := range r.AllPolicyChecks() {
+		if check.ID == id {
+			return check
+		}
+	}
+	return nil
+}
+
+// PolicyCheckByPath returns the policy check with the given run-relative path (stage.checktype).
+func (r *Run) PolicyCheckByPath(path string) *PolicyCheck {
+	for _, check := range r.AllPolicyChecks() {
+		if check.GetPath() == path {
+			return check
+		}
+	}
+	return nil
+}
+
+// NodeByPath returns the run node addressed by the given run-relative path — "plan", "apply", a task
+// stage ("post_plan") or a policy check within one ("post_plan.opa") — or nil when the run has no
+// node at that path. It is the read counterpart of the nodePath RetryRunNode takes.
+func (r *Run) NodeByPath(path string) RunNode {
+	switch path {
+	case PlanNodePath:
+		return &r.Plan
+	case ApplyNodePath:
+		// A speculative run has no apply node.
+		if r.Apply == nil {
+			return nil
+		}
+		return r.Apply
+	}
+
+	for _, stage := range r.TaskStages {
+		if stage.GetPath() == path {
+			return stage
+		}
+	}
+
+	if check := r.PolicyCheckByPath(path); check != nil {
+		return check
+	}
+
+	return nil
+}
+
+// TaskStageByID returns the task stage with the given node ID, or nil.
+func (r *Run) TaskStageByID(id string) *RunTaskStage {
+	for _, s := range r.TaskStages {
+		if s.ID == id {
+			return s
+		}
+	}
+	return nil
 }
 
 // GetGroupPath returns the group path
@@ -283,10 +790,17 @@ func (r *Run) Copy() *Run {
 		AutoApply:              r.AutoApply,
 		Refresh:                r.Refresh,
 		RefreshOnly:            r.RefreshOnly,
+		HasAdvisoryFailures:    r.HasAdvisoryFailures,
 	}
 	if r.Apply != nil {
 		applyCopy := r.Apply.Copy().(*Apply)
 		cp.Apply = applyCopy
+	}
+	if r.TaskStages != nil {
+		cp.TaskStages = make([]*RunTaskStage, len(r.TaskStages))
+		for i, stage := range r.TaskStages {
+			cp.TaskStages[i] = stage.Copy().(*RunTaskStage)
+		}
 	}
 	return cp
 }
@@ -316,6 +830,32 @@ func (r *Run) Diff(other *Run) []string {
 		changedIDs = append(changedIDs, r.Apply.ID)
 	}
 
+	// Compare task stage nodes by ID. A stage present now but not in the comparison target (or
+	// whose own status changed) is flagged by its own ID — its status is a persisted row.
+	otherStages := make(map[string]*RunTaskStage, len(other.TaskStages))
+	for _, stage := range other.TaskStages {
+		otherStages[stage.ID] = stage
+	}
+	for _, stage := range r.TaskStages {
+		otherStage, ok := otherStages[stage.ID]
+		if !ok || !stage.ShallowCompare(otherStage) {
+			changedIDs = append(changedIDs, stage.ID)
+		}
+	}
+
+	// Compare policy checks by ID (across all stages). A check present now but not in the
+	// comparison target (or whose content changed) is flagged by its own ID.
+	otherChecks := make(map[string]*PolicyCheck)
+	for _, check := range other.AllPolicyChecks() {
+		otherChecks[check.ID] = check
+	}
+	for _, check := range r.AllPolicyChecks() {
+		otherCheck, ok := otherChecks[check.ID]
+		if !ok || !check.ShallowCompare(otherCheck) {
+			changedIDs = append(changedIDs, check.ID)
+		}
+	}
+
 	return changedIDs
 }
 
@@ -343,6 +883,7 @@ func (r *Run) ShallowCompare(other *Run) bool {
 		r.AutoApply == other.AutoApply &&
 		r.Refresh == other.Refresh &&
 		r.RefreshOnly == other.RefreshOnly &&
+		r.HasAdvisoryFailures == other.HasAdvisoryFailures &&
 		ptrStringEqual(r.ConfigurationVersionID, other.ConfigurationVersionID) &&
 		ptrStringEqual(r.ModuleSource, other.ModuleSource) &&
 		ptrStringEqual(r.ModuleVersion, other.ModuleVersion) &&

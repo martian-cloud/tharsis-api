@@ -164,6 +164,34 @@ func (_m *MockRuns) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResu
 	return r0, r1
 }
 
+// GetWorkspaceIDForRun provides a mock function with given fields: ctx, id
+func (_m *MockRuns) GetWorkspaceIDForRun(ctx context.Context, id string) (string, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceIDForRun")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // UpdateRun provides a mock function with given fields: ctx, run, nodeIDs
 func (_m *MockRuns) UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string) (*models.Run, error) {
 	_va := make([]interface{}, len(nodeIDs))

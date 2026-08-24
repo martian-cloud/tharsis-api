@@ -49,6 +49,7 @@ const environment = (fetchGraphQL: (query: string, variables?: object) => Promis
             },
             subscribe),
         store: new Store(new RecordSource()),
+        UNSTABLE_defaultRenderPolicy: 'full',
     });
 }
 

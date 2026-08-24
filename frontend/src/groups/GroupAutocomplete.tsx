@@ -18,12 +18,14 @@ interface Props {
     placeholder: string
     includeNoParentOption?: boolean
     sx?: SxProps<Theme>
+    /** Leave undefined to let the autocomplete track its own selection. */
+    value?: GroupOption | null
     onSelected: (value: GroupOption | null) => void
     filterGroups: (options: GroupOption[]) => GroupOption[]
 }
 
 function GroupAutocomplete(props: Props) {
-    const { placeholder, includeNoParentOption, sx, onSelected, filterGroups } = props
+    const { placeholder, includeNoParentOption, sx, value, onSelected, filterGroups } = props
     const [options, setOptions] = useState<ReadonlyArray<GroupOption>>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [inputValue, setInputValue] = useState<string>('');
@@ -88,7 +90,8 @@ function GroupAutocomplete(props: Props) {
             sx={sx}
             fullWidth
             size="small"
-            onChange={(event: React.SyntheticEvent, value: GroupOption | null) => onSelected(value)}
+            value={value}
+            onChange={(event: React.SyntheticEvent, newValue: GroupOption | null) => onSelected(newValue)}
             onInputChange={(_, newInputValue: string) => setInputValue(newInputValue)}
             filterOptions={filterGroups}
             isOptionEqualToValue={(option: GroupOption, value: GroupOption) => option.id === value.id}

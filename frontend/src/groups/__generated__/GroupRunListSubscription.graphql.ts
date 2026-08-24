@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a3f89141b7b165c1811afa8a783df7f8>>
+ * @generated SignedSource<<27b108aef45c0c57d096de8998e86afc>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -190,6 +190,13 @@ return {
               {
                 "alias": null,
                 "args": null,
+                "kind": "ScalarField",
+                "name": "hasAdvisoryFailures",
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
                 "concreteType": "Workspace",
                 "kind": "LinkedField",
                 "name": "workspace",
@@ -209,6 +216,16 @@ return {
               {
                 "alias": null,
                 "args": null,
+                "concreteType": "Apply",
+                "kind": "LinkedField",
+                "name": "apply",
+                "plural": false,
+                "selections": (v6/*: any*/),
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
                 "concreteType": "Plan",
                 "kind": "LinkedField",
                 "name": "plan",
@@ -219,11 +236,20 @@ return {
               {
                 "alias": null,
                 "args": null,
-                "concreteType": "Apply",
+                "concreteType": "RunTaskStage",
                 "kind": "LinkedField",
-                "name": "apply",
-                "plural": false,
-                "selections": (v6/*: any*/),
+                "name": "taskStages",
+                "plural": true,
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "stageName",
+                    "storageKey": null
+                  },
+                  (v5/*: any*/)
+                ],
                 "storageKey": null
               }
             ],
@@ -235,12 +261,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "5aa3af085553d893d1b4c545eb28cb63",
+    "cacheID": "13c49c1a0b279adc188863a81efe3d8b",
     "id": null,
     "metadata": {},
     "name": "GroupRunListSubscription",
     "operationKind": "subscription",
-    "text": "subscription GroupRunListSubscription(\n  $input: RunSubscriptionInput!\n) {\n  workspaceRunEvents(input: $input) {\n    action\n    run {\n      id\n      assessment\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n"
+    "text": "subscription GroupRunListSubscription(\n  $input: RunSubscriptionInput!\n) {\n  workspaceRunEvents(input: $input) {\n    action\n    run {\n      id\n      assessment\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  hasAdvisoryFailures\n  workspace {\n    fullPath\n    id\n  }\n  apply {\n    status\n    id\n  }\n  ...RunStageIconsFragment_run\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
   }
 };
 })();

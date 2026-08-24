@@ -344,6 +344,66 @@ func (r *NodeResolver) ToTerraformModuleVersion() (*TerraformModuleVersionResolv
 	}
 }
 
+// ToPolicy resolver
+func (r *NodeResolver) ToPolicy() (*PolicyResolver, bool) {
+	switch res := r.result.(type) {
+	case *PolicyResolver:
+		return res, true
+	case *models.Policy:
+		return &PolicyResolver{policy: res}, true
+	default:
+		return nil, false
+	}
+}
+
+// ToRunGate resolver
+func (r *NodeResolver) ToRunGate() (*RunGateResolver, bool) {
+	switch res := r.result.(type) {
+	case *RunGateResolver:
+		return res, true
+	case *models.RunGate:
+		return &RunGateResolver{runGate: res}, true
+	default:
+		return nil, false
+	}
+}
+
+// ToRunGateApproval resolver
+func (r *NodeResolver) ToRunGateApproval() (*RunGateApprovalResolver, bool) {
+	switch res := r.result.(type) {
+	case *RunGateApprovalResolver:
+		return res, true
+	case *models.RunGateApproval:
+		return &RunGateApprovalResolver{approval: res}, true
+	default:
+		return nil, false
+	}
+}
+
+// ToPackage resolver
+func (r *NodeResolver) ToPackage() (*PackageResolver, bool) {
+	switch res := r.result.(type) {
+	case *PackageResolver:
+		return res, true
+	case *models.Package:
+		return &PackageResolver{pkg: res}, true
+	default:
+		return nil, false
+	}
+}
+
+// ToPackageVersion resolver
+func (r *NodeResolver) ToPackageVersion() (*PackageVersionResolver, bool) {
+	switch res := r.result.(type) {
+	case *PackageVersionResolver:
+		return res, true
+	case *models.PackageVersion:
+		return &PackageVersionResolver{pkgVersion: res}, true
+	default:
+		return nil, false
+	}
+}
+
 // ToTerraformModuleAttestation resolver
 func (r *NodeResolver) ToTerraformModuleAttestation() (*TerraformModuleAttestationResolver, bool) {
 	switch res := r.result.(type) {

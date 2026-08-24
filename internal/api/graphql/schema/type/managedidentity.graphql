@@ -108,6 +108,13 @@ type ManagedIdentity implements Node {
   aliasSource: ManagedIdentity
   isAlias: Boolean!
   accessRules: [ManagedIdentityAccessRule!]!
+  """
+  referencingPolicies are the policies that name this identity in a managed_identity scope rule.
+  Nothing is assigned: this is a reverse lookup over policy scopes, so a policy that evaluates on
+  runs using this identity without naming it — one with an empty or namespace-only scope — is not
+  included. Requires permission to view policies in the identity's own group.
+  """
+  referencingPolicies: [Policy!]!
   aliases(
     after: String
     before: String

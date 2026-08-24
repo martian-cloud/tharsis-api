@@ -298,6 +298,22 @@ func (r *ManagedIdentityResolver) AccessRules(ctx context.Context) ([]*ManagedId
 	return resolvers, nil
 }
 
+// ReferencingPolicies resolver
+func (r *ManagedIdentityResolver) ReferencingPolicies(ctx context.Context) ([]*PolicyResolver, error) {
+	policies, err := getServiceCatalog(ctx).PolicyService.GetPoliciesReferencingManagedIdentity(ctx, r.managedIdentity.Metadata.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvers := make([]*PolicyResolver, len(policies))
+	for i := range policies {
+		p := policies[i]
+		resolvers[i] = &PolicyResolver{policy: &p}
+	}
+
+	return resolvers, nil
+}
+
 // CreatedBy resolver
 func (r *ManagedIdentityResolver) CreatedBy() string {
 	return r.managedIdentity.CreatedBy
@@ -503,8 +519,8 @@ type CreateManagedIdentityAccessRuleInput struct {
 	AllowedUsers              *[]string // DEPRECATED: use AllowedUserIDs instead
 	AllowedServiceAccounts    *[]string // DEPRECATED: use AllowServiceAccountIDs instead
 	VerifyStateLineage        *bool
-	Type                      models.ManagedIdentityAccessRuleType
-	RunStage                  models.JobType
+	Type                      string
+	RunStage                  string
 	ManagedIdentityID         string
 }
 
@@ -520,7 +536,7 @@ type UpdateManagedIdentityAccessRuleInput struct {
 	AllowedTeams              *[]string // DEPRECATED: use AllowedTeamIDs instead
 	VerifyStateLineage        *bool
 	ID                        string
-	RunStage                  models.JobType
+	RunStage                  string
 }
 
 // DeleteManagedIdentityAccessRuleInput is the input for deleting an access rule
@@ -541,8 +557,8 @@ type CreateManagedIdentityInput struct {
 		AllowedServiceAccounts    *[]string // DEPRECATED: use AllowedServiceAccountIDs instead
 		AllowedTeams              *[]string // DEPRECATED: use AllowedTeamIDs instead
 		VerifyStateLineage        *bool
-		Type                      models.ManagedIdentityAccessRuleType
-		RunStage                  models.JobType
+		Type                      string
+		RunStage                  string
 	}
 	Type        string
 	Name        string
@@ -643,7 +659,7 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 	var moduleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
 	var err error
 
-	switch input.Type {
+	switch models.ManagedIdentityAccessRuleType(input.Type) {
 	case models.ManagedIdentityAccessRuleEligiblePrincipals:
 		if input.AllowedUserIDs != nil && input.AllowedUsers != nil {
 			return nil, errors.New("cannot specify both allowedUserIDs and allowedUsers", errors.WithErrorCode(errors.EInvalid))
@@ -717,8 +733,8 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 
 	rule := models.ManagedIdentityAccessRule{
 		ManagedIdentityID:         managedIdentityID,
-		Type:                      input.Type,
-		RunStage:                  input.RunStage,
+		Type:                      models.ManagedIdentityAccessRuleType(input.Type),
+		RunStage:                  models.JobType(input.RunStage),
 		ModuleAttestationPolicies: moduleAttestationPolicies,
 		AllowedUserIDs:            allowedUserIDs,
 		AllowedServiceAccountIDs:  allowedServiceAccountIDs,
@@ -811,7 +827,7 @@ func updateManagedIdentityAccessRuleMutation(ctx context.Context, input *UpdateM
 		return nil, fmt.Errorf("unexpected managed identity rule type: %s", rule.Type)
 	}
 
-	rule.RunStage = input.RunStage
+	rule.RunStage = models.JobType(input.RunStage)
 	rule.ModuleAttestationPolicies = moduleAttestationPolicies
 	rule.AllowedUserIDs = allowedUserIDs
 	rule.AllowedServiceAccountIDs = allowedServiceAccountIDs
@@ -946,7 +962,7 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 			var allowedUserIDs, allowedServiceAccountIDs, allowedTeamIDs []string
 			var moduleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
 
-			switch r.Type {
+			switch models.ManagedIdentityAccessRuleType(r.Type) {
 			case models.ManagedIdentityAccessRuleEligiblePrincipals:
 				if r.AllowedUserIDs != nil && r.AllowedUsers != nil {
 					return nil, errors.New("cannot specify both allowedUserIDs and allowedUsers", errors.WithErrorCode(errors.EInvalid))
@@ -1022,8 +1038,8 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 					AllowedTeamIDs            []string
 					VerifyStateLineage        bool
 				}{
-					Type:                      r.Type,
-					RunStage:                  r.RunStage,
+					Type:                      models.ManagedIdentityAccessRuleType(r.Type),
+					RunStage:                  models.JobType(r.RunStage),
 					ModuleAttestationPolicies: moduleAttestationPolicies,
 					AllowedUserIDs:            allowedUserIDs,
 					AllowedServiceAccountIDs:  allowedServiceAccountIDs,

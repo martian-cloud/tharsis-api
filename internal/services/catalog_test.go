@@ -37,7 +37,7 @@ func TestFetchModel(t *testing.T) {
 		{
 			name:            "TRN resource type not supported",
 			searchValue:     "trn:invalid:some/path",
-			expectErrorCode: errors.EInternal,
+			expectErrorCode: errors.EInvalid,
 		},
 		{
 			name:            "gid code not supported",
@@ -104,7 +104,7 @@ func TestFetchModelID(t *testing.T) {
 		{
 			name:            "TRN resource type not supported",
 			searchValue:     "trn:invalid:some/path",
-			expectErrorCode: errors.EInternal,
+			expectErrorCode: errors.EInvalid,
 		},
 	}
 

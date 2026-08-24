@@ -1,3 +1,4 @@
+import NoResults from '@/common/NoResults';
 import { Alert, Box, Button, Paper, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
@@ -134,6 +135,8 @@ function AssignedManagedIdentityList(props: Props) {
         return accumulator;
     }, new Set());
 
+    const edges = data?.managedIdentities?.edges ?? [];
+
     return (
         <Box>
             <NamespaceBreadcrumbs
@@ -143,7 +146,7 @@ function AssignedManagedIdentityList(props: Props) {
                 ]}
             />
             <Typography variant="h5" gutterBottom>Assigned Managed Identities</Typography>
-            {(data.managedIdentities.edges?.length ?? 0) > 0 &&
+            {edges.length > 0 &&
                 <Paper variant="outlined" sx={{ marginTop: 4, marginBottom: 4 }}>
                     <Box padding={2}>
                         <Typography gutterBottom>
@@ -174,11 +177,9 @@ function AssignedManagedIdentityList(props: Props) {
                         </Alert>}
                     </Box>
                 </Paper>}
-            {(data.managedIdentities.edges?.length ?? 0) === 0 && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                    <Typography variant="h6" color="textSecondary" align="center">No managed identities have been created in any parent group</Typography>
-                </Box>
-            </Paper>}
+            {edges.length === 0 && <NoResults sx={{ mt: 4 }}>
+                No managed identities have been created in any parent group
+            </NoResults>}
 
             {data.assignedManagedIdentities.length > 0 && <Box marginTop={2}>
                 <Typography variant="h6" gutterBottom>

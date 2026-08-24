@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9b959429fff0790e4029d68508d83bd6>>
+ * @generated SignedSource<<45bcffb8a3ed883ab8948dacdfb359fe>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,7 @@ export type ActivityEventTerraformProviderTargetFragment_event$data = {
   readonly target: {
     readonly name?: string;
     readonly registryNamespace?: string;
-  };
+  } | null | undefined;
   readonly " $fragmentSpreads": FragmentRefs<"ActivityEventListItemFragment_event">;
   readonly " $fragmentType": "ActivityEventTerraformProviderTargetFragment_event";
 };

@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.package;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+
+// Packages implements functionality related to Tharsis packages.
+service Packages {
+  // GetPackageVersion resolves a package source and version constraint to the concrete uploaded
+  // package version satisfying it. It lets a caller that only holds a package source + constraint
+  // (e.g. a job evaluating a policy that tracks a version range) obtain both the resolved version
+  // and the package version id needed to download it. An exact version is itself a valid constraint
+  // and resolves to itself. Returns NOT_FOUND when no uploaded version satisfies the constraint.
+  rpc GetPackageVersion(GetPackageVersionRequest) returns (PackageVersion);
+}
+
+// GetPackageVersionRequest identifies a package version by source and version constraint. An empty
+// version_constraint resolves to the latest uploaded version.
+message GetPackageVersionRequest {
+  string source             = 1;
+  string version_constraint = 2;
+}
+
+// PackageVersion represents a version of a package in the registry.
+message PackageVersion {
+  metadata.ResourceMetadata metadata   = 1;
+  string                    package_id = 2;
+  string                    version    = 3;
+  string                    status     = 4;
+  // sha_sum is the hex-encoded SHA checksum of the uploaded package version.
+  string                    sha_sum    = 5;
+}

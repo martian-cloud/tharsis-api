@@ -63,7 +63,9 @@ function ServiceAccountNamespaceMemberships({ serviceAccountId }: Props) {
         queryData.node
     );
 
-    if (!data?.namespaceMemberships?.edges || data.namespaceMemberships.edges.length === 0) {
+    const edges = data?.namespaceMemberships?.edges ?? [];
+
+    if (edges.length === 0) {
         return (
             <Paper sx={{ padding: 2 }}>
                 <Typography variant="body2" color="textSecondary">
@@ -78,18 +80,18 @@ function ServiceAccountNamespaceMemberships({ serviceAccountId }: Props) {
             <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
                 <Box padding={2}>
                     <Typography variant="subtitle1">
-                        {data.namespaceMemberships.totalCount} namespace membership{data.namespaceMemberships.totalCount !== 1 && 's'}
+                        {data?.namespaceMemberships.totalCount} namespace membership{data?.namespaceMemberships.totalCount !== 1 && 's'}
                     </Typography>
                 </Box>
             </Paper>
             <InfiniteScroll
-                dataLength={data.namespaceMemberships.edges.length}
+                dataLength={edges.length}
                 next={() => loadNext(20)}
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
             >
                 <List disablePadding>
-                    {data.namespaceMemberships.edges.filter(edge => edge?.node).map((edge: any) => (
+                    {edges.filter(edge => edge?.node).map((edge: any) => (
                         <ListItem
                             key={edge.node.id}
                             sx={{

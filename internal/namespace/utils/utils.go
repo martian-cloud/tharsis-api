@@ -21,3 +21,11 @@ func ExpandPath(path string) []string {
 func IsDescendantOfPath(descendantPath, ancestorPath string) bool {
 	return strings.HasPrefix(descendantPath, ancestorPath+"/")
 }
+
+// RootGroupPath returns the first segment (root group path) of a namespace path.
+func RootGroupPath(path string) string {
+	if i := strings.Index(path, "/"); i >= 0 {
+		return path[:i]
+	}
+	return path
+}

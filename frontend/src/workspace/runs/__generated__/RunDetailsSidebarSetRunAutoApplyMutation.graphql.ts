@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a06a5d64ede914a58695ff2b7d3db6a3>>
+ * @generated SignedSource<<89a3e14a610d07521c57398a9d7cee54>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -145,7 +145,14 @@ v6 = [
     "storageKey": null
   },
   (v3/*: any*/)
-];
+],
+v7 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "stageName",
+  "storageKey": null
+};
 return {
   "fragment": {
     "argumentDefinitions": (v0/*: any*/),
@@ -241,6 +248,13 @@ return {
                 "alias": null,
                 "args": null,
                 "kind": "ScalarField",
+                "name": "hasAdvisoryFailures",
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
                 "name": "moduleSource",
                 "storageKey": null
               },
@@ -314,6 +328,32 @@ return {
               {
                 "alias": null,
                 "args": null,
+                "concreteType": "RunTaskStage",
+                "kind": "LinkedField",
+                "name": "taskStages",
+                "plural": true,
+                "selections": [
+                  (v7/*: any*/),
+                  (v4/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "PolicyCheck",
+                    "kind": "LinkedField",
+                    "name": "policyChecks",
+                    "plural": true,
+                    "selections": [
+                      (v4/*: any*/),
+                      (v7/*: any*/)
+                    ],
+                    "storageKey": null
+                  }
+                ],
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
                 "concreteType": "Apply",
                 "kind": "LinkedField",
                 "name": "apply",
@@ -331,12 +371,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "5919a87d35707d462203f68ba53ea65d",
+    "cacheID": "c5d02f54161d04597b12478e436906c0",
     "id": null,
     "metadata": {},
     "name": "RunDetailsSidebarSetRunAutoApplyMutation",
     "operationKind": "mutation",
-    "text": "mutation RunDetailsSidebarSetRunAutoApplyMutation(\n  $input: SetRunAutoApplyInput!\n) {\n  setRunAutoApply(input: $input) {\n    run {\n      ...RunDetailsSidebarFragment_details\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment RunDetailsSidebarFragment_details on Run {\n  id\n  status\n  createdBy\n  isDestroy\n  assessment\n  autoApply\n  moduleSource\n  moduleVersion\n  workspace {\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    trn\n  }\n  configurationVersion {\n    id\n  }\n  plan {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n  apply {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n}\n"
+    "text": "mutation RunDetailsSidebarSetRunAutoApplyMutation(\n  $input: SetRunAutoApplyInput!\n) {\n  setRunAutoApply(input: $input) {\n    run {\n      ...RunDetailsSidebarFragment_details\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment RunDetailsSidebarFragment_details on Run {\n  id\n  status\n  createdBy\n  isDestroy\n  assessment\n  autoApply\n  hasAdvisoryFailures\n  moduleSource\n  moduleVersion\n  workspace {\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    trn\n  }\n  configurationVersion {\n    id\n  }\n  plan {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n  taskStages {\n    stageName\n    status\n    policyChecks {\n      status\n      stageName\n    }\n  }\n  apply {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n}\n"
   }
 };
 })();

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8e0bf43ddde545876ce78a5d87ac26a1>>
+ * @generated SignedSource<<db015a2269a9169019ba3d0c87819427>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,8 +10,8 @@
 
 import { ReaderFragment } from 'relay-runtime';
 export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
-export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "queuing" | "queuing_apply" | "%future added value";
+export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
+export type RunStatus = "applied" | "apply_queued" | "apply_queuing" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "plan_queuing" | "planned" | "planned_and_finished" | "planning" | "post_plan_awaiting_decision" | "post_plan_completed" | "post_plan_running" | "pre_apply_awaiting_decision" | "pre_apply_completed" | "pre_apply_queuing" | "pre_apply_running" | "pre_plan_awaiting_decision" | "pre_plan_completed" | "pre_plan_queuing" | "pre_plan_running" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type WorkspaceDetailsIndexFragment_workspace$data = {
   readonly assessment: {
@@ -44,6 +44,7 @@ export type WorkspaceDetailsIndexFragment_workspace$data = {
         } | null | undefined;
       } | null | undefined;
       readonly createdBy: string;
+      readonly hasAdvisoryFailures: boolean;
       readonly id: string;
       readonly isDestroy: boolean;
       readonly metadata: {
@@ -320,6 +321,13 @@ return {
               "alias": null,
               "args": null,
               "kind": "ScalarField",
+              "name": "hasAdvisoryFailures",
+              "storageKey": null
+            },
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
               "name": "createdBy",
               "storageKey": null
             },
@@ -437,6 +445,6 @@ return {
 };
 })();
 
-(node as any).hash = "273b32c210d5f23068df49359499bce1";
+(node as any).hash = "a8c1c5e5a7847ac259a4dffad5b776d0";
 
 export default node;

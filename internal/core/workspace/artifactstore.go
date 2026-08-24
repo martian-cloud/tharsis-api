@@ -34,6 +34,8 @@ type ArtifactStore interface {
 	GetPlanDiff(ctx context.Context, run *models.Run) (io.ReadCloser, error)
 	UploadRunVariables(ctx context.Context, run *models.Run, body io.Reader) (db.RetainObjectRefFunc, string, error)
 	GetRunVariables(ctx context.Context, run *models.Run) (io.ReadCloser, error)
+	UploadPolicyCheckPolicyMessages(ctx context.Context, run *models.Run, body io.Reader) (db.RetainObjectRefFunc, string, error)
+	GetPolicyCheckPolicyMessages(ctx context.Context, policy *models.PolicyCheckPolicy) (io.ReadCloser, error)
 }
 
 type artifactStore struct {
@@ -180,6 +182,29 @@ func (a *artifactStore) GetRunVariables(ctx context.Context, run *models.Run) (i
 	return result.Body, nil
 }
 
+// UploadPolicyCheckPolicyMessages stores the JSON array of violation messages one of a policy check's
+// policies reported. A fresh key per upload, so a re-evaluated check writes a new object rather than
+// overwriting the one a reader may be streaming; the previous object stays linked to the run and is
+// collected with it.
+func (a *artifactStore) UploadPolicyCheckPolicyMessages(ctx context.Context, run *models.Run, body io.Reader) (db.RetainObjectRefFunc, string, error) {
+	key := policyMessagesObjectKey(run.WorkspaceID, run.Metadata.ID, uuid.New().String())
+	if err := a.upload(ctx, key, body); err != nil {
+		return nil, "", err
+	}
+
+	return func(ctx context.Context, ownerID string) error {
+		return a.objectStoreRefs.LinkRef(ctx, key, db.ObjectStoreRefOwnerRun, ownerID)
+	}, key, nil
+}
+
+func (a *artifactStore) GetPolicyCheckPolicyMessages(ctx context.Context, policy *models.PolicyCheckPolicy) (io.ReadCloser, error) {
+	result, err := a.getObjectStream(ctx, ptr.ToString(policy.MessagesObjectStoreKey))
+	if err != nil {
+		return nil, err
+	}
+	return result.Body, nil
+}
+
 func (a *artifactStore) upload(ctx context.Context, key string, body io.Reader) error {
 	return a.objectStore.UploadObject(ctx, key, body)
 }
@@ -210,6 +235,10 @@ func planDiffObjectKey(workspaceID, runID, id string) string {
 
 func planCacheObjectKey(workspaceID, runID, planID string) string {
 	return fmt.Sprintf("workspaces/%s/runs/%s/plan/%s", workspaceID, runID, planID)
+}
+
+func policyMessagesObjectKey(workspaceID, runID, id string) string {
+	return fmt.Sprintf("workspaces/%s/runs/%s/policy_messages/%s.json", workspaceID, runID, id)
 }
 
 func runVariablesObjectKey(workspaceID, id string) string {

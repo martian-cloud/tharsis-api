@@ -80,20 +80,31 @@ func (RunSortableField) EnumDescriptor() ([]byte, []int) {
 type RunStatus int32
 
 const (
-	RunStatus_UNSPECIFIED          RunStatus = 0
-	RunStatus_PENDING              RunStatus = 1
-	RunStatus_PLAN_QUEUED          RunStatus = 2
-	RunStatus_PLANNING             RunStatus = 3
-	RunStatus_PLANNED              RunStatus = 4
-	RunStatus_PLANNED_AND_FINISHED RunStatus = 5
-	RunStatus_QUEUING              RunStatus = 6
-	RunStatus_QUEUING_APPLY        RunStatus = 7
-	RunStatus_APPLY_QUEUED         RunStatus = 8
-	RunStatus_APPLYING             RunStatus = 9
-	RunStatus_APPLIED              RunStatus = 10
-	RunStatus_CANCELED             RunStatus = 11
-	RunStatus_DISCARDED            RunStatus = 12
-	RunStatus_ERRORED              RunStatus = 13
+	RunStatus_UNSPECIFIED                 RunStatus = 0
+	RunStatus_PENDING                     RunStatus = 1
+	RunStatus_PLAN_QUEUED                 RunStatus = 2
+	RunStatus_PLANNING                    RunStatus = 3
+	RunStatus_PLANNED                     RunStatus = 4
+	RunStatus_PLANNED_AND_FINISHED        RunStatus = 5
+	RunStatus_PLAN_QUEUING                RunStatus = 6
+	RunStatus_APPLY_QUEUING               RunStatus = 7
+	RunStatus_APPLY_QUEUED                RunStatus = 8
+	RunStatus_APPLYING                    RunStatus = 9
+	RunStatus_APPLIED                     RunStatus = 10
+	RunStatus_CANCELED                    RunStatus = 11
+	RunStatus_DISCARDED                   RunStatus = 12
+	RunStatus_ERRORED                     RunStatus = 13
+	RunStatus_PRE_PLAN_QUEUING            RunStatus = 14
+	RunStatus_PRE_PLAN_RUNNING            RunStatus = 15
+	RunStatus_PRE_PLAN_AWAITING_DECISION  RunStatus = 16
+	RunStatus_PRE_PLAN_COMPLETED          RunStatus = 17
+	RunStatus_POST_PLAN_RUNNING           RunStatus = 18
+	RunStatus_POST_PLAN_AWAITING_DECISION RunStatus = 19
+	RunStatus_POST_PLAN_COMPLETED         RunStatus = 20
+	RunStatus_PRE_APPLY_QUEUING           RunStatus = 21
+	RunStatus_PRE_APPLY_RUNNING           RunStatus = 22
+	RunStatus_PRE_APPLY_AWAITING_DECISION RunStatus = 23
+	RunStatus_PRE_APPLY_COMPLETED         RunStatus = 24
 )
 
 // Enum value maps for RunStatus.
@@ -105,30 +116,52 @@ var (
 		3:  "PLANNING",
 		4:  "PLANNED",
 		5:  "PLANNED_AND_FINISHED",
-		6:  "QUEUING",
-		7:  "QUEUING_APPLY",
+		6:  "PLAN_QUEUING",
+		7:  "APPLY_QUEUING",
 		8:  "APPLY_QUEUED",
 		9:  "APPLYING",
 		10: "APPLIED",
 		11: "CANCELED",
 		12: "DISCARDED",
 		13: "ERRORED",
+		14: "PRE_PLAN_QUEUING",
+		15: "PRE_PLAN_RUNNING",
+		16: "PRE_PLAN_AWAITING_DECISION",
+		17: "PRE_PLAN_COMPLETED",
+		18: "POST_PLAN_RUNNING",
+		19: "POST_PLAN_AWAITING_DECISION",
+		20: "POST_PLAN_COMPLETED",
+		21: "PRE_APPLY_QUEUING",
+		22: "PRE_APPLY_RUNNING",
+		23: "PRE_APPLY_AWAITING_DECISION",
+		24: "PRE_APPLY_COMPLETED",
 	}
 	RunStatus_value = map[string]int32{
-		"UNSPECIFIED":          0,
-		"PENDING":              1,
-		"PLAN_QUEUED":          2,
-		"PLANNING":             3,
-		"PLANNED":              4,
-		"PLANNED_AND_FINISHED": 5,
-		"QUEUING":              6,
-		"QUEUING_APPLY":        7,
-		"APPLY_QUEUED":         8,
-		"APPLYING":             9,
-		"APPLIED":              10,
-		"CANCELED":             11,
-		"DISCARDED":            12,
-		"ERRORED":              13,
+		"UNSPECIFIED":                 0,
+		"PENDING":                     1,
+		"PLAN_QUEUED":                 2,
+		"PLANNING":                    3,
+		"PLANNED":                     4,
+		"PLANNED_AND_FINISHED":        5,
+		"PLAN_QUEUING":                6,
+		"APPLY_QUEUING":               7,
+		"APPLY_QUEUED":                8,
+		"APPLYING":                    9,
+		"APPLIED":                     10,
+		"CANCELED":                    11,
+		"DISCARDED":                   12,
+		"ERRORED":                     13,
+		"PRE_PLAN_QUEUING":            14,
+		"PRE_PLAN_RUNNING":            15,
+		"PRE_PLAN_AWAITING_DECISION":  16,
+		"PRE_PLAN_COMPLETED":          17,
+		"POST_PLAN_RUNNING":           18,
+		"POST_PLAN_AWAITING_DECISION": 19,
+		"POST_PLAN_COMPLETED":         20,
+		"PRE_APPLY_QUEUING":           21,
+		"PRE_APPLY_RUNNING":           22,
+		"PRE_APPLY_AWAITING_DECISION": 23,
+		"PRE_APPLY_COMPLETED":         24,
 	}
 )
 
@@ -157,6 +190,359 @@ func (x RunStatus) Number() protoreflect.EnumNumber {
 // Deprecated: Use RunStatus.Descriptor instead.
 func (RunStatus) EnumDescriptor() ([]byte, []int) {
 	return file_run_proto_rawDescGZIP(), []int{1}
+}
+
+// PolicyCheckType identifies the policy engine a check runs.
+type PolicyCheckType int32
+
+const (
+	PolicyCheckType_POLICY_CHECK_TYPE_UNSPECIFIED PolicyCheckType = 0
+	PolicyCheckType_POLICY_CHECK_TYPE_OPA         PolicyCheckType = 1
+)
+
+// Enum value maps for PolicyCheckType.
+var (
+	PolicyCheckType_name = map[int32]string{
+		0: "POLICY_CHECK_TYPE_UNSPECIFIED",
+		1: "POLICY_CHECK_TYPE_OPA",
+	}
+	PolicyCheckType_value = map[string]int32{
+		"POLICY_CHECK_TYPE_UNSPECIFIED": 0,
+		"POLICY_CHECK_TYPE_OPA":         1,
+	}
+)
+
+func (x PolicyCheckType) Enum() *PolicyCheckType {
+	p := new(PolicyCheckType)
+	*p = x
+	return p
+}
+
+func (x PolicyCheckType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PolicyCheckType) Descriptor() protoreflect.EnumDescriptor {
+	return file_run_proto_enumTypes[2].Descriptor()
+}
+
+func (PolicyCheckType) Type() protoreflect.EnumType {
+	return &file_run_proto_enumTypes[2]
+}
+
+func (x PolicyCheckType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PolicyCheckType.Descriptor instead.
+func (PolicyCheckType) EnumDescriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{2}
+}
+
+// RunTaskStageName identifies which stage of a run a policy check evaluates at.
+type RunTaskStageName int32
+
+const (
+	RunTaskStageName_RUN_TASK_STAGE_NAME_UNSPECIFIED RunTaskStageName = 0
+	RunTaskStageName_RUN_TASK_STAGE_NAME_PRE_PLAN    RunTaskStageName = 1
+	RunTaskStageName_RUN_TASK_STAGE_NAME_POST_PLAN   RunTaskStageName = 2
+	RunTaskStageName_RUN_TASK_STAGE_NAME_PRE_APPLY   RunTaskStageName = 3
+	RunTaskStageName_RUN_TASK_STAGE_NAME_POST_APPLY  RunTaskStageName = 4
+)
+
+// Enum value maps for RunTaskStageName.
+var (
+	RunTaskStageName_name = map[int32]string{
+		0: "RUN_TASK_STAGE_NAME_UNSPECIFIED",
+		1: "RUN_TASK_STAGE_NAME_PRE_PLAN",
+		2: "RUN_TASK_STAGE_NAME_POST_PLAN",
+		3: "RUN_TASK_STAGE_NAME_PRE_APPLY",
+		4: "RUN_TASK_STAGE_NAME_POST_APPLY",
+	}
+	RunTaskStageName_value = map[string]int32{
+		"RUN_TASK_STAGE_NAME_UNSPECIFIED": 0,
+		"RUN_TASK_STAGE_NAME_PRE_PLAN":    1,
+		"RUN_TASK_STAGE_NAME_POST_PLAN":   2,
+		"RUN_TASK_STAGE_NAME_PRE_APPLY":   3,
+		"RUN_TASK_STAGE_NAME_POST_APPLY":  4,
+	}
+)
+
+func (x RunTaskStageName) Enum() *RunTaskStageName {
+	p := new(RunTaskStageName)
+	*p = x
+	return p
+}
+
+func (x RunTaskStageName) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RunTaskStageName) Descriptor() protoreflect.EnumDescriptor {
+	return file_run_proto_enumTypes[3].Descriptor()
+}
+
+func (RunTaskStageName) Type() protoreflect.EnumType {
+	return &file_run_proto_enumTypes[3]
+}
+
+func (x RunTaskStageName) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RunTaskStageName.Descriptor instead.
+func (RunTaskStageName) EnumDescriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{3}
+}
+
+// RunTaskStageStatus represents the aggregate status of a task stage node.
+type RunTaskStageStatus int32
+
+const (
+	RunTaskStageStatus_RUN_TASK_STAGE_STATUS_UNSPECIFIED       RunTaskStageStatus = 0
+	RunTaskStageStatus_RUN_TASK_STAGE_STATUS_CREATED           RunTaskStageStatus = 1
+	RunTaskStageStatus_RUN_TASK_STAGE_STATUS_RUNNING           RunTaskStageStatus = 2
+	RunTaskStageStatus_RUN_TASK_STAGE_STATUS_AWAITING_OVERRIDE RunTaskStageStatus = 3
+	RunTaskStageStatus_RUN_TASK_STAGE_STATUS_COMPLETED         RunTaskStageStatus = 4
+	RunTaskStageStatus_RUN_TASK_STAGE_STATUS_ERRORED           RunTaskStageStatus = 5
+	RunTaskStageStatus_RUN_TASK_STAGE_STATUS_CANCELED          RunTaskStageStatus = 6
+	RunTaskStageStatus_RUN_TASK_STAGE_STATUS_SKIPPED           RunTaskStageStatus = 7
+	// Ready, but still waiting for the workspace slot. Only the workspace-gated stages
+	// (pre_plan, pre_apply) reach this.
+	RunTaskStageStatus_RUN_TASK_STAGE_STATUS_PENDING RunTaskStageStatus = 8
+)
+
+// Enum value maps for RunTaskStageStatus.
+var (
+	RunTaskStageStatus_name = map[int32]string{
+		0: "RUN_TASK_STAGE_STATUS_UNSPECIFIED",
+		1: "RUN_TASK_STAGE_STATUS_CREATED",
+		2: "RUN_TASK_STAGE_STATUS_RUNNING",
+		3: "RUN_TASK_STAGE_STATUS_AWAITING_OVERRIDE",
+		4: "RUN_TASK_STAGE_STATUS_COMPLETED",
+		5: "RUN_TASK_STAGE_STATUS_ERRORED",
+		6: "RUN_TASK_STAGE_STATUS_CANCELED",
+		7: "RUN_TASK_STAGE_STATUS_SKIPPED",
+		8: "RUN_TASK_STAGE_STATUS_PENDING",
+	}
+	RunTaskStageStatus_value = map[string]int32{
+		"RUN_TASK_STAGE_STATUS_UNSPECIFIED":       0,
+		"RUN_TASK_STAGE_STATUS_CREATED":           1,
+		"RUN_TASK_STAGE_STATUS_RUNNING":           2,
+		"RUN_TASK_STAGE_STATUS_AWAITING_OVERRIDE": 3,
+		"RUN_TASK_STAGE_STATUS_COMPLETED":         4,
+		"RUN_TASK_STAGE_STATUS_ERRORED":           5,
+		"RUN_TASK_STAGE_STATUS_CANCELED":          6,
+		"RUN_TASK_STAGE_STATUS_SKIPPED":           7,
+		"RUN_TASK_STAGE_STATUS_PENDING":           8,
+	}
+)
+
+func (x RunTaskStageStatus) Enum() *RunTaskStageStatus {
+	p := new(RunTaskStageStatus)
+	*p = x
+	return p
+}
+
+func (x RunTaskStageStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RunTaskStageStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_run_proto_enumTypes[4].Descriptor()
+}
+
+func (RunTaskStageStatus) Type() protoreflect.EnumType {
+	return &file_run_proto_enumTypes[4]
+}
+
+func (x RunTaskStageStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RunTaskStageStatus.Descriptor instead.
+func (RunTaskStageStatus) EnumDescriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{4}
+}
+
+// PolicyCheckStatus represents the status of a policy check node.
+type PolicyCheckStatus int32
+
+const (
+	PolicyCheckStatus_POLICY_CHECK_STATUS_UNSPECIFIED PolicyCheckStatus = 0
+	PolicyCheckStatus_POLICY_CHECK_STATUS_CREATED     PolicyCheckStatus = 1
+	PolicyCheckStatus_POLICY_CHECK_STATUS_QUEUED      PolicyCheckStatus = 2
+	PolicyCheckStatus_POLICY_CHECK_STATUS_RUNNING     PolicyCheckStatus = 3
+	PolicyCheckStatus_POLICY_CHECK_STATUS_PASSED      PolicyCheckStatus = 4
+	PolicyCheckStatus_POLICY_CHECK_STATUS_SOFT_FAILED PolicyCheckStatus = 5
+	PolicyCheckStatus_POLICY_CHECK_STATUS_OVERRIDDEN  PolicyCheckStatus = 6
+	PolicyCheckStatus_POLICY_CHECK_STATUS_ERRORED     PolicyCheckStatus = 7
+	PolicyCheckStatus_POLICY_CHECK_STATUS_CANCELED    PolicyCheckStatus = 8
+	PolicyCheckStatus_POLICY_CHECK_STATUS_SKIPPED     PolicyCheckStatus = 9
+	PolicyCheckStatus_POLICY_CHECK_STATUS_PENDING     PolicyCheckStatus = 10
+)
+
+// Enum value maps for PolicyCheckStatus.
+var (
+	PolicyCheckStatus_name = map[int32]string{
+		0:  "POLICY_CHECK_STATUS_UNSPECIFIED",
+		1:  "POLICY_CHECK_STATUS_CREATED",
+		2:  "POLICY_CHECK_STATUS_QUEUED",
+		3:  "POLICY_CHECK_STATUS_RUNNING",
+		4:  "POLICY_CHECK_STATUS_PASSED",
+		5:  "POLICY_CHECK_STATUS_SOFT_FAILED",
+		6:  "POLICY_CHECK_STATUS_OVERRIDDEN",
+		7:  "POLICY_CHECK_STATUS_ERRORED",
+		8:  "POLICY_CHECK_STATUS_CANCELED",
+		9:  "POLICY_CHECK_STATUS_SKIPPED",
+		10: "POLICY_CHECK_STATUS_PENDING",
+	}
+	PolicyCheckStatus_value = map[string]int32{
+		"POLICY_CHECK_STATUS_UNSPECIFIED": 0,
+		"POLICY_CHECK_STATUS_CREATED":     1,
+		"POLICY_CHECK_STATUS_QUEUED":      2,
+		"POLICY_CHECK_STATUS_RUNNING":     3,
+		"POLICY_CHECK_STATUS_PASSED":      4,
+		"POLICY_CHECK_STATUS_SOFT_FAILED": 5,
+		"POLICY_CHECK_STATUS_OVERRIDDEN":  6,
+		"POLICY_CHECK_STATUS_ERRORED":     7,
+		"POLICY_CHECK_STATUS_CANCELED":    8,
+		"POLICY_CHECK_STATUS_SKIPPED":     9,
+		"POLICY_CHECK_STATUS_PENDING":     10,
+	}
+)
+
+func (x PolicyCheckStatus) Enum() *PolicyCheckStatus {
+	p := new(PolicyCheckStatus)
+	*p = x
+	return p
+}
+
+func (x PolicyCheckStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PolicyCheckStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_run_proto_enumTypes[5].Descriptor()
+}
+
+func (PolicyCheckStatus) Type() protoreflect.EnumType {
+	return &file_run_proto_enumTypes[5]
+}
+
+func (x PolicyCheckStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PolicyCheckStatus.Descriptor instead.
+func (PolicyCheckStatus) EnumDescriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{5}
+}
+
+// PolicyCheckPolicyStatus is the pass/fail result the evaluator reported for a single policy.
+type PolicyCheckPolicyStatus int32
+
+const (
+	PolicyCheckPolicyStatus_POLICY_CHECK_POLICY_STATUS_UNSPECIFIED PolicyCheckPolicyStatus = 0
+	PolicyCheckPolicyStatus_POLICY_CHECK_POLICY_STATUS_PASSED      PolicyCheckPolicyStatus = 1
+	PolicyCheckPolicyStatus_POLICY_CHECK_POLICY_STATUS_FAILED      PolicyCheckPolicyStatus = 2
+	PolicyCheckPolicyStatus_POLICY_CHECK_POLICY_STATUS_PENDING     PolicyCheckPolicyStatus = 3
+)
+
+// Enum value maps for PolicyCheckPolicyStatus.
+var (
+	PolicyCheckPolicyStatus_name = map[int32]string{
+		0: "POLICY_CHECK_POLICY_STATUS_UNSPECIFIED",
+		1: "POLICY_CHECK_POLICY_STATUS_PASSED",
+		2: "POLICY_CHECK_POLICY_STATUS_FAILED",
+		3: "POLICY_CHECK_POLICY_STATUS_PENDING",
+	}
+	PolicyCheckPolicyStatus_value = map[string]int32{
+		"POLICY_CHECK_POLICY_STATUS_UNSPECIFIED": 0,
+		"POLICY_CHECK_POLICY_STATUS_PASSED":      1,
+		"POLICY_CHECK_POLICY_STATUS_FAILED":      2,
+		"POLICY_CHECK_POLICY_STATUS_PENDING":     3,
+	}
+)
+
+func (x PolicyCheckPolicyStatus) Enum() *PolicyCheckPolicyStatus {
+	p := new(PolicyCheckPolicyStatus)
+	*p = x
+	return p
+}
+
+func (x PolicyCheckPolicyStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PolicyCheckPolicyStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_run_proto_enumTypes[6].Descriptor()
+}
+
+func (PolicyCheckPolicyStatus) Type() protoreflect.EnumType {
+	return &file_run_proto_enumTypes[6]
+}
+
+func (x PolicyCheckPolicyStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PolicyCheckPolicyStatus.Descriptor instead.
+func (PolicyCheckPolicyStatus) EnumDescriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{6}
+}
+
+// PolicyEnforcementLevel controls how a policy failure affects a run.
+type PolicyEnforcementLevel int32
+
+const (
+	PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_UNSPECIFIED    PolicyEnforcementLevel = 0
+	PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_ADVISORY       PolicyEnforcementLevel = 1
+	PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_SOFT_MANDATORY PolicyEnforcementLevel = 2
+	PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY PolicyEnforcementLevel = 3
+)
+
+// Enum value maps for PolicyEnforcementLevel.
+var (
+	PolicyEnforcementLevel_name = map[int32]string{
+		0: "POLICY_ENFORCEMENT_LEVEL_UNSPECIFIED",
+		1: "POLICY_ENFORCEMENT_LEVEL_ADVISORY",
+		2: "POLICY_ENFORCEMENT_LEVEL_SOFT_MANDATORY",
+		3: "POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY",
+	}
+	PolicyEnforcementLevel_value = map[string]int32{
+		"POLICY_ENFORCEMENT_LEVEL_UNSPECIFIED":    0,
+		"POLICY_ENFORCEMENT_LEVEL_ADVISORY":       1,
+		"POLICY_ENFORCEMENT_LEVEL_SOFT_MANDATORY": 2,
+		"POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY": 3,
+	}
+)
+
+func (x PolicyEnforcementLevel) Enum() *PolicyEnforcementLevel {
+	p := new(PolicyEnforcementLevel)
+	*p = x
+	return p
+}
+
+func (x PolicyEnforcementLevel) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PolicyEnforcementLevel) Descriptor() protoreflect.EnumDescriptor {
+	return file_run_proto_enumTypes[7].Descriptor()
+}
+
+func (PolicyEnforcementLevel) Type() protoreflect.EnumType {
+	return &file_run_proto_enumTypes[7]
+}
+
+func (x PolicyEnforcementLevel) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PolicyEnforcementLevel.Descriptor instead.
+func (PolicyEnforcementLevel) EnumDescriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{7}
 }
 
 // GetRunByIDRequest is the input for retrieving a Run by its ID.
@@ -827,10 +1213,12 @@ type Run struct {
 	AutoApply        bool     `protobuf:"varint,21,opt,name=auto_apply,json=autoApply,proto3" json:"auto_apply,omitempty"`
 	Plan             *Plan    `protobuf:"bytes,22,opt,name=plan,proto3" json:"plan,omitempty"`
 	// Not set for speculative runs, which have no apply stage.
-	Apply         *Apply    `protobuf:"bytes,23,opt,name=apply,proto3,oneof" json:"apply,omitempty"`
-	Status        RunStatus `protobuf:"varint,24,opt,name=status,proto3,enum=martiancloud.tharsis.api.run.RunStatus" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Apply           *Apply          `protobuf:"bytes,23,opt,name=apply,proto3,oneof" json:"apply,omitempty"`
+	Status          RunStatus       `protobuf:"varint,24,opt,name=status,proto3,enum=martiancloud.tharsis.api.run.RunStatus" json:"status,omitempty"`
+	TaskStages      []*RunTaskStage `protobuf:"bytes,25,rep,name=task_stages,json=taskStages,proto3" json:"task_stages,omitempty"`
+	IsAssessmentRun bool            `protobuf:"varint,26,opt,name=is_assessment_run,json=isAssessmentRun,proto3" json:"is_assessment_run,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Run) Reset() {
@@ -1032,6 +1420,451 @@ func (x *Run) GetStatus() RunStatus {
 	return RunStatus_UNSPECIFIED
 }
 
+func (x *Run) GetTaskStages() []*RunTaskStage {
+	if x != nil {
+		return x.TaskStages
+	}
+	return nil
+}
+
+func (x *Run) GetIsAssessmentRun() bool {
+	if x != nil {
+		return x.IsAssessmentRun
+	}
+	return false
+}
+
+// RunTaskStage is a stage of a run (pre_plan, post_plan, ...), mirroring the run model's
+// RunTaskStage. It owns the policy checks evaluated at that stage; its status is their aggregate
+// verdict.
+type RunTaskStage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	StageName     RunTaskStageName       `protobuf:"varint,2,opt,name=stage_name,json=stageName,proto3,enum=martiancloud.tharsis.api.run.RunTaskStageName" json:"stage_name,omitempty"`
+	Status        RunTaskStageStatus     `protobuf:"varint,3,opt,name=status,proto3,enum=martiancloud.tharsis.api.run.RunTaskStageStatus" json:"status,omitempty"`
+	PolicyChecks  []*PolicyCheck         `protobuf:"bytes,4,rep,name=policy_checks,json=policyChecks,proto3" json:"policy_checks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunTaskStage) Reset() {
+	*x = RunTaskStage{}
+	mi := &file_run_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunTaskStage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunTaskStage) ProtoMessage() {}
+
+func (x *RunTaskStage) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunTaskStage.ProtoReflect.Descriptor instead.
+func (*RunTaskStage) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *RunTaskStage) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RunTaskStage) GetStageName() RunTaskStageName {
+	if x != nil {
+		return x.StageName
+	}
+	return RunTaskStageName_RUN_TASK_STAGE_NAME_UNSPECIFIED
+}
+
+func (x *RunTaskStage) GetStatus() RunTaskStageStatus {
+	if x != nil {
+		return x.Status
+	}
+	return RunTaskStageStatus_RUN_TASK_STAGE_STATUS_UNSPECIFIED
+}
+
+func (x *RunTaskStage) GetPolicyChecks() []*PolicyCheck {
+	if x != nil {
+		return x.PolicyChecks
+	}
+	return nil
+}
+
+// PolicyCheck is a policy-evaluation node of a run, mirroring the run model's PolicyCheck. It owns
+// the per-policy-set policies it evaluates (with their results) and the check verdict.
+type PolicyCheck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CheckType     PolicyCheckType        `protobuf:"varint,2,opt,name=check_type,json=checkType,proto3,enum=martiancloud.tharsis.api.run.PolicyCheckType" json:"check_type,omitempty"`
+	Status        PolicyCheckStatus      `protobuf:"varint,3,opt,name=status,proto3,enum=martiancloud.tharsis.api.run.PolicyCheckStatus" json:"status,omitempty"`
+	LatestJobId   *string                `protobuf:"bytes,4,opt,name=latest_job_id,json=latestJobId,proto3,oneof" json:"latest_job_id,omitempty"`
+	Policies      []*PolicyCheckPolicy   `protobuf:"bytes,5,rep,name=policies,proto3" json:"policies,omitempty"`
+	StageName     RunTaskStageName       `protobuf:"varint,6,opt,name=stage_name,json=stageName,proto3,enum=martiancloud.tharsis.api.run.RunTaskStageName" json:"stage_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PolicyCheck) Reset() {
+	*x = PolicyCheck{}
+	mi := &file_run_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PolicyCheck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PolicyCheck) ProtoMessage() {}
+
+func (x *PolicyCheck) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PolicyCheck.ProtoReflect.Descriptor instead.
+func (*PolicyCheck) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PolicyCheck) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PolicyCheck) GetCheckType() PolicyCheckType {
+	if x != nil {
+		return x.CheckType
+	}
+	return PolicyCheckType_POLICY_CHECK_TYPE_UNSPECIFIED
+}
+
+func (x *PolicyCheck) GetStatus() PolicyCheckStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PolicyCheckStatus_POLICY_CHECK_STATUS_UNSPECIFIED
+}
+
+func (x *PolicyCheck) GetLatestJobId() string {
+	if x != nil && x.LatestJobId != nil {
+		return *x.LatestJobId
+	}
+	return ""
+}
+
+func (x *PolicyCheck) GetPolicies() []*PolicyCheckPolicy {
+	if x != nil {
+		return x.Policies
+	}
+	return nil
+}
+
+func (x *PolicyCheck) GetStageName() RunTaskStageName {
+	if x != nil {
+		return x.StageName
+	}
+	return RunTaskStageName_RUN_TASK_STAGE_NAME_UNSPECIFIED
+}
+
+// PolicyCheckPolicy is one policy attachment a check evaluates, with its result. There is one entry
+// per valid attachment (no de-duplication); id is the stable per-attachment identity the evaluator
+// echoes when reporting outcomes. package_version_constraint is resolved to a concrete package
+// version by the evaluator when the check runs — an empty constraint means the latest uploaded
+// version. package_digest, when set, is the hex sha256 the package must match. status is empty
+// until the check is evaluated. (Approver fields live server-side only.)
+//
+// The violation messages a previous evaluation reported are deliberately absent: the runner never
+// read them, and they are held in object storage, so carrying them here would cost a fetch per
+// policy on every run sent to a runner.
+type PolicyCheckPolicy struct {
+	state                    protoimpl.MessageState       `protogen:"open.v1"`
+	Id                       string                       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	PackageSource            string                       `protobuf:"bytes,2,opt,name=package_source,json=packageSource,proto3" json:"package_source,omitempty"`
+	PackageVersionConstraint string                       `protobuf:"bytes,3,opt,name=package_version_constraint,json=packageVersionConstraint,proto3" json:"package_version_constraint,omitempty"`
+	EnforcementLevel         PolicyEnforcementLevel       `protobuf:"varint,4,opt,name=enforcement_level,json=enforcementLevel,proto3,enum=martiancloud.tharsis.api.run.PolicyEnforcementLevel" json:"enforcement_level,omitempty"`
+	Status                   PolicyCheckPolicyStatus      `protobuf:"varint,5,opt,name=status,proto3,enum=martiancloud.tharsis.api.run.PolicyCheckPolicyStatus" json:"status,omitempty"`
+	PackageDigest            *string                      `protobuf:"bytes,6,opt,name=package_digest,json=packageDigest,proto3,oneof" json:"package_digest,omitempty"`
+	Provenance               *PolicyCheckPolicyProvenance `protobuf:"bytes,7,opt,name=provenance,proto3" json:"provenance,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *PolicyCheckPolicy) Reset() {
+	*x = PolicyCheckPolicy{}
+	mi := &file_run_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PolicyCheckPolicy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PolicyCheckPolicy) ProtoMessage() {}
+
+func (x *PolicyCheckPolicy) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PolicyCheckPolicy.ProtoReflect.Descriptor instead.
+func (*PolicyCheckPolicy) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PolicyCheckPolicy) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PolicyCheckPolicy) GetPackageSource() string {
+	if x != nil {
+		return x.PackageSource
+	}
+	return ""
+}
+
+func (x *PolicyCheckPolicy) GetPackageVersionConstraint() string {
+	if x != nil {
+		return x.PackageVersionConstraint
+	}
+	return ""
+}
+
+func (x *PolicyCheckPolicy) GetEnforcementLevel() PolicyEnforcementLevel {
+	if x != nil {
+		return x.EnforcementLevel
+	}
+	return PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_UNSPECIFIED
+}
+
+func (x *PolicyCheckPolicy) GetStatus() PolicyCheckPolicyStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PolicyCheckPolicyStatus_POLICY_CHECK_POLICY_STATUS_UNSPECIFIED
+}
+
+func (x *PolicyCheckPolicy) GetPackageDigest() string {
+	if x != nil && x.PackageDigest != nil {
+		return *x.PackageDigest
+	}
+	return ""
+}
+
+func (x *PolicyCheckPolicy) GetProvenance() *PolicyCheckPolicyProvenance {
+	if x != nil {
+		return x.Provenance
+	}
+	return nil
+}
+
+// PolicyCheckPolicyProvenance records the group that owns a policy attachment and the stable TRN
+// of the attachment itself. Policies are always group-scoped.
+type PolicyCheckPolicyProvenance struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GroupId       string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	PolicyTrn     string                 `protobuf:"bytes,2,opt,name=policy_trn,json=policyTrn,proto3" json:"policy_trn,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PolicyCheckPolicyProvenance) Reset() {
+	*x = PolicyCheckPolicyProvenance{}
+	mi := &file_run_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PolicyCheckPolicyProvenance) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PolicyCheckPolicyProvenance) ProtoMessage() {}
+
+func (x *PolicyCheckPolicyProvenance) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PolicyCheckPolicyProvenance.ProtoReflect.Descriptor instead.
+func (*PolicyCheckPolicyProvenance) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *PolicyCheckPolicyProvenance) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *PolicyCheckPolicyProvenance) GetPolicyTrn() string {
+	if x != nil {
+		return x.PolicyTrn
+	}
+	return ""
+}
+
+// RunPolicyOutcomeInput is a single policy's outcome reported by the policy evaluator, keyed by the
+// PolicyCheckPolicy id it received. The enforcement level is taken server-side from the pinned
+// policy, not supplied here. messages holds one entry per violation the policy reported, in the
+// order it should be displayed; the server bounds how much of it is kept.
+type RunPolicyOutcomeInput struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PolicyId      string                 `protobuf:"bytes,1,opt,name=policy_id,json=policyId,proto3" json:"policy_id,omitempty"`
+	Passed        bool                   `protobuf:"varint,2,opt,name=passed,proto3" json:"passed,omitempty"`
+	Messages      []string               `protobuf:"bytes,3,rep,name=messages,proto3" json:"messages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunPolicyOutcomeInput) Reset() {
+	*x = RunPolicyOutcomeInput{}
+	mi := &file_run_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunPolicyOutcomeInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunPolicyOutcomeInput) ProtoMessage() {}
+
+func (x *RunPolicyOutcomeInput) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunPolicyOutcomeInput.ProtoReflect.Descriptor instead.
+func (*RunPolicyOutcomeInput) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *RunPolicyOutcomeInput) GetPolicyId() string {
+	if x != nil {
+		return x.PolicyId
+	}
+	return ""
+}
+
+func (x *RunPolicyOutcomeInput) GetPassed() bool {
+	if x != nil {
+		return x.Passed
+	}
+	return false
+}
+
+func (x *RunPolicyOutcomeInput) GetMessages() []string {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+// ReportRunPolicyOutcomesRequest reports the per-policy-set outcomes for a run's policy check
+// node, identified by its RunNode GID
+type ReportRunPolicyOutcomesRequest struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	PolicyCheckId string                   `protobuf:"bytes,1,opt,name=policy_check_id,json=policyCheckId,proto3" json:"policy_check_id,omitempty"`
+	Outcomes      []*RunPolicyOutcomeInput `protobuf:"bytes,2,rep,name=outcomes,proto3" json:"outcomes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportRunPolicyOutcomesRequest) Reset() {
+	*x = ReportRunPolicyOutcomesRequest{}
+	mi := &file_run_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportRunPolicyOutcomesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportRunPolicyOutcomesRequest) ProtoMessage() {}
+
+func (x *ReportRunPolicyOutcomesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportRunPolicyOutcomesRequest.ProtoReflect.Descriptor instead.
+func (*ReportRunPolicyOutcomesRequest) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ReportRunPolicyOutcomesRequest) GetPolicyCheckId() string {
+	if x != nil {
+		return x.PolicyCheckId
+	}
+	return ""
+}
+
+func (x *ReportRunPolicyOutcomesRequest) GetOutcomes() []*RunPolicyOutcomeInput {
+	if x != nil {
+		return x.Outcomes
+	}
+	return nil
+}
+
 // RunVariable represents a variable used in a run.
 type RunVariable struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
@@ -1048,7 +1881,7 @@ type RunVariable struct {
 
 func (x *RunVariable) Reset() {
 	*x = RunVariable{}
-	mi := &file_run_proto_msgTypes[11]
+	mi := &file_run_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1060,7 +1893,7 @@ func (x *RunVariable) String() string {
 func (*RunVariable) ProtoMessage() {}
 
 func (x *RunVariable) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[11]
+	mi := &file_run_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1073,7 +1906,7 @@ func (x *RunVariable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunVariable.ProtoReflect.Descriptor instead.
 func (*RunVariable) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{11}
+	return file_run_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RunVariable) GetNamespacePath() string {
@@ -1136,7 +1969,7 @@ type RunEvent struct {
 
 func (x *RunEvent) Reset() {
 	*x = RunEvent{}
-	mi := &file_run_proto_msgTypes[12]
+	mi := &file_run_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1148,7 +1981,7 @@ func (x *RunEvent) String() string {
 func (*RunEvent) ProtoMessage() {}
 
 func (x *RunEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[12]
+	mi := &file_run_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1161,7 +1994,7 @@ func (x *RunEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunEvent.ProtoReflect.Descriptor instead.
 func (*RunEvent) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{12}
+	return file_run_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RunEvent) GetAction() string {
@@ -1189,7 +2022,7 @@ type GetRunsResponse struct {
 
 func (x *GetRunsResponse) Reset() {
 	*x = GetRunsResponse{}
-	mi := &file_run_proto_msgTypes[13]
+	mi := &file_run_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1201,7 +2034,7 @@ func (x *GetRunsResponse) String() string {
 func (*GetRunsResponse) ProtoMessage() {}
 
 func (x *GetRunsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[13]
+	mi := &file_run_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1214,7 +2047,7 @@ func (x *GetRunsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRunsResponse.ProtoReflect.Descriptor instead.
 func (*GetRunsResponse) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{13}
+	return file_run_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetRunsResponse) GetRuns() []*Run {
@@ -1241,7 +2074,7 @@ type GetRunVariablesResponse struct {
 
 func (x *GetRunVariablesResponse) Reset() {
 	*x = GetRunVariablesResponse{}
-	mi := &file_run_proto_msgTypes[14]
+	mi := &file_run_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1253,7 +2086,7 @@ func (x *GetRunVariablesResponse) String() string {
 func (*GetRunVariablesResponse) ProtoMessage() {}
 
 func (x *GetRunVariablesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[14]
+	mi := &file_run_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1266,7 +2099,7 @@ func (x *GetRunVariablesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRunVariablesResponse.ProtoReflect.Descriptor instead.
 func (*GetRunVariablesResponse) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{14}
+	return file_run_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetRunVariablesResponse) GetVariables() []*RunVariable {
@@ -1344,7 +2177,8 @@ const file_run_proto_rawDesc = "" +
 	"\x06_value\"c\n" +
 	"%SetVariablesIncludedInTFConfigRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12#\n" +
-	"\rvariable_keys\x18\x02 \x03(\tR\fvariableKeys\"\xd4\t\n" +
+	"\rvariable_keys\x18\x02 \x03(\tR\fvariableKeys\"\xcd\n" +
+	"\n" +
 	"\x03Run\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x19\n" +
 	"\bapply_id\x18\x02 \x01(\tR\aapplyId\x12=\n" +
@@ -1374,14 +2208,55 @@ const file_run_proto_rawDesc = "" +
 	"auto_apply\x18\x15 \x01(\bR\tautoApply\x127\n" +
 	"\x04plan\x18\x16 \x01(\v2#.martiancloud.tharsis.api.plan.PlanR\x04plan\x12@\n" +
 	"\x05apply\x18\x17 \x01(\v2%.martiancloud.tharsis.api.apply.ApplyH\x06R\x05apply\x88\x01\x01\x12?\n" +
-	"\x06status\x18\x18 \x01(\x0e2'.martiancloud.tharsis.api.run.RunStatusR\x06statusB\x1b\n" +
+	"\x06status\x18\x18 \x01(\x0e2'.martiancloud.tharsis.api.run.RunStatusR\x06status\x12K\n" +
+	"\vtask_stages\x18\x19 \x03(\v2*.martiancloud.tharsis.api.run.RunTaskStageR\n" +
+	"taskStages\x12*\n" +
+	"\x11is_assessment_run\x18\x1a \x01(\bR\x0fisAssessmentRunB\x1b\n" +
 	"\x19_configuration_version_idB\x1c\n" +
 	"\x1a_force_cancel_available_atB\x14\n" +
 	"\x12_force_canceled_byB\x10\n" +
 	"\x0e_module_digestB\x10\n" +
 	"\x0e_module_sourceB\x11\n" +
 	"\x0f_module_versionB\b\n" +
-	"\x06_apply\"\xa3\x02\n" +
+	"\x06_apply\"\x87\x02\n" +
+	"\fRunTaskStage\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12M\n" +
+	"\n" +
+	"stage_name\x18\x02 \x01(\x0e2..martiancloud.tharsis.api.run.RunTaskStageNameR\tstageName\x12H\n" +
+	"\x06status\x18\x03 \x01(\x0e20.martiancloud.tharsis.api.run.RunTaskStageStatusR\x06status\x12N\n" +
+	"\rpolicy_checks\x18\x04 \x03(\v2).martiancloud.tharsis.api.run.PolicyCheckR\fpolicyChecks\"\x8b\x03\n" +
+	"\vPolicyCheck\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12L\n" +
+	"\n" +
+	"check_type\x18\x02 \x01(\x0e2-.martiancloud.tharsis.api.run.PolicyCheckTypeR\tcheckType\x12G\n" +
+	"\x06status\x18\x03 \x01(\x0e2/.martiancloud.tharsis.api.run.PolicyCheckStatusR\x06status\x12'\n" +
+	"\rlatest_job_id\x18\x04 \x01(\tH\x00R\vlatestJobId\x88\x01\x01\x12K\n" +
+	"\bpolicies\x18\x05 \x03(\v2/.martiancloud.tharsis.api.run.PolicyCheckPolicyR\bpolicies\x12M\n" +
+	"\n" +
+	"stage_name\x18\x06 \x01(\x0e2..martiancloud.tharsis.api.run.RunTaskStageNameR\tstageNameB\x10\n" +
+	"\x0e_latest_job_id\"\xd4\x03\n" +
+	"\x11PolicyCheckPolicy\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
+	"\x0epackage_source\x18\x02 \x01(\tR\rpackageSource\x12<\n" +
+	"\x1apackage_version_constraint\x18\x03 \x01(\tR\x18packageVersionConstraint\x12a\n" +
+	"\x11enforcement_level\x18\x04 \x01(\x0e24.martiancloud.tharsis.api.run.PolicyEnforcementLevelR\x10enforcementLevel\x12M\n" +
+	"\x06status\x18\x05 \x01(\x0e25.martiancloud.tharsis.api.run.PolicyCheckPolicyStatusR\x06status\x12*\n" +
+	"\x0epackage_digest\x18\x06 \x01(\tH\x00R\rpackageDigest\x88\x01\x01\x12Y\n" +
+	"\n" +
+	"provenance\x18\a \x01(\v29.martiancloud.tharsis.api.run.PolicyCheckPolicyProvenanceR\n" +
+	"provenanceB\x11\n" +
+	"\x0f_package_digest\"W\n" +
+	"\x1bPolicyCheckPolicyProvenance\x12\x19\n" +
+	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\x1d\n" +
+	"\n" +
+	"policy_trn\x18\x02 \x01(\tR\tpolicyTrn\"h\n" +
+	"\x15RunPolicyOutcomeInput\x12\x1b\n" +
+	"\tpolicy_id\x18\x01 \x01(\tR\bpolicyId\x12\x16\n" +
+	"\x06passed\x18\x02 \x01(\bR\x06passed\x12\x1a\n" +
+	"\bmessages\x18\x03 \x03(\tR\bmessages\"\x99\x01\n" +
+	"\x1eReportRunPolicyOutcomesRequest\x12&\n" +
+	"\x0fpolicy_check_id\x18\x01 \x01(\tR\rpolicyCheckId\x12O\n" +
+	"\boutcomes\x18\x02 \x03(\v23.martiancloud.tharsis.api.run.RunPolicyOutcomeInputR\boutcomes\"\xa3\x02\n" +
 	"\vRunVariable\x12*\n" +
 	"\x0enamespace_path\x18\x01 \x01(\tH\x00R\rnamespacePath\x88\x01\x01\x12\x1a\n" +
 	"\bcategory\x18\x02 \x01(\tR\bcategory\x12\x10\n" +
@@ -1406,23 +2281,76 @@ const file_run_proto_rawDesc = "" +
 	"\x0eCREATED_AT_ASC\x10\x00\x12\x13\n" +
 	"\x0fCREATED_AT_DESC\x10\x01\x12\x12\n" +
 	"\x0eUPDATED_AT_ASC\x10\x02\x12\x13\n" +
-	"\x0fUPDATED_AT_DESC\x10\x03*\xe6\x01\n" +
+	"\x0fUPDATED_AT_DESC\x10\x03*\x88\x04\n" +
 	"\tRunStatus\x12\x0f\n" +
 	"\vUNSPECIFIED\x10\x00\x12\v\n" +
 	"\aPENDING\x10\x01\x12\x0f\n" +
 	"\vPLAN_QUEUED\x10\x02\x12\f\n" +
 	"\bPLANNING\x10\x03\x12\v\n" +
 	"\aPLANNED\x10\x04\x12\x18\n" +
-	"\x14PLANNED_AND_FINISHED\x10\x05\x12\v\n" +
-	"\aQUEUING\x10\x06\x12\x11\n" +
-	"\rQUEUING_APPLY\x10\a\x12\x10\n" +
+	"\x14PLANNED_AND_FINISHED\x10\x05\x12\x10\n" +
+	"\fPLAN_QUEUING\x10\x06\x12\x11\n" +
+	"\rAPPLY_QUEUING\x10\a\x12\x10\n" +
 	"\fAPPLY_QUEUED\x10\b\x12\f\n" +
 	"\bAPPLYING\x10\t\x12\v\n" +
 	"\aAPPLIED\x10\n" +
 	"\x12\f\n" +
 	"\bCANCELED\x10\v\x12\r\n" +
 	"\tDISCARDED\x10\f\x12\v\n" +
-	"\aERRORED\x10\r2\x93\v\n" +
+	"\aERRORED\x10\r\x12\x14\n" +
+	"\x10PRE_PLAN_QUEUING\x10\x0e\x12\x14\n" +
+	"\x10PRE_PLAN_RUNNING\x10\x0f\x12\x1e\n" +
+	"\x1aPRE_PLAN_AWAITING_DECISION\x10\x10\x12\x16\n" +
+	"\x12PRE_PLAN_COMPLETED\x10\x11\x12\x15\n" +
+	"\x11POST_PLAN_RUNNING\x10\x12\x12\x1f\n" +
+	"\x1bPOST_PLAN_AWAITING_DECISION\x10\x13\x12\x17\n" +
+	"\x13POST_PLAN_COMPLETED\x10\x14\x12\x15\n" +
+	"\x11PRE_APPLY_QUEUING\x10\x15\x12\x15\n" +
+	"\x11PRE_APPLY_RUNNING\x10\x16\x12\x1f\n" +
+	"\x1bPRE_APPLY_AWAITING_DECISION\x10\x17\x12\x17\n" +
+	"\x13PRE_APPLY_COMPLETED\x10\x18*O\n" +
+	"\x0fPolicyCheckType\x12!\n" +
+	"\x1dPOLICY_CHECK_TYPE_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15POLICY_CHECK_TYPE_OPA\x10\x01*\xc3\x01\n" +
+	"\x10RunTaskStageName\x12#\n" +
+	"\x1fRUN_TASK_STAGE_NAME_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cRUN_TASK_STAGE_NAME_PRE_PLAN\x10\x01\x12!\n" +
+	"\x1dRUN_TASK_STAGE_NAME_POST_PLAN\x10\x02\x12!\n" +
+	"\x1dRUN_TASK_STAGE_NAME_PRE_APPLY\x10\x03\x12\"\n" +
+	"\x1eRUN_TASK_STAGE_NAME_POST_APPLY\x10\x04*\xe0\x02\n" +
+	"\x12RunTaskStageStatus\x12%\n" +
+	"!RUN_TASK_STAGE_STATUS_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dRUN_TASK_STAGE_STATUS_CREATED\x10\x01\x12!\n" +
+	"\x1dRUN_TASK_STAGE_STATUS_RUNNING\x10\x02\x12+\n" +
+	"'RUN_TASK_STAGE_STATUS_AWAITING_OVERRIDE\x10\x03\x12#\n" +
+	"\x1fRUN_TASK_STAGE_STATUS_COMPLETED\x10\x04\x12!\n" +
+	"\x1dRUN_TASK_STAGE_STATUS_ERRORED\x10\x05\x12\"\n" +
+	"\x1eRUN_TASK_STAGE_STATUS_CANCELED\x10\x06\x12!\n" +
+	"\x1dRUN_TASK_STAGE_STATUS_SKIPPED\x10\a\x12!\n" +
+	"\x1dRUN_TASK_STAGE_STATUS_PENDING\x10\b*\x88\x03\n" +
+	"\x11PolicyCheckStatus\x12#\n" +
+	"\x1fPOLICY_CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bPOLICY_CHECK_STATUS_CREATED\x10\x01\x12\x1e\n" +
+	"\x1aPOLICY_CHECK_STATUS_QUEUED\x10\x02\x12\x1f\n" +
+	"\x1bPOLICY_CHECK_STATUS_RUNNING\x10\x03\x12\x1e\n" +
+	"\x1aPOLICY_CHECK_STATUS_PASSED\x10\x04\x12#\n" +
+	"\x1fPOLICY_CHECK_STATUS_SOFT_FAILED\x10\x05\x12\"\n" +
+	"\x1ePOLICY_CHECK_STATUS_OVERRIDDEN\x10\x06\x12\x1f\n" +
+	"\x1bPOLICY_CHECK_STATUS_ERRORED\x10\a\x12 \n" +
+	"\x1cPOLICY_CHECK_STATUS_CANCELED\x10\b\x12\x1f\n" +
+	"\x1bPOLICY_CHECK_STATUS_SKIPPED\x10\t\x12\x1f\n" +
+	"\x1bPOLICY_CHECK_STATUS_PENDING\x10\n" +
+	"*\xbb\x01\n" +
+	"\x17PolicyCheckPolicyStatus\x12*\n" +
+	"&POLICY_CHECK_POLICY_STATUS_UNSPECIFIED\x10\x00\x12%\n" +
+	"!POLICY_CHECK_POLICY_STATUS_PASSED\x10\x01\x12%\n" +
+	"!POLICY_CHECK_POLICY_STATUS_FAILED\x10\x02\x12&\n" +
+	"\"POLICY_CHECK_POLICY_STATUS_PENDING\x10\x03*\xc3\x01\n" +
+	"\x16PolicyEnforcementLevel\x12(\n" +
+	"$POLICY_ENFORCEMENT_LEVEL_UNSPECIFIED\x10\x00\x12%\n" +
+	"!POLICY_ENFORCEMENT_LEVEL_ADVISORY\x10\x01\x12+\n" +
+	"'POLICY_ENFORCEMENT_LEVEL_SOFT_MANDATORY\x10\x02\x12+\n" +
+	"'POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY\x10\x032\x84\f\n" +
 	"\x04Runs\x12`\n" +
 	"\n" +
 	"GetRunByID\x12/.martiancloud.tharsis.api.run.GetRunByIDRequest\x1a!.martiancloud.tharsis.api.run.Run\x12f\n" +
@@ -1434,7 +2362,8 @@ const file_run_proto_rawDesc = "" +
 	"\vGetPlanByID\x121.martiancloud.tharsis.api.plan.GetPlanByIDRequest\x1a#.martiancloud.tharsis.api.plan.Plan\x12j\n" +
 	"\fGetApplyByID\x123.martiancloud.tharsis.api.apply.GetApplyByIDRequest\x1a%.martiancloud.tharsis.api.apply.Apply\x12c\n" +
 	"\n" +
-	"UpdatePlan\x120.martiancloud.tharsis.api.plan.UpdatePlanRequest\x1a#.martiancloud.tharsis.api.plan.Plan\x12h\n" +
+	"UpdatePlan\x120.martiancloud.tharsis.api.plan.UpdatePlanRequest\x1a#.martiancloud.tharsis.api.plan.Plan\x12o\n" +
+	"\x17ReportRunPolicyOutcomes\x12<.martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest\x1a\x16.google.protobuf.Empty\x12h\n" +
 	"\vUpdateApply\x122.martiancloud.tharsis.api.apply.UpdateApplyRequest\x1a%.martiancloud.tharsis.api.apply.Apply\x12}\n" +
 	"\x1eSetVariablesIncludedInTFConfig\x12C.martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest\x1a\x16.google.protobuf.Empty\x12{\n" +
 	"\x14SubscribeToRunEvents\x129.martiancloud.tharsis.api.run.SubscribeToRunEventsRequest\x1a&.martiancloud.tharsis.api.run.RunEvent0\x01\x12\x84\x01\n" +
@@ -1452,82 +2381,108 @@ func file_run_proto_rawDescGZIP() []byte {
 	return file_run_proto_rawDescData
 }
 
-var file_run_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_run_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_run_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
+var file_run_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_run_proto_goTypes = []any{
 	(RunSortableField)(0),                         // 0: martiancloud.tharsis.api.run.RunSortableField
 	(RunStatus)(0),                                // 1: martiancloud.tharsis.api.run.RunStatus
-	(*GetRunByIDRequest)(nil),                     // 2: martiancloud.tharsis.api.run.GetRunByIDRequest
-	(*GetRunsRequest)(nil),                        // 3: martiancloud.tharsis.api.run.GetRunsRequest
-	(*CreateRunRequest)(nil),                      // 4: martiancloud.tharsis.api.run.CreateRunRequest
-	(*ApplyRunRequest)(nil),                       // 5: martiancloud.tharsis.api.run.ApplyRunRequest
-	(*CancelRunRequest)(nil),                      // 6: martiancloud.tharsis.api.run.CancelRunRequest
-	(*CreateDestroyRunForWorkspaceRequest)(nil),   // 7: martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
-	(*GetRunVariablesRequest)(nil),                // 8: martiancloud.tharsis.api.run.GetRunVariablesRequest
-	(*SubscribeToRunEventsRequest)(nil),           // 9: martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
-	(*RunVariableInput)(nil),                      // 10: martiancloud.tharsis.api.run.RunVariableInput
-	(*SetVariablesIncludedInTFConfigRequest)(nil), // 11: martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
-	(*Run)(nil),                                   // 12: martiancloud.tharsis.api.run.Run
-	(*RunVariable)(nil),                           // 13: martiancloud.tharsis.api.run.RunVariable
-	(*RunEvent)(nil),                              // 14: martiancloud.tharsis.api.run.RunEvent
-	(*GetRunsResponse)(nil),                       // 15: martiancloud.tharsis.api.run.GetRunsResponse
-	(*GetRunVariablesResponse)(nil),               // 16: martiancloud.tharsis.api.run.GetRunVariablesResponse
-	(*PaginationOptions)(nil),                     // 17: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),                      // 18: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*timestamppb.Timestamp)(nil),                 // 19: google.protobuf.Timestamp
-	(*Plan)(nil),                                  // 20: martiancloud.tharsis.api.plan.Plan
-	(*Apply)(nil),                                 // 21: martiancloud.tharsis.api.apply.Apply
-	(*PageInfo)(nil),                              // 22: martiancloud.tharsis.api.pagination.PageInfo
-	(*GetPlanByIDRequest)(nil),                    // 23: martiancloud.tharsis.api.plan.GetPlanByIDRequest
-	(*GetApplyByIDRequest)(nil),                   // 24: martiancloud.tharsis.api.apply.GetApplyByIDRequest
-	(*UpdatePlanRequest)(nil),                     // 25: martiancloud.tharsis.api.plan.UpdatePlanRequest
-	(*UpdateApplyRequest)(nil),                    // 26: martiancloud.tharsis.api.apply.UpdateApplyRequest
-	(*emptypb.Empty)(nil),                         // 27: google.protobuf.Empty
+	(PolicyCheckType)(0),                          // 2: martiancloud.tharsis.api.run.PolicyCheckType
+	(RunTaskStageName)(0),                         // 3: martiancloud.tharsis.api.run.RunTaskStageName
+	(RunTaskStageStatus)(0),                       // 4: martiancloud.tharsis.api.run.RunTaskStageStatus
+	(PolicyCheckStatus)(0),                        // 5: martiancloud.tharsis.api.run.PolicyCheckStatus
+	(PolicyCheckPolicyStatus)(0),                  // 6: martiancloud.tharsis.api.run.PolicyCheckPolicyStatus
+	(PolicyEnforcementLevel)(0),                   // 7: martiancloud.tharsis.api.run.PolicyEnforcementLevel
+	(*GetRunByIDRequest)(nil),                     // 8: martiancloud.tharsis.api.run.GetRunByIDRequest
+	(*GetRunsRequest)(nil),                        // 9: martiancloud.tharsis.api.run.GetRunsRequest
+	(*CreateRunRequest)(nil),                      // 10: martiancloud.tharsis.api.run.CreateRunRequest
+	(*ApplyRunRequest)(nil),                       // 11: martiancloud.tharsis.api.run.ApplyRunRequest
+	(*CancelRunRequest)(nil),                      // 12: martiancloud.tharsis.api.run.CancelRunRequest
+	(*CreateDestroyRunForWorkspaceRequest)(nil),   // 13: martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
+	(*GetRunVariablesRequest)(nil),                // 14: martiancloud.tharsis.api.run.GetRunVariablesRequest
+	(*SubscribeToRunEventsRequest)(nil),           // 15: martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
+	(*RunVariableInput)(nil),                      // 16: martiancloud.tharsis.api.run.RunVariableInput
+	(*SetVariablesIncludedInTFConfigRequest)(nil), // 17: martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
+	(*Run)(nil),                                   // 18: martiancloud.tharsis.api.run.Run
+	(*RunTaskStage)(nil),                          // 19: martiancloud.tharsis.api.run.RunTaskStage
+	(*PolicyCheck)(nil),                           // 20: martiancloud.tharsis.api.run.PolicyCheck
+	(*PolicyCheckPolicy)(nil),                     // 21: martiancloud.tharsis.api.run.PolicyCheckPolicy
+	(*PolicyCheckPolicyProvenance)(nil),           // 22: martiancloud.tharsis.api.run.PolicyCheckPolicyProvenance
+	(*RunPolicyOutcomeInput)(nil),                 // 23: martiancloud.tharsis.api.run.RunPolicyOutcomeInput
+	(*ReportRunPolicyOutcomesRequest)(nil),        // 24: martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest
+	(*RunVariable)(nil),                           // 25: martiancloud.tharsis.api.run.RunVariable
+	(*RunEvent)(nil),                              // 26: martiancloud.tharsis.api.run.RunEvent
+	(*GetRunsResponse)(nil),                       // 27: martiancloud.tharsis.api.run.GetRunsResponse
+	(*GetRunVariablesResponse)(nil),               // 28: martiancloud.tharsis.api.run.GetRunVariablesResponse
+	(*PaginationOptions)(nil),                     // 29: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),                      // 30: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*timestamppb.Timestamp)(nil),                 // 31: google.protobuf.Timestamp
+	(*Plan)(nil),                                  // 32: martiancloud.tharsis.api.plan.Plan
+	(*Apply)(nil),                                 // 33: martiancloud.tharsis.api.apply.Apply
+	(*PageInfo)(nil),                              // 34: martiancloud.tharsis.api.pagination.PageInfo
+	(*GetPlanByIDRequest)(nil),                    // 35: martiancloud.tharsis.api.plan.GetPlanByIDRequest
+	(*GetApplyByIDRequest)(nil),                   // 36: martiancloud.tharsis.api.apply.GetApplyByIDRequest
+	(*UpdatePlanRequest)(nil),                     // 37: martiancloud.tharsis.api.plan.UpdatePlanRequest
+	(*UpdateApplyRequest)(nil),                    // 38: martiancloud.tharsis.api.apply.UpdateApplyRequest
+	(*emptypb.Empty)(nil),                         // 39: google.protobuf.Empty
 }
 var file_run_proto_depIdxs = []int32{
-	17, // 0: martiancloud.tharsis.api.run.GetRunsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	29, // 0: martiancloud.tharsis.api.run.GetRunsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.run.GetRunsRequest.sort:type_name -> martiancloud.tharsis.api.run.RunSortableField
-	10, // 2: martiancloud.tharsis.api.run.CreateRunRequest.variables:type_name -> martiancloud.tharsis.api.run.RunVariableInput
-	18, // 3: martiancloud.tharsis.api.run.Run.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	19, // 4: martiancloud.tharsis.api.run.Run.force_cancel_available_at:type_name -> google.protobuf.Timestamp
-	20, // 5: martiancloud.tharsis.api.run.Run.plan:type_name -> martiancloud.tharsis.api.plan.Plan
-	21, // 6: martiancloud.tharsis.api.run.Run.apply:type_name -> martiancloud.tharsis.api.apply.Apply
+	16, // 2: martiancloud.tharsis.api.run.CreateRunRequest.variables:type_name -> martiancloud.tharsis.api.run.RunVariableInput
+	30, // 3: martiancloud.tharsis.api.run.Run.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	31, // 4: martiancloud.tharsis.api.run.Run.force_cancel_available_at:type_name -> google.protobuf.Timestamp
+	32, // 5: martiancloud.tharsis.api.run.Run.plan:type_name -> martiancloud.tharsis.api.plan.Plan
+	33, // 6: martiancloud.tharsis.api.run.Run.apply:type_name -> martiancloud.tharsis.api.apply.Apply
 	1,  // 7: martiancloud.tharsis.api.run.Run.status:type_name -> martiancloud.tharsis.api.run.RunStatus
-	12, // 8: martiancloud.tharsis.api.run.RunEvent.run:type_name -> martiancloud.tharsis.api.run.Run
-	12, // 9: martiancloud.tharsis.api.run.GetRunsResponse.runs:type_name -> martiancloud.tharsis.api.run.Run
-	22, // 10: martiancloud.tharsis.api.run.GetRunsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	13, // 11: martiancloud.tharsis.api.run.GetRunVariablesResponse.variables:type_name -> martiancloud.tharsis.api.run.RunVariable
-	2,  // 12: martiancloud.tharsis.api.run.Runs.GetRunByID:input_type -> martiancloud.tharsis.api.run.GetRunByIDRequest
-	3,  // 13: martiancloud.tharsis.api.run.Runs.GetRuns:input_type -> martiancloud.tharsis.api.run.GetRunsRequest
-	4,  // 14: martiancloud.tharsis.api.run.Runs.CreateRun:input_type -> martiancloud.tharsis.api.run.CreateRunRequest
-	5,  // 15: martiancloud.tharsis.api.run.Runs.ApplyRun:input_type -> martiancloud.tharsis.api.run.ApplyRunRequest
-	6,  // 16: martiancloud.tharsis.api.run.Runs.CancelRun:input_type -> martiancloud.tharsis.api.run.CancelRunRequest
-	8,  // 17: martiancloud.tharsis.api.run.Runs.GetRunVariables:input_type -> martiancloud.tharsis.api.run.GetRunVariablesRequest
-	23, // 18: martiancloud.tharsis.api.run.Runs.GetPlanByID:input_type -> martiancloud.tharsis.api.plan.GetPlanByIDRequest
-	24, // 19: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
-	25, // 20: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
-	26, // 21: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
-	11, // 22: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:input_type -> martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
-	9,  // 23: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
-	7,  // 24: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:input_type -> martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
-	12, // 25: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
-	15, // 26: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
-	12, // 27: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
-	12, // 28: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
-	12, // 29: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
-	16, // 30: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
-	20, // 31: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
-	21, // 32: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
-	20, // 33: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
-	21, // 34: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
-	27, // 35: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:output_type -> google.protobuf.Empty
-	14, // 36: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
-	12, // 37: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:output_type -> martiancloud.tharsis.api.run.Run
-	25, // [25:38] is the sub-list for method output_type
-	12, // [12:25] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	19, // 8: martiancloud.tharsis.api.run.Run.task_stages:type_name -> martiancloud.tharsis.api.run.RunTaskStage
+	3,  // 9: martiancloud.tharsis.api.run.RunTaskStage.stage_name:type_name -> martiancloud.tharsis.api.run.RunTaskStageName
+	4,  // 10: martiancloud.tharsis.api.run.RunTaskStage.status:type_name -> martiancloud.tharsis.api.run.RunTaskStageStatus
+	20, // 11: martiancloud.tharsis.api.run.RunTaskStage.policy_checks:type_name -> martiancloud.tharsis.api.run.PolicyCheck
+	2,  // 12: martiancloud.tharsis.api.run.PolicyCheck.check_type:type_name -> martiancloud.tharsis.api.run.PolicyCheckType
+	5,  // 13: martiancloud.tharsis.api.run.PolicyCheck.status:type_name -> martiancloud.tharsis.api.run.PolicyCheckStatus
+	21, // 14: martiancloud.tharsis.api.run.PolicyCheck.policies:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicy
+	3,  // 15: martiancloud.tharsis.api.run.PolicyCheck.stage_name:type_name -> martiancloud.tharsis.api.run.RunTaskStageName
+	7,  // 16: martiancloud.tharsis.api.run.PolicyCheckPolicy.enforcement_level:type_name -> martiancloud.tharsis.api.run.PolicyEnforcementLevel
+	6,  // 17: martiancloud.tharsis.api.run.PolicyCheckPolicy.status:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyStatus
+	22, // 18: martiancloud.tharsis.api.run.PolicyCheckPolicy.provenance:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyProvenance
+	23, // 19: martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest.outcomes:type_name -> martiancloud.tharsis.api.run.RunPolicyOutcomeInput
+	18, // 20: martiancloud.tharsis.api.run.RunEvent.run:type_name -> martiancloud.tharsis.api.run.Run
+	18, // 21: martiancloud.tharsis.api.run.GetRunsResponse.runs:type_name -> martiancloud.tharsis.api.run.Run
+	34, // 22: martiancloud.tharsis.api.run.GetRunsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	25, // 23: martiancloud.tharsis.api.run.GetRunVariablesResponse.variables:type_name -> martiancloud.tharsis.api.run.RunVariable
+	8,  // 24: martiancloud.tharsis.api.run.Runs.GetRunByID:input_type -> martiancloud.tharsis.api.run.GetRunByIDRequest
+	9,  // 25: martiancloud.tharsis.api.run.Runs.GetRuns:input_type -> martiancloud.tharsis.api.run.GetRunsRequest
+	10, // 26: martiancloud.tharsis.api.run.Runs.CreateRun:input_type -> martiancloud.tharsis.api.run.CreateRunRequest
+	11, // 27: martiancloud.tharsis.api.run.Runs.ApplyRun:input_type -> martiancloud.tharsis.api.run.ApplyRunRequest
+	12, // 28: martiancloud.tharsis.api.run.Runs.CancelRun:input_type -> martiancloud.tharsis.api.run.CancelRunRequest
+	14, // 29: martiancloud.tharsis.api.run.Runs.GetRunVariables:input_type -> martiancloud.tharsis.api.run.GetRunVariablesRequest
+	35, // 30: martiancloud.tharsis.api.run.Runs.GetPlanByID:input_type -> martiancloud.tharsis.api.plan.GetPlanByIDRequest
+	36, // 31: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
+	37, // 32: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
+	24, // 33: martiancloud.tharsis.api.run.Runs.ReportRunPolicyOutcomes:input_type -> martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest
+	38, // 34: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
+	17, // 35: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:input_type -> martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
+	15, // 36: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
+	13, // 37: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:input_type -> martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
+	18, // 38: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
+	27, // 39: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
+	18, // 40: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
+	18, // 41: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
+	18, // 42: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
+	28, // 43: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
+	32, // 44: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
+	33, // 45: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
+	32, // 46: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
+	39, // 47: martiancloud.tharsis.api.run.Runs.ReportRunPolicyOutcomes:output_type -> google.protobuf.Empty
+	33, // 48: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
+	39, // 49: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:output_type -> google.protobuf.Empty
+	26, // 50: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
+	18, // 51: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:output_type -> martiancloud.tharsis.api.run.Run
+	38, // [38:52] is the sub-list for method output_type
+	24, // [24:38] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_run_proto_init() }
@@ -1545,14 +2500,16 @@ func file_run_proto_init() {
 	file_run_proto_msgTypes[7].OneofWrappers = []any{}
 	file_run_proto_msgTypes[8].OneofWrappers = []any{}
 	file_run_proto_msgTypes[10].OneofWrappers = []any{}
-	file_run_proto_msgTypes[11].OneofWrappers = []any{}
+	file_run_proto_msgTypes[12].OneofWrappers = []any{}
+	file_run_proto_msgTypes[13].OneofWrappers = []any{}
+	file_run_proto_msgTypes[17].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_run_proto_rawDesc), len(file_run_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   15,
+			NumEnums:      8,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

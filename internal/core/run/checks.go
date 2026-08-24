@@ -17,12 +17,10 @@ type CheckResultObject struct {
 	FailureMessages []string
 }
 
-// validCheckStatuses lists the status values accepted by the CheckResultStatus enum
-// defined in the GraphQL schema (see run.graphql). Keep this in sync with that enum.
 var validCheckStatuses = []string{"pass", "fail", "error", "unknown"}
 
-// NormalizeCheckStatus ensures the status is one of the known values accepted by the
-// GraphQL enum, defaulting any unrecognized value to "unknown".
+// NormalizeCheckStatus returns the status unchanged if it is a known Terraform check
+// status value, or "unknown" for any unrecognized input.
 func NormalizeCheckStatus(status string) string {
 	if slices.Contains(validCheckStatuses, status) {
 		return status

@@ -1,0 +1,205 @@
+enum PolicyKind {
+  OPA
+}
+
+enum PolicyStage {
+  PRE_PLAN
+  POST_PLAN
+  POST_APPLY
+}
+
+enum PolicyEnforcementLevel {
+  ADVISORY
+  SOFT_MANDATORY
+  HARD_MANDATORY
+}
+
+"""
+SpeculativeRunEnforcementLevel is the level a policy may be enforced at on a run that has no apply: a
+speculative plan, or an assessment run. SOFT_MANDATORY is deliberately absent — overriding a failure
+only ever unblocks an apply, and no one is waiting on one of these runs to grant it — so the choice is
+between recording the failure and refusing to run at all.
+"""
+enum SpeculativeRunEnforcementLevel {
+  ADVISORY
+  HARD_MANDATORY
+}
+
+"""
+PolicyScopeRuleType names which of a run's paths a scope rule is matched against.
+"""
+enum PolicyScopeRuleType {
+  """WORKSPACE matches the path of the run's workspace."""
+  WORKSPACE
+  """
+  GROUP matches any workspace nested beneath a group whose path matches. A path with no wildcard
+  covers the group's whole subtree rather than naming a single namespace.
+  """
+  GROUP
+  """
+  MANAGED_IDENTITY matches the paths of the managed identities the run's workspace uses. An alias
+  matches both its own path and the path of the identity it aliases.
+  """
+  MANAGED_IDENTITY
+}
+
+enum PolicyScopeRuleAction {
+  INCLUDE
+  EXCLUDE
+}
+
+"""
+PolicyScopeRule controls whether a policy applies to a specific run context by matching a path glob
+against the path named by its type. The wildcard crosses path separators, so "group/*" covers a
+workspace at any depth beneath that group, and a pattern with no wildcard matches exactly one path
+(except for a GROUP rule, which always covers the matched group's subtree).
+"""
+type PolicyScopeRule {
+  type: PolicyScopeRuleType!
+  action: PolicyScopeRuleAction!
+  """
+  pattern is the glob pattern this rule matches with. It may also be written as a TRN of the resource
+  type named by type ("trn:workspace:group/ws"), in which case only the resource path is matched.
+  """
+  pattern: String!
+}
+
+input PolicyScopeRuleInput {
+  type: PolicyScopeRuleType!
+  action: PolicyScopeRuleAction!
+  """
+  pattern is the glob pattern this rule matches with, and must be non-empty. It may also be written as
+  a TRN of the resource type named by type ("trn:group:my-group/sub"); a TRN of any other type is
+  rejected.
+  """
+  pattern: String!
+}
+
+"""
+OPAPolicyData holds the OPA-specific configuration for a policy.
+"""
+type OPAPolicyData {
+  packageSource: String!
+  """
+  packageVersionConstraint is a semver constraint (e.g. "1.0.0", "^1.0"); null/empty resolves to the
+  latest available version at run creation.
+  """
+  packageVersionConstraint: String
+  """
+  packageDigest, when set, is the hex sha256 the package must match at eval time; a mismatch
+  fails the policy at its enforcement level.
+  """
+  packageDigest: String
+  stage: PolicyStage!
+  enforcementLevel: PolicyEnforcementLevel!
+  """
+  speculativeRunEnforcementLevel is the level this policy is enforced at on a run with no apply — a
+  speculative plan, or an assessment run — in place of enforcementLevel.
+  """
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
+}
+
+"""
+Policy attaches a policy package to an owning group and controls where it evaluates
+via its scope rules. Empty scope = applies to all workspaces under the owning group.
+"""
+type Policy implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  group: Group!
+  """
+  groupPath is the path of the owning group, read from the policy's own TRN. Prefer it over
+  group.fullPath when the path is all that is needed: it costs no group lookup.
+  """
+  groupPath: String!
+  name: String!
+  description: String!
+  kind: PolicyKind!
+  opaData: OPAPolicyData
+  scope: [PolicyScopeRule!]!
+  """
+  Approvers may override a soft-mandatory failure of this policy. Only meaningful when
+  opaData.enforcementLevel is soft_mandatory.
+  """
+  requiredApprovals: Int!
+  allowedUsers: [User!]!
+  allowedServiceAccounts: [ServiceAccount!]!
+  allowedTeams: [Team!]!
+  createdBy: String!
+}
+
+enum PolicySort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+type PolicyEdge {
+  cursor: String!
+  node: Policy
+}
+
+type PolicyConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [PolicyEdge]
+}
+
+type PolicyMutationPayload {
+  clientMutationId: String
+  policy: Policy
+  problems: [Problem!]!
+}
+
+"""
+OPAPolicyDataInput holds the OPA-specific fields for create/update mutations.
+
+Supplying opaData replaces it wholesale, so every field that always has a value must be sent.
+packageVersionConstraint and packageDigest stay nullable because omitting them is how a caller says
+"track the latest version" and "do not pin a checksum". A stage change takes effect on runs created
+afterwards: a run snapshots the policies applying to each stage when it is created.
+"""
+input OPAPolicyDataInput {
+  packageSource: String!
+  packageVersionConstraint: String
+  packageDigest: String
+  stage: PolicyStage!
+  enforcementLevel: PolicyEnforcementLevel!
+  """
+  speculativeRunEnforcementLevel replaces enforcementLevel on a run with no apply — a speculative plan,
+  or an assessment run. It is required, and required separately from enforcementLevel, because a
+  failure on a run nobody can apply cannot be approved past: the policy has to say whether it is
+  recorded (ADVISORY) or blocks the run outright (HARD_MANDATORY).
+  """
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
+}
+
+input CreatePolicyInput {
+  clientMutationId: String
+  kind: PolicyKind!
+  groupId: String!
+  name: String!
+  description: String
+  opaData: OPAPolicyDataInput
+  scope: [PolicyScopeRuleInput!]
+  requiredApprovals: Int
+  allowedUsers: [String!]
+  allowedServiceAccounts: [String!]
+  allowedTeams: [String!]
+}
+
+input DeletePolicyInput {
+  clientMutationId: String
+  id: String!
+}
+
+input UpdatePolicyInput {
+  clientMutationId: String
+  id: String!
+  description: String
+  opaData: OPAPolicyDataInput
+  scope: [PolicyScopeRuleInput!]
+  requiredApprovals: Int
+  allowedUsers: [String!]
+  allowedServiceAccounts: [String!]
+  allowedTeams: [String!]
+}

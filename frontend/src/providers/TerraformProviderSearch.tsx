@@ -14,6 +14,7 @@ import TerraformProviderSearchListItem from './TerraformProviderSearchListItem';
 import { TerraformProviderSearchFragment_providers$key } from './__generated__/TerraformProviderSearchFragment_providers.graphql';
 import { TerraformProviderSearchPaginationQuery } from './__generated__/TerraformProviderSearchPaginationQuery.graphql';
 import { TerraformProviderSearchQuery } from './__generated__/TerraformProviderSearchQuery.graphql';
+import { PageLayoutProvider } from '../layout/PageLayoutContext';
 
 export const INITIAL_ITEM_COUNT = 50;
 
@@ -100,10 +101,12 @@ function TerraformProviderSearch(props: Props) {
     }
   };
 
-  return (
-    <Box maxWidth={1200} margin="auto" padding={2}>
+  const edges = data.terraformProviders?.edges ?? [];
 
-      {(search !== '' || data.terraformProviders?.edges?.length !== 0) && <React.Fragment>
+  return (
+    <PageLayoutProvider>
+
+      {(search !== '' || edges.length !== 0) && <React.Fragment>
         <Typography variant="h5" sx={{ marginBottom: 2 }}>Terraform Providers</Typography>
         <Box marginBottom={2}>
           <SearchInput
@@ -120,7 +123,7 @@ function TerraformProviderSearch(props: Props) {
             </Typography>
           </Box>
         </Paper>
-        {(!data.terraformProviders.edges || data.terraformProviders.edges?.length === 0) && search !== '' && <Typography
+        {(edges.length === 0) && search !== '' && <Typography
           sx={{
             padding: 4,
             borderBottom: `1px solid ${theme.palette.divider}`,
@@ -135,13 +138,13 @@ function TerraformProviderSearch(props: Props) {
           No providers matching search <strong>{search}</strong>
         </Typography>}
         <InfiniteScroll
-          dataLength={data.terraformProviders.edges?.length ?? 0}
+          dataLength={edges.length}
           next={() => loadNext(INITIAL_ITEM_COUNT)}
           hasMore={hasNext}
           loader={<ListSkeleton rowCount={3} />}
         >
           <List disablePadding sx={isRefreshing ? { opacity: 0.5 } : null}>
-            {data.terraformProviders.edges?.map((edge: any) => <TerraformProviderSearchListItem
+            {edges.map((edge: any) => <TerraformProviderSearchListItem
               key={edge.node.id}
               fragmentRef={edge.node}
             />)}
@@ -149,12 +152,12 @@ function TerraformProviderSearch(props: Props) {
         </InfiniteScroll>
       </React.Fragment>}
 
-      {!search && data.terraformProviders.edges?.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+      {!search && edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
         <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
           <Typography variant="h6">You don't have access to any Terraform Providers</Typography>
         </Box>
       </Box>}
-    </Box>
+    </PageLayoutProvider>
   );
 }
 

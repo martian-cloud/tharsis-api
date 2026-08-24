@@ -336,7 +336,7 @@ func TestCreateRole(t *testing.T) {
 			input: &CreateRoleInput{
 				Name:        "role",
 				Description: "Some new role.",
-				Permissions: []models.Permission{models.UpdatePlanPermission},
+				Permissions: []models.Permission{models.UpdateRunPermission},
 			},
 			expectErrorCode: errors.EInvalid,
 		},
@@ -485,7 +485,7 @@ func TestUpdateRole(t *testing.T) {
 				},
 			},
 			updatePerms: []models.Permission{
-				models.UpdatePlanPermission,
+				models.UpdateRunPermission,
 			},
 			expectErrorCode: errors.EInvalid,
 		},

@@ -1,4 +1,5 @@
-import { Box, Typography } from '@mui/material';
+import { Typography } from '@mui/material';
+import { PageLayoutProvider } from '../layout/PageLayoutContext';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment, PreloadedQuery, usePreloadedQuery } from 'react-relay/hooks';
 import GlobalNotificationPreference from './GlobalNotificationPreference';
@@ -39,7 +40,7 @@ function UserPreferences({ queryRef }: Props) {
     );
 
     return (
-        <Box maxWidth={1200} margin="auto" padding={2}>
+        <PageLayoutProvider>
             <Typography marginBottom={4} variant="h5" gutterBottom>
                 Preferences
             </Typography>
@@ -53,7 +54,7 @@ function UserPreferences({ queryRef }: Props) {
                     <UserSessions fragmentRef={data.me} />
                 </PreferenceSection>
             )}
-        </Box>
+        </PageLayoutProvider>
     );
 }
 

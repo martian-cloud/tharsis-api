@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d2d6d6e9726c40a13d2fd81684976c90>>
+ * @generated SignedSource<<8dc822fa8c670995a4c2911780e21495>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,24 +9,18 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
-export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type HomeRunListItemFragment_run$data = {
-  readonly apply: {
-    readonly status: ApplyStatus;
-  } | null | undefined;
   readonly createdBy: string;
   readonly id: string;
+  readonly isDestroy: boolean;
   readonly metadata: {
     readonly createdAt: any;
-  };
-  readonly plan: {
-    readonly status: PlanStatus;
   };
   readonly workspace: {
     readonly fullPath: string;
   };
+  readonly " $fragmentSpreads": FragmentRefs<"RunStageIconsFragment_run">;
   readonly " $fragmentType": "HomeRunListItemFragment_run";
 };
 export type HomeRunListItemFragment_run$key = {
@@ -34,17 +28,7 @@ export type HomeRunListItemFragment_run$key = {
   readonly " $fragmentSpreads": FragmentRefs<"HomeRunListItemFragment_run">;
 };
 
-const node: ReaderFragment = (function(){
-var v0 = [
-  {
-    "alias": null,
-    "args": null,
-    "kind": "ScalarField",
-    "name": "status",
-    "storageKey": null
-  }
-];
-return {
+const node: ReaderFragment = {
   "argumentDefinitions": [],
   "kind": "Fragment",
   "metadata": null,
@@ -62,6 +46,13 @@ return {
       "args": null,
       "kind": "ScalarField",
       "name": "createdBy",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "isDestroy",
       "storageKey": null
     },
     {
@@ -85,26 +76,6 @@ return {
     {
       "alias": null,
       "args": null,
-      "concreteType": "Plan",
-      "kind": "LinkedField",
-      "name": "plan",
-      "plural": false,
-      "selections": (v0/*: any*/),
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "Apply",
-      "kind": "LinkedField",
-      "name": "apply",
-      "plural": false,
-      "selections": (v0/*: any*/),
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
       "concreteType": "Workspace",
       "kind": "LinkedField",
       "name": "workspace",
@@ -119,13 +90,17 @@ return {
         }
       ],
       "storageKey": null
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "RunStageIconsFragment_run"
     }
   ],
   "type": "Run",
   "abstractKey": null
 };
-})();
 
-(node as any).hash = "0672250ea469c286561cdbbf114e1691";
+(node as any).hash = "596a04e9e11c24a98b4b37007b061265";
 
 export default node;

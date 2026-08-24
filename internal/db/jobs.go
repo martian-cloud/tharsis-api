@@ -72,6 +72,7 @@ type JobFilter struct {
 	RunID               *string
 	WorkspaceID         *string
 	RunnerID            *string
+	PolicyCheckID       *string
 	JobType             *models.JobType
 	JobStatus           *models.JobStatus
 	TagFilter           *JobTagFilter
@@ -101,7 +102,7 @@ type jobs struct {
 
 var jobFieldList = append(metadataFieldList, "status", "type", "workspace_id", "run_id",
 	"cancel_requested_at",
-	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration", "force_canceled", "tags", "properties", "outdated_job_protocol_version")
+	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration", "force_canceled", "tags", "properties", "outdated_job_protocol_version", "job_data")
 
 // NewJobs returns an instance of the Jobs interface
 func NewJobs(dbClient *Client) Jobs {
@@ -173,6 +174,12 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 	if input.Filter != nil {
 		if input.Filter.RunID != nil {
 			ex = ex.Append(goqu.I("jobs.run_id").Eq(*input.Filter.RunID))
+		}
+
+		if input.Filter.PolicyCheckID != nil {
+			// A policy check's jobs (its OPA evaluation jobs, including retries) are matched on the
+			// policy check ID stored in the job_data JSONB blob (OPAJobData.policyCheckID).
+			ex = ex.Append(goqu.L("jobs.job_data->>'policyCheckID' = ?", *input.Filter.PolicyCheckID))
 		}
 
 		if input.Filter.WorkspaceID != nil {
@@ -286,6 +293,14 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 		return nil, err
 	}
 
+	var jobData []byte
+	if job.OPAData != nil {
+		jobData, err = json.Marshal(job.OPAData)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("jobs.UpdateJob", dialect.From("jobs").
@@ -310,6 +325,7 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 						"force_canceled":                job.ForceCanceled,
 						"outdated_job_protocol_version": job.OutdatedJobProtocolVersion,
 						"tags":                          tags,
+						"job_data":                      jobData,
 					},
 				).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).
 				Returning("*"),
@@ -350,6 +366,14 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 		return nil, err
 	}
 
+	var jobData []byte
+	if job.OPAData != nil {
+		jobData, err = json.Marshal(job.OPAData)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("jobs.CreateJob", dialect.From("jobs").
@@ -377,6 +401,7 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 					"outdated_job_protocol_version": job.OutdatedJobProtocolVersion,
 					"tags":                          tags,
 					"properties":                    properties,
+					"job_data":                      jobData,
 				}).Returning("*"),
 		).Select(j.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})))
@@ -477,6 +502,7 @@ func scanJob(row scanner) (*models.Job, error) {
 	var finishedAt sql.NullTime
 	var workspacePath string
 	var status models.JobStatus
+	var rawJobData []byte
 
 	job := &models.Job{}
 
@@ -501,6 +527,7 @@ func scanJob(row scanner) (*models.Job, error) {
 		&job.Tags,
 		&job.Properties,
 		&job.OutdatedJobProtocolVersion,
+		&rawJobData,
 		&workspacePath,
 	}
 
@@ -513,6 +540,16 @@ func scanJob(row scanner) (*models.Job, error) {
 	// Hydrate the status from the persisted value (allowed from the job's zero value).
 	if err := job.SetStatus(status); err != nil {
 		return nil, err
+	}
+
+	if rawJobData != nil {
+		switch job.Type {
+		case models.JobOPAType:
+			job.OPAData = &models.OPAJobData{}
+			if err := json.Unmarshal(rawJobData, job.OPAData); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if cancelRequestedAt.Valid {

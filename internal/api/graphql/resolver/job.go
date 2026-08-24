@@ -182,8 +182,8 @@ func (r *JobResolver) ID() graphql.ID {
 }
 
 // Status resolver
-func (r *JobResolver) Status() models.JobStatus {
-	return r.job.GetStatus()
+func (r *JobResolver) Status() string {
+	return string(r.job.GetStatus())
 }
 
 // Completed resolver

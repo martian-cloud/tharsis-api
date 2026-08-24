@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e0a8765434a8281af0f89490a3d8fdbb>>
+ * @generated SignedSource<<459a37e7e1e01dc12df2adf5b0ffa621>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,8 +11,8 @@
 import { ReaderFragment } from 'relay-runtime';
 export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
 export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "queuing" | "queuing_apply" | "%future added value";
+export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
+export type RunStatus = "applied" | "apply_queued" | "apply_queuing" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "plan_queuing" | "planned" | "planned_and_finished" | "planning" | "post_plan_awaiting_decision" | "post_plan_completed" | "post_plan_running" | "pre_apply_awaiting_decision" | "pre_apply_completed" | "pre_apply_queuing" | "pre_apply_running" | "pre_plan_awaiting_decision" | "pre_plan_completed" | "pre_plan_queuing" | "pre_plan_running" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunDetailsPlanStageFragment_plan$data = {
   readonly apply: {
@@ -39,6 +39,7 @@ export type RunDetailsPlanStageFragment_plan$data = {
     readonly diffSize: number;
     readonly errorMessage: string | null | undefined;
     readonly hasChanges: boolean;
+    readonly id: string;
     readonly jobs: {
       readonly totalCount: number;
     };
@@ -95,6 +96,7 @@ return {
       "name": "plan",
       "plural": false,
       "selections": [
+        (v0/*: any*/),
         {
           "alias": null,
           "args": null,
@@ -138,7 +140,7 @@ return {
         {
           "alias": null,
           "args": null,
-          "concreteType": "CheckResult",
+          "concreteType": "TerraformCheckResult",
           "kind": "LinkedField",
           "name": "checkResults",
           "plural": true,
@@ -280,6 +282,6 @@ return {
 };
 })();
 
-(node as any).hash = "537f97880c09d2fd640be6dabc75dcd0";
+(node as any).hash = "443894b6409bc45f8c5d69a9d0610a44";
 
 export default node;

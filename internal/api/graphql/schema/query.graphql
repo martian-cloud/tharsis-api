@@ -95,10 +95,29 @@ type Query {
     system: String!
     version: String
   ): TerraformModuleVersion
+  packages(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+    sort: PackageSort
+  ): PackageConnection!
   run(id: String!): Run
     @deprecated(
       reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
     )
+  """
+  runNode returns a single node of a run, addressed by the run-relative nodePath: "plan", "apply", a
+  task stage ("post_plan") or a policy check within one ("post_plan.opa"). Null when the run has no
+  node at that path. runId accepts a TRN or a global ID and gates the lookup on the workspace's view
+  permission, as the run query does.
+
+  Nodes are reachable through the run itself, but only through list fields; this addresses one node
+  directly, which is what a client paginating a node's jobs connection needs. It is the read
+  counterpart of the nodePath the retryRunNode mutation takes.
+  """
+  runNode(runId: String!, nodePath: String!): RunNode
   runs(
     after: String
     before: String
@@ -112,6 +131,18 @@ type Query {
     sort: RunSort
     workspaceAssessment: Boolean
   ): RunConnection!
+  """
+  runGatesAwaitingMyDecision returns the caller's approvals inbox: pending run gates the caller is
+  an eligible approver for and has not yet decided. Because one gate is created per policy check,
+  each qualifying run surfaces a single gate. Both user and service-account callers are supported.
+  """
+  runGatesAwaitingMyDecision(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: RunGateSort
+  ): RunGateConnection!
   namespaceVariableVersion(
     id: String!
     includeSensitiveValue: Boolean

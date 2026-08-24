@@ -118,7 +118,7 @@ func TestCreateRun_Execute(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cmd.Created)
 			assert.Same(t, input, gotInput, "the command passes its resolved input to createRun")
-			assert.Equal(t, models.RunQueuing, cmd.Created.Status)
+			assert.Equal(t, models.RunPlanQueuing, cmd.Created.Status)
 			got, gErr := runStore.GetRunByID(ctx, "run-new")
 			require.NoError(t, gErr)
 			assert.Equal(t, cmd.Created, got)

@@ -130,6 +130,8 @@ function ManagedIdentityList(props: Props) {
         }
     };
 
+    const edges = data?.managedIdentities?.edges ?? [];
+
     return (
         <Box>
             <NamespaceBreadcrumbs
@@ -138,7 +140,7 @@ function ManagedIdentityList(props: Props) {
                     { title: "managed identities", path: 'managed_identities' }
                 ]}
             />
-            {(search !== '' || data?.managedIdentities.edges?.length !== 0) && <Box>
+            {(search !== '' || edges.length !== 0) && <Box>
                 <Box>
                     <Box sx={{
                         display: 'flex',
@@ -171,11 +173,11 @@ function ManagedIdentityList(props: Props) {
                 <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
                     <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
                         <Typography variant="subtitle1">
-                            {data?.managedIdentities.edges?.length} managed identit{data?.managedIdentities.edges?.length === 1 ? 'y' : 'ies'}
+                            {edges.length} managed identit{edges.length === 1 ? 'y' : 'ies'}
                         </Typography>
                     </Box>
                 </Paper>
-                {(data?.managedIdentities.edges?.length === 0) && search !== '' && <Typography
+                {edges.length === 0 && search !== '' && <Typography
                     sx={{
                         padding: 4,
                         borderBottom: `1px solid ${theme.palette.divider}`,
@@ -190,13 +192,13 @@ function ManagedIdentityList(props: Props) {
                     No managed identities matching search <strong>{search}</strong>
                 </Typography>}
                 <InfiniteScroll
-                    dataLength={data?.managedIdentities.edges?.length ?? 0}
+                    dataLength={edges.length}
                     next={() => loadNext(20)}
                     hasMore={hasNext}
                     loader={<ListSkeleton rowCount={3} />}
                 >
                     <List sx={isRefreshing ? { opacity: 0.5 } : null} disablePadding>
-                        {data?.managedIdentities.edges?.map((edge: any) => <ManagedIdentityListItem
+                        {edges.map((edge: any) => <ManagedIdentityListItem
                             key={edge.node.id}
                             fragmentRef={edge.node}
                             inherited={edge.node.groupPath !== group.fullPath}
@@ -204,7 +206,7 @@ function ManagedIdentityList(props: Props) {
                     </List>
                 </InfiniteScroll>
             </Box>}
-            {search === '' && data?.managedIdentities.edges?.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+            {search === '' && edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
                 <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
                     <Typography variant="h6">Get started with managed identities</Typography>
                     <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>

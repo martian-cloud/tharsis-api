@@ -27,7 +27,7 @@ func TestFactory_NewSyncJobStatus(t *testing.T) {
 	f := newTestFactory()
 
 	persistJob := func(_ context.Context) error { return nil }
-	cmd := f.NewSyncJobStatus("run-1", models.JobApplyType, "job-1", models.JobFinished, persistJob)
+	cmd := f.NewSyncJobStatus("run-1", models.JobApplyType, "job-1", nil, models.JobFinished, persistJob)
 
 	require.NotNil(t, cmd)
 	assert.Equal(t, "run-1", cmd.RunID)

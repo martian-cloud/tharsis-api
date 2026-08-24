@@ -23,8 +23,8 @@ const (
 	reconcileMinInterval = 5 * time.Minute
 	reconcileMaxInterval = 10 * time.Minute
 
-	// reconcileStaleThreshold is the minimum age (since last update) a queuing run must
-	// reach before the reconciler re-drives it. The event-driven path advances queuing
+	// reconcileStaleThreshold is the minimum age (since last update) a run awaiting workspace
+	// admission must reach before the reconciler re-drives it. The event-driven path advances such
 	// runs within seconds (or one workItemEventTimeout on a missed event); the threshold
 	// keeps the reconciler from churning work items for runs that path is already
 	// handling. It is not a correctness guard — re-enqueueing is harmless at any age.
@@ -39,7 +39,7 @@ var (
 	runReconcilerWorkspacesEnqueued = metric.NewCounter("run_reconciler_workspaces_enqueued", "Number of workspaces re-enqueued by the run reconciler.")
 )
 
-// Reconciler is a safety net for runs stranded in queuing/queuing_apply. The event-driven
+// Reconciler is a safety net for runs stranded awaiting workspace admission. The event-driven
 // path (WorkspaceLockManager enqueues a QUEUE_PENDING_RUNS_FOR_WORKSPACE work item that the
 // WorkItemConsumer processes) normally advances these runs, but a run is stranded if that
 // work item is never enqueued (e.g. a crash between commit and enqueue) or never processed
@@ -81,7 +81,7 @@ func (r *Reconciler) Start(ctx context.Context) {
 	}()
 }
 
-// reconcile paginates every run in queuing/queuing_apply that has been stale for at least
+// reconcile paginates every run awaiting workspace admission that has been stale for at least
 // reconcileStaleThreshold and enqueues one QUEUE_PENDING_RUNS_FOR_WORKSPACE work item per
 // distinct workspace. The consumer's handler is idempotent and re-checks workspace
 // availability, so re-enqueueing is safe even for runs legitimately waiting on a busy
@@ -115,12 +115,12 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 				After: cursor,
 			},
 			Filter: &db.RunFilter{
-				Statuses:      []models.RunStatus{models.RunQueuing, models.RunQueuingApply},
+				Statuses:      models.QueuingRunStatuses,
 				UpdatedBefore: &cutoff,
 			},
 		})
 		if err != nil {
-			return errors.Wrap(err, "failed to query queuing runs in reconciler")
+			return errors.Wrap(err, "failed to query runs awaiting workspace admission in reconciler")
 		}
 
 		for _, run := range result.Runs {

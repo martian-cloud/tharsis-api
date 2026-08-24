@@ -113,7 +113,8 @@ function GroupList(props: Props) {
         }
     };
 
-    const edgeCount = (data.groups?.edges?.length ?? 0) - 1
+    const edges = data.groups?.edges ?? [];
+    const edgeCount = edges.length - 1
 
     return (
         <Box>
@@ -124,7 +125,7 @@ function GroupList(props: Props) {
                 onChange={onSearchChange}
                 onKeyPress={onKeyPress}
             />
-            {(data.groups?.edges?.length === 0) && search !== '' && <Typography
+            {(edges.length === 0) && search !== '' && <Typography
                 sx={{ p: 4 }}
                 align="center"
                 color="textSecondary"
@@ -132,13 +133,13 @@ function GroupList(props: Props) {
                 No subgroups matching search <strong>{search}</strong>
             </Typography>}
             <InfiniteScroll
-                dataLength={data.groups?.edges?.length ?? 0}
+                dataLength={edges.length}
                 next={() => loadNext(100)}
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
             >
                 <List sx={isRefreshing ? { opacity: 0.5 } : null} disablePadding>
-                    {data.groups?.edges?.map((edge: any, index: number) => <GroupListItem key={edge.node.id} groupKey={edge.node} last={index === edgeCount} />)}
+                    {edges.map((edge: any, index: number) => <GroupListItem key={edge.node.id} groupKey={edge.node} last={index === edgeCount} />)}
                 </List>
             </InfiniteScroll>
         </Box>

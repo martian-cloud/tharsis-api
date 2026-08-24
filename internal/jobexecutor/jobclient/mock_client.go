@@ -243,12 +243,60 @@ func (_m *MockClient) DownloadConfigurationVersion(ctx context.Context, configVe
 	return r0
 }
 
+// DownloadPackage provides a mock function with given fields: ctx, packageVersionID
+func (_m *MockClient) DownloadPackage(ctx context.Context, packageVersionID string) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, packageVersionID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DownloadPackage")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (io.ReadCloser, error)); ok {
+		return rf(ctx, packageVersionID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) io.ReadCloser); ok {
+		r0 = rf(ctx, packageVersionID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, packageVersionID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DownloadPlanCache provides a mock function with given fields: ctx, planID, writer
 func (_m *MockClient) DownloadPlanCache(ctx context.Context, planID string, writer io.Writer) error {
 	ret := _m.Called(ctx, planID, writer)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DownloadPlanCache")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Writer) error); ok {
+		r0 = rf(ctx, planID, writer)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DownloadPlanJSON provides a mock function with given fields: ctx, planID, writer
+func (_m *MockClient) DownloadPlanJSON(ctx context.Context, planID string, writer io.Writer) error {
+	ret := _m.Called(ctx, planID, writer)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DownloadPlanJSON")
 	}
 
 	var r0 error
@@ -399,6 +447,36 @@ func (_m *MockClient) GetJob(ctx context.Context, id string) (*gen.Job, error) {
 	return r0, r1
 }
 
+// GetPackageVersion provides a mock function with given fields: ctx, source, versionConstraint
+func (_m *MockClient) GetPackageVersion(ctx context.Context, source string, versionConstraint string) (*gen.PackageVersion, error) {
+	ret := _m.Called(ctx, source, versionConstraint)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPackageVersion")
+	}
+
+	var r0 *gen.PackageVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*gen.PackageVersion, error)); ok {
+		return rf(ctx, source, versionConstraint)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *gen.PackageVersion); ok {
+		r0 = rf(ctx, source, versionConstraint)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*gen.PackageVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, source, versionConstraint)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetProviderPlatformMirror provides a mock function with given fields: ctx, id
 func (_m *MockClient) GetProviderPlatformMirror(ctx context.Context, id string) (*gen.TerraformProviderPlatformMirror, error) {
 	ret := _m.Called(ctx, id)
@@ -489,9 +567,9 @@ func (_m *MockClient) GetRun(ctx context.Context, id string) (*gen.Run, error) {
 	return r0, r1
 }
 
-// GetRunVariables provides a mock function with given fields: ctx, runID
-func (_m *MockClient) GetRunVariables(ctx context.Context, runID string) ([]*gen.RunVariable, error) {
-	ret := _m.Called(ctx, runID)
+// GetRunVariables provides a mock function with given fields: ctx, runID, includeSensitiveValues
+func (_m *MockClient) GetRunVariables(ctx context.Context, runID string, includeSensitiveValues bool) ([]*gen.RunVariable, error) {
+	ret := _m.Called(ctx, runID, includeSensitiveValues)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRunVariables")
@@ -499,19 +577,19 @@ func (_m *MockClient) GetRunVariables(ctx context.Context, runID string) ([]*gen
 
 	var r0 []*gen.RunVariable
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]*gen.RunVariable, error)); ok {
-		return rf(ctx, runID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) ([]*gen.RunVariable, error)); ok {
+		return rf(ctx, runID, includeSensitiveValues)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []*gen.RunVariable); ok {
-		r0 = rf(ctx, runID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) []*gen.RunVariable); ok {
+		r0 = rf(ctx, runID, includeSensitiveValues)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*gen.RunVariable)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, runID)
+	if rf, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = rf(ctx, runID, includeSensitiveValues)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -547,6 +625,24 @@ func (_m *MockClient) GetWorkspace(ctx context.Context, id string) (*gen.Workspa
 	}
 
 	return r0, r1
+}
+
+// ReportRunPolicyOutcomes provides a mock function with given fields: ctx, policyCheckID, outcomes
+func (_m *MockClient) ReportRunPolicyOutcomes(ctx context.Context, policyCheckID string, outcomes []RunPolicyOutcomeInput) error {
+	ret := _m.Called(ctx, policyCheckID, outcomes)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReportRunPolicyOutcomes")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []RunPolicyOutcomeInput) error); ok {
+		r0 = rf(ctx, policyCheckID, outcomes)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // SaveJobLogs provides a mock function with given fields: ctx, jobID, startOffset, buffer

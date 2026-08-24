@@ -242,7 +242,7 @@ type CreateVCSProviderInput struct {
 	GroupID            *string
 	OAuthClientID      string
 	OAuthClientSecret  string
-	Type               models.VCSProviderType
+	Type               string
 	AutoCreateWebhooks bool
 }
 
@@ -326,7 +326,7 @@ func createVCSProviderMutation(ctx context.Context, input *CreateVCSProviderInpu
 		URL:                input.URL,
 		OAuthClientID:      input.OAuthClientID,
 		OAuthClientSecret:  input.OAuthClientSecret,
-		Type:               input.Type,
+		Type:               models.VCSProviderType(input.Type),
 		AutoCreateWebhooks: input.AutoCreateWebhooks,
 	}
 

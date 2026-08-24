@@ -19,6 +19,7 @@ import TerraformModuleSearchListItem from './TerraformModuleSearchListItem';
 import { TerraformModuleSearchFragment_modules$key } from './__generated__/TerraformModuleSearchFragment_modules.graphql';
 import { TerraformModuleSearchPaginationQuery } from './__generated__/TerraformModuleSearchPaginationQuery.graphql';
 import { TerraformModuleSearchQuery } from './__generated__/TerraformModuleSearchQuery.graphql';
+import { PageLayoutProvider } from '../layout/PageLayoutContext';
 
 export const INITIAL_ITEM_COUNT = 50;
 
@@ -154,10 +155,12 @@ function TerraformModuleSearch({ search = '', labelFilters = [], filterExpanded 
     setSearchParams(nextParams, { replace: true });
   };
 
-  return (
-    <Box maxWidth={1200} margin="auto" padding={2}>
+  const edges = data.terraformModules?.edges ?? [];
 
-      {(!!search || labelFilters.length > 0 || data.terraformModules?.edges?.length !== 0) && <React.Fragment>
+  return (
+    <PageLayoutProvider>
+
+      {(!!search || labelFilters.length > 0 || edges.length !== 0) && <React.Fragment>
         <Typography variant="h5" sx={{ marginBottom: 2 }}>Terraform Modules</Typography>
         <Box marginBottom={2} display="flex" gap={1} alignItems="flex-start">
           <Box flex={1}>
@@ -203,7 +206,7 @@ function TerraformModuleSearch({ search = '', labelFilters = [], filterExpanded 
             </Typography>
           </Box>
         </Paper>
-        {(!data.terraformModules.edges || data.terraformModules.edges?.length === 0) && (!!search || labelFilters.length > 0) && <Typography
+        {(edges.length === 0) && (!!search || labelFilters.length > 0) && <Typography
           sx={{
             padding: 4,
             borderBottom: `1px solid ${theme.palette.divider}`,
@@ -218,13 +221,13 @@ function TerraformModuleSearch({ search = '', labelFilters = [], filterExpanded 
           No modules matching {search && labelFilters.length > 0 ? 'search and filters' : search ? `search "${search}"` : 'filters'}
         </Typography>}
         <InfiniteScroll
-          dataLength={data.terraformModules.edges?.length ?? 0}
+          dataLength={edges.length}
           next={() => loadNext(INITIAL_ITEM_COUNT)}
           hasMore={hasNext}
           loader={<ListSkeleton rowCount={3} />}
         >
           <List disablePadding sx={{ opacity: isRefreshing ? 0.5 : 1, transition: 'opacity 0.3s ease-in-out' }}>
-            {data.terraformModules.edges?.map((edge) => edge?.node && <TerraformModuleSearchListItem
+            {edges.map((edge) => edge?.node && <TerraformModuleSearchListItem
               key={edge.node.id}
               fragmentRef={edge.node}
             />)}
@@ -232,12 +235,12 @@ function TerraformModuleSearch({ search = '', labelFilters = [], filterExpanded 
         </InfiniteScroll>
       </React.Fragment>}
 
-      {!search && labelFilters.length === 0 && data.terraformModules.edges?.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+      {!search && labelFilters.length === 0 && edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
         <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
           <Typography variant="h6">You don't have access to any Terraform Modules</Typography>
         </Box>
       </Box>}
-    </Box>
+    </PageLayoutProvider>
   );
 }
 

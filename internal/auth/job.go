@@ -296,10 +296,17 @@ func (j *JobCaller) requireRunAccess(ctx context.Context, _ *models.Permission, 
 	return j.requireAccessToWorkspacesInGroupHierarchy(ctx, nil, checks)
 }
 
-// requirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state
-func (j *JobCaller) requirePlanWriteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
-	if checks.planID == nil {
+// requireRunWriteAccess authorizes a run's job to update one of the run's nodes — its plan,
+// apply, or policy check — selected by which resource ID constraint is set. The caller's job must
+// belong to the run identified by the run ID constraint, the referenced resource must exist on
+// that run, and the run's latest job of the matching type must be this caller's job.
+func (j *JobCaller) requireRunWriteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
+	if checks.runID == nil {
 		return errMissingConstraints
+	}
+
+	if j.RunID != *checks.runID {
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	run, err := j.dbClient.Runs.GetRunByID(ctx, j.RunID)
@@ -311,51 +318,33 @@ func (j *JobCaller) requirePlanWriteAccess(ctx context.Context, _ *models.Permis
 		return j.UnauthorizedError(ctx, false)
 	}
 
-	// run.Plan is a value (always present); a mismatched ID fails closed.
-	if run.Plan.GetID() != *checks.planID {
-		return j.UnauthorizedError(ctx, false)
-	}
-
-	// Get latest job associated with plan
-	job, err := j.dbClient.Jobs.GetLatestJobByType(ctx, j.RunID, models.JobPlanType)
-	if err != nil {
-		return err
-	}
-
-	if job == nil || job.Metadata.ID != j.JobID {
-		return j.UnauthorizedError(ctx, false)
-	}
-
-	return nil
-}
-
-// requireApplyWriteAccess will return an error if the caller doesn't have permission to update apply state
-func (j *JobCaller) requireApplyWriteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
-	if checks.applyID == nil {
+	// Each updatable run node records the ID of the job currently driving it. The caller is
+	// authorized only if the referenced node exists on the run and the caller owns that node's
+	// latest job.
+	var latestJobID *string
+	switch {
+	case checks.planID != nil:
+		// run.Plan is a value (always present); a mismatched ID fails closed.
+		if run.Plan.GetID() != *checks.planID {
+			return j.UnauthorizedError(ctx, false)
+		}
+		latestJobID = run.Plan.LatestJobID
+	case checks.applyID != nil:
+		if run.Apply == nil || run.Apply.GetID() != *checks.applyID {
+			return j.UnauthorizedError(ctx, false)
+		}
+		latestJobID = run.Apply.LatestJobID
+	case checks.policyCheckID != nil:
+		check := run.PolicyCheckByID(*checks.policyCheckID)
+		if check == nil {
+			return j.UnauthorizedError(ctx, false)
+		}
+		latestJobID = check.LatestJobID
+	default:
 		return errMissingConstraints
 	}
 
-	run, err := j.dbClient.Runs.GetRunByID(ctx, j.RunID)
-	if err != nil {
-		return err
-	}
-
-	if run == nil {
-		return j.UnauthorizedError(ctx, false)
-	}
-
-	applyNode := run.Apply
-	if applyNode == nil || applyNode.GetID() != *checks.applyID {
-		return j.UnauthorizedError(ctx, false)
-	}
-
-	// Get latest job associated with plan
-	job, err := j.dbClient.Jobs.GetLatestJobByType(ctx, j.RunID, models.JobApplyType)
-	if err != nil {
-		return err
-	}
-
-	if job == nil || job.Metadata.ID != j.JobID {
+	if latestJobID == nil || *latestJobID != j.JobID {
 		return j.UnauthorizedError(ctx, false)
 	}
 
@@ -539,8 +528,7 @@ func (j *JobCaller) getPermissionHandler(perm models.Permission) (permissionType
 		models.ViewJobPermission:                       j.requireJobAccess, // View is automatically granted if action != View.
 		models.UpdateJobPermission:                     j.requireJobAccess,
 		models.IssueFederatedRegistryTokenPermission:   j.requireJobAccess,
-		models.UpdatePlanPermission:                    j.requirePlanWriteAccess,
-		models.UpdateApplyPermission:                   j.requireApplyWriteAccess,
+		models.UpdateRunPermission:                     j.requireRunWriteAccess,
 		models.CreateTerraformProviderMirrorPermission: j.requireProviderMirrorAccess,
 	}
 

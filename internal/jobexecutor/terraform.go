@@ -159,7 +159,7 @@ func (t *terraformWorkspace) close(ctx context.Context) error {
 // init prepares for and does "terraform init".
 func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error) {
 	// Get run variables
-	variables, err := t.client.GetRunVariables(ctx, t.run.Metadata.Id)
+	variables, err := t.client.GetRunVariables(ctx, t.run.Metadata.Id, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get run variables %v", err)
 	}

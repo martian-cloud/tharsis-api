@@ -25,6 +25,7 @@ import TerraformModuleVersionList from './TerraformModuleVersionList';
 import { TerraformModuleVersionDetailsIndexFragment_details$key } from './__generated__/TerraformModuleVersionDetailsIndexFragment_details.graphql';
 import { TerraformModuleVersionDetailsQuery } from './__generated__/TerraformModuleVersionDetailsQuery.graphql';
 import TerraformModuleVersionDocs from './docs/TerraformModuleVersionDocs';
+import { PageLayoutProvider, usePageLayout } from '@/layout/PageLayoutContext';
 
 const query = graphql`
     query TerraformModuleVersionDetailsQuery($registryNamespace: String!, $moduleName: String!, $system: String!, $version: String, $first: Int, $after: String) {
@@ -65,14 +66,14 @@ function TerraformModuleVersionDetails(props: Props) {
                 >
                     <CircularProgress />
                 </Box>}>
-                    <Box maxWidth={1400} margin="auto" padding={2}>
+                    <PageLayoutProvider size="wide">
                         {queryData.terraformModuleVersion && <TerraformModuleVersionDetailsIndex fragmentRef={queryData.terraformModuleVersion} />}
                         {!queryData.terraformModuleVersion && <Box display="flex" justifyContent="center" marginTop={4}>
                             <Typography variant="h6" color="textSecondary">
                                 version <strong>{version || 'latest'}</strong> not found for module <strong>{registryNamespace}/{moduleName}/{system}</strong>
                             </Typography>
                         </Box>}
-                    </Box>
+                    </PageLayoutProvider>
                 </Suspense>
             </Box>
         </Box>
@@ -84,6 +85,7 @@ interface IndexProps {
 }
 
 function TerraformModuleVersionDetailsIndex(props: IndexProps) {
+    usePageLayout('fullscreen');
     const [searchParams, setSearchParams] = useSearchParams();
 
     const theme = useTheme();

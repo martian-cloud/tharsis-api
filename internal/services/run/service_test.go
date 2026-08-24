@@ -561,6 +561,190 @@ func TestGetStateVersionsByRunIDs(t *testing.T) {
 	}
 }
 
+func TestGetRunGatesByIDs(t *testing.T) {
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+		runGateIDs      []string
+		gates           []models.RunGate
+		// expectPermissionChecks is the number of RequirePermission calls expected: one per distinct
+		// run across the returned gates, not one per gate.
+		expectPermissionChecks int
+	}
+
+	testCases := []testCase{
+		{
+			name:       "gates on the same run are authorized once",
+			runGateIDs: []string{"gate1", "gate2"},
+			gates: []models.RunGate{
+				{Metadata: models.ResourceMetadata{ID: "gate1"}, RunID: "run1", WorkspaceID: "ws1"},
+				{Metadata: models.ResourceMetadata{ID: "gate2"}, RunID: "run1", WorkspaceID: "ws1"},
+			},
+			expectPermissionChecks: 1,
+		},
+		{
+			name:       "gates spanning two runs are authorized per run",
+			runGateIDs: []string{"gate1", "gate2"},
+			gates: []models.RunGate{
+				{Metadata: models.ResourceMetadata{ID: "gate1"}, RunID: "run1", WorkspaceID: "ws1"},
+				{Metadata: models.ResourceMetadata{ID: "gate2"}, RunID: "run2", WorkspaceID: "ws2"},
+			},
+			expectPermissionChecks: 2,
+		},
+		{
+			name:       "no matching gates authorizes nothing",
+			runGateIDs: []string{"gate1"},
+		},
+		{
+			name:       "subject does not have permission to view run",
+			runGateIDs: []string{"gate1"},
+			gates: []models.RunGate{
+				{Metadata: models.ResourceMetadata{ID: "gate1"}, RunID: "run1", WorkspaceID: "ws1"},
+			},
+			expectPermissionChecks: 1,
+			authError:              errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode:        errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRunGates := db.NewMockRunGates(t)
+
+			mockRunGates.On("GetRunGates", mock.Anything, &db.GetRunGatesInput{
+				Filter: &db.RunGateFilter{
+					RunGateIDs: test.runGateIDs,
+				},
+			}).Return(&db.RunGatesResult{
+				RunGates: test.gates,
+				PageInfo: &pagination.PageInfo{
+					TotalCount: pagination.StaticCount(int32(len(test.gates))),
+					HasResults: len(test.gates) > 0,
+				},
+			}, nil)
+
+			if test.expectPermissionChecks > 0 {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).
+					Return(test.authError).Times(test.expectPermissionChecks)
+			}
+
+			service := &service{
+				dbClient: &db.Client{RunGates: mockRunGates},
+			}
+
+			result, err := service.GetRunGatesByIDs(auth.WithCaller(ctx, mockCaller), test.runGateIDs)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Len(t, result, len(test.gates))
+			for i := range result {
+				assert.Equal(t, test.gates[i].Metadata.ID, result[i].Metadata.ID)
+			}
+		})
+	}
+}
+
+func TestGetRunGatesByPolicyCheckIDs(t *testing.T) {
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+		policyCheckIDs  []string
+		gates           []models.RunGate
+		// expectPermissionChecks is the number of RequirePermission calls expected: one per distinct
+		// run across the returned gates, not one per gate.
+		expectPermissionChecks int
+	}
+
+	testCases := []testCase{
+		{
+			name:           "gates for checks on the same run are authorized once",
+			policyCheckIDs: []string{"check1", "check2"},
+			gates: []models.RunGate{
+				{Metadata: models.ResourceMetadata{ID: "gate1"}, RunID: "run1", WorkspaceID: "ws1", PolicyCheckID: "check1"},
+				{Metadata: models.ResourceMetadata{ID: "gate2"}, RunID: "run1", WorkspaceID: "ws1", PolicyCheckID: "check2"},
+			},
+			expectPermissionChecks: 1,
+		},
+		{
+			name:           "gates spanning two runs are authorized per run",
+			policyCheckIDs: []string{"check1", "check2"},
+			gates: []models.RunGate{
+				{Metadata: models.ResourceMetadata{ID: "gate1"}, RunID: "run1", WorkspaceID: "ws1", PolicyCheckID: "check1"},
+				{Metadata: models.ResourceMetadata{ID: "gate2"}, RunID: "run2", WorkspaceID: "ws2", PolicyCheckID: "check2"},
+			},
+			expectPermissionChecks: 2,
+		},
+		{
+			name:           "checks with no gates authorize nothing",
+			policyCheckIDs: []string{"check1"},
+		},
+		{
+			name:           "subject does not have permission to view run",
+			policyCheckIDs: []string{"check1"},
+			gates: []models.RunGate{
+				{Metadata: models.ResourceMetadata{ID: "gate1"}, RunID: "run1", WorkspaceID: "ws1", PolicyCheckID: "check1"},
+			},
+			expectPermissionChecks: 1,
+			authError:              errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode:        errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRunGates := db.NewMockRunGates(t)
+
+			mockRunGates.On("GetRunGates", mock.Anything, &db.GetRunGatesInput{
+				Filter: &db.RunGateFilter{
+					PolicyCheckIDs: test.policyCheckIDs,
+				},
+			}).Return(&db.RunGatesResult{
+				RunGates: test.gates,
+				PageInfo: &pagination.PageInfo{
+					TotalCount: pagination.StaticCount(int32(len(test.gates))),
+					HasResults: len(test.gates) > 0,
+				},
+			}, nil)
+
+			if test.expectPermissionChecks > 0 {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).
+					Return(test.authError).Times(test.expectPermissionChecks)
+			}
+
+			service := &service{
+				dbClient: &db.Client{RunGates: mockRunGates},
+			}
+
+			result, err := service.GetRunGatesByPolicyCheckIDs(auth.WithCaller(ctx, mockCaller), test.policyCheckIDs)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Len(t, result, len(test.gates))
+			for i := range result {
+				assert.Equal(t, test.gates[i].Metadata.ID, result[i].Metadata.ID)
+			}
+		})
+	}
+}
+
 func TestGetRuns(t *testing.T) {
 	workspace := &models.Workspace{
 		Metadata: models.ResourceMetadata{
@@ -1017,6 +1201,158 @@ func TestGetPlanCheckResults(t *testing.T) {
 	}
 }
 
+func TestGetPolicyCheckPolicyMessages(t *testing.T) {
+	workspaceID := "ws1"
+	runID := "run1"
+	checkID := "check-1"
+
+	// runWith builds a run whose post-plan check pins one policy, with the given messages key on it.
+	runWith := func(key *string) *models.Run {
+		return &models.Run{
+			Metadata:    models.ResourceMetadata{ID: runID},
+			WorkspaceID: workspaceID,
+			TaskStages: []*models.RunTaskStage{{
+				ID:        "stage-1",
+				StageName: models.RunTaskStageNamePostPlan,
+				PolicyChecks: []*models.PolicyCheck{{
+					ID:        checkID,
+					StageName: models.RunTaskStageNamePostPlan,
+					CheckType: models.PolicyKindOPA,
+					Policies: []*models.PolicyCheckPolicy{
+						{ID: "pol-1", MessagesObjectStoreKey: key},
+					},
+				}},
+			}},
+		}
+	}
+
+	messagesKey := ptr.String("workspaces/ws1/runs/run1/policy_messages/obj-1.json")
+
+	type testCase struct {
+		name            string
+		authError       error
+		runError        error
+		run             *models.Run
+		policyID        string
+		artifactError   error
+		object          string
+		skipCaller      bool
+		expectResult    []string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "auth failure",
+			skipCaller:      true,
+			policyID:        "pol-1",
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			name:            "permission denied",
+			run:             runWith(messagesKey),
+			policyID:        "pol-1",
+			authError:       errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "run not found",
+			run:             nil,
+			policyID:        "pol-1",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "failed to get run by policy check ID",
+			runError:        errors.New("db error", errors.WithErrorCode(errors.EInternal)),
+			policyID:        "pol-1",
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:            "policy not pinned by the check",
+			run:             runWith(messagesKey),
+			policyID:        "pol-missing",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			// A policy that reported nothing has no key, which is an empty list and no object read —
+			// the mock would fail the test if one were attempted.
+			name:         "no messages reported",
+			run:          runWith(nil),
+			policyID:     "pol-1",
+			expectResult: []string{},
+		},
+		{
+			name:            "artifact store error",
+			run:             runWith(messagesKey),
+			policyID:        "pol-1",
+			artifactError:   errors.New("store error", errors.WithErrorCode(errors.EInternal)),
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:            "invalid stored JSON",
+			run:             runWith(messagesKey),
+			policyID:        "pol-1",
+			object:          "not-json",
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:         "messages are returned in stored order",
+			run:          runWith(messagesKey),
+			policyID:     "pol-1",
+			object:       `["denied by rule X","denied by rule Y"]`,
+			expectResult: []string{"denied by rule X", "denied by rule Y"},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+
+			if !test.skipCaller {
+				mockRuns.On("GetRunByNodeID", mock.Anything, checkID).Return(test.run, test.runError)
+
+				if test.run != nil && test.runError == nil {
+					mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+				}
+
+				if test.authError == nil && test.run != nil && test.runError == nil {
+					var reader io.ReadCloser
+					if test.object != "" {
+						reader = io.NopCloser(strings.NewReader(test.object))
+					}
+					mockArtifactStore.On("GetPolicyCheckPolicyMessages", mock.Anything, mock.Anything).
+						Return(reader, test.artifactError).Maybe()
+				}
+			}
+
+			service := &service{
+				dbClient:      &db.Client{Runs: mockRuns},
+				artifactStore: mockArtifactStore,
+			}
+
+			callCtx := ctx
+			if !test.skipCaller {
+				callCtx = auth.WithCaller(ctx, mockCaller)
+			}
+
+			result, err := service.GetPolicyCheckPolicyMessages(callCtx, checkID, test.policyID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectResult, result)
+		})
+	}
+}
+
 func TestUploadPlanBinary(t *testing.T) {
 	workspaceID := "ws1"
 	runID := "run1"
@@ -1059,7 +1395,7 @@ func TestUploadPlanBinary(t *testing.T) {
 			defer cancel()
 
 			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunPermission, mock.Anything, mock.Anything).Return(test.authError)
 
 			mockRuns := db.NewMockRuns(t)
 			mockRuns.On("GetRunByNodeID", mock.Anything, planID).Return(run, nil).Maybe()
@@ -1155,7 +1491,9 @@ func TestProcessPlanData(t *testing.T) {
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
 
-			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(test.authError)
+			mockRuns.On("GetRunByNodeID", mock.Anything, planID).Return(run, nil)
+
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunPermission, mock.Anything, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				Runs: mockRuns,
@@ -1679,7 +2017,7 @@ func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 			mockRuns.On("GetRunByID", mock.Anything, runID).Return(tc.run, nil)
 
 			if tc.run != nil {
-				mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(tc.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunPermission, mock.Anything, mock.Anything).Return(tc.authError)
 
 				if tc.authError == nil {
 					data, err := json.Marshal(sampleVariables)
@@ -1771,7 +2109,9 @@ func TestUpdateApply(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockRuns := db.NewMockRuns(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, models.UpdateApplyPermission, mock.Anything).Return(test.authError)
+			mockRuns.On("GetRunByNodeID", mock.Anything, applyID).Return(&models.Run{Metadata: models.ResourceMetadata{ID: "run-1"}, Apply: &models.Apply{ID: applyID}}, nil)
+
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunPermission, mock.Anything, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				Runs: mockRuns,
@@ -1860,7 +2200,9 @@ func TestUpdatePlan(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockRuns := db.NewMockRuns(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(test.authError)
+			mockRuns.On("GetRunByNodeID", mock.Anything, planID).Return(&models.Run{Metadata: models.ResourceMetadata{ID: "run-1"}}, nil)
+
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunPermission, mock.Anything, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				Runs: mockRuns,
@@ -2292,6 +2634,282 @@ func TestRunMutationAuthorization(t *testing.T) {
 	}
 }
 
+func TestApproveRunGateAuthorization(t *testing.T) {
+	// Approver eligibility is decided inside the command, against the gate's snapshotted allowed
+	// subjects. The service's job is the check that eligibility cannot substitute for: that the
+	// caller can see the run at all. A denied caller must short-circuit before the command is
+	// processed, so no approval row is ever written for a gate they could not have fetched.
+	sampleGate := &models.RunGate{
+		Metadata:    models.ResourceMetadata{ID: "gate-1", TRN: "trn:run_gate:acme/ws/gate-1"},
+		RunID:       "run-1",
+		WorkspaceID: "workspace-1",
+		Status:      models.RunGatePending,
+	}
+
+	type testCase struct {
+		gate            *models.RunGate
+		authError       error
+		name            string
+		decision        models.RunGateDecision
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:     "subject is authorized",
+			gate:     sampleGate,
+			decision: models.RunGateDecisionApprove,
+		},
+		{
+			name:            "subject cannot view the run",
+			gate:            sampleGate,
+			decision:        models.RunGateDecisionApprove,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "a reject is authorized the same way as an approve",
+			gate:            sampleGate,
+			decision:        models.RunGateDecisionReject,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			// Resolved before the permission check, so a missing gate cannot be told apart from
+			// one the caller may not see — but it also must not reach the command.
+			name:            "gate does not exist",
+			decision:        models.RunGateDecisionApprove,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "unsupported decision is rejected before the gate is fetched",
+			decision:        models.RunGateDecision("bogus"),
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockRunGates := db.NewMockRunGates(t)
+			mockRuns := db.NewMockRuns(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockCaller := auth.NewMockCaller(t)
+
+			if test.expectErrorCode != errors.EInvalid {
+				mockRunGates.On("GetRunGateByID", mock.Anything, "gate-1").Return(test.gate, nil)
+			}
+
+			if test.gate != nil {
+				// requireRunViewAccess resolves the run's workspace before checking the permission.
+				mockRuns.On("GetWorkspaceIDForRun", mock.Anything, "run-1").Return("workspace-1", nil)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).
+					Return(test.authError)
+			}
+
+			testLogger, _ := logger.NewForTest()
+			mockProcessor := engine.NewMockCmdProcessor(t)
+			if test.gate != nil && test.authError == nil {
+				mockCaller.On("GetSubject").Return("user@example.com").Maybe()
+				mockProcessor.On("ProcessCommand", mock.Anything, mock.Anything).
+					Run(func(args mock.Arguments) {
+						if c, ok := args.Get(1).(*commands.SetRunGateDecision); ok {
+							c.UpdatedGate = test.gate
+						}
+					}).Return(nil)
+				// A nil workspace skips the activity event, which is not what this test covers.
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "workspace-1").Return(nil, nil)
+			}
+
+			service := &service{
+				logger: testLogger,
+				dbClient: &db.Client{
+					RunGates:   mockRunGates,
+					Runs:       mockRuns,
+					Workspaces: mockWorkspaces,
+				},
+				cmdProcessor: mockProcessor,
+				cmdFactory:   commands.NewFactory(testLogger, &db.Client{}, nil, nil, nil, "", nil, nil),
+			}
+
+			gate, err := service.ApproveRunGate(auth.WithCaller(context.Background(), mockCaller), &ApproveRunGateInput{
+				GateID:   "gate-1",
+				Decision: test.decision,
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, "gate-1", gate.Metadata.ID)
+		})
+	}
+}
+
+func TestOverrideRunGateAuthorization(t *testing.T) {
+	// An override needs two separate rights: seeing the run, and UpdatePolicyPermission in the group
+	// defining each soft-mandatory policy that failed on the gate's check. The view check comes first
+	// and short-circuits before the gate's state is resolved, so a caller who cannot see the run cannot
+	// learn the gate's status or whether its check is awaiting an override.
+	gateWithRules := &models.RunGate{
+		Metadata:      models.ResourceMetadata{ID: "gate-1", TRN: "trn:run_gate:acme/ws/gate-1"},
+		RunID:         "run-1",
+		WorkspaceID:   "workspace-1",
+		PolicyCheckID: "check-1",
+		Status:        models.RunGatePending,
+		ApprovalRules: []*models.RunGateApprovalRule{
+			{Name: "policy-1", RequiredApprovals: 1},
+		},
+	}
+
+	// The gate a soft failure with no approvers produces. It carries no rules, so nobody can approve
+	// it — but the policy permission is still required, because the override lifts the same policy's
+	// requirement either way.
+	gateWithoutRules := &models.RunGate{
+		Metadata:      models.ResourceMetadata{ID: "gate-1", TRN: "trn:run_gate:acme/ws/gate-1"},
+		RunID:         "run-1",
+		WorkspaceID:   "workspace-1",
+		PolicyCheckID: "check-1",
+		Status:        models.RunGatePending,
+		ApprovalRules: []*models.RunGateApprovalRule{},
+	}
+
+	sampleRun := &models.Run{
+		Metadata:    models.ResourceMetadata{ID: "run-1"},
+		WorkspaceID: "workspace-1",
+		TaskStages: []*models.RunTaskStage{
+			{
+				ID:        "stage-1",
+				StageName: models.RunTaskStageNamePostPlan,
+				PolicyChecks: []*models.PolicyCheck{
+					{
+						ID:        "check-1",
+						StageName: models.RunTaskStageNamePostPlan,
+						CheckType: models.PolicyKindOPA,
+						Status:    models.PolicyCheckSoftFailed,
+						Policies: []*models.PolicyCheckPolicy{
+							{
+								ID:               "policy-1",
+								Status:           models.PolicyCheckPolicyFailed,
+								EnforcementLevel: models.PolicyEnforcementSoftMandatory,
+								Provenance:       models.PolicyCheckPolicyProvenance{GroupID: "group-1"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	type testCase struct {
+		gate            *models.RunGate
+		viewError       error
+		overrideError   error
+		name            string
+		expectErrorCode errors.CodeType
+		isAdmin         bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "subject holds both rights",
+			gate: gateWithRules,
+		},
+		{
+			// Admin mode skips the override permission, but the view check still runs — it is
+			// satisfied by RequirePermission's own admin-mode short-circuit, not by skipping it.
+			name:    "admin mode",
+			gate:    gateWithRules,
+			isAdmin: true,
+		},
+		{
+			name:            "subject cannot view the run",
+			gate:            gateWithRules,
+			viewError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "subject can view the run but cannot update the policy",
+			gate:            gateWithRules,
+			overrideError:   errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "rule-less gate is overridable with the policy permission",
+			gate: gateWithoutRules,
+		},
+		{
+			// The check keys on the check's failed policies, not the gate's rules, so a gate with no
+			// rules is not a free pass.
+			name:            "rule-less gate still requires the policy permission",
+			gate:            gateWithoutRules,
+			overrideError:   errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockRunGates := db.NewMockRunGates(t)
+			mockRuns := db.NewMockRuns(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockCaller := auth.NewMockCaller(t)
+
+			mockRunGates.On("GetRunGateByID", mock.Anything, "gate-1").Return(test.gate, nil)
+
+			// requireRunViewAccess resolves the run's workspace before checking the permission.
+			mockRuns.On("GetWorkspaceIDForRun", mock.Anything, "run-1").Return("workspace-1", nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).
+				Return(test.viewError)
+
+			if test.viewError == nil {
+				mockRuns.On("GetRunByID", mock.Anything, "run-1").Return(sampleRun, nil)
+				mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin)
+				if !test.isAdmin {
+					mockCaller.On("RequirePermission", mock.Anything, models.UpdatePolicyPermission, mock.Anything).
+						Return(test.overrideError)
+				}
+			}
+
+			testLogger, _ := logger.NewForTest()
+			mockProcessor := engine.NewMockCmdProcessor(t)
+			if test.expectErrorCode == "" {
+				mockCaller.On("GetSubject").Return("user@example.com").Maybe()
+				mockProcessor.On("ProcessCommand", mock.Anything, mock.Anything).
+					Run(func(args mock.Arguments) {
+						if c, ok := args.Get(1).(*commands.SetRunGateDecision); ok {
+							c.UpdatedGate = test.gate
+						}
+					}).Return(nil)
+				// A nil workspace skips the activity event, which is not what this test covers.
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "workspace-1").Return(nil, nil)
+			}
+
+			service := &service{
+				logger: testLogger,
+				dbClient: &db.Client{
+					RunGates:   mockRunGates,
+					Runs:       mockRuns,
+					Workspaces: mockWorkspaces,
+				},
+				cmdProcessor: mockProcessor,
+				cmdFactory:   commands.NewFactory(testLogger, &db.Client{}, nil, nil, nil, "", nil, nil),
+			}
+
+			gate, err := service.OverrideRunGate(auth.WithCaller(context.Background(), mockCaller), "gate-1", nil)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, "gate-1", gate.Metadata.ID)
+		})
+	}
+}
+
 func TestGetRunByNodeID(t *testing.T) {
 	sampleRun := &models.Run{
 		Metadata:    models.ResourceMetadata{ID: "run-id-1"},
@@ -2436,6 +3054,546 @@ func TestDownloadPlan(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestService_DownloadPlanJSON(t *testing.T) {
+	sampleRun := &models.Run{
+		Metadata:    models.ResourceMetadata{ID: "run-id-1"},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject is not authorized",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "subject is authorized",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+
+			mockRuns.On("GetRunByNodeID", mock.Anything, "plan-1").Return(sampleRun, nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			if test.expectErrorCode == "" {
+				// On the authorized path the plan JSON is streamed from the artifact store.
+				mockArtifactStore.On("GetPlanJSON", mock.Anything, sampleRun).
+					Return(io.NopCloser(strings.NewReader("plan-json-data")), nil)
+			}
+
+			service := &service{
+				dbClient:      &db.Client{Runs: mockRuns},
+				artifactStore: mockArtifactStore,
+			}
+
+			result, err := service.DownloadPlanJSON(auth.WithCaller(context.Background(), mockCaller), "plan-1")
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			data, rErr := io.ReadAll(result)
+			require.NoError(t, rErr)
+			assert.Equal(t, "plan-json-data", string(data))
+		})
+	}
+}
+
+func TestService_ReportRunPolicyOutcomes(t *testing.T) {
+	sampleRun := &models.Run{
+		Metadata:    models.ResourceMetadata{ID: "run-1"},
+		WorkspaceID: "workspace-1",
+		TaskStages: []*models.RunTaskStage{
+			{
+				StageName: models.RunTaskStageNamePostPlan,
+				PolicyChecks: []*models.PolicyCheck{
+					{ID: "check-1", StageName: models.RunTaskStageNamePostPlan, CheckType: models.PolicyKindOPA},
+				},
+			},
+		},
+	}
+
+	type testCase struct {
+		run                 *models.Run
+		authError           error
+		name                string
+		expectErrorCode     errors.CodeType
+		expectPermissionSet bool
+	}
+
+	testCases := []testCase{
+		{
+			name:                "subject is authorized and the policy check exists",
+			run:                 sampleRun,
+			expectPermissionSet: true,
+		},
+		{
+			name:            "run for the policy check node ID does not exist",
+			run:             nil,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "run exists but has no policy check with that ID",
+			run: &models.Run{
+				Metadata:    models.ResourceMetadata{ID: "run-1"},
+				WorkspaceID: "workspace-1",
+			},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:                "subject is not authorized",
+			run:                 sampleRun,
+			authError:           errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode:     errors.EForbidden,
+			expectPermissionSet: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockRuns.On("GetRunByNodeID", mock.Anything, "check-1").Return(test.run, nil)
+
+			testLogger, _ := logger.NewForTest()
+			mockProcessor := engine.NewMockCmdProcessor(t)
+			if test.expectPermissionSet {
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			}
+			if test.expectErrorCode == "" {
+				mockProcessor.On("ProcessCommand", mock.Anything, mock.Anything).Return(nil)
+			}
+
+			service := &service{
+				logger:       testLogger,
+				dbClient:     &db.Client{Runs: mockRuns},
+				cmdProcessor: mockProcessor,
+				cmdFactory:   commands.NewFactory(testLogger, &db.Client{}, nil, nil, nil, "", nil, nil),
+			}
+
+			err := service.ReportRunPolicyOutcomes(auth.WithCaller(context.Background(), mockCaller), &ReportRunPolicyOutcomesInput{
+				PolicyCheckID: "check-1",
+				Outcomes: []*PolicyOutcome{
+					{PolicyID: "policy-1", Messages: []string{"ok"}, Passed: true},
+				},
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestService_GetRunGateByTRN(t *testing.T) {
+	sampleGate := &models.RunGate{
+		Metadata: models.ResourceMetadata{ID: "gate-1", TRN: "trn:run_gate:acme/ws/gate-1"},
+		RunID:    "run-1",
+	}
+
+	type testCase struct {
+		gate            *models.RunGate
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "subject is authorized",
+			gate: sampleGate,
+		},
+		{
+			name:            "gate does not exist",
+			gate:            nil,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject cannot view the run",
+			gate:            sampleGate,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockRunGates := db.NewMockRunGates(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockRunGates.On("GetRunGateByTRN", mock.Anything, "trn:run_gate:acme/ws/gate-1").Return(test.gate, nil)
+			if test.gate != nil {
+				// requireRunViewAccess resolves the run's workspace before checking the permission.
+				mockRuns.On("GetWorkspaceIDForRun", mock.Anything, "run-1").Return("workspace-1", nil)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).
+					Return(test.authError)
+			}
+
+			service := &service{
+				dbClient: &db.Client{
+					RunGates: mockRunGates,
+					Runs:     mockRuns,
+				},
+			}
+
+			result, err := service.GetRunGateByTRN(auth.WithCaller(context.Background(), mockCaller), "trn:run_gate:acme/ws/gate-1")
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, "gate-1", result.Metadata.ID)
+		})
+	}
+}
+
+func TestService_GetRunGateApprovalByID(t *testing.T) {
+	sampleApproval := &models.RunGateApproval{
+		Metadata:  models.ResourceMetadata{ID: "approval-1"},
+		RunGateID: "gate-1",
+	}
+	sampleGate := &models.RunGate{
+		Metadata: models.ResourceMetadata{ID: "gate-1"},
+		RunID:    "run-1",
+	}
+
+	type testCase struct {
+		approval        *models.RunGateApproval
+		gate            *models.RunGate
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:     "subject is authorized",
+			approval: sampleApproval,
+			gate:     sampleGate,
+		},
+		{
+			name:            "approval does not exist",
+			approval:        nil,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "the approval's gate does not exist",
+			approval:        sampleApproval,
+			gate:            nil,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject cannot view the run",
+			approval:        sampleApproval,
+			gate:            sampleGate,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockRunGates := db.NewMockRunGates(t)
+			mockRunGateApprovals := db.NewMockRunGateApprovals(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockRunGateApprovals.On("GetRunGateApprovalByID", mock.Anything, "approval-1").Return(test.approval, nil)
+			if test.approval != nil {
+				mockRunGates.On("GetRunGateByID", mock.Anything, "gate-1").Return(test.gate, nil)
+			}
+			if test.gate != nil {
+				mockRuns.On("GetWorkspaceIDForRun", mock.Anything, "run-1").Return("workspace-1", nil)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).
+					Return(test.authError)
+			}
+
+			service := &service{
+				dbClient: &db.Client{
+					RunGates:         mockRunGates,
+					RunGateApprovals: mockRunGateApprovals,
+					Runs:             mockRuns,
+				},
+			}
+
+			result, err := service.GetRunGateApprovalByID(auth.WithCaller(context.Background(), mockCaller), "approval-1")
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, "approval-1", result.Metadata.ID)
+		})
+	}
+}
+
+func TestService_GetRunGateApprovalByTRN(t *testing.T) {
+	sampleApproval := &models.RunGateApproval{
+		Metadata:  models.ResourceMetadata{ID: "approval-1", TRN: "trn:run_gate_approval:acme/ws/gate-1/approval-1"},
+		RunGateID: "gate-1",
+	}
+	sampleGate := &models.RunGate{
+		Metadata: models.ResourceMetadata{ID: "gate-1"},
+		RunID:    "run-1",
+	}
+
+	type testCase struct {
+		approval        *models.RunGateApproval
+		gate            *models.RunGate
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:     "subject is authorized",
+			approval: sampleApproval,
+			gate:     sampleGate,
+		},
+		{
+			name:            "approval does not exist",
+			approval:        nil,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "the approval's gate does not exist",
+			approval:        sampleApproval,
+			gate:            nil,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject cannot view the run",
+			approval:        sampleApproval,
+			gate:            sampleGate,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockRunGates := db.NewMockRunGates(t)
+			mockRunGateApprovals := db.NewMockRunGateApprovals(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockRunGateApprovals.On("GetRunGateApprovalByTRN", mock.Anything, "trn:run_gate_approval:acme/ws/gate-1/approval-1").Return(test.approval, nil)
+			if test.approval != nil {
+				mockRunGates.On("GetRunGateByID", mock.Anything, "gate-1").Return(test.gate, nil)
+			}
+			if test.gate != nil {
+				mockRuns.On("GetWorkspaceIDForRun", mock.Anything, "run-1").Return("workspace-1", nil)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).
+					Return(test.authError)
+			}
+
+			service := &service{
+				dbClient: &db.Client{
+					RunGates:         mockRunGates,
+					RunGateApprovals: mockRunGateApprovals,
+					Runs:             mockRuns,
+				},
+			}
+
+			result, err := service.GetRunGateApprovalByTRN(auth.WithCaller(context.Background(), mockCaller), "trn:run_gate_approval:acme/ws/gate-1/approval-1")
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, "approval-1", result.Metadata.ID)
+		})
+	}
+}
+
+func TestService_GetRunGateApprovalsByGateID(t *testing.T) {
+	sampleGate := &models.RunGate{
+		Metadata: models.ResourceMetadata{ID: "gate-1"},
+		RunID:    "run-1",
+	}
+	sampleApprovals := []models.RunGateApproval{
+		{Metadata: models.ResourceMetadata{ID: "approval-1"}, RunGateID: "gate-1"},
+		{Metadata: models.ResourceMetadata{ID: "approval-2"}, RunGateID: "gate-1"},
+	}
+
+	type testCase struct {
+		gate            *models.RunGate
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "subject is authorized",
+			gate: sampleGate,
+		},
+		{
+			name:            "gate does not exist",
+			gate:            nil,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject cannot view the run",
+			gate:            sampleGate,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			mockRunGates := db.NewMockRunGates(t)
+			mockRunGateApprovals := db.NewMockRunGateApprovals(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockRunGates.On("GetRunGateByID", mock.Anything, "gate-1").Return(test.gate, nil)
+			if test.gate != nil {
+				mockRuns.On("GetWorkspaceIDForRun", mock.Anything, "run-1").Return("workspace-1", nil)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).
+					Return(test.authError)
+			}
+			if test.expectErrorCode == "" {
+				mockRunGateApprovals.On("GetRunGateApprovalsByGateID", mock.Anything, "gate-1").Return(sampleApprovals, nil)
+			}
+
+			service := &service{
+				dbClient: &db.Client{
+					RunGates:         mockRunGates,
+					RunGateApprovals: mockRunGateApprovals,
+					Runs:             mockRuns,
+				},
+			}
+
+			result, err := service.GetRunGateApprovalsByGateID(auth.WithCaller(context.Background(), mockCaller), "gate-1")
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Len(t, result, len(sampleApprovals))
+		})
+	}
+}
+
+func TestService_GetRunGatesAwaitingDecision(t *testing.T) {
+	rootNamespacePath := "root-namespace-path"
+
+	type testCase struct {
+		isAdmin           bool
+		useServiceAccount bool
+		name              string
+	}
+
+	testCases := []testCase{
+		{
+			name: "a non-admin user is scoped to their root namespace memberships",
+		},
+		{
+			name:    "an admin user is not scoped to root namespace memberships",
+			isAdmin: true,
+		},
+		{
+			name:              "a service account caller is supported",
+			useServiceAccount: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockRunGates := db.NewMockRunGates(t)
+			mockAuthorizer := auth.NewMockAuthorizer(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+			mockUsers := db.NewMockUsers(t)
+
+			dbClient := &db.Client{
+				RunGates: mockRunGates,
+				Users:    mockUsers,
+			}
+
+			var rootNamespaceMemberships []models.MembershipNamespace
+			if !test.isAdmin {
+				rootNamespaceMemberships = []models.MembershipNamespace{
+					{ID: "root-namespace-1", Path: rootNamespacePath},
+				}
+				mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return(rootNamespaceMemberships, nil).Maybe()
+			}
+
+			eligibility := &db.RunGateEligibilityFilter{}
+			var testCaller auth.Caller
+			if test.useServiceAccount {
+				saID := "service-account-1"
+				eligibility.ServiceAccountID = &saID
+				testCaller = auth.NewServiceAccountCaller(saID, "sa/service-account-1", mockAuthorizer, dbClient, mockMaintenanceMonitor)
+			} else {
+				userID := "user-1"
+				eligibility.UserID = &userID
+				callerUser := &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    test.isAdmin,
+					AdminModeExpiration: func() *time.Time {
+						if test.isAdmin {
+							t := time.Now().Add(time.Hour)
+							return &t
+						}
+						return nil
+					}(),
+				}
+				mockUsers.On("GetUserByID", mock.Anything, userID).Return(callerUser, nil).Maybe()
+				testCaller = auth.NewUserCaller(callerUser, mockAuthorizer, dbClient, mockMaintenanceMonitor, nil)
+			}
+
+			expectedSort := db.RunGateSortableFieldCreatedAtDesc
+			mockRunGates.On("GetRunGates", mock.Anything, &db.GetRunGatesInput{
+				Sort: &expectedSort,
+				Filter: &db.RunGateFilter{
+					Statuses:                 []models.RunGateStatus{models.RunGatePending},
+					Eligibility:              eligibility,
+					RootNamespaceMemberships: rootNamespaceMemberships,
+				},
+			}).Return(&db.RunGatesResult{
+				PageInfo: &pagination.PageInfo{},
+			}, nil)
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			result, err := service.GetRunGatesAwaitingDecision(auth.WithCaller(context.Background(), testCaller), &GetRunGatesAwaitingDecisionInput{})
+
+			require.NoError(t, err)
+			assert.NotNil(t, result)
 		})
 	}
 }

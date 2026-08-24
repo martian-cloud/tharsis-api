@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
@@ -81,4 +82,14 @@ func toModelID(ctx context.Context, path *string, globalID *string, modelType ty
 	}
 
 	return getServiceCatalog(ctx).FetchModelID(ctx, valueToResolve)
+}
+
+// toGraphqlEnum converts a model enum string constant to its GraphQL wire format (UPPER_SNAKE_CASE).
+func toGraphqlEnum(s string) string {
+	return strings.ToUpper(s)
+}
+
+// fromGraphqlEnum converts a GraphQL enum value (UPPER_SNAKE_CASE) back to its model constant form (lower_snake_case).
+func fromGraphqlEnum(s string) string {
+	return strings.ToLower(s)
 }

@@ -17,6 +17,7 @@ import TRNButton from '../../common/TRNButton';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import { ConfigurationVersionDetailsFragment_workspace$key } from './__generated__/ConfigurationVersionDetailsFragment_workspace.graphql';
 import { ConfigurationVersionDetailsQuery } from './__generated__/ConfigurationVersionDetailsQuery.graphql';
+import { usePageLayout } from '@/layout/PageLayoutContext';
 
 // fetchConfigurationVersionPackage downloads the configuration version tarball as an ArrayBuffer.
 async function fetchConfigurationVersionPackage(authService: AuthenticationService, id: string): Promise<ArrayBuffer> {
@@ -48,6 +49,7 @@ function ConfigurationVersionDetails({ fragmentRef }: Props) {
     const { id } = useParams();
     const configurationVersionId = id as string;
 
+    usePageLayout('fullscreen');
     const authService = useContext<AuthenticationService>(AuthServiceContext);
     const { enqueueSnackbar } = useSnackbar();
 

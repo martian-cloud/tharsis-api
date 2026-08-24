@@ -1,5 +1,5 @@
+import NoResults from '@/common/NoResults';
 import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import React, { useMemo, useState } from 'react';
@@ -58,13 +58,9 @@ function StateVersionCheckResults(props: Props) {
             {(filteredChecks.length === 0 && search !== '') && <Typography sx={{ padding: 2, marginTop: 4 }} align="center" color="textSecondary">
                 No checks matching search <strong>{search}</strong>
             </Typography>}
-            {(filteredChecks.length === 0 && search === '') && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                    <Typography color="textSecondary" align="center">
-                        This workspace does not have any check results
-                    </Typography>
-                </Box>
-            </Paper>}
+            {(filteredChecks.length === 0 && search === '') && <NoResults sx={{ mt: 4 }}>
+                This workspace does not have any check results
+            </NoResults>}
             {filteredChecks.length > 0 && <ResponsiveTable columns={columns} ariaLabel="check results">
                 {filteredChecks.map((check) => <StateVersionCheckResultRow
                     key={check.name}

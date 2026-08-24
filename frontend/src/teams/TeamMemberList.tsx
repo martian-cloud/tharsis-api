@@ -1,4 +1,5 @@
-import { Box, Paper, Table, TableBody, TableContainer, TableCell, TableHead, TableRow, Typography, useTheme } from "@mui/material";
+import NoResults from '@/common/NoResults';
+import { Table, TableBody, TableContainer, TableCell, TableHead, TableRow, useTheme } from "@mui/material";
 import graphql from 'babel-plugin-relay/macro';
 import TeamMemberListItem from './TeamMemberListItem';
 import InfiniteScroll from 'react-infinite-scroll-component';
@@ -32,10 +33,12 @@ function TeamMemberList({ fragmentRef }: Props) {
         }
     `, fragmentRef);
 
-    if (data.members?.edges && data.members?.edges.length > 0) {
+    const edges = data?.members?.edges ?? [];
+
+    if (edges.length > 0) {
         return (
             <InfiniteScroll
-                dataLength={data.members?.edges.length}
+                dataLength={edges.length}
                 next={() => loadNext(20)}
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
@@ -80,7 +83,7 @@ function TeamMemberList({ fragmentRef }: Props) {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {data.members?.edges?.map((edge: any) => <TeamMemberListItem
+                            {edges.map((edge: any) => <TeamMemberListItem
                                 key={edge.node.id}
                                 fragmentRef={edge.node}
                             />)}
@@ -90,11 +93,7 @@ function TeamMemberList({ fragmentRef }: Props) {
             </InfiniteScroll>
         );
     } else {
-        return <Paper variant="outlined" sx={{ display: "flex", justifyContent: "center" }}>
-            <Box sx={{ p: 4 }}>
-                <Typography variant="h6" color="textSecondary" align="center">There are no members on this team.</Typography>
-            </Box>
-        </Paper>;
+        return <NoResults>There are no members on this team.</NoResults>;
     }
 }
 

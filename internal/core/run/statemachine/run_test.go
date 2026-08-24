@@ -18,25 +18,25 @@ func TestRunNode_PlanPendingMovesRunToQueuing(t *testing.T) {
 	New(run)
 
 	require.NoError(t, run.Plan().SetStatus(models.PlanPending))
-	assert.Equal(t, models.RunQueuing, run.Status())
+	assert.Equal(t, models.RunPlanQueuing, run.Status())
 	assert.Equal(t, models.PlanPending, run.Plan().Status())
 
 	require.NoError(t, run.Plan().SetStatus(models.PlanQueued))
 	assert.Equal(t, models.RunPlanQueued, run.Status())
 }
 
-// TestRunNode_QueuingReadiesPlan verifies the run-driven queue path used at run
-// creation: transitioning the run itself to queuing drives the still-created plan to
-// pending (recorded for persistence, without re-projecting onto the run).
-func TestRunNode_QueuingReadiesPlan(t *testing.T) {
+// TestRunNode_StartReadiesPlan verifies the run-start path used at run creation for a run with no
+// pre-plan stage: advancing the fresh run readies the still-created plan to pending, which projects the run
+// onto queuing.
+func TestRunNode_StartReadiesPlan(t *testing.T) {
 	run := NewRunNode(models.RunPending)
 	run.SetPlanNode(NewPlanNode("plan", models.PlanCreated, true))
 	run.SetApplyNode(NewApplyNode("apply", models.ApplyCreated, false))
 	New(run)
 
-	require.NoError(t, run.SetStatus(models.RunQueuing))
+	require.NoError(t, run.advance())
 
-	assert.Equal(t, models.RunQueuing, run.Status())
+	assert.Equal(t, models.RunPlanQueuing, run.Status())
 	assert.Equal(t, models.PlanPending, run.Plan().Status())
 
 	// The plan change is recorded for persistence.
@@ -44,11 +44,11 @@ func TestRunNode_QueuingReadiesPlan(t *testing.T) {
 	require.Len(t, planChanges, 1)
 	assert.Equal(t, models.PlanPending, planChanges[0].(PlanStatusChange).NewStatus)
 
-	// The run recorded exactly one transition (pending -> queuing): the silent
-	// plan set must not have re-projected onto the run.
+	// The run recorded exactly one transition (pending -> queuing): readying the plan projects onto
+	// the run once, through the plan-pending listener.
 	runChanges := run.GetStatusChanges()
 	require.Len(t, runChanges, 1)
-	assert.Equal(t, models.RunQueuing, runChanges[0].(RunStatusChange).NewStatus)
+	assert.Equal(t, models.RunPlanQueuing, runChanges[0].(RunStatusChange).NewStatus)
 }
 
 // TestRunNode_PlanTransitions verifies how the run reacts as the plan advances
@@ -61,7 +61,7 @@ func TestRunNode_PlanTransitions(t *testing.T) {
 		wantRun   models.RunStatus
 		wantApply models.ApplyStatus
 	}{
-		{"plan pending moves run to queuing", []models.PlanStatus{models.PlanPending}, models.RunQueuing, models.ApplyCreated},
+		{"plan pending moves run to plan_queuing", []models.PlanStatus{models.PlanPending}, models.RunPlanQueuing, models.ApplyCreated},
 		{"plan queued moves run to plan_queued", []models.PlanStatus{models.PlanPending, models.PlanQueued}, models.RunPlanQueued, models.ApplyCreated},
 		{"plan running moves run to planning", []models.PlanStatus{models.PlanPending, models.PlanQueued, models.PlanRunning}, models.RunPlanning, models.ApplyCreated},
 		{"plan finished plans run and leaves apply created", []models.PlanStatus{models.PlanPending, models.PlanQueued, models.PlanRunning, models.PlanFinished}, models.RunPlanned, models.ApplyCreated},
@@ -95,7 +95,7 @@ func TestRunNode_ApplyTransitions(t *testing.T) {
 		applySeq []models.ApplyStatus
 		wantRun  models.RunStatus
 	}{
-		{"apply pending moves run to queuing_apply", []models.ApplyStatus{models.ApplyPending}, models.RunQueuingApply},
+		{"apply pending moves run to apply_queuing", []models.ApplyStatus{models.ApplyPending}, models.RunApplyQueuing},
 		{"apply queued moves run to apply_queued", []models.ApplyStatus{models.ApplyPending, models.ApplyQueued}, models.RunApplyQueued},
 		{"apply running moves run to applying", []models.ApplyStatus{models.ApplyPending, models.ApplyQueued, models.ApplyRunning}, models.RunApplying},
 		{"apply finished applies run", []models.ApplyStatus{models.ApplyPending, models.ApplyQueued, models.ApplyRunning, models.ApplyFinished}, models.RunApplied},
@@ -223,9 +223,9 @@ func TestRunNode_PlanFinishLeavesApplyCreated(t *testing.T) {
 	assert.Equal(t, 1, plannedCount)
 }
 
-// TestRunNode_AutoApplyPlanFinishPendsApply verifies that when an auto-apply
-// run's plan finishes with changes, the apply is moved to pending (ready to be
-// queued) and the run passes through planned into queuing_apply.
+// TestRunNode_AutoApplyPlanFinishPendsApply verifies that when an auto-apply run's plan finishes with
+// changes, the apply is moved to pending (ready to be queued) and the run goes straight to
+// apply_queuing without entering planned — the run is pre-approved, so it never waits on a human.
 func TestRunNode_AutoApplyPlanFinishPendsApply(t *testing.T) {
 	run := NewRunNode(models.RunPending)
 	run.SetPlanNode(NewPlanNode("plan", models.PlanCreated, true))
@@ -237,17 +237,18 @@ func TestRunNode_AutoApplyPlanFinishPendsApply(t *testing.T) {
 
 	require.NoError(t, run.Plan().SetStatus(models.PlanFinished))
 
-	assert.Equal(t, models.RunQueuingApply, run.Status())
+	assert.Equal(t, models.RunApplyQueuing, run.Status())
 	assert.Equal(t, models.ApplyPending, run.Apply().Status())
 
-	// The run recorded its passage through planned on the way to queuing_apply.
+	// planned means "waiting on a human to approve the apply", which an auto-apply run never does, so
+	// it must not appear anywhere in the run's history.
 	var sawPlanned bool
 	for _, c := range run.GetStatusChanges() {
 		if rc, ok := c.(RunStatusChange); ok && rc.NewStatus == models.RunPlanned {
 			sawPlanned = true
 		}
 	}
-	assert.True(t, sawPlanned, "run should record the planned transition before queuing_apply")
+	assert.False(t, sawPlanned, "an auto-apply run should never enter planned")
 }
 
 // TestRunNode_SameStatusIsNoOp verifies that setting the run to the status it already
@@ -273,7 +274,7 @@ func TestRunNode_StandardHappyPath(t *testing.T) {
 	apply := run.Apply()
 
 	require.NoError(t, plan.SetStatus(models.PlanPending))
-	assert.Equal(t, models.RunQueuing, run.Status()) // plan waiting to be queued
+	assert.Equal(t, models.RunPlanQueuing, run.Status()) // plan waiting to be queued
 
 	require.NoError(t, plan.SetStatus(models.PlanQueued))
 	assert.Equal(t, models.RunPlanQueued, run.Status())
@@ -286,7 +287,7 @@ func TestRunNode_StandardHappyPath(t *testing.T) {
 	assert.Equal(t, models.ApplyCreated, apply.Status())
 
 	require.NoError(t, apply.SetStatus(models.ApplyPending))
-	assert.Equal(t, models.RunQueuingApply, run.Status()) // apply waiting to be queued
+	assert.Equal(t, models.RunApplyQueuing, run.Status()) // apply waiting to be queued
 
 	require.NoError(t, apply.SetStatus(models.ApplyQueued))
 	assert.Equal(t, models.RunApplyQueued, run.Status())
@@ -393,7 +394,7 @@ func TestRunNode_PlanRetryUnskipsApply(t *testing.T) {
 
 	// Retry the plan: errored -> pending resets the run to queuing and un-skips the apply.
 	require.NoError(t, run.Plan().SetStatus(models.PlanPending))
-	assert.Equal(t, models.RunQueuing, run.Status())
+	assert.Equal(t, models.RunPlanQueuing, run.Status())
 	assert.Equal(t, models.ApplyCreated, run.Apply().Status())
 
 	// The retried run proceeds normally: the plan finishing with changes lands the run
@@ -443,7 +444,7 @@ func TestRunNode_RetryPlan(t *testing.T) {
 			// again waiting to be queued).
 			require.NoError(t, plan.SetStatus(models.PlanPending))
 			assert.Equal(t, models.PlanPending, plan.Status())
-			assert.Equal(t, models.RunQueuing, run.Status())
+			assert.Equal(t, models.RunPlanQueuing, run.Status())
 		})
 	}
 }
@@ -477,7 +478,7 @@ func TestRunNode_RetryApply(t *testing.T) {
 			// apply is again waiting to be queued).
 			require.NoError(t, apply.SetStatus(models.ApplyPending))
 			assert.Equal(t, models.ApplyPending, apply.Status())
-			assert.Equal(t, models.RunQueuingApply, run.Status())
+			assert.Equal(t, models.RunApplyQueuing, run.Status())
 		})
 	}
 }
@@ -492,7 +493,7 @@ func TestRunNode_PendingProjection(t *testing.T) {
 	run.SetApplyNode(NewApplyNode("apply", models.ApplyCreated, false))
 	New(run)
 	require.NoError(t, run.Plan().SetStatus(models.PlanPending))
-	assert.Equal(t, models.RunQueuing, run.Status())
+	assert.Equal(t, models.RunPlanQueuing, run.Status())
 
 	// Apply created -> pending at start-apply moves the run to queuing_apply.
 	run = NewRunNode(models.RunPending)
@@ -504,5 +505,5 @@ func TestRunNode_PendingProjection(t *testing.T) {
 	require.NoError(t, run.Plan().SetStatus(models.PlanRunning))
 	require.NoError(t, run.Plan().SetStatus(models.PlanFinished))
 	require.NoError(t, run.Apply().SetStatus(models.ApplyPending))
-	assert.Equal(t, models.RunQueuingApply, run.Status())
+	assert.Equal(t, models.RunApplyQueuing, run.Status())
 }

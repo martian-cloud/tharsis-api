@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8b69a867463a80396641a1c2a99563ab>>
+ * @generated SignedSource<<a657819a1da50ee10739b325d9d2f64a>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,8 +10,7 @@
 
 import { ReaderFragment } from 'relay-runtime';
 export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
-export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type RunStatus = "applied" | "apply_queued" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "planned" | "planned_and_finished" | "planning" | "queuing" | "queuing_apply" | "%future added value";
+export type RunStatus = "applied" | "apply_queued" | "apply_queuing" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "plan_queuing" | "planned" | "planned_and_finished" | "planning" | "post_plan_awaiting_decision" | "post_plan_completed" | "post_plan_running" | "pre_apply_awaiting_decision" | "pre_apply_completed" | "pre_apply_queuing" | "pre_apply_running" | "pre_plan_awaiting_decision" | "pre_plan_completed" | "pre_plan_queuing" | "pre_plan_running" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunListItemFragment_run$data = {
   readonly apply: {
@@ -19,19 +18,18 @@ export type RunListItemFragment_run$data = {
   } | null | undefined;
   readonly assessment: boolean;
   readonly createdBy: string;
+  readonly hasAdvisoryFailures: boolean;
   readonly id: string;
   readonly isDestroy: boolean;
   readonly metadata: {
     readonly createdAt: any;
     readonly trn: string;
   };
-  readonly plan: {
-    readonly status: PlanStatus;
-  };
   readonly status: RunStatus;
   readonly workspace: {
     readonly fullPath: string;
   };
+  readonly " $fragmentSpreads": FragmentRefs<"RunStageIconsFragment_run">;
   readonly " $fragmentType": "RunListItemFragment_run";
 };
 export type RunListItemFragment_run$key = {
@@ -46,10 +44,7 @@ var v0 = {
   "kind": "ScalarField",
   "name": "status",
   "storageKey": null
-},
-v1 = [
-  (v0/*: any*/)
-];
+};
 return {
   "argumentDefinitions": [],
   "kind": "Fragment",
@@ -113,6 +108,13 @@ return {
     {
       "alias": null,
       "args": null,
+      "kind": "ScalarField",
+      "name": "hasAdvisoryFailures",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
       "concreteType": "Workspace",
       "kind": "LinkedField",
       "name": "workspace",
@@ -131,22 +133,19 @@ return {
     {
       "alias": null,
       "args": null,
-      "concreteType": "Plan",
-      "kind": "LinkedField",
-      "name": "plan",
-      "plural": false,
-      "selections": (v1/*: any*/),
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
       "concreteType": "Apply",
       "kind": "LinkedField",
       "name": "apply",
       "plural": false,
-      "selections": (v1/*: any*/),
+      "selections": [
+        (v0/*: any*/)
+      ],
       "storageKey": null
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "RunStageIconsFragment_run"
     }
   ],
   "type": "Run",
@@ -154,6 +153,6 @@ return {
 };
 })();
 
-(node as any).hash = "e1612b9fbac3dc1149945bd711fe3306";
+(node as any).hash = "db65a6eb2a49fa6d719baead76dd155a";
 
 export default node;

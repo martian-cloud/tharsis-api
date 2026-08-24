@@ -28,6 +28,7 @@ type JobType int32
 const (
 	JobType_plan  JobType = 0
 	JobType_apply JobType = 1
+	JobType_opa   JobType = 2
 )
 
 // Enum value maps for JobType.
@@ -35,10 +36,12 @@ var (
 	JobType_name = map[int32]string{
 		0: "plan",
 		1: "apply",
+		2: "opa",
 	}
 	JobType_value = map[string]int32{
 		"plan":  0,
 		"apply": 1,
+		"opa":   2,
 	}
 )
 
@@ -645,6 +648,51 @@ func (x *SaveJobLogsRequest) GetLogs() string {
 	return ""
 }
 
+// OPAJobData contains OPA-specific data associated with an OPA policy evaluation job.
+type OPAJobData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PolicyCheckId string                 `protobuf:"bytes,1,opt,name=policy_check_id,json=policyCheckId,proto3" json:"policy_check_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OPAJobData) Reset() {
+	*x = OPAJobData{}
+	mi := &file_job_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OPAJobData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OPAJobData) ProtoMessage() {}
+
+func (x *OPAJobData) ProtoReflect() protoreflect.Message {
+	mi := &file_job_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OPAJobData.ProtoReflect.Descriptor instead.
+func (*OPAJobData) Descriptor() ([]byte, []int) {
+	return file_job_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *OPAJobData) GetPolicyCheckId() string {
+	if x != nil {
+		return x.PolicyCheckId
+	}
+	return ""
+}
+
 // Job represents a Terraform job.
 type Job struct {
 	state                      protoimpl.MessageState `protogen:"open.v1"`
@@ -658,13 +706,17 @@ type Job struct {
 	CancelRequested            bool                   `protobuf:"varint,8,opt,name=cancel_requested,json=cancelRequested,proto3" json:"cancel_requested,omitempty"`
 	ForceCanceled              bool                   `protobuf:"varint,9,opt,name=force_canceled,json=forceCanceled,proto3" json:"force_canceled,omitempty"`
 	OutdatedJobProtocolVersion bool                   `protobuf:"varint,10,opt,name=outdated_job_protocol_version,json=outdatedJobProtocolVersion,proto3" json:"outdated_job_protocol_version,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	// Types that are valid to be assigned to JobData:
+	//
+	//	*Job_OpaData
+	JobData       isJob_JobData `protobuf_oneof:"job_data"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Job) Reset() {
 	*x = Job{}
-	mi := &file_job_proto_msgTypes[10]
+	mi := &file_job_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -676,7 +728,7 @@ func (x *Job) String() string {
 func (*Job) ProtoMessage() {}
 
 func (x *Job) ProtoReflect() protoreflect.Message {
-	mi := &file_job_proto_msgTypes[10]
+	mi := &file_job_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -689,7 +741,7 @@ func (x *Job) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Job.ProtoReflect.Descriptor instead.
 func (*Job) Descriptor() ([]byte, []int) {
-	return file_job_proto_rawDescGZIP(), []int{10}
+	return file_job_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Job) GetMetadata() *ResourceMetadata {
@@ -762,6 +814,32 @@ func (x *Job) GetOutdatedJobProtocolVersion() bool {
 	return false
 }
 
+func (x *Job) GetJobData() isJob_JobData {
+	if x != nil {
+		return x.JobData
+	}
+	return nil
+}
+
+func (x *Job) GetOpaData() *OPAJobData {
+	if x != nil {
+		if x, ok := x.JobData.(*Job_OpaData); ok {
+			return x.OpaData
+		}
+	}
+	return nil
+}
+
+type isJob_JobData interface {
+	isJob_JobData()
+}
+
+type Job_OpaData struct {
+	OpaData *OPAJobData `protobuf:"bytes,11,opt,name=opa_data,json=opaData,proto3,oneof"`
+}
+
+func (*Job_OpaData) isJob_JobData() {}
+
 // JobLogStreamEventData contains the log data.
 type JobLogStreamEventData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -773,7 +851,7 @@ type JobLogStreamEventData struct {
 
 func (x *JobLogStreamEventData) Reset() {
 	*x = JobLogStreamEventData{}
-	mi := &file_job_proto_msgTypes[11]
+	mi := &file_job_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -785,7 +863,7 @@ func (x *JobLogStreamEventData) String() string {
 func (*JobLogStreamEventData) ProtoMessage() {}
 
 func (x *JobLogStreamEventData) ProtoReflect() protoreflect.Message {
-	mi := &file_job_proto_msgTypes[11]
+	mi := &file_job_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -798,7 +876,7 @@ func (x *JobLogStreamEventData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobLogStreamEventData.ProtoReflect.Descriptor instead.
 func (*JobLogStreamEventData) Descriptor() ([]byte, []int) {
-	return file_job_proto_rawDescGZIP(), []int{11}
+	return file_job_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *JobLogStreamEventData) GetOffset() int32 {
@@ -827,7 +905,7 @@ type JobLogStreamEvent struct {
 
 func (x *JobLogStreamEvent) Reset() {
 	*x = JobLogStreamEvent{}
-	mi := &file_job_proto_msgTypes[12]
+	mi := &file_job_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -839,7 +917,7 @@ func (x *JobLogStreamEvent) String() string {
 func (*JobLogStreamEvent) ProtoMessage() {}
 
 func (x *JobLogStreamEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_job_proto_msgTypes[12]
+	mi := &file_job_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -852,7 +930,7 @@ func (x *JobLogStreamEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobLogStreamEvent.ProtoReflect.Descriptor instead.
 func (*JobLogStreamEvent) Descriptor() ([]byte, []int) {
-	return file_job_proto_rawDescGZIP(), []int{12}
+	return file_job_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *JobLogStreamEvent) GetCompleted() bool {
@@ -887,7 +965,7 @@ type JobEvent struct {
 
 func (x *JobEvent) Reset() {
 	*x = JobEvent{}
-	mi := &file_job_proto_msgTypes[13]
+	mi := &file_job_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -899,7 +977,7 @@ func (x *JobEvent) String() string {
 func (*JobEvent) ProtoMessage() {}
 
 func (x *JobEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_job_proto_msgTypes[13]
+	mi := &file_job_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -912,7 +990,7 @@ func (x *JobEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobEvent.ProtoReflect.Descriptor instead.
 func (*JobEvent) Descriptor() ([]byte, []int) {
-	return file_job_proto_rawDescGZIP(), []int{13}
+	return file_job_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *JobEvent) GetAction() string {
@@ -939,7 +1017,7 @@ type JobCancellationEvent struct {
 
 func (x *JobCancellationEvent) Reset() {
 	*x = JobCancellationEvent{}
-	mi := &file_job_proto_msgTypes[14]
+	mi := &file_job_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -951,7 +1029,7 @@ func (x *JobCancellationEvent) String() string {
 func (*JobCancellationEvent) ProtoMessage() {}
 
 func (x *JobCancellationEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_job_proto_msgTypes[14]
+	mi := &file_job_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -964,7 +1042,7 @@ func (x *JobCancellationEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobCancellationEvent.ProtoReflect.Descriptor instead.
 func (*JobCancellationEvent) Descriptor() ([]byte, []int) {
-	return file_job_proto_rawDescGZIP(), []int{14}
+	return file_job_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *JobCancellationEvent) GetJob() *Job {
@@ -984,7 +1062,7 @@ type GetJobLogsResponse struct {
 
 func (x *GetJobLogsResponse) Reset() {
 	*x = GetJobLogsResponse{}
-	mi := &file_job_proto_msgTypes[15]
+	mi := &file_job_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -996,7 +1074,7 @@ func (x *GetJobLogsResponse) String() string {
 func (*GetJobLogsResponse) ProtoMessage() {}
 
 func (x *GetJobLogsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_job_proto_msgTypes[15]
+	mi := &file_job_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1009,7 +1087,7 @@ func (x *GetJobLogsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobLogsResponse.ProtoReflect.Descriptor instead.
 func (*GetJobLogsResponse) Descriptor() ([]byte, []int) {
-	return file_job_proto_rawDescGZIP(), []int{15}
+	return file_job_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetJobLogsResponse) GetLogs() string {
@@ -1030,7 +1108,7 @@ type ClaimJobResponse struct {
 
 func (x *ClaimJobResponse) Reset() {
 	*x = ClaimJobResponse{}
-	mi := &file_job_proto_msgTypes[16]
+	mi := &file_job_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1042,7 +1120,7 @@ func (x *ClaimJobResponse) String() string {
 func (*ClaimJobResponse) ProtoMessage() {}
 
 func (x *ClaimJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_job_proto_msgTypes[16]
+	mi := &file_job_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1055,7 +1133,7 @@ func (x *ClaimJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimJobResponse.ProtoReflect.Descriptor instead.
 func (*ClaimJobResponse) Descriptor() ([]byte, []int) {
-	return file_job_proto_rawDescGZIP(), []int{16}
+	return file_job_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ClaimJobResponse) GetJob() *Job {
@@ -1108,7 +1186,10 @@ const file_job_proto_rawDesc = "" +
 	"\x12SaveJobLogsRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12!\n" +
 	"\fstart_offset\x18\x02 \x01(\x05R\vstartOffset\x12\x12\n" +
-	"\x04logs\x18\x03 \x01(\tR\x04logs\"\xb6\x04\n" +
+	"\x04logs\x18\x03 \x01(\tR\x04logs\"4\n" +
+	"\n" +
+	"OPAJobData\x12&\n" +
+	"\x0fpolicy_check_id\x18\x01 \x01(\tR\rpolicyCheckId\"\x89\x05\n" +
 	"\x03Job\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x15\n" +
@@ -1122,10 +1203,13 @@ const file_job_proto_rawDesc = "" +
 	"\x10cancel_requested\x18\b \x01(\bR\x0fcancelRequested\x12%\n" +
 	"\x0eforce_canceled\x18\t \x01(\bR\rforceCanceled\x12A\n" +
 	"\x1doutdated_job_protocol_version\x18\n" +
-	" \x01(\bR\x1aoutdatedJobProtocolVersion\x1a=\n" +
+	" \x01(\bR\x1aoutdatedJobProtocolVersion\x12E\n" +
+	"\bopa_data\x18\v \x01(\v2(.martiancloud.tharsis.api.job.OPAJobDataH\x00R\aopaData\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"C\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\n" +
+	"\n" +
+	"\bjob_data\"C\n" +
 	"\x15JobLogStreamEventData\x12\x16\n" +
 	"\x06offset\x18\x01 \x01(\x05R\x06offset\x12\x12\n" +
 	"\x04logs\x18\x02 \x01(\tR\x04logs\"\x9c\x01\n" +
@@ -1143,10 +1227,11 @@ const file_job_proto_rawDesc = "" +
 	"\x04logs\x18\x01 \x01(\tR\x04logs\"]\n" +
 	"\x10ClaimJobResponse\x123\n" +
 	"\x03job\x18\x01 \x01(\v2!.martiancloud.tharsis.api.job.JobR\x03job\x12\x14\n" +
-	"\x05token\x18\x02 \x01(\tR\x05token*\x1e\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token*'\n" +
 	"\aJobType\x12\b\n" +
 	"\x04plan\x10\x00\x12\t\n" +
-	"\x05apply\x10\x01*h\n" +
+	"\x05apply\x10\x01\x12\a\n" +
+	"\x03opa\x10\x02*h\n" +
 	"\tJobStatus\x12\n" +
 	"\n" +
 	"\x06queued\x10\x00\x12\v\n" +
@@ -1184,7 +1269,7 @@ func file_job_proto_rawDescGZIP() []byte {
 }
 
 var file_job_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_job_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_job_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_job_proto_goTypes = []any{
 	(JobType)(0),                                   // 0: martiancloud.tharsis.api.job.JobType
 	(JobStatus)(0),                                 // 1: martiancloud.tharsis.api.job.JobStatus
@@ -1198,51 +1283,53 @@ var file_job_proto_goTypes = []any{
 	(*SubscribeToJobCancellationEventRequest)(nil), // 9: martiancloud.tharsis.api.job.SubscribeToJobCancellationEventRequest
 	(*ClaimJobRequest)(nil),                        // 10: martiancloud.tharsis.api.job.ClaimJobRequest
 	(*SaveJobLogsRequest)(nil),                     // 11: martiancloud.tharsis.api.job.SaveJobLogsRequest
-	(*Job)(nil),                                    // 12: martiancloud.tharsis.api.job.Job
-	(*JobLogStreamEventData)(nil),                  // 13: martiancloud.tharsis.api.job.JobLogStreamEventData
-	(*JobLogStreamEvent)(nil),                      // 14: martiancloud.tharsis.api.job.JobLogStreamEvent
-	(*JobEvent)(nil),                               // 15: martiancloud.tharsis.api.job.JobEvent
-	(*JobCancellationEvent)(nil),                   // 16: martiancloud.tharsis.api.job.JobCancellationEvent
-	(*GetJobLogsResponse)(nil),                     // 17: martiancloud.tharsis.api.job.GetJobLogsResponse
-	(*ClaimJobResponse)(nil),                       // 18: martiancloud.tharsis.api.job.ClaimJobResponse
-	nil,                                            // 19: martiancloud.tharsis.api.job.Job.PropertiesEntry
-	(*ResourceMetadata)(nil),                       // 20: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*emptypb.Empty)(nil),                          // 21: google.protobuf.Empty
+	(*OPAJobData)(nil),                             // 12: martiancloud.tharsis.api.job.OPAJobData
+	(*Job)(nil),                                    // 13: martiancloud.tharsis.api.job.Job
+	(*JobLogStreamEventData)(nil),                  // 14: martiancloud.tharsis.api.job.JobLogStreamEventData
+	(*JobLogStreamEvent)(nil),                      // 15: martiancloud.tharsis.api.job.JobLogStreamEvent
+	(*JobEvent)(nil),                               // 16: martiancloud.tharsis.api.job.JobEvent
+	(*JobCancellationEvent)(nil),                   // 17: martiancloud.tharsis.api.job.JobCancellationEvent
+	(*GetJobLogsResponse)(nil),                     // 18: martiancloud.tharsis.api.job.GetJobLogsResponse
+	(*ClaimJobResponse)(nil),                       // 19: martiancloud.tharsis.api.job.ClaimJobResponse
+	nil,                                            // 20: martiancloud.tharsis.api.job.Job.PropertiesEntry
+	(*ResourceMetadata)(nil),                       // 21: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*emptypb.Empty)(nil),                          // 22: google.protobuf.Empty
 }
 var file_job_proto_depIdxs = []int32{
 	1,  // 0: martiancloud.tharsis.api.job.SetJobStatusInput.status:type_name -> martiancloud.tharsis.api.job.JobStatus
-	20, // 1: martiancloud.tharsis.api.job.Job.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	21, // 1: martiancloud.tharsis.api.job.Job.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
 	1,  // 2: martiancloud.tharsis.api.job.Job.status:type_name -> martiancloud.tharsis.api.job.JobStatus
-	19, // 3: martiancloud.tharsis.api.job.Job.properties:type_name -> martiancloud.tharsis.api.job.Job.PropertiesEntry
-	13, // 4: martiancloud.tharsis.api.job.JobLogStreamEvent.data:type_name -> martiancloud.tharsis.api.job.JobLogStreamEventData
-	12, // 5: martiancloud.tharsis.api.job.JobEvent.job:type_name -> martiancloud.tharsis.api.job.Job
-	12, // 6: martiancloud.tharsis.api.job.JobCancellationEvent.job:type_name -> martiancloud.tharsis.api.job.Job
-	12, // 7: martiancloud.tharsis.api.job.ClaimJobResponse.job:type_name -> martiancloud.tharsis.api.job.Job
-	2,  // 8: martiancloud.tharsis.api.job.Jobs.GetJobByID:input_type -> martiancloud.tharsis.api.job.GetJobByIDRequest
-	3,  // 9: martiancloud.tharsis.api.job.Jobs.GetJobLogs:input_type -> martiancloud.tharsis.api.job.GetJobLogsRequest
-	4,  // 10: martiancloud.tharsis.api.job.Jobs.GetLatestJobForPlan:input_type -> martiancloud.tharsis.api.job.GetLatestJobForPlanRequest
-	5,  // 11: martiancloud.tharsis.api.job.Jobs.GetLatestJobForApply:input_type -> martiancloud.tharsis.api.job.GetLatestJobForApplyRequest
-	6,  // 12: martiancloud.tharsis.api.job.Jobs.SetJobStatus:input_type -> martiancloud.tharsis.api.job.SetJobStatusInput
-	11, // 13: martiancloud.tharsis.api.job.Jobs.SaveJobLogs:input_type -> martiancloud.tharsis.api.job.SaveJobLogsRequest
-	10, // 14: martiancloud.tharsis.api.job.Jobs.ClaimJob:input_type -> martiancloud.tharsis.api.job.ClaimJobRequest
-	7,  // 15: martiancloud.tharsis.api.job.Jobs.SubscribeToJobLogStream:input_type -> martiancloud.tharsis.api.job.SubscribeToJobLogStreamRequest
-	8,  // 16: martiancloud.tharsis.api.job.Jobs.SubscribeToJobEvents:input_type -> martiancloud.tharsis.api.job.SubscribeToJobEventsRequest
-	9,  // 17: martiancloud.tharsis.api.job.Jobs.SubscribeToJobCancellationEvent:input_type -> martiancloud.tharsis.api.job.SubscribeToJobCancellationEventRequest
-	12, // 18: martiancloud.tharsis.api.job.Jobs.GetJobByID:output_type -> martiancloud.tharsis.api.job.Job
-	17, // 19: martiancloud.tharsis.api.job.Jobs.GetJobLogs:output_type -> martiancloud.tharsis.api.job.GetJobLogsResponse
-	12, // 20: martiancloud.tharsis.api.job.Jobs.GetLatestJobForPlan:output_type -> martiancloud.tharsis.api.job.Job
-	12, // 21: martiancloud.tharsis.api.job.Jobs.GetLatestJobForApply:output_type -> martiancloud.tharsis.api.job.Job
-	12, // 22: martiancloud.tharsis.api.job.Jobs.SetJobStatus:output_type -> martiancloud.tharsis.api.job.Job
-	21, // 23: martiancloud.tharsis.api.job.Jobs.SaveJobLogs:output_type -> google.protobuf.Empty
-	18, // 24: martiancloud.tharsis.api.job.Jobs.ClaimJob:output_type -> martiancloud.tharsis.api.job.ClaimJobResponse
-	14, // 25: martiancloud.tharsis.api.job.Jobs.SubscribeToJobLogStream:output_type -> martiancloud.tharsis.api.job.JobLogStreamEvent
-	15, // 26: martiancloud.tharsis.api.job.Jobs.SubscribeToJobEvents:output_type -> martiancloud.tharsis.api.job.JobEvent
-	16, // 27: martiancloud.tharsis.api.job.Jobs.SubscribeToJobCancellationEvent:output_type -> martiancloud.tharsis.api.job.JobCancellationEvent
-	18, // [18:28] is the sub-list for method output_type
-	8,  // [8:18] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	20, // 3: martiancloud.tharsis.api.job.Job.properties:type_name -> martiancloud.tharsis.api.job.Job.PropertiesEntry
+	12, // 4: martiancloud.tharsis.api.job.Job.opa_data:type_name -> martiancloud.tharsis.api.job.OPAJobData
+	14, // 5: martiancloud.tharsis.api.job.JobLogStreamEvent.data:type_name -> martiancloud.tharsis.api.job.JobLogStreamEventData
+	13, // 6: martiancloud.tharsis.api.job.JobEvent.job:type_name -> martiancloud.tharsis.api.job.Job
+	13, // 7: martiancloud.tharsis.api.job.JobCancellationEvent.job:type_name -> martiancloud.tharsis.api.job.Job
+	13, // 8: martiancloud.tharsis.api.job.ClaimJobResponse.job:type_name -> martiancloud.tharsis.api.job.Job
+	2,  // 9: martiancloud.tharsis.api.job.Jobs.GetJobByID:input_type -> martiancloud.tharsis.api.job.GetJobByIDRequest
+	3,  // 10: martiancloud.tharsis.api.job.Jobs.GetJobLogs:input_type -> martiancloud.tharsis.api.job.GetJobLogsRequest
+	4,  // 11: martiancloud.tharsis.api.job.Jobs.GetLatestJobForPlan:input_type -> martiancloud.tharsis.api.job.GetLatestJobForPlanRequest
+	5,  // 12: martiancloud.tharsis.api.job.Jobs.GetLatestJobForApply:input_type -> martiancloud.tharsis.api.job.GetLatestJobForApplyRequest
+	6,  // 13: martiancloud.tharsis.api.job.Jobs.SetJobStatus:input_type -> martiancloud.tharsis.api.job.SetJobStatusInput
+	11, // 14: martiancloud.tharsis.api.job.Jobs.SaveJobLogs:input_type -> martiancloud.tharsis.api.job.SaveJobLogsRequest
+	10, // 15: martiancloud.tharsis.api.job.Jobs.ClaimJob:input_type -> martiancloud.tharsis.api.job.ClaimJobRequest
+	7,  // 16: martiancloud.tharsis.api.job.Jobs.SubscribeToJobLogStream:input_type -> martiancloud.tharsis.api.job.SubscribeToJobLogStreamRequest
+	8,  // 17: martiancloud.tharsis.api.job.Jobs.SubscribeToJobEvents:input_type -> martiancloud.tharsis.api.job.SubscribeToJobEventsRequest
+	9,  // 18: martiancloud.tharsis.api.job.Jobs.SubscribeToJobCancellationEvent:input_type -> martiancloud.tharsis.api.job.SubscribeToJobCancellationEventRequest
+	13, // 19: martiancloud.tharsis.api.job.Jobs.GetJobByID:output_type -> martiancloud.tharsis.api.job.Job
+	18, // 20: martiancloud.tharsis.api.job.Jobs.GetJobLogs:output_type -> martiancloud.tharsis.api.job.GetJobLogsResponse
+	13, // 21: martiancloud.tharsis.api.job.Jobs.GetLatestJobForPlan:output_type -> martiancloud.tharsis.api.job.Job
+	13, // 22: martiancloud.tharsis.api.job.Jobs.GetLatestJobForApply:output_type -> martiancloud.tharsis.api.job.Job
+	13, // 23: martiancloud.tharsis.api.job.Jobs.SetJobStatus:output_type -> martiancloud.tharsis.api.job.Job
+	22, // 24: martiancloud.tharsis.api.job.Jobs.SaveJobLogs:output_type -> google.protobuf.Empty
+	19, // 25: martiancloud.tharsis.api.job.Jobs.ClaimJob:output_type -> martiancloud.tharsis.api.job.ClaimJobResponse
+	15, // 26: martiancloud.tharsis.api.job.Jobs.SubscribeToJobLogStream:output_type -> martiancloud.tharsis.api.job.JobLogStreamEvent
+	16, // 27: martiancloud.tharsis.api.job.Jobs.SubscribeToJobEvents:output_type -> martiancloud.tharsis.api.job.JobEvent
+	17, // 28: martiancloud.tharsis.api.job.Jobs.SubscribeToJobCancellationEvent:output_type -> martiancloud.tharsis.api.job.JobCancellationEvent
+	19, // [19:29] is the sub-list for method output_type
+	9,  // [9:19] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_job_proto_init() }
@@ -1253,14 +1340,17 @@ func file_job_proto_init() {
 	file_metadata_proto_init()
 	file_job_proto_msgTypes[5].OneofWrappers = []any{}
 	file_job_proto_msgTypes[6].OneofWrappers = []any{}
-	file_job_proto_msgTypes[12].OneofWrappers = []any{}
+	file_job_proto_msgTypes[11].OneofWrappers = []any{
+		(*Job_OpaData)(nil),
+	}
+	file_job_proto_msgTypes[13].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_job_proto_rawDesc), len(file_job_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   18,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

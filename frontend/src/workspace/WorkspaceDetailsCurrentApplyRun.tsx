@@ -23,31 +23,7 @@ function WorkspaceDetailsCurrentApplyRun(props: Props) {
         fullPath
         currentApplyRun {
             id
-            status
-            createdBy
-            isDestroy
-            moduleSource
-            moduleVersion
-            metadata {
-                createdAt
-            }
-            configurationVersion {
-                id
-            }
-            plan {
-                status
-                metadata {
-                    createdAt
-                }
-            }
-            apply {
-                status
-                triggeredBy
-                metadata {
-                    createdAt
-                    updatedAt
-                }
-            }
+            ...RunStageIconsFragment_run
         }
       }
     `, fragmentRef);
@@ -65,11 +41,7 @@ function WorkspaceDetailsCurrentApplyRun(props: Props) {
                         {' '}is currently in progress
                     </Typography>
                 </Stack>
-                <RunStageIcons
-                    runPath={`/groups/${data.fullPath}/-/runs/${data.currentApplyRun.id}`}
-                    planStatus={data.currentApplyRun.plan.status}
-                    applyStatus={data.currentApplyRun.apply?.status}
-                />
+                <RunStageIcons fragmentRef={data.currentApplyRun} />
             </Box>
         </Paper>
     ) : null;

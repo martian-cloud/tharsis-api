@@ -5,6 +5,7 @@ interface Props {
     title: string;
     children: React.ReactNode;
     confirmLabel: string;
+    cancelLabel?: string;
     confirmDisabled?: boolean;
     confirmColor?: 'error' | 'primary';
     confirmInProgress: boolean;
@@ -13,10 +14,11 @@ interface Props {
     maxWidth?: 'xs' | 'sm' | 'md';
 }
 
-function ConfirmationDialog({ title, children, confirmLabel, confirmDisabled, confirmColor = 'error', confirmInProgress, onClose, onConfirm, maxWidth = 'xs', ...other }: Props) {
+function ConfirmationDialog({ title, children, confirmLabel, cancelLabel, confirmDisabled, confirmColor = 'error', confirmInProgress, onClose, onConfirm, maxWidth = 'xs', ...other }: Props) {
     return (
         <Dialog
             maxWidth={maxWidth}
+            fullWidth
             open
             keepMounted={false}
             {...other}
@@ -27,7 +29,7 @@ function ConfirmationDialog({ title, children, confirmLabel, confirmDisabled, co
             </DialogContent>
             <DialogActions>
                 <Button color="inherit" onClick={onClose}>
-                    Cancel
+                    {cancelLabel || 'Cancel'}
                 </Button>
                 <Button
                     color={confirmColor}

@@ -128,6 +128,11 @@ func (f *Factory) NewStartApply(in *StartApplyInput) *StartApply {
 	return &StartApply{dbClient: f.dbClient, moduleResolver: f.moduleResolver, ruleEnforcer: f.ruleEnforcer, in: in}
 }
 
+// NewSetRunGateDecision creates a SetRunGateDecision command.
+func (f *Factory) NewSetRunGateDecision(in *SetRunGateDecisionInput) *SetRunGateDecision {
+	return &SetRunGateDecision{dbClient: f.dbClient, in: in}
+}
+
 // NewCancelRun creates a CancelRun command.
 func (f *Factory) NewCancelRun(in *CancelRunInput) *CancelRun {
 	return &CancelRun{dbClient: f.dbClient, in: in}
@@ -163,6 +168,16 @@ func (f *Factory) NewUpdatePlan(planID string, hasChanges bool, errorMessage *st
 	return &UpdatePlan{dbClient: f.dbClient, PlanID: planID, HasChanges: hasChanges, ErrorMessage: errorMessage}
 }
 
+// NewReportRunPolicyOutcomes creates a ReportRunPolicyOutcomes command.
+func (f *Factory) NewReportRunPolicyOutcomes(policyCheckID string, outcomes []RunPolicyOutcome) *ReportRunPolicyOutcomes {
+	return &ReportRunPolicyOutcomes{
+		dbClient:      f.dbClient,
+		artifactStore: f.artifactStore,
+		PolicyCheckID: policyCheckID,
+		Outcomes:      outcomes,
+	}
+}
+
 // NewUpdateApply creates an UpdateApply command.
 func (f *Factory) NewUpdateApply(applyID string, errorMessage *string) *UpdateApply {
 	return &UpdateApply{dbClient: f.dbClient, ApplyID: applyID, ErrorMessage: errorMessage}
@@ -175,8 +190,9 @@ func (f *Factory) NewQueueRun(runID string) *QueueRun {
 
 // NewSyncJobStatus creates a SyncJobStatus command. jobID identifies the reporting
 // job so the command skips the node projection for a superseded job (e.g. after a
-// retry). persistJob, if non-nil, runs inside the command transaction before the node
-// sync (see SyncJobStatus.PersistJob).
-func (f *Factory) NewSyncJobStatus(runID string, jobType models.JobType, jobID string, newStatus models.JobStatus, persistJob func(ctx context.Context) error) *SyncJobStatus {
-	return &SyncJobStatus{logger: f.logger, RunID: runID, JobType: jobType, JobID: jobID, NewStatus: newStatus, PersistJob: persistJob}
+// retry). jobData is the type-specific payload for the job (nil for plan/apply).
+// persistJob, if non-nil, runs inside the command transaction before the node sync
+// (see SyncJobStatus.PersistJob).
+func (f *Factory) NewSyncJobStatus(runID string, jobType models.JobType, jobID string, jobData *models.OPAJobData, newStatus models.JobStatus, persistJob func(ctx context.Context) error) *SyncJobStatus {
+	return &SyncJobStatus{logger: f.logger, RunID: runID, JobType: jobType, JobID: jobID, JobData: jobData, NewStatus: newStatus, PersistJob: persistJob}
 }

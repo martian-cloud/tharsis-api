@@ -168,7 +168,7 @@ func TestProcessCommand_TransformersSeeEachChangeExactlyOnce(t *testing.T) {
 
 	run := &models.Run{
 		Metadata: models.ResourceMetadata{ID: "run-1"},
-		Status:   models.RunQueuing,
+		Status:   models.RunPlanQueued,
 		Plan:     models.Plan{ID: "plan-1", Status: models.PlanPending},
 	}
 

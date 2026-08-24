@@ -71,6 +71,7 @@ type constraints struct {
 	groupID        *string
 	planID         *string
 	applyID        *string
+	policyCheckID  *string
 	jobID          *string
 	runID          *string
 	teamID         *string
@@ -121,6 +122,13 @@ func WithPlanID(id string) func(*constraints) {
 func WithApplyID(id string) func(*constraints) {
 	return func(c *constraints) {
 		c.applyID = &id
+	}
+}
+
+// WithPolicyCheckID sets the PolicyCheckID (policy check node ID) on constraints struct.
+func WithPolicyCheckID(id string) func(*constraints) {
+	return func(c *constraints) {
+		c.policyCheckID = &id
 	}
 }
 

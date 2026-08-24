@@ -126,17 +126,19 @@ function TerraformModuleVersionAttestList({ fragmentRef }: Props) {
         }
     };
 
-    return (data.attestations.edges && data.attestations.edges.length > 0) ?
+    const edges = data?.attestations?.edges ?? [];
+
+    return (edges.length > 0) ?
         <Box>
             <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
                 <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
                     <Typography variant="subtitle1">
-                        {data.attestations?.edges?.length} attestation{data.attestations.edges.length === 1 ? '' : 's'}
+                        {edges.length} attestation{edges.length === 1 ? '' : 's'}
                     </Typography>
                 </Box>
             </Paper>
             <InfiniteScroll
-                dataLength={data.attestations.edges.length ?? 0}
+                dataLength={edges.length}
                 next={() => loadNext(20)}
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
@@ -152,7 +154,7 @@ function TerraformModuleVersionAttestList({ fragmentRef }: Props) {
                         { label: '' },
                     ]}
                 >
-                    {data.attestations.edges?.map((edge: any) => <TerraformModuleVersionAttestListItem
+                    {edges.map((edge: any) => <TerraformModuleVersionAttestListItem
                         key={edge.node.id}
                         fragmentRef={edge.node}
                         onOpenDataDialog={() => setAttestationDataToDisplay(edge.node.data)}

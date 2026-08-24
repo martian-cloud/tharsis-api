@@ -3,12 +3,17 @@ import graphql from 'babel-plugin-relay/macro';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { LoadMoreFn, useFragment } from "react-relay/hooks";
 import ListSkeleton from '../skeletons/ListSkeleton';
+import ActivityEventTargetNotFound from './targets/ActivityEventTargetNotFound';
 import ActivityEventGPGKeyTarget from './targets/ActivityEventGPGKeyTarget';
 import ActivityEventGroupTarget from './targets/ActivityEventGroupTarget';
 import ActivityEventManagedIdentityAccessRuleTarget from './targets/ActivityEventManagedIdentityAccessRule';
 import ActivityEventManagedIdentityTarget from './targets/ActivityEventManagedIdentityTarget';
 import ActivityEventNamespaceMembershipTarget from './targets/ActivityEventNamespaceMembershipTarget';
+import ActivityEventPackageTarget from './targets/ActivityEventPackageTarget';
+import ActivityEventPackageVersionTarget from './targets/ActivityEventPackageVersionTarget';
+import ActivityEventPolicyTarget from './targets/ActivityEventPolicyTarget';
 import ActivityEventRunTarget from './targets/ActivityEventRunTarget';
+import ActivityEventRunGateTarget from './targets/ActivityEventRunGateTarget';
 import ActivityEventServiceAccountTarget from './targets/ActivityEventServiceAccountTarget';
 import ActivityEventStateVersionTarget from './targets/ActivityEventStateVersionTarget';
 import ActivityEventTeamTarget from './targets/ActivityEventTeamTarget';
@@ -34,6 +39,7 @@ const TARGET_COMPONENT_MAP = {
     ServiceAccount: ActivityEventServiceAccountTarget,
     NamespaceVariable: ActivityEventVariableTarget,
     Run: ActivityEventRunTarget,
+    RunGate: ActivityEventRunGateTarget,
     StateVersion: ActivityEventStateVersionTarget,
     Team: ActivityEventTeamTarget,
     TerraformProvider: ActivityEventTerraformProviderTarget,
@@ -43,7 +49,10 @@ const TARGET_COMPONENT_MAP = {
     Role: ActivityEventRoleTarget,
     Runner: ActivityEventRunnerTarget,
     FederatedRegistry: ActivityEventFederatedRegistryTarget,
-    TerraformProviderVersionMirror: ActivityEventTerraformProviderVersionMirrorTarget
+    TerraformProviderVersionMirror: ActivityEventTerraformProviderVersionMirrorTarget,
+    Package: ActivityEventPackageTarget,
+    PackageVersion: ActivityEventPackageVersionTarget,
+    Policy: ActivityEventPolicyTarget
 } as any;
 
 interface Props {
@@ -80,6 +89,11 @@ function ActivityEventList({ fragmentRef, loadNext, hasNext }: Props) {
                     ...ActivityEventRunnerTargetFragment_event
                     ...ActivityEventFederatedRegistryTargetFragment_event
                     ...ActivityEventTerraformProviderVersionMirrorTargetFragment_event
+                    ...ActivityEventRunGateTargetFragment_event
+                    ...ActivityEventPackageTargetFragment_event
+                    ...ActivityEventPackageVersionTargetFragment_event
+                    ...ActivityEventPolicyTargetFragment_event
+                    ...ActivityEventTargetNotFoundFragment_event
                 }
             }
         }
@@ -94,6 +108,11 @@ function ActivityEventList({ fragmentRef, loadNext, hasNext }: Props) {
         >
             <List sx={{ paddingTop: 0 }}>
                 {data.edges?.map((edge: any) => {
+                    // A null target means the API would not resolve it -- deleted, or outside what this
+                    // viewer may see. The event itself still reads, so it is rendered either way.
+                    if (!edge.node.target) {
+                        return <ActivityEventTargetNotFound key={edge.node.id} fragmentRef={edge.node} />;
+                    }
                     const Target = TARGET_COMPONENT_MAP[edge.node.target.__typename];
                     return Target ? <Target key={edge.node.id} fragmentRef={edge.node} /> : null;
                 })}

@@ -10,6 +10,7 @@ import { GroupTreeContainerFragment_groups$key } from './__generated__/GroupTree
 import { GroupTreeContainerFragment_me$key } from './__generated__/GroupTreeContainerFragment_me.graphql';
 import { GroupTreeContainerQuery } from './__generated__/GroupTreeContainerQuery.graphql';
 import { GroupsPaginationQuery } from './__generated__/GroupsPaginationQuery.graphql';
+import { PageLayoutProvider } from '../../layout/PageLayoutContext';
 
 export const INITIAL_ITEM_COUNT = 100;
 export const DEFAULT_SORT = 'FULL_PATH_ASC';
@@ -123,9 +124,11 @@ function GroupTreeContainer(props: Props) {
         }
     };
 
+    const edges = data?.groups?.edges ?? [];
+
     return (
-        <Box maxWidth={1200} margin="auto" padding={2}>
-            {(search !== '' || (data.groups.edges && data.groups.edges.length > 0)) && <Box>
+        <PageLayoutProvider>
+            {(search !== '' || edges.length > 0) && <Box>
                 <Box display="flex" justifyContent="space-between">
                     <Box marginBottom={2}>
                         <Typography variant="h5">Groups</Typography>
@@ -142,7 +145,7 @@ function GroupTreeContainer(props: Props) {
                         onKeyPress={onKeyPress}
                     />
                 </Box>
-                {(!data.groups.edges || data.groups.edges?.length === 0) && search !== '' && <Paper
+                {edges.length === 0 && search !== '' && <Paper
                     variant="outlined"
                     sx={{ p: 4, mt: 2, textAlign: "center" }}>
                     <Typography color="textSecondary">No groups matching search <strong>{search}</strong>
@@ -150,7 +153,7 @@ function GroupTreeContainer(props: Props) {
                 </Paper>}
                 <GroupTree connectionKey={data.groups} loadNext={loadNext} hasNext={hasNext} isLoadingNext={isLoadingNext} isRefreshing={isRefreshing} />
             </Box>}
-            {((!data.groups.edges || data.groups.edges.length === 0) && search === '') && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+            {(edges.length === 0 && search === '') && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
                 <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
                     {!isAdmin && <React.Fragment>
                         <Typography variant="h6">You're not a member of any groups</Typography>
@@ -167,7 +170,7 @@ function GroupTreeContainer(props: Props) {
                     </React.Fragment>}
                 </Box>
             </Box>}
-        </Box>
+        </PageLayoutProvider>
     );
 }
 

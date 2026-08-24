@@ -5,20 +5,190 @@ enum RunSort {
   UPDATED_AT_DESC
 }
 
+"""
+RunStatus is the run's current phase. Phases that need the workspace report two waits separately: a
+*_QUEUING status means the run is waiting for the workspace slot, and *_QUEUED means it holds the slot
+and is waiting for a runner to pick up its job.
+"""
 enum RunStatus {
   applied
   apply_queued
+  apply_queuing
   applying
   canceled
   discarded
   errored
   pending
   plan_queued
+  plan_queuing
   planned
   planned_and_finished
   planning
-  queuing
-  queuing_apply
+  pre_plan_queuing
+  pre_plan_running
+  pre_plan_awaiting_decision
+  pre_plan_completed
+  post_plan_running
+  post_plan_awaiting_decision
+  post_plan_completed
+  pre_apply_queuing
+  pre_apply_running
+  pre_apply_awaiting_decision
+  pre_apply_completed
+}
+
+enum PolicyCheckStatus {
+  CREATED
+  PENDING
+  QUEUED
+  RUNNING
+  PASSED
+  SOFT_FAILED
+  OVERRIDDEN
+  ERRORED
+  CANCELED
+  SKIPPED
+}
+
+"""
+RunTaskStageStatus is a task stage's status. PENDING means the stage is ready but still waiting for the
+workspace slot; it only applies to the workspace-gated stages (PRE_PLAN, PRE_APPLY).
+"""
+enum RunTaskStageStatus {
+  CREATED
+  PENDING
+  RUNNING
+  AWAITING_OVERRIDE
+  COMPLETED
+  ERRORED
+  CANCELED
+  SKIPPED
+}
+
+"""
+RunTaskStageName identifies which stage of a run a task stage represents.
+"""
+enum RunTaskStageName {
+  PRE_PLAN
+  POST_PLAN
+  PRE_APPLY
+  POST_APPLY
+}
+
+"""
+RunNode is one of a run's typed nodes: its plan, its apply, a task stage, or a policy check within a
+stage. Every node is addressed by a run-relative path — see the runNode query.
+"""
+union RunNode = Plan | Apply | RunTaskStage | PolicyCheck
+
+"""
+RunTaskStage is a stage of a run (pre_plan, post_plan, ...). Its status is the aggregate verdict of
+the policy checks it owns (and, in future, run task results).
+"""
+type RunTaskStage {
+  id: String!
+  stageName: RunTaskStageName!
+  status: RunTaskStageStatus!
+  policyChecks: [PolicyCheck!]!
+}
+
+"""
+PolicyCheck is a policy evaluation node of a run — one per policy engine/type (e.g. the OPA
+post-plan check). Its policies list the packages the check evaluates, each with its result.
+"""
+type PolicyCheck {
+  id: String!
+  checkType: String!
+  """
+  nodePath is the check's node path within the run (e.g. "post_plan.opa"). It is the value
+  retryRunNode takes to retry this check, whether it ERRORED, was CANCELED, or SOFT_FAILED.
+  stageName and checkType are returned as upper-cased enums, so they cannot be joined into this path
+  reliably — use this field.
+  """
+  nodePath: String!
+  stageName: RunTaskStageName!
+  status: PolicyCheckStatus!
+  """
+  runGate is the gate blocking this check, or null when the check is not blocked. Every SOFT_FAILED
+  check has exactly one gate and no other status has one, so this is non-null precisely while an
+  override is outstanding or has been resolved. A gate with empty approvalRules had no approvers to
+  collect, and overrideRunGate is the only thing that can clear it. Retrying a check deletes its gate,
+  so this always describes the current attempt.
+  """
+  runGate: RunGate
+  policies: [PolicyCheckPolicy!]!
+  """
+  messagesSummary previews the violation messages this check's policies reported. It is held on the
+  check itself, so reading it costs nothing extra — prefer it over each policy's messages field
+  whenever more than one check is on screen.
+  """
+  messagesSummary: PolicyCheckMessagesSummary!
+  currentJob: Job
+  jobs(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: JobSort
+  ): JobConnection!
+}
+
+"""
+PolicyCheckPolicy is one policy a policy check evaluates, together with its result. There
+is one entry per valid policy (no de-duplication); source is the owner whose policy
+contributed it. status is empty until the check has been evaluated.
+"""
+type PolicyCheckPolicy {
+  id: String!
+  """
+  name and description are snapshotted from the policy when the run is created, so they keep
+  describing the policy as it was evaluated even after it is renamed or deleted. Both are empty on
+  checks created before these fields existed.
+  """
+  name: String!
+  description: String!
+  packageSource: String!
+  """
+  packageVersionConstraint is the policy's package version constraint, snapshotted unresolved. Empty
+  means the latest uploaded version. The concrete version a check evaluated is recorded in that
+  policy check's job log, not here, because each check resolves the constraint when it runs.
+  """
+  packageVersionConstraint: String!
+  enforcementLevel: PolicyEnforcementLevel!
+  status: String!
+  """
+  messages holds one entry per violation the policy reported, in display order, and is empty until
+  the check has been evaluated or when the policy passed. The list is stored outside the run, so
+  selecting it costs a read per policy; a check's messagesSummary is the cheap preview.
+  """
+  messages: [String!]!
+  provenance: PolicyCheckPolicyProvenance!
+  """
+  policy is the policy resource this entry was snapshotted from. It is null when the policy has
+  since been deleted or the caller cannot view it — the snapshot fields above always remain.
+  Its fields reflect the policy as it is now, not as it was when the run was created.
+  """
+  policy: Policy
+}
+
+"""
+PolicyCheckMessagesSummary is a capped copy of the violation messages a check's policies reported,
+held on the check so a view listing several checks can show what failed without reading every
+policy's full message list. truncated says messages leaves some of what was reported out; an
+individual policy's messages field is always complete.
+"""
+type PolicyCheckMessagesSummary {
+  messages: [String!]!
+  truncated: Boolean!
+}
+
+"""
+PolicyCheckPolicyProvenance records the group that owns a policy attachment and the stable TRN
+of the attachment itself. Policies are always group-scoped.
+"""
+type PolicyCheckPolicyProvenance {
+  groupId: String!
+  policyTrn: String!
 }
 
 type RunConnection {
@@ -57,6 +227,7 @@ type Run implements Node {
   configurationVersion: ConfigurationVersion
   plan: Plan!
   apply: Apply
+  taskStages: [RunTaskStage!]!
   variables: [RunVariable!]!
   sensitiveVariableValues: [RunVariableSensitiveValue!]!
   stateVersion: StateVersion
@@ -74,6 +245,12 @@ type Run implements Node {
   speculative: Boolean!
   autoApply: Boolean!
   assessment: Boolean!
+  """
+  hasAdvisoryFailures is true when at least one advisory policy this run evaluated failed. An advisory
+  failure does not block the run, so its status does not reflect one; this is what lets a caller flag a
+  run that passed with findings. Every policy on an assessment run is advisory.
+  """
+  hasAdvisoryFailures: Boolean!
 }
 
 type RunEvent {
@@ -165,8 +342,13 @@ input CancelRunInput {
 }
 
 """
-RetryRunNodeInput retries a run's failed or canceled plan/apply node by resetting it
-to pending. The node is identified by runId and nodePath ("plan" or "apply").
+RetryRunNodeInput retries a run's node by resetting it to pending. The node is identified by runId
+and nodePath: "plan", "apply", or a policy check's nodePath (e.g. "post_plan.opa", as returned by
+PolicyCheck.nodePath). A plan or apply can be retried only when it is failed or canceled. A policy
+check can additionally be retried when it is SOFT_FAILED, so a policy that has since been fixed can
+be re-evaluated instead of overridden — this discards the check's run gate along with any approvals
+already recorded on it, and clears the previous attempt's per-policy results. A check cannot be
+retried while its run is discarded; undiscard the run first.
 """
 input RetryRunNodeInput {
   clientMutationId: String
@@ -193,21 +375,21 @@ input SetVariablesIncludedInTFConfigInput {
   variableKeys: [String!]!
 }
 
-type CheckResultObject {
+type TerraformCheckResultObject {
   address: String!
-  status: CheckResultStatus!
+  status: TerraformCheckResultStatus!
   failureMessages: [String!]!
 }
 
-type CheckResult {
+type TerraformCheckResult {
   name: String!
-  status: CheckResultStatus!
-  objects: [CheckResultObject!]!
+  status: TerraformCheckResultStatus!
+  objects: [TerraformCheckResultObject!]!
 }
 
-enum CheckResultStatus {
-  pass
-  fail
-  error
-  unknown
+enum TerraformCheckResultStatus {
+  PASS
+  FAIL
+  ERROR
+  UNKNOWN
 }

@@ -268,14 +268,14 @@ func (s *RunServer) GetRunVariables(ctx context.Context, req *pb.GetRunVariables
 
 // GetPlanByID returns a Plan by an ID.
 func (s *RunServer) GetPlanByID(ctx context.Context, req *pb.GetPlanByIDRequest) (*pb.Plan, error) {
-	model, err := s.serviceCatalog.FetchModel(ctx, req.Id)
+	parsedGID, err := gid.ParseGlobalID(req.Id)
 	if err != nil {
 		return nil, err
 	}
 
-	run, ok := model.(*models.Run)
-	if !ok {
-		return nil, errors.New("plan with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
+	run, err := s.serviceCatalog.RunService.GetRunByNodeID(ctx, parsedGID.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	return toPBPlan(run), nil
@@ -283,14 +283,14 @@ func (s *RunServer) GetPlanByID(ctx context.Context, req *pb.GetPlanByIDRequest)
 
 // GetApplyByID returns an Apply by an ID.
 func (s *RunServer) GetApplyByID(ctx context.Context, req *pb.GetApplyByIDRequest) (*pb.Apply, error) {
-	model, err := s.serviceCatalog.FetchModel(ctx, req.Id)
+	parsedGID, err := gid.ParseGlobalID(req.Id)
 	if err != nil {
 		return nil, err
 	}
 
-	run, ok := model.(*models.Run)
-	if !ok {
-		return nil, errors.New("apply with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
+	run, err := s.serviceCatalog.RunService.GetRunByNodeID(ctx, parsedGID.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	if run.Apply == nil {
@@ -302,13 +302,13 @@ func (s *RunServer) GetApplyByID(ctx context.Context, req *pb.GetApplyByIDReques
 
 // UpdatePlan updates a Plan.
 func (s *RunServer) UpdatePlan(ctx context.Context, req *pb.UpdatePlanRequest) (*pb.Plan, error) {
-	planID, err := s.serviceCatalog.FetchModelID(ctx, req.Id)
+	parsedGID, err := gid.ParseGlobalID(req.Id)
 	if err != nil {
 		return nil, err
 	}
 
 	input := &run.UpdatePlanInput{
-		PlanID:     planID,
+		PlanID:     parsedGID.ID,
 		HasChanges: req.HasChanges,
 	}
 
@@ -333,15 +333,43 @@ func (s *RunServer) UpdatePlan(ctx context.Context, req *pb.UpdatePlanRequest) (
 	return toPBPlan(run), nil
 }
 
+// ReportRunPolicyOutcomes records the policy outcomes for a run's policy check node.
+func (s *RunServer) ReportRunPolicyOutcomes(ctx context.Context, req *pb.ReportRunPolicyOutcomesRequest) (*emptypb.Empty, error) {
+	// The policy check is a run node addressed by its RunNode GID; decode it to the raw node ID.
+	parsedGID, err := gid.ParseGlobalID(req.PolicyCheckId)
+	if err != nil {
+		return nil, err
+	}
+	policyCheckID := parsedGID.ID
+
+	outcomes := make([]*run.PolicyOutcome, 0, len(req.Outcomes))
+	for _, o := range req.Outcomes {
+		outcomes = append(outcomes, &run.PolicyOutcome{
+			PolicyID: o.PolicyId,
+			Messages: o.Messages,
+			Passed:   o.Passed,
+		})
+	}
+
+	if err := s.serviceCatalog.RunService.ReportRunPolicyOutcomes(ctx, &run.ReportRunPolicyOutcomesInput{
+		PolicyCheckID: policyCheckID,
+		Outcomes:      outcomes,
+	}); err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
 // UpdateApply updates an Apply.
 func (s *RunServer) UpdateApply(ctx context.Context, req *pb.UpdateApplyRequest) (*pb.Apply, error) {
-	applyID, err := s.serviceCatalog.FetchModelID(ctx, req.Id)
+	parsedGID, err := gid.ParseGlobalID(req.Id)
 	if err != nil {
 		return nil, err
 	}
 
 	input := &run.UpdateApplyInput{
-		ApplyID: applyID,
+		ApplyID: parsedGID.ID,
 	}
 
 	if req.Version != nil {
@@ -459,14 +487,16 @@ func toPBApplyStatus(s models.ApplyStatus) pb.ApplyStatus {
 // toPBRun converts from Run model to ProtoBuf model.
 func toPBRun(r *models.Run) *pb.Run {
 	pbRun := &pb.Run{
-		Metadata:         toPBMetadata(&r.Metadata, types.RunModelType),
-		CreatedBy:        r.CreatedBy,
-		ForceCanceled:    r.ForceCanceled,
-		ForceCanceledBy:  r.ForceCanceledBy,
-		HasChanges:       r.HasChanges(),
-		IsDestroy:        r.IsDestroy,
-		Speculative:      r.Speculative(),
-		AutoApply:        r.AutoApply,
+		Metadata:        toPBMetadata(&r.Metadata, types.RunModelType),
+		CreatedBy:       r.CreatedBy,
+		ForceCanceled:   r.ForceCanceled,
+		ForceCanceledBy: r.ForceCanceledBy,
+		HasChanges:      r.HasChanges(),
+		IsDestroy:       r.IsDestroy,
+		Speculative:     r.Speculative(),
+		IsAssessmentRun: r.IsAssessmentRun,
+		AutoApply:       r.AutoApply,
+
 		ModuleSource:     r.ModuleSource,
 		ModuleVersion:    r.ModuleVersion,
 		Refresh:          r.Refresh,
@@ -499,14 +529,71 @@ func toPBRun(r *models.Run) *pb.Run {
 		pbRun.ForceCancelAvailableAt = timestamppb.New(*r.ForceCancelAvailableAt)
 	}
 
+	// Mirror the run's task stages (each owning its policy checks) onto the message. The policy-eval
+	// job reads its check (id + pinned policies) from these to evaluate and report outcomes.
+	pbRun.TaskStages = toPBTaskStages(r)
+
 	return pbRun
+}
+
+// toPBTaskStages converts a run's task stage nodes (each owning its policy checks) to their ProtoBuf
+// form, in canonical stage order.
+func toPBTaskStages(run *models.Run) []*pb.RunTaskStage {
+	stages := run.TaskStages
+	pbStages := make([]*pb.RunTaskStage, 0, len(stages))
+	for _, stage := range stages {
+		pbStage := &pb.RunTaskStage{
+			Id:           stage.GetGlobalID(),
+			StageName:    enumToPB[pb.RunTaskStageName](string(stage.StageName), pb.RunTaskStageName_value, "RUN_TASK_STAGE_NAME_"),
+			Status:       enumToPB[pb.RunTaskStageStatus](string(stage.Status), pb.RunTaskStageStatus_value, "RUN_TASK_STAGE_STATUS_"),
+			PolicyChecks: make([]*pb.PolicyCheck, 0, len(stage.PolicyChecks)),
+		}
+		for _, check := range stage.PolicyChecks {
+			pbStage.PolicyChecks = append(pbStage.PolicyChecks, toPBPolicyCheck(check))
+		}
+		pbStages = append(pbStages, pbStage)
+	}
+	return pbStages
+}
+
+// toPBPolicyCheck converts a single policy-check node to its ProtoBuf form.
+func toPBPolicyCheck(check *models.PolicyCheck) *pb.PolicyCheck {
+	pbCheck := &pb.PolicyCheck{
+		Id:        check.GetGlobalID(),
+		CheckType: enumToPB[pb.PolicyCheckType](string(check.CheckType), pb.PolicyCheckType_value, "POLICY_CHECK_TYPE_"),
+		StageName: enumToPB[pb.RunTaskStageName](string(check.StageName), pb.RunTaskStageName_value, "RUN_TASK_STAGE_NAME_"),
+		Status:    enumToPB[pb.PolicyCheckStatus](string(check.Status), pb.PolicyCheckStatus_value, "POLICY_CHECK_STATUS_"),
+		Policies:  make([]*pb.PolicyCheckPolicy, 0, len(check.Policies)),
+	}
+	if check.LatestJobID != nil {
+		jobID := gid.ToGlobalID(types.JobModelType, *check.LatestJobID)
+		pbCheck.LatestJobId = &jobID
+	}
+	for i := range check.Policies {
+		p := check.Policies[i]
+		// The messages a previous evaluation reported are not sent: the runner does not read them,
+		// and they live in object storage (see PolicyCheckPolicy in run.proto).
+		pbCheck.Policies = append(pbCheck.Policies, &pb.PolicyCheckPolicy{
+			Id:                       p.ID,
+			PackageSource:            p.PackageSource,
+			PackageVersionConstraint: p.PackageVersionConstraint,
+			EnforcementLevel:         enumToPB[pb.PolicyEnforcementLevel](string(p.EnforcementLevel), pb.PolicyEnforcementLevel_value, "POLICY_ENFORCEMENT_LEVEL_"),
+			Status:                   enumToPB[pb.PolicyCheckPolicyStatus](string(p.Status), pb.PolicyCheckPolicyStatus_value, "POLICY_CHECK_POLICY_STATUS_"),
+			PackageDigest:            p.PackageDigest,
+			Provenance: &pb.PolicyCheckPolicyProvenance{
+				GroupId:   p.Provenance.GroupID,
+				PolicyTrn: p.Provenance.PolicyTRN,
+			},
+		})
+	}
+	return pbCheck
 }
 
 // toPBPlan converts from Plan model to ProtoBuf model.
 func toPBPlan(run *models.Run) *pb.Plan {
 	p := run.Plan
 	pbPlan := &pb.Plan{
-		Metadata:         toPBMetadata(p.Metadata(run), types.PlanModelType),
+		Metadata:         toPBMetadataWithGID(p.Metadata(run), p.GetGlobalID()),
 		DeprecatedStatus: string(p.Status),
 		Status:           toPBPlanStatus(p.Status),
 		HasChanges:       p.HasChanges,
@@ -532,7 +619,7 @@ func toPBApply(run *models.Run) *pb.Apply {
 		return nil
 	}
 	pbApply := &pb.Apply{
-		Metadata:         toPBMetadata(a.Metadata(run), types.ApplyModelType),
+		Metadata:         toPBMetadataWithGID(a.Metadata(run), a.GetGlobalID()),
 		DeprecatedStatus: string(a.Status),
 		Status:           toPBApplyStatus(a.Status),
 		TriggeredBy:      a.TriggeredBy,

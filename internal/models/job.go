@@ -59,7 +59,13 @@ type JobType string
 const (
 	JobPlanType  JobType = "plan"
 	JobApplyType JobType = "apply"
+	JobOPAType   JobType = "opa"
 )
+
+// OPAJobData holds OPA-specific data stored alongside the job.
+type OPAJobData struct {
+	PolicyCheckID string `json:"policyCheckID"`
+}
 
 // Job Property Keys
 const (
@@ -94,6 +100,9 @@ type Job struct {
 	OutdatedJobProtocolVersion bool
 	Tags                       []string
 	Properties                 map[string]string
+	// OPAData is set for OPA jobs and nil otherwise. Add a typed field per job type
+	// that carries type-specific data; the field matching Type is set, the rest nil.
+	OPAData *OPAJobData
 }
 
 // GetStatus returns the job's current status.

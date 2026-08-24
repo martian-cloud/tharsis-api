@@ -7,9 +7,11 @@ type NodeType string
 
 // NodeType constants
 const (
-	RunNodeType   NodeType = "run"
-	PlanNodeType  NodeType = "plan"
-	ApplyNodeType NodeType = "apply"
+	RunNodeType         NodeType = "run"
+	PlanNodeType        NodeType = "plan"
+	ApplyNodeType       NodeType = "apply"
+	PolicyCheckNodeType NodeType = "policy_check"
+	TaskStageNodeType   NodeType = "task_stage"
 )
 
 // NodeStatusChange is a discriminated union of status changes across all node types.
@@ -45,3 +47,25 @@ type ApplyStatusChange struct {
 
 // GetNodeType returns the node type.
 func (ApplyStatusChange) GetNodeType() NodeType { return ApplyNodeType }
+
+// PolicyCheckStatusChange represents a status change on a policy check node.
+type PolicyCheckStatusChange struct {
+	OldStatus models.PolicyCheckStatus
+	NewStatus models.PolicyCheckStatus
+	CheckID   string
+	Path      string
+}
+
+// GetNodeType returns the node type.
+func (PolicyCheckStatusChange) GetNodeType() NodeType { return PolicyCheckNodeType }
+
+// TaskStageStatusChange represents a status change on a task stage node.
+type TaskStageStatusChange struct {
+	OldStatus models.RunTaskStageStatus
+	NewStatus models.RunTaskStageStatus
+	StageID   string
+	Path      string
+}
+
+// GetNodeType returns the node type.
+func (TaskStageStatusChange) GetNodeType() NodeType { return TaskStageNodeType }

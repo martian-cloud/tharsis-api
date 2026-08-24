@@ -1,5 +1,5 @@
-import { Box, Typography } from '@mui/material';
-import Paper from '@mui/material/Paper';
+import NoResults from '@/common/NoResults';
+import { Box } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useLazyLoadQuery, usePaginationFragment } from "react-relay/hooks";
 import { ConnectionHandler } from 'relay-runtime';
@@ -61,16 +61,14 @@ function WorkspaceRunList({ workspaceId, includeAssessmentRuns }: Props) {
       }
     `, queryData);
 
+    const edges = data?.runs?.edges ?? [];
+
     return (
         <Box>
-            {data.runs.edges && data.runs.edges.length > 0 && <RunList fragmentRef={data.runs} hasNext={hasNext} loadNext={loadNext} />}
-            {data.runs.edges?.length === 0 && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                    <Typography variant="h6" color="textSecondary" align="center">
-                        No runs have been created in this workspace
-                    </Typography>
-                </Box>
-            </Paper>}
+            {edges.length > 0 && <RunList fragmentRef={data.runs} hasNext={hasNext} loadNext={loadNext} />}
+            {edges.length === 0 && <NoResults sx={{ mt: 4 }}>
+                No runs have been created in this workspace
+            </NoResults>}
         </Box>
     );
 }

@@ -48,7 +48,8 @@ function ManagedIdentityWorkspaceList({ managedIdentityId }: Props) {
         }
     `, queryData.node);
 
-    const edgeCount = (data?.workspaces.edges?.length ?? 0);
+    const edges = data?.workspaces?.edges ?? [];
+    const edgeCount = edges.length;
 
     return (
         <Box>
@@ -62,13 +63,13 @@ function ManagedIdentityWorkspaceList({ managedIdentityId }: Props) {
             {edgeCount > 0 && <React.Fragment>
                 <Typography mb={1} fontWeight={500}>{data?.workspaces.totalCount} assigned workspace{data?.workspaces.totalCount === 1 ? '' : 's'}</Typography>
                 <InfiniteScroll
-                    dataLength={data?.workspaces.edges?.length ?? 0}
+                    dataLength={edges.length}
                     next={() => loadNext(INITIAL_ITEM_COUNT)}
                     hasMore={hasNext}
                     loader={<ListSkeleton rowCount={3} />}
                 >
                     <List disablePadding>
-                        {data?.workspaces.edges?.map((edge: any, index: number) => <ManagedIdentityWorkspaceListItem key={edge.node.id} workspaceKey={edge.node} last={index === (edgeCount - 1)} />)}
+                        {edges.map((edge: any, index: number) => <ManagedIdentityWorkspaceListItem key={edge.node.id} workspaceKey={edge.node} last={index === (edgeCount - 1)} />)}
                     </List>
                 </InfiniteScroll>
             </React.Fragment>}

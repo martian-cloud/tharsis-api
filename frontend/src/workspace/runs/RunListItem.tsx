@@ -40,15 +40,14 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
             status
             isDestroy
             assessment
+            hasAdvisoryFailures
             workspace {
                 fullPath
-            }
-            plan {
-                status
             }
             apply {
                 status
             }
+            ...RunStageIconsFragment_run
         }
     `, runFragment)
 
@@ -73,7 +72,7 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
                     width: 24,
                     height: 24,
                     bgcolor: 'avatar.default',
-                    fontSize: 14,
+                    fontSize: theme => theme.typography.body2.fontSize,
                     fontWeight: 500
                 }}>
                 {getServiceAccountInitial(data.createdBy)}
@@ -87,7 +86,7 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
             sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
         >
             <TableCell>
-                <RunStatusChip to={runPath} status={data.status} />
+                <RunStatusChip to={runPath} status={data.status} hasAdvisoryFailures={data.hasAdvisoryFailures} />
             </TableCell>
             <TableCell>
                 <Link color="inherit" to={runPath}>{data.id.substring(0, 8)}...</Link>
@@ -115,7 +114,7 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
                 </Box>
             </TableCell>
             <TableCell>
-                <RunStageIcons planStatus={data.plan.status} applyStatus={data.apply?.status} runPath={runPath} />
+                <RunStageIcons fragmentRef={data} />
             </TableCell>
             <TableCell align="right">
                 <TRNButton trn={data.metadata.trn} size="small" />
@@ -124,7 +123,7 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
     ) : (
         <ListItem divider={!last}>
             <ListItemIcon sx={{ minWidth: 80 }}>
-                <RunStageIcons planStatus={data.plan.status} applyStatus={data.apply?.status} runPath={runPath} />
+                <RunStageIcons fragmentRef={data} />
             </ListItemIcon>
             <ListItemText
                 primary={

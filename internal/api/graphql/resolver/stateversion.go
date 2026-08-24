@@ -222,10 +222,10 @@ func (r *StateVersionInventoryResolver) Dependencies() []*StateVersionDependency
 }
 
 // CheckResults resolver
-func (r *StateVersionInventoryResolver) CheckResults() []*CheckResultResolver {
-	resolvers := make([]*CheckResultResolver, len(r.inventory.CheckResults))
+func (r *StateVersionInventoryResolver) CheckResults() []*TerraformCheckResultResolver {
+	resolvers := make([]*TerraformCheckResultResolver, len(r.inventory.CheckResults))
 	for i, result := range r.inventory.CheckResults {
-		resolvers[i] = &CheckResultResolver{checkResult: result}
+		resolvers[i] = &TerraformCheckResultResolver{checkResult: result}
 	}
 	return resolvers
 }

@@ -35,7 +35,8 @@ function RunList({ fragmentRef, hasNext, loadNext, displayWorkspacePath }: Props
       }
     `, fragmentRef);
 
-    const edgeCount = data.edges?.length ?? 0;
+    const edges = data?.edges ?? [];
+    const edgeCount = edges.length;
 
     return (
         <InfiniteScroll
@@ -59,7 +60,7 @@ function RunList({ fragmentRef, hasNext, loadNext, displayWorkspacePath }: Props
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {data.edges?.map((edge: any) => (
+                        {edges.map((edge: any) => (
                             <RunListItem
                                 key={edge.node.id}
                                 runFragment={edge.node}
@@ -71,7 +72,7 @@ function RunList({ fragmentRef, hasNext, loadNext, displayWorkspacePath }: Props
                 </Table>
             </TableContainer>}
             {mobile && <List>
-                {data.edges?.map((edge: any, index: number) => (
+                {edges.map((edge: any, index: number) => (
                     <RunListItem
                         key={edge.node.id}
                         runFragment={edge.node}

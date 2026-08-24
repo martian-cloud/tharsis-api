@@ -56,6 +56,36 @@ func (_m *MockService) ApplyRun(ctx context.Context, runID string, comment *stri
 	return r0, r1
 }
 
+// ApproveRunGate provides a mock function with given fields: ctx, input
+func (_m *MockService) ApproveRunGate(ctx context.Context, input *ApproveRunGateInput) (*models.RunGate, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ApproveRunGate")
+	}
+
+	var r0 *models.RunGate
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *ApproveRunGateInput) (*models.RunGate, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *ApproveRunGateInput) *models.RunGate); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.RunGate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *ApproveRunGateInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CancelRun provides a mock function with given fields: ctx, options
 func (_m *MockService) CancelRun(ctx context.Context, options *CancelRunInput) (*models.Run, error) {
 	ret := _m.Called(ctx, options)
@@ -266,6 +296,36 @@ func (_m *MockService) DownloadPlan(ctx context.Context, planID string) (io.Read
 	return r0, r1
 }
 
+// DownloadPlanJSON provides a mock function with given fields: ctx, planID
+func (_m *MockService) DownloadPlanJSON(ctx context.Context, planID string) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, planID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DownloadPlanJSON")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (io.ReadCloser, error)); ok {
+		return rf(ctx, planID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) io.ReadCloser); ok {
+		r0 = rf(ctx, planID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, planID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetPlanCheckResults provides a mock function with given fields: ctx, planID
 func (_m *MockService) GetPlanCheckResults(ctx context.Context, planID string) ([]corerun.CheckResult, error) {
 	ret := _m.Called(ctx, planID)
@@ -319,6 +379,36 @@ func (_m *MockService) GetPlanDiff(ctx context.Context, planID string) (*plan.Di
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, planID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPolicyCheckPolicyMessages provides a mock function with given fields: ctx, policyCheckID, policyID
+func (_m *MockService) GetPolicyCheckPolicyMessages(ctx context.Context, policyCheckID string, policyID string) ([]string, error) {
+	ret := _m.Called(ctx, policyCheckID, policyID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPolicyCheckPolicyMessages")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]string, error)); ok {
+		return rf(ctx, policyCheckID, policyID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) []string); ok {
+		r0 = rf(ctx, policyCheckID, policyID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, policyCheckID, policyID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -409,6 +499,276 @@ func (_m *MockService) GetRunByTRN(ctx context.Context, trn string) (*models.Run
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunGateApprovalByID provides a mock function with given fields: ctx, id
+func (_m *MockService) GetRunGateApprovalByID(ctx context.Context, id string) (*models.RunGateApproval, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunGateApprovalByID")
+	}
+
+	var r0 *models.RunGateApproval
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.RunGateApproval, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.RunGateApproval); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.RunGateApproval)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunGateApprovalByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetRunGateApprovalByTRN(ctx context.Context, trn string) (*models.RunGateApproval, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunGateApprovalByTRN")
+	}
+
+	var r0 *models.RunGateApproval
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.RunGateApproval, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.RunGateApproval); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.RunGateApproval)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunGateApprovalsByGateID provides a mock function with given fields: ctx, gateID
+func (_m *MockService) GetRunGateApprovalsByGateID(ctx context.Context, gateID string) ([]models.RunGateApproval, error) {
+	ret := _m.Called(ctx, gateID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunGateApprovalsByGateID")
+	}
+
+	var r0 []models.RunGateApproval
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]models.RunGateApproval, error)); ok {
+		return rf(ctx, gateID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []models.RunGateApproval); ok {
+		r0 = rf(ctx, gateID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.RunGateApproval)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, gateID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunGateByID provides a mock function with given fields: ctx, id
+func (_m *MockService) GetRunGateByID(ctx context.Context, id string) (*models.RunGate, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunGateByID")
+	}
+
+	var r0 *models.RunGate
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.RunGate, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.RunGate); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.RunGate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunGateByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetRunGateByTRN(ctx context.Context, trn string) (*models.RunGate, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunGateByTRN")
+	}
+
+	var r0 *models.RunGate
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.RunGate, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.RunGate); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.RunGate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunGates provides a mock function with given fields: ctx, input
+func (_m *MockService) GetRunGates(ctx context.Context, input *GetRunGatesInput) (*db.RunGatesResult, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunGates")
+	}
+
+	var r0 *db.RunGatesResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *GetRunGatesInput) (*db.RunGatesResult, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *GetRunGatesInput) *db.RunGatesResult); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*db.RunGatesResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *GetRunGatesInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunGatesAwaitingDecision provides a mock function with given fields: ctx, input
+func (_m *MockService) GetRunGatesAwaitingDecision(ctx context.Context, input *GetRunGatesAwaitingDecisionInput) (*db.RunGatesResult, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunGatesAwaitingDecision")
+	}
+
+	var r0 *db.RunGatesResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *GetRunGatesAwaitingDecisionInput) (*db.RunGatesResult, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *GetRunGatesAwaitingDecisionInput) *db.RunGatesResult); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*db.RunGatesResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *GetRunGatesAwaitingDecisionInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunGatesByIDs provides a mock function with given fields: ctx, ids
+func (_m *MockService) GetRunGatesByIDs(ctx context.Context, ids []string) ([]*models.RunGate, error) {
+	ret := _m.Called(ctx, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunGatesByIDs")
+	}
+
+	var r0 []*models.RunGate
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]*models.RunGate, error)); ok {
+		return rf(ctx, ids)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []*models.RunGate); ok {
+		r0 = rf(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.RunGate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunGatesByPolicyCheckIDs provides a mock function with given fields: ctx, policyCheckIDs
+func (_m *MockService) GetRunGatesByPolicyCheckIDs(ctx context.Context, policyCheckIDs []string) ([]*models.RunGate, error) {
+	ret := _m.Called(ctx, policyCheckIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunGatesByPolicyCheckIDs")
+	}
+
+	var r0 []*models.RunGate
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]*models.RunGate, error)); ok {
+		return rf(ctx, policyCheckIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []*models.RunGate); ok {
+		r0 = rf(ctx, policyCheckIDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.RunGate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, policyCheckIDs)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -536,6 +896,36 @@ func (_m *MockService) GetStateVersionsByRunIDs(ctx context.Context, idList []st
 	return r0, r1
 }
 
+// OverrideRunGate provides a mock function with given fields: ctx, gateID, comment
+func (_m *MockService) OverrideRunGate(ctx context.Context, gateID string, comment *string) (*models.RunGate, error) {
+	ret := _m.Called(ctx, gateID, comment)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OverrideRunGate")
+	}
+
+	var r0 *models.RunGate
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *string) (*models.RunGate, error)); ok {
+		return rf(ctx, gateID, comment)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *string) *models.RunGate); ok {
+		r0 = rf(ctx, gateID, comment)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.RunGate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *string) error); ok {
+		r1 = rf(ctx, gateID, comment)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ProcessPlanData provides a mock function with given fields: ctx, planID, _a2, providerSchemas
 func (_m *MockService) ProcessPlanData(ctx context.Context, planID string, _a2 *tfjson.Plan, providerSchemas *tfjson.ProviderSchemas) error {
 	ret := _m.Called(ctx, planID, _a2, providerSchemas)
@@ -547,6 +937,24 @@ func (_m *MockService) ProcessPlanData(ctx context.Context, planID string, _a2 *
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, *tfjson.Plan, *tfjson.ProviderSchemas) error); ok {
 		r0 = rf(ctx, planID, _a2, providerSchemas)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ReportRunPolicyOutcomes provides a mock function with given fields: ctx, input
+func (_m *MockService) ReportRunPolicyOutcomes(ctx context.Context, input *ReportRunPolicyOutcomesInput) error {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReportRunPolicyOutcomes")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *ReportRunPolicyOutcomesInput) error); ok {
+		r0 = rf(ctx, input)
 	} else {
 		r0 = ret.Error(0)
 	}

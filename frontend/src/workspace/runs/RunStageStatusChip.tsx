@@ -7,7 +7,7 @@ interface Props {
 }
 
 function RunStageStatusChip(props: Props) {
-  const type = RunStageStatusTypes[props.status] ?? { label: 'unknown', color: 'runStatus.unknown' }
+  const type = RunStageStatusTypes[props.status.toLowerCase()] ?? { label: 'unknown', color: 'runStatus.unknown' }
   const StatusIcon = type.icon;
   return (
     <Chip

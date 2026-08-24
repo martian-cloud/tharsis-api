@@ -134,7 +134,7 @@ func TestCreateAssessmentRun_Execute(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cmd.Created)
 			assert.True(t, createCalled)
-			assert.Equal(t, models.RunQueuing, cmd.Created.Status)
+			assert.Equal(t, models.RunPlanQueuing, cmd.Created.Status)
 		})
 	}
 }

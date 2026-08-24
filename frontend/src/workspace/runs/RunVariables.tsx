@@ -1,3 +1,4 @@
+import NoResults from '@/common/NoResults';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -10,7 +11,6 @@ import { useFragment } from 'react-relay/hooks';
 import { RunVariablesFragment_variables$key } from './__generated__/RunVariablesFragment_variables.graphql';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import Paper from '@mui/material/Paper';
 import { useTheme } from '@mui/material/styles';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { IconButton, Menu, MenuItem } from '@mui/material';
@@ -151,16 +151,10 @@ function RunVariables(props: Props) {
             {(filteredVariables.length === 0 && search !== '') && <Typography sx={{ padding: 2 }} align="center" color="textSecondary">
                 No variables matching search
             </Typography>}
-            {(filteredVariables.length === 0 && search === '') && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                    {variableCategory === 'terraform' && <Typography color="textSecondary" align="center">
-                        This run does not have any Terraform variables
-                    </Typography>}
-                    {variableCategory === 'environment' && <Typography color="textSecondary" align="center">
-                        This run does not have any environment variables
-                    </Typography>}
-                </Box>
-            </Paper>}
+            {(filteredVariables.length === 0 && search === '') && <NoResults sx={{ mt: 4, mb: 6 }}>
+                {variableCategory === 'terraform' && 'This run does not have any Terraform variables'}
+                {variableCategory === 'environment' && 'This run does not have any environment variables'}
+            </NoResults>}
             {filteredVariables.length > 0 && <Box sx={{ mt: 2 }}>
                 <ResponsiveTable
                     ariaLabel="run variables"

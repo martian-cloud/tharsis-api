@@ -1,11 +1,14 @@
 import { Route, Routes } from 'react-router-dom';
 import AdminAreaEntryPoint from '../admin/AdminArea';
+import Approvals from '../approvals/Approvals';
 import GraphiQLEditor from '../graphiql/GraphiQLEditor';
 import NewGroup from '../groups/NewGroup';
 import HomePage from '../home/HomePage';
 import NewWorkspace from '../workspace/NewWorkspace';
 import ExploreGroupsEntryPoint from './ExploreGroupsEntryPoint';
 import GroupOrWorkspaceDetailsEntryPoint from './GroupOrWorkspaceDetailsEntryPoint';
+import PackageSearchEntryPoint from './PackageSearchEntryPoint';
+import PackageVersionDetailsEntryPoint from './PackageVersionDetailsEntryPoint';
 import ScrollRestoration from './ScrollRestoration';
 import TeamDetailsEntryPoint from './TeamDetailsEntryPoint';
 import TerraformModuleSearchEntryPoint from './TerraformModuleSearchEntryPoint';
@@ -32,8 +35,11 @@ function AppRoutes() {
                 <Route path="/module-registry/:registryNamespace/:moduleName/:system/:version" element={<TerraformModuleVersionDetailsEntryPoint />} />
                 <Route path="/module-registry/:registryNamespace/:moduleName/:system" element={<TerraformModuleVersionDetailsEntryPoint />} />
                 <Route path="/module-registry/*" element={<TerraformModuleSearchEntryPoint />} />
+                <Route path="/package-registry/:packageId" element={<PackageVersionDetailsEntryPoint />} />
+                <Route path="/package-registry/*" element={<PackageSearchEntryPoint />} />
                 <Route path="/admin/*" element={<AdminAreaEntryPoint />} />
                 <Route path="/preferences" element={<UserPreferencesEntryPoint />} />
+                <Route path="/approval_requests" element={<Approvals />} />
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/teams/:teamName" element={<TeamDetailsEntryPoint />} />
                 <Route path="/" element={<HomePage />} />

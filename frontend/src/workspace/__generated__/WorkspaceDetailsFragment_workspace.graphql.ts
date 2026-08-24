@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<77a36c86bf4450e48274ecf168eaac27>>
+ * @generated SignedSource<<5d6985355ef992dc6f94e329a50ed71b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,7 +15,7 @@ export type WorkspaceDetailsFragment_workspace$data = {
   readonly fullPath: string;
   readonly id: string;
   readonly name: string;
-  readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListFragment_assignedManagedIdentities" | "ConfigurationVersionDetailsFragment_workspace" | "NamespaceActivityFragment_activity" | "NamespaceMembershipsFragment_memberships" | "ProviderMirrorsFragment_namespace" | "RunsFragment_runs" | "StateVersionsFragment_stateVersions" | "VariablesFragment_variables" | "WorkspaceDetailsIndexFragment_workspace" | "WorkspaceSettingsFragment_workspace">;
+  readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListFragment_assignedManagedIdentities" | "AssignedPolicyListFragment_workspace" | "ConfigurationVersionDetailsFragment_workspace" | "NamespaceActivityFragment_activity" | "NamespaceMembershipsFragment_memberships" | "ProviderMirrorsFragment_namespace" | "RunsFragment_runs" | "StateVersionsFragment_stateVersions" | "VariablesFragment_variables" | "WorkspaceDetailsIndexFragment_workspace" | "WorkspaceSettingsFragment_workspace">;
   readonly " $fragmentType": "WorkspaceDetailsFragment_workspace";
 };
 export type WorkspaceDetailsFragment_workspace$key = {
@@ -61,6 +61,11 @@ const node: ReaderFragment = {
       "args": null,
       "kind": "FragmentSpread",
       "name": "WorkspaceDetailsIndexFragment_workspace"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "AssignedPolicyListFragment_workspace"
     },
     {
       "args": null,
@@ -112,6 +117,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "c7170df0288688ab08a90c9c4301c383";
+(node as any).hash = "408a5bd8627cb50884fe917b7ed68597";
 
 export default node;

@@ -2,20 +2,20 @@
 
 export function getCheckStatusLabel(status: string): string {
     switch (status) {
-        case 'pass': return 'Pass';
-        case 'fail': return 'Fail';
-        case 'error': return 'Error';
-        case 'unknown': return 'Unknown';
+        case 'PASS': return 'Pass';
+        case 'FAIL': return 'Fail';
+        case 'ERROR': return 'Error';
+        case 'UNKNOWN': return 'Unknown';
         default: return status;
     }
 }
 
 export function getCheckStatusTooltip(status: string): string {
     switch (status) {
-        case 'pass': return 'The check assertion condition evaluated to true';
-        case 'fail': return 'The check assertion condition evaluated to false';
-        case 'error': return 'Terraform could not evaluate the check condition';
-        case 'unknown': return 'The check result could not be determined';
+        case 'PASS': return 'The check assertion condition evaluated to true';
+        case 'FAIL': return 'The check assertion condition evaluated to false';
+        case 'ERROR': return 'Terraform could not evaluate the check condition';
+        case 'UNKNOWN': return 'The check result could not be determined';
         default: return '';
     }
 }

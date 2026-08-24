@@ -93,7 +93,9 @@ func (c *CreateReconcileRun) Execute(ctx context.Context, input *types.ExecuteIn
 	}
 
 	input.RunStore.AddRun(created)
-	changes, err := statemachine.SetRunStatus(created, models.RunQueuing)
+	// Advance the newly-created run, which begins its plan phase: the run node readies its pre-plan
+	// policy stage if it has one, and otherwise the plan.
+	changes, err := statemachine.AdvanceRun(created)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize run state")
 	}

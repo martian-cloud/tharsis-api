@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7a4ad170e50b255691187f1dac861298>>
+ * @generated SignedSource<<0d7ffed47e49e6cfd2e1bf4c040c2cd8>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,7 +16,7 @@ export type ActivityEventRunnerTargetFragment_event$data = {
   readonly namespacePath: string | null | undefined;
   readonly target: {
     readonly name?: string;
-  };
+  } | null | undefined;
   readonly " $fragmentSpreads": FragmentRefs<"ActivityEventListItemFragment_event">;
   readonly " $fragmentType": "ActivityEventRunnerTargetFragment_event";
 };

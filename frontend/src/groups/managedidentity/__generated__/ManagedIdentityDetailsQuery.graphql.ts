@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<410d633a833ef58f9d397cf8299e4912>>
+ * @generated SignedSource<<1ce841f82427b7324da705f61d3a79e5>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -48,7 +48,7 @@ export type ManagedIdentityDetailsQuery$data = {
     };
     readonly name: string;
     readonly type: string;
-    readonly " $fragmentSpreads": FragmentRefs<"ManagedIdentityAliasesFragment_managedIdentity" | "ManagedIdentityRulesFragment_managedIdentity" | "MoveManagedIdentityDialogFragment_managedIdentity">;
+    readonly " $fragmentSpreads": FragmentRefs<"ManagedIdentityAliasesFragment_managedIdentity" | "ManagedIdentityPoliciesFragment_managedIdentity" | "ManagedIdentityRulesFragment_managedIdentity" | "MoveManagedIdentityDialogFragment_managedIdentity">;
   } | null | undefined;
 };
 export type ManagedIdentityDetailsQuery = {
@@ -302,6 +302,11 @@ return {
           {
             "args": null,
             "kind": "FragmentSpread",
+            "name": "ManagedIdentityPoliciesFragment_managedIdentity"
+          },
+          {
+            "args": null,
+            "kind": "FragmentSpread",
             "name": "MoveManagedIdentityDialogFragment_managedIdentity"
           }
         ],
@@ -505,16 +510,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "df97a07d83fadc24a520b28f3ad13b9d",
+    "cacheID": "2e9936654c455a9b4bf46112700dfc4c",
     "id": null,
     "metadata": {},
     "name": "ManagedIdentityDetailsQuery",
     "operationKind": "query",
-    "text": "query ManagedIdentityDetailsQuery(\n  $id: String!\n  $first: Int!\n  $after: String\n  $last: Int\n  $before: String\n) {\n  managedIdentity(id: $id) {\n    id\n    isAlias\n    name\n    description\n    type\n    data\n    groupPath\n    metadata {\n      trn\n    }\n    accessRules {\n      id\n      runStage\n      allowedUsers {\n        id\n        username\n        email\n      }\n      allowedTeams {\n        id\n        name\n      }\n      allowedServiceAccounts {\n        id\n        name\n        resourcePath\n      }\n    }\n    ...ManagedIdentityAliasesFragment_managedIdentity\n    ...ManagedIdentityRulesFragment_managedIdentity\n    ...MoveManagedIdentityDialogFragment_managedIdentity\n  }\n}\n\nfragment ManagedIdentityAliasesFragment_managedIdentity on ManagedIdentity {\n  ...ManagedIdentityAliasesListFragment_managedIdentity\n  ...NewManagedIdentityAliasDialogFragment_managedIdentity\n}\n\nfragment ManagedIdentityAliasesListFragment_managedIdentity on ManagedIdentity {\n  id\n  aliases(first: $first, last: $last, after: $after, before: $before) {\n    edges {\n      node {\n        id\n        ...ManagedIdentityAliasesListItemFragment_managedIdentity\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment ManagedIdentityAliasesListItemFragment_managedIdentity on ManagedIdentity {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  type\n  groupPath\n}\n\nfragment ManagedIdentityRulesFragment_managedIdentity on ManagedIdentity {\n  id\n  isAlias\n  accessRules {\n    id\n    type\n    runStage\n    moduleAttestationPolicies {\n      publicKey\n      predicateType\n    }\n    allowedUsers {\n      id\n      username\n      email\n    }\n    allowedTeams {\n      id\n      name\n    }\n    allowedServiceAccounts {\n      id\n      name\n      resourcePath\n    }\n  }\n}\n\nfragment MoveManagedIdentityDialogFragment_managedIdentity on ManagedIdentity {\n  id\n  name\n  groupPath\n}\n\nfragment NewManagedIdentityAliasDialogFragment_managedIdentity on ManagedIdentity {\n  id\n  groupPath\n}\n"
+    "text": "query ManagedIdentityDetailsQuery(\n  $id: String!\n  $first: Int!\n  $after: String\n  $last: Int\n  $before: String\n) {\n  managedIdentity(id: $id) {\n    id\n    isAlias\n    name\n    description\n    type\n    data\n    groupPath\n    metadata {\n      trn\n    }\n    accessRules {\n      id\n      runStage\n      allowedUsers {\n        id\n        username\n        email\n      }\n      allowedTeams {\n        id\n        name\n      }\n      allowedServiceAccounts {\n        id\n        name\n        resourcePath\n      }\n    }\n    ...ManagedIdentityAliasesFragment_managedIdentity\n    ...ManagedIdentityRulesFragment_managedIdentity\n    ...ManagedIdentityPoliciesFragment_managedIdentity\n    ...MoveManagedIdentityDialogFragment_managedIdentity\n  }\n}\n\nfragment ManagedIdentityAliasesFragment_managedIdentity on ManagedIdentity {\n  ...ManagedIdentityAliasesListFragment_managedIdentity\n  ...NewManagedIdentityAliasDialogFragment_managedIdentity\n}\n\nfragment ManagedIdentityAliasesListFragment_managedIdentity on ManagedIdentity {\n  id\n  aliases(first: $first, last: $last, after: $after, before: $before) {\n    edges {\n      node {\n        id\n        ...ManagedIdentityAliasesListItemFragment_managedIdentity\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment ManagedIdentityAliasesListItemFragment_managedIdentity on ManagedIdentity {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  type\n  groupPath\n}\n\nfragment ManagedIdentityPoliciesFragment_managedIdentity on ManagedIdentity {\n  id\n}\n\nfragment ManagedIdentityRulesFragment_managedIdentity on ManagedIdentity {\n  id\n  isAlias\n  accessRules {\n    id\n    type\n    runStage\n    moduleAttestationPolicies {\n      publicKey\n      predicateType\n    }\n    allowedUsers {\n      id\n      username\n      email\n    }\n    allowedTeams {\n      id\n      name\n    }\n    allowedServiceAccounts {\n      id\n      name\n      resourcePath\n    }\n  }\n}\n\nfragment MoveManagedIdentityDialogFragment_managedIdentity on ManagedIdentity {\n  id\n  name\n  groupPath\n}\n\nfragment NewManagedIdentityAliasDialogFragment_managedIdentity on ManagedIdentity {\n  id\n  groupPath\n}\n"
   }
 };
 })();
 
-(node as any).hash = "28bb7c044ba6d466d180238f48bf43e2";
+(node as any).hash = "38bd95e381f6218dd6d22c891e0b9dce";
 
 export default node;

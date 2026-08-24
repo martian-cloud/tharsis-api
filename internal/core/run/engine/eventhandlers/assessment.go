@@ -84,10 +84,12 @@ func (h *AssessmentRunHandler) handleRun(ctx context.Context, run *models.Run) e
 		assessment.RequiresNotification = hasDrift && !assessment.HasDrift
 		assessment.HasDrift = hasDrift
 	} else {
-		// The run failed/canceled/discarded, so it produced no fresh drift verdict.
-		// Clear the previous verdict rather than presenting it as this run's result.
+		// The run failed, was canceled, or was blocked by a hard-mandatory policy, so it produced no
+		// fresh drift verdict. The previous verdict is left standing rather than cleared: reporting a
+		// workspace as clean because the assessment could not complete is a false negative, and the run
+		// linked above carries the status that says this attempt did not produce a result. Notification
+		// stays off — a verdict that was already recorded is not news.
 		assessment.RequiresNotification = false
-		assessment.HasDrift = false
 	}
 
 	if _, err := h.dbClient.WorkspaceAssessments.UpdateWorkspaceAssessment(ctx, assessment); err != nil {

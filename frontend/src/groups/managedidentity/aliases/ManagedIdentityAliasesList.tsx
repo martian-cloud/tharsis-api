@@ -45,23 +45,25 @@ function ManagedIdentityAliasesList({ fragmentRef }: Props) {
                 }
             }`, fragmentRef);
 
-    return (data.aliases.edges && data.aliases.edges?.length > 0) ?
+    const edges = data?.aliases?.edges ?? [];
+
+    return (edges.length > 0) ?
         <Box>
             <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
                 <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
                     <Typography variant="subtitle1">
-                    {data.aliases.edges.length} alias{data.aliases.edges.length === 1 ? '' : 'es'}</Typography>
+                    {edges.length} alias{edges.length === 1 ? '' : 'es'}</Typography>
                 </Box>
             </Paper>
             <InfiniteScroll
-                dataLength={data.aliases.edges.length ?? 0}
+                dataLength={edges.length}
                 next={() => loadNext(20)}
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
             >
                 <List
                     disablePadding
-                > {data.aliases.edges.map((edge: any) => <ManagedIdentityAliasesListItem
+                > {edges.map((edge: any) => <ManagedIdentityAliasesListItem
                     key={edge.node.id}
                     fragmentRef={edge.node}
                     />)}

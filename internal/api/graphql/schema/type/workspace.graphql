@@ -102,6 +102,7 @@ type Workspace implements Node, Namespace {
   destroyed: Boolean!
   locked: Boolean!
   assignedManagedIdentities: [ManagedIdentity!]!
+  assignedPolicies: [Policy!]!
   labels: [WorkspaceLabel!]!
   assessment: WorkspaceAssessment
   managedIdentities(
