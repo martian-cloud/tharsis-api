@@ -13,7 +13,6 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -253,14 +252,12 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 		pagination.WithQueryTag("serviceaccount.GetServiceAccounts"),
 	)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, s.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -270,16 +267,14 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 	for rows.Next() {
 		item, err := scanServiceAccount(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := ServiceAccountsResult{
@@ -300,8 +295,7 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 
 	trustPoliciesJSON, err := s.marshalOIDCTrustPolicies(serviceAccount.OIDCTrustPolicies)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal OIDC trust policies")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal OIDC trust policies", errors.WithSpan(span))
 	}
 
 	sql, args, err := toSQLWithTag("serviceaccount.CreateServiceAccount", dialect.From("service_accounts").
@@ -325,28 +319,23 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 		).Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdServiceAccount, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil,
-					"Service account with name %s already exists in group %s", serviceAccount.Name, serviceAccount.GroupID)
 				return nil, errors.New(
 					"Service account with name %s already exists in group %s", serviceAccount.Name, serviceAccount.GroupID,
-					errors.WithErrorCode(errors.EConflict),
+					errors.WithErrorCode(errors.EConflict), errors.WithSpan(span),
 				)
 			}
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
-				tracing.RecordError(span, nil, "invalid group: the specified group does not exist")
-				return nil, errors.New("invalid group: the specified group does not exist", errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("invalid group: the specified group does not exist", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdServiceAccount, nil
@@ -360,8 +349,7 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 
 	trustPoliciesJSON, err := s.marshalOIDCTrustPolicies(serviceAccount.OIDCTrustPolicies)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal OIDC trust policies")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal OIDC trust policies", errors.WithSpan(span))
 	}
 
 	timestamp := currentTime()
@@ -385,18 +373,15 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 		).Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedServiceAccount, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedServiceAccount, nil
@@ -416,29 +401,24 @@ func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccou
 		).Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) {
-				tracing.RecordError(span, nil,
-					"Service account %s is assigned as a member of a group/workspace", serviceAccount.Name)
 				return errors.New(
 					"Service account %s is assigned as a member of a group/workspace", serviceAccount.Name,
-					errors.WithErrorCode(errors.EConflict),
+					errors.WithErrorCode(errors.EConflict), errors.WithSpan(span),
 				)
 			}
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil
@@ -488,19 +468,16 @@ func (s *serviceAccounts) AssignServiceAccountToRunner(ctx context.Context, serv
 		}))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err = s.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil, "service account already assigned to runner")
-				return errors.New("service account already assigned to runner", errors.WithErrorCode(errors.EConflict))
+				return errors.New("service account already assigned to runner", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil
@@ -521,13 +498,11 @@ func (s *serviceAccounts) UnassignServiceAccountFromRunner(ctx context.Context, 
 		))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err = s.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil

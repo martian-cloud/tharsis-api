@@ -12,7 +12,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
@@ -68,16 +67,14 @@ func (s *stateVersionOutputs) CreateStateVersionOutput(ctx context.Context,
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdStateVersionOutput, err := scanStateVersionOutput(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		s.dbClient.logger.WithContextFields(ctx).Error(err)
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 	return createdStateVersionOutput, nil
 }
@@ -97,14 +94,12 @@ func (s *stateVersionOutputs) GetStateVersionOutputs(ctx context.Context,
 		Where(goqu.Ex{"state_version_id": stateVersionID}))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	rows, err := s.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 	defer rows.Close()
 
@@ -113,8 +108,7 @@ func (s *stateVersionOutputs) GetStateVersionOutputs(ctx context.Context,
 	for rows.Next() {
 		item, err := scanStateVersionOutput(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 		results = append(results, *item)
 	}
@@ -168,7 +162,7 @@ func (s *stateVersionOutputs) getStateVersionOutput(ctx context.Context, ex goqu
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
 		Where(ex))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
+		_ = errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	stateVersionOutput, err := scanStateVersionOutput(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))

@@ -14,7 +14,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -140,24 +139,20 @@ func (s *service) GetManagedIdentities(ctx context.Context, input *GetManagedIde
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if input.NamespacePath != "" {
 		if err = caller.RequirePermission(ctx, models.ViewManagedIdentityPermission, auth.WithNamespacePath(input.NamespacePath)); err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	} else if input.AliasSourceID != nil {
 		sourceIdentity, gErr := s.getManagedIdentityByID(ctx, *input.AliasSourceID)
 		if gErr != nil {
-			tracing.RecordError(span, gErr, "failed to get managed identity by ID")
 			return nil, gErr
 		}
 
 		if err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(sourceIdentity.GroupID)); err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	} else {
@@ -192,8 +187,7 @@ func (s *service) GetManagedIdentities(ctx context.Context, input *GetManagedIde
 		Filter:            filter,
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identities")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identities", errors.WithSpan(span))
 	}
 
 	return result, nil
@@ -206,7 +200,6 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
@@ -217,7 +210,6 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 
 	err = caller.RequirePermission(ctx, models.DeleteManagedIdentityPermission, auth.WithGroupID(input.ManagedIdentity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -230,8 +222,7 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 		// Verify that managed identity is not assigned to any workspaces
 		workspaces, wErr := s.dbClient.Workspaces.GetWorkspacesForManagedIdentity(ctx, input.ManagedIdentity.Metadata.ID)
 		if wErr != nil {
-			tracing.RecordError(span, wErr, "failed to get workspaces for managed identity")
-			return wErr
+			return errors.Wrap(wErr, "failed to get workspaces for managed identity", errors.WithSpan(span))
 		}
 		if len(workspaces) > 0 {
 			return errors.New(
@@ -244,8 +235,7 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -256,8 +246,7 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 
 	err = s.dbClient.ManagedIdentities.DeleteManagedIdentity(txContext, input.ManagedIdentity)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to delete managed identity")
-		return err
+		return errors.Wrap(err, "failed to delete managed identity", errors.WithSpan(span))
 	}
 
 	groupPath := input.ManagedIdentity.GetGroupPath()
@@ -274,8 +263,7 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 				Type: string(models.TargetManagedIdentity),
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	return s.dbClient.Transactions.CommitTx(txContext)
@@ -288,20 +276,17 @@ func (s *service) GetManagedIdentitiesForWorkspace(ctx context.Context, workspac
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewManagedIdentityPermission, auth.WithWorkspaceID(workspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	identities, err := s.dbClient.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, workspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identities for workspace")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identities for workspace", errors.WithSpan(span))
 	}
 
 	return identities, nil
@@ -314,28 +299,24 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(workspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	// Get managed identity that will be added
 	identity, err := s.getManagedIdentityByID(ctx, managedIdentityID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by ID")
 		return err
 	}
 
 	// Get workspace
 	workspace, err := s.workspaceService.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get workspace by ID")
-		return err
+		return errors.Wrap(err, "failed to get workspace by ID", errors.WithSpan(span))
 	}
 
 	resourcePathParts := strings.Split(identity.GetResourcePath(), "/")
@@ -348,8 +329,7 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 
 	identitiesInWorkspace, err := s.GetManagedIdentitiesForWorkspace(ctx, workspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identities for workspace")
-		return err
+		return errors.Wrap(err, "failed to get managed identities for workspace", errors.WithSpan(span))
 	}
 
 	// We only allow one managed identity of each type in a workspace, except for AWS federated.
@@ -363,8 +343,7 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -375,27 +354,23 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 
 	if aErr := s.dbClient.ManagedIdentities.AddManagedIdentityToWorkspace(txContext,
 		managedIdentityID, workspaceID); aErr != nil {
-		tracing.RecordError(span, aErr, "failed to add managed identity to workspace")
-		return aErr
+		return errors.Wrap(aErr, "failed to add managed identity to workspace", errors.WithSpan(span))
 	}
 
 	// Get the number of managed identities assigned to a workspace to check whether we just violated the limit.
 	newManagedIdentities, err := s.dbClient.ManagedIdentities.GetManagedIdentitiesForWorkspace(txContext, workspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get workspace's managed identities")
-		return err
+		return errors.Wrap(err, "failed to get workspace's managed identities", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitAssignedManagedIdentitiesPerWorkspace, limits.StaticCount(int32(len(newManagedIdentities)))); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
 		return err
 	}
 
 	// Must check the group ID of the managed identity to make sure the managed identity did not get moved.
 	newManagedIdentity, err := s.dbClient.ManagedIdentities.GetManagedIdentityByID(ctx, managedIdentityID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get updated managed identity")
-		return err
+		return errors.Wrap(err, "failed to get updated managed identity", errors.WithSpan(span))
 	}
 	if newManagedIdentity.GroupID != identity.GroupID {
 		return errors.New("managed identity was moved while adding to workspace", errors.WithErrorCode(errors.EConflict))
@@ -408,13 +383,11 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 			TargetType:    models.TargetManagedIdentity,
 			TargetID:      identity.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Added a managed identity to a workspace.",
@@ -432,34 +405,29 @@ func (s *service) RemoveManagedIdentityFromWorkspace(ctx context.Context, manage
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(workspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	// Get managed identity that will be removed
 	identity, err := s.getManagedIdentityByID(ctx, managedIdentityID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by ID")
 		return err
 	}
 
 	// Get workspace
 	workspace, err := s.workspaceService.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get workspace by ID")
-		return err
+		return errors.Wrap(err, "failed to get workspace by ID", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -470,8 +438,7 @@ func (s *service) RemoveManagedIdentityFromWorkspace(ctx context.Context, manage
 
 	if err = s.dbClient.ManagedIdentities.RemoveManagedIdentityFromWorkspace(txContext,
 		managedIdentityID, workspaceID); err != nil {
-		tracing.RecordError(span, err, "failed to remove managed identity from workspace")
-		return err
+		return errors.Wrap(err, "failed to remove managed identity from workspace", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -481,13 +448,11 @@ func (s *service) RemoveManagedIdentityFromWorkspace(ctx context.Context, manage
 			TargetType:    models.TargetManagedIdentity,
 			TargetID:      identity.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Removed a managed identity from workspace.",
@@ -504,20 +469,17 @@ func (s *service) GetManagedIdentityByID(ctx context.Context, id string) (*model
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get identity from DB
 	identity, err := s.getManagedIdentityByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by ID")
 		return nil, err
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(identity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
 	}
 
@@ -531,15 +493,13 @@ func (s *service) GetManagedIdentityByTRN(ctx context.Context, trn string) (*mod
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get identity from DB
 	identity, err := s.dbClient.ManagedIdentities.GetManagedIdentityByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identity by TRN", errors.WithSpan(span))
 	}
 
 	if identity == nil {
@@ -548,7 +508,6 @@ func (s *service) GetManagedIdentityByTRN(ctx context.Context, trn string) (*mod
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(identity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
 	}
 
@@ -562,20 +521,17 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Require permissions for target group (group being shared to).
 	err = caller.RequirePermission(ctx, models.CreateManagedIdentityPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	aliasSourceIdentity, err := s.getManagedIdentityByID(ctx, input.AliasSourceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by ID")
 		return nil, err
 	}
 
@@ -586,8 +542,7 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 
 	sourceGroup, err := s.dbClient.Groups.GetGroupByID(ctx, aliasSourceIdentity.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group by ID", errors.WithSpan(span))
 	}
 
 	// Shouldn't happen.
@@ -598,14 +553,12 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 	// Require permissions for source group (group source managed identity belongs to).
 	err = caller.RequirePermission(ctx, models.CreateManagedIdentityPermission, auth.WithGroupID(sourceGroup.Metadata.ID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	newGroup, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group by ID", errors.WithSpan(span))
 	}
 
 	if newGroup == nil {
@@ -619,8 +572,7 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -637,14 +589,12 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 	}
 
 	if err = toCreate.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate managed identity model to create")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate managed identity model to create", errors.WithSpan(span))
 	}
 
 	createdAlias, err := s.dbClient.ManagedIdentities.CreateManagedIdentity(txContext, toCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create managed identity")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create managed identity", errors.WithSpan(span))
 	}
 
 	groupPath := createdAlias.GetGroupPath()
@@ -659,12 +609,10 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group's managed identities")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group's managed identities", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitManagedIdentitiesPerGroup, newManagedIdentities.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
 
@@ -678,12 +626,10 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity's aliases")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identity's aliases", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitManagedIdentityAliasesPerManagedIdentity, newAliases.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
 
@@ -694,13 +640,11 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 			TargetType:    models.TargetManagedIdentity,
 			TargetID:      createdAlias.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a managed identity alias.",
@@ -718,7 +662,6 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
@@ -732,13 +675,11 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 	if err = caller.RequirePermission(ctx, perm, auth.WithGroupID(input.ManagedIdentity.GroupID)); err != nil {
 		aliasSource, gErr := s.getManagedIdentityByID(ctx, *input.ManagedIdentity.AliasSourceID)
 		if gErr != nil {
-			tracing.RecordError(span, gErr, "failed to get managed identity by ID")
 			return gErr
 		}
 
 		// Now check if they have permissions in group of the source managed identity.
 		if err = caller.RequirePermission(ctx, perm, auth.WithGroupID(aliasSource.GroupID)); err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return err
 		}
 
@@ -753,8 +694,7 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 		// Verify that managed identity alias is not assigned to any workspaces
 		workspaces, wErr := s.dbClient.Workspaces.GetWorkspacesForManagedIdentity(ctx, input.ManagedIdentity.Metadata.ID)
 		if wErr != nil {
-			tracing.RecordError(span, wErr, "failed to get workspaces for managed identity")
-			return wErr
+			return errors.Wrap(wErr, "failed to get workspaces for managed identity", errors.WithSpan(span))
 		}
 		if len(workspaces) > 0 {
 			return errors.New(
@@ -767,8 +707,7 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -779,8 +718,7 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 
 	err = s.dbClient.ManagedIdentities.DeleteManagedIdentity(txContext, input.ManagedIdentity)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to delete managed identity")
-		return err
+		return errors.Wrap(err, "failed to delete managed identity", errors.WithSpan(span))
 	}
 
 	groupPath := input.ManagedIdentity.GetGroupPath()
@@ -797,8 +735,7 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 				Type: string(models.TargetManagedIdentity),
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	return s.dbClient.Transactions.CommitTx(txContext)
@@ -811,19 +748,16 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateManagedIdentityPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	delegate, err := s.getDelegate(input.Type)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get delegate")
 		return nil, err
 	}
 
@@ -838,7 +772,6 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 
 	// Validate model
 	if err = managedIdentity.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate managed identity model")
 		return nil, err
 	}
 
@@ -849,8 +782,7 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -862,19 +794,16 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 	// Store identity in DB
 	managedIdentity, err = s.dbClient.ManagedIdentities.CreateManagedIdentity(txContext, managedIdentity)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create managed identity")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create managed identity", errors.WithSpan(span))
 	}
 
 	if err = delegate.SetManagedIdentityData(txContext, managedIdentity, input.Data); err != nil {
-		tracing.RecordError(span, err, "failed to set managed identity data")
-		return nil, errors.Wrap(err, "failed to set managed identity data", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.Wrap(err, "failed to set managed identity data", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	managedIdentity, err = s.dbClient.ManagedIdentities.UpdateManagedIdentity(txContext, managedIdentity)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update managed identity")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update managed identity", errors.WithSpan(span))
 	}
 
 	groupPath := managedIdentity.GetGroupPath()
@@ -889,12 +818,10 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group's managed identities")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group's managed identities", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitManagedIdentitiesPerGroup, newManagedIdentities.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
 
@@ -905,15 +832,13 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 			TargetType:    models.TargetManagedIdentity,
 			TargetID:      managedIdentity.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	// Store access rules
 	if input.AccessRules != nil {
 		for _, rule := range input.AccessRules {
 			if err = s.verifyServiceAccountAccessForGroup(ctx, rule.AllowedServiceAccountIDs, managedIdentity.GetGroupPath()); err != nil {
-				tracing.RecordError(span, err, "failed to verify service access for group")
 				return nil, err
 			}
 
@@ -929,21 +854,18 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 			}
 
 			if err = ruleToCreate.Validate(); err != nil {
-				tracing.RecordError(span, err, "failed to validate managed identity access rule model to create")
-				return nil, err
+				return nil, errors.Wrap(err, "failed to validate managed identity access rule model to create", errors.WithSpan(span))
 			}
 
 			_, err := s.dbClient.ManagedIdentities.CreateManagedIdentityAccessRule(txContext, &ruleToCreate)
 			if err != nil {
-				tracing.RecordError(span, err, "failed to create managed identity access rule")
-				return nil, err
+				return nil, errors.Wrap(err, "failed to create managed identity access rule", errors.WithSpan(span))
 			}
 		}
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	return managedIdentity, nil
@@ -956,7 +878,6 @@ func (s *service) GetManagedIdentitiesByIDs(ctx context.Context, ids []string) (
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -967,8 +888,7 @@ func (s *service) GetManagedIdentitiesByIDs(ctx context.Context, ids []string) (
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identities")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identities", errors.WithSpan(span))
 	}
 
 	namespacePaths := []string{}
@@ -979,7 +899,6 @@ func (s *service) GetManagedIdentitiesByIDs(ctx context.Context, ids []string) (
 	if len(namespacePaths) > 0 {
 		err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -994,13 +913,11 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	managedIdentity, err := s.getManagedIdentityByID(ctx, input.ID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by ID")
 		return nil, err
 	}
 
@@ -1011,13 +928,11 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 
 	err = caller.RequirePermission(ctx, models.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	delegate, err := s.getDelegate(managedIdentity.Type)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get delegate")
 		return nil, err
 	}
 
@@ -1027,14 +942,12 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 
 	// Validate model
 	if vErr := managedIdentity.Validate(); vErr != nil {
-		tracing.RecordError(span, vErr, "failed to validate managed identity model to update")
 		return nil, vErr
 	}
 
 	if len(input.Data) > 0 {
 		if sErr := delegate.SetManagedIdentityData(ctx, managedIdentity, input.Data); sErr != nil {
-			tracing.RecordError(span, sErr, "failed to set managed identity date")
-			return nil, errors.Wrap(sErr, "failed to set managed identity data", errors.WithErrorCode(errors.EInvalid))
+			return nil, errors.Wrap(sErr, "failed to set managed identity data", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 	}
 
@@ -1045,8 +958,7 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1058,8 +970,7 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 	// Store identity in DB
 	updatedManagedIdentity, err := s.dbClient.ManagedIdentities.UpdateManagedIdentity(txContext, managedIdentity)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update managed identity")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update managed identity", errors.WithSpan(span))
 	}
 
 	groupPath := updatedManagedIdentity.GetGroupPath()
@@ -1071,13 +982,11 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 			TargetType:    models.TargetManagedIdentity,
 			TargetID:      updatedManagedIdentity.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	return updatedManagedIdentity, nil
@@ -1090,13 +999,11 @@ func (s *service) GetManagedIdentityAccessRules(ctx context.Context, managedIden
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
 	}
 
@@ -1106,8 +1013,7 @@ func (s *service) GetManagedIdentityAccessRules(ctx context.Context, managedIden
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity access rules")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identity access rules", errors.WithSpan(span))
 	}
 
 	return resp.ManagedIdentityAccessRules, nil
@@ -1121,7 +1027,6 @@ func (s *service) GetManagedIdentityAccessRulesByIDs(ctx context.Context,
 
 	_, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1132,8 +1037,7 @@ func (s *service) GetManagedIdentityAccessRulesByIDs(ctx context.Context,
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity access rules")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identity access rules", errors.WithSpan(span))
 	}
 
 	// Get the identity IDs.
@@ -1150,8 +1054,7 @@ func (s *service) GetManagedIdentityAccessRulesByIDs(ctx context.Context,
 	// Make sure caller has permission to see the affected groups.
 	_, err = s.GetManagedIdentitiesByIDs(ctx, identityIDs)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identities by IDs")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identities by IDs", errors.WithSpan(span))
 	}
 
 	return resp.ManagedIdentityAccessRules, nil
@@ -1164,14 +1067,12 @@ func (s *service) GetManagedIdentityAccessRuleByID(ctx context.Context, ruleID s
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	rule, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRuleByID(ctx, ruleID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity access rule")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identity access rule", errors.WithSpan(span))
 	}
 
 	if rule == nil {
@@ -1180,13 +1081,11 @@ func (s *service) GetManagedIdentityAccessRuleByID(ctx context.Context, ruleID s
 
 	managedIdentity, err := s.getManagedIdentityByID(ctx, rule.ManagedIdentityID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by ID")
 		return nil, err
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
 	}
 
@@ -1199,14 +1098,12 @@ func (s *service) GetManagedIdentityAccessRuleByTRN(ctx context.Context, trn str
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	rule, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRuleByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity access rule")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identity access rule", errors.WithSpan(span))
 	}
 
 	if rule == nil {
@@ -1215,13 +1112,11 @@ func (s *service) GetManagedIdentityAccessRuleByTRN(ctx context.Context, trn str
 
 	managedIdentity, err := s.getManagedIdentityByID(ctx, rule.ManagedIdentityID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by ID")
 		return nil, err
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
 	}
 
@@ -1235,18 +1130,15 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if err = input.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate managed identity access rule model")
 		return nil, err
 	}
 
 	managedIdentity, err := s.getManagedIdentityByID(ctx, input.ManagedIdentityID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by ID")
 		return nil, err
 	}
 
@@ -1257,19 +1149,16 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 
 	err = caller.RequirePermission(ctx, models.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	if err = s.verifyServiceAccountAccessForGroup(ctx, input.AllowedServiceAccountIDs, managedIdentity.GetGroupPath()); err != nil {
-		tracing.RecordError(span, err, "group service account access check failed")
 		return nil, err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1280,8 +1169,7 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 
 	rule, err := s.dbClient.ManagedIdentities.CreateManagedIdentityAccessRule(txContext, input)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create managed identity access rule")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create managed identity access rule", errors.WithSpan(span))
 	}
 
 	// Get the number of access rules in the managed identity to check whether we just violated the limit.
@@ -1295,12 +1183,10 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 			},
 		})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity's access rules")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identity's access rules", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitManagedIdentityAccessRulesPerManagedIdentity, newAccessRules.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
 
@@ -1315,13 +1201,11 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 			TargetType:    models.TargetManagedIdentityAccessRule,
 			TargetID:      rule.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a managed identity access rule.",
@@ -1338,18 +1222,15 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if err = input.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate managed identity access rule model")
 		return nil, err
 	}
 
 	managedIdentity, err := s.getManagedIdentityByID(ctx, input.ManagedIdentityID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by ID")
 		return nil, err
 	}
 
@@ -1360,19 +1241,16 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 
 	err = caller.RequirePermission(ctx, models.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	if err = s.verifyServiceAccountAccessForGroup(ctx, input.AllowedServiceAccountIDs, managedIdentity.GetGroupPath()); err != nil {
-		tracing.RecordError(span, err, "group service account access check failed")
 		return nil, err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1383,8 +1261,7 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 
 	rule, err := s.dbClient.ManagedIdentities.UpdateManagedIdentityAccessRule(txContext, input)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update managed identity access rule")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update managed identity access rule", errors.WithSpan(span))
 	}
 
 	groupPath := managedIdentity.GetGroupPath()
@@ -1397,13 +1274,11 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 			TargetType:    models.TargetManagedIdentityAccessRule,
 			TargetID:      rule.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated a managed identity access rule.",
@@ -1420,13 +1295,11 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	managedIdentity, err := s.getManagedIdentityByID(ctx, rule.ManagedIdentityID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by ID")
 		return err
 	}
 
@@ -1437,14 +1310,12 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 
 	err = caller.RequirePermission(ctx, models.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1455,8 +1326,7 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 
 	err = s.dbClient.ManagedIdentities.DeleteManagedIdentityAccessRule(txContext, rule)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to delete managed identity access rule")
-		return err
+		return errors.Wrap(err, "failed to delete managed identity access rule", errors.WithSpan(span))
 	}
 
 	groupPath := managedIdentity.GetGroupPath()
@@ -1473,13 +1343,11 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 				Type: string(models.TargetManagedIdentityAccessRule),
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Deleted a managed identity access rule.",
@@ -1496,7 +1364,6 @@ func (s *service) CreateCredentials(ctx context.Context, identity *models.Manage
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1508,15 +1375,13 @@ func (s *service) CreateCredentials(ctx context.Context, identity *models.Manage
 	// Get Job
 	job, err := s.jobService.GetJobByID(ctx, jobCaller.JobID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get job")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get job", errors.WithSpan(span))
 	}
 
 	// Verify job is in a workspace that has access to this managed identity
 	identitiesInWorkspace, err := s.GetManagedIdentitiesForWorkspace(ctx, job.WorkspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identities for workspace")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identities for workspace", errors.WithSpan(span))
 	}
 
 	found := false
@@ -1533,7 +1398,6 @@ func (s *service) CreateCredentials(ctx context.Context, identity *models.Manage
 
 	delegate, err := s.getDelegate(identity.Type)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get delegate")
 		return nil, err
 	}
 
@@ -1551,27 +1415,23 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	managedIdentity, err := s.getManagedIdentityByID(ctx, input.ManagedIdentityID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identity", errors.WithSpan(span))
 	}
 
 	// Caller must be an owner of both the old group and the new group.
 	err = caller.RequirePermission(ctx, models.DeleteManagedIdentityPermission,
 		auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 	err = caller.RequirePermission(ctx, models.CreateManagedIdentityPermission,
 		auth.WithGroupID(input.NewGroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1582,8 +1442,7 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 
 	newGroup, err := s.dbClient.Groups.GetGroupByID(ctx, input.NewGroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get new group")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get new group", errors.WithSpan(span))
 	}
 
 	if newGroup == nil {
@@ -1611,8 +1470,7 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1627,8 +1485,7 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 	managedIdentity.GroupID = input.NewGroupID
 	managedIdentity, err = s.dbClient.ManagedIdentities.UpdateManagedIdentity(txContext, managedIdentity)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to move managed identity")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to move managed identity", errors.WithSpan(span))
 	}
 
 	// Get the number of managed identities now in the new group to check whether we just violated the limit.
@@ -1641,14 +1498,12 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group's managed identities")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group's managed identities", errors.WithSpan(span))
 	}
 
 	// Check the resource limit.
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitManagedIdentitiesPerGroup, newManagedIdentities.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
 
@@ -1662,13 +1517,11 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 				PreviousGroupPath: oldGroupPath,
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	return managedIdentity, nil

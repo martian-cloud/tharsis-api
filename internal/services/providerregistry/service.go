@@ -17,7 +17,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -147,20 +146,17 @@ func (s *service) GetProviderByID(ctx context.Context, id string) (*models.Terra
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	provider, err := s.getProviderByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -174,14 +170,12 @@ func (s *service) GetProviderByTRN(ctx context.Context, trn string) (*models.Ter
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	provider, err := s.dbClient.TerraformProviders.GetProviderByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by TRN", errors.WithSpan(span))
 	}
 
 	if provider == nil {
@@ -191,7 +185,6 @@ func (s *service) GetProviderByTRN(ctx context.Context, trn string) (*models.Ter
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -206,14 +199,12 @@ func (s *service) GetProviderByAddress(ctx context.Context, namespace string, na
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	rootGroup, err := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(namespace))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group by TRN", errors.WithSpan(span))
 	}
 
 	if rootGroup == nil {
@@ -228,8 +219,7 @@ func (s *service) GetProviderByAddress(ctx context.Context, namespace string, na
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get providers")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get providers", errors.WithSpan(span))
 	}
 
 	if len(providerResult.Providers) == 0 {
@@ -241,7 +231,6 @@ func (s *service) GetProviderByAddress(ctx context.Context, namespace string, na
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -256,7 +245,6 @@ func (s *service) GetProviders(ctx context.Context, input *GetProvidersInput) (*
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -271,7 +259,6 @@ func (s *service) GetProviders(ctx context.Context, input *GetProvidersInput) (*
 	if input.Group != nil {
 		err = caller.RequirePermission(ctx, models.ViewTerraformProviderPermission, auth.WithNamespacePath(input.Group.FullPath))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		dbInput.Filter.GroupID = &input.Group.Metadata.ID
@@ -279,8 +266,7 @@ func (s *service) GetProviders(ctx context.Context, input *GetProvidersInput) (*
 		if !caller.IsAdminModeActivated(ctx) {
 			rootNamespaces, rErr := caller.GetRootNamespaceMemberships(ctx)
 			if rErr != nil {
-				tracing.RecordError(span, rErr, "failed to get root namespaces")
-				return nil, rErr
+				return nil, errors.Wrap(rErr, "failed to get root namespaces", errors.WithSpan(span))
 			}
 			dbInput.Filter.RootNamespaceMemberships = rootNamespaces
 		}
@@ -296,25 +282,21 @@ func (s *service) UpdateProvider(ctx context.Context, provider *models.Terraform
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	if vErr := provider.Validate(); vErr != nil {
-		tracing.RecordError(span, vErr, "failed to validate terraform provider model")
-		return nil, vErr
+		return nil, errors.Wrap(vErr, "failed to validate terraform provider model", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -325,8 +307,7 @@ func (s *service) UpdateProvider(ctx context.Context, provider *models.Terraform
 
 	updatedProvider, err := s.dbClient.TerraformProviders.UpdateProvider(txContext, provider)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update provider")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update provider", errors.WithSpan(span))
 	}
 
 	groupPath := updatedProvider.GetGroupPath()
@@ -338,13 +319,11 @@ func (s *service) UpdateProvider(ctx context.Context, provider *models.Terraform
 			TargetType:    models.TargetTerraformProvider,
 			TargetID:      updatedProvider.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated a provider.",
@@ -362,20 +341,17 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateTerraformProviderPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group by ID", errors.WithSpan(span))
 	}
 
 	if group == nil {
@@ -388,8 +364,7 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 	} else {
 		rootGroup, gErr := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(group.GetRootGroupPath()))
 		if gErr != nil {
-			tracing.RecordError(span, gErr, "failed to get group by full path")
-			return nil, gErr
+			return nil, errors.Wrap(gErr, "failed to get group by full path", errors.WithSpan(span))
 		}
 
 		if rootGroup == nil {
@@ -408,14 +383,12 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 	}
 
 	if vErr := providerToCreate.Validate(); vErr != nil {
-		tracing.RecordError(span, vErr, "failed to validate terraform provider model")
-		return nil, vErr
+		return nil, errors.Wrap(vErr, "failed to validate terraform provider model", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -426,8 +399,7 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 
 	createdProvider, err := s.dbClient.TerraformProviders.CreateProvider(txContext, providerToCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create provider")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create provider", errors.WithSpan(span))
 	}
 
 	// Get the number of providers in the group to check whether we just violated the limit.
@@ -440,13 +412,11 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group's Terraform providers")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group's Terraform providers", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitTerraformProvidersPerGroup, newProviders.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
-		return nil, err
+		return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -456,13 +426,11 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 			TargetType:    models.TargetTerraformProvider,
 			TargetID:      createdProvider.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a provider.",
@@ -480,20 +448,17 @@ func (s *service) DeleteProvider(ctx context.Context, provider *models.Terraform
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, models.DeleteTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -504,8 +469,7 @@ func (s *service) DeleteProvider(ctx context.Context, provider *models.Terraform
 
 	err = s.dbClient.TerraformProviders.DeleteProvider(txContext, provider)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to delete provider")
-		return err
+		return errors.Wrap(err, "failed to delete provider", errors.WithSpan(span))
 	}
 
 	groupPath := provider.GetGroupPath()
@@ -522,13 +486,11 @@ func (s *service) DeleteProvider(ctx context.Context, provider *models.Terraform
 				Type: string(models.TargetTerraformProvider),
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Deleted a provider.",
@@ -546,7 +508,6 @@ func (s *service) GetProvidersByIDs(ctx context.Context, ids []string) ([]models
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -556,8 +517,7 @@ func (s *service) GetProvidersByIDs(ctx context.Context, ids []string) ([]models
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get providers")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get providers", errors.WithSpan(span))
 	}
 
 	namespacePaths := []string{}
@@ -570,7 +530,6 @@ func (s *service) GetProvidersByIDs(ctx context.Context, ids []string) ([]models
 	if len(namespacePaths) > 0 {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -585,35 +544,30 @@ func (s *service) GetProviderVersionReadme(ctx context.Context, providerVersion 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return "", err
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return "", err
+		return "", errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return "", err
 		}
 	}
 
 	reader, err := s.registryStore.GetProviderVersionReadme(ctx, ptr.ToString(providerVersion.ReadmeObjectStoreKey))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version readme")
-		return "", err
+		return "", errors.Wrap(err, "failed to get provider version readme", errors.WithSpan(span))
 	}
 	defer reader.Close()
 
 	buffer, err := io.ReadAll(reader)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create reder for provider module readme")
-		return "", err
+		return "", errors.Wrap(err, "failed to create reder for provider module readme", errors.WithSpan(span))
 	}
 
 	return string(buffer), nil
@@ -626,26 +580,22 @@ func (s *service) GetProviderVersionByID(ctx context.Context, id string) (*model
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	providerVersion, err := s.getProviderVersionByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -659,14 +609,12 @@ func (s *service) GetProviderVersionByTRN(ctx context.Context, trn string) (*mod
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	providerVersion, err := s.dbClient.TerraformProviderVersions.GetProviderVersionByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version by TRN", errors.WithSpan(span))
 	}
 
 	if providerVersion == nil {
@@ -675,14 +623,12 @@ func (s *service) GetProviderVersionByTRN(ctx context.Context, trn string) (*mod
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -697,20 +643,17 @@ func (s *service) GetProviderVersions(ctx context.Context, input *GetProviderVer
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	provider, err := s.getProviderByID(ctx, input.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -737,7 +680,6 @@ func (s *service) GetProviderVersionsByIDs(ctx context.Context, ids []string) ([
 	defer span.End()
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -747,8 +689,7 @@ func (s *service) GetProviderVersionsByIDs(ctx context.Context, ids []string) ([
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider versions")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider versions", errors.WithSpan(span))
 	}
 
 	providerIDList := []string{}
@@ -760,8 +701,7 @@ func (s *service) GetProviderVersionsByIDs(ctx context.Context, ids []string) ([
 	// GetProvidersByIDs performs the authorization checks to verify that the subject
 	// can view the requested providers
 	if _, err := s.GetProvidersByIDs(ctx, providerIDList); err != nil {
-		tracing.RecordError(span, err, "failed to get providers by IDs")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get providers by IDs", errors.WithSpan(span))
 	}
 
 	return response.ProviderVersions, nil
@@ -774,27 +714,23 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	provider, err := s.getProviderByID(ctx, input.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Verify semantic version is valid
 	semVersion, err := version.NewSemver(input.SemanticVersion)
 	if err != nil {
-		tracing.RecordError(span, err, "invalid semantic version")
-		return nil, errors.Wrap(err, "invalid semantic version", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.Wrap(err, "invalid semantic version", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Check if this version is greater than the previous latest
@@ -808,14 +744,12 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider versions")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider versions", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -829,16 +763,14 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		prevLatest := versionsResp.ProviderVersions[0]
 		prevSemVersion, sErr := version.NewSemver(prevLatest.SemanticVersion)
 		if sErr != nil {
-			tracing.RecordError(span, sErr, "failed to validate semver")
-			return nil, sErr
+			return nil, errors.Wrap(sErr, "failed to validate semver", errors.WithSpan(span))
 		}
 		if semver.IsSemverGreaterThan(semVersion, prevSemVersion) {
 			isLatest = true
 			// Remove latest from version
 			prevLatest.Latest = false
 			if _, uErr := s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, &prevLatest); uErr != nil {
-				tracing.RecordError(span, uErr, "failed to update provider version")
-				return nil, uErr
+				return nil, errors.Wrap(uErr, "failed to update provider version", errors.WithSpan(span))
 			}
 		}
 	} else {
@@ -854,8 +786,7 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		CreatedBy:       caller.GetSubject(),
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create provider version")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create provider version", errors.WithSpan(span))
 	}
 
 	groupPath := provider.GetGroupPath()
@@ -871,13 +802,11 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider's versions")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider's versions", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitVersionsPerTerraformProviderPerTimePeriod, newVersions.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
-		return nil, err
+		return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -887,13 +816,11 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 			TargetType:    models.TargetTerraformProviderVersion,
 			TargetID:      providerVersion.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a provider version.",
@@ -911,19 +838,16 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -936,8 +860,7 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 			},
 		})
 		if gpErr != nil {
-			tracing.RecordError(span, err, "failed to get provider versions")
-			return err
+			return errors.Wrap(err, "failed to get provider versions", errors.WithSpan(span))
 		}
 
 		for _, v := range versionsResp.ProviderVersions {
@@ -955,14 +878,12 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 
 			latestSemver, lsErr := version.NewSemver(newLatestVersion.SemanticVersion)
 			if lsErr != nil {
-				tracing.RecordError(span, lsErr, "failed to validate latest semver")
-				return lsErr
+				return errors.Wrap(lsErr, "failed to validate latest semver", errors.WithSpan(span))
 			}
 
 			currentSemver, csErr := version.NewSemver(vCopy.SemanticVersion)
 			if csErr != nil {
-				tracing.RecordError(span, csErr, "failed to validate current semver")
-				return csErr
+				return errors.Wrap(csErr, "failed to validate current semver", errors.WithSpan(span))
 			}
 
 			if semver.IsSemverGreaterThan(currentSemver, latestSemver) {
@@ -973,8 +894,7 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -985,8 +905,7 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 
 	// Delete provider version from DB
 	if err = s.dbClient.TerraformProviderVersions.DeleteProviderVersion(txContext, providerVersion); err != nil {
-		tracing.RecordError(span, err, "failed to delete module version")
-		return err
+		return errors.Wrap(err, "failed to delete module version", errors.WithSpan(span))
 	}
 
 	if newLatestVersion != nil {
@@ -998,14 +917,12 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 		)
 		newLatestVersion.Latest = true
 		if _, err = s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, newLatestVersion); err != nil {
-			tracing.RecordError(span, err, "failed to update provider version")
-			return err
+			return errors.Wrap(err, "failed to update provider version", errors.WithSpan(span))
 		}
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Deleted a provider version.",
@@ -1023,32 +940,27 @@ func (s *service) GetProviderPlatformByID(ctx context.Context, id string) (*mode
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	platform, err := s.getProviderPlatformByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider platform by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider platform by ID", errors.WithSpan(span))
 	}
 
 	providerVersion, err := s.getProviderVersionByID(ctx, platform.ProviderVersionID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -1063,14 +975,12 @@ func (s *service) GetProviderPlatformByTRN(ctx context.Context, trn string) (*mo
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	platform, err := s.dbClient.TerraformProviderPlatforms.GetProviderPlatformByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider platform by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider platform by TRN", errors.WithSpan(span))
 	}
 
 	if platform == nil {
@@ -1079,20 +989,17 @@ func (s *service) GetProviderPlatformByTRN(ctx context.Context, trn string) (*mo
 
 	providerVersion, err := s.getProviderVersionByID(ctx, platform.ProviderVersionID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -1107,7 +1014,6 @@ func (s *service) GetProviderPlatforms(ctx context.Context, input *GetProviderPl
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1120,27 +1026,23 @@ func (s *service) GetProviderPlatforms(ctx context.Context, input *GetProviderPl
 	if input.ProviderID != nil {
 		provider, err = s.getProviderByID(ctx, *input.ProviderID)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to get provider by ID")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 		}
 	} else if input.ProviderVersionID != nil {
 		providerVersion, pvErr := s.getProviderVersionByID(ctx, *input.ProviderVersionID)
 		if pvErr != nil {
-			tracing.RecordError(span, err, "failed to get provider version by ID")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 		}
 
 		provider, err = s.getProviderByID(ctx, providerVersion.ProviderID)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to get provider by ID")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 		}
 	}
 
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -1157,8 +1059,7 @@ func (s *service) GetProviderPlatforms(ctx context.Context, input *GetProviderPl
 
 	response, err := s.dbClient.TerraformProviderPlatforms.GetProviderPlatforms(ctx, &dbInput)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider platforms")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider platforms", errors.WithSpan(span))
 	}
 
 	return response, nil
@@ -1171,32 +1072,27 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	providerVersion, err := s.getProviderVersionByID(ctx, input.ProviderVersionID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1215,8 +1111,7 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 		CreatedBy:         caller.GetSubject(),
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create terraform provider platform")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create terraform provider platform", errors.WithSpan(span))
 	}
 
 	// Get the number of platforms for this provider version to check whether we just violated the limit.
@@ -1229,18 +1124,15 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider's platforms")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider's platforms", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitPlatformsPerTerraformProviderVersion, newPlatforms.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
-		return nil, err
+		return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a provider platform.",
@@ -1258,31 +1150,26 @@ func (s *service) DeleteProviderPlatform(ctx context.Context, providerPlatform *
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	providerVersion, err := s.getProviderVersionByID(ctx, providerPlatform.ProviderVersionID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	if err := s.dbClient.TerraformProviderPlatforms.DeleteProviderPlatform(ctx, providerPlatform); err != nil {
-		tracing.RecordError(span, err, "failed to delete provider platform")
-		return err
+		return errors.Wrap(err, "failed to delete provider platform", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Deleted a provider platform.",
@@ -1300,31 +1187,26 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	providerPlatform, err := s.getProviderPlatformByID(ctx, providerPlatformID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider platform by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider platform by ID", errors.WithSpan(span))
 	}
 
 	providerVersion, err := s.getProviderVersionByID(ctx, providerPlatform.ProviderVersionID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -1335,8 +1217,7 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 	// Upload before, and outside, the DB update so the slow write doesn't hold a transaction open.
 	binaryRetainFn, binaryKey, err := s.registryStore.UploadProviderPlatformBinary(ctx, providerPlatform, providerVersion, provider, reader)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to upload provider platform binary")
-		return err
+		return errors.Wrap(err, "failed to upload provider platform binary", errors.WithSpan(span))
 	}
 
 	providerPlatform.BinaryUploaded = true
@@ -1344,8 +1225,7 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1355,18 +1235,15 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 	}()
 
 	if _, err := s.dbClient.TerraformProviderPlatforms.UpdateProviderPlatform(txContext, providerPlatform); err != nil {
-		tracing.RecordError(span, err, "failed to store provider binary key")
-		return errors.Wrap(err, "failed to store provider binary key")
+		return errors.Wrap(err, "failed to store provider binary key", errors.WithSpan(span))
 	}
 
 	if err := binaryRetainFn(txContext, providerPlatform.Metadata.ID); err != nil {
-		tracing.RecordError(span, err, "failed to link provider binary object store ref")
-		return errors.Wrap(err, "failed to link provider binary object store ref")
+		return errors.Wrap(err, "failed to link provider binary object store ref", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Uploaded a provider platform binary.",
@@ -1384,25 +1261,21 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	providerVersion, err := s.getProviderVersionByID(ctx, providerVersionID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -1413,8 +1286,7 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 	// Upload before, and outside, the DB update so the slow write doesn't hold a transaction open.
 	readmeRetainFn, readmeKey, err := s.registryStore.UploadProviderVersionReadme(ctx, providerVersion, provider, reader)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to upload provider version readme")
-		return err
+		return errors.Wrap(err, "failed to upload provider version readme", errors.WithSpan(span))
 	}
 
 	providerVersion.ReadmeUploaded = true
@@ -1422,8 +1294,7 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1433,18 +1304,15 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 	}()
 
 	if _, err := s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, providerVersion); err != nil {
-		tracing.RecordError(span, err, "failed to store provider readme key")
-		return errors.Wrap(err, "failed to store provider readme key")
+		return errors.Wrap(err, "failed to store provider readme key", errors.WithSpan(span))
 	}
 
 	if err := readmeRetainFn(txContext, providerVersion.Metadata.ID); err != nil {
-		tracing.RecordError(span, err, "failed to link provider readme object store ref")
-		return errors.Wrap(err, "failed to link provider readme object store ref")
+		return errors.Wrap(err, "failed to link provider readme object store ref", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Uploaded a provider version README.",
@@ -1462,25 +1330,21 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	providerVersion, err := s.getProviderVersionByID(ctx, providerVersionID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -1491,8 +1355,7 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 	// Upload before, and outside, the DB update so the slow write doesn't hold a transaction open.
 	sumsRetainFn, sumsKey, err := s.registryStore.UploadProviderVersionSHASums(ctx, providerVersion, provider, reader)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to upload provider version SHA sums")
-		return err
+		return errors.Wrap(err, "failed to upload provider version SHA sums", errors.WithSpan(span))
 	}
 
 	providerVersion.SHASumsUploaded = true
@@ -1500,8 +1363,7 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1511,18 +1373,15 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 	}()
 
 	if _, err := s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, providerVersion); err != nil {
-		tracing.RecordError(span, err, "failed to store provider SHA sums key")
-		return errors.Wrap(err, "failed to store provider SHA sums key")
+		return errors.Wrap(err, "failed to store provider SHA sums key", errors.WithSpan(span))
 	}
 
 	if err := sumsRetainFn(txContext, providerVersion.Metadata.ID); err != nil {
-		tracing.RecordError(span, err, "failed to link provider SHA sums object store ref")
-		return errors.Wrap(err, "failed to link provider SHA sums object store ref")
+		return errors.Wrap(err, "failed to link provider SHA sums object store ref", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Uploaded provider version SHA256 sums.",
@@ -1540,25 +1399,21 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	providerVersion, err := s.getProviderVersionByID(ctx, providerVersionID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -1573,8 +1428,7 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 
 	pkt, err := packetReader.Next()
 	if err != nil {
-		tracing.RecordError(span, err, "failed to read gpg signature")
-		return errors.Wrap(err, "failed to read gpg signature", errors.WithErrorCode(errors.EInvalid))
+		return errors.Wrap(err, "failed to read gpg signature", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	key, ok := pkt.(*packet.Signature)
@@ -1588,8 +1442,7 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 	// Get the group that this provider is in
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, provider.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by ID")
-		return err
+		return errors.Wrap(err, "failed to get group by ID", errors.WithSpan(span))
 	}
 
 	if group == nil {
@@ -1615,8 +1468,7 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 	// Upload before, and outside, the DB update so the slow write doesn't hold a transaction open.
 	sigRetainFn, sigKey, err := s.registryStore.UploadProviderVersionSHASumsSignature(ctx, providerVersion, provider, &sigBuffer)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to upload provider version SHA sums signature")
-		return err
+		return errors.Wrap(err, "failed to upload provider version SHA sums signature", errors.WithSpan(span))
 	}
 
 	providerVersion.GPGKeyID = &gpgKey.GPGKeyID
@@ -1626,8 +1478,7 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1637,18 +1488,15 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 	}()
 
 	if _, err := s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, providerVersion); err != nil {
-		tracing.RecordError(span, err, "failed to store provider SHA sums signature key")
-		return errors.Wrap(err, "failed to store provider SHA sums signature key")
+		return errors.Wrap(err, "failed to store provider SHA sums signature key", errors.WithSpan(span))
 	}
 
 	if err := sigRetainFn(txContext, providerVersion.Metadata.ID); err != nil {
-		tracing.RecordError(span, err, "failed to link provider SHA sums signature object store ref")
-		return errors.Wrap(err, "failed to link provider SHA sums signature object store ref")
+		return errors.Wrap(err, "failed to link provider SHA sums signature object store ref", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Uploaded provider version SHA256 sums signature.",
@@ -1666,46 +1514,39 @@ func (s *service) GetProviderPlatformDownloadURLs(ctx context.Context, providerP
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	providerVersion, err := s.getProviderVersionByID(ctx, providerPlatform.ProviderVersionID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
 	}
 
 	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if provider.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
 
 	downloadURL, err := s.registryStore.GetProviderPlatformBinaryPresignedURL(ctx, ptr.ToString(providerPlatform.BinaryObjectStoreKey))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider platform binary presigned URL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider platform binary presigned URL", errors.WithSpan(span))
 	}
 
 	shaSumsURL, err := s.registryStore.GetProviderVersionSHASumsPresignedURL(ctx, ptr.ToString(providerVersion.SHASumsObjectStoreKey))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version SHA sums presigned URL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version SHA sums presigned URL", errors.WithSpan(span))
 	}
 
 	shaSumsSignatureURL, err := s.registryStore.GetProviderVersionSHASumsSignaturePresignedURL(ctx, ptr.ToString(providerVersion.SHASumsSignatureObjectStoreKey))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version SHA sums signature presigned URL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version SHA sums signature presigned URL", errors.WithSpan(span))
 	}
 
 	return &ProviderPlatformDownloadURLs{

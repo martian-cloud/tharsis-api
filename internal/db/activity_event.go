@@ -11,7 +11,6 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -206,14 +205,12 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 		pagination.WithQueryTag("activity_event.GetActivityEvents"),
 	)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -223,16 +220,14 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 	for rows.Next() {
 		item, err := scanActivityEvent(rows, true)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan rows")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan rows", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := ActivityEventsResult{
@@ -253,13 +248,11 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 
 		namespace, err := getNamespaceByPath(ctx, m.dbClient.getConnection(ctx), *input.NamespacePath)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to get namespace by path")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get namespace by path", errors.WithSpan(span))
 		}
 
 		if namespace == nil {
-			tracing.RecordError(span, nil, "Namespace not found")
-			return nil, errors.New("Namespace not found", errors.WithErrorCode(errors.ENotFound))
+			return nil, errors.New("Namespace not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 		}
 
 		namespaceID = &namespace.id
@@ -344,8 +337,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		runGateTargetID = &input.TargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
-		tracing.RecordError(span, nil, "invalid target type: %s", input.TargetType)
-		return nil, fmt.Errorf("invalid target type: %s", input.TargetType)
+		return nil, errors.New("invalid target type: %s", input.TargetType, errors.WithSpan(span))
 	}
 
 	var payload interface{}
@@ -396,8 +388,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		Rows(record).
 		Returning(m.getSelectFields(false)...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to insert to table")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to insert to table", errors.WithSpan(span))
 	}
 
 	createdActivityEvent, err := scanActivityEvent(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
@@ -406,90 +397,63 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_activity_events_user_id":
-					tracing.RecordError(span, nil, "user does not exist")
-					return nil, errors.New("user does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("user does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_service_account_id":
-					tracing.RecordError(span, nil, "service account does not exist")
-					return nil, errors.New("service account does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("service account does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_namespace_id":
-					tracing.RecordError(span, nil, "namespace path does not exist")
-					return nil, errors.New("namespace path does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("namespace path does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_gpg_key_target_id":
-					tracing.RecordError(span, nil, "GPG key does not exist")
-					return nil, errors.New("GPG key does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("GPG key does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_group_target_id":
-					tracing.RecordError(span, nil, "group does not exist")
-					return nil, errors.New("group does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("group does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_managed_identity_target_id":
-					tracing.RecordError(span, nil, "managed identity does not exist")
-					return nil, errors.New("managed identity does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("managed identity does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_managed_identity_rule_target_id":
-					tracing.RecordError(span, nil, "managed identity access rule does not exist")
-					return nil, errors.New("managed identity access rule does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("managed identity access rule does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_namespace_membership_target_id":
-					tracing.RecordError(span, nil, "namespace membership does not exist")
-					return nil, errors.New("namespace membership does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("namespace membership does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_run_target_id":
-					tracing.RecordError(span, nil, "run does not exist")
-					return nil, errors.New("run does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("run does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_service_account_target_id":
-					tracing.RecordError(span, nil, "service account does not exist")
-					return nil, errors.New("service account does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("service account does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_state_version_target_id":
-					tracing.RecordError(span, nil, "state version does not exist")
-					return nil, errors.New("state version does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("state version does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_team_target_id":
-					tracing.RecordError(span, nil, "team does not exist")
-					return nil, errors.New("team does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("team does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_terraform_provider_target_id":
-					tracing.RecordError(span, nil, "terraform provider does not exist")
-					return nil, errors.New("terraform provider does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("terraform provider does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_terraform_provider_version_target_id":
-					tracing.RecordError(span, nil, "terraform provider version does not exist")
-					return nil, errors.New("terraform provider version does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("terraform provider version does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_terraform_module_target_id":
-					tracing.RecordError(span, nil, "terraform module does not exist")
-					return nil, errors.New("terraform module does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("terraform module does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_terraform_module_version_target_id":
-					tracing.RecordError(span, nil, "terraform module version does not exist")
-					return nil, errors.New("terraform module version does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("terraform module version does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_variable_target_id":
-					tracing.RecordError(span, nil, "variable does not exist")
-					return nil, errors.New("variable does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("variable does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_workspace_target_id":
-					tracing.RecordError(span, nil, "workspace does not exist")
-					return nil, errors.New("workspace does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("workspace does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_vcs_providers_target_id":
-					tracing.RecordError(span, nil, "vcs provider does not exist")
-					return nil, errors.New("vcs provider does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("vcs provider does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_role_target_id":
-					tracing.RecordError(span, nil, "role does not exist")
-					return nil, errors.New("role does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("role does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_runner_target_id":
-					tracing.RecordError(span, nil, "runner does not exist")
-					return nil, errors.New("runner does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("runner does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_terraform_provider_version_mirror_target_id":
-					tracing.RecordError(span, nil, "terraform provider version mirror does not exist")
-					return nil, errors.New("terraform provider version mirror does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("terraform provider version mirror does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_federated_registry_target_id":
 					return nil, errors.New("federated registry does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_package_target_id":
-					tracing.RecordError(span, nil, "package does not exist")
-					return nil, errors.New("package does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("package does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_package_version_target_id":
-					tracing.RecordError(span, nil, "package version does not exist")
-					return nil, errors.New("package version does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("package version does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_policy_target_id":
-					tracing.RecordError(span, nil, "policy does not exist")
-					return nil, errors.New("policy does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("policy does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_run_gate_target_id":
-					tracing.RecordError(span, nil, "run gate does not exist")
-					return nil, errors.New("run gate does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("run gate does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				}
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	// Set the namespace path

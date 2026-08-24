@@ -26,7 +26,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 
 	corerun "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -325,7 +324,6 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -339,7 +337,6 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 	case options.WorkspaceID != nil:
 		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithWorkspaceID(*options.WorkspaceID))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	default:
@@ -351,8 +348,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 		if !userCaller.IsAdminModeActivated(ctx) {
 			rootNamespaces, rErr := userCaller.GetRootNamespaceMemberships(ctx)
 			if rErr != nil {
-				tracing.RecordError(span, rErr, "failed to get root namespaces")
-				return nil, rErr
+				return nil, errors.Wrap(rErr, "failed to get root namespaces", errors.WithSpan(span))
 			}
 			rootNamespaceMemberships = rootNamespaces
 			checkRootNamespaceMemberships = true
@@ -364,8 +360,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 	if options.AncestorGroupID != nil {
 		targetGroup, err := s.dbClient.Groups.GetGroupByID(ctx, *options.AncestorGroupID)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to query target group")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to query target group", errors.WithSpan(span))
 		}
 		if targetGroup == nil {
 			return nil, errors.New("target group not found", errors.WithErrorCode(errors.ENotFound))
@@ -498,13 +493,11 @@ func (s *service) CreateAssessmentRunForWorkspace(ctx context.Context, options *
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -517,8 +510,7 @@ func (s *service) CreateAssessmentRunForWorkspace(ctx context.Context, options *
 		LatestAssessmentVersion: options.LatestAssessmentVersion,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to create assessment run")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create assessment run", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created an assessment run.",
@@ -534,13 +526,11 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -549,8 +539,7 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 		WorkspaceID: options.WorkspaceID,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to create destroy run")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create destroy run", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a destroy run.",
@@ -566,13 +555,11 @@ func (s *service) CreateReconcileRunForWorkspace(ctx context.Context, options *C
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -581,8 +568,7 @@ func (s *service) CreateReconcileRunForWorkspace(ctx context.Context, options *C
 		WorkspaceID: options.WorkspaceID,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to create reconcile run")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create reconcile run", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a reconcile run.",
@@ -599,19 +585,16 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	if err = options.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate create run options")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate create run options", errors.WithSpan(span))
 	}
 
 	// The command's Prepare phase builds the run variables (merging the
@@ -635,8 +618,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		IncludeModulePrereleases: options.IncludeModulePrereleases,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to create run")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create run", errors.WithSpan(span))
 	}
 
 	run := cmd.Created
@@ -688,7 +670,6 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 
 	caller, run, err := s.authorizeRunMutation(ctx, runID)
 	if err != nil {
-		tracing.RecordError(span, err, "run mutation authorization failed")
 		return nil, err
 	}
 
@@ -703,8 +684,7 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		Comment:     commentStr,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to start apply")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to start apply", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Applied a run.",
@@ -721,7 +701,6 @@ func (s *service) SetRunAutoApply(ctx context.Context, runID string, autoApply b
 
 	_, run, err := s.authorizeRunMutation(ctx, runID)
 	if err != nil {
-		tracing.RecordError(span, err, "run mutation authorization failed")
 		return nil, err
 	}
 
@@ -730,8 +709,7 @@ func (s *service) SetRunAutoApply(ctx context.Context, runID string, autoApply b
 		AutoApply: autoApply,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to set run auto-apply")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to set run auto-apply", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Set run auto-apply.",
@@ -748,7 +726,6 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 
 	caller, _, err := s.authorizeRunMutation(ctx, options.RunID)
 	if err != nil {
-		tracing.RecordError(span, err, "run mutation authorization failed")
 		return nil, err
 	}
 
@@ -758,8 +735,7 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 		Force:      options.Force,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to cancel run")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to cancel run", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Canceled a run.",
@@ -774,7 +750,6 @@ func (s *service) RetryRunNode(ctx context.Context, options *RetryRunNodeInput) 
 	defer span.End()
 
 	if _, _, err := s.authorizeRunMutation(ctx, options.RunID); err != nil {
-		tracing.RecordError(span, err, "run mutation authorization failed")
 		return nil, err
 	}
 
@@ -783,8 +758,7 @@ func (s *service) RetryRunNode(ctx context.Context, options *RetryRunNodeInput) 
 		NodePath: options.NodePath,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to retry run node")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to retry run node", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Retried a run node.",
@@ -800,7 +774,6 @@ func (s *service) DiscardRun(ctx context.Context, options *DiscardRunInput) (*mo
 	defer span.End()
 
 	if _, _, err := s.authorizeRunMutation(ctx, options.RunID); err != nil {
-		tracing.RecordError(span, err, "run mutation authorization failed")
 		return nil, err
 	}
 
@@ -808,8 +781,7 @@ func (s *service) DiscardRun(ctx context.Context, options *DiscardRunInput) (*mo
 		RunID: options.RunID,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to discard run")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to discard run", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Discarded a run.",
@@ -824,7 +796,6 @@ func (s *service) UndiscardRun(ctx context.Context, options *UndiscardRunInput) 
 	defer span.End()
 
 	if _, _, err := s.authorizeRunMutation(ctx, options.RunID); err != nil {
-		tracing.RecordError(span, err, "run mutation authorization failed")
 		return nil, err
 	}
 
@@ -832,8 +803,7 @@ func (s *service) UndiscardRun(ctx context.Context, options *UndiscardRunInput) 
 		RunID: options.RunID,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to undiscard run")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to undiscard run", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Undiscarded a run.",
@@ -851,19 +821,16 @@ func (s *service) GetRunByID(ctx context.Context, runID string) (*models.Run, er
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	run, err := s.getRun(ctx, runID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -877,13 +844,11 @@ func (s *service) GetRunByTRN(ctx context.Context, trn string) (*models.Run, err
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run by TRN")
 		return nil, errors.Wrap(err, "failed to get run by TRN", errors.WithSpan(span))
 	}
 
@@ -893,7 +858,6 @@ func (s *service) GetRunByTRN(ctx context.Context, trn string) (*models.Run, err
 
 	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -907,13 +871,11 @@ func (s *service) GetRunByNodeID(ctx context.Context, nodeID string) (*models.Ru
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, nodeID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run by node ID")
 		return nil, errors.Wrap(err, "failed to get run by node ID", errors.WithSpan(span))
 	}
 
@@ -923,7 +885,6 @@ func (s *service) GetRunByNodeID(ctx context.Context, nodeID string) (*models.Ru
 
 	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -937,7 +898,6 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -949,14 +909,12 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 	case input.Workspace != nil:
 		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithNamespacePath(input.Workspace.FullPath))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		filter.WorkspaceID = &input.Workspace.Metadata.ID
 	case input.Group != nil:
 		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithNamespacePath(input.Group.FullPath))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		filter.GroupID = &input.Group.Metadata.ID
@@ -971,8 +929,7 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 			// Restrict to runs in the user's member namespaces (and descendants).
 			rootNamespaces, rErr := userCaller.GetRootNamespaceMemberships(ctx)
 			if rErr != nil {
-				tracing.RecordError(span, rErr, "failed to get root namespaces")
-				return nil, rErr
+				return nil, errors.Wrap(rErr, "failed to get root namespaces", errors.WithSpan(span))
 			}
 			filter.RootNamespaceMemberships = rootNamespaces
 		}
@@ -1001,7 +958,6 @@ func (s *service) GetRunsByIDs(ctx context.Context, idList []string) ([]*models.
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1011,17 +967,16 @@ func (s *service) GetRunsByIDs(ctx context.Context, idList []string) ([]*models.
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "Failed to get runs")
 		return nil, errors.Wrap(
 			err,
 			"Failed to get runs",
+			errors.WithSpan(span),
 		)
 	}
 
 	for _, run := range result.Runs {
 		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	}
@@ -1035,14 +990,12 @@ func (s *service) UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*mode
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, input.PlanID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run by plan node ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run by plan node ID", errors.WithSpan(span))
 	}
 	if run == nil {
 		return nil, errors.New("plan with ID %s not found", input.PlanID, errors.WithErrorCode(errors.ENotFound))
@@ -1050,14 +1003,12 @@ func (s *service) UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*mode
 
 	err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithPlanID(input.PlanID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	cmd := s.cmdFactory.NewUpdatePlan(input.PlanID, input.HasChanges, input.ErrorMessage)
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to update plan node")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update plan node", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated a plan.",
@@ -1073,21 +1024,18 @@ func (s *service) ReportRunPolicyOutcomes(ctx context.Context, input *ReportRunP
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, input.PolicyCheckID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run by policy check node ID")
-		return err
+		return errors.Wrap(err, "failed to get run by policy check node ID", errors.WithSpan(span))
 	}
 	if run == nil || run.PolicyCheckByID(input.PolicyCheckID) == nil {
 		return errors.New("policy check node with ID %s not found", input.PolicyCheckID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithPolicyCheckID(input.PolicyCheckID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -1102,8 +1050,7 @@ func (s *service) ReportRunPolicyOutcomes(ctx context.Context, input *ReportRunP
 
 	cmd := s.cmdFactory.NewReportRunPolicyOutcomes(input.PolicyCheckID, outcomes)
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to report stage outcomes")
-		return err
+		return errors.Wrap(err, "failed to report stage outcomes", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Reported policy check outcomes.",
@@ -1122,14 +1069,12 @@ func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadClose
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, planID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run by plan ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run by plan ID", errors.WithSpan(span))
 	}
 
 	if run == nil {
@@ -1138,16 +1083,15 @@ func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadClose
 
 	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	result, err := s.artifactStore.GetPlanCache(ctx, run)
 	if err != nil {
-		tracing.RecordError(span, err, "Failed to get plan cache from artifact store")
 		return nil, errors.Wrap(
 			err,
 			"Failed to get plan cache from artifact store",
+			errors.WithSpan(span),
 		)
 	}
 
@@ -1160,14 +1104,12 @@ func (s *service) DownloadPlanJSON(ctx context.Context, planID string) (io.ReadC
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, planID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run by plan ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run by plan ID", errors.WithSpan(span))
 	}
 
 	if run == nil {
@@ -1176,14 +1118,12 @@ func (s *service) DownloadPlanJSON(ctx context.Context, planID string) (io.ReadC
 
 	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	result, err := s.artifactStore.GetPlanJSON(ctx, run)
 	if err != nil {
-		tracing.RecordError(span, err, "Failed to get plan JSON from artifact store")
-		return nil, errors.Wrap(err, "Failed to get plan JSON from artifact store")
+		return nil, errors.Wrap(err, "Failed to get plan JSON from artifact store", errors.WithSpan(span))
 	}
 
 	return result, nil
@@ -1195,16 +1135,15 @@ func (s *service) GetRunVariables(ctx context.Context, runID string, includeSens
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByID(ctx, runID)
 	if err != nil {
-		tracing.RecordError(span, err, "Failed to get run")
 		return nil, errors.Wrap(
 			err,
 			"Failed to get run",
+			errors.WithSpan(span),
 		)
 	}
 
@@ -1218,7 +1157,6 @@ func (s *service) GetRunVariables(ctx context.Context, runID string, includeSens
 	if err = caller.RequirePermission(ctx, models.ViewSensitiveVariableValuePermission, auth.WithWorkspaceID(run.WorkspaceID)); err == nil {
 		hasPermissionToViewSensitiveValues = true
 	} else if err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithWorkspaceID(run.WorkspaceID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1268,7 +1206,7 @@ func (s *service) SetVariablesIncludedInTFConfig(ctx context.Context, input *Set
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByID(ctx, input.RunID)
@@ -1282,7 +1220,7 @@ func (s *service) SetVariablesIncludedInTFConfig(ctx context.Context, input *Set
 
 	// Since variables should only be updated during the plan operation, we're requiring that permission here.
 	if err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithPlanID(run.Plan.GetID())); err != nil {
-		return errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+		return err
 	}
 
 	if len(input.VariableKeys) == 0 {
@@ -1339,14 +1277,12 @@ func (s *service) UploadPlanBinary(ctx context.Context, planID string, reader io
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, planID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run by plan ID")
-		return err
+		return errors.Wrap(err, "failed to get run by plan ID", errors.WithSpan(span))
 	}
 
 	if run == nil {
@@ -1355,20 +1291,17 @@ func (s *service) UploadPlanBinary(ctx context.Context, planID string, reader io
 
 	err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithPlanID(planID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	retainFn, cacheKey, err := s.artifactStore.UploadPlanCache(ctx, run, reader)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to upload plan cache")
-		return errors.Wrap(err, "failed to upload plan cache")
+		return errors.Wrap(err, "failed to upload plan cache", errors.WithSpan(span))
 	}
 
 	txCtx, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin transaction")
-		return errors.Wrap(err, "failed to begin transaction")
+		return errors.Wrap(err, "failed to begin transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1379,18 +1312,15 @@ func (s *service) UploadPlanBinary(ctx context.Context, planID string, reader io
 
 	run.Plan.CacheObjectStoreKey = &cacheKey
 	if _, err = s.dbClient.Runs.UpdateRun(txCtx, run, run.Plan.GetID()); err != nil {
-		tracing.RecordError(span, err, "failed to update run")
-		return errors.Wrap(err, "failed to update run")
+		return errors.Wrap(err, "failed to update run", errors.WithSpan(span))
 	}
 
 	if err = retainFn(txCtx, run.Metadata.ID); err != nil {
-		tracing.RecordError(span, err, "failed to link plan cache object store ref")
-		return errors.Wrap(err, "failed to link plan cache object store ref")
+		return errors.Wrap(err, "failed to link plan cache object store ref", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txCtx); err != nil {
-		tracing.RecordError(span, err, "failed to commit transaction")
-		return errors.Wrap(err, "failed to commit transaction")
+		return errors.Wrap(err, "failed to commit transaction", errors.WithSpan(span))
 	}
 
 	return nil
@@ -1402,14 +1332,12 @@ func (s *service) ProcessPlanData(ctx context.Context, planID string, tfPlan *tf
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, planID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run by plan node ID")
-		return err
+		return errors.Wrap(err, "failed to get run by plan node ID", errors.WithSpan(span))
 	}
 	if run == nil {
 		return errors.New("plan with ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
@@ -1417,7 +1345,6 @@ func (s *service) ProcessPlanData(ctx context.Context, planID string, tfPlan *tf
 
 	err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithPlanID(planID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -1427,8 +1354,7 @@ func (s *service) ProcessPlanData(ctx context.Context, planID string, tfPlan *tf
 		TFProviderSchemas: tfProviderSchemas,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to update plan summary")
-		return err
+		return errors.Wrap(err, "failed to update plan summary", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Processed plan data.",
@@ -1444,14 +1370,12 @@ func (s *service) GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, e
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, planID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run by plan ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run by plan ID", errors.WithSpan(span))
 	}
 
 	if run == nil {
@@ -1460,7 +1384,6 @@ func (s *service) GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, e
 
 	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1495,7 +1418,7 @@ func (s *service) GetPlanCheckResults(ctx context.Context, planID string) ([]cor
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, planID)
@@ -1509,7 +1432,7 @@ func (s *service) GetPlanCheckResults(ctx context.Context, planID string) ([]cor
 
 	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
-		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	if run.Plan.JSONObjectStoreKey == nil {
@@ -1560,7 +1483,7 @@ func (s *service) GetPolicyCheckPolicyMessages(ctx context.Context, policyCheckI
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, policyCheckID)
@@ -1572,7 +1495,7 @@ func (s *service) GetPolicyCheckPolicyMessages(ctx context.Context, policyCheckI
 	}
 
 	if err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID)); err != nil {
-		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	check := run.PolicyCheckByID(policyCheckID)
@@ -1617,14 +1540,12 @@ func (s *service) UpdateApply(ctx context.Context, input *UpdateApplyInput) (*mo
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	run, err := s.dbClient.Runs.GetRunByNodeID(ctx, input.ApplyID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run by apply node ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run by apply node ID", errors.WithSpan(span))
 	}
 	if run == nil {
 		return nil, errors.New("apply with ID %s not found", input.ApplyID, errors.WithErrorCode(errors.ENotFound))
@@ -1632,14 +1553,12 @@ func (s *service) UpdateApply(ctx context.Context, input *UpdateApplyInput) (*mo
 
 	err = caller.RequirePermission(ctx, models.UpdateRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithApplyID(input.ApplyID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	cmd := s.cmdFactory.NewUpdateApply(input.ApplyID, input.ErrorMessage)
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to update apply node")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update apply node", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated an apply.",
@@ -1712,21 +1631,18 @@ func (s *service) GetRunGateByID(ctx context.Context, id string) (*models.RunGat
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gate by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gate by ID", errors.WithSpan(span))
 	}
 	if gate == nil {
 		return nil, errors.New("run gate with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1739,21 +1655,18 @@ func (s *service) GetRunGateByTRN(ctx context.Context, trnValue string) (*models
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	gate, err := s.dbClient.RunGates.GetRunGateByTRN(ctx, trnValue)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gate by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gate by TRN", errors.WithSpan(span))
 	}
 	if gate == nil {
 		return nil, errors.New("run gate with TRN %s not found", trnValue, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1766,12 +1679,10 @@ func (s *service) GetRunGates(ctx context.Context, input *GetRunGatesInput) (*db
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if err = s.requireRunViewAccess(ctx, caller, input.RunID); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1792,7 +1703,6 @@ func (s *service) GetRunGatesByIDs(ctx context.Context, ids []string) ([]*models
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1802,8 +1712,7 @@ func (s *service) GetRunGatesByIDs(ctx context.Context, ids []string) ([]*models
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gates")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gates", errors.WithSpan(span))
 	}
 
 	gates := make([]*models.RunGate, len(result.RunGates))
@@ -1813,7 +1722,6 @@ func (s *service) GetRunGatesByIDs(ctx context.Context, ids []string) ([]*models
 		if _, checked := checkedRuns[gate.RunID]; !checked {
 			if err = caller.RequirePermission(ctx, models.ViewRunPermission,
 				auth.WithRunID(gate.RunID), auth.WithWorkspaceID(gate.WorkspaceID)); err != nil {
-				tracing.RecordError(span, err, "permission check failed")
 				return nil, err
 			}
 			checkedRuns[gate.RunID] = struct{}{}
@@ -1835,7 +1743,6 @@ func (s *service) GetRunGatesByPolicyCheckIDs(ctx context.Context, policyCheckID
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1845,8 +1752,7 @@ func (s *service) GetRunGatesByPolicyCheckIDs(ctx context.Context, policyCheckID
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gates")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gates", errors.WithSpan(span))
 	}
 
 	gates := make([]*models.RunGate, len(result.RunGates))
@@ -1856,7 +1762,6 @@ func (s *service) GetRunGatesByPolicyCheckIDs(ctx context.Context, policyCheckID
 		if _, checked := checkedRuns[gate.RunID]; !checked {
 			if err = caller.RequirePermission(ctx, models.ViewRunPermission,
 				auth.WithRunID(gate.RunID), auth.WithWorkspaceID(gate.WorkspaceID)); err != nil {
-				tracing.RecordError(span, err, "permission check failed")
 				return nil, err
 			}
 			checkedRuns[gate.RunID] = struct{}{}
@@ -1873,14 +1778,12 @@ func (s *service) GetRunGateApprovalByID(ctx context.Context, id string) (*model
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	approval, err := s.dbClient.RunGateApprovals.GetRunGateApprovalByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gate approval by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gate approval by ID", errors.WithSpan(span))
 	}
 	if approval == nil {
 		return nil, errors.New("run gate approval with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
@@ -1888,15 +1791,13 @@ func (s *service) GetRunGateApprovalByID(ctx context.Context, id string) (*model
 
 	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, approval.RunGateID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gate by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gate by ID", errors.WithSpan(span))
 	}
 	if gate == nil {
 		return nil, errors.New("run gate with id %s not found", approval.RunGateID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1909,14 +1810,12 @@ func (s *service) GetRunGateApprovalByTRN(ctx context.Context, trnValue string) 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	approval, err := s.dbClient.RunGateApprovals.GetRunGateApprovalByTRN(ctx, trnValue)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gate approval by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gate approval by TRN", errors.WithSpan(span))
 	}
 	if approval == nil {
 		return nil, errors.New("run gate approval with TRN %s not found", trnValue, errors.WithErrorCode(errors.ENotFound))
@@ -1924,15 +1823,13 @@ func (s *service) GetRunGateApprovalByTRN(ctx context.Context, trnValue string) 
 
 	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, approval.RunGateID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gate by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gate by ID", errors.WithSpan(span))
 	}
 	if gate == nil {
 		return nil, errors.New("run gate with id %s not found", approval.RunGateID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1945,21 +1842,18 @@ func (s *service) GetRunGateApprovalsByGateID(ctx context.Context, gateID string
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, gateID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gate by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gate by ID", errors.WithSpan(span))
 	}
 	if gate == nil {
 		return nil, errors.New("run gate with id %s not found", gateID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1978,7 +1872,6 @@ func (s *service) GetRunGatesAwaitingDecision(ctx context.Context, input *GetRun
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1998,7 +1891,6 @@ func (s *service) GetRunGatesAwaitingDecision(ctx context.Context, input *GetRun
 			return nil
 		},
 	); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -2010,8 +1902,7 @@ func (s *service) GetRunGatesAwaitingDecision(ctx context.Context, input *GetRun
 	if !caller.IsAdminModeActivated(ctx) {
 		rootNamespaces, rErr := caller.GetRootNamespaceMemberships(ctx)
 		if rErr != nil {
-			tracing.RecordError(span, rErr, "failed to get root namespaces")
-			return nil, rErr
+			return nil, errors.Wrap(rErr, "failed to get root namespaces", errors.WithSpan(span))
 		}
 		rootNamespaceMemberships = rootNamespaces
 	}
@@ -2053,7 +1944,6 @@ func (s *service) ApproveRunGate(ctx context.Context, input *ApproveRunGateInput
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -2075,15 +1965,13 @@ func (s *service) ApproveRunGate(ctx context.Context, input *ApproveRunGateInput
 	// inbox, could still be approved by ID.
 	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, input.GateID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gate")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gate", errors.WithSpan(span))
 	}
 	if gate == nil {
 		return nil, errors.New("run gate with id %s not found", input.GateID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -2094,14 +1982,12 @@ func (s *service) ApproveRunGate(ctx context.Context, input *ApproveRunGateInput
 		Caller:   caller,
 	})
 	if err = s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to set run gate decision")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to set run gate decision", errors.WithSpan(span))
 	}
 
 	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, cmd.UpdatedGate.WorkspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get workspace for activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get workspace for activity event", errors.WithSpan(span))
 	}
 	if ws != nil {
 		if _, err = activity.CreateActivityEvent(ctx, s.dbClient, &activity.CreateActivityEventInput{
@@ -2114,8 +2000,7 @@ func (s *service) ApproveRunGate(ctx context.Context, input *ApproveRunGateInput
 				Comment: input.Comment,
 			},
 		}); err != nil {
-			tracing.RecordError(span, err, "failed to create activity event")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 		}
 	}
 
@@ -2139,14 +2024,12 @@ func (s *service) OverrideRunGate(ctx context.Context, gateID string, comment *s
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to authorize caller")
 		return nil, err
 	}
 
 	gate, err := s.dbClient.RunGates.GetRunGateByID(ctx, gateID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run gate")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run gate", errors.WithSpan(span))
 	}
 	if gate == nil {
 		return nil, errors.New("run gate with id %s not found", gateID, errors.WithErrorCode(errors.ENotFound))
@@ -2158,7 +2041,6 @@ func (s *service) OverrideRunGate(ctx context.Context, gateID string, comment *s
 	// ancestor of the workspace, so it says the caller may lift that policy's requirement; it does not
 	// say they may read this run. Both are required.
 	if err = s.requireRunViewAccess(ctx, caller, gate.RunID); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -2168,8 +2050,7 @@ func (s *service) OverrideRunGate(ctx context.Context, gateID string, comment *s
 
 	run, err := s.dbClient.Runs.GetRunByID(ctx, gate.RunID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get run", errors.WithSpan(span))
 	}
 
 	check := run.PolicyCheckByID(gate.PolicyCheckID)
@@ -2179,7 +2060,6 @@ func (s *service) OverrideRunGate(ctx context.Context, gateID string, comment *s
 
 	if !caller.IsAdminModeActivated(ctx) {
 		if err = requireGateOverridePermission(ctx, caller, check); err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	}
@@ -2191,14 +2071,12 @@ func (s *service) OverrideRunGate(ctx context.Context, gateID string, comment *s
 		Caller:   caller,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
-		tracing.RecordError(span, err, "failed to override run gate")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to override run gate", errors.WithSpan(span))
 	}
 
 	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, gate.WorkspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get workspace for activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get workspace for activity event", errors.WithSpan(span))
 	}
 	if ws != nil {
 		if _, err = activity.CreateActivityEvent(ctx, s.dbClient, &activity.CreateActivityEventInput{
@@ -2211,8 +2089,7 @@ func (s *service) OverrideRunGate(ctx context.Context, gateID string, comment *s
 				Comment: comment,
 			},
 		}); err != nil {
-			tracing.RecordError(span, err, "failed to create activity event")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 		}
 	}
 

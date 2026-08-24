@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
@@ -65,14 +64,12 @@ func (wpl *workspaceVCSProviderLinks) GetLinksByProviderID(ctx context.Context, 
 		Where(goqu.Ex{"workspace_vcs_provider_links.provider_id": providerID}))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	rows, err := wpl.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -82,8 +79,7 @@ func (wpl *workspaceVCSProviderLinks) GetLinksByProviderID(ctx context.Context, 
 	for rows.Next() {
 		item, err := scanLink(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
@@ -106,8 +102,7 @@ func (wpl *workspaceVCSProviderLinks) GetLinkByTRN(ctx context.Context, trnValue
 
 	parsed, err := trn.TypeWorkspaceVCSProviderLink.Parse(trnValue)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to parse TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
 	}
 
 	if !parsed.HasParent() {
@@ -140,8 +135,7 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 
 	globPatternsJSON, err := json.Marshal(link.GlobPatterns)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal link glob patterns")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal link glob patterns", errors.WithSpan(span))
 	}
 
 	sql, args, err := toSQLWithTag("workspacevcsproviderlink.CreateLink", dialect.From("workspace_vcs_provider_links").
@@ -169,32 +163,26 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 		).Select(wpl.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_vcs_provider_links.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdLink, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil,
-					"workspace is already linked with a vcs provider")
-				return nil, errors.New("workspace is already linked with a vcs provider", errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("workspace is already linked with a vcs provider", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_workspace_id":
-					tracing.RecordError(span, nil, "workspace does not exist")
-					return nil, errors.New("workspace does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("workspace does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_provider_id":
-					tracing.RecordError(span, nil, "vcs provider does not exist")
-					return nil, errors.New("vcs provider does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("vcs provider does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				}
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdLink, nil
@@ -209,8 +197,7 @@ func (wpl *workspaceVCSProviderLinks) UpdateLink(ctx context.Context, link *mode
 
 	globPatternsJSON, err := json.Marshal(link.GlobPatterns)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal link glob patterns")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal link glob patterns", errors.WithSpan(span))
 	}
 
 	sql, args, err := toSQLWithTag("workspacevcsproviderlink.UpdateLink", dialect.From("workspace_vcs_provider_links").
@@ -235,19 +222,16 @@ func (wpl *workspaceVCSProviderLinks) UpdateLink(ctx context.Context, link *mode
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_vcs_provider_links.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedLink, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedLink, nil
@@ -272,18 +256,15 @@ func (wpl *workspaceVCSProviderLinks) DeleteLink(ctx context.Context, provider *
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_vcs_provider_links.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil

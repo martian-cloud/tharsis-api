@@ -13,7 +13,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -154,8 +153,7 @@ func (u *users) GetUserByExternalID(ctx context.Context, issuer string, external
 
 	sql, args, err := toSQLWithTag("user.GetUserByExternalID", query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	user, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -163,8 +161,7 @@ func (u *users) GetUserByExternalID(ctx context.Context, issuer string, external
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return user, nil
@@ -189,8 +186,7 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 			"user_id":     userID,
 		}))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	_, err = u.dbClient.getConnection(ctx).Exec(ctx, sql, args...)
@@ -198,13 +194,10 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil,
-					"user with external id %s already exists for issuer %s", externalID, issuer)
-				return errors.New("user with external id %s already exists for issuer %s", externalID, issuer, errors.WithErrorCode(errors.EConflict))
+				return errors.New("user with external id %s already exists for issuer %s", externalID, issuer, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil
@@ -221,14 +214,12 @@ func (u *users) UnlinkUserExternalID(ctx context.Context, issuer string, externa
 			"external_id": externalID,
 		}))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	_, err = u.dbClient.getConnection(ctx).Exec(ctx, sql, args...)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil
@@ -285,14 +276,12 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 		pagination.WithQueryTag("user.GetUsers"),
 	)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, u.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -302,16 +291,14 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 	for rows.Next() {
 		item, err := scanUser(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := UsersResult{
@@ -345,25 +332,20 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 			},
 		).Where(goqu.Ex{"id": user.Metadata.ID, "version": user.Metadata.Version}).Returning(userFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedUser, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil,
-					"user with username %s already exists", user.Username)
-				return nil, errors.New("user with username %s already exists", user.Username, errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("user with username %s already exists", user.Username, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedUser, nil
@@ -392,8 +374,7 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 		}).
 		Returning(userFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdUser, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -408,8 +389,7 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 				}
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdUser, nil
@@ -429,18 +409,15 @@ func (u *users) DeleteUser(ctx context.Context, user *models.User) error {
 			},
 		).Returning(userFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil

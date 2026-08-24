@@ -25,7 +25,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -157,18 +156,15 @@ func (s *service) GetPackageByID(ctx context.Context, id string) (*models.Packag
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	pkg, err := corepkg.GetPackageByID(ctx, s.dbClient, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package by ID", errors.WithSpan(span))
 	}
 
 	if err = s.authorizeViewPackage(ctx, caller, pkg); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -181,21 +177,18 @@ func (s *service) GetPackageByTRN(ctx context.Context, trn string) (*models.Pack
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	pkg, err := s.dbClient.Packages.GetPackageByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package by TRN", errors.WithSpan(span))
 	}
 	if pkg == nil {
 		return nil, errors.New("package with trn %s not found", trn, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = s.authorizeViewPackage(ctx, caller, pkg); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -212,7 +205,6 @@ func (s *service) GetPackagesByIDs(ctx context.Context, ids []string) ([]models.
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -220,8 +212,7 @@ func (s *service) GetPackagesByIDs(ctx context.Context, ids []string) ([]models.
 		Filter: &db.PackageFilter{PackageIDs: ids},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get packages")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get packages", errors.WithSpan(span))
 	}
 
 	// The authorization scope is what authorizeViewPackage keys on: a global package needs no check,
@@ -250,7 +241,6 @@ func (s *service) GetPackagesByIDs(ctx context.Context, ids []string) ([]models.
 			continue
 		}
 		if err = s.authorizeViewPackage(ctx, caller, pkg); err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		checkedScopes[scope] = struct{}{}
@@ -265,7 +255,6 @@ func (s *service) GetPackages(ctx context.Context, input *GetPackagesInput) (*db
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -283,8 +272,7 @@ func (s *service) GetPackages(ctx context.Context, input *GetPackagesInput) (*db
 		if !caller.IsAdminModeActivated(ctx) {
 			rootNamespaces, rErr := caller.GetRootNamespaceMemberships(ctx)
 			if rErr != nil {
-				tracing.RecordError(span, rErr, "failed to get root namespaces")
-				return nil, rErr
+				return nil, errors.Wrap(rErr, "failed to get root namespaces", errors.WithSpan(span))
 			}
 			dbInput.Filter.RootNamespaceMemberships = rootNamespaces
 		}
@@ -293,7 +281,6 @@ func (s *service) GetPackages(ctx context.Context, input *GetPackagesInput) (*db
 	}
 
 	if err = caller.RequirePermission(ctx, models.ViewPackagePermission, auth.WithNamespacePath(input.Group.FullPath)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -331,18 +318,15 @@ func (s *service) GetVisiblePackages(ctx context.Context, input *GetVisiblePacka
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if input.Group == nil {
 		err = errors.New("group is required", errors.WithErrorCode(errors.EInvalid))
-		tracing.RecordError(span, err, "missing group")
-		return nil, err
+		return nil, errors.Wrap(err, "missing group", errors.WithSpan(span))
 	}
 
 	if err = caller.RequirePermission(ctx, models.ViewPackagePermission, auth.WithNamespacePath(input.Group.FullPath)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -362,19 +346,16 @@ func (s *service) CreatePackage(ctx context.Context, input *CreatePackageInput) 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if err = caller.RequirePermission(ctx, models.CreatePackagePermission, auth.WithGroupID(input.GroupID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group by ID", errors.WithSpan(span))
 	}
 	if group == nil {
 		return nil, errors.New("group with id %s not found", input.GroupID, errors.WithErrorCode(errors.ENotFound))
@@ -385,8 +366,7 @@ func (s *service) CreatePackage(ctx context.Context, input *CreatePackageInput) 
 	if group.ParentID != "" {
 		rootGroup, gErr := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(group.GetRootGroupPath()))
 		if gErr != nil {
-			tracing.RecordError(span, gErr, "failed to get root group")
-			return nil, gErr
+			return nil, errors.Wrap(gErr, "failed to get root group", errors.WithSpan(span))
 		}
 		if rootGroup == nil {
 			return nil, errors.New("root group with path %s not found", group.GetRootGroupPath(), errors.WithErrorCode(errors.ENotFound))
@@ -416,14 +396,12 @@ func (s *service) CreatePackage(ctx context.Context, input *CreatePackageInput) 
 	}
 
 	if vErr := packageToCreate.Validate(); vErr != nil {
-		tracing.RecordError(span, vErr, "failed to validate package model")
-		return nil, vErr
+		return nil, errors.Wrap(vErr, "failed to validate package model", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -434,8 +412,7 @@ func (s *service) CreatePackage(ctx context.Context, input *CreatePackageInput) 
 
 	createdPackage, err := s.dbClient.Packages.CreatePackage(txContext, packageToCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create package")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create package", errors.WithSpan(span))
 	}
 
 	// Get the number of packages in the group to check whether we just violated the limit.
@@ -448,12 +425,10 @@ func (s *service) CreatePackage(ctx context.Context, input *CreatePackageInput) 
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to query packages in group")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to query packages in group", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitPackagesPerGroup, pkgsResult.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "failed to check limit for packages per group")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to check limit for packages per group", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient, &activity.CreateActivityEventInput{
@@ -462,13 +437,11 @@ func (s *service) CreatePackage(ctx context.Context, input *CreatePackageInput) 
 		TargetType:    models.TargetPackage,
 		TargetID:      createdPackage.Metadata.ID,
 	}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a package.",
@@ -486,18 +459,15 @@ func (s *service) UpdatePackage(ctx context.Context, input *UpdatePackageInput) 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	pkg, err := corepkg.GetPackageByID(ctx, s.dbClient, input.ID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package by ID", errors.WithSpan(span))
 	}
 
 	if err = caller.RequirePermission(ctx, models.UpdatePackagePermission, auth.WithGroupID(pkg.GroupID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -512,14 +482,12 @@ func (s *service) UpdatePackage(ctx context.Context, input *UpdatePackageInput) 
 	}
 
 	if vErr := pkg.Validate(); vErr != nil {
-		tracing.RecordError(span, vErr, "failed to validate package model")
-		return nil, vErr
+		return nil, errors.Wrap(vErr, "failed to validate package model", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -530,8 +498,7 @@ func (s *service) UpdatePackage(ctx context.Context, input *UpdatePackageInput) 
 
 	updatedPackage, err := s.dbClient.Packages.UpdatePackage(txContext, pkg)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update package")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update package", errors.WithSpan(span))
 	}
 
 	groupPath := pkg.GetGroupPath()
@@ -541,13 +508,11 @@ func (s *service) UpdatePackage(ctx context.Context, input *UpdatePackageInput) 
 		TargetType:    models.TargetPackage,
 		TargetID:      updatedPackage.Metadata.ID,
 	}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated a package.",
@@ -566,19 +531,16 @@ func (s *service) DeletePackage(ctx context.Context, pkg *models.Package) error 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	if err = caller.RequirePermission(ctx, models.DeletePackagePermission, auth.WithGroupID(pkg.GroupID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -588,8 +550,7 @@ func (s *service) DeletePackage(ctx context.Context, pkg *models.Package) error 
 	}()
 
 	if err = s.dbClient.Packages.DeletePackage(txContext, pkg); err != nil {
-		tracing.RecordError(span, err, "failed to delete package")
-		return err
+		return errors.Wrap(err, "failed to delete package", errors.WithSpan(span))
 	}
 
 	groupPath := pkg.GetGroupPath()
@@ -606,13 +567,11 @@ func (s *service) DeletePackage(ctx context.Context, pkg *models.Package) error 
 				Type: string(models.TargetPackage),
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Deleted a package.",
@@ -630,24 +589,20 @@ func (s *service) GetPackageVersionByID(ctx context.Context, id string) (*models
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	packageVersion, err := s.getPackageVersionByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package version by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package version by ID", errors.WithSpan(span))
 	}
 
 	pkg, err := corepkg.GetPackageByID(ctx, s.dbClient, packageVersion.PackageID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package by ID", errors.WithSpan(span))
 	}
 
 	if err = s.authorizeViewPackage(ctx, caller, pkg); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -660,14 +615,12 @@ func (s *service) GetPackageVersionByTRN(ctx context.Context, trn string) (*mode
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	packageVersion, err := s.dbClient.PackageVersions.GetPackageVersionByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package version by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package version by TRN", errors.WithSpan(span))
 	}
 	if packageVersion == nil {
 		return nil, errors.New("package version with trn %s not found", trn, errors.WithErrorCode(errors.ENotFound))
@@ -675,12 +628,10 @@ func (s *service) GetPackageVersionByTRN(ctx context.Context, trn string) (*mode
 
 	pkg, err := corepkg.GetPackageByID(ctx, s.dbClient, packageVersion.PackageID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package by ID", errors.WithSpan(span))
 	}
 
 	if err = s.authorizeViewPackage(ctx, caller, pkg); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -696,7 +647,6 @@ func (s *service) GetPackageVersionsByIDs(ctx context.Context, ids []string) ([]
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -704,8 +654,7 @@ func (s *service) GetPackageVersionsByIDs(ctx context.Context, ids []string) ([]
 		Filter: &db.PackageVersionFilter{PackageVersionIDs: ids},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package versions")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package versions", errors.WithSpan(span))
 	}
 
 	checkedPackages := map[string]struct{}{}
@@ -718,12 +667,10 @@ func (s *service) GetPackageVersionsByIDs(ctx context.Context, ids []string) ([]
 
 		pkg, pErr := corepkg.GetPackageByID(ctx, s.dbClient, packageID)
 		if pErr != nil {
-			tracing.RecordError(span, pErr, "failed to get package by ID")
-			return nil, pErr
+			return nil, errors.Wrap(pErr, "failed to get package by ID", errors.WithSpan(span))
 		}
 
 		if err = s.authorizeViewPackage(ctx, caller, pkg); err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		checkedPackages[packageID] = struct{}{}
@@ -738,18 +685,15 @@ func (s *service) GetPackageVersions(ctx context.Context, input *GetPackageVersi
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	pkg, err := corepkg.GetPackageByID(ctx, s.dbClient, input.PackageID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package by ID", errors.WithSpan(span))
 	}
 
 	if err = s.authorizeViewPackage(ctx, caller, pkg); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -778,14 +722,12 @@ func (s *service) ResolvePackageVersion(ctx context.Context, input *ResolvePacka
 	// authz handled in GetPackageByTRN
 	pkg, err := s.GetPackageByTRN(ctx, trn.TypePackage.Build(input.PackageSource))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package by TRN", errors.WithSpan(span))
 	}
 
 	packageVersion, err := corepkg.ResolveVersionConstraint(ctx, s.dbClient, pkg.Metadata.ID, input.VersionConstraint)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to resolve package version constraint")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to resolve package version constraint", errors.WithSpan(span))
 	}
 	if packageVersion == nil {
 		return nil, errors.New(
@@ -803,25 +745,21 @@ func (s *service) CreatePackageVersion(ctx context.Context, input *CreatePackage
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	pkg, err := corepkg.GetPackageByID(ctx, s.dbClient, input.PackageID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package by ID", errors.WithSpan(span))
 	}
 
 	if err = caller.RequirePermission(ctx, models.UpdatePackagePermission, auth.WithGroupID(pkg.GroupID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	semVersion, err := version.NewSemver(input.SemanticVersion)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to verify semantic version")
-		return nil, errors.Wrap(err, "invalid semantic version", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.Wrap(err, "invalid semantic version", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	versionsResp, err := s.dbClient.PackageVersions.GetPackageVersions(ctx, &db.GetPackageVersionsInput{
@@ -834,14 +772,12 @@ func (s *service) CreatePackageVersion(ctx context.Context, input *CreatePackage
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package versions")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package versions", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -855,15 +791,13 @@ func (s *service) CreatePackageVersion(ctx context.Context, input *CreatePackage
 		prevLatest := versionsResp.PackageVersions[0]
 		prevSemVersion, sErr := version.NewSemver(prevLatest.SemanticVersion)
 		if sErr != nil {
-			tracing.RecordError(span, sErr, "semver validation failed")
-			return nil, sErr
+			return nil, errors.Wrap(sErr, "semver validation failed", errors.WithSpan(span))
 		}
 		if semver.IsSemverGreaterThan(semVersion, prevSemVersion) {
 			isLatest = true
 			prevLatest.Latest = false
 			if _, uErr := s.dbClient.PackageVersions.UpdatePackageVersion(txContext, &prevLatest); uErr != nil {
-				tracing.RecordError(span, uErr, "failed to update package version")
-				return nil, uErr
+				return nil, errors.Wrap(uErr, "failed to update package version", errors.WithSpan(span))
 			}
 		}
 	} else {
@@ -879,14 +813,12 @@ func (s *service) CreatePackageVersion(ctx context.Context, input *CreatePackage
 		CreatedBy:       caller.GetSubject(),
 	}
 	if vErr := versionToCreate.Validate(); vErr != nil {
-		tracing.RecordError(span, vErr, "invalid package version")
-		return nil, vErr
+		return nil, errors.Wrap(vErr, "invalid package version", errors.WithSpan(span))
 	}
 
 	packageVersion, err := s.dbClient.PackageVersions.CreatePackageVersion(txContext, versionToCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create package version")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create package version", errors.WithSpan(span))
 	}
 
 	// Get the number of versions of this package within the time period to check whether we just
@@ -901,13 +833,11 @@ func (s *service) CreatePackageVersion(ctx context.Context, input *CreatePackage
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package's versions")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get package's versions", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitVersionsPerPackagePerTimePeriod, newVersions.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "failed to check limit for package versions per time period")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to check limit for package versions per time period", errors.WithSpan(span))
 	}
 
 	groupPath := pkg.GetGroupPath()
@@ -917,13 +847,11 @@ func (s *service) CreatePackageVersion(ctx context.Context, input *CreatePackage
 		TargetType:    models.TargetPackageVersion,
 		TargetID:      packageVersion.Metadata.ID,
 	}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a package version.",
@@ -945,20 +873,17 @@ func (s *service) DeletePackageVersion(ctx context.Context, packageVersion *mode
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	pkg, err := corepkg.GetPackageByID(ctx, s.dbClient, packageVersion.PackageID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by ID")
-		return err
+		return errors.Wrap(err, "failed to get package by ID", errors.WithSpan(span))
 	}
 
 	// A version is a child of the package, so removing one is an update to the package rather than a
 	// package deletion; this is the permission CreatePackageVersion requires.
 	if err = caller.RequirePermission(ctx, models.UpdatePackagePermission, auth.WithGroupID(pkg.GroupID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -971,8 +896,7 @@ func (s *service) DeletePackageVersion(ctx context.Context, packageVersion *mode
 			},
 		})
 		if gErr != nil {
-			tracing.RecordError(span, gErr, "failed to get package versions")
-			return gErr
+			return errors.Wrap(gErr, "failed to get package versions", errors.WithSpan(span))
 		}
 
 		for _, v := range versionsResp.PackageVersions {
@@ -984,8 +908,7 @@ func (s *service) DeletePackageVersion(ctx context.Context, packageVersion *mode
 
 			currentSemVersion, cErr := version.NewSemver(vCopy.SemanticVersion)
 			if cErr != nil {
-				tracing.RecordError(span, cErr, "semver validation failed")
-				return cErr
+				return errors.Wrap(cErr, "semver validation failed", errors.WithSpan(span))
 			}
 
 			if newLatestVersion == nil {
@@ -995,8 +918,7 @@ func (s *service) DeletePackageVersion(ctx context.Context, packageVersion *mode
 
 			latestSemVersion, lErr := version.NewSemver(newLatestVersion.SemanticVersion)
 			if lErr != nil {
-				tracing.RecordError(span, lErr, "semver validation failed")
-				return lErr
+				return errors.Wrap(lErr, "semver validation failed", errors.WithSpan(span))
 			}
 
 			if semver.IsSemverGreaterThan(currentSemVersion, latestSemVersion) {
@@ -1007,8 +929,7 @@ func (s *service) DeletePackageVersion(ctx context.Context, packageVersion *mode
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1020,15 +941,13 @@ func (s *service) DeletePackageVersion(ctx context.Context, packageVersion *mode
 	// The delete must land before the promotion: index_package_versions_on_latest is a unique partial
 	// index on (package_id, latest) where latest is true, so two latest rows cannot coexist.
 	if err = s.dbClient.PackageVersions.DeletePackageVersion(txContext, packageVersion); err != nil {
-		tracing.RecordError(span, err, "failed to delete package version")
-		return err
+		return errors.Wrap(err, "failed to delete package version", errors.WithSpan(span))
 	}
 
 	if newLatestVersion != nil {
 		newLatestVersion.Latest = true
 		if _, err = s.dbClient.PackageVersions.UpdatePackageVersion(txContext, newLatestVersion); err != nil {
-			tracing.RecordError(span, err, "failed to update package version")
-			return err
+			return errors.Wrap(err, "failed to update package version", errors.WithSpan(span))
 		}
 	}
 
@@ -1046,13 +965,11 @@ func (s *service) DeletePackageVersion(ctx context.Context, packageVersion *mode
 				Type: string(models.TargetPackageVersion),
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Deleted a package version.",
@@ -1081,18 +998,15 @@ func (s *service) UploadPackageVersion(ctx context.Context, packageVersion *mode
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	pkg, err := corepkg.GetPackageByID(ctx, s.dbClient, packageVersion.PackageID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by ID")
-		return err
+		return errors.Wrap(err, "failed to get package by ID", errors.WithSpan(span))
 	}
 
 	if err = caller.RequirePermission(ctx, models.UpdatePackagePermission, auth.WithGroupID(pkg.GroupID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -1124,8 +1038,7 @@ func (s *service) UploadPackageVersion(ctx context.Context, packageVersion *mode
 	// verification fails), the janitor reclaims the orphaned object after its grace period.
 	retainRef, objectStoreKey, err := s.store.UploadPackageVersion(ctx, packageVersion, teeReader)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to upload package")
-		return err
+		return errors.Wrap(err, "failed to upload package", errors.WithSpan(span))
 	}
 
 	shaSum := hex.EncodeToString(checksum.Sum(nil))
@@ -1142,7 +1055,6 @@ func (s *service) UploadPackageVersion(ctx context.Context, packageVersion *mode
 		packageVersion.Status = models.PackageVersionStatusErrored
 		packageVersion.Error = &errorMsg
 		if _, err = s.dbClient.PackageVersions.UpdatePackageVersion(ctx, packageVersion); err != nil {
-			tracing.RecordError(span, err, "failed to set package version status to errored")
 			s.logger.WithContextFields(ctx).Errorf("failed to set package version status to errored %v", err)
 		}
 		return nil
@@ -1168,8 +1080,7 @@ func (s *service) UploadPackageVersion(ctx context.Context, packageVersion *mode
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1180,13 +1091,11 @@ func (s *service) UploadPackageVersion(ctx context.Context, packageVersion *mode
 
 	updatedPackageVersion, err := s.dbClient.PackageVersions.UpdatePackageVersion(txContext, packageVersion)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update package version")
-		return err
+		return errors.Wrap(err, "failed to update package version", errors.WithSpan(span))
 	}
 
 	if err = retainRef(txContext, updatedPackageVersion.Metadata.ID); err != nil {
-		tracing.RecordError(span, err, "failed to link package version object store ref")
-		return err
+		return errors.Wrap(err, "failed to link package version object store ref", errors.WithSpan(span))
 	}
 
 	// Record a durable tamper trail when a re-upload changed the version's content. The activity event
@@ -1199,14 +1108,12 @@ func (s *service) UploadPackageVersion(ctx context.Context, packageVersion *mode
 			TargetType:    models.TargetPackageVersion,
 			TargetID:      updatedPackageVersion.Metadata.ID,
 		}); err != nil {
-			tracing.RecordError(span, err, "failed to create package version re-upload activity event")
-			return err
+			return errors.Wrap(err, "failed to create package version re-upload activity event", errors.WithSpan(span))
 		}
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	if reupload {
@@ -1240,25 +1147,21 @@ func (s *service) DownloadPackageVersion(ctx context.Context, packageVersion *mo
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return "", err
 	}
 
 	pkg, err := corepkg.GetPackageByID(ctx, s.dbClient, packageVersion.PackageID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package by ID")
-		return "", err
+		return "", errors.Wrap(err, "failed to get package by ID", errors.WithSpan(span))
 	}
 
 	if err = s.authorizeViewPackage(ctx, caller, pkg); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return "", err
 	}
 
 	downloadURL, err := s.store.GetPackageVersionPresignedURL(ctx, packageVersion)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get package presigned URL")
-		return "", err
+		return "", errors.Wrap(err, "failed to get package presigned URL", errors.WithSpan(span))
 	}
 
 	return downloadURL, nil

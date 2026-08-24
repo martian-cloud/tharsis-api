@@ -12,7 +12,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -105,14 +104,12 @@ func (s *service) GetGroupsByIDs(ctx context.Context, idList []string) ([]models
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	resp, err := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{Filter: &db.GroupFilter{GroupIDs: idList}})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get groups")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get groups", errors.WithSpan(span))
 	}
 
 	paths := []string{}
@@ -124,7 +121,6 @@ func (s *service) GetGroupsByIDs(ctx context.Context, idList []string) ([]models
 	if len(paths) > 0 {
 		err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePaths(paths))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	}
@@ -139,7 +135,6 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -180,7 +175,6 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 		// Since parent group is specified we will authorize access based on the parent group
 		err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithGroupID(*input.ParentGroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		dbInput.Filter.ParentID = input.ParentGroupID
@@ -191,8 +185,7 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 		if !caller.IsAdminModeActivated(ctx) {
 			rootNamespaces, err := caller.GetRootNamespaceMemberships(ctx)
 			if err != nil {
-				tracing.RecordError(span, err, "failed to get root namespaces")
-				return nil, err
+				return nil, errors.Wrap(err, "failed to get root namespaces", errors.WithSpan(span))
 			}
 			// The db layer restricts to these memberships: exact root namespaces when RootOnly,
 			// or their descendants otherwise.
@@ -210,26 +203,22 @@ func (s *service) GetGroupByID(ctx context.Context, id string) (*models.Group, e
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group by ID", errors.WithSpan(span))
 	}
 
 	if group == nil {
-		tracing.RecordError(span, nil, "group with id %s not found", id)
 		return nil, errors.New(
 			"group with id %s not found", id,
-			errors.WithErrorCode(errors.ENotFound))
+			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -243,26 +232,22 @@ func (s *service) GetGroupByTRN(ctx context.Context, trn string) (*models.Group,
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by trn")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group by trn", errors.WithSpan(span))
 	}
 
 	if group == nil {
-		tracing.RecordError(span, nil, "Group with trn %s not found", trn)
 		return nil, errors.New(
 			"Group with trn %s not found", trn,
-			errors.WithErrorCode(errors.ENotFound))
+			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -276,13 +261,11 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, models.DeleteGroupPermission, auth.WithGroupID(input.Group.Metadata.ID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -296,43 +279,34 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 
 		subgroups, gErr := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{Filter: &db.GroupFilter{ParentID: &input.Group.Metadata.ID}})
 		if gErr != nil {
-			tracing.RecordError(span, gErr, "failed to get groups")
-			return gErr
+			return errors.Wrap(gErr, "failed to get groups", errors.WithSpan(span))
 		}
 
 		if len(subgroups.Groups) > 0 {
-			tracing.RecordError(span, nil,
-				"This group can't be deleted because it contains subgroups, "+
-					"use the force option to automatically delete all subgroups.")
 			return errors.New(
 				"This group can't be deleted because it contains subgroups, "+
 					"use the force option to automatically delete all subgroups.",
-				errors.WithErrorCode(errors.EConflict),
+				errors.WithErrorCode(errors.EConflict), errors.WithSpan(span),
 			)
 		}
 
 		workspaces, wErr := s.dbClient.Workspaces.GetWorkspaces(ctx, &db.GetWorkspacesInput{Filter: &db.WorkspaceFilter{GroupID: &input.Group.Metadata.ID}})
 		if wErr != nil {
-			tracing.RecordError(span, wErr, "failed to get workspaces")
-			return wErr
+			return errors.Wrap(wErr, "failed to get workspaces", errors.WithSpan(span))
 		}
 
 		if len(workspaces.Workspaces) > 0 {
-			tracing.RecordError(span, nil,
-				"This group can't be deleted because it contains workspaces, "+
-					"use the force option to automatically delete all workspaces in this group.")
 			return errors.New(
 				"This group can't be deleted because it contains workspaces, "+
 					"use the force option to automatically delete all workspaces in this group.",
-				errors.WithErrorCode(errors.EConflict),
+				errors.WithErrorCode(errors.EConflict), errors.WithSpan(span),
 			)
 		}
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin a DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin a DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -346,8 +320,7 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 	// This will return an error if the group has nested groups or workspaces
 	err = s.dbClient.Groups.DeleteGroup(txContext, input.Group)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to delete a group")
-		return err
+		return errors.Wrap(err, "failed to delete a group", errors.WithSpan(span))
 	}
 
 	// If this group is nested, create an activity event for removal of this group from its parent.
@@ -365,8 +338,7 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 					Type: string(models.TargetGroup),
 				},
 			}); err != nil {
-			tracing.RecordError(span, err, "failed to create an activity event")
-			return err
+			return errors.Wrap(err, "failed to create an activity event", errors.WithSpan(span))
 		}
 	}
 
@@ -380,33 +352,28 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if input.ParentID != "" {
 		err = caller.RequirePermission(ctx, models.CreateGroupPermission, auth.WithGroupID(input.ParentID))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	} else {
 		userCaller, ok := caller.(*auth.UserCaller)
 		if !ok {
-			tracing.RecordError(span, nil, "Unsupported caller type, only users are allowed to create top-level groups")
-			return nil, errors.New("Unsupported caller type, only users are allowed to create top-level groups", errors.WithErrorCode(errors.EForbidden))
+			return nil, errors.New("Unsupported caller type, only users are allowed to create top-level groups", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 		}
 		// Only admins with admin mode activated are allowed to create top level groups
 		if !userCaller.IsAdminModeActivated(ctx) {
-			tracing.RecordError(span, nil, "only admins with admin mode activated can create top-level groups")
-			return nil, errors.New("only admins with admin mode activated can create top-level groups", errors.WithErrorCode(errors.EForbidden))
+			return nil, errors.New("only admins with admin mode activated can create top-level groups", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 		}
 	}
 
 	// Validate model
 	if err = input.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate a group model")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate a group model", errors.WithSpan(span))
 	}
 
 	input.CreatedBy = caller.GetSubject()
@@ -419,8 +386,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin a DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin a DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -431,8 +397,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 
 	group, err := s.dbClient.Groups.CreateGroup(txContext, input)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create a group")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create a group", errors.WithSpan(span))
 	}
 
 	// If a nested group, check limits to see whether we just violated them.
@@ -447,8 +412,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 
 		// Check the limit on depth of the tree.
 		if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitGroupTreeDepth, limits.StaticCount(int32(group.GetDepth()))); err != nil {
-			tracing.RecordError(span, err, "limit check failed")
-			return nil, err
+			return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 		}
 	}
 
@@ -459,8 +423,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 			TargetType:    models.TargetGroup,
 			TargetID:      group.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create an activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create an activity event", errors.WithSpan(span))
 	}
 
 	// Add owner namespace membership if this is a top level group
@@ -476,14 +439,12 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 		// This call to CreateNamespaceMembership creates the activity event for the namespace membership,
 		// so don't create another activity event from this module or there will be duplicates.
 		if _, err := s.namespaceMembershipService.CreateNamespaceMembership(txContext, namespaceMembershipInput); err != nil {
-			tracing.RecordError(span, err, "failed to create a namespace membership")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create a namespace membership", errors.WithSpan(span))
 		}
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit a DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit a DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a new group.",
@@ -500,20 +461,17 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateGroupPermission, auth.WithGroupID(group.Metadata.ID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Validate model
 	if err = group.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate a group model")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate a group model", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Requested an update to a group.",
@@ -523,8 +481,7 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin a DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin a DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -535,8 +492,7 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 
 	updatedGroup, err := s.dbClient.Groups.UpdateGroup(txContext, group)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update a group")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update a group", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -546,13 +502,11 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 			TargetType:    models.TargetGroup,
 			TargetID:      updatedGroup.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create an activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create an activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit a DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit a DB transaction", errors.WithSpan(span))
 	}
 
 	return updatedGroup, nil
@@ -565,27 +519,23 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get the group to be moved.
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, groupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get a group by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get a group by ID", errors.WithSpan(span))
 	}
 	if group == nil {
-		tracing.RecordError(span, nil, "group with id %s not found", groupID)
 		return nil, errors.New(
 			"group with id %s not found", groupID,
-			errors.WithErrorCode(errors.ENotFound))
+			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	// Caller must have DeleteGroupPermission in the group being moved.
 	err = caller.RequirePermission(ctx, models.DeleteGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -596,40 +546,34 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 	if newParentID != nil {
 		newParent, nErr = s.dbClient.Groups.GetGroupByID(ctx, *newParentID)
 		if nErr != nil {
-			tracing.RecordError(span, nErr, "failed to get a group by ID")
-			return nil, nErr
+			return nil, errors.Wrap(nErr, "failed to get a group by ID", errors.WithSpan(span))
 		}
 		if newParent == nil {
-			tracing.RecordError(span, nil, "group with id %s not found", *newParentID)
 			return nil, errors.New(
 				"group with id %s not found", *newParentID,
-				errors.WithErrorCode(errors.ENotFound))
+				errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 		}
 
 		// In case a user gets confused or otherwise tries to do a no-op move, detect and bail out.
 		// Because nothing gets done, it's safe to do this before the authorization check on the new parent.
 		if group.ParentID == newParent.Metadata.ID {
 			// Return BadRequest.
-			tracing.RecordError(span, nil, "group already has the specified parent")
-			return nil, errors.New("group already has the specified parent", errors.WithErrorCode(errors.EInvalid))
+			return nil, errors.New("group already has the specified parent", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 
 		// Make sure the group to be moved and the new parent group aren't exactly the same group.
 		if newParent.FullPath == group.FullPath {
-			tracing.RecordError(span, nil, "cannot move a group to be its own parent")
-			return nil, errors.New("cannot move a group to be its own parent", errors.WithErrorCode(errors.EInvalid))
+			return nil, errors.New("cannot move a group to be its own parent", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 
 		// Make sure the group to be moved and the new parent group aren't respective ancestor and descendant.
 		if newParent.IsDescendantOfGroup(group.FullPath) {
-			tracing.RecordError(span, nil, "cannot move a group under one of its descendants")
-			return nil, errors.New("cannot move a group under one of its descendants", errors.WithErrorCode(errors.EInvalid))
+			return nil, errors.New("cannot move a group under one of its descendants", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 
 		// If there is a new parent, the caller must have CreateGroupPermission in the new parent.
 		err = caller.RequirePermission(ctx, models.CreateGroupPermission, auth.WithNamespacePath(newParent.FullPath))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 
@@ -639,22 +583,19 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		// Return BadRequest if the user tries to move a root group to root.
 		if group.ParentID == "" {
 			// Return BadRequest.
-			tracing.RecordError(span, nil, "group is already a top-level group")
-			return nil, errors.New("group is already a top-level group", errors.WithErrorCode(errors.EInvalid))
+			return nil, errors.New("group is already a top-level group", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 
 		// If moving to root, the caller must be admin, because only admins are allowed to create new root groups.
 		userCaller, ok := caller.(*auth.UserCaller)
 		if !ok {
-			tracing.RecordError(span, nil, "Unsupported caller type, only users are allowed to move groups to top-level")
 			return nil, errors.New(
 				"Unsupported caller type, only users are allowed to move groups to top-level",
-				errors.WithErrorCode(errors.EForbidden),
+				errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span),
 			)
 		}
 		if !userCaller.IsAdminModeActivated(ctx) {
-			tracing.RecordError(span, nil, "only admins with admin mode activated can move groups to top-level")
-			return nil, errors.New("only admins with admin mode activated can move groups to top-level", errors.WithErrorCode(errors.EForbidden))
+			return nil, errors.New("only admins with admin mode activated can move groups to top-level", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 		}
 		// Leave newParentPath empty for the log message.
 	}
@@ -670,8 +611,7 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin a DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin a DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -683,8 +623,7 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 	// Now that all checks have passed and the transaction is open, do the actual work of the migration.
 	migratedGroup, err := s.dbClient.Groups.MigrateGroup(txContext, group, newParent)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to migrate a group")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to migrate a group", errors.WithSpan(span))
 	}
 
 	// If it will be a nested group, check limits to see whether we just committed a violation.
@@ -700,14 +639,12 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		// Check the limit on depth of the tree.
 		childDepth, cErr := s.dbClient.Groups.GetChildDepth(txContext, migratedGroup)
 		if cErr != nil {
-			tracing.RecordError(span, cErr, "failed to get group's depth of descendants")
-			return nil, cErr
+			return nil, errors.Wrap(cErr, "failed to get group's depth of descendants", errors.WithSpan(span))
 		}
 
 		if err = s.limitChecker.CheckLimit(txContext,
 			limits.ResourceLimitGroupTreeDepth, limits.StaticCount(int32(migratedGroup.GetDepth()+childDepth))); err != nil {
-			tracing.RecordError(span, err, "limit check failed")
-			return nil, err
+			return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 		}
 	}
 
@@ -723,13 +660,11 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 				PreviousGroupPath: group.FullPath,
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create an activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create an activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to create a DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create a DB transaction", errors.WithSpan(span))
 	}
 
 	return migratedGroup, nil
@@ -742,13 +677,11 @@ func (s *service) GetRunnerTagsSetting(ctx context.Context, group *models.Group)
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -762,13 +695,11 @@ func (s *service) GetDriftDetectionEnabledSetting(ctx context.Context, group *mo
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -782,13 +713,11 @@ func (s *service) GetProviderMirrorEnabledSetting(ctx context.Context, group *mo
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -802,12 +731,12 @@ func (s *service) GetOutputVisibilitySetting(ctx context.Context, group *models.
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
-		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	setting, err := s.inheritedSettingsResolver.GetOutputVisibility(ctx, group)
@@ -830,13 +759,11 @@ func (s *service) checkParentSubgroupLimit(ctx context.Context, span trace.Span,
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get parent group's children")
-		return err
+		return errors.Wrap(err, "failed to get parent group's children", errors.WithSpan(span))
 	}
 
 	if err = s.limitChecker.CheckLimit(ctx, limits.ResourceLimitSubgroupsPerParent, children.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
-		return err
+		return errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 	}
 
 	return nil

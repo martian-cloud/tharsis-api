@@ -10,7 +10,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -191,7 +190,7 @@ func (s *service) SetNotificationPreference(ctx context.Context, input *SetNotif
 	// Any authenticated user can view basic user information
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -299,7 +298,7 @@ func (s *service) GetNotificationPreference(ctx context.Context, input *GetNotif
 	// Any authenticated user can view basic user information
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -334,24 +333,20 @@ func (s *service) GetUserByID(ctx context.Context, userID string) (*models.User,
 
 	// Any authenticated user can view basic user information
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	user, err := s.dbClient.Users.GetUserByID(ctx, userID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get user by ID")
 		return nil, errors.Wrap(
 			err,
-			"Failed to get user",
-		)
+			"Failed to get user", errors.WithSpan(span))
 	}
 
 	if user == nil {
-		tracing.RecordError(span, nil, "User with ID %s not found", userID)
 		return nil, errors.New(
 			"User with ID %s not found", userID,
-			errors.WithErrorCode(errors.ENotFound))
+			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	return user, nil
@@ -364,24 +359,20 @@ func (s *service) GetUserByTRN(ctx context.Context, trn string) (*models.User, e
 
 	// Any authenticated user can view basic user information
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	user, err := s.dbClient.Users.GetUserByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "Failed to get user")
 		return nil, errors.Wrap(
 			err,
-			"Failed to get user",
-		)
+			"Failed to get user", errors.WithSpan(span))
 	}
 
 	if user == nil {
-		tracing.RecordError(span, nil, "User with TRN %s not found", trn)
 		return nil, errors.New(
 			"User with TRN %s not found", trn,
-			errors.WithErrorCode(errors.ENotFound))
+			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	return user, nil
@@ -394,7 +385,6 @@ func (s *service) GetUsers(ctx context.Context, input *GetUsersInput) (*db.Users
 
 	// Any authenticated user can view basic user information
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -406,8 +396,7 @@ func (s *service) GetUsers(ctx context.Context, input *GetUsersInput) (*db.Users
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get users")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get users", errors.WithSpan(span))
 	}
 
 	return usersResult, nil
@@ -420,14 +409,12 @@ func (s *service) GetUsersByIDs(ctx context.Context, idList []string) ([]models.
 
 	// Any authenticated user can view basic user information
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	resp, err := s.dbClient.Users.GetUsers(ctx, &db.GetUsersInput{Filter: &db.UserFilter{UserIDs: idList}})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get users")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get users", errors.WithSpan(span))
 	}
 
 	return resp.Users, nil
@@ -538,7 +525,7 @@ func (s *service) UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdm
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -604,7 +591,7 @@ func (s *service) RevokeUserSession(ctx context.Context, input *RevokeUserSessio
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -646,7 +633,7 @@ func (s *service) CreateUser(ctx context.Context, input *CreateUserInput) (*mode
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	if !caller.IsAdminModeActivated(ctx) {
@@ -690,7 +677,7 @@ func (s *service) DeleteUser(ctx context.Context, input *DeleteUserInput) error 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return err
 	}
 
 	if !caller.IsAdminModeActivated(ctx) {
@@ -734,7 +721,7 @@ func (s *service) SetUserPassword(ctx context.Context, input *SetUserPasswordInp
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -782,7 +769,7 @@ func (s *service) GetNamespaceFavoriteByID(ctx context.Context, id string) (*mod
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -808,7 +795,7 @@ func (s *service) GetNamespaceFavoriteByTRN(ctx context.Context, trn string) (*m
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -834,7 +821,7 @@ func (s *service) GetNamespaceFavorites(ctx context.Context, input *GetNamespace
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -859,7 +846,7 @@ func (s *service) CreateNamespaceFavorite(ctx context.Context, input *CreateName
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -948,7 +935,7 @@ func (s *service) DeleteNamespaceFavorite(ctx context.Context, input *DeleteName
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+		return err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -1037,7 +1024,7 @@ func (s *service) ActivateAdminMode(ctx context.Context, input *ActivateAdminMod
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
@@ -1087,7 +1074,7 @@ func (s *service) DeactivateAdminMode(ctx context.Context) (*models.User, error)
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)

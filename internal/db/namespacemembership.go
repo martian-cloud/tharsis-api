@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -146,13 +145,11 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 
 	namespace, err := getNamespaceByPath(ctx, m.dbClient.getConnection(ctx), input.NamespacePath)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by path")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get namespace by path", errors.WithSpan(span))
 	}
 
 	if namespace == nil {
-		tracing.RecordError(span, nil, "Namespace not found")
-		return nil, errors.New("Namespace not found", errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("Namespace not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	timestamp := currentTime()
@@ -185,39 +182,31 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 		).Select(m.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil, "member already exists")
-				return nil, errors.New("member already exists", errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("member already exists", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_memberships_user_id":
-					tracing.RecordError(span, nil, "user does not exist")
-					return nil, errors.New("user does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("user does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_namespace_memberships_service_account_id":
-					tracing.RecordError(span, nil, "service account does not exist")
-					return nil, errors.New("service account does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("service account does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_namespace_memberships_team_id":
-					tracing.RecordError(span, nil, "team does not exist")
-					return nil, errors.New("team does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("team does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_namespace_memberships_namespace_id":
-					tracing.RecordError(span, nil, "namespace does not exist")
-					return nil, errors.New("namespace does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("namespace does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_namespace_memberships_role_id":
-					tracing.RecordError(span, nil, "role does not exist")
-					return nil, errors.New("role does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("role does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				}
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdNamespaceMembership, nil
@@ -249,31 +238,26 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 		).Select(m.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil, "member already exists")
-				return nil, errors.New("member already exists", errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("member already exists", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_memberships_role_id":
-					tracing.RecordError(span, nil, "role does not exist")
-					return nil, errors.New("role does not exist", errors.WithErrorCode(errors.ENotFound))
+					return nil, errors.New("role does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				}
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedNamespaceMembership, nil
@@ -296,18 +280,15 @@ func (m *namespaceMemberships) DeleteNamespaceMembership(ctx context.Context, na
 		).Select(m.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil
@@ -398,14 +379,12 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 		pagination.WithQueryTag("namespacemembership.GetNamespaceMemberships"),
 	)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -415,16 +394,14 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 	for rows.Next() {
 		item, err := scanNamespaceMembership(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := NamespaceMembershipResult{

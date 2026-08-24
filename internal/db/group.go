@@ -16,7 +16,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -238,14 +237,12 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 		pagination.WithQueryTag("group.GetGroups"),
 	)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, g.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -255,16 +252,14 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 	for rows.Next() {
 		item, err := scanGroup(rows, true)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := GroupsResult{
@@ -292,8 +287,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 	// Use transaction to update groups and namespaces tables
 	tx, err := g.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	// Rollback is safe to call even if the tx is already closed, so if
@@ -324,27 +318,22 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 		}).
 		Returning(groupFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdGroup, err := scanGroup(tx.QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
-				tracing.RecordError(span, nil,
-					"invalid group parent: the specified parent group does not exist")
-				return nil, errors.New("invalid group parent: the specified parent group does not exist", errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("invalid group parent: the specified parent group does not exist", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 
 			if isInvalidIDViolation(pgErr) {
-				tracing.RecordError(span, pgErr, "invalid ID")
 				return nil, ErrInvalidID
 			}
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	fullPath := group.Name
@@ -353,8 +342,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 	if group.ParentID != "" {
 		parentNamespace, err := getNamespaceByGroupID(ctx, tx, group.ParentID)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to get namespace by group ID")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get namespace by group ID", errors.WithSpan(span))
 		}
 
 		fullPath = fmt.Sprintf("%s/%s", parentNamespace.path, fullPath)
@@ -362,13 +350,11 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 
 	// Create new namespace resource for group
 	if _, err := createNamespace(ctx, tx, &namespaceRow{path: fullPath, groupID: createdGroup.Metadata.ID}); err != nil {
-		tracing.RecordError(span, err, "failed to create namespace for group")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create namespace for group", errors.WithSpan(span))
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	createdGroup.FullPath = fullPath
@@ -412,18 +398,15 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 		).Select(g.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedGroup, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedGroup, nil
@@ -463,8 +446,7 @@ func (g *groups) getChildDepth(ctx context.Context, conn connection, span trace.
 	for _, child := range resp.Groups {
 		candidate, err := g.getChildDepth(ctx, conn, span, child.Metadata.ID)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to recurse")
-			return 0, err
+			return 0, errors.Wrap(err, "failed to recurse", errors.WithSpan(span))
 		}
 
 		if candidate > maxChildDepth {
@@ -532,8 +514,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 
 	tx, err := g.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	// Rollback is safe to call even if the tx is already closed, so if
@@ -548,8 +529,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 
 	// Substitute the affected paths in the namespaces table first so that the FullPath field below will be set correctly.
 	if err = migrateNamespaces(ctx, tx, group.FullPath, newPath); err != nil {
-		tracing.RecordError(span, err, "failed to migrate namespaces")
-		return nil, fmt.Errorf("failed to migrate namespaces: %v", err)
+		return nil, errors.Wrap(err, "failed to migrate namespaces", errors.WithSpan(span))
 	}
 
 	// Update the parent_id field in the group being migrated.
@@ -568,20 +548,15 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 		).Select(g.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err,
-			"failed to generate SQL to update the migrating group's parent ID")
-		return nil, fmt.Errorf("failed to generate SQL to update the migrating group's parent ID: %v", err)
+		return nil, errors.Wrap(err, "failed to generate SQL to update the migrating group's parent ID", errors.WithSpan(span))
 	}
 
 	migratedGroup, err := scanGroup(tx.QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err,
-			"failed to execute query to update the migrating group's parent ID")
-		return nil, fmt.Errorf("failed to execute query to update the migrating group's parent ID: %v", err)
+		return nil, errors.Wrap(err, "failed to execute query to update the migrating group's parent ID", errors.WithSpan(span))
 	}
 
 	// The four deletes below all answer the same question about a different pair of tables: is the
@@ -608,14 +583,10 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 					g.principalOutOfScopeExpr("resource_ns", "principal_ns"),
 				))))
 	if err != nil {
-		tracing.RecordError(span, err,
-			"failed to generate SQL to delete managed identity assignments")
-		return nil, fmt.Errorf("failed to generate SQL to delete managed identity assignments: %v", err)
+		return nil, errors.Wrap(err, "failed to generate SQL to delete managed identity assignments", errors.WithSpan(span))
 	}
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
-		tracing.RecordError(span, err,
-			"failed to execute query to delete managed identity assignments")
-		return nil, fmt.Errorf("failed to execute query to delete managed identity assignments: %v", err)
+		return nil, errors.Wrap(err, "failed to execute query to delete managed identity assignments", errors.WithSpan(span))
 	}
 
 	// Delete service accounts assigned to runners
@@ -638,14 +609,10 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 					g.principalOutOfScopeExpr("resource_ns", "principal_ns"),
 				))))
 	if err != nil {
-		tracing.RecordError(span, err,
-			"failed to generate SQL to delete runner service account assignments")
-		return nil, fmt.Errorf("failed to generate SQL to delete runner service account assignments: %v", err)
+		return nil, errors.Wrap(err, "failed to generate SQL to delete runner service account assignments", errors.WithSpan(span))
 	}
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
-		tracing.RecordError(span, err,
-			"failed to execute query to delete runner service account assignments")
-		return nil, fmt.Errorf("failed to execute query to delete runner service account assignments: %v", err)
+		return nil, errors.Wrap(err, "failed to execute query to delete runner service account assignments", errors.WithSpan(span))
 	}
 
 	// Delete namespace memberships of service accounts
@@ -668,14 +635,10 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 					g.principalOutOfScopeExpr("resource_ns", "principal_ns"),
 				))))
 	if err != nil {
-		tracing.RecordError(span, err,
-			"failed to generate SQL to delete service account namespace memberships")
-		return nil, fmt.Errorf("failed to generate SQL to delete service account namespace memberships: %v", err)
+		return nil, errors.Wrap(err, "failed to generate SQL to delete service account namespace memberships", errors.WithSpan(span))
 	}
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
-		tracing.RecordError(span, err,
-			"failed to execute query to delete service account namespace memberships")
-		return nil, fmt.Errorf("failed to execute query to delete service account namespace memberships: %v", err)
+		return nil, errors.Wrap(err, "failed to execute query to delete service account namespace memberships", errors.WithSpan(span))
 	}
 
 	// Delete workspace VCS provider links
@@ -696,14 +659,10 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 					g.principalOutOfScopeExpr("resource_ns", "principal_ns"),
 				))))
 	if err != nil {
-		tracing.RecordError(span, err,
-			"failed to generate SQL to delete workspace VCS provider links")
-		return nil, fmt.Errorf("failed to generate SQL to delete workspace VCS provider links: %v", err)
+		return nil, errors.Wrap(err, "failed to generate SQL to delete workspace VCS provider links", errors.WithSpan(span))
 	}
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
-		tracing.RecordError(span, err,
-			"failed to execute query to delete workspace VCS provider links")
-		return nil, fmt.Errorf("failed to execute query to delete workspace VCS provider links: %v", err)
+		return nil, errors.Wrap(err, "failed to execute query to delete workspace VCS provider links", errors.WithSpan(span))
 	}
 
 	// Delete service accounts allowed to approve a policy
@@ -726,25 +685,19 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 					g.principalOutOfScopeExpr("resource_ns", "principal_ns"),
 				))))
 	if err != nil {
-		tracing.RecordError(span, err,
-			"failed to generate SQL to delete policy allowed service accounts")
-		return nil, fmt.Errorf("failed to generate SQL to delete policy allowed service accounts: %v", err)
+		return nil, errors.Wrap(err, "failed to generate SQL to delete policy allowed service accounts", errors.WithSpan(span))
 	}
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
-		tracing.RecordError(span, err,
-			"failed to execute query to delete policy allowed service accounts")
-		return nil, fmt.Errorf("failed to execute query to delete policy allowed service accounts: %v", err)
+		return nil, errors.Wrap(err, "failed to execute query to delete policy allowed service accounts", errors.WithSpan(span))
 	}
 
 	// Find the new root group ID.
 	newRootGroupRow, err := getNamespaceByPath(ctx, tx, migratedGroup.GetRootGroupPath())
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get new root group")
-		return nil, fmt.Errorf("failed to get new root group: %v", err)
+		return nil, errors.Wrap(err, "failed to get new root group", errors.WithSpan(span))
 	}
 	if newRootGroupRow == nil {
-		tracing.RecordError(span, nil, "failed to get new root group")
-		return nil, fmt.Errorf("failed to get new root group")
+		return nil, errors.New("failed to get new root group", errors.WithSpan(span))
 	}
 	newRootGroupID := newRootGroupRow.groupID
 
@@ -777,14 +730,10 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 				goqu.I("terraform_providers.root_group_id").Neq(newRootGroupID),
 			)))
 	if err != nil {
-		tracing.RecordError(span, err,
-			"failed to prepare SQL to update the root group of Terraform providers")
-		return nil, fmt.Errorf("failed to prepare SQL to update the root group of Terraform providers: %v", err)
+		return nil, errors.Wrap(err, "failed to prepare SQL to update the root group of Terraform providers", errors.WithSpan(span))
 	}
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
-		tracing.RecordError(span, err,
-			"failed to execute query to update the root group of Terraform providers")
-		return nil, fmt.Errorf("failed to execute query to update the root group of Terraform providers: %v", err)
+		return nil, errors.Wrap(err, "failed to execute query to update the root group of Terraform providers", errors.WithSpan(span))
 	}
 
 	// For any affected Terraform modules, find all of them under the new path and update the root_group_id
@@ -816,14 +765,10 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 				goqu.I("terraform_modules.root_group_id").Neq(newRootGroupID),
 			)))
 	if err != nil {
-		tracing.RecordError(span, err,
-			"failed to prepare SQL to update the root group of Terraform modules")
-		return nil, fmt.Errorf("failed to prepare SQL to update the root group of Terraform modules: %v", err)
+		return nil, errors.Wrap(err, "failed to prepare SQL to update the root group of Terraform modules", errors.WithSpan(span))
 	}
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
-		tracing.RecordError(span, err,
-			"failed to execute query to update the root group of Terraform modules")
-		return nil, fmt.Errorf("failed to execute query to update the root group of Terraform modules: %v", err)
+		return nil, errors.Wrap(err, "failed to execute query to update the root group of Terraform modules", errors.WithSpan(span))
 	}
 
 	// For any affected packages, find all of them under the new path and update the root_group_id
@@ -855,14 +800,10 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 				goqu.I("packages.root_group_id").Neq(newRootGroupID),
 			)))
 	if err != nil {
-		tracing.RecordError(span, err,
-			"failed to prepare SQL to update the root group of packages")
-		return nil, fmt.Errorf("failed to prepare SQL to update the root group of packages: %v", err)
+		return nil, errors.Wrap(err, "failed to prepare SQL to update the root group of packages", errors.WithSpan(span))
 	}
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
-		tracing.RecordError(span, err,
-			"failed to execute query to update the root group of packages")
-		return nil, fmt.Errorf("failed to execute query to update the root group of packages: %v", err)
+		return nil, errors.Wrap(err, "failed to execute query to update the root group of packages", errors.WithSpan(span))
 	}
 
 	// For any affected Terraform provider mirrors, find all of them under the new path and update the group_id
@@ -894,19 +835,14 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 				goqu.I("terraform_provider_version_mirrors.group_id").Neq(newRootGroupID),
 			)))
 	if err != nil {
-		tracing.RecordError(span, err,
-			"failed to prepare SQL to update the root group of Terraform provider version mirrors")
-		return nil, fmt.Errorf("failed to prepare SQL to update the group of Terraform provider version mirrors: %v", err)
+		return nil, errors.Wrap(err, "failed to prepare SQL to update the group of Terraform provider version mirrors", errors.WithSpan(span))
 	}
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
-		tracing.RecordError(span, err,
-			"failed to execute query to update the group of Terraform provider version mirrors")
-		return nil, fmt.Errorf("failed to execute query to update the group of Terraform provider version mirrors: %v", err)
+		return nil, errors.Wrap(err, "failed to execute query to update the group of Terraform provider version mirrors", errors.WithSpan(span))
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit group migration transaction")
-		return nil, fmt.Errorf("failed to commit group migration transaction: %v", err)
+		return nil, errors.Wrap(err, "failed to commit group migration transaction", errors.WithSpan(span))
 	}
 
 	return migratedGroup, nil
@@ -930,26 +866,21 @@ func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 		).Select(g.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
-				tracing.RecordError(span, nil,
-					"all nested groups and workspaces must be deleted before this group can be deleted")
-				return errors.New("all nested groups and workspaces must be deleted before this group can be deleted", errors.WithErrorCode(errors.EConflict))
+				return errors.New("all nested groups and workspaces must be deleted before this group can be deleted", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
 
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil

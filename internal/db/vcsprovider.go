@@ -12,7 +12,6 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -241,14 +240,12 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 		pagination.WithQueryTag("vcsprovider.GetProviders"),
 	)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, vp.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -258,16 +255,14 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 	for rows.Next() {
 		item, err := scanVCSProvider(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := VCSProvidersResult{
@@ -312,25 +307,21 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdProvider, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil, "vcs provider already exists in the specified group")
-				return nil, errors.New("vcs provider already exists in the specified group", errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("vcs provider already exists in the specified group", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
-				tracing.RecordError(span, nil, "invalid group: the specified group does not exist")
-				return nil, errors.New("invalid group: the specified group does not exist", errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("invalid group: the specified group does not exist", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdProvider, nil
@@ -364,18 +355,15 @@ func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCS
 		).Select(vp.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedProvider, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedProvider, nil
@@ -399,29 +387,25 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 		).Select(vp.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_workspace_id" {
-				tracing.RecordError(span, nil,
-					"VCS provider %s has workspace configurations", provider.Name)
 				return errors.New(
 					"VCS provider %s has workspace configurations", provider.Name,
 					errors.WithErrorCode(errors.EConflict),
+					errors.WithSpan(span),
 				)
 			}
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil

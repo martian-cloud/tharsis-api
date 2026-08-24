@@ -15,7 +15,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -87,13 +86,11 @@ func (s *service) GetGPGKeys(ctx context.Context, input *GetGPGKeysInput) (*db.G
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewGPGKeyPermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -122,8 +119,7 @@ func (s *service) GetGPGKeys(ctx context.Context, input *GetGPGKeysInput) (*db.G
 		Filter:            filter,
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get GPG keys")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get GPG keys", errors.WithSpan(span))
 	}
 	return result, nil
 }
@@ -135,7 +131,6 @@ func (s *service) GetGPGKeysByIDs(ctx context.Context, idList []string) ([]model
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -145,8 +140,7 @@ func (s *service) GetGPGKeysByIDs(ctx context.Context, idList []string) ([]model
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get GPG keys by IDs")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get GPG keys by IDs", errors.WithSpan(span))
 	}
 
 	namespacePaths := []string{}
@@ -157,7 +151,6 @@ func (s *service) GetGPGKeysByIDs(ctx context.Context, idList []string) ([]model
 	if len(namespacePaths) > 0 {
 		err = caller.RequireAccessToInheritableResource(ctx, types.GPGKeyModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
-			tracing.RecordError(span, err, "inherited resource access check failed")
 			return nil, err
 		}
 	}
@@ -172,13 +165,11 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, models.DeleteGPGKeyPermission, auth.WithGroupID(gpgKey.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -189,8 +180,7 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to start a DB transaction")
-		return err
+		return errors.Wrap(err, "failed to start a DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -200,19 +190,16 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 	}()
 
 	if err = s.dbClient.GPGKeys.DeleteGPGKey(txContext, gpgKey); err != nil {
-		tracing.RecordError(span, err, "failed to delete a GPG key")
-		return err
+		return errors.Wrap(err, "failed to delete a GPG key", errors.WithSpan(span))
 	}
 
 	// Retrieve the group to get its path.
 	group, err := s.dbClient.Groups.GetGroupByID(txContext, gpgKey.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to retrieve a GPG key's group")
-		return err
+		return errors.Wrap(err, "failed to retrieve a GPG key's group", errors.WithSpan(span))
 	}
 	if group == nil {
-		tracing.RecordError(span, nil, "GPG key's group does not exist: %s", gpgKey.GroupID)
-		return fmt.Errorf("group ID does not exist: %s", gpgKey.GroupID)
+		return errors.New("group ID does not exist: %s", gpgKey.GroupID, errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -227,8 +214,7 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 				Type: string(models.TargetGPGKey),
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create an activity event")
-		return err
+		return errors.Wrap(err, "failed to create an activity event", errors.WithSpan(span))
 	}
 
 	return s.dbClient.Transactions.CommitTx(txContext)
@@ -241,25 +227,21 @@ func (s *service) GetGPGKeyByID(ctx context.Context, id string) (*models.GPGKey,
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get gpgKey from DB
 	gpgKey, err := s.dbClient.GPGKeys.GetGPGKeyByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get GPG key by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get GPG key by ID", errors.WithSpan(span))
 	}
 
 	if gpgKey == nil {
-		tracing.RecordError(span, nil, "gpg key with ID %s not found", id)
-		return nil, errors.New("gpg key with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("gpg key with ID %s not found", id, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.GPGKeyModelType, auth.WithGroupID(gpgKey.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "inheritable resource permission check failed")
 		return nil, err
 	}
 
@@ -272,25 +254,21 @@ func (s *service) GetGPGKeyByTRN(ctx context.Context, trn string) (*models.GPGKe
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get gpgKey from DB
 	gpgKey, err := s.dbClient.GPGKeys.GetGPGKeyByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get GPG key by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get GPG key by TRN", errors.WithSpan(span))
 	}
 
 	if gpgKey == nil {
-		tracing.RecordError(span, nil, "gpg key with TRN %s not found", trn)
-		return nil, errors.New("gpg key with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("gpg key with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.GPGKeyModelType, auth.WithGroupID(gpgKey.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "inheritable resource permission check failed")
 		return nil, err
 	}
 
@@ -304,36 +282,30 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateGPGKeyPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Read key to get GPG key ID and fingerprint
 	entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(input.ASCIIArmor))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to read ascii key armor")
-		return nil, errors.Wrap(err, "failed to read ascii key armor", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.Wrap(err, "failed to read ascii key armor", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	if len(entityList) != 1 {
-		tracing.RecordError(span, nil, "invalid number of public keys found, expected 1 but found %d", len(entityList))
-		return nil, errors.New("invalid number of public keys found, expected 1 but found %d", len(entityList), errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.New("invalid number of public keys found, expected 1 but found %d", len(entityList), errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get GPG key's group by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get GPG key's group by ID", errors.WithSpan(span))
 	}
 	if group == nil {
-		tracing.RecordError(span, nil, "group ID does not exist: %s", input.GroupID)
-		return nil, fmt.Errorf("group ID does not exist: %s", input.GroupID)
+		return nil, errors.New("group ID does not exist: %s", input.GroupID, errors.WithSpan(span))
 	}
 
 	primaryKey := entityList[0].PrimaryKey
@@ -352,8 +324,7 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin a DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin a DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -365,8 +336,7 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 	// Store gpg key in DB
 	createdKey, err := s.dbClient.GPGKeys.CreateGPGKey(txContext, toCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to store a GPG key in the DB")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to store a GPG key in the DB", errors.WithSpan(span))
 	}
 
 	// Get the number of GPG keys in the group to check whether we just violated the limit.
@@ -379,13 +349,11 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group's GPG keys")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group's GPG keys", errors.WithSpan(span))
 	}
 
 	if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitGPGKeysPerGroup, newKeys.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
-		return nil, err
+		return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -399,8 +367,7 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit a DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit a DB transaction", errors.WithSpan(span))
 	}
 
 	return createdKey, nil

@@ -16,7 +16,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	nsutils "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -143,7 +142,6 @@ func (s *service) GetPolicies(ctx context.Context, input *GetPoliciesInput) (*db
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -153,7 +151,6 @@ func (s *service) GetPolicies(ctx context.Context, input *GetPoliciesInput) (*db
 	// inherited by the namespace where the caller holds the permission.
 	if err = caller.RequireAccessToInheritableResource(ctx, types.PolicyModelType,
 		auth.WithGroupID(input.Group.Metadata.ID)); err != nil {
-		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
 	}
 
@@ -165,8 +162,7 @@ func (s *service) GetPolicies(ctx context.Context, input *GetPoliciesInput) (*db
 			Filter: &db.GroupFilter{GroupPaths: groupPaths},
 		})
 		if gErr != nil {
-			tracing.RecordError(span, gErr, "failed to get ancestor groups")
-			return nil, gErr
+			return nil, errors.Wrap(gErr, "failed to get ancestor groups", errors.WithSpan(span))
 		}
 		groupIDs := make([]string, len(groupsResult.Groups))
 		for i := range groupsResult.Groups {
@@ -190,14 +186,12 @@ func (s *service) GetPolicyByID(ctx context.Context, id string) (*models.Policy,
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	policy, err := s.dbClient.Policies.GetPolicyByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get policy by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get policy by ID", errors.WithSpan(span))
 	}
 	if policy == nil {
 		return nil, errors.New("policy with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
@@ -208,7 +202,6 @@ func (s *service) GetPolicyByID(ctx context.Context, id string) (*models.Policy,
 	// when the policy came from an ancestor group.
 	if err = caller.RequireAccessToInheritableResource(ctx, types.PolicyModelType,
 		auth.WithGroupID(policy.GroupID)); err != nil {
-		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
 	}
 
@@ -221,14 +214,12 @@ func (s *service) GetPolicyByTRN(ctx context.Context, trnValue string) (*models.
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	policy, err := s.dbClient.Policies.GetPolicyByTRN(ctx, trnValue)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get policy by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get policy by TRN", errors.WithSpan(span))
 	}
 	if policy == nil {
 		return nil, errors.New("policy with TRN %s not found", trnValue, errors.WithErrorCode(errors.ENotFound))
@@ -236,7 +227,6 @@ func (s *service) GetPolicyByTRN(ctx context.Context, trnValue string) (*models.
 
 	if err = caller.RequireAccessToInheritableResource(ctx, types.PolicyModelType,
 		auth.WithGroupID(policy.GroupID)); err != nil {
-		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
 	}
 
@@ -257,7 +247,6 @@ func (s *service) GetPoliciesByIDs(ctx context.Context, ids []string) ([]models.
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -265,8 +254,7 @@ func (s *service) GetPoliciesByIDs(ctx context.Context, ids []string) ([]models.
 		Filter: &db.PolicyFilter{PolicyIDs: ids},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get policies")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get policies", errors.WithSpan(span))
 	}
 
 	// Deduplicated because a batch usually holds several policies from the same group, and each distinct
@@ -285,7 +273,6 @@ func (s *service) GetPoliciesByIDs(ctx context.Context, ids []string) ([]models.
 	if len(groupPaths) > 0 {
 		if err = caller.RequireAccessToInheritableResource(ctx, types.PolicyModelType,
 			auth.WithNamespacePaths(groupPaths)); err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -304,19 +291,16 @@ func (s *service) GetWorkspaceAssignedPolicies(ctx context.Context, workspaceID 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if err = caller.RequirePermission(ctx, models.ViewPolicyPermission, auth.WithWorkspaceID(workspaceID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	workspace, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get workspace")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get workspace", errors.WithSpan(span))
 	}
 	if workspace == nil {
 		return nil, errors.New("workspace not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
@@ -324,8 +308,7 @@ func (s *service) GetWorkspaceAssignedPolicies(ctx context.Context, workspaceID 
 
 	managedIdentities, err := s.dbClient.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, workspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identities for workspace")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identities for workspace", errors.WithSpan(span))
 	}
 
 	return corepolicy.GetWorkspaceAssignedPolicies(ctx, s.dbClient, workspace, managedIdentities, nil)
@@ -347,14 +330,12 @@ func (s *service) GetPoliciesReferencingManagedIdentity(ctx context.Context, man
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	managedIdentity, err := s.dbClient.ManagedIdentities.GetManagedIdentityByID(ctx, managedIdentityID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get managed identity", errors.WithSpan(span))
 	}
 	if managedIdentity == nil {
 		return nil, errors.New("managed identity not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
@@ -362,7 +343,6 @@ func (s *service) GetPoliciesReferencingManagedIdentity(ctx context.Context, man
 
 	if err = caller.RequirePermission(ctx, models.ViewPolicyPermission,
 		auth.WithGroupID(managedIdentity.GroupID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -375,7 +355,6 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -388,15 +367,13 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 
 	ownerGroup, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get owner group")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get owner group", errors.WithSpan(span))
 	}
 	if ownerGroup == nil {
 		return nil, errors.New("group with id %s not found", input.GroupID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = caller.RequirePermission(ctx, models.CreatePolicyPermission, auth.WithGroupID(input.GroupID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -410,12 +387,10 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 	}
 
 	if err = validateScopeRules(input.Scope); err != nil {
-		tracing.RecordError(span, err, "invalid scope rules")
-		return nil, err
+		return nil, errors.Wrap(err, "invalid scope rules", errors.WithSpan(span))
 	}
 
 	if err = s.verifyServiceAccountAccessForGroup(ctx, input.AllowedServiceAccountIDs, ownerGroup.FullPath); err != nil {
-		tracing.RecordError(span, err, "service account access check failed")
 		return nil, err
 	}
 
@@ -433,14 +408,12 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 		CreatedBy:                caller.GetSubject(),
 	}
 	if vErr := toCreate.Validate(); vErr != nil {
-		tracing.RecordError(span, vErr, "failed to validate policy")
-		return nil, vErr
+		return nil, errors.Wrap(vErr, "failed to validate policy", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -451,8 +424,7 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 
 	created, err := s.dbClient.Policies.CreatePolicy(txContext, toCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create policy")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create policy", errors.WithSpan(span))
 	}
 
 	policiesResult, pErr := s.dbClient.Policies.GetPolicies(txContext, &db.GetPoliciesInput{
@@ -462,12 +434,10 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 		},
 	})
 	if pErr != nil {
-		tracing.RecordError(span, pErr, "failed to query policies in namespace")
-		return nil, pErr
+		return nil, errors.Wrap(pErr, "failed to query policies in namespace", errors.WithSpan(span))
 	}
 	if lErr := s.limitChecker.CheckLimit(txContext, limits.ResourceLimitPoliciesPerGroup, policiesResult.PageInfo.TotalCount); lErr != nil {
-		tracing.RecordError(span, lErr, "failed to check limit for policies per namespace")
-		return nil, lErr
+		return nil, errors.Wrap(lErr, "failed to check limit for policies per namespace", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient, &activity.CreateActivityEventInput{
@@ -476,13 +446,11 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 		TargetType:    models.TargetPolicy,
 		TargetID:      created.Metadata.ID,
 	}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a policy.",
@@ -501,41 +469,35 @@ func (s *service) UpdatePolicy(ctx context.Context, input *UpdatePolicyInput) (*
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	policy, err := s.dbClient.Policies.GetPolicyByID(ctx, input.ID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get policy by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get policy by ID", errors.WithSpan(span))
 	}
 	if policy == nil {
 		return nil, errors.New("policy with id %s not found", input.ID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = caller.RequirePermission(ctx, models.UpdatePolicyPermission, auth.WithGroupID(policy.GroupID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	ownerGroup, err := s.dbClient.Groups.GetGroupByID(ctx, policy.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get owner group")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get owner group", errors.WithSpan(span))
 	}
 	if ownerGroup == nil {
 		return nil, errors.New("group with id %s not found", policy.GroupID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if err = input.Validate(); err != nil {
-		tracing.RecordError(span, err, "invalid update policy input")
-		return nil, err
+		return nil, errors.Wrap(err, "invalid update policy input", errors.WithSpan(span))
 	}
 
 	if input.AllowedServiceAccountIDs != nil {
 		if err = s.verifyServiceAccountAccessForGroup(ctx, *input.AllowedServiceAccountIDs, ownerGroup.FullPath); err != nil {
-			tracing.RecordError(span, err, "service account access check failed")
 			return nil, err
 		}
 	}
@@ -572,14 +534,12 @@ func (s *service) UpdatePolicy(ctx context.Context, input *UpdatePolicyInput) (*
 	}
 
 	if vErr := policy.Validate(); vErr != nil {
-		tracing.RecordError(span, vErr, "failed to validate policy")
-		return nil, vErr
+		return nil, errors.Wrap(vErr, "failed to validate policy", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -590,8 +550,7 @@ func (s *service) UpdatePolicy(ctx context.Context, input *UpdatePolicyInput) (*
 
 	updated, err := s.dbClient.Policies.UpdatePolicy(txContext, policy)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update policy")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update policy", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient, &activity.CreateActivityEventInput{
@@ -600,13 +559,11 @@ func (s *service) UpdatePolicy(ctx context.Context, input *UpdatePolicyInput) (*
 		TargetType:    models.TargetPolicy,
 		TargetID:      updated.Metadata.ID,
 	}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated a policy.",
@@ -623,19 +580,16 @@ func (s *service) DeletePolicy(ctx context.Context, policy *models.Policy) error
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	if err = caller.RequirePermission(ctx, models.DeletePolicyPermission, auth.WithGroupID(policy.GroupID)); err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	ownerGroup, err := s.dbClient.Groups.GetGroupByID(ctx, policy.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get owner group")
-		return err
+		return errors.Wrap(err, "failed to get owner group", errors.WithSpan(span))
 	}
 	if ownerGroup == nil {
 		return errors.New("group with id %s not found", policy.GroupID, errors.WithErrorCode(errors.ENotFound))
@@ -643,8 +597,7 @@ func (s *service) DeletePolicy(ctx context.Context, policy *models.Policy) error
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -654,8 +607,7 @@ func (s *service) DeletePolicy(ctx context.Context, policy *models.Policy) error
 	}()
 
 	if err = s.dbClient.Policies.DeletePolicy(txContext, policy); err != nil {
-		tracing.RecordError(span, err, "failed to delete policy")
-		return err
+		return errors.Wrap(err, "failed to delete policy", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient, &activity.CreateActivityEventInput{
@@ -669,13 +621,11 @@ func (s *service) DeletePolicy(ctx context.Context, policy *models.Policy) error
 			Type: string(models.TargetPolicy),
 		},
 	}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Deleted a policy.",

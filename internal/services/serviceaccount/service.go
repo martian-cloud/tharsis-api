@@ -20,7 +20,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -237,12 +236,12 @@ func (s *service) GetServiceAccounts(ctx context.Context, input *GetServiceAccou
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewServiceAccountPermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
-		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	filter := &db.ServiceAccountFilter{
@@ -286,7 +285,7 @@ func (s *service) GetServiceAccountsByIDs(ctx context.Context, idList []string) 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	result, err := s.dbClient.ServiceAccounts.GetServiceAccounts(ctx, &db.GetServiceAccountsInput{
@@ -306,7 +305,7 @@ func (s *service) GetServiceAccountsByIDs(ctx context.Context, idList []string) 
 	if len(namespacePaths) > 0 {
 		err = caller.RequireAccessToInheritableResource(ctx, types.ServiceAccountModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
-			return nil, errors.Wrap(err, "inheritable resource access check failed", errors.WithSpan(span))
+			return nil, err
 		}
 	}
 
@@ -319,7 +318,7 @@ func (s *service) DeleteServiceAccount(ctx context.Context, input *DeleteService
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return err
 	}
 
 	serviceAccount, err := s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, input.ID)
@@ -333,7 +332,7 @@ func (s *service) DeleteServiceAccount(ctx context.Context, input *DeleteService
 
 	err = caller.RequirePermission(ctx, models.DeleteServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
-		return errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+		return err
 	}
 
 	if input.MetadataVersion != nil {
@@ -390,7 +389,7 @@ func (s *service) GetServiceAccountByTRN(ctx context.Context, trn string) (*mode
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	// Get serviceAccount from DB
@@ -405,7 +404,7 @@ func (s *service) GetServiceAccountByTRN(ctx context.Context, trn string) (*mode
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.ServiceAccountModelType, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
-		return nil, errors.Wrap(err, "inheritable resource access check failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	return serviceAccount, nil
@@ -418,7 +417,7 @@ func (s *service) GetServiceAccountByID(ctx context.Context, id string) (*models
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	// Get serviceAccount from DB
@@ -433,7 +432,7 @@ func (s *service) GetServiceAccountByID(ctx context.Context, id string) (*models
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.ServiceAccountModelType, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
-		return nil, errors.Wrap(err, "inheritable resource access check failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	return serviceAccount, nil
@@ -445,12 +444,12 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *CreateService
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateServiceAccountPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
-		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	serviceAccount := &models.ServiceAccount{
@@ -541,7 +540,7 @@ func (s *service) UpdateServiceAccount(ctx context.Context, input *UpdateService
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	serviceAccount, err := s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, input.ID)
@@ -741,7 +740,6 @@ func (s *service) CreateClientCredentialsToken(ctx context.Context, input *Creat
 	defer span.End()
 
 	if input.ClientID == "" || input.ClientSecret == "" {
-		tracing.RecordError(span, nil, "client credentials are required")
 		return nil, errFailedCreateClientCredentialsToken
 	}
 
@@ -754,25 +752,21 @@ func (s *service) CreateClientCredentialsToken(ctx context.Context, input *Creat
 	}
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get service account")
 		return nil, errFailedCreateClientCredentialsToken
 	}
 
 	if serviceAccount == nil {
 		s.logger.WithContextFields(ctx).Infof("Service account %s not found for client credentials authentication.", input.ClientID)
-		tracing.RecordError(span, nil, "service account not found")
 		return nil, errFailedCreateClientCredentialsToken
 	}
 
 	if !serviceAccount.ClientCredentialsEnabled() {
 		s.logger.WithContextFields(ctx).Infof("Client credentials not enabled for service account %s.", serviceAccount.Metadata.ID)
-		tracing.RecordError(span, nil, "client credentials not enabled")
 		return nil, errFailedCreateClientCredentialsToken
 	}
 
 	if !serviceAccount.VerifyClientSecret(input.ClientSecret) {
 		s.logger.WithContextFields(ctx).Infof("Invalid or expired client secret for service account %s.", serviceAccount.Metadata.ID)
-		tracing.RecordError(span, nil, "invalid client credentials")
 		return nil, errFailedCreateClientCredentialsToken
 	}
 
@@ -785,7 +779,7 @@ func (s *service) ResetClientCredentials(ctx context.Context, input *ResetClient
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	serviceAccount, err := s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, input.ID)

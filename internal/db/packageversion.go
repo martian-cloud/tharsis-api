@@ -12,7 +12,6 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -191,14 +190,12 @@ func (p *packageVersions) GetPackageVersions(ctx context.Context, input *GetPack
 		pagination.WithQueryTag("packageversion.GetPackageVersions"),
 	)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, p.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -208,16 +205,14 @@ func (p *packageVersions) GetPackageVersions(ctx context.Context, input *GetPack
 	for rows.Next() {
 		item, err := scanPackageVersion(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := PackageVersionsResult{
@@ -261,8 +256,7 @@ func (p *packageVersions) CreatePackageVersion(ctx context.Context, packageVersi
 		InnerJoin(goqu.T("packages"), goqu.On(goqu.I("packages.id").Eq(goqu.I("package_versions.package_id")))).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"packages.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdPackageVersion, err := scanPackageVersion(p.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -271,22 +265,15 @@ func (p *packageVersions) CreatePackageVersion(ctx context.Context, packageVersi
 			if isUniqueViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "index_package_versions_on_latest":
-					tracing.RecordError(span, nil,
-						"another policy set version is already marked as the latest for the same policy set")
-					return nil, errors.New("another policy set version is already marked as the latest for the same policy set", errors.WithErrorCode(errors.EConflict))
+					return nil, errors.New("another policy set version is already marked as the latest for the same policy set", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 				case "index_package_versions_on_semantic_version":
-					tracing.RecordError(span, nil,
-						"policy set version %s already exists", packageVersion.SemanticVersion)
-					return nil, errors.New("policy set version %s already exists", packageVersion.SemanticVersion, errors.WithErrorCode(errors.EConflict))
+					return nil, errors.New("policy set version %s already exists", packageVersion.SemanticVersion, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 				default:
-					tracing.RecordError(span, nil,
-						"database constraint violated: %s", pgErr.ConstraintName)
-					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict))
+					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 				}
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdPackageVersion, nil
@@ -321,32 +308,25 @@ func (p *packageVersions) UpdatePackageVersion(ctx context.Context, packageVersi
 		InnerJoin(goqu.T("packages"), goqu.On(goqu.I("packages.id").Eq(goqu.I("package_versions.package_id")))).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"packages.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedPackageVersion, err := scanPackageVersion(p.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "index_package_versions_on_latest":
-					tracing.RecordError(span, nil,
-						"another policy set version is already marked as the latest for the same policy set")
-					return nil, errors.New("another policy set version is already marked as the latest for the same policy set", errors.WithErrorCode(errors.EConflict))
+					return nil, errors.New("another policy set version is already marked as the latest for the same policy set", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 				default:
-					tracing.RecordError(span, nil,
-						"database constraint violated: %s", pgErr.ConstraintName)
-					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict))
+					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 				}
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedPackageVersion, nil
@@ -368,18 +348,15 @@ func (p *packageVersions) DeletePackageVersion(ctx context.Context, packageVersi
 		InnerJoin(goqu.T("packages"), goqu.On(goqu.I("packages.id").Eq(goqu.I("package_versions.package_id")))).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"packages.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	_, err = scanPackageVersion(p.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil

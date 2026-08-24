@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -136,14 +135,12 @@ func (np *notificationPreferences) GetNotificationPreferences(ctx context.Contex
 	)
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, np.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -153,16 +150,14 @@ func (np *notificationPreferences) GetNotificationPreferences(ctx context.Contex
 	for rows.Next() {
 		item, err := scanNotificationPreference(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := NotificationPreferencesResult{
@@ -206,20 +201,17 @@ func (np *notificationPreferences) UpdateNotificationPreference(ctx context.Cont
 		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"notification_preferences.namespace_id": goqu.I("namespaces.id")})))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedNotificationPreference, err := scanNotificationPreference(np.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedNotificationPreference, nil
@@ -234,13 +226,11 @@ func (np *notificationPreferences) CreateNotificationPreference(ctx context.Cont
 
 		namespace, err := getNamespaceByPath(ctx, np.dbClient.getConnection(ctx), *preference.NamespacePath)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to get namespace by path")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get namespace by path", errors.WithSpan(span))
 		}
 
 		if namespace == nil {
-			tracing.RecordError(span, nil, "Namespace not found")
-			return nil, errors.New("Namespace not found", errors.WithErrorCode(errors.EInvalid))
+			return nil, errors.New("Namespace not found", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 
 		namespaceID = &namespace.id
@@ -276,8 +266,7 @@ func (np *notificationPreferences) CreateNotificationPreference(ctx context.Cont
 		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"notification_preferences.namespace_id": goqu.I("namespaces.id")})))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdNotificationPreference, err := scanNotificationPreference(np.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -299,8 +288,7 @@ func (np *notificationPreferences) CreateNotificationPreference(ctx context.Cont
 			}
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdNotificationPreference, nil
@@ -325,18 +313,15 @@ func (np *notificationPreferences) DeleteNotificationPreference(ctx context.Cont
 		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"notification_preferences.namespace_id": goqu.I("namespaces.id")})))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err := scanNotificationPreference(np.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil

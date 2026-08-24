@@ -33,6 +33,22 @@ const (
 	EServiceUnavailable CodeType = "service unavailable"
 )
 
+// serverFaultCodes are error codes representing a fault in the service itself, as opposed to an
+// expected, caller-driven outcome (rejected input, missing resource, insufficient permission,
+// rate limiting). Spans are marked Error only for these, mirroring the OTel HTTP semantic
+// convention of not flagging 4xx-equivalent outcomes as server-side span errors.
+var serverFaultCodes = map[CodeType]bool{
+	EInternal:           true,
+	ENotImplemented:     true,
+	EServiceUnavailable: true,
+}
+
+// isClientError returns true if err represents an expected, caller-driven outcome (per its
+// TharsisError code) rather than an internal fault.
+func isClientError(err error) bool {
+	return !serverFaultCodes[ErrorCode(err)]
+}
+
 type config struct {
 	span      trace.Span
 	errorCode CodeType
@@ -77,7 +93,7 @@ func New(format string, a ...any) *TharsisError {
 		message: msg,
 	}
 
-	if cfg.span != nil {
+	if cfg.span != nil && !isClientError(resultError) {
 		cfg.span.RecordError(resultError)
 		cfg.span.SetStatus(codes.Error, msg)
 	}
@@ -88,10 +104,6 @@ func New(format string, a ...any) *TharsisError {
 // Wrap returns a new TharsisError which wraps an existing error
 func Wrap(err error, format string, a ...any) *TharsisError {
 	msg, cfg := interpretArgs(format, a...)
-	if cfg.span != nil {
-		cfg.span.RecordError(err)
-		cfg.span.SetStatus(codes.Error, msg)
-	}
 
 	code := cfg.errorCode
 	if code == "" {
@@ -99,11 +111,18 @@ func Wrap(err error, format string, a ...any) *TharsisError {
 		code = ErrorCode(err)
 	}
 
-	return &TharsisError{
+	resultError := &TharsisError{
 		code:    code,
 		message: msg,
 		err:     err,
 	}
+
+	if cfg.span != nil && !isClientError(resultError) {
+		cfg.span.RecordError(err)
+		cfg.span.SetStatus(codes.Error, msg)
+	}
+
+	return resultError
 }
 
 // Error implements the error interface by writing out the recursive messages.

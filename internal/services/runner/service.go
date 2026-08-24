@@ -18,7 +18,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -145,14 +144,12 @@ func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.R
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if input.NamespacePath != nil {
 		err = caller.RequirePermission(ctx, models.ViewRunnerPermission, auth.WithNamespacePath(*input.NamespacePath))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	} else if !caller.IsAdminModeActivated(ctx) {
@@ -197,8 +194,7 @@ func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.R
 		Filter:            filter,
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get runners")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get runners", errors.WithSpan(span))
 	}
 
 	return result, nil
@@ -211,7 +207,6 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -221,8 +216,7 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get runners")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get runners", errors.WithSpan(span))
 	}
 
 	for ix := range result.Runners {
@@ -252,14 +246,12 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	if runner.GroupID != nil {
 		err = caller.RequirePermission(ctx, models.DeleteRunnerPermission, auth.WithGroupID(*runner.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return err
 		}
 	} else {
@@ -285,8 +277,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -297,8 +288,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 
 	err = s.dbClient.Runners.DeleteRunner(txContext, runner)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to delete runner")
-		return err
+		return errors.Wrap(err, "failed to delete runner", errors.WithSpan(span))
 	}
 
 	if runner.GroupID != nil {
@@ -316,8 +306,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 					Type: string(models.TargetRunner),
 				},
 			}); err != nil {
-			tracing.RecordError(span, err, "failed to create activity event")
-			return err
+			return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 		}
 	}
 
@@ -568,15 +557,13 @@ func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner,
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get runner from DB
 	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get runner by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get runner by ID", errors.WithSpan(span))
 	}
 
 	if runner == nil {
@@ -605,15 +592,13 @@ func (s *service) GetRunnerByTRN(ctx context.Context, trn string) (*models.Runne
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get runner from DB
 	runner, err := s.dbClient.Runners.GetRunnerByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get runner by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get runner by TRN", errors.WithSpan(span))
 	}
 
 	if runner == nil {
@@ -643,14 +628,12 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if input.GroupID != "" {
 		err = caller.RequirePermission(ctx, models.CreateRunnerPermission, auth.WithGroupID(input.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	} else {
@@ -673,8 +656,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 
 	// Validate model
 	if err = runnerToCreate.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate runner model")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate runner model", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Requested creation of a runner.",
@@ -684,8 +666,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -697,8 +678,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 	// Store runner in DB
 	createdRunner, err := s.dbClient.Runners.CreateRunner(txContext, &runnerToCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create runner")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create runner", errors.WithSpan(span))
 	}
 
 	groupPath := createdRunner.GetGroupPath()
@@ -713,12 +693,10 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group's runners")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get group's runners", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitRunnerAgentsPerGroup, newRunners.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
-		return nil, err
+		return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -728,13 +706,11 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 			TargetType:    models.TargetRunner,
 			TargetID:      createdRunner.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	return createdRunner, nil
@@ -749,14 +725,12 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if runner.GroupID != nil {
 		err = caller.RequirePermission(ctx, models.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	} else {
@@ -778,8 +752,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 
 	// Validate model
 	if err = runner.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate runner model")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate runner model", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Requested an update to a runner.",
@@ -788,8 +761,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -801,8 +773,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 	// Store runner in DB
 	updatedRunner, err := s.dbClient.Runners.UpdateRunner(txContext, runner)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update runner")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update runner", errors.WithSpan(span))
 	}
 
 	if runner.GroupID != nil {
@@ -815,14 +786,12 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 				TargetType:    models.TargetRunner,
 				TargetID:      updatedRunner.Metadata.ID,
 			}); err != nil {
-			tracing.RecordError(span, err, "failed to create activity event")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 		}
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	return updatedRunner, nil
@@ -835,14 +804,12 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, runnerID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get runner by ID")
-		return err
+		return errors.Wrap(err, "failed to get runner by ID", errors.WithSpan(span))
 	}
 
 	if runner == nil {
@@ -856,14 +823,12 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 
 	err = caller.RequirePermission(ctx, models.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	sa, err := s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, serviceAccountID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get service account by ID")
-		return err
+		return errors.Wrap(err, "failed to get service account by ID", errors.WithSpan(span))
 	}
 
 	if sa == nil {
@@ -879,8 +844,7 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 	}
 
 	if err := s.dbClient.ServiceAccounts.AssignServiceAccountToRunner(ctx, serviceAccountID, runnerID); err != nil {
-		tracing.RecordError(span, err, "failed to assign service account to runner")
-		return err
+		return errors.Wrap(err, "failed to assign service account to runner", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Assigned a service account to a runner.",
@@ -898,14 +862,12 @@ func (s *service) UnassignServiceAccountFromRunner(ctx context.Context, serviceA
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, runnerID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get runner by ID")
-		return err
+		return errors.Wrap(err, "failed to get runner by ID", errors.WithSpan(span))
 	}
 
 	if runner == nil {
@@ -919,13 +881,11 @@ func (s *service) UnassignServiceAccountFromRunner(ctx context.Context, serviceA
 
 	err = caller.RequirePermission(ctx, models.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	if err := s.dbClient.ServiceAccounts.UnassignServiceAccountFromRunner(ctx, serviceAccountID, runnerID); err != nil {
-		tracing.RecordError(span, err, "failed to unassign service account from runner")
-		return err
+		return errors.Wrap(err, "failed to unassign service account from runner", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Unassigned a service account from a runner.",

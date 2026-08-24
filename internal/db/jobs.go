@@ -15,7 +15,6 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -153,8 +152,7 @@ func (j *jobs) GetLatestJobByType(ctx context.Context, runID string, jobType mod
 			Sort:              &sortBy,
 		})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get job")
-		return nil, errors.Wrap(err, "failed to get job")
+		return nil, errors.Wrap(err, "failed to get job", errors.WithSpan(span))
 	}
 
 	if len(jobResult.Jobs) == 0 {
@@ -246,14 +244,12 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 	)
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, j.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -263,16 +259,14 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 	for rows.Next() {
 		item, err := scanJob(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := JobsResult{
@@ -333,19 +327,16 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedJob, err := scanJob(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedJob, nil
@@ -406,15 +397,13 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 		).Select(j.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdJob, err := scanJob(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdJob, nil
@@ -435,14 +424,12 @@ func (j *jobs) GetJobCountForRunner(ctx context.Context, runnerID string) (int, 
 
 	sql, args, err := toSQLWithTag("jobs.GetJobCountForRunner", query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return 0, err
+		return 0, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	err = j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...).Scan(&count)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return 0, err
+		return 0, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 	return count, nil
 }
@@ -460,8 +447,7 @@ func (j *jobs) getJob(ctx context.Context, exp goqu.Ex) (*models.Job, error) {
 
 	sql, args, err := toSQLWithTag("jobs.getJob", query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	job, err := scanJob(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -477,8 +463,7 @@ func (j *jobs) getJob(ctx context.Context, exp goqu.Ex) (*models.Job, error) {
 			}
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return job, nil
