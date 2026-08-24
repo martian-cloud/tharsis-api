@@ -11,6 +11,9 @@ RUN apk upgrade --no-cache && \
 
 WORKDIR /app
 
+# Increase default memory limit
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
 # Copy dependency files first for better layer caching
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
