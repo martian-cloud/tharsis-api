@@ -7,7 +7,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -48,7 +47,6 @@ func (s *service) GetResourceLimits(ctx context.Context) ([]models.ResourceLimit
 
 	_, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -56,8 +54,7 @@ func (s *service) GetResourceLimits(ctx context.Context) ([]models.ResourceLimit
 
 	result, err := s.dbClient.ResourceLimits.GetResourceLimits(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get resource limits")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get resource limits", errors.WithSpan(span))
 	}
 
 	return result, nil
@@ -70,30 +67,25 @@ func (s *service) UpdateResourceLimit(ctx context.Context, input *UpdateResource
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	userCaller, ok := caller.(*auth.UserCaller)
 	if !ok {
-		tracing.RecordError(span, nil, "Unsupported caller type, only users are allowed to update resource limits")
-		return nil, errors.New("Unsupported caller type, only users are allowed to update resource limits", errors.WithErrorCode(errors.EForbidden))
+		return nil, errors.New("Unsupported caller type, only users are allowed to update resource limits", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 	// Only admins with admin mode activated are allowed to update resource limits.
 	if !userCaller.IsAdminModeActivated(ctx) {
-		tracing.RecordError(span, nil, "only admins with admin mode activated can update resource limits")
-		return nil, errors.New("only admins with admin mode activated can update resource limits", errors.WithErrorCode(errors.EForbidden))
+		return nil, errors.New("only admins with admin mode activated can update resource limits", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
 	// Validate the limit name/key.
 	foundLimit, err := s.dbClient.ResourceLimits.GetResourceLimit(ctx, string(input.Name))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get resource limit to validate name")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get resource limit to validate name", errors.WithSpan(span))
 	}
 	if foundLimit == nil {
-		tracing.RecordError(span, err, "Invalid resource limit name")
-		return nil, errors.New("Invalid resource limit name", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.New("Invalid resource limit name", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Do an update DB operation.
@@ -103,8 +95,7 @@ func (s *service) UpdateResourceLimit(ctx context.Context, input *UpdateResource
 	foundLimit.Value = input.Value
 	newLimit, err := s.dbClient.ResourceLimits.UpdateResourceLimit(ctx, foundLimit)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update resource limit")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update resource limit", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated a resource limit.",

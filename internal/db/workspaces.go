@@ -15,7 +15,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -280,14 +279,12 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		pagination.WithQueryTag("workspaces.GetWorkspaces"),
 	)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, w.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -297,16 +294,14 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 	for rows.Next() {
 		item, err := scanWorkspace(rows, true)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := WorkspacesResult{
@@ -370,18 +365,15 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 		).Select(w.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedWorkspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedWorkspace, nil
@@ -414,8 +406,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 	// Use transaction to update workspaces and namespaces tables
 	tx, err := w.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	// Rollback is safe to call even if the tx is already closed, so if
@@ -454,47 +445,39 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 		}).
 		Returning(workspaceFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
-				tracing.RecordError(span, nil,
-					"invalid group parent: the specified parent group does not exist")
-				return nil, errors.New("invalid group parent: the specified parent group does not exist", errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("invalid group parent: the specified parent group does not exist", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 
 			if isInvalidIDViolation(pgErr) {
-				tracing.RecordError(span, pgErr, "invalid ID")
 				return nil, ErrInvalidID
 			}
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	// Lookup namespace for parent group
 	parentNamespace, err := getNamespaceByGroupID(ctx, tx, workspace.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get namespace by group ID", errors.WithSpan(span))
 	}
 
 	fullPath := fmt.Sprintf("%s/%s", parentNamespace.path, workspace.Name)
 
 	// Create new namespace resource for workspace
 	if _, err := createNamespace(ctx, tx, &namespaceRow{path: fullPath, workspaceID: createdWorkspace.Metadata.ID}); err != nil {
-		tracing.RecordError(span, err, "failed to create namespace")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create namespace", errors.WithSpan(span))
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	createdWorkspace.FullPath = fullPath
@@ -521,18 +504,15 @@ func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Work
 		).Select(w.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil
@@ -550,14 +530,12 @@ func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, manage
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
 		Where(goqu.Ex{"workspace_managed_identity_relation.managed_identity_id": managedIdentityID}))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	rows, err := w.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -567,8 +545,7 @@ func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, manage
 	for rows.Next() {
 		item, err := scanWorkspace(rows, true)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
@@ -627,7 +604,6 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 	migratedWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		return nil, errors.Wrap(err, "failed to execute query to update the migrating workspace's group ID", errors.WithSpan(span))

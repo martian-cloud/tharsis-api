@@ -19,7 +19,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -178,20 +177,17 @@ func (s *service) GetProviderVersionMirrorByID(ctx context.Context, id string) (
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	versionMirror, err := s.getVersionMirrorByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version mirror", errors.WithSpan(span))
 	}
 
 	// Provider mirror is available to anyone within a group hierarchy.
 	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
@@ -204,24 +200,20 @@ func (s *service) GetProviderVersionMirrorByTRN(ctx context.Context, trn string)
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	versionMirror, err := s.dbClient.TerraformProviderVersionMirrors.GetVersionMirrorByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version mirror", errors.WithSpan(span))
 	}
 
 	if versionMirror == nil {
-		tracing.RecordError(span, nil, "provider version mirror not found")
-		return nil, errors.New("provider version mirror not found", errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("provider version mirror not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
@@ -234,7 +226,6 @@ func (s *service) GetProviderVersionMirrorsByIDs(ctx context.Context, idList []s
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -244,8 +235,7 @@ func (s *service) GetProviderVersionMirrorsByIDs(ctx context.Context, idList []s
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirrors")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version mirrors", errors.WithSpan(span))
 	}
 
 	for _, m := range result.VersionMirrors {
@@ -264,13 +254,11 @@ func (s *service) GetProviderVersionMirrors(ctx context.Context, input *GetProvi
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
@@ -286,8 +274,7 @@ func (s *service) GetProviderVersionMirrors(ctx context.Context, input *GetProvi
 
 	result, err := s.dbClient.TerraformProviderVersionMirrors.GetVersionMirrors(ctx, dbInput)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirrors")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version mirrors", errors.WithSpan(span))
 	}
 
 	return result, nil
@@ -299,42 +286,35 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateTerraformProviderMirrorPermission, auth.WithNamespacePath(input.GroupPath))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByTRN(ctx, trn.TypeGroup.Build(input.GroupPath))
 	if err != nil {
-		tracing.RecordError(span, err, "group not found")
-		return nil, err
+		return nil, errors.Wrap(err, "group not found", errors.WithSpan(span))
 	}
 
 	if group == nil {
-		tracing.RecordError(span, nil, "group not found")
-		return nil, errors.New("group %s not found", input.GroupPath, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("group %s not found", input.GroupPath, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	if group.ParentID != "" {
-		tracing.RecordError(span, nil, "terraform provider version mirrors can only be created in a top-level group")
-		return nil, errors.New("terraform provider version mirrors can only be created in a top-level group", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.New("terraform provider version mirrors can only be created in a top-level group", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	prov, err := provider.NewProvider(input.RegistryHostname, input.RegistryNamespace, input.Type)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to parse provider")
-		return nil, errors.Wrap(err, "invalid provider", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.Wrap(err, "invalid provider", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	wantVersion, err := versions.ParseVersion(input.SemanticVersion)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to parse provider version")
-		return nil, errors.Wrap(err, "invalid provider version", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.Wrap(err, "invalid provider version", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Build request options with token if available.
@@ -347,15 +327,13 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 	// platforms it supports. It isn't possible to know this otherwise.
 	availableVersions, err := s.registryClient.ListVersions(ctx, prov, reqOpts...)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to list available provider versions")
-		return nil, errors.Wrap(err, "failed to list available provider versions", errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.Wrap(err, "failed to list available provider versions", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	// Find a platform the provider supports. We only need one for our purposes.
 	supportedPlatform, err := provider.GetPlatformForVersion(wantVersion.String(), availableVersions)
 	if err != nil {
-		tracing.RecordError(span, err, "unsupported provider version")
-		return nil, errors.Wrap(err, "unsupported version %s for provider %s", wantVersion, prov, errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.Wrap(err, "unsupported version %s for provider %s", wantVersion, prov, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Now, find the sha sums, signature URLs and the associated GPG key(s) by arbitrarily using
@@ -363,21 +341,18 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 	// of the platform being queried for.
 	packageInfo, err := s.registryClient.GetPackageInfo(ctx, prov, wantVersion.String(), supportedPlatform.OS, supportedPlatform.Arch, reqOpts...)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to find provider package")
-		return nil, errors.Wrap(err, "could not find package at provider registry API", errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.Wrap(err, "could not find package at provider registry API", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	// Retrieve and verify the checksums from the response.
 	digests, err := s.registryClient.GetChecksums(ctx, packageInfo)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get checksums")
-		return nil, fmt.Errorf("failed to get checksums: %w", err)
+		return nil, errors.Wrap(err, "failed to get checksums", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -398,8 +373,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 
 	created, err := s.dbClient.TerraformProviderVersionMirrors.CreateVersionMirror(txContext, toCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create provider version mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create provider version mirror", errors.WithSpan(span))
 	}
 
 	newMirrors, err := s.dbClient.TerraformProviderVersionMirrors.GetVersionMirrors(txContext, &db.GetProviderVersionMirrorsInput{
@@ -411,8 +385,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get a group's provider version mirrors")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get a group's provider version mirrors", errors.WithSpan(span))
 	}
 
 	if err = s.limitChecker.CheckLimit(
@@ -420,8 +393,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 		limits.ResourceLimitTerraformProviderVersionMirrorsPerGroup,
 		newMirrors.PageInfo.TotalCount,
 	); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
-		return nil, err
+		return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -431,13 +403,11 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 			TargetType:    models.TargetTerraformProviderVersionMirror,
 			TargetID:      created.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a terraform provider version mirror.",
@@ -454,13 +424,11 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, models.DeleteTerraformProviderMirrorPermission, auth.WithGroupID(input.VersionMirror.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return err
 	}
 
@@ -476,33 +444,27 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 			},
 		})
 		if pErr != nil {
-			tracing.RecordError(span, pErr, "failed to get platform mirrors")
-			return pErr
+			return errors.Wrap(pErr, "failed to get platform mirrors", errors.WithSpan(span))
 		}
 
 		if result.PageInfo.HasResults {
 			totalCount, cErr := result.PageInfo.TotalCount(ctx)
 			if cErr != nil {
-				tracing.RecordError(span, cErr, "failed to get platform mirror count")
-				return cErr
+				return errors.Wrap(cErr, "failed to get platform mirror count", errors.WithSpan(span))
 			}
 
-			tracing.RecordError(span, nil,
-				"This provider version mirror can't be deleted because it currently mirrors %d platform(s). "+
-					"Setting force to true will automatically remove all mirrored Terraform provider platform mirrors. ", totalCount,
-			)
 			return errors.New(
 				"This provider version mirror can't be deleted because it currently mirrors %d platform(s). "+
 					"Setting force to true will automatically remove all mirrored Terraform provider platform mirrors. ", totalCount,
 				errors.WithErrorCode(errors.EConflict),
+				errors.WithSpan(span),
 			)
 		}
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -512,20 +474,17 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 	}()
 
 	if err = s.dbClient.TerraformProviderVersionMirrors.DeleteVersionMirror(txContext, input.VersionMirror); err != nil {
-		tracing.RecordError(span, err, "failed to delete provider version mirror")
-		return err
+		return errors.Wrap(err, "failed to delete provider version mirror", errors.WithSpan(span))
 	}
 
 	// Find the group so, we can get its path.
 	group, err := s.dbClient.Groups.GetGroupByID(txContext, input.VersionMirror.GroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group associated with provider version mirror")
-		return err
+		return errors.Wrap(err, "failed to get group associated with provider version mirror", errors.WithSpan(span))
 	}
 
 	if group == nil {
-		tracing.RecordError(span, nil, "failed to get group associated with version mirror")
-		return fmt.Errorf("failed to get group associated with version mirror: %w", err)
+		return errors.Wrap(err, "failed to get group associated with version mirror", errors.WithSpan(span))
 	}
 
 	provider := &provider.Provider{
@@ -547,13 +506,11 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 				Type: string(models.TargetTerraformProviderVersionMirror),
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Deleted a terraform provider version mirror.",
@@ -571,25 +528,21 @@ func (s *service) GetProviderPlatformMirrorByID(ctx context.Context, id string) 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	platformMirror, err := s.getPlatformMirrorByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider platform mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider platform mirror", errors.WithSpan(span))
 	}
 
 	versionMirror, err := s.getVersionMirrorByID(ctx, platformMirror.VersionMirrorID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version mirror", errors.WithSpan(span))
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
@@ -602,30 +555,25 @@ func (s *service) GetProviderPlatformMirrorByTRN(ctx context.Context, trn string
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	platformMirror, err := s.dbClient.TerraformProviderPlatformMirrors.GetPlatformMirrorByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider platform mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider platform mirror", errors.WithSpan(span))
 	}
 
 	if platformMirror == nil {
-		tracing.RecordError(span, nil, "provider platform mirror not found")
-		return nil, errors.New("provider platform mirror not found", errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("provider platform mirror not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	versionMirror, err := s.getVersionMirrorByID(ctx, platformMirror.VersionMirrorID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version mirror", errors.WithSpan(span))
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
@@ -638,19 +586,16 @@ func (s *service) GetProviderPlatformMirrors(ctx context.Context, input *GetProv
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	versionMirror, err := s.getVersionMirrorByID(ctx, input.VersionMirrorID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version mirror", errors.WithSpan(span))
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
@@ -666,8 +611,7 @@ func (s *service) GetProviderPlatformMirrors(ctx context.Context, input *GetProv
 
 	result, err := s.dbClient.TerraformProviderPlatformMirrors.GetPlatformMirrors(ctx, dbInput)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get platform mirrors")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get platform mirrors", errors.WithSpan(span))
 	}
 
 	return result, nil
@@ -679,25 +623,21 @@ func (s *service) DeleteProviderPlatformMirror(ctx context.Context, input *Delet
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	versionMirror, err := s.getVersionMirrorByID(ctx, input.PlatformMirror.VersionMirrorID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirror")
-		return err
+		return errors.Wrap(err, "failed to get provider version mirror", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.DeleteTerraformProviderMirrorPermission, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return err
 	}
 
 	if err = s.dbClient.TerraformProviderPlatformMirrors.DeletePlatformMirror(ctx, input.PlatformMirror); err != nil {
-		tracing.RecordError(span, err, "failed to delete provider platform mirror")
-		return err
+		return errors.Wrap(err, "failed to delete provider platform mirror", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Deleted a terraform provider platform mirror.",
@@ -716,19 +656,16 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	versionMirror, err := s.getVersionMirrorByID(ctx, input.VersionMirrorID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirror")
-		return err
+		return errors.Wrap(err, "failed to get provider version mirror", errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateTerraformProviderMirrorPermission, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return err
 	}
 
@@ -744,13 +681,11 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider platform mirrors")
-		return err
+		return errors.Wrap(err, "failed to get provider platform mirrors", errors.WithSpan(span))
 	}
 
 	if result.PageInfo.HasResults {
-		tracing.RecordError(span, nil, "provider platform package is already mirrored")
-		return errors.New("provider platform package is already mirrored", errors.WithErrorCode(errors.EConflict))
+		return errors.New("provider platform package is already mirrored", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 	}
 
 	digestKey := provider.GetPackageName(versionMirror.Type, versionMirror.SemanticVersion, input.OS, input.Architecture)
@@ -758,8 +693,7 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 	// No point in continuing if we don't have a checksum for the package.
 	expectDigest, ok := versionMirror.Digests[digestKey]
 	if !ok {
-		tracing.RecordError(span, nil, "no checksum available for provider package %s", digestKey)
-		return errors.New("no checksum available for provider package %s", digestKey)
+		return errors.New("no checksum available for provider package %s", digestKey, errors.WithSpan(span))
 	}
 
 	checksum := sha256.New()
@@ -770,27 +704,23 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 
 	packageFile, err := os.CreateTemp("", "terraform-provider-package-*.zip")
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create temporary package file")
-		return err
+		return errors.Wrap(err, "failed to create temporary package file", errors.WithSpan(span))
 	}
 	defer os.Remove(packageFile.Name())
 	defer packageFile.Close()
 
 	if _, err = io.Copy(packageFile, teeReader); err != nil {
-		tracing.RecordError(span, err, "failed to save uploaded provider package file to disk")
-		return fmt.Errorf("failed to save uploaded provider package file to disk: %w", err)
+		return errors.Wrap(err, "failed to save uploaded provider package file to disk", errors.WithSpan(span))
 	}
 
 	calculatedSum := checksum.Sum(nil)
 	if !bytes.Equal(expectDigest, calculatedSum) {
-		tracing.RecordError(span, nil, "checksum of the uploaded provider platform package %x does not match the expected checksum %x", calculatedSum, expectDigest)
-		return errors.New("checksum of the uploaded provider platform package %x does not match the expected checksum %x", calculatedSum, expectDigest, errors.WithErrorCode(errors.EInvalid))
+		return errors.New("checksum of the uploaded provider platform package %x does not match the expected checksum %x", calculatedSum, expectDigest, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Seek back to beginning for upload
 	if _, err = packageFile.Seek(0, io.SeekStart); err != nil {
-		tracing.RecordError(span, err, "failed to seek package file")
-		return fmt.Errorf("failed to seek package file: %w", err)
+		return errors.Wrap(err, "failed to seek package file", errors.WithSpan(span))
 	}
 
 	// Upload before the TX -- S3 writes must not run inside a DB transaction. trackedStore creates a
@@ -798,14 +728,12 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 	// inside the same TX as the row insert so the two commit atomically.
 	retainMirrorRef, mirrorKey, err := s.mirrorStore.UploadProviderPlatformPackage(ctx, packageFile)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to upload provider platform package to object store")
-		return fmt.Errorf("failed to upload provider platform package to object store: %w", err)
+		return errors.Wrap(err, "failed to upload provider platform package to object store", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -821,18 +749,15 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 		ObjectStoreKey:  mirrorKey,
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create provider platform mirror")
-		return errors.Wrap(err, "failed to create provider platform mirror")
+		return errors.Wrap(err, "failed to create provider platform mirror", errors.WithSpan(span))
 	}
 
 	if err := retainMirrorRef(txContext, platformMirror.Metadata.ID); err != nil {
-		tracing.RecordError(span, err, "failed to link provider platform mirror object store ref")
-		return err
+		return errors.Wrap(err, "failed to link provider platform mirror object store ref", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return err
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Uploaded a terraform provider installation package.",
@@ -854,7 +779,6 @@ func (s *service) GetAvailableProviderVersions(ctx context.Context, input *GetAv
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -865,14 +789,12 @@ func (s *service) GetAvailableProviderVersions(ctx context.Context, input *GetAv
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(group.Metadata.ID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
 	prov, err := provider.NewProvider(input.RegistryHostname, input.RegistryNamespace, input.Type)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to parse provider")
-		return nil, errors.Wrap(err, "invalid provider", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.Wrap(err, "invalid provider", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Only return versions with packages.
@@ -888,14 +810,12 @@ func (s *service) GetAvailableProviderVersions(ctx context.Context, input *GetAv
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirrors")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider version mirrors", errors.WithSpan(span))
 	}
 
 	// Per Terraform docs, must return a ENotFound when we have no mirrored provider versions.
 	if len(result.VersionMirrors) == 0 {
-		tracing.RecordError(span, nil, "no versions are currently mirrored for Terraform provider %s", prov)
-		return nil, errors.New("no versions are currently mirrored for Terraform provider %s", prov, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("no versions are currently mirrored for Terraform provider %s", prov, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	// Must convert to a map here as needed by Terraform CLI.
@@ -914,7 +834,6 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -925,14 +844,12 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(group.Metadata.ID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
 	prov, err := provider.NewProvider(input.RegistryHostname, input.RegistryNamespace, input.Type)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to parse provider")
-		return nil, errors.Wrap(err, "invalid provider", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.Wrap(err, "invalid provider", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Find the version mirror first.
@@ -950,13 +867,11 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get version mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get version mirror", errors.WithSpan(span))
 	}
 
 	if len(versionsResult.VersionMirrors) == 0 {
-		tracing.RecordError(span, nil, "version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, prov)
-		return nil, errors.New("version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, prov, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, prov, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	versionMirror := versionsResult.VersionMirrors[0]
@@ -967,20 +882,17 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get platform mirrors")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get platform mirrors", errors.WithSpan(span))
 	}
 
 	if len(result.PlatformMirrors) == 0 {
-		tracing.RecordError(span, nil, "no installation packages are currently mirrored for Terraform provider %s", prov)
-		return nil, errors.New("no installation packages are currently mirrored for Terraform provider %s", prov, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("no installation packages are currently mirrored for Terraform provider %s", prov, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	// Build the list of supported packages.
 	supportedPackages, err := s.buildSupportedPackages(ctx, &versionMirror, result.PlatformMirrors)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build supported packages")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build supported packages", errors.WithSpan(span))
 	}
 
 	return supportedPackages, nil
@@ -992,7 +904,6 @@ func (s *service) GetInstallationPackage(ctx context.Context, input *GetInstalla
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1003,7 +914,6 @@ func (s *service) GetInstallationPackage(ctx context.Context, input *GetInstalla
 
 	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(group.Metadata.ID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
@@ -1014,8 +924,7 @@ func (s *service) GetInstallationPackage(ctx context.Context, input *GetInstalla
 
 	versionMirror, err := s.dbClient.TerraformProviderVersionMirrors.GetVersionMirrorByTRN(ctx, versionTRN)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get version mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get version mirror", errors.WithSpan(span))
 	}
 	if versionMirror == nil {
 		return nil, errors.New("version %s is not mirrored for provider %s/%s/%s", input.SemanticVersion, input.RegistryHostname, input.RegistryNamespace, input.Type, errors.WithErrorCode(errors.ENotFound))
@@ -1028,8 +937,7 @@ func (s *service) GetInstallationPackage(ctx context.Context, input *GetInstalla
 
 	platformMirror, err := s.dbClient.TerraformProviderPlatformMirrors.GetPlatformMirrorByTRN(ctx, platformTRN)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get platform mirror")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get platform mirror", errors.WithSpan(span))
 	}
 	if platformMirror == nil {
 		return nil, errors.New("platform %s_%s is not mirrored", input.OS, input.Arch, errors.WithErrorCode(errors.ENotFound))
@@ -1043,8 +951,7 @@ func (s *service) GetInstallationPackage(ctx context.Context, input *GetInstalla
 
 	presignedURL, err := s.mirrorStore.GetProviderPlatformPackagePresignedURL(ctx, platformMirror.ObjectStoreKey)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get presigned URL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get presigned URL", errors.WithSpan(span))
 	}
 
 	return &InstallationPackage{

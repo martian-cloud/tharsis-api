@@ -28,7 +28,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -333,24 +332,20 @@ func (s *service) GetVCSProviderByID(ctx context.Context, id string) (*models.VC
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	provider, err := s.dbClient.VCSProviders.GetProviderByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if provider == nil {
-		tracing.RecordError(span, nil, "VCS provider with ID %s not found", id)
-		return nil, errors.New("VCS provider with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("VCS provider with ID %s not found", id, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -363,24 +358,20 @@ func (s *service) GetVCSProviderByTRN(ctx context.Context, trn string) (*models.
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	provider, err := s.dbClient.VCSProviders.GetProviderByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by TRN", errors.WithSpan(span))
 	}
 
 	if provider == nil {
-		tracing.RecordError(span, nil, "VCS provider with TRN %s not found", trn)
-		return nil, errors.New("VCS provider with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("VCS provider with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -394,13 +385,11 @@ func (s *service) GetVCSProviders(ctx context.Context, input *GetVCSProvidersInp
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -431,8 +420,7 @@ func (s *service) GetVCSProviders(ctx context.Context, input *GetVCSProvidersInp
 		Filter:            filter,
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get providers")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get providers", errors.WithSpan(span))
 	}
 
 	return result, nil
@@ -445,7 +433,6 @@ func (s *service) GetVCSProvidersByIDs(ctx context.Context, idList []string) ([]
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -455,8 +442,7 @@ func (s *service) GetVCSProvidersByIDs(ctx context.Context, idList []string) ([]
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get providers")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get providers", errors.WithSpan(span))
 	}
 
 	namespacePaths := []string{}
@@ -467,7 +453,6 @@ func (s *service) GetVCSProvidersByIDs(ctx context.Context, idList []string) ([]
 	if len(namespacePaths) > 0 {
 		err = caller.RequireAccessToInheritableResource(ctx, mtypes.VCSProviderModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -482,21 +467,18 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateVCSProviderPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Check if provider is supported.
 	provider, err := s.getVCSProvider(input.Type)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get VCS provider")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get VCS provider", errors.WithSpan(span))
 	}
 
 	// Use the default providerURL if nothing provided.
@@ -506,8 +488,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 	} else {
 		parsedURL, uErr := url.Parse(*input.URL)
 		if uErr != nil || (parsedURL.Scheme == "") || (parsedURL.Host == "") {
-			tracing.RecordError(span, nil, "Invalid provider URL")
-			return nil, errors.New("Invalid provider URL", errors.WithErrorCode(errors.EInvalid))
+			return nil, errors.New("Invalid provider URL", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 
 		// Remove any trailing backslash.
@@ -518,8 +499,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 	// Use a UUID for the state.
 	oAuthState, err := s.oAuthStateGenerator()
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate an OAuth state")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate an OAuth state", errors.WithSpan(span))
 	}
 
 	// Must be a pointer.
@@ -527,8 +507,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -551,14 +530,12 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 	}
 
 	if err = toCreate.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate VCS provider model")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate VCS provider model", errors.WithSpan(span))
 	}
 
 	createdProvider, err := s.dbClient.VCSProviders.CreateProvider(txContext, toCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create provider")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create provider", errors.WithSpan(span))
 	}
 
 	groupPath := createdProvider.GetGroupPath()
@@ -573,13 +550,11 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get VCS providers")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get VCS providers", errors.WithSpan(span))
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
 		limits.ResourceLimitVCSProvidersPerGroup, newVCSProviders.PageInfo.TotalCount); err != nil {
-		tracing.RecordError(span, err, "limit check failed")
-		return nil, err
+		return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -589,13 +564,11 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 			TargetType:    models.TargetVCSProvider,
 			TargetID:      createdProvider.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a VCS provider.",
@@ -606,8 +579,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 
 	authorizationURL, err := s.getOAuthAuthorizationURL(ctx, createdProvider)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get authorization URL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get authorization URL", errors.WithSpan(span))
 	}
 
 	return &CreateVCSProviderResponse{
@@ -623,25 +595,21 @@ func (s *service) UpdateVCSProvider(ctx context.Context, input *UpdateVCSProvide
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateVCSProviderPermission, auth.WithGroupID(input.Provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	if err = input.Provider.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate VCS provider model")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate VCS provider model", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -652,8 +620,7 @@ func (s *service) UpdateVCSProvider(ctx context.Context, input *UpdateVCSProvide
 
 	updatedProvider, err := s.dbClient.VCSProviders.UpdateProvider(txContext, input.Provider)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update provider")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update provider", errors.WithSpan(span))
 	}
 
 	groupPath := updatedProvider.GetGroupPath()
@@ -665,13 +632,11 @@ func (s *service) UpdateVCSProvider(ctx context.Context, input *UpdateVCSProvide
 			TargetType:    models.TargetVCSProvider,
 			TargetID:      updatedProvider.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated a VCS provider.",
@@ -690,38 +655,30 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, models.DeleteVCSProviderPermission, auth.WithGroupID(input.Provider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	// Verify the provider does not have any links.
 	links, gErr := s.dbClient.WorkspaceVCSProviderLinks.GetLinksByProviderID(ctx, input.Provider.Metadata.ID)
 	if gErr != nil {
-		tracing.RecordError(span, gErr, "failed to commit DB transaction")
-		return gErr
+		return errors.Wrap(gErr, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	if !input.Force && len(links) > 0 {
-		tracing.RecordError(span, nil,
-			"This VCS provider can't be deleted because it's currently linked to %d workspaces. "+
-				"Setting force to true will automatically remove all associated links for this provider.", len(links))
 		return errors.New(
 			"This VCS provider can't be deleted because it's currently linked to %d workspaces. "+
 				"Setting force to true will automatically remove all associated links for this provider.", len(links),
-			errors.WithErrorCode(errors.EConflict),
-		)
+			errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -732,23 +689,20 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 
 	err = s.dbClient.VCSProviders.DeleteProvider(txContext, input.Provider)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to delete provider")
-		return err
+		return errors.Wrap(err, "failed to delete provider", errors.WithSpan(span))
 	}
 
 	// Delete all webhooks associated with provider.
 	if input.Provider.AutoCreateWebhooks && len(links) > 0 {
 		provider, gErr := s.getVCSProvider(input.Provider.Type)
 		if gErr != nil {
-			tracing.RecordError(span, gErr, "failed to get VCS provider")
-			return gErr
+			return errors.Wrap(gErr, "failed to get VCS provider", errors.WithSpan(span))
 		}
 
 		// Get a new access token.
 		accessToken, rErr := s.refreshOAuthToken(ctx, provider, input.Provider, true)
 		if rErr != nil {
-			tracing.RecordError(span, rErr, "failed to refresh OAuth token")
-			return fmt.Errorf("failed to refresh access token: %v", rErr)
+			return errors.Wrap(rErr, "failed to refresh access token", errors.WithSpan(span))
 		}
 
 		for _, link := range links {
@@ -759,8 +713,7 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 				WebhookID:      link.WebhookID,
 			})
 			if err != nil {
-				tracing.RecordError(span, err, "failed to delete webhook")
-				return err
+				return errors.Wrap(err, "failed to delete webhook", errors.WithSpan(span))
 			}
 		}
 	}
@@ -778,8 +731,7 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 				Type: string(models.TargetVCSProvider),
 			},
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return err
+		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Deleted a VCS provider.",
@@ -798,25 +750,21 @@ func (s *service) GetWorkspaceVCSProviderLinkByWorkspaceID(ctx context.Context, 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(workspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	link, err := s.dbClient.WorkspaceVCSProviderLinks.GetLinkByWorkspaceID(ctx, workspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	if link == nil {
-		tracing.RecordError(span, nil, "failed to commit DB transaction")
-		return nil, errors.New("workspace vcs provider link for workspace ID %s not found", workspaceID, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("workspace vcs provider link for workspace ID %s not found", workspaceID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	return link, nil
@@ -829,24 +777,20 @@ func (s *service) GetWorkspaceVCSProviderLinkByID(ctx context.Context, id string
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	link, err := s.dbClient.WorkspaceVCSProviderLinks.GetLinkByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get link by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get link by ID", errors.WithSpan(span))
 	}
 
 	if link == nil {
-		tracing.RecordError(span, nil, "workspace vcs provider link with ID %s not found", id)
-		return nil, errors.New("workspace vcs provider link with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("workspace vcs provider link with ID %s not found", id, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(link.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -859,24 +803,20 @@ func (s *service) GetWorkspaceVCSProviderLinkByTRN(ctx context.Context, trn stri
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	link, err := s.dbClient.WorkspaceVCSProviderLinks.GetLinkByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get link by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get link by TRN", errors.WithSpan(span))
 	}
 
 	if link == nil {
-		tracing.RecordError(span, nil, "workspace vcs provider link with TRN %s not found", trn)
-		return nil, errors.New("workspace vcs provider link with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("workspace vcs provider link with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(link.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -890,26 +830,22 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Make sure the VCS provider exists. Also, used to configure it.
 	vp, err := s.dbClient.VCSProviders.GetProviderByID(ctx, input.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if vp == nil {
-		tracing.RecordError(span, nil, "failed to get provider by ID")
-		return nil, errors.New("vcs provider with id %s not found", input.ProviderID, errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.New("vcs provider with id %s not found", input.ProviderID, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Get the group path.
@@ -918,38 +854,28 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 
 	// Verify that the vcs provider's group is in the same hierarchy as the workspace.
 	if !strings.HasPrefix(input.Workspace.FullPath, groupPath) {
-		tracing.RecordError(span, nil,
-			"VCS provider %s is not available to workspace %s", providerResourcePath, input.Workspace.FullPath)
-		return nil, errors.New("VCS provider %s is not available to workspace %s", providerResourcePath, input.Workspace.FullPath, errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.New("VCS provider %s is not available to workspace %s", providerResourcePath, input.Workspace.FullPath, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Make sure the token is there, otherwise user forgot to complete
 	// the OAuth flow for the VCS provider.
 	if vp.OAuthAccessToken == nil {
-		tracing.RecordError(span, nil,
-			"OAuth flow must be completed before linking a workspace to a VCS provider. "+
-				"Either use the original authorization URL when VCS provider was created "+
-				"or request another one",
-		)
 		return nil, errors.New(
 			"OAuth flow must be completed before linking a workspace to a VCS provider. "+
 				"Either use the original authorization URL when VCS provider was created "+
 				"or request another one",
-			errors.WithErrorCode(errors.EInvalid),
-		)
+			errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	provider, cErr := s.getVCSProvider(vp.Type)
 	if cErr != nil {
-		tracing.RecordError(span, cErr, "failed to get VCS provider")
-		return nil, cErr
+		return nil, errors.Wrap(cErr, "failed to get VCS provider", errors.WithSpan(span))
 	}
 
 	// Get a new access token.
 	accessToken, err := s.refreshOAuthToken(ctx, provider, vp, false)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to refresh access token")
-		return nil, fmt.Errorf("failed to refresh access token: %v", err)
+		return nil, errors.Wrap(err, "failed to refresh access token", errors.WithSpan(span))
 	}
 
 	// Get the project, this also validates the repository exists.
@@ -959,8 +885,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 		RepositoryPath: input.RepositoryPath,
 	})
 	if gErr != nil {
-		tracing.RecordError(span, gErr, "failed to get projects")
-		return nil, gErr
+		return nil, errors.Wrap(gErr, "failed to get projects", errors.WithSpan(span))
 	}
 
 	branch := payload.DefaultBranch
@@ -970,8 +895,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -1003,14 +927,12 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 	}
 
 	if err = toCreate.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate workspace VCS provider link model")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate workspace VCS provider link model", errors.WithSpan(span))
 	}
 
 	createdLink, err := s.dbClient.WorkspaceVCSProviderLinks.CreateLink(txContext, toCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create link")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create link", errors.WithSpan(span))
 	}
 
 	response := &CreateWorkspaceVCSProviderLinkResponse{}
@@ -1026,8 +948,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 		},
 	})
 	if gErr != nil {
-		tracing.RecordError(span, gErr, "failed to generate token with a UUID claim")
-		return nil, gErr
+		return nil, errors.Wrap(gErr, "failed to generate token with a UUID claim", errors.WithSpan(span))
 	}
 
 	// If provider was set to automatically create webhook, create it.
@@ -1040,8 +961,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 			WebhookToken:   token,
 		})
 		if cErr != nil {
-			tracing.RecordError(span, cErr, "failed to create webhook")
-			return nil, cErr
+			return nil, errors.Wrap(cErr, "failed to create webhook", errors.WithSpan(span))
 		}
 
 		// Set the webhook ID to the one just created.
@@ -1049,8 +969,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 
 		createdLink, err = s.dbClient.WorkspaceVCSProviderLinks.UpdateLink(txContext, createdLink)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to update link")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to update link", errors.WithSpan(span))
 		}
 	} else {
 		// Get the webhook URL based on the provider type. GitLab supports
@@ -1066,8 +985,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 
 		webhookURL, wErr := getTharsisWebhookURL(s.tharsisURL, webhookToken)
 		if wErr != nil {
-			tracing.RecordError(span, wErr, "failed to get webhook URL")
-			return nil, wErr
+			return nil, errors.Wrap(wErr, "failed to get webhook URL", errors.WithSpan(span))
 		}
 
 		response.WebhookURL = &webhookURL
@@ -1077,8 +995,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 	response.Link = createdLink
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a workspace vcs provider link.",
@@ -1097,19 +1014,16 @@ func (s *service) UpdateWorkspaceVCSProviderLink(ctx context.Context, input *Upd
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Link.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	if err = input.Link.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Requested an update to a workspace vcs provider link.",
@@ -1127,26 +1041,22 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Link.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	// Get the provider, so we can reconfigure it.
 	vp, err := s.dbClient.VCSProviders.GetProviderByID(ctx, input.Link.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	if vp == nil {
-		tracing.RecordError(span, nil, "failed to get provider by ID")
-		return errors.New("vcs provider with id %s not found", input.Link.ProviderID)
+		return errors.New("vcs provider with id %s not found", input.Link.ProviderID, errors.WithSpan(span))
 	}
 
 	// If the provider was automatically configured, delete the webhook
@@ -1154,16 +1064,14 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 	if vp.AutoCreateWebhooks {
 		provider, err := s.getVCSProvider(vp.Type)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to get VCS provider")
-			return err
+			return errors.Wrap(err, "failed to get VCS provider", errors.WithSpan(span))
 		}
 
 		// Get a new access token.
 		accessToken, err := s.refreshOAuthToken(ctx, provider, vp, false)
 		if err != nil && !input.Force {
-			tracing.RecordError(span, nil, "failed to validate workspace VCS provider link model")
-			return fmt.Errorf("error refreshing access token. "+
-				"Setting force to true will delete this link but webhooks may have to be deleted manually: %v", err)
+			return errors.New("error refreshing access token. "+
+				"Setting force to true will delete this link but webhooks may have to be deleted manually: %v", err, errors.WithSpan(span))
 		}
 
 		// Delete the existing webhook.
@@ -1173,11 +1081,8 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 			RepositoryPath: input.Link.RepositoryPath,
 			WebhookID:      input.Link.WebhookID,
 		}); err != nil && !input.Force {
-			tracing.RecordError(span, nil,
-				"error deleting webhook. "+
-					"Setting force to true will delete this link but webhooks may have to be deleted manually: %v", err)
-			return fmt.Errorf("error deleting webhook. "+
-				"Setting force to true will delete this link but webhooks may have to be deleted manually: %v", err)
+			return errors.New("error deleting webhook. "+
+				"Setting force to true will delete this link but webhooks may have to be deleted manually: %v", err, errors.WithSpan(span))
 		}
 	}
 
@@ -1196,24 +1101,20 @@ func (s *service) GetVCSEventByID(ctx context.Context, id string) (*models.VCSEv
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	event, err := s.dbClient.VCSEvents.GetEventByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get event by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get event by ID", errors.WithSpan(span))
 	}
 
 	if event == nil {
-		tracing.RecordError(span, nil, "vcs event with id %s not found", id)
-		return nil, errors.New("vcs event with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("vcs event with id %s not found", id, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithWorkspaceID(event.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1227,24 +1128,20 @@ func (s *service) GetVCSEventByTRN(ctx context.Context, trn string) (*models.VCS
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	event, err := s.dbClient.VCSEvents.GetEventByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get event by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get event by TRN", errors.WithSpan(span))
 	}
 
 	if event == nil {
-		tracing.RecordError(span, nil, "vcs event with TRN %s not found", trn)
-		return nil, errors.New("vcs event with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("vcs event with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithWorkspaceID(event.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1258,13 +1155,11 @@ func (s *service) GetVCSEvents(ctx context.Context, input *GetVCSEventsInput) (*
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithWorkspaceID(input.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1286,7 +1181,6 @@ func (s *service) GetVCSEventsByIDs(ctx context.Context, idList []string) ([]mod
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1296,14 +1190,12 @@ func (s *service) GetVCSEventsByIDs(ctx context.Context, idList []string) ([]mod
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get events")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get events", errors.WithSpan(span))
 	}
 
 	for _, ve := range result.VCSEvents {
 		err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithWorkspaceID(ve.WorkspaceID))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	}
@@ -1318,53 +1210,44 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	// Make sure the workspace is linked to a VCS provider.
 	link, err := s.dbClient.WorkspaceVCSProviderLinks.GetLinkByWorkspaceID(ctx, input.Workspace.Metadata.ID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get link by workspace ID")
-		return err
+		return errors.Wrap(err, "failed to get link by workspace ID", errors.WithSpan(span))
 	}
 
 	if link == nil {
-		tracing.RecordError(span, nil,
-			"Workspace %s is not linked to a VCS provider", input.Workspace.FullPath)
-		return errors.New("Workspace %s is not linked to a VCS provider", input.Workspace.FullPath, errors.WithErrorCode(errors.EInvalid))
+		return errors.New("Workspace %s is not linked to a VCS provider", input.Workspace.FullPath, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Get the provider associated with the link.
 	vp, err := s.dbClient.VCSProviders.GetProviderByID(ctx, link.ProviderID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by ID")
-		return err
+		return errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
 	}
 
 	// Shouldn't happen.
 	if vp == nil {
-		tracing.RecordError(span, nil, "failed to get provider by ID")
-		return errors.New("VCS provider associated with link ID %s not found", link.Metadata.ID)
+		return errors.New("VCS provider associated with link ID %s not found", link.Metadata.ID, errors.WithSpan(span))
 	}
 
 	// Get the appropriate provider from the map, so we can download from it.
 	provider, err := s.getVCSProvider(vp.Type)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get VCS provider")
-		return err
+		return errors.Wrap(err, "failed to get VCS provider", errors.WithSpan(span))
 	}
 
 	accessToken, err := s.refreshOAuthToken(ctx, provider, vp, false)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to refresh OAuth token")
-		return err
+		return errors.Wrap(err, "failed to refresh OAuth token", errors.WithSpan(span))
 	}
 
 	var referenceName string
@@ -1394,8 +1277,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 		RepositoryPath: link.RepositoryPath,
 	})
 	if err != nil {
-		tracing.RecordError(span, nil, "failed to build repository url")
-		return fmt.Errorf("failed to build repository url: %w", err)
+		return errors.Wrap(err, "failed to build repository url", errors.WithSpan(span))
 	}
 
 	// Create the VCS event with 'pending' status.
@@ -1408,8 +1290,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 		RepositoryURL:       repoURL,
 	})
 	if err != nil {
-		tracing.RecordError(span, nil, "failed to create a vcs event")
-		return fmt.Errorf("failed to create a vcs event: %w", err)
+		return errors.Wrap(err, "failed to create a vcs event", errors.WithSpan(span))
 	}
 
 	handleVCSRunCallback := func(ctx context.Context) {
@@ -1469,20 +1350,17 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	vcsCaller, ok := caller.(*auth.VCSWorkspaceLinkCaller)
 	if !ok {
-		tracing.RecordError(span, nil, "Invalid caller; only version control systems can invoke webhook")
-		return errors.New("Invalid caller; only version control systems can invoke webhook", errors.WithErrorCode(errors.EInvalid))
+		return errors.New("Invalid caller; only version control systems can invoke webhook", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Require permission for creating plan runs.
 	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(vcsCaller.Link.WorkspaceID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -1490,8 +1368,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 	// Mainly just to allow easier debugging incase things do go wrong.
 	workspace, err := s.workspaceService.GetWorkspaceByID(ctx, vcsCaller.Link.WorkspaceID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get workspace by ID")
-		return err
+		return errors.Wrap(err, "failed to get workspace by ID", errors.WithSpan(span))
 	}
 
 	if vcsCaller.Link.WebhookDisabled {
@@ -1507,8 +1384,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 
 	provider, err := s.getVCSProvider(vcsCaller.Provider.Type)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get VCS provider")
-		return err
+		return errors.Wrap(err, "failed to get VCS provider", errors.WithSpan(span))
 	}
 
 	eventType := provider.ToVCSEventType(&types.ToVCSEventTypeInput{
@@ -1536,8 +1412,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 
 	accessToken, err := s.refreshOAuthToken(ctx, provider, vcsCaller.Provider, false)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to refresh access token")
-		return fmt.Errorf("failed to refresh access token: %v", err)
+		return errors.Wrap(err, "failed to refresh access token", errors.WithSpan(span))
 	}
 
 	ref := input.Ref
@@ -1554,8 +1429,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 		RepositoryPath: vcsCaller.Link.RepositoryPath,
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build repository URL")
-		return fmt.Errorf("failed to build repository URL: %w", err)
+		return errors.Wrap(err, "failed to build repository URL", errors.WithSpan(span))
 	}
 
 	// Create the VCS event with 'pending' status.
@@ -1568,8 +1442,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 		RepositoryURL:       repoURL,
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create a vcs event")
-		return fmt.Errorf("failed to create a vcs event: %v", err)
+		return errors.Wrap(err, "failed to create a vcs event", errors.WithSpan(span))
 	}
 
 	// Build a callback for taskManager.
@@ -1631,21 +1504,18 @@ func (s *service) ResetVCSProviderOAuthToken(ctx context.Context, input *ResetVC
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateVCSProviderPermission, auth.WithGroupID(input.VCSProvider.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Use a UUID for the state.
 	oAuthState, err := s.oAuthStateGenerator()
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate an OAuth state")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate an OAuth state", errors.WithSpan(span))
 	}
 
 	oAuthStateString := oAuthState.String()
@@ -1658,8 +1528,7 @@ func (s *service) ResetVCSProviderOAuthToken(ctx context.Context, input *ResetVC
 
 	updatedProvider, err := s.dbClient.VCSProviders.UpdateProvider(ctx, input.VCSProvider)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update provider")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update provider", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Reset the OAuth token for a VCS provider.",
@@ -1670,8 +1539,7 @@ func (s *service) ResetVCSProviderOAuthToken(ctx context.Context, input *ResetVC
 
 	authorizationURL, err := s.getOAuthAuthorizationURL(ctx, updatedProvider)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get OAuth authorization URL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get OAuth authorization URL", errors.WithSpan(span))
 	}
 
 	return &ResetVCSProviderOAuthTokenResponse{
@@ -1716,46 +1584,39 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	// Make sure the state value if a valid UUID. Avoids
 	// a DB query for random calls to the endpoint.
 	if _, err = uuid.Parse(input.State); err != nil {
-		tracing.RecordError(span, err, "failed to get VCS provider")
-		return err
+		return errors.Wrap(err, "failed to get VCS provider", errors.WithSpan(span))
 	}
 
 	// Validate the state value.
 	vp, err := s.dbClient.VCSProviders.GetProviderByOAuthState(ctx, input.State)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by OAuth state")
-		return err
+		return errors.Wrap(err, "failed to get provider by OAuth state", errors.WithSpan(span))
 	}
 
 	if vp == nil {
-		tracing.RecordError(span, nil, "VCS provider not found")
-		return errors.New("VCS provider not found", errors.WithErrorCode(errors.ENotFound))
+		return errors.New("VCS provider not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
 	// Require UpdateVCSProviderPermission since we're updating the provider's values.
 	err = caller.RequirePermission(ctx, models.UpdateVCSProviderPermission, auth.WithGroupID(vp.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	provider, err := s.getVCSProvider(vp.Type)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get VCS provider")
-		return err
+		return errors.Wrap(err, "failed to get VCS provider", errors.WithSpan(span))
 	}
 
 	redirectURL, err := s.getOAuthCallBackURL(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get Tharsis OAuth callback URL")
-		return fmt.Errorf("failed to get Tharsis OAuth callback URL: %v", err)
+		return errors.Wrap(err, "failed to get Tharsis OAuth callback URL", errors.WithSpan(span))
 	}
 
 	// Create the access token with the provider.
@@ -1767,8 +1628,7 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 		RedirectURI:       redirectURL,
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create access token")
-		return err
+		return errors.Wrap(err, "failed to create access token", errors.WithSpan(span))
 	}
 
 	// Test the access token incase the value wasn't retrieved for some reason.
@@ -1776,8 +1636,7 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 		ProviderURL: vp.URL,
 		AccessToken: payload.AccessToken,
 	}); err != nil {
-		tracing.RecordError(span, err, "access token connection test failed")
-		return err
+		return errors.Wrap(err, "access token connection test failed", errors.WithSpan(span))
 	}
 
 	// Update provider's fields.
@@ -1793,8 +1652,7 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 	// Update the provider.
 	_, err = s.dbClient.VCSProviders.UpdateProvider(ctx, vp)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update VCS provider in service layer ProcessOAuth")
-		return fmt.Errorf("failed to update VCS provider in service layer ProcessOAuth: %v", err)
+		return errors.Wrap(err, "failed to update VCS provider in service layer ProcessOAuth", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Completed the OAuth flow for a VCS provider.",

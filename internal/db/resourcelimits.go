@@ -8,7 +8,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
@@ -43,8 +43,7 @@ func (t *resourceLimits) GetResourceLimit(ctx context.Context, name string) (*mo
 
 	sql, args, err := toSQLWithTag("resourcelimits.GetResourceLimit", query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	resourceLimit, err := scanResourceLimit(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -59,8 +58,7 @@ func (t *resourceLimits) GetResourceLimit(ctx context.Context, name string) (*mo
 			}
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return resourceLimit, nil
@@ -80,14 +78,12 @@ func (t *resourceLimits) GetResourceLimits(ctx context.Context) ([]models.Resour
 
 	sql, args, err := toSQLWithTag("resourcelimits.GetResourceLimits", query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	rows, err := t.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -97,8 +93,7 @@ func (t *resourceLimits) GetResourceLimits(ctx context.Context) ([]models.Resour
 	for rows.Next() {
 		item, err := scanResourceLimit(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
@@ -125,18 +120,15 @@ func (t *resourceLimits) UpdateResourceLimit(ctx context.Context, resourceLimit 
 			},
 		).Where(goqu.Ex{"id": resourceLimit.Metadata.ID, "version": resourceLimit.Metadata.Version}).Returning(resourceLimitFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedResourceLimit, err := scanResourceLimit(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedResourceLimit, nil

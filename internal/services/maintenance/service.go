@@ -7,7 +7,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -37,14 +36,12 @@ func (s *service) GetMaintenanceMode(ctx context.Context) (*models.MaintenanceMo
 	defer span.End()
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	maintenanceMode, err := s.dbClient.MaintenanceModes.GetMaintenanceMode(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get maintenance mode")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get maintenance mode", errors.WithSpan(span))
 	}
 
 	if maintenanceMode == nil {
@@ -60,13 +57,11 @@ func (s *service) EnableMaintenanceMode(ctx context.Context) (*models.Maintenanc
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if !caller.IsAdminModeActivated(ctx) {
-		tracing.RecordError(span, nil, "only system admins can enable maintenance mode")
-		return nil, errors.New("only admins with admin mode activated can enable maintenance mode", errors.WithErrorCode(errors.EForbidden))
+		return nil, errors.New("only admins with admin mode activated can enable maintenance mode", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
 	toCreate := &models.MaintenanceMode{
@@ -75,8 +70,7 @@ func (s *service) EnableMaintenanceMode(ctx context.Context) (*models.Maintenanc
 
 	created, err := s.dbClient.MaintenanceModes.CreateMaintenanceMode(ctx, toCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create maintenance mode")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create maintenance mode", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Enabled maintenance mode.",
@@ -92,29 +86,24 @@ func (s *service) DisableMaintenanceMode(ctx context.Context) error {
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	if !caller.IsAdminModeActivated(ctx) {
-		tracing.RecordError(span, nil, "only system admins can disable maintenance mode")
-		return errors.New("only admins with admin mode activated can perform this operation", errors.WithErrorCode(errors.EForbidden))
+		return errors.New("only admins with admin mode activated can perform this operation", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
 	maintenanceMode, err := s.dbClient.MaintenanceModes.GetMaintenanceMode(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get maintenance mode")
-		return err
+		return errors.Wrap(err, "failed to get maintenance mode", errors.WithSpan(span))
 	}
 
 	if maintenanceMode == nil {
-		tracing.RecordError(span, nil, "maintenance mode is not enabled")
-		return errors.New("maintenance mode is not enabled", errors.WithErrorCode(errors.EInvalid))
+		return errors.New("maintenance mode is not enabled", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	if err = s.dbClient.MaintenanceModes.DeleteMaintenanceMode(ctx, maintenanceMode); err != nil {
-		tracing.RecordError(span, err, "failed to delete maintenance mode")
-		return err
+		return errors.Wrap(err, "failed to delete maintenance mode", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Disabled maintenance mode.")

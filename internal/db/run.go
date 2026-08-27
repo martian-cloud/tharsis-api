@@ -15,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -654,14 +653,12 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 	)
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, r.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -671,22 +668,19 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 	for rows.Next() {
 		item, err := scanRun(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	// Hydrate run nodes for all results
 	if err := r.hydrateRunNodes(ctx, r.dbClient.getConnection(ctx), results); err != nil {
-		tracing.RecordError(span, err, "failed to hydrate run nodes")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to hydrate run nodes", errors.WithSpan(span))
 	}
 
 	result := RunsResult{
@@ -705,8 +699,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 
 	tx, err := r.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 	// Rollback is safe to call even if the tx is already closed, so if the tx
 	// commits successfully, this is a no-op.
@@ -720,8 +713,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 
 	targets, err := json.Marshal(run.TargetAddresses)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal target addresses")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal target addresses", errors.WithSpan(span))
 	}
 
 	sql, args, err := toSQLWithTag("run.CreateRun", dialect.From("runs").
@@ -758,23 +750,20 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdRun, err := scanRun(tx.QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		r.dbClient.logger.WithContextFields(ctx).Error(err)
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	// Create run nodes
 	run.Metadata.ID = createdRun.Metadata.ID
 	if err := r.createRunNodes(ctx, tx, run); err != nil {
-		tracing.RecordError(span, err, "failed to create run nodes")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create run nodes", errors.WithSpan(span))
 	}
 	// Hydrate nodes onto the returned run
 	if err := r.hydrateRunNodes(ctx, tx, []*models.Run{createdRun}); err != nil {
@@ -782,8 +771,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	return createdRun, nil
@@ -797,8 +785,7 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string
 
 	tx, err := r.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 	// Rollback is safe to call even if the tx is already closed, so if the tx
 	// commits successfully, this is a no-op.
@@ -840,26 +827,22 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedRun, err := scanRun(tx.QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		r.dbClient.logger.WithContextFields(ctx).Error(err)
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	// Update run nodes
 	if err := r.updateRunNodes(ctx, tx, run, nodeIDSet); err != nil {
-		tracing.RecordError(span, err, "failed to update run nodes")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update run nodes", errors.WithSpan(span))
 	}
 	// Re-hydrate nodes onto the returned run
 	if err := r.hydrateRunNodes(ctx, tx, []*models.Run{updatedRun}); err != nil {
@@ -867,8 +850,7 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	return updatedRun, nil

@@ -11,7 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/terraform"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -76,14 +76,12 @@ func (s *service) GetTerraformCLIVersions(ctx context.Context) (TerraformCLIVers
 	defer span.End()
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	versions, err := terraform.GetCLIVersions(ctx, s.terraformCLIVersionConstraint)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get Terraform CLI versions")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get Terraform CLI versions", errors.WithSpan(span))
 	}
 
 	return versions, nil
@@ -96,14 +94,12 @@ func (s *service) CreateTerraformCLIDownloadURL(ctx context.Context, input *Terr
 	defer span.End()
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return "", err
 	}
 
 	exists, err := s.cliStore.DoesTerraformCLIBinaryExist(ctx, input.Version, input.OS, input.Architecture)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to check whether the Terraform CLI version binary exists")
-		return "", err
+		return "", errors.Wrap(err, "failed to check whether the Terraform CLI version binary exists", errors.WithSpan(span))
 	}
 
 	// Attempt to download the CLI release in a goroutine if it doesn't exist.

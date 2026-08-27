@@ -13,7 +13,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -91,11 +90,11 @@ func (s *service) CreateFederatedRegistryTokensForJob(ctx context.Context, jobID
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	if err = caller.RequirePermission(ctx, models.IssueFederatedRegistryTokenPermission, auth.WithJobID(jobID)); err != nil {
-		return nil, errors.Wrap(err, "caller lacks permission to create federated registry tokens", errors.WithSpan(span))
+		return nil, err
 	}
 
 	job, err := s.dbClient.Jobs.GetJobByID(ctx, jobID)
@@ -150,7 +149,7 @@ func (s *service) GetFederatedRegistriesByIDs(ctx context.Context, ids []string)
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	// Must get the registries in order to check permissions on any registry IDs being asked for.
@@ -169,8 +168,6 @@ func (s *service) GetFederatedRegistriesByIDs(ctx context.Context, ids []string)
 		err = caller.RequireAccessToInheritableResource(ctx, types.FederatedRegistryModelType,
 			auth.WithGroupID(registry.GroupID))
 		if err != nil {
-			tracing.RecordError(span, err, "caller lacks permission to view the group for registry %s",
-				registry.GetGlobalID())
 			return nil, err
 		}
 	}
@@ -184,7 +181,7 @@ func (s *service) GetFederatedRegistryByID(ctx context.Context, id string) (*mod
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	federatedRegistry, err := s.dbClient.FederatedRegistries.GetFederatedRegistryByID(ctx, id)
@@ -200,7 +197,6 @@ func (s *service) GetFederatedRegistryByID(ctx context.Context, id string) (*mod
 	err = caller.RequireAccessToInheritableResource(ctx, types.FederatedRegistryModelType,
 		auth.WithGroupID(federatedRegistry.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller lacks permission to access the requested group")
 		return nil, err
 	}
 
@@ -213,7 +209,7 @@ func (s *service) GetFederatedRegistryByTRN(ctx context.Context, trn string) (*m
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	federatedRegistry, err := s.dbClient.FederatedRegistries.GetFederatedRegistryByTRN(ctx, trn)
@@ -229,7 +225,6 @@ func (s *service) GetFederatedRegistryByTRN(ctx context.Context, trn string) (*m
 	err = caller.RequireAccessToInheritableResource(ctx, types.FederatedRegistryModelType,
 		auth.WithGroupID(federatedRegistry.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller lacks permission to access the requested group")
 		return nil, err
 	}
 
@@ -242,7 +237,7 @@ func (s *service) GetFederatedRegistries(ctx context.Context, input *GetFederate
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	// Only an admin user can ask for information on all registries.
@@ -255,7 +250,6 @@ func (s *service) GetFederatedRegistries(ctx context.Context, input *GetFederate
 	if input.GroupPath != nil {
 		rErr := caller.RequireAccessToInheritableResource(ctx, types.FederatedRegistryModelType, auth.WithNamespacePath(*input.GroupPath))
 		if rErr != nil {
-			tracing.RecordError(span, err, "caller lacks permission to access the requested group")
 			return nil, rErr
 		}
 
@@ -291,7 +285,7 @@ func (s *service) CreateFederatedRegistry(ctx context.Context,
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	// Set the CreatedBy field to the caller's subject
@@ -305,7 +299,6 @@ func (s *service) CreateFederatedRegistry(ctx context.Context,
 		auth.WithGroupID(federatedRegistry.GroupID),
 	)
 	if err != nil {
-		tracing.RecordError(span, err, "caller lacks permission to view federated registry")
 		return nil, err
 	}
 
@@ -386,14 +379,13 @@ func (s *service) UpdateFederatedRegistry(ctx context.Context,
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateFederatedRegistryPermission,
 		auth.WithGroupID(federatedRegistry.GroupID),
 	)
 	if err != nil {
-		tracing.RecordError(span, err, "caller lacks permission to update federated registry")
 		return nil, err
 	}
 
@@ -453,13 +445,12 @@ func (s *service) DeleteFederatedRegistry(ctx context.Context, federatedRegistry
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+		return err
 	}
 
 	err = caller.RequirePermission(ctx, models.DeleteFederatedRegistryPermission,
 		auth.WithGroupID(federatedRegistry.GroupID))
 	if err != nil {
-		tracing.RecordError(span, err, "caller lacks permission to delete federated registry")
 		return err
 	}
 

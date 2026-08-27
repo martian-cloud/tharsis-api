@@ -10,7 +10,6 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -198,8 +197,7 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 
 	tx, err := m.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	// Rollback is safe to call even if the tx is already closed, so if
@@ -310,8 +308,7 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 
 	tx, err := m.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return err
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	// Rollback is safe to call even if the tx is already closed, so if
@@ -429,7 +426,6 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		if pgErr := asPgError(err); pgErr != nil {
@@ -479,7 +475,6 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 	updatedVariable, err := scanVariable(tx.QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		if pgErr := asPgError(err); pgErr != nil {
@@ -522,7 +517,6 @@ func (m *variables) DeleteVariable(ctx context.Context, variable *models.Variabl
 
 	if _, err := scanVariable(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))

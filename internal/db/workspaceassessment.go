@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -177,14 +176,12 @@ func (r *workspaceAssessments) GetWorkspaceAssessments(ctx context.Context, inpu
 	)
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, r.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -194,16 +191,14 @@ func (r *workspaceAssessments) GetWorkspaceAssessments(ctx context.Context, inpu
 	for rows.Next() {
 		item, err := scanWorkspaceAssessment(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := WorkspaceAssessmentsResult{
@@ -239,8 +234,7 @@ func (r *workspaceAssessments) CreateWorkspaceAssessment(ctx context.Context, as
 		).Select(r.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdWorkspaceAssessment, err := scanWorkspaceAssessment(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -253,8 +247,7 @@ func (r *workspaceAssessments) CreateWorkspaceAssessment(ctx context.Context, as
 				return nil, errors.New("invalid workspace ID", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdWorkspaceAssessment, nil
@@ -284,18 +277,15 @@ func (r *workspaceAssessments) UpdateWorkspaceAssessment(ctx context.Context, as
 		).Select(r.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedWorkspaceAssessment, err := scanWorkspaceAssessment(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedWorkspaceAssessment, nil
@@ -319,18 +309,15 @@ func (r *workspaceAssessments) DeleteWorkspaceAssessment(ctx context.Context, as
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err := scanWorkspaceAssessment(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil
@@ -347,8 +334,7 @@ func (r *workspaceAssessments) getWorkspaceAssessment(ctx context.Context, exp e
 		Where(exp))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	assessment, err := scanWorkspaceAssessment(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -364,8 +350,7 @@ func (r *workspaceAssessments) getWorkspaceAssessment(ctx context.Context, exp e
 			}
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return assessment, nil

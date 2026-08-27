@@ -8,7 +8,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5" // Instantiating migrate command
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -46,15 +46,13 @@ func (m *migrations) migrateUp() error {
 
 	fsDriver, err := iofs.New(migrationSchema, "migrations")
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get new iofs driver")
-		return err
+		return errors.Wrap(err, "failed to get new iofs driver", errors.WithSpan(span))
 	}
 	defer fsDriver.Close()
 
 	migrateCmd, err := migrate.NewWithSourceInstance("iofs", fsDriver, m.databaseURL)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build migration command")
-		return err
+		return errors.Wrap(err, "failed to build migration command", errors.WithSpan(span))
 	}
 
 	defer func() {

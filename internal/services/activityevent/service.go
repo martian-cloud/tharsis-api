@@ -10,7 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -52,7 +52,6 @@ func (s *service) GetActivityEvents(ctx context.Context,
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -63,8 +62,7 @@ func (s *service) GetActivityEvents(ctx context.Context,
 	if !caller.IsAdminModeActivated(ctx) {
 		rootNamespaces, rErr := caller.GetRootNamespaceMemberships(ctx)
 		if rErr != nil {
-			tracing.RecordError(span, rErr, "failed to get root namespaces")
-			return nil, rErr
+			return nil, errors.Wrap(rErr, "failed to get root namespaces", errors.WithSpan(span))
 		}
 		rootNamespaceMemberships = rootNamespaces
 	}
@@ -89,8 +87,7 @@ func (s *service) GetActivityEvents(ctx context.Context,
 
 	activityEventsResult, err := s.dbClient.ActivityEvents.GetActivityEvents(ctx, &dbInput)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get activity events")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get activity events", errors.WithSpan(span))
 	}
 
 	return activityEventsResult, nil

@@ -8,13 +8,11 @@ import (
 
 	"go.opentelemetry.io/contrib/propagators/aws/xray"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -120,16 +118,4 @@ func newTracerProvider(traceType traceType, exp sdktrace.SpanExporter, res *reso
 	}
 
 	return sdktrace.NewTracerProvider(options...)
-}
-
-// RecordError is a convenience function for recording an error and setting span status.
-func RecordError(span trace.Span, err error, format string, args ...any) {
-
-	// If there is no pre-defined error object, make one from the description.
-	if err == nil {
-		err = fmt.Errorf(format, args...)
-	}
-
-	span.RecordError(err)
-	span.SetStatus(codes.Error, fmt.Sprintf(format, args...))
 }

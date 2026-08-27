@@ -8,7 +8,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // CreateActivityEventInput specifies the inputs for creating an activity event.
@@ -48,8 +48,7 @@ func CreateActivityEvent(ctx context.Context, dbClient *db.Client, input *Create
 	if input.Payload != nil {
 		payloadBuffer, err = json.Marshal(input.Payload)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to marshal payload")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to marshal payload", errors.WithSpan(span))
 		}
 	}
 
@@ -65,7 +64,6 @@ func CreateActivityEvent(ctx context.Context, dbClient *db.Client, input *Create
 
 	activityEvent, err := dbClient.ActivityEvents.CreateActivityEvent(ctx, &toCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 

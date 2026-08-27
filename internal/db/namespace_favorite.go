@@ -12,7 +12,6 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -99,8 +98,7 @@ func (f *namespaceFavorites) GetNamespaceFavoriteByID(ctx context.Context, id st
 		Filter: &NamespaceFavoriteFilter{NamespaceFavoriteIDs: []string{id}},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace favorite")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get namespace favorite", errors.WithSpan(span))
 	}
 
 	if len(result.NamespaceFavorites) == 0 {
@@ -194,14 +192,12 @@ func (f *namespaceFavorites) GetNamespaceFavorites(ctx context.Context, input *G
 	)
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, f.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -211,21 +207,18 @@ func (f *namespaceFavorites) GetNamespaceFavorites(ctx context.Context, input *G
 	for rows.Next() {
 		item, err := scanNamespaceFavorite(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Err(); err != nil {
-		tracing.RecordError(span, err, "error during row iteration")
-		return nil, err
+		return nil, errors.Wrap(err, "error during row iteration", errors.WithSpan(span))
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := NamespaceFavoritesResult{
@@ -265,8 +258,7 @@ func (f *namespaceFavorites) CreateNamespaceFavorite(ctx context.Context, favori
 		)))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdNamespaceFavorite, err := scanNamespaceFavorite(f.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -285,8 +277,7 @@ func (f *namespaceFavorites) CreateNamespaceFavorite(ctx context.Context, favori
 			}
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdNamespaceFavorite, nil
@@ -306,18 +297,15 @@ func (f *namespaceFavorites) DeleteNamespaceFavorite(ctx context.Context, favori
 		))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	result, err := f.dbClient.getConnection(ctx).Exec(ctx, sql, args...)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	if result.RowsAffected() == 0 {
-		tracing.RecordError(span, nil, "optimistic lock error")
 		return ErrOptimisticLockError
 	}
 

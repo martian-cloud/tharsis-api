@@ -10,7 +10,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -78,7 +77,6 @@ func (s *service) GetAvailablePermissions(ctx context.Context) ([]string, error)
 	defer span.End()
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -91,14 +89,12 @@ func (s *service) GetRoleByID(ctx context.Context, id string) (*models.Role, err
 	defer span.End()
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	role, err := s.getRoleByID(ctx, id)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get role by ID")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get role by ID", errors.WithSpan(span))
 	}
 
 	return role, nil
@@ -109,14 +105,12 @@ func (s *service) GetRoleByTRN(ctx context.Context, trn string) (*models.Role, e
 	defer span.End()
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	role, err := s.dbClient.Roles.GetRoleByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get role by TRN")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get role by TRN", errors.WithSpan(span))
 	}
 
 	if role == nil {
@@ -132,7 +126,6 @@ func (s *service) GetRolesByIDs(ctx context.Context, idList []string) ([]models.
 	defer span.End()
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -142,8 +135,7 @@ func (s *service) GetRolesByIDs(ctx context.Context, idList []string) ([]models.
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get roles")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get roles", errors.WithSpan(span))
 	}
 
 	return result.Roles, nil
@@ -155,7 +147,6 @@ func (s *service) GetRoles(ctx context.Context, input *GetRolesInput) (*db.Roles
 	defer span.End()
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -177,7 +168,6 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -200,14 +190,12 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 	toCreate.SetPermissions(input.Permissions)
 
 	if err = toCreate.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate role model")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate role model", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -218,8 +206,7 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 
 	createdRole, err := s.dbClient.Roles.CreateRole(txContext, toCreate)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to create role")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create role", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -228,13 +215,11 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 			TargetType: models.TargetRole,
 			TargetID:   createdRole.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a role.",
@@ -252,7 +237,6 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -271,14 +255,12 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 	}
 
 	if err = input.Role.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate role model")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate role model", errors.WithSpan(span))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
 	}
 
 	defer func() {
@@ -289,8 +271,7 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 
 	updatedRole, err := s.dbClient.Roles.UpdateRole(txContext, input.Role)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update role")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to update role", errors.WithSpan(span))
 	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
@@ -299,13 +280,11 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 			TargetType: models.TargetRole,
 			TargetID:   updatedRole.Metadata.ID,
 		}); err != nil {
-		tracing.RecordError(span, err, "failed to create activity event")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated a role.",
@@ -323,7 +302,6 @@ func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error 
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
@@ -348,8 +326,7 @@ func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error 
 		},
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace memberships")
-		return err
+		return errors.Wrap(err, "failed to get namespace memberships", errors.WithSpan(span))
 	}
 
 	if !input.Force && len(result.NamespaceMemberships) > 0 {

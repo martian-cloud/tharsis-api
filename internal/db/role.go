@@ -12,7 +12,6 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -155,14 +154,12 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 	)
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, r.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -172,16 +169,14 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 	for rows.Next() {
 		item, err := scanRole(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := RolesResult{
@@ -201,8 +196,7 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 
 	permissions, err := r.marshalPermissions(role.GetPermissions())
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal permissions")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal permissions", errors.WithSpan(span))
 	}
 
 	sql, args, err := toSQLWithTag("role.CreateRole", dialect.Insert("roles").
@@ -219,20 +213,17 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 		}).
 		Returning(rolesFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdRole, err := scanRole(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil, "role with name %s already exists", role.Name)
-				return nil, errors.New("role with name %s already exists", role.Name, errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("role with name %s already exists", role.Name, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdRole, nil
@@ -247,8 +238,7 @@ func (r *roles) UpdateRole(ctx context.Context, role *models.Role) (*models.Role
 
 	permissions, err := r.marshalPermissions(role.GetPermissions())
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal permissions")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal permissions", errors.WithSpan(span))
 	}
 
 	sql, args, err := toSQLWithTag("role.UpdateRole", dialect.Update("roles").
@@ -262,18 +252,15 @@ func (r *roles) UpdateRole(ctx context.Context, role *models.Role) (*models.Role
 			},
 		).Where(goqu.Ex{"id": role.Metadata.ID, "version": role.Metadata.Version}).Returning(rolesFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedRole, err := scanRole(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedRole, nil
@@ -294,18 +281,15 @@ func (r *roles) DeleteRole(ctx context.Context, role *models.Role) error {
 		).Returning(rolesFieldList...))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err := scanRole(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil

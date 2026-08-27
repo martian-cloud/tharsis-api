@@ -13,7 +13,6 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -202,14 +201,12 @@ func (t *terraformModuleVersions) GetModuleVersions(ctx context.Context, input *
 	)
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to build query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	defer rows.Close()
@@ -219,16 +216,14 @@ func (t *terraformModuleVersions) GetModuleVersions(ctx context.Context, input *
 	for rows.Next() {
 		item, err := scanTerraformModuleVersion(rows)
 		if err != nil {
-			tracing.RecordError(span, err, "failed to scan row")
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
 
 		results = append(results, *item)
 	}
 
 	if err := rows.Finalize(&results); err != nil {
-		tracing.RecordError(span, err, "failed to finalize rows")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to finalize rows", errors.WithSpan(span))
 	}
 
 	result := ModuleVersionsResult{
@@ -248,14 +243,12 @@ func (t *terraformModuleVersions) CreateModuleVersion(ctx context.Context, modul
 
 	submodules, err := json.Marshal(moduleVersion.Submodules)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal module version submodules")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal module version submodules", errors.WithSpan(span))
 	}
 
 	examples, err := json.Marshal(moduleVersion.Examples)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal module version examples")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal module version examples", errors.WithSpan(span))
 	}
 
 	record := goqu.Record{
@@ -287,8 +280,7 @@ func (t *terraformModuleVersions) CreateModuleVersion(ctx context.Context, modul
 		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_versions.module_id")))).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdTerraformModuleVersion, err := scanTerraformModuleVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -297,22 +289,15 @@ func (t *terraformModuleVersions) CreateModuleVersion(ctx context.Context, modul
 			if isUniqueViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "index_terraform_module_versions_on_latest":
-					tracing.RecordError(span, nil,
-						"another terraform module version is already marked as the latest for the same module")
-					return nil, errors.New("another terraform module version is already marked as the latest for the same module", errors.WithErrorCode(errors.EConflict))
+					return nil, errors.New("another terraform module version is already marked as the latest for the same module", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 				case "index_terraform_module_versions_on_semantic_version":
-					tracing.RecordError(span, nil,
-						"terraform module version %s already exists", moduleVersion.SemanticVersion)
-					return nil, errors.New("terraform module version %s already exists", moduleVersion.SemanticVersion, errors.WithErrorCode(errors.EConflict))
+					return nil, errors.New("terraform module version %s already exists", moduleVersion.SemanticVersion, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 				default:
-					tracing.RecordError(span, nil,
-						"database constraint violated: %s", pgErr.ConstraintName)
-					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict))
+					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 				}
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdTerraformModuleVersion, nil
@@ -327,14 +312,12 @@ func (t *terraformModuleVersions) UpdateModuleVersion(ctx context.Context, modul
 
 	submodules, err := json.Marshal(moduleVersion.Submodules)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal module version submodules")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal module version submodules", errors.WithSpan(span))
 	}
 
 	examples, err := json.Marshal(moduleVersion.Examples)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to marshal module version examples")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal module version examples", errors.WithSpan(span))
 	}
 
 	record := goqu.Record{
@@ -363,33 +346,26 @@ func (t *terraformModuleVersions) UpdateModuleVersion(ctx context.Context, modul
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	updatedTerraformModuleVersion, err := scanTerraformModuleVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "index_terraform_module_versions_on_latest":
-					tracing.RecordError(span, nil,
-						"another terraform module version is already marked as the latest for the same module")
-					return nil, errors.New("another terraform module version is already marked as the latest for the same module", errors.WithErrorCode(errors.EConflict))
+					return nil, errors.New("another terraform module version is already marked as the latest for the same module", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 				default:
-					tracing.RecordError(span, nil,
-						"database constraint violated: %s", pgErr.ConstraintName)
-					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict))
+					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 				}
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return updatedTerraformModuleVersion, nil
@@ -412,18 +388,15 @@ func (t *terraformModuleVersions) DeleteModuleVersion(ctx context.Context, modul
 		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_versions.module_id")))).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	_, err = scanTerraformModuleVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil

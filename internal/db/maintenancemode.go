@@ -8,7 +8,6 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
@@ -45,8 +44,7 @@ func (s *maintenanceModes) GetMaintenanceMode(ctx context.Context) (*models.Main
 		Prepared(true).
 		Select(maintenanceModesFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	mode, err := scanMaintenanceMode(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -77,8 +75,7 @@ func (s *maintenanceModes) CreateMaintenanceMode(ctx context.Context, mode *mode
 		}).
 		Returning(maintenanceModesFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdMode, err := scanMaintenanceMode(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -88,8 +85,7 @@ func (s *maintenanceModes) CreateMaintenanceMode(ctx context.Context, mode *mode
 				return nil, errors.New("maintenance mode already enabled", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdMode, nil
@@ -108,18 +104,15 @@ func (s *maintenanceModes) DeleteMaintenanceMode(ctx context.Context, mode *mode
 			},
 		).Returning(maintenanceModesFieldList...))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	if _, err = scanMaintenanceMode(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
-		tracing.RecordError(span, err, "failed to execute query")
-		return err
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return nil

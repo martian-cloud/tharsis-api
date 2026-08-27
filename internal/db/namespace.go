@@ -7,7 +7,6 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -55,8 +54,7 @@ func getNamespace(ctx context.Context, conn connection, ex goqu.Ex) (*namespaceR
 		Select(namespaceFieldList...).
 		Where(ex))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	namespace, err := scanNamespace(conn.QueryRow(ctx, sql, args...))
@@ -64,8 +62,7 @@ func getNamespace(ctx context.Context, conn connection, ex goqu.Ex) (*namespaceR
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return namespace, nil
@@ -92,20 +89,17 @@ func createNamespace(ctx context.Context, conn connection, namespace *namespaceR
 		Returning(namespaceFieldList...))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	createdNamespace, err := scanNamespace(conn.QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil, "namespace %s already exists", namespace.path)
-				return nil, errors.New("namespace %s already exists", namespace.path, errors.WithErrorCode(errors.EConflict))
+				return nil, errors.New("namespace %s already exists", namespace.path, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return createdNamespace, nil
@@ -133,8 +127,7 @@ func migrateNamespaces(ctx context.Context, conn connection, oldPath, newPath st
 	)).Returning(namespaceFieldList...))
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return err
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	_, err = conn.Exec(ctx, sql, args...)
@@ -145,8 +138,7 @@ func migrateNamespaces(ctx context.Context, conn connection, oldPath, newPath st
 					errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
-		tracing.RecordError(span, err, "failed to execute DB query")
-		return err
+		return errors.Wrap(err, "failed to execute DB query", errors.WithSpan(span))
 	}
 
 	return nil
