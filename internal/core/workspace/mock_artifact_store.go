@@ -289,6 +289,36 @@ func (_m *MockArtifactStore) GetStateVersion(ctx context.Context, stateVersion *
 	return r0, r1
 }
 
+// GetStateVersionJSON provides a mock function with given fields: ctx, stateVersion
+func (_m *MockArtifactStore) GetStateVersionJSON(ctx context.Context, stateVersion *models.StateVersion) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, stateVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStateVersionJSON")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion) (io.ReadCloser, error)); ok {
+		return rf(ctx, stateVersion)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion) io.ReadCloser); ok {
+		r0 = rf(ctx, stateVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.StateVersion) error); ok {
+		r1 = rf(ctx, stateVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // UploadConfigurationVersion provides a mock function with given fields: ctx, configurationVersion, body
 func (_m *MockArtifactStore) UploadConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion, body io.Reader) (db.RetainObjectRefFunc, string, error) {
 	ret := _m.Called(ctx, configurationVersion, body)
@@ -517,6 +547,43 @@ func (_m *MockArtifactStore) UploadStateVersion(ctx context.Context, stateVersio
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadStateVersion")
+	}
+
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, stateVersion, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, io.Reader) db.RetainObjectRefFunc); ok {
+		r0 = rf(ctx, stateVersion, body)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.StateVersion, io.Reader) string); ok {
+		r1 = rf(ctx, stateVersion, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.StateVersion, io.Reader) error); ok {
+		r2 = rf(ctx, stateVersion, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// UploadStateVersionJSON provides a mock function with given fields: ctx, stateVersion, body
+func (_m *MockArtifactStore) UploadStateVersionJSON(ctx context.Context, stateVersion *models.StateVersion, body io.Reader) (db.RetainObjectRefFunc, string, error) {
+	ret := _m.Called(ctx, stateVersion, body)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadStateVersionJSON")
 	}
 
 	var r0 db.RetainObjectRefFunc

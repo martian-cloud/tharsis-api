@@ -14,7 +14,7 @@ import { stageLabel } from './policyCheck';
 interface Props {
     // Which policy stage this route renders. Supplied by the route rather than read from the URL,
     // so there is no stage to default to and no ambiguity about which stage is on screen.
-    stageName: 'PRE_PLAN' | 'POST_PLAN'
+    stageName: 'PRE_PLAN' | 'POST_PLAN' | 'PRE_APPLY' | 'POST_APPLY'
     fragmentRef: RunDetailsRunTaskStageFragment_taskStage$key
     onError: (error: MutationError) => void
 }

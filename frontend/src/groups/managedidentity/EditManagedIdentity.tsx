@@ -6,6 +6,7 @@ import graphql from 'babel-plugin-relay/macro';
 import { useState } from 'react';
 import { useFragment, useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { parseBase64Json } from '../../common/base64';
 import { MutationError } from '../../common/error';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import ManagedIdentityForm, { FormData } from './ManagedIdentityForm';
@@ -18,7 +19,7 @@ interface Props {
 }
 
 function parsePayloadData(data: string): any {
-    return JSON.parse(atob(data));
+    return parseBase64Json(data);
 }
 
 function EditManagedIdentity(props: Props) {

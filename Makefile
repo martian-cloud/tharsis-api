@@ -120,15 +120,15 @@ update-schema: ## update the GraphQL schema
 # Docker targets
 .PHONY: build-tharsis-docker
 build-tharsis-docker:
-	docker build --build-arg goversion=$(GO_VERSION) --target tharsis -t tharsis/tharsis .
+	docker build --target tharsis -t tharsis/tharsis .
 
 .PHONY: build-job-docker
 build-job-docker:
-	docker build --build-arg goversion=$(GO_VERSION) --target job-executor -t tharsis/job-executor .
+	docker build --target job-executor -t tharsis/job-executor .
 
 .PHONY: build-runner-docker
 build-runner-docker:
-	docker build --build-arg goversion=$(GO_VERSION) --target runner -t tharsis/runner .
+	docker build --target runner -t tharsis/runner .
 
 .PHONY: run-tharsis-docker
 run-tharsis-docker:

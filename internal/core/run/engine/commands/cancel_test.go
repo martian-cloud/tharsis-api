@@ -201,6 +201,78 @@ func TestCancelActivePhase(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, changes)
 	})
+
+	t.Run("acts on a pre-apply check before the not-yet-started apply", func(t *testing.T) {
+		mockJobs := db.NewMockJobs(t)
+		checkJobID := "pre-apply-check-job"
+		job := jobWithStatus(checkJobID, models.JobQueued)
+		mockJobs.On("GetJobByID", ctx, checkJobID).Return(job, nil)
+		mockJobs.On("UpdateJob", ctx, job).Return(job, nil)
+
+		mockLogStreams := db.NewMockLogStreams(t)
+		mockLogStreams.On("GetLogStreamByJobID", ctx, checkJobID).Return(&models.LogStream{}, nil)
+		mockLogStreams.On("UpdateLogStream", ctx, mock.Anything).Return(&models.LogStream{}, nil)
+
+		run := &models.Run{
+			Metadata: models.ResourceMetadata{ID: "run-1"},
+			Status:   models.RunPreApplyRunning,
+			Plan:     models.Plan{ID: "plan-1", Status: models.PlanFinished, HasChanges: true},
+			Apply:    &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+			TaskStages: []*models.RunTaskStage{
+				{
+					ID:        "stage-1",
+					StageName: models.RunTaskStageNamePreApply,
+					Status:    models.RunTaskStageRunning,
+					PolicyChecks: []*models.PolicyCheck{
+						{ID: "check-1", StageName: models.RunTaskStageNamePreApply, Status: models.PolicyCheckQueued, LatestJobID: &checkJobID},
+					},
+				},
+			},
+		}
+
+		changes, err := cancelActivePhase(ctx, &db.Client{Jobs: mockJobs, LogStreams: mockLogStreams}, run, false)
+		require.NoError(t, err)
+		assert.NotEmpty(t, changes)
+		// The not-yet-started apply must not have its own job canceled — the run terminating settles
+		// it to skipped (it never started), not canceled (which would mean it was interrupted
+		// mid-flight).
+		assert.Equal(t, models.ApplySkipped, run.Apply.Status)
+	})
+
+	t.Run("acts on a post-apply check when the apply already finished", func(t *testing.T) {
+		mockJobs := db.NewMockJobs(t)
+		checkJobID := "post-apply-check-job"
+		job := jobWithStatus(checkJobID, models.JobQueued)
+		mockJobs.On("GetJobByID", ctx, checkJobID).Return(job, nil)
+		mockJobs.On("UpdateJob", ctx, job).Return(job, nil)
+
+		mockLogStreams := db.NewMockLogStreams(t)
+		mockLogStreams.On("GetLogStreamByJobID", ctx, checkJobID).Return(&models.LogStream{}, nil)
+		mockLogStreams.On("UpdateLogStream", ctx, mock.Anything).Return(&models.LogStream{}, nil)
+
+		run := &models.Run{
+			Metadata: models.ResourceMetadata{ID: "run-1"},
+			Status:   models.RunPostApplyRunning,
+			Plan:     models.Plan{ID: "plan-1", Status: models.PlanFinished, HasChanges: true},
+			Apply:    &models.Apply{ID: "apply-1", Status: models.ApplyFinished},
+			TaskStages: []*models.RunTaskStage{
+				{
+					ID:        "stage-1",
+					StageName: models.RunTaskStageNamePostApply,
+					Status:    models.RunTaskStageRunning,
+					PolicyChecks: []*models.PolicyCheck{
+						{ID: "check-1", StageName: models.RunTaskStageNamePostApply, Status: models.PolicyCheckQueued, LatestJobID: &checkJobID},
+					},
+				},
+			},
+		}
+
+		changes, err := cancelActivePhase(ctx, &db.Client{Jobs: mockJobs, LogStreams: mockLogStreams}, run, false)
+		require.NoError(t, err)
+		assert.NotEmpty(t, changes)
+		// The already-finished apply must be untouched by the cancel.
+		assert.Equal(t, models.ApplyFinished, run.Apply.Status)
+	})
 }
 
 func TestCancelRun_Execute_InvalidStates(t *testing.T) {

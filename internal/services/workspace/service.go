@@ -191,11 +191,13 @@ type Service interface {
 	LockWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error)
 	UnlockWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error)
 	GetCurrentStateVersion(ctx context.Context, workspaceID string) (*models.StateVersion, error)
-	CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string) (*models.StateVersion, error)
+	CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string, jsonData *string) (*models.StateVersion, error)
 	GetStateVersionByID(ctx context.Context, stateVersionID string) (*models.StateVersion, error)
 	GetStateVersionByTRN(ctx context.Context, trn string) (*models.StateVersion, error)
 	GetStateVersions(ctx context.Context, input *GetStateVersionsInput) (*db.StateVersionsResult, error)
 	GetStateVersionContent(ctx context.Context, stateVersionID string) (io.ReadCloser, error)
+	UploadStateVersionJSON(ctx context.Context, stateVersionID string, reader io.Reader) error
+	GetStateVersionJSONContent(ctx context.Context, stateVersionID string) (io.ReadCloser, error)
 	GetStateVersionsByIDs(ctx context.Context, idList []string) ([]models.StateVersion, error)
 	GetWorkspaceAssessmentByID(ctx context.Context, id string) (*models.WorkspaceAssessment, error)
 	GetWorkspaceAssessmentByTRN(ctx context.Context, trn string) (*models.WorkspaceAssessment, error)
@@ -1103,7 +1105,7 @@ func (s *service) GetStateVersionInventory(ctx context.Context, stateVersion *mo
 	}, nil
 }
 
-func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string) (*models.StateVersion, error) {
+func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string, jsonData *string) (*models.StateVersion, error) {
 	ctx, span := tracer.Start(ctx, "svc.CreateStateVersion")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
@@ -1135,6 +1137,17 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	}
 	if state.Version != version4 {
 		return nil, errors.New("expected stateVersionV4, got %d", state.Version, errors.WithSpan(span))
+	}
+
+	// jsonData is the optional "terraform show -json" rendering of the same state, base64 encoded like
+	// data. Decoding it here, before anything is written, means a malformed payload costs nothing.
+	var decodedJSON []byte
+	if jsonData != nil && *jsonData != "" {
+		decodedJSON, err = base64.StdEncoding.DecodeString(*jsonData)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode base64-encoded state version JSON",
+				errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+		}
 	}
 
 	// Collect limit violations. Outputs that violate a limit are not persisted
@@ -1216,6 +1229,16 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		))
 	}
 
+	var jsonRetainFn db.RetainObjectRefFunc
+	if decodedJSON != nil {
+		retainFn, jsonKey, jsonErr := s.artifactStore.UploadStateVersionJSON(ctx, stateVersion, bytes.NewBuffer(decodedJSON))
+		if jsonErr != nil {
+			return nil, errors.Wrap(jsonErr, "failed to write state version JSON to object storage", errors.WithSpan(span))
+		}
+		jsonRetainFn = retainFn
+		stateVersion.JSONObjectStoreKey = &jsonKey
+	}
+
 	// Upload before the transaction so the pending ref is committed immediately.
 	// If the TX rolls back, the janitor will clean up the orphaned S3 object.
 	svRetainFn, svKey, err := s.artifactStore.UploadStateVersion(ctx, stateVersion, bytes.NewBuffer(decoded))
@@ -1246,6 +1269,12 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 
 	if err = svRetainFn(txContext, createdStateVersion.Metadata.ID); err != nil {
 		return nil, errors.Wrap(err, "failed to link state version object store ref", errors.WithSpan(span))
+	}
+
+	if jsonRetainFn != nil {
+		if err = jsonRetainFn(txContext, createdStateVersion.Metadata.ID); err != nil {
+			return nil, errors.Wrap(err, "failed to link state version JSON object store ref", errors.WithSpan(span))
+		}
 	}
 
 	// Get the number of recent state versions for this workspace to check whether we just violated the limit.
@@ -1447,6 +1476,113 @@ func (s *service) GetStateVersionContent(ctx context.Context, stateVersionID str
 		return nil, errors.Wrap(
 			err,
 			"Failed to get state version from artifact store", errors.WithSpan(span))
+	}
+
+	return result, nil
+}
+
+// UploadStateVersionJSON stores the "terraform show -json" rendering of a state version that already
+// exists. It is a separate request from CreateStateVersion on purpose: that call carries the raw state
+// base64-encoded inside a single gRPC message, so bundling a second, typically larger, payload into it
+// would halve the state size the transport can carry and would couple the two — an oversized rendering
+// would fail the write of the state itself, at a point where infrastructure has already changed.
+func (s *service) UploadStateVersionJSON(ctx context.Context, stateVersionID string, reader io.Reader) error {
+	ctx, span := tracer.Start(ctx, "svc.UploadStateVersionJSON")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return err
+	}
+
+	sv, err := s.dbClient.StateVersions.GetStateVersionByID(ctx, stateVersionID)
+	if err != nil {
+		return errors.Wrap(err, "failed to query state version from the database", errors.WithSpan(span))
+	}
+
+	if sv == nil {
+		return errors.New("state version with ID %s not found", stateVersionID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// Writing the rendering is part of recording state, so it takes the same permission as creating the
+	// state version rather than a weaker view permission.
+	if err = caller.RequirePermission(ctx, models.CreateStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID)); err != nil {
+		return err
+	}
+
+	// Upload before the transaction so the pending ref is committed immediately. If the transaction
+	// rolls back, the janitor collects the orphaned object.
+	retainFn, key, err := s.artifactStore.UploadStateVersionJSON(ctx, sv, reader)
+	if err != nil {
+		return errors.Wrap(err, "failed to write state version JSON to object storage", errors.WithSpan(span))
+	}
+
+	sv.JSONObjectStoreKey = &key
+
+	// Recording the key and retaining the object have to happen together: a key with no ref would let
+	// the janitor collect an object the row still points at, and a ref with no key would leak an object
+	// nothing can reach.
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for UploadStateVersionJSON: %v", txErr)
+		}
+	}()
+
+	if _, err = s.dbClient.StateVersions.UpdateStateVersion(txContext, sv); err != nil {
+		return errors.Wrap(err, "failed to update state version", errors.WithSpan(span))
+	}
+
+	if err = retainFn(txContext, sv.Metadata.ID); err != nil {
+		return errors.Wrap(err, "failed to link state version JSON object store ref", errors.WithSpan(span))
+	}
+
+	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
+	}
+
+	return nil
+}
+
+func (s *service) GetStateVersionJSONContent(ctx context.Context, stateVersionID string) (io.ReadCloser, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionJSONContent")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sv, err := s.dbClient.StateVersions.GetStateVersionByID(ctx, stateVersionID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query state version from the database", errors.WithSpan(span))
+	}
+
+	if sv == nil {
+		return nil, errors.New("state version with ID %s not found", stateVersionID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if err = caller.RequirePermission(ctx, models.ViewStateVersionDataPermission, auth.WithWorkspaceID(sv.WorkspaceID)); err != nil {
+		return nil, err
+	}
+
+	// A missing rendering is an expected state, not a failure: it means nothing ever uploaded one. It
+	// surfaces as ENotFound so callers can distinguish "no rendering" from a storage error and decide
+	// for themselves whether to fall back.
+	if sv.JSONObjectStoreKey == nil {
+		return nil, errors.New(
+			"state version with ID %s has no JSON rendering", stateVersionID,
+			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span),
+		)
+	}
+
+	result, err := s.artifactStore.GetStateVersionJSON(ctx, sv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get state version JSON from artifact store", errors.WithSpan(span))
 	}
 
 	return result, nil

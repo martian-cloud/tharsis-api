@@ -160,6 +160,42 @@ func TestRunNode_PlanFinishedNoChangesFinishesRun(t *testing.T) {
 	assert.Equal(t, models.ApplySkipped, run.Apply().Status()) // apply will never start
 }
 
+// TestRunNode_PlanFinishedNoChangesSkipsRemainingStages verifies that a run finishing on a no-change
+// plan settles every stage that will now never run: the post-plan stage and the apply-phase
+// (pre-apply/post-apply) stages alike, each cascading the skip to its own checks. The run is final
+// here, so a stage left in created would advertise an evaluation that is never coming.
+func TestRunNode_PlanFinishedNoChangesSkipsRemainingStages(t *testing.T) {
+	run := NewRunNode(models.RunPending)
+	run.SetPlanNode(NewPlanNode("plan", models.PlanCreated, false)) // no changes
+	run.SetApplyNode(NewApplyNode("apply", models.ApplyCreated, false))
+	remaining := []models.RunTaskStageName{
+		models.RunTaskStageNamePostPlan,
+		models.RunTaskStageNamePreApply,
+		models.RunTaskStageNamePostApply,
+	}
+	for _, stageName := range remaining {
+		stage := NewTaskStageNode(string(stageName)+"-stage", stageName, models.RunTaskStageCreated)
+		stage.AddPolicyCheckNode(NewPolicyCheckNode(
+			string(stageName)+"-1", string(stageName)+"/opa", models.PolicyKindOPA, models.PolicyCheckCreated))
+		run.AddTaskStageNode(stage)
+	}
+	New(run)
+
+	require.NoError(t, run.Plan().SetStatus(models.PlanPending))
+	require.NoError(t, run.Plan().SetStatus(models.PlanQueued))
+	require.NoError(t, run.Plan().SetStatus(models.PlanRunning))
+	require.NoError(t, run.Plan().SetStatus(models.PlanFinished))
+
+	assert.Equal(t, models.RunPlannedAndFinished, run.Status())
+	assert.Equal(t, models.ApplySkipped, run.Apply().Status())
+	for _, stageName := range remaining {
+		stage := run.TaskStage(stageName)
+		assert.Equalf(t, models.RunTaskStageSkipped, stage.Status(), "%s stage should be skipped", stageName)
+		assert.Equalf(t, models.PolicyCheckSkipped, stage.PolicyChecks()[0].Status(),
+			"%s check should be skipped", stageName)
+	}
+}
+
 // TestRunNode_SpeculativePlanErrored verifies a speculative run errors when the
 // plan errors, with no apply cascade to perform.
 func TestRunNode_SpeculativePlanErrored(t *testing.T) {

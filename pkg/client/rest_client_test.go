@@ -437,6 +437,96 @@ func TestUploadPlanData(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestUploadStateVersionJSON verifies the rendering is streamed to the TFE-compatible endpoint, whose
+// location comes from service discovery rather than being assumed, the same as the raw state download.
+func TestUploadStateVersionJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/v2/tfe/state-versions/sv-123/content.json", r.URL.Path)
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		body, _ := io.ReadAll(r.Body)
+		assert.JSONEq(t, `{"format_version":"1.0"}`, string(body))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := newTFEDiscoveryTestClient(t, server)
+
+	err := client.UploadStateVersionJSON(t.Context(), &UploadStateVersionJSONInput{
+		StateVersionID: "sv-123",
+		Reader:         bytes.NewReader([]byte(`{"format_version":"1.0"}`)),
+	})
+	require.NoError(t, err)
+}
+
+// TestDownloadStateVersionJSON pins the behaviour policy evaluation depends on: a 404 means the state
+// version simply has no rendering and must surface as ErrStateVersionJSONNotFound, while any other
+// failure stays an ordinary error so it is not mistaken for a documented absence.
+func TestDownloadStateVersionJSON(t *testing.T) {
+	type testCase struct {
+		name         string
+		status       int
+		body         string
+		expectErr    error
+		errorMessage string
+		expectOutput string
+	}
+
+	testCases := []testCase{
+		{
+			name:         "success",
+			status:       http.StatusOK,
+			body:         `{"format_version":"1.0"}`,
+			expectOutput: `{"format_version":"1.0"}`,
+		},
+		{
+			name:      "not found yields the sentinel",
+			status:    http.StatusNotFound,
+			body:      `{"errors":["state version has no JSON rendering"]}`,
+			expectErr: ErrStateVersionJSONNotFound,
+		},
+		{
+			// A non-retryable failure status: 5xx is deliberately avoided here because the retryable
+			// transport would spend a minute backing off before surfacing it.
+			name:         "other failure stays an error",
+			status:       http.StatusForbidden,
+			body:         "forbidden",
+			errorMessage: "download failed with status code 403",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodGet, r.Method)
+				assert.Equal(t, "/v2/tfe/state-versions/sv-123/content.json", r.URL.Path)
+				w.WriteHeader(test.status)
+				_, _ = w.Write([]byte(test.body))
+			}))
+			defer server.Close()
+
+			client := newTFEDiscoveryTestClient(t, server)
+
+			var buf bytes.Buffer
+			err := client.DownloadStateVersionJSON(t.Context(), &DownloadStateVersionJSONInput{
+				StateVersionID: "sv-123",
+				Writer:         &buf,
+			})
+
+			switch {
+			case test.expectErr != nil:
+				require.ErrorIs(t, err, test.expectErr)
+			case test.errorMessage != "":
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.errorMessage)
+			default:
+				require.NoError(t, err)
+				assert.JSONEq(t, test.expectOutput, buf.String())
+			}
+		})
+	}
+}
+
 func TestDownloadStateVersion(t *testing.T) {
 	type testCase struct {
 		name         string
@@ -602,5 +692,26 @@ func TestDownloadPlanCache(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectOutput, buf.String())
 		})
+	}
+}
+
+// newTFEDiscoveryTestClient builds a client whose TFE service discovery resolves to the test server
+// under /v2/tfe, so tests exercise the discovered prefix instead of a hardcoded one.
+func newTFEDiscoveryTestClient(t *testing.T, server *httptest.Server) *restClient {
+	baseURL, err := url.Parse(server.URL)
+	require.NoError(t, err)
+
+	mockDiscoverer := provider.NewMockServiceDiscoverer(t)
+	mockDiscoverer.On("DiscoverTFEServices", mock.Anything, baseURL.String()).Return(&provider.TFEServices{
+		Services: map[provider.ServiceID]*url.URL{
+			provider.TFEServiceID: baseURL.JoinPath("/v2/tfe"),
+		},
+	}, nil)
+
+	return &restClient{
+		baseURL:           baseURL,
+		tokenResolver:     &mockTokenResolver{token: "test-token"},
+		httpClient:        http.DefaultClient,
+		serviceDiscoverer: mockDiscoverer,
 	}
 }

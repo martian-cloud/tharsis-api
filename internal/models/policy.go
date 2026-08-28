@@ -297,6 +297,20 @@ func (p *Policy) Validate() error {
 		if err := ValidSpeculativeRunEnforcementLevel(p.OPAData.SpeculativeRunEnforcementLevel); err != nil {
 			return err
 		}
+		// A post-apply check evaluates after state has already been written, so there is no run outcome
+		// left for a stronger enforcement level to protect: neither a soft nor a hard gate can block
+		// anything the apply hasn't already done. Both enforcement fields are therefore restricted to
+		// advisory for this stage.
+		if p.OPAData.Stage == RunTaskStageNamePostApply {
+			if p.OPAData.EnforcementLevel != PolicyEnforcementAdvisory {
+				return errors.New("post_apply policy enforcement level must be %s", PolicyEnforcementAdvisory,
+					errors.WithErrorCode(errors.EInvalid))
+			}
+			if p.OPAData.SpeculativeRunEnforcementLevel != PolicyEnforcementAdvisory {
+				return errors.New("post_apply policy speculative run enforcement level must be %s", PolicyEnforcementAdvisory,
+					errors.WithErrorCode(errors.EInvalid))
+			}
+		}
 		if p.OPAData.PackageVersionConstraint != nil && *p.OPAData.PackageVersionConstraint != "" {
 			if _, err := goversion.NewConstraint(*p.OPAData.PackageVersionConstraint); err != nil {
 				return errors.New("policy version constraint %q is invalid", *p.OPAData.PackageVersionConstraint,

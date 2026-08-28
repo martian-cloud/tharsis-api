@@ -2597,6 +2597,7 @@ enum PolicySort {
 enum PolicyStage {
   POST_APPLY
   POST_PLAN
+  PRE_APPLY
   PRE_PLAN
 }
 
@@ -2918,8 +2919,8 @@ enum RunStatus {
   planned
   planned_and_finished
   planning
+  post_apply_running
   post_plan_awaiting_decision
-  post_plan_completed
   post_plan_running
   pre_apply_awaiting_decision
   pre_apply_completed
@@ -3230,6 +3231,7 @@ type StateVersion implements Node {
   data: String!
   id: ID!
   inventory: StateVersionInventory!
+  jsonData: String
   metadata: ResourceMetadata!
   outputs: [StateVersionOutput!]!
   run: Run

@@ -19,8 +19,13 @@ export function isPolicyCheckFinal(status: string): boolean {
 // stageLabel turns a RunTaskStageName into the display label used in the stage card and the stage
 // header, which have to agree. The return type is narrowed to the literals RunDetailsStageHeader
 // accepts, since it shares this vocabulary with the plan and apply stages.
-export function stageLabel(stageName: string): 'Pre-Plan' | 'Post-Plan' {
-    return stageName === 'PRE_PLAN' ? 'Pre-Plan' : 'Post-Plan';
+export function stageLabel(stageName: string): 'Pre-Plan' | 'Post-Plan' | 'Pre-Apply' | 'Post-Apply' {
+    switch (stageName) {
+        case 'PRE_PLAN': return 'Pre-Plan';
+        case 'PRE_APPLY': return 'Pre-Apply';
+        case 'POST_APPLY': return 'Post-Apply';
+        default: return 'Post-Plan';
+    }
 }
 
 // approvalsForRule returns the decisions that cover a given rule. coveredRules exists precisely

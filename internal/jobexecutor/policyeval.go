@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -16,6 +17,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/policyeval"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/client"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
@@ -34,13 +36,14 @@ const (
 	policyInputSchemaVersion = 1
 )
 
-// PolicyEvalHandler evaluates the OPA policy sets pinned to a run's post-plan stage.
+// PolicyEvalHandler evaluates the OPA policy sets pinned to a run's policy check, at whichever
+// stage (pre-plan, post-plan, pre-apply, post-apply) that check belongs to.
 //
 // Rego evaluation follows the Conftest convention: rules named "deny" or "violation" (in any
 // package) produce violation messages; a non-empty union of those messages across a policy set's
 // modules means the policy set FAILED, an empty union means it PASSED. Messages may be strings or
 // objects with a "msg" field. Policies are authored in Rego v1 syntax and evaluate against the
-// input document assembled in buildInputDocument (schemaVersion, stage, run, tfplan).
+// input document assembled in buildInputDocument (schemaVersion, stage, run, tfplan, tfstate).
 type PolicyEvalHandler struct {
 	client         jobclient.Client
 	cancellableCtx context.Context
@@ -146,7 +149,8 @@ func (p *PolicyEvalHandler) Execute(ctx context.Context) error {
 	}
 
 	// A pre-plan check runs before the plan, so there is no plan JSON to evaluate — the input
-	// carries only the run/workspace context. A post-plan check additionally includes the tfplan.
+	// carries only the run/workspace context. Every other stage (post-plan, pre-apply, post-apply)
+	// additionally includes the tfplan.
 	var planJSON interface{}
 	if check.StageName != pb.RunTaskStageName_RUN_TASK_STAGE_NAME_PRE_PLAN {
 		planJSON, err = p.downloadPlanJSON(ctx)
@@ -155,7 +159,17 @@ func (p *PolicyEvalHandler) Execute(ctx context.Context) error {
 		}
 	}
 
-	input := p.buildInputDocument(check.StageName, runVariables, planJSON)
+	// A post-apply check evaluates after state has been written, so it additionally carries the
+	// state's JSON representation, taken from the state version this run created.
+	var stateJSON interface{}
+	if check.StageName == pb.RunTaskStageName_RUN_TASK_STAGE_NAME_POST_APPLY {
+		stateJSON, err = p.downloadStateJSON(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	input := p.buildInputDocument(check.StageName, runVariables, planJSON, stateJSON)
 
 	// Resolve and download every policy set package up front. A constraint no uploaded version
 	// satisfies, a package whose pinned digest does not match its content, and a package whose files
@@ -302,11 +316,74 @@ func (p *PolicyEvalHandler) downloadPlanJSON(ctx context.Context) (interface{}, 
 	return planJSON, nil
 }
 
+// downloadStateJSON downloads and unmarshals the JSON representation ("terraform show -json") of the
+// state version this run's apply created. It is keyed off the run, not off the workspace's current
+// state version: those diverge as soon as anything else writes state after the apply (a rollback or a
+// direct state push), and the policy must be evaluated against what this run actually produced.
+//
+// It returns nil, without an error, whenever no representation is available: the run wrote no state at
+// all, or its state version has no JSON rendering stored because it was written by a job executor
+// predating that upload, or by a client that never produces one. The key is then omitted from the input
+// document rather than failing the check, so a mixed-version fleet keeps evaluating policies while
+// runners roll out. The trade-off is real and deliberate: a rule that reads input.tfstate is simply
+// undefined when the representation is missing, so it neither fires nor errors. The absence is logged
+// to the job log so it is diagnosable from the run.
+func (p *PolicyEvalHandler) downloadStateJSON(ctx context.Context) (interface{}, error) {
+	stateVersion, err := p.client.GetRunStateVersion(ctx, p.run.Metadata.Id)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			p.jobLogger.Infof("This run created no state version; policies will be evaluated without input.tfstate.")
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get the run's state version: %w", err)
+	}
+
+	stateVersionID := stateVersion.GetMetadata().GetId()
+
+	var buf bytes.Buffer
+	if err := p.client.DownloadStateVersionJSON(ctx, stateVersionID, &buf); err != nil {
+		if errors.Is(err, client.ErrStateVersionJSONNotFound) {
+			p.jobLogger.Infof(
+				"State version %s has no JSON representation stored; policies will be evaluated without input.tfstate.",
+				stateVersionID,
+			)
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to download state version JSON: %w", err)
+	}
+
+	if buf.Len() == 0 {
+		p.jobLogger.Infof(
+			"State version %s has an empty JSON representation; policies will be evaluated without input.tfstate.",
+			stateVersionID,
+		)
+		return nil, nil
+	}
+
+	var stateJSON interface{}
+	if err := json.Unmarshal(buf.Bytes(), &stateJSON); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal state JSON: %w", err)
+	}
+
+	return stateJSON, nil
+}
+
 // buildInputDocument assembles the rich input document evaluated by the policies. Keys are left
-// absent when the corresponding value is not applicable — notably tfplan, which is only present for
-// a post-plan stage (a pre-plan check runs before the plan exists). The stage is surfaced at the top
-// level so a policy can branch on which stage it is evaluating at.
-func (p *PolicyEvalHandler) buildInputDocument(stage pb.RunTaskStageName, runVariables []*pb.RunVariable, planJSON interface{}) map[string]interface{} {
+// absent when the corresponding value is not applicable — notably tfplan, which is absent only for a
+// pre-plan stage (which runs before the plan exists), and tfstate, which is present only for a
+// post-apply stage (the only stage that evaluates after state has been written) and only when a JSON
+// representation of that state is available. The stage is surfaced at the top level so a policy can
+// branch on which stage it is evaluating at.
+//
+// Both tfplan and tfstate are the documented "terraform show -json" renderings, not Terraform's
+// internal file formats, so a policy reads tfplan.resource_changes and
+// tfstate.values.root_module.resources.
+func (p *PolicyEvalHandler) buildInputDocument(
+	stage pb.RunTaskStageName,
+	runVariables []*pb.RunVariable,
+	planJSON interface{},
+	stateJSON interface{},
+) map[string]interface{} {
 	runDoc := map[string]interface{}{
 		"id":                     p.run.Metadata.Id,
 		"createdBy":              p.run.CreatedBy,
@@ -353,6 +430,9 @@ func (p *PolicyEvalHandler) buildInputDocument(stage pb.RunTaskStageName, runVar
 
 	if planJSON != nil {
 		input["tfplan"] = planJSON
+	}
+	if stateJSON != nil {
+		input["tfstate"] = stateJSON
 	}
 
 	return input

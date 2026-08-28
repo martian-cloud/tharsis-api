@@ -13,7 +13,7 @@ import { blankScopeRule, isScopeRuleComplete, ScopeRuleFormData } from './scopeR
 // The empty string is the unselected state: a policy's type has no sensible default, so it has to be
 // chosen before there is anything else to fill in.
 export type PolicyKind = '' | 'OPA';
-export type PolicyStage = 'PRE_PLAN' | 'POST_PLAN';
+export type PolicyStage = 'PRE_PLAN' | 'POST_PLAN' | 'PRE_APPLY' | 'POST_APPLY';
 export type PolicyEnforcementLevel = 'ADVISORY' | 'SOFT_MANDATORY' | 'HARD_MANDATORY';
 // A run with no apply cannot be enforced at SOFT_MANDATORY: an override there would unblock nothing,
 // and nobody is waiting on a speculative plan or a scheduled assessment run to approve one. The api
@@ -73,6 +73,8 @@ const KIND_OPTIONS: { value: PolicyKind, label: string, description: string }[] 
 const STAGE_OPTIONS: { value: PolicyStage, label: string }[] = [
     { value: 'PRE_PLAN', label: 'Pre Plan' },
     { value: 'POST_PLAN', label: 'Post Plan' },
+    { value: 'PRE_APPLY', label: 'Pre Apply' },
+    { value: 'POST_APPLY', label: 'Post Apply' },
 ];
 
 // The stage label, keyed by the GraphQL enum value, so any other view that shows a policy's stage
@@ -80,6 +82,14 @@ const STAGE_OPTIONS: { value: PolicyStage, label: string }[] = [
 export const STAGE_LABELS: Record<string, string> = Object.fromEntries(
     STAGE_OPTIONS.map(o => [o.value, o.label])
 );
+
+// isPostApplyStage reports whether the given stage is restricted to advisory enforcement: state has
+// already been written by the time a post-apply check evaluates, so there is no run outcome left for
+// a stronger enforcement level to protect (see models.Policy.Validate on the backend, which rejects
+// anything else for this stage).
+export function isPostApplyStage(stage: PolicyStage): boolean {
+    return stage === 'POST_APPLY';
+}
 
 const ENFORCEMENT_OPTIONS: { value: PolicyEnforcementLevel, label: string, description: string }[] = [
     { value: 'ADVISORY', label: 'Advisory', description: 'Failures are logged but never block the run.' },
@@ -118,6 +128,20 @@ export function buildApproverInput(data: PolicyFormData) {
             allowedTeams: data.allowedTeams.map((t: any) => t.id),
         }
         : {};
+}
+
+// clearApprovals drops the approval configuration — the required count and every named approver.
+// Approvals gate the override of an apply blocked at soft mandatory, so they only mean anything at
+// that level for apply runs; changing that level therefore clears them rather than leaving them
+// hidden in form state, where they would silently reappear if the user returned to soft mandatory.
+function clearApprovals(data: PolicyFormData): PolicyFormData {
+    return {
+        ...data,
+        requiredApprovals: DEFAULT_POLICY_FORM_DATA.requiredApprovals,
+        allowedUsers: [],
+        allowedTeams: [],
+        allowedServiceAccounts: [],
+    };
 }
 
 interface Props {
@@ -308,7 +332,17 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                             <Select
                                 label="Stage"
                                 value={data.stage}
-                                onChange={event => onChange({ ...data, stage: event.target.value as PolicyStage })}
+                                onChange={event => {
+                                    const stage = event.target.value as PolicyStage;
+                                    // Post-apply can only be advisory (state has already been written by
+                                    // the time it evaluates), so switching to it pins both enforcement
+                                    // levels rather than leaving a stale, now-invalid selection on screen.
+                                    // Pinning apply runs to advisory takes the approvals with it, the same
+                                    // as choosing that level directly.
+                                    onChange(isPostApplyStage(stage)
+                                        ? clearApprovals({ ...data, stage, enforcementLevel: 'ADVISORY', speculativeRunEnforcementLevel: 'ADVISORY' })
+                                        : { ...data, stage });
+                                }}
                             >
                                 {STAGE_OPTIONS.map(opt => (
                                     <MenuItem key={opt.value} value={opt.value}>
@@ -320,15 +354,21 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                     </Box>
                     <Box>
                         <Typography variant="subtitle2" mb={2}>Enforcement Level</Typography>
+                        {isPostApplyStage(data.stage) && <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 1 }}>
+                            Post-apply policies can only be enforced at Advisory: state has already been written by the time this stage evaluates, so there is no run outcome left for a stronger level to block.
+                        </Typography>}
                         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 1 }}>
-                            <FormControl size="small" sx={{ minWidth: 420 }}>
+                            <FormControl size="small" sx={{ minWidth: 420 }} disabled={isPostApplyStage(data.stage)}>
                                 <InputLabel>Apply Runs</InputLabel>
                                 <Select
                                     label="Apply Runs"
                                     value={data.enforcementLevel}
                                     onChange={event => {
                                         const level = event.target.value as PolicyEnforcementLevel;
-                                        onChange({ ...data, enforcementLevel: level });
+                                        // The approvals below belong to the level being left behind, so
+                                        // they go with it — including when the new level is soft
+                                        // mandatory, where the section reappears configured fresh.
+                                        onChange(clearApprovals({ ...data, enforcementLevel: level }));
                                     }}
                                 >
                                     {ENFORCEMENT_OPTIONS.map(opt => (
@@ -341,7 +381,7 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                                     ))}
                                 </Select>
                             </FormControl>
-                            <FormControl size="small" sx={{ minWidth: 420 }}>
+                            <FormControl size="small" sx={{ minWidth: 420 }} disabled={isPostApplyStage(data.stage)}>
                                 <InputLabel>Speculative & Assessment Runs</InputLabel>
                                 <Select
                                     label="Speculative & Assessment Runs"

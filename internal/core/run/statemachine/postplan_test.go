@@ -9,6 +9,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
+// This file covers the post-plan policy stage's lifecycle and verdicts (the ungated stage that runs
+// after the plan finishes with changes), plus the PolicyCheckNode transition table and the
+// package-level SetPolicyCheckStatus entry point, which it exercises via post-plan fixtures since a
+// check's own transitions do not depend on which stage it belongs to.
+
 // opaCheckPath is the run-relative path of the OPA post-plan policy check node.
 const opaCheckPath = "post_plan/opa"
 

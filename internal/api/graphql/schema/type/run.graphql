@@ -30,11 +30,11 @@ enum RunStatus {
   pre_plan_completed
   post_plan_running
   post_plan_awaiting_decision
-  post_plan_completed
   pre_apply_queuing
   pre_apply_running
   pre_apply_awaiting_decision
   pre_apply_completed
+  post_apply_running
 }
 
 enum PolicyCheckStatus {
@@ -89,7 +89,7 @@ type RunTaskStage {
   id: String!
   stageName: RunTaskStageName!
   status: RunTaskStageStatus!
-  policyChecks: [PolicyCheck!]!
+  policyChecks: [PolicyCheck!]! @complexity(value: 0)
 }
 
 """
@@ -116,13 +116,13 @@ type PolicyCheck {
   so this always describes the current attempt.
   """
   runGate: RunGate
-  policies: [PolicyCheckPolicy!]!
+  policies: [PolicyCheckPolicy!]! @complexity(value: 0)
   """
   messagesSummary previews the violation messages this check's policies reported. It is held on the
   check itself, so reading it costs nothing extra — prefer it over each policy's messages field
   whenever more than one check is on screen.
   """
-  messagesSummary: PolicyCheckMessagesSummary!
+  messagesSummary: PolicyCheckMessagesSummary! @complexity(value: 0)
   currentJob: Job
   jobs(
     after: String
@@ -161,8 +161,8 @@ type PolicyCheckPolicy {
   the check has been evaluated or when the policy passed. The list is stored outside the run, so
   selecting it costs a read per policy; a check's messagesSummary is the cheap preview.
   """
-  messages: [String!]!
-  provenance: PolicyCheckPolicyProvenance!
+  messages: [String!]! @complexity(value: 1)
+  provenance: PolicyCheckPolicyProvenance! @complexity(value: 0)
   """
   policy is the policy resource this entry was snapshotted from. It is null when the policy has
   since been deleted or the caller cannot view it — the snapshot fields above always remain.
@@ -225,9 +225,9 @@ type Run implements Node {
   isDestroy: Boolean!
   workspace: Workspace!
   configurationVersion: ConfigurationVersion
-  plan: Plan!
-  apply: Apply
-  taskStages: [RunTaskStage!]!
+  plan: Plan! @complexity(value: 0)
+  apply: Apply @complexity(value: 0)
+  taskStages: [RunTaskStage!]! @complexity(value: 0)
   variables: [RunVariable!]!
   sensitiveVariableValues: [RunVariableSensitiveValue!]!
   stateVersion: StateVersion

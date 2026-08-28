@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<bf09192e7a54061f0c56cb432c9e4de8>>
+ * @generated SignedSource<<c4e9114cae2571c6fc61f761986cc9f2>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -13,7 +13,7 @@ export type PolicyEnforcementLevel = "ADVISORY" | "HARD_MANDATORY" | "SOFT_MANDA
 export type PolicyKind = "OPA" | "%future added value";
 export type PolicyScopeRuleAction = "EXCLUDE" | "INCLUDE" | "%future added value";
 export type PolicyScopeRuleType = "GROUP" | "MANAGED_IDENTITY" | "WORKSPACE" | "%future added value";
-export type PolicyStage = "POST_APPLY" | "POST_PLAN" | "PRE_PLAN" | "%future added value";
+export type PolicyStage = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_PLAN" | "%future added value";
 export type SpeculativeRunEnforcementLevel = "ADVISORY" | "HARD_MANDATORY" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type EditPolicyFragment_policy$data = {

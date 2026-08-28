@@ -60,6 +60,20 @@ func TharsisStateVersionToStateVersion(sv *models.StateVersion, tharsisAPIURL, t
 
 	if tharsisAPIURL != "" {
 		resp.DownloadURL = fmt.Sprintf("%s%s/state-versions/%s/content", tharsisAPIURL, tfeStateVersionedPath, sv.GetGlobalID())
+
+		// The rendering can be uploaded at any point after the state version exists — the job executor
+		// sends it once the apply finishes — so the URL is always advertised. UploadURL has no
+		// counterpart because raw state only arrives with the state version itself.
+		resp.JSONUploadURL = fmt.Sprintf("%s%s/state-versions/%s/content.json",
+			tharsisAPIURL, tfeStateVersionedPath, sv.GetGlobalID())
+
+		// Only advertise the rendering for download when one is stored. A state version created by an
+		// older job executor has none, and HCP Terraform likewise leaves the field empty until it has
+		// one, so a TFE client already has to treat it as optional rather than assume the URL resolves.
+		if sv.JSONObjectStoreKey != nil {
+			resp.JSONDownloadURL = fmt.Sprintf("%s%s/state-versions/%s/content.json",
+				tharsisAPIURL, tfeStateVersionedPath, sv.GetGlobalID())
+		}
 	}
 
 	return resp
@@ -191,7 +205,10 @@ func tharsisRunStatusToTFE(status models.RunStatus) RunStatus {
 		return RunApplyQueued
 	case models.RunApplying:
 		return RunApplying
-
+	case models.RunPostApplyRunning:
+		return RunPostApplyRunning
+	case models.RunPostApplyCompleted:
+		return RunPostApplyCompleted
 	case models.RunApplied:
 		return RunApplied
 	case models.RunCanceled:

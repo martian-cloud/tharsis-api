@@ -251,7 +251,8 @@ func (r *RunResolver) Plan() (*PlanResolver, error) {
 }
 
 // TaskStages resolver returns the run's task stage nodes in canonical stage order (pre_plan,
-// post_plan; empty when the run has no policies). Each stage owns its policy checks.
+// post_plan, pre_apply, post_apply; empty when the run has no policies). Each stage owns its policy
+// checks.
 func (r *RunResolver) TaskStages() []*RunTaskStageResolver {
 	stages := r.run.TaskStages
 	resolvers := make([]*RunTaskStageResolver, len(stages))
@@ -272,7 +273,8 @@ func (r *RunTaskStageResolver) ID() string {
 	return string(r.stage.GetGlobalID())
 }
 
-// StageName resolver returns the run stage this task stage evaluates (e.g. PRE_PLAN, POST_PLAN).
+// StageName resolver returns the run stage this task stage evaluates (e.g. PRE_PLAN, POST_PLAN,
+// PRE_APPLY, POST_APPLY).
 func (r *RunTaskStageResolver) StageName() string {
 	return toGraphqlEnum(string(r.stage.StageName))
 }

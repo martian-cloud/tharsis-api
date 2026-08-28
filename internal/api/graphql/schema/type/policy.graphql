@@ -5,6 +5,7 @@ enum PolicyKind {
 enum PolicyStage {
   PRE_PLAN
   POST_PLAN
+  PRE_APPLY
   POST_APPLY
 }
 
@@ -157,6 +158,10 @@ Supplying opaData replaces it wholesale, so every field that always has a value 
 packageVersionConstraint and packageDigest stay nullable because omitting them is how a caller says
 "track the latest version" and "do not pin a checksum". A stage change takes effect on runs created
 afterwards: a run snapshots the policies applying to each stage when it is created.
+
+A POST_APPLY policy may only be enforced at ADVISORY: state has already been written by the time a
+post-apply check evaluates, so there is no run outcome left for a stronger enforcement level to
+protect (both enforcementLevel and speculativeRunEnforcementLevel are rejected otherwise).
 """
 input OPAPolicyDataInput {
   packageSource: String!

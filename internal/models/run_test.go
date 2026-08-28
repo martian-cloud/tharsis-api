@@ -15,6 +15,7 @@ func TestRunStatus_IsFinalStatus(t *testing.T) {
 		RunPending,
 		RunPrePlanQueuing, RunPlanQueuing, RunPlanQueued, RunPlanning, RunPlanned,
 		RunPreApplyQueuing, RunApplyQueuing, RunApplyQueued, RunApplying,
+		RunPostApplyRunning, RunPostApplyCompleted,
 	}
 
 	for _, s := range final {

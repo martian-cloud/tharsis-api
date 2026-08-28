@@ -40,11 +40,11 @@ declare module '@mui/material/styles' {
             pre_plan_completed: string;
             post_plan_running: string;
             post_plan_awaiting_decision: string;
-            post_plan_completed: string;
             pre_apply_queuing: string;
             pre_apply_running: string;
             pre_apply_awaiting_decision: string;
             pre_apply_completed: string;
+            post_apply_running: string;
             created: string;
             finished: string;
             running: string;
@@ -146,11 +146,11 @@ export default createTheme({
             pre_plan_completed: '#34d399',
             post_plan_running: '#60a5fa',
             post_plan_awaiting_decision: '#fbbf24',
-            post_plan_completed: '#34d399',
             pre_apply_queuing: '#8ba3c7',
             pre_apply_running: '#60a5fa',
             pre_apply_awaiting_decision: '#fbbf24',
             pre_apply_completed: '#34d399',
+            post_apply_running: '#60a5fa',
             created: '#8ba3c7',
             finished: '#34d399',
             running: '#60a5fa',

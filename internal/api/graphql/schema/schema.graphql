@@ -3,3 +3,11 @@ schema {
   mutation: Mutation
   subscription: Subscription
 }
+
+"""
+complexity assigns a query cost to a field in place of its default, for fields that are
+expensive to resolve because they are backed by their own database lookup or object store read.
+Rate limiting charges a query the sum of its fields' costs, so this is what makes an expensive
+field count for more than a cheap one selected alongside it.
+"""
+directive @complexity(value: Int!) on FIELD_DEFINITION

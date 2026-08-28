@@ -57,6 +57,7 @@ type Client interface {
 	GetAssignedManagedIdentities(ctx context.Context, workspaceID string) ([]*pb.ManagedIdentity, error)
 	GetConfigurationVersion(ctx context.Context, id string) (*pb.ConfigurationVersion, error)
 	CreateStateVersion(ctx context.Context, runID string, body io.Reader) (*pb.StateVersion, error)
+	GetRunStateVersion(ctx context.Context, runID string) (*pb.StateVersion, error)
 	CreateManagedIdentityCredentials(ctx context.Context, managedIdentityID string) ([]byte, error)
 	CreateTerraformCLIDownloadURL(ctx context.Context, version, os, architecture string) (string, error)
 	SaveJobLogs(ctx context.Context, jobID string, startOffset int, buffer []byte) error
@@ -67,8 +68,10 @@ type Client interface {
 	SetJobStatus(ctx context.Context, jobID string, status pb.JobStatus, jobProtocolVersion string) (*pb.Job, error)
 	UploadPlanCache(ctx context.Context, planID string, body io.Reader) error
 	UploadPlanData(ctx context.Context, planID string, tfPlan *tfjson.Plan, tfProviderSchemas *tfjson.ProviderSchemas) error
+	UploadStateVersionJSON(ctx context.Context, stateVersionID string, tfState *tfjson.State) error
 	DownloadConfigurationVersion(ctx context.Context, configVersionID string, writer io.Writer) error
 	DownloadStateVersion(ctx context.Context, stateVersionID string, writer io.Writer) error
+	DownloadStateVersionJSON(ctx context.Context, stateVersionID string, writer io.Writer) error
 	DownloadPlanCache(ctx context.Context, planID string, writer io.Writer) error
 	DownloadPlanJSON(ctx context.Context, planID string, writer io.Writer) error
 	Close() error
@@ -306,6 +309,15 @@ func (c *jobClient) CreateStateVersion(ctx context.Context, runID string, body i
 	})
 }
 
+// GetRunStateVersion returns the state version a run's apply created. A run that wrote no state has
+// none, which the server reports as a NotFound status; callers that only need the state version when
+// it exists should check for codes.NotFound rather than treating it as a failure.
+func (c *jobClient) GetRunStateVersion(ctx context.Context, runID string) (*pb.StateVersion, error) {
+	return c.grpcClient.StateVersionsClient.GetRunStateVersion(ctx, &pb.GetRunStateVersionRequest{
+		RunId: runID,
+	})
+}
+
 // GetConfigurationVersion returns a configuration version by ID
 func (c *jobClient) GetConfigurationVersion(ctx context.Context, id string) (*pb.ConfigurationVersion, error) {
 	return c.grpcClient.ConfigurationVersionsClient.GetConfigurationVersionByID(ctx, &pb.GetConfigurationVersionByIDRequest{Id: id})
@@ -322,6 +334,31 @@ func (c *jobClient) DownloadConfigurationVersion(ctx context.Context, configVers
 // DownloadStateVersion downloads a state version and returns any errors
 func (c *jobClient) DownloadStateVersion(ctx context.Context, stateVersionID string, writer io.Writer) error {
 	return c.restClient.DownloadStateVersion(ctx, &client.DownloadStateVersionInput{
+		StateVersionID: stateVersionID,
+		Writer:         writer,
+	})
+}
+
+// UploadStateVersionJSON uploads the "terraform show -json" rendering of a state version that has
+// already been created. Sent separately from CreateStateVersion because that call carries the raw
+// state base64-encoded inside a single gRPC message, which the rendering would not reliably fit
+// alongside; this goes over the streaming REST endpoint instead.
+func (c *jobClient) UploadStateVersionJSON(ctx context.Context, stateVersionID string, tfState *tfjson.State) error {
+	data, err := json.Marshal(tfState)
+	if err != nil {
+		return fmt.Errorf("failed to marshal state json: %w", err)
+	}
+
+	return c.restClient.UploadStateVersionJSON(ctx, &client.UploadStateVersionJSONInput{
+		StateVersionID: stateVersionID,
+		Reader:         bytes.NewReader(data),
+	})
+}
+
+// DownloadStateVersionJSON downloads a state version's JSON rendering. A state version with no
+// rendering yields client.ErrStateVersionJSONNotFound.
+func (c *jobClient) DownloadStateVersionJSON(ctx context.Context, stateVersionID string, writer io.Writer) error {
+	return c.restClient.DownloadStateVersionJSON(ctx, &client.DownloadStateVersionJSONInput{
 		StateVersionID: stateVersionID,
 		Writer:         writer,
 	})

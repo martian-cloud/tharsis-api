@@ -168,6 +168,10 @@ func TestCreate_AttachesPostPlanStageWhenPolicyApplies(t *testing.T) {
 		},
 	}}, nil)
 	env.policies.On("GetPolicies", ctx, stageIs(models.RunTaskStageNamePrePlan)).Return(&db.PoliciesResult{}, nil)
+	// This run has an apply (non-speculative), so the apply-phase stages are resolved too; return no
+	// policies from either so only the post-plan stage attaches.
+	env.policies.On("GetPolicies", ctx, stageIs(models.RunTaskStageNamePreApply)).Return(&db.PoliciesResult{}, nil)
+	env.policies.On("GetPolicies", ctx, stageIs(models.RunTaskStageNamePostApply)).Return(&db.PoliciesResult{}, nil)
 
 	// Capture the run model handed to CreateRun to assert the stage node is attached.
 	var capturedRun *models.Run
@@ -213,6 +217,123 @@ func TestCreate_AttachesPostPlanStageWhenPolicyApplies(t *testing.T) {
 		},
 		Status: models.PolicyCheckPolicyPending,
 	}, check.Policies[0])
+}
+
+// TestCreate_AttachesAllFourStagesWhenPoliciesApply verifies that a non-speculative run resolves
+// policies at all four stages — pre_plan, post_plan, pre_apply, post_apply — attaching one task
+// stage per stage with an applicable policy, in run order.
+func TestCreate_AttachesAllFourStagesWhenPoliciesApply(t *testing.T) {
+	ctx := callerCtx()
+	env := newCreateTestEnv(t)
+
+	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
+		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
+	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
+		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
+	}}, nil)
+
+	stageIs := func(stage models.RunTaskStageName) interface{} {
+		return mock.MatchedBy(func(in *db.GetPoliciesInput) bool {
+			return in.Filter != nil && in.Filter.Stage != nil && *in.Filter.Stage == stage
+		})
+	}
+	policyForStage := func(id string, stage models.RunTaskStageName) *models.Policy {
+		return &models.Policy{
+			Metadata: models.ResourceMetadata{ID: id},
+			GroupID:  "g-ancestor",
+			Kind:     models.PolicyKindOPA,
+			Name:     "policy-" + id,
+			OPAData: &models.OPAPolicyData{
+				PackageSource:                  "my-group/my-package",
+				Stage:                          stage,
+				EnforcementLevel:               models.PolicyEnforcementAdvisory,
+				SpeculativeRunEnforcementLevel: models.PolicyEnforcementAdvisory,
+			},
+		}
+	}
+	for _, stage := range []models.RunTaskStageName{
+		models.RunTaskStageNamePrePlan, models.RunTaskStageNamePostPlan,
+		models.RunTaskStageNamePreApply, models.RunTaskStageNamePostApply,
+	} {
+		env.policies.On("GetPolicies", ctx, stageIs(stage)).Return(&db.PoliciesResult{
+			Policies: []*models.Policy{policyForStage("p-"+string(stage), stage)},
+		}, nil)
+	}
+
+	var capturedRun *models.Run
+	env.runs.On("CreateRun", ctx, mock.Anything).Return(func(_ context.Context, run *models.Run) *models.Run {
+		capturedRun = run
+		run.Metadata.ID = "run-1"
+		run.Metadata.CreationTimestamp = ptr.Time(time.Now().UTC())
+		return run
+	}, nil)
+	env.runs.On("GetRuns", ctx, mock.Anything).
+		Return(&db.RunsResult{PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)}}, nil)
+	env.limitChecker.On("CheckLimit", ctx, limits.ResourceLimitRunsPerWorkspacePerTimePeriod, mock.Anything).Return(nil)
+	env.activityEvts.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
+	_, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	require.NoError(t, err)
+
+	require.NotNil(t, capturedRun)
+	require.Len(t, capturedRun.TaskStages, 4, "all four stages should attach for a non-speculative run with policies at each")
+	gotOrder := make([]models.RunTaskStageName, len(capturedRun.TaskStages))
+	for i, s := range capturedRun.TaskStages {
+		gotOrder[i] = s.StageName
+	}
+	assert.Equal(t, []models.RunTaskStageName{
+		models.RunTaskStageNamePrePlan, models.RunTaskStageNamePostPlan,
+		models.RunTaskStageNamePreApply, models.RunTaskStageNamePostApply,
+	}, gotOrder, "stages must attach in run order")
+}
+
+// TestCreate_SpeculativeRunSkipsApplyPhaseStages verifies that a speculative run never resolves
+// pre_apply/post_apply policies at all — not merely that it ends up with no apply-phase stages,
+// but that the apply-phase GetPolicies queries are never issued, since a speculative run has no
+// apply node for such a stage to ever gate.
+func TestCreate_SpeculativeRunSkipsApplyPhaseStages(t *testing.T) {
+	ctx := callerCtx()
+	env := newCreateTestEnv(t)
+
+	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
+		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
+	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
+		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
+	}}, nil)
+	// Only pre_plan/post_plan queries are expected; an unexpected pre_apply/post_apply query fails
+	// the test via the mock's strict expectations.
+	env.policies.On("GetPolicies", ctx, mock.MatchedBy(func(in *db.GetPoliciesInput) bool {
+		return in.Filter != nil && in.Filter.Stage != nil &&
+			(*in.Filter.Stage == models.RunTaskStageNamePrePlan || *in.Filter.Stage == models.RunTaskStageNamePostPlan)
+	})).Return(&db.PoliciesResult{Policies: []*models.Policy{}}, nil)
+
+	var capturedRun *models.Run
+	env.runs.On("CreateRun", ctx, mock.Anything).Return(func(_ context.Context, run *models.Run) *models.Run {
+		capturedRun = run
+		run.Metadata.ID = "run-1"
+		run.Metadata.CreationTimestamp = ptr.Time(time.Now().UTC())
+		return run
+	}, nil)
+	env.runs.On("GetRuns", ctx, mock.Anything).
+		Return(&db.RunsResult{PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)}}, nil)
+	env.limitChecker.On("CheckLimit", ctx, limits.ResourceLimitRunsPerWorkspacePerTimePeriod, mock.Anything).Return(nil)
+	env.activityEvts.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
+	moduleSource := "registry/group/module"
+	speculative := true
+	_, err := env.create(ctx, &CreateRunInput{
+		Subject:      "u",
+		WorkspaceID:  "ws-1",
+		ModuleSource: &moduleSource,
+		Speculative:  &speculative,
+	})
+	require.NoError(t, err)
+
+	require.NotNil(t, capturedRun)
+	assert.Empty(t, capturedRun.TaskStages, "a speculative run with no matching pre/post-plan policies attaches no stages")
+	assert.Nil(t, capturedRun.Apply, "a speculative run has no apply node")
 }
 
 // TestCreate_OPAKindWithNilOPADataFailsRunCreation verifies that an OPA-kind policy whose OPAData

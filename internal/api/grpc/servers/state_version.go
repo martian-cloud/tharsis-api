@@ -42,6 +42,37 @@ func (s *StateVersionServer) GetStateVersionByID(ctx context.Context, req *pb.Ge
 	return toPBStateVersion(stateVersion), nil
 }
 
+// GetRunStateVersion returns the StateVersion a run's apply created. A run that wrote no state has
+// none, which is reported as ENotFound so a caller can tell "this run produced no state" apart from a
+// lookup failure. This is deliberately keyed off the run rather than the workspace's current state
+// version: the two diverge as soon as anything else writes state (a later run, a rollback, or a direct
+// push), and a consumer asking about a run wants that run's result.
+func (s *StateVersionServer) GetRunStateVersion(ctx context.Context, req *pb.GetRunStateVersionRequest) (*pb.StateVersion, error) {
+	model, err := s.serviceCatalog.FetchModel(ctx, req.RunId)
+	if err != nil {
+		return nil, err
+	}
+
+	run, ok := model.(*models.Run)
+	if !ok {
+		return nil, errors.New("run with id %s not found", req.RunId, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	stateVersions, err := s.serviceCatalog.RunService.GetStateVersionsByRunIDs(ctx, []string{run.Metadata.ID})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(stateVersions) == 0 {
+		return nil, errors.New(
+			"run with id %s has no state version", req.RunId,
+			errors.WithErrorCode(errors.ENotFound),
+		)
+	}
+
+	return toPBStateVersion(&stateVersions[0]), nil
+}
+
 // GetStateVersions returns a paginated list of StateVersions.
 func (s *StateVersionServer) GetStateVersions(ctx context.Context, req *pb.GetStateVersionsRequest) (*pb.GetStateVersionsResponse, error) {
 	sort := db.StateVersionSortableField(req.GetSort().String())
@@ -125,7 +156,7 @@ func (s *StateVersionServer) CreateStateVersion(ctx context.Context, req *pb.Cre
 		stateVersion.RunID = &run.Metadata.ID
 	}
 
-	createdStateVersion, err := s.serviceCatalog.WorkspaceService.CreateStateVersion(ctx, stateVersion, req.State)
+	createdStateVersion, err := s.serviceCatalog.WorkspaceService.CreateStateVersion(ctx, stateVersion, req.State, nil)
 	if err != nil {
 		return nil, err
 	}

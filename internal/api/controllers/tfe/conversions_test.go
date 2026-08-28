@@ -52,6 +52,9 @@ func TestTharsisRunStatusToTFE(t *testing.T) {
 		models.RunApplyQueued:  RunApplyQueued,
 		models.RunApplying:     RunApplying,
 
+		models.RunPostApplyRunning:   RunPostApplyRunning,
+		models.RunPostApplyCompleted: RunPostApplyCompleted,
+
 		models.RunApplied:   RunApplied,
 		models.RunCanceled:  RunCanceled,
 		models.RunDiscarded: RunDiscarded,

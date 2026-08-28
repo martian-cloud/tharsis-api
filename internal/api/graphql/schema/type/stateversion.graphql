@@ -45,8 +45,9 @@ type StateVersion implements Node {
   metadata: ResourceMetadata!
   run: Run
   outputs: [StateVersionOutput!]!
-  inventory: StateVersionInventory!
+  inventory: StateVersionInventory! @complexity(value: 5)
   data: String!
+  jsonData: String @complexity(value: 5)
   createdBy: String!
 }
 

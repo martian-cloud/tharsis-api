@@ -113,6 +113,51 @@ func (x *GetStateVersionByIDRequest) GetId() string {
 	return ""
 }
 
+// GetRunStateVersionRequest is the input for retrieving the StateVersion created by a Run.
+type GetRunStateVersionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRunStateVersionRequest) Reset() {
+	*x = GetRunStateVersionRequest{}
+	mi := &file_state_version_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRunStateVersionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRunStateVersionRequest) ProtoMessage() {}
+
+func (x *GetRunStateVersionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_state_version_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRunStateVersionRequest.ProtoReflect.Descriptor instead.
+func (*GetRunStateVersionRequest) Descriptor() ([]byte, []int) {
+	return file_state_version_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetRunStateVersionRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
 // GetStateVersionsRequest is the input for retrieving a paginated list of StateVersions.
 type GetStateVersionsRequest struct {
 	state             protoimpl.MessageState     `protogen:"open.v1"`
@@ -125,7 +170,7 @@ type GetStateVersionsRequest struct {
 
 func (x *GetStateVersionsRequest) Reset() {
 	*x = GetStateVersionsRequest{}
-	mi := &file_state_version_proto_msgTypes[1]
+	mi := &file_state_version_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -137,7 +182,7 @@ func (x *GetStateVersionsRequest) String() string {
 func (*GetStateVersionsRequest) ProtoMessage() {}
 
 func (x *GetStateVersionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_version_proto_msgTypes[1]
+	mi := &file_state_version_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -150,7 +195,7 @@ func (x *GetStateVersionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStateVersionsRequest.ProtoReflect.Descriptor instead.
 func (*GetStateVersionsRequest) Descriptor() ([]byte, []int) {
-	return file_state_version_proto_rawDescGZIP(), []int{1}
+	return file_state_version_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetStateVersionsRequest) GetWorkspaceId() string {
@@ -185,7 +230,7 @@ type CreateStateVersionRequest struct {
 
 func (x *CreateStateVersionRequest) Reset() {
 	*x = CreateStateVersionRequest{}
-	mi := &file_state_version_proto_msgTypes[2]
+	mi := &file_state_version_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -197,7 +242,7 @@ func (x *CreateStateVersionRequest) String() string {
 func (*CreateStateVersionRequest) ProtoMessage() {}
 
 func (x *CreateStateVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_version_proto_msgTypes[2]
+	mi := &file_state_version_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -210,7 +255,7 @@ func (x *CreateStateVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateStateVersionRequest.ProtoReflect.Descriptor instead.
 func (*CreateStateVersionRequest) Descriptor() ([]byte, []int) {
-	return file_state_version_proto_rawDescGZIP(), []int{2}
+	return file_state_version_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateStateVersionRequest) GetRunId() string {
@@ -240,7 +285,7 @@ type StateVersion struct {
 
 func (x *StateVersion) Reset() {
 	*x = StateVersion{}
-	mi := &file_state_version_proto_msgTypes[3]
+	mi := &file_state_version_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -252,7 +297,7 @@ func (x *StateVersion) String() string {
 func (*StateVersion) ProtoMessage() {}
 
 func (x *StateVersion) ProtoReflect() protoreflect.Message {
-	mi := &file_state_version_proto_msgTypes[3]
+	mi := &file_state_version_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -265,7 +310,7 @@ func (x *StateVersion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateVersion.ProtoReflect.Descriptor instead.
 func (*StateVersion) Descriptor() ([]byte, []int) {
-	return file_state_version_proto_rawDescGZIP(), []int{3}
+	return file_state_version_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StateVersion) GetMetadata() *ResourceMetadata {
@@ -307,7 +352,7 @@ type GetStateVersionsResponse struct {
 
 func (x *GetStateVersionsResponse) Reset() {
 	*x = GetStateVersionsResponse{}
-	mi := &file_state_version_proto_msgTypes[4]
+	mi := &file_state_version_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -319,7 +364,7 @@ func (x *GetStateVersionsResponse) String() string {
 func (*GetStateVersionsResponse) ProtoMessage() {}
 
 func (x *GetStateVersionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_version_proto_msgTypes[4]
+	mi := &file_state_version_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -332,7 +377,7 @@ func (x *GetStateVersionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStateVersionsResponse.ProtoReflect.Descriptor instead.
 func (*GetStateVersionsResponse) Descriptor() ([]byte, []int) {
-	return file_state_version_proto_rawDescGZIP(), []int{4}
+	return file_state_version_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetStateVersionsResponse) GetStateVersions() []*StateVersion {
@@ -355,7 +400,9 @@ const file_state_version_proto_rawDesc = "" +
 	"\n" +
 	"\x13state_version.proto\x12&martiancloud.tharsis.api.state_version\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1astate_version_output.proto\",\n" +
 	"\x1aGetStateVersionByIDRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xa4\x02\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"2\n" +
+	"\x19GetRunStateVersionRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\"\xa4\x02\n" +
 	"\x17GetStateVersionsRequest\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12j\n" +
 	"\x12pagination_options\x18\x02 \x01(\v26.martiancloud.tharsis.api.pagination.PaginationOptionsH\x00R\x11paginationOptions\x88\x01\x01\x12Z\n" +
@@ -378,9 +425,10 @@ const file_state_version_proto_rawDesc = "" +
 	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo*D\n" +
 	"\x19StateVersionSortableField\x12\x12\n" +
 	"\x0eUPDATED_AT_ASC\x10\x00\x12\x13\n" +
-	"\x0fUPDATED_AT_DESC\x10\x012\xb3\x06\n" +
+	"\x0fUPDATED_AT_DESC\x10\x012\xc3\a\n" +
 	"\rStateVersions\x12\x8f\x01\n" +
-	"\x13GetStateVersionByID\x12B.martiancloud.tharsis.api.state_version.GetStateVersionByIDRequest\x1a4.martiancloud.tharsis.api.state_version.StateVersion\x12\x95\x01\n" +
+	"\x13GetStateVersionByID\x12B.martiancloud.tharsis.api.state_version.GetStateVersionByIDRequest\x1a4.martiancloud.tharsis.api.state_version.StateVersion\x12\x8d\x01\n" +
+	"\x12GetRunStateVersion\x12A.martiancloud.tharsis.api.state_version.GetRunStateVersionRequest\x1a4.martiancloud.tharsis.api.state_version.StateVersion\x12\x95\x01\n" +
 	"\x10GetStateVersions\x12?.martiancloud.tharsis.api.state_version.GetStateVersionsRequest\x1a@.martiancloud.tharsis.api.state_version.GetStateVersionsResponse\x12\x8d\x01\n" +
 	"\x12CreateStateVersion\x12A.martiancloud.tharsis.api.state_version.CreateStateVersionRequest\x1a4.martiancloud.tharsis.api.state_version.StateVersion\x12\xaf\x01\n" +
 	"\x19GetStateVersionOutputByID\x12O.martiancloud.tharsis.api.state_version_output.GetStateVersionOutputByIDRequest\x1aA.martiancloud.tharsis.api.state_version_output.StateVersionOutput\x12\xb5\x01\n" +
@@ -399,40 +447,43 @@ func file_state_version_proto_rawDescGZIP() []byte {
 }
 
 var file_state_version_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_state_version_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_state_version_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_state_version_proto_goTypes = []any{
 	(StateVersionSortableField)(0),           // 0: martiancloud.tharsis.api.state_version.StateVersionSortableField
 	(*GetStateVersionByIDRequest)(nil),       // 1: martiancloud.tharsis.api.state_version.GetStateVersionByIDRequest
-	(*GetStateVersionsRequest)(nil),          // 2: martiancloud.tharsis.api.state_version.GetStateVersionsRequest
-	(*CreateStateVersionRequest)(nil),        // 3: martiancloud.tharsis.api.state_version.CreateStateVersionRequest
-	(*StateVersion)(nil),                     // 4: martiancloud.tharsis.api.state_version.StateVersion
-	(*GetStateVersionsResponse)(nil),         // 5: martiancloud.tharsis.api.state_version.GetStateVersionsResponse
-	(*PaginationOptions)(nil),                // 6: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),                 // 7: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                         // 8: martiancloud.tharsis.api.pagination.PageInfo
-	(*GetStateVersionOutputByIDRequest)(nil), // 9: martiancloud.tharsis.api.state_version_output.GetStateVersionOutputByIDRequest
-	(*GetStateVersionOutputsRequest)(nil),    // 10: martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsRequest
-	(*StateVersionOutput)(nil),               // 11: martiancloud.tharsis.api.state_version_output.StateVersionOutput
-	(*GetStateVersionOutputsResponse)(nil),   // 12: martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsResponse
+	(*GetRunStateVersionRequest)(nil),        // 2: martiancloud.tharsis.api.state_version.GetRunStateVersionRequest
+	(*GetStateVersionsRequest)(nil),          // 3: martiancloud.tharsis.api.state_version.GetStateVersionsRequest
+	(*CreateStateVersionRequest)(nil),        // 4: martiancloud.tharsis.api.state_version.CreateStateVersionRequest
+	(*StateVersion)(nil),                     // 5: martiancloud.tharsis.api.state_version.StateVersion
+	(*GetStateVersionsResponse)(nil),         // 6: martiancloud.tharsis.api.state_version.GetStateVersionsResponse
+	(*PaginationOptions)(nil),                // 7: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),                 // 8: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*PageInfo)(nil),                         // 9: martiancloud.tharsis.api.pagination.PageInfo
+	(*GetStateVersionOutputByIDRequest)(nil), // 10: martiancloud.tharsis.api.state_version_output.GetStateVersionOutputByIDRequest
+	(*GetStateVersionOutputsRequest)(nil),    // 11: martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsRequest
+	(*StateVersionOutput)(nil),               // 12: martiancloud.tharsis.api.state_version_output.StateVersionOutput
+	(*GetStateVersionOutputsResponse)(nil),   // 13: martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsResponse
 }
 var file_state_version_proto_depIdxs = []int32{
-	6,  // 0: martiancloud.tharsis.api.state_version.GetStateVersionsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	7,  // 0: martiancloud.tharsis.api.state_version.GetStateVersionsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.state_version.GetStateVersionsRequest.sort:type_name -> martiancloud.tharsis.api.state_version.StateVersionSortableField
-	7,  // 2: martiancloud.tharsis.api.state_version.StateVersion.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	4,  // 3: martiancloud.tharsis.api.state_version.GetStateVersionsResponse.state_versions:type_name -> martiancloud.tharsis.api.state_version.StateVersion
-	8,  // 4: martiancloud.tharsis.api.state_version.GetStateVersionsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	8,  // 2: martiancloud.tharsis.api.state_version.StateVersion.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	5,  // 3: martiancloud.tharsis.api.state_version.GetStateVersionsResponse.state_versions:type_name -> martiancloud.tharsis.api.state_version.StateVersion
+	9,  // 4: martiancloud.tharsis.api.state_version.GetStateVersionsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
 	1,  // 5: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionByID:input_type -> martiancloud.tharsis.api.state_version.GetStateVersionByIDRequest
-	2,  // 6: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersions:input_type -> martiancloud.tharsis.api.state_version.GetStateVersionsRequest
-	3,  // 7: martiancloud.tharsis.api.state_version.StateVersions.CreateStateVersion:input_type -> martiancloud.tharsis.api.state_version.CreateStateVersionRequest
-	9,  // 8: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputByID:input_type -> martiancloud.tharsis.api.state_version_output.GetStateVersionOutputByIDRequest
-	10, // 9: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputs:input_type -> martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsRequest
-	4,  // 10: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionByID:output_type -> martiancloud.tharsis.api.state_version.StateVersion
-	5,  // 11: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersions:output_type -> martiancloud.tharsis.api.state_version.GetStateVersionsResponse
-	4,  // 12: martiancloud.tharsis.api.state_version.StateVersions.CreateStateVersion:output_type -> martiancloud.tharsis.api.state_version.StateVersion
-	11, // 13: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputByID:output_type -> martiancloud.tharsis.api.state_version_output.StateVersionOutput
-	12, // 14: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputs:output_type -> martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsResponse
-	10, // [10:15] is the sub-list for method output_type
-	5,  // [5:10] is the sub-list for method input_type
+	2,  // 6: martiancloud.tharsis.api.state_version.StateVersions.GetRunStateVersion:input_type -> martiancloud.tharsis.api.state_version.GetRunStateVersionRequest
+	3,  // 7: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersions:input_type -> martiancloud.tharsis.api.state_version.GetStateVersionsRequest
+	4,  // 8: martiancloud.tharsis.api.state_version.StateVersions.CreateStateVersion:input_type -> martiancloud.tharsis.api.state_version.CreateStateVersionRequest
+	10, // 9: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputByID:input_type -> martiancloud.tharsis.api.state_version_output.GetStateVersionOutputByIDRequest
+	11, // 10: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputs:input_type -> martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsRequest
+	5,  // 11: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionByID:output_type -> martiancloud.tharsis.api.state_version.StateVersion
+	5,  // 12: martiancloud.tharsis.api.state_version.StateVersions.GetRunStateVersion:output_type -> martiancloud.tharsis.api.state_version.StateVersion
+	6,  // 13: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersions:output_type -> martiancloud.tharsis.api.state_version.GetStateVersionsResponse
+	5,  // 14: martiancloud.tharsis.api.state_version.StateVersions.CreateStateVersion:output_type -> martiancloud.tharsis.api.state_version.StateVersion
+	12, // 15: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputByID:output_type -> martiancloud.tharsis.api.state_version_output.StateVersionOutput
+	13, // 16: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputs:output_type -> martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsResponse
+	11, // [11:17] is the sub-list for method output_type
+	5,  // [5:11] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -446,16 +497,16 @@ func file_state_version_proto_init() {
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_state_version_output_proto_init()
-	file_state_version_proto_msgTypes[1].OneofWrappers = []any{}
 	file_state_version_proto_msgTypes[2].OneofWrappers = []any{}
 	file_state_version_proto_msgTypes[3].OneofWrappers = []any{}
+	file_state_version_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_state_version_proto_rawDesc), len(file_state_version_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

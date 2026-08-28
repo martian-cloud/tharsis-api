@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -269,6 +270,96 @@ func TestGetNamespaceFavorites(t *testing.T) {
 
 			require.Nil(t, err)
 			assert.Equal(t, test.expectResultCount, len(result.NamespaceFavorites))
+		})
+	}
+}
+
+// TestGetNamespaceFavorites_RootNamespaceMembershipsFilter verifies the membership filter: a favorite
+// is returned when its namespace is one of the caller's root member namespaces or a descendant of one,
+// and an empty (non-nil) membership set matches nothing rather than everything.
+func TestGetNamespaceFavorites_RootNamespaceMembershipsFilter(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-fav-membership",
+		FullPath:  "test-group-fav-membership",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-fav-membership",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-fav-membership",
+		Email:    "test-user-fav-membership@test.com",
+	})
+	require.NoError(t, err)
+
+	groupFavorite, err := testClient.client.NamespaceFavorites.CreateNamespaceFavorite(ctx, &models.NamespaceFavorite{
+		UserID:  user.Metadata.ID,
+		GroupID: &group.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	workspaceFavorite, err := testClient.client.NamespaceFavorites.CreateNamespaceFavorite(ctx, &models.NamespaceFavorite{
+		UserID:      user.Metadata.ID,
+		WorkspaceID: &workspace.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		memberships []models.MembershipNamespace
+		wantIDs     []string
+	}{
+		{
+			// The root group itself matches, and the workspace beneath it matches as a descendant.
+			name:        "membership at the root group includes it and everything under it",
+			memberships: []models.MembershipNamespace{{Path: group.FullPath}},
+			wantIDs:     []string{groupFavorite.Metadata.ID, workspaceFavorite.Metadata.ID},
+		},
+		{
+			// A membership deeper in the tree matches that namespace only, not its ancestors.
+			name:        "membership at the workspace excludes its parent group",
+			memberships: []models.MembershipNamespace{{Path: workspace.FullPath}},
+			wantIDs:     []string{workspaceFavorite.Metadata.ID},
+		},
+		{
+			name:        "membership in an unrelated namespace excludes both",
+			memberships: []models.MembershipNamespace{{Path: "some-other-group"}},
+			wantIDs:     []string{},
+		},
+		{
+			name:        "empty memberships match nothing",
+			memberships: []models.MembershipNamespace{},
+			wantIDs:     []string{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, rErr := testClient.client.NamespaceFavorites.GetNamespaceFavorites(ctx, &GetNamespaceFavoritesInput{
+				PaginationOptions: &pagination.Options{First: ptr.Int32(100)},
+				Filter: &NamespaceFavoriteFilter{
+					UserIDs:                  []string{user.Metadata.ID},
+					RootNamespaceMemberships: test.memberships,
+				},
+			})
+			require.NoError(t, rErr)
+
+			ids := []string{}
+			for _, favorite := range result.NamespaceFavorites {
+				ids = append(ids, favorite.Metadata.ID)
+			}
+			assert.ElementsMatch(t, test.wantIDs, ids)
 		})
 	}
 }

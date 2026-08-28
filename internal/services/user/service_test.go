@@ -1689,24 +1689,38 @@ func TestService_SetUserPassword(t *testing.T) {
 func TestGetNamespaceFavorites(t *testing.T) {
 	userID := "user-id-1"
 
+	// The root namespaces the caller's authorizer reports; the service forwards them as the membership
+	// filter so a favorite whose namespace the caller is no longer a member of is not returned.
+	rootNamespaces := []models.MembershipNamespace{{Path: "root-group"}, {Path: "other-group/sub-group"}}
+
+	// memberCaller is a non-admin user caller with the memberships above.
+	memberCaller := func(t *testing.T) auth.Caller {
+		mockAuthorizer := auth.NewMockAuthorizer(t)
+		mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return(rootNamespaces, nil)
+
+		return auth.NewUserCaller(&models.User{
+			Metadata: models.ResourceMetadata{ID: userID},
+		}, mockAuthorizer, nil, nil, nil)
+	}
+
 	type testCase struct {
 		name            string
-		caller          auth.Caller
+		caller          func(*testing.T) auth.Caller
 		input           *GetNamespaceFavoritesInput
 		mockResult      *db.NamespaceFavoritesResult
 		expectError     bool
 		expectErrorCode errors.CodeType
+		// expectRootNamespaceMemberships is the membership filter the db layer should be given. Nil
+		// means no filter, which is what an admin-mode caller gets.
+		expectRootNamespaceMemberships []models.MembershipNamespace
 	}
 
 	testCases := []testCase{
 		{
-			name: "successfully get namespace favorites for user",
-			caller: &auth.UserCaller{
-				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: userID},
-				},
-			},
-			input: &GetNamespaceFavoritesInput{},
+			name:                           "successfully get namespace favorites for user",
+			caller:                         memberCaller,
+			expectRootNamespaceMemberships: rootNamespaces,
+			input:                          &GetNamespaceFavoritesInput{},
 			mockResult: &db.NamespaceFavoritesResult{
 				NamespaceFavorites: []models.NamespaceFavorite{
 					{
@@ -1716,12 +1730,9 @@ func TestGetNamespaceFavorites(t *testing.T) {
 			},
 		},
 		{
-			name: "get namespace favorites with namespace filter",
-			caller: &auth.UserCaller{
-				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: userID},
-				},
-			},
+			name:                           "get namespace favorites with namespace filter",
+			caller:                         memberCaller,
+			expectRootNamespaceMemberships: rootNamespaces,
 			input: &GetNamespaceFavoritesInput{
 				NamespacePath: ptr.String("test-namespace"),
 			},
@@ -1734,12 +1745,9 @@ func TestGetNamespaceFavorites(t *testing.T) {
 			},
 		},
 		{
-			name: "get namespace favorites with search filter",
-			caller: &auth.UserCaller{
-				User: &models.User{
-					Metadata: models.ResourceMetadata{ID: userID},
-				},
-			},
+			name:                           "get namespace favorites with search filter",
+			caller:                         memberCaller,
+			expectRootNamespaceMemberships: rootNamespaces,
 			input: &GetNamespaceFavoritesInput{
 				Search: ptr.String("test-search"),
 			},
@@ -1752,8 +1760,33 @@ func TestGetNamespaceFavorites(t *testing.T) {
 			},
 		},
 		{
+			// An admin-mode caller can view every namespace, so no membership filter is applied and the
+			// caller sees all of its own favorites.
+			name: "admin mode applies no membership filter",
+			caller: func(t *testing.T) auth.Caller {
+				adminUser := &models.User{
+					Metadata:            models.ResourceMetadata{ID: userID},
+					Admin:               true,
+					AdminModeExpiration: ptr.Time(time.Now().UTC().Add(time.Hour)),
+				}
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, userID).Return(adminUser, nil)
+
+				return auth.NewUserCaller(adminUser, nil, &db.Client{Users: mockUsers}, nil, nil)
+			},
+			input: &GetNamespaceFavoritesInput{},
+			mockResult: &db.NamespaceFavoritesResult{
+				NamespaceFavorites: []models.NamespaceFavorite{
+					{
+						UserID: userID,
+					},
+				},
+			},
+			expectRootNamespaceMemberships: nil,
+		},
+		{
 			name:            "non-user caller cannot get namespace favorites",
-			caller:          &auth.ServiceAccountCaller{},
+			caller:          func(*testing.T) auth.Caller { return &auth.ServiceAccountCaller{} },
 			input:           &GetNamespaceFavoritesInput{},
 			expectError:     true,
 			expectErrorCode: errors.EForbidden,
@@ -1773,20 +1806,28 @@ func TestGetNamespaceFavorites(t *testing.T) {
 
 			mockNamespaceFavorites := db.NewMockNamespaceFavorites(t)
 
+			var caller auth.Caller
 			if tc.caller != nil {
-				if _, ok := tc.caller.(*auth.UserCaller); ok {
-					mockNamespaceFavorites.On("GetNamespaceFavorites", mock.Anything, mock.MatchedBy(func(input *db.GetNamespaceFavoritesInput) bool {
-						return input.Filter != nil && len(input.Filter.UserIDs) > 0
-					})).Return(tc.mockResult, nil).Maybe()
-				}
+				caller = tc.caller(t)
+			}
+
+			// The filter the service builds is read off the call itself, so the membership filter is
+			// asserted rather than merely allowed through by a permissive matcher.
+			var capturedInput *db.GetNamespaceFavoritesInput
+			if _, ok := caller.(*auth.UserCaller); ok {
+				mockNamespaceFavorites.On("GetNamespaceFavorites", mock.Anything, mock.Anything).
+					Run(func(args mock.Arguments) {
+						capturedInput = args.Get(1).(*db.GetNamespaceFavoritesInput)
+					}).
+					Return(tc.mockResult, nil).Maybe()
 			}
 
 			dbClient := &db.Client{
 				NamespaceFavorites: mockNamespaceFavorites,
 			}
 
-			if tc.caller != nil {
-				ctx = auth.WithCaller(ctx, tc.caller)
+			if caller != nil {
+				ctx = auth.WithCaller(ctx, caller)
 			}
 
 			logger, _ := logger.NewForTest()
@@ -1803,6 +1844,13 @@ func TestGetNamespaceFavorites(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			assert.Equal(t, len(tc.mockResult.NamespaceFavorites), len(result.NamespaceFavorites))
+
+			require.NotNil(t, capturedInput)
+			require.NotNil(t, capturedInput.Filter)
+			assert.Equal(t, []string{userID}, capturedInput.Filter.UserIDs)
+			assert.Equal(t, tc.input.NamespacePath, capturedInput.Filter.NamespacePath)
+			assert.Equal(t, tc.input.Search, capturedInput.Filter.Search)
+			assert.Equal(t, tc.expectRootNamespaceMemberships, capturedInput.Filter.RootNamespaceMemberships)
 		})
 	}
 }

@@ -120,8 +120,9 @@ func TestCreatePolicy(t *testing.T) {
 	}
 }
 
-// TestCreatePolicy_StageGate verifies the OPA stage gate: pre_plan and post_plan are accepted,
-// while post_apply is rejected as not-yet-supported.
+// TestCreatePolicy_StageGate verifies the OPA stage gate: all four run stages are accepted (a policy
+// stage advances only from run creation resolving it, so any of the four the model recognizes is
+// valid to store), while an unrecognized stage is rejected.
 func TestCreatePolicy_StageGate(t *testing.T) {
 	const groupID = "group-id"
 
@@ -132,7 +133,9 @@ func TestCreatePolicy_StageGate(t *testing.T) {
 	}{
 		{name: "pre_plan accepted", stage: models.RunTaskStageNamePrePlan},
 		{name: "post_plan accepted", stage: models.RunTaskStageNamePostPlan},
-		{name: "post_apply rejected", stage: models.RunTaskStageNamePostApply, expectErrCode: errors.EInvalid},
+		{name: "pre_apply accepted", stage: models.RunTaskStageNamePreApply},
+		{name: "post_apply accepted", stage: models.RunTaskStageNamePostApply},
+		{name: "unrecognized stage rejected", stage: models.RunTaskStageName("bogus"), expectErrCode: errors.EInvalid},
 	}
 
 	for _, test := range tests {
@@ -198,7 +201,101 @@ func TestCreatePolicy_StageGate(t *testing.T) {
 	}
 }
 
-// TestPolicy_ServiceAccountAccessForGroup_MultipleApprovers covers what a per-ID lookup could not get
+// TestCreatePolicy_PostApplyAdvisoryOnly verifies that a post_apply policy is only accepted at
+// advisory enforcement: state has already been written by the time a post-apply check evaluates, so
+// there is no run outcome left for a stronger level to protect. The gate lives on the model's own
+// Validate (called for every kind of policy write), so it is exercised here through CreatePolicy
+// rather than duplicated per service method.
+func TestCreatePolicy_PostApplyAdvisoryOnly(t *testing.T) {
+	const groupID = "group-id"
+
+	tests := []struct {
+		name                           string
+		enforcementLevel               models.PolicyEnforcementLevel
+		speculativeRunEnforcementLevel models.PolicyEnforcementLevel
+		expectErrCode                  errors.CodeType
+	}{
+		{
+			name:                           "advisory/advisory accepted",
+			enforcementLevel:               models.PolicyEnforcementAdvisory,
+			speculativeRunEnforcementLevel: models.PolicyEnforcementAdvisory,
+		},
+		{
+			name:                           "hard_mandatory enforcement rejected",
+			enforcementLevel:               models.PolicyEnforcementHardMandatory,
+			speculativeRunEnforcementLevel: models.PolicyEnforcementAdvisory,
+			expectErrCode:                  errors.EInvalid,
+		},
+		{
+			name:                           "hard_mandatory speculative enforcement rejected",
+			enforcementLevel:               models.PolicyEnforcementAdvisory,
+			speculativeRunEnforcementLevel: models.PolicyEnforcementHardMandatory,
+			expectErrCode:                  errors.EInvalid,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+
+			mockGroups := db.NewMockGroups(t)
+			mockGroups.On("GetGroupByID", mock.Anything, groupID).
+				Return(&models.Group{Metadata: models.ResourceMetadata{ID: groupID}, FullPath: "my-group"}, nil)
+
+			mockPolicies := db.NewMockPolicies(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockResourceLimits := db.NewMockResourceLimits(t)
+
+			if test.expectErrCode == "" {
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockPolicies.On("CreatePolicy", mock.Anything, mock.Anything).
+					Return(&models.Policy{Metadata: models.ResourceMetadata{ID: "policy-id"}}, nil)
+				mockPolicies.On("GetPolicies", mock.Anything, mock.Anything).
+					Return(&db.PoliciesResult{PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)}}, nil)
+				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+					Return(&models.ResourceLimit{Value: 100}, nil)
+			}
+
+			dbClient := db.Client{
+				Groups:         mockGroups,
+				Policies:       mockPolicies,
+				Transactions:   mockTransactions,
+				ResourceLimits: mockResourceLimits,
+			}
+
+			testLogger, _ := logger.NewForTest()
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient))
+
+			input := &CreatePolicyInput{
+				GroupID: groupID,
+				Name:    "test-policy",
+				Kind:    models.PolicyKindOPA,
+				OPAData: &models.OPAPolicyData{
+					PackageSource:                  "my-group/my-package",
+					Stage:                          models.RunTaskStageNamePostApply,
+					EnforcementLevel:               test.enforcementLevel,
+					SpeculativeRunEnforcementLevel: test.speculativeRunEnforcementLevel,
+				},
+			}
+
+			_, err := service.CreatePolicy(auth.WithCaller(ctx, mockCaller), input)
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
 // wrong: the whole approver list resolves through one query, so the result rows arrive in the DB's order
 // rather than the caller's, and the check has to pair them back up itself. The mock accepts exactly one
 // call carrying every requested ID, which fails the test if the batching regresses to a loop.
@@ -1100,19 +1197,37 @@ func TestUpdatePolicy(t *testing.T) {
 		}
 	}
 
-	// happyPathMocks sets up the full successful update path.
-	happyPathMocks := func(mockCaller *auth.MockCaller, mockPolicies *db.MockPolicies, mockGroups *db.MockGroups, mockTransactions *db.MockTransactions) {
-		mockPolicies.On("GetPolicyByID", mock.Anything, "policy-1").Return(existingPolicy(), nil)
-		mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockGroups.On("GetGroupByID", mock.Anything, "group-1").
-			Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}, FullPath: "root/team"}, nil)
-		mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(context.Background(), mockCaller), nil)
-		mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-		mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-		mockPolicies.On("UpdatePolicy", mock.Anything, mock.Anything).Return(&models.Policy{
-			Metadata: models.ResourceMetadata{ID: "policy-1"},
-		}, nil)
+	// policyWithApprovers is the same policy at soft mandatory with a full approval configuration — the
+	// state a change of enforcement level has to clean up, since approvers are only valid at that level.
+	policyWithApprovers := func() *models.Policy {
+		policy := existingPolicy()
+		policy.OPAData.EnforcementLevel = models.PolicyEnforcementSoftMandatory
+		policy.RequiredApprovals = 2
+		policy.AllowedUserIDs = []string{"user-1", "user-2"}
+		policy.AllowedServiceAccountIDs = []string{"sa-1"}
+		policy.AllowedTeamIDs = []string{"team-1"}
+		return policy
 	}
+
+	// happyPathMocksFor sets up the full successful update path for the given stored policy. The policy
+	// is built per subtest because the service mutates it in place.
+	happyPathMocksFor := func(storedPolicy func() *models.Policy) func(*auth.MockCaller, *db.MockPolicies, *db.MockGroups, *db.MockTransactions) {
+		return func(mockCaller *auth.MockCaller, mockPolicies *db.MockPolicies, mockGroups *db.MockGroups, mockTransactions *db.MockTransactions) {
+			mockPolicies.On("GetPolicyByID", mock.Anything, "policy-1").Return(storedPolicy(), nil)
+			mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			mockGroups.On("GetGroupByID", mock.Anything, "group-1").
+				Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}, FullPath: "root/team"}, nil)
+			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(context.Background(), mockCaller), nil)
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+			mockPolicies.On("UpdatePolicy", mock.Anything, mock.Anything).Return(&models.Policy{
+				Metadata: models.ResourceMetadata{ID: "policy-1"},
+			}, nil)
+		}
+	}
+
+	// happyPathMocks sets up the full successful update path.
+	happyPathMocks := happyPathMocksFor(existingPolicy)
 
 	tests := []struct {
 		name                  string
@@ -1124,6 +1239,7 @@ func TestUpdatePolicy(t *testing.T) {
 		wantSpeculativeLevel  models.PolicyEnforcementLevel
 		wantRequiredApprovals *int
 		wantAllowedUserIDs    []string
+		wantApprovalsCleared  bool
 		wantScopeLen          *int
 		expectErrorCode       errors.CodeType
 	}{
@@ -1221,15 +1337,95 @@ func TestUpdatePolicy(t *testing.T) {
 			wantScopeLen:          ptr.Int(1),
 		},
 		{
-			// Nothing evaluates policies after apply, so storing that stage would leave a policy that
-			// never fires.
+			// Approvers are only valid at soft mandatory (models.Policy.Validate), so moving off that
+			// level clears the approval configuration the caller did not mention. Without the reset this
+			// same update fails validation on approvers it never touched, leaving no way to change the
+			// level without restating them.
+			name: "resets the approval config when the enforcement level changes",
+			input: &UpdatePolicyInput{
+				ID: "policy-1",
+				OPAData: &models.OPAPolicyData{
+					PackageSource:                  "root/team/pkg",
+					Stage:                          models.RunTaskStageNamePostPlan,
+					EnforcementLevel:               models.PolicyEnforcementAdvisory,
+					SpeculativeRunEnforcementLevel: models.PolicyEnforcementAdvisory,
+				},
+			},
+			setupMocks:           happyPathMocksFor(policyWithApprovers),
+			wantID:               "policy-1",
+			wantApprovalsCleared: true,
+		},
+		{
+			// The reset is keyed on the level actually changing: an update that resends the stored level
+			// while changing something else leaves the approval configuration alone.
+			name: "preserves the approval config when the enforcement level is unchanged",
+			input: &UpdatePolicyInput{
+				ID: "policy-1",
+				OPAData: &models.OPAPolicyData{
+					PackageSource:                  "root/team/other-pkg",
+					Stage:                          models.RunTaskStageNamePostPlan,
+					EnforcementLevel:               models.PolicyEnforcementSoftMandatory,
+					SpeculativeRunEnforcementLevel: models.PolicyEnforcementAdvisory,
+				},
+			},
+			setupMocks:            happyPathMocksFor(policyWithApprovers),
+			wantID:                "policy-1",
+			wantPackageSource:     "root/team/other-pkg",
+			wantRequiredApprovals: ptr.Int(2),
+			wantAllowedUserIDs:    []string{"user-1", "user-2"},
+		},
+		{
+			// A caller that changes the level and supplies approvals in the same call gets what it sent:
+			// the reset only covers the fields left nil.
+			name: "keeps supplied approvals when the enforcement level changes",
+			input: &UpdatePolicyInput{
+				ID: "policy-1",
+				OPAData: &models.OPAPolicyData{
+					PackageSource:                  "root/team/pkg",
+					Stage:                          models.RunTaskStageNamePostPlan,
+					EnforcementLevel:               models.PolicyEnforcementSoftMandatory,
+					SpeculativeRunEnforcementLevel: models.PolicyEnforcementAdvisory,
+				},
+				RequiredApprovals: ptr.Int(1),
+				AllowedUserIDs:    &[]string{"user-3"},
+			},
+			setupMocks:            happyPathMocks,
+			wantID:                "policy-1",
+			wantRequiredApprovals: ptr.Int(1),
+			wantAllowedUserIDs:    []string{"user-3"},
+		},
+		{
+			// UpdatePolicyInput.Validate rejects any stage the RunTaskStageName type does not
+			// recognize; an actually invalid stage is what exercises that gate now that all four
+			// real stages are supported.
 			name: "rejects an unsupported stage",
 			input: &UpdatePolicyInput{
 				ID: "policy-1",
 				OPAData: &models.OPAPolicyData{
 					PackageSource:                  "root/team/pkg",
-					Stage:                          models.RunTaskStageNamePostApply,
+					Stage:                          models.RunTaskStageName("bogus"),
 					EnforcementLevel:               models.PolicyEnforcementAdvisory,
+					SpeculativeRunEnforcementLevel: models.PolicyEnforcementAdvisory,
+				},
+			},
+			setupMocks: func(mockCaller *auth.MockCaller, mockPolicies *db.MockPolicies, mockGroups *db.MockGroups, _ *db.MockTransactions) {
+				mockPolicies.On("GetPolicyByID", mock.Anything, "policy-1").Return(existingPolicy(), nil)
+				mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				mockGroups.On("GetGroupByID", mock.Anything, "group-1").
+					Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}, FullPath: "root/team"}, nil)
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			// post_apply is a supported stage, but non-advisory enforcement on it is caught by the
+			// model's own Validate (called after OPAData is applied), not by UpdatePolicyInput.Validate.
+			name: "rejects post_apply with non-advisory enforcement",
+			input: &UpdatePolicyInput{
+				ID: "policy-1",
+				OPAData: &models.OPAPolicyData{
+					PackageSource:                  "root/team/pkg",
+					Stage:                          models.RunTaskStageNamePostApply,
+					EnforcementLevel:               models.PolicyEnforcementHardMandatory,
 					SpeculativeRunEnforcementLevel: models.PolicyEnforcementAdvisory,
 				},
 			},
@@ -1337,6 +1533,14 @@ func TestUpdatePolicy(t *testing.T) {
 			if tt.wantAllowedUserIDs != nil {
 				require.NotNil(t, updated)
 				assert.Equal(t, tt.wantAllowedUserIDs, updated.AllowedUserIDs)
+			}
+
+			if tt.wantApprovalsCleared {
+				require.NotNil(t, updated)
+				assert.Zero(t, updated.RequiredApprovals)
+				assert.Empty(t, updated.AllowedUserIDs)
+				assert.Empty(t, updated.AllowedServiceAccountIDs)
+				assert.Empty(t, updated.AllowedTeamIDs)
 			}
 
 			if tt.wantScopeLen != nil {

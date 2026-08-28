@@ -75,7 +75,7 @@ type Job implements Node {
   runner: Runner
   runnerPath: String
   tags: [String!]!
-  runnerAvailabilityStatus: RunnerAvailabilityStatus!
+  runnerAvailabilityStatus: RunnerAvailabilityStatus! @complexity(value: 5)
   properties: [KeyValueEntry!]!
   completed: Boolean!
   outdatedJobProtocolVersion: Boolean!

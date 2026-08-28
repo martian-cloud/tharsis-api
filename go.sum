@@ -650,8 +650,8 @@ gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20230411193226-32
 gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20230411193226-3247984d5abc/go.mod h1:x1aPLfLHokaered5iuPhqhf1aaHQUqhH/BxL+Xgi9I0=
 gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747-eb2ce440abb8 h1:Yz4g//NceLfvpLeGt8UeF+8qFeRAONckzc+l/M1K0U8=
 gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747-eb2ce440abb8/go.mod h1:mMYcru0pfzczcqWk3fo9T4vlucHvOqt6Xb8WGPyJmzM=
-gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.4.0 h1:ZsQXFunIZHYH/zQ5kCwKZNT2NAoXI4rCZZl9O/70q7U=
-gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.4.0/go.mod h1:5KyvfNcn3wC4wot7Bma+v/g+hjw+/nhSGP0fODz7k4Q=
+gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.6.0 h1:UiZE0Hwm9xpWKVqbg6SWWS2va+ey/o+qTNd+ToltpqI=
+gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.6.0/go.mod h1:U6XRtsoWgVfuTeYGSVRLe6jxAf81q03VSNPOtTo6E/g=
 go.etcd.io/bbolt v1.4.3 h1:dEadXpI6G79deX5prL3QRNP6JB8UxVkqo4UPnHaNXJo=
 go.etcd.io/bbolt v1.4.3/go.mod h1:tKQlpPaYCVFctUIgFKFnAlvbmB3tpy1vkTnDWohtc0E=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8d28b86e25108fa28031338a58ee4538>>
+ * @generated SignedSource<<7b1a6c1d304b13b267743f64b62e07d1>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,6 +9,7 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
+export type PackageKind = "OPA_POLICY" | "%future added value";
 export type PackageVersionStatus = "ERRORED" | "PENDING" | "UPLOADED" | "UPLOAD_IN_PROGRESS" | "%future added value";
 export type EditPackageVersionQuery$variables = {
   packageId: string;
@@ -23,6 +24,7 @@ export type EditPackageVersionQuery$data = {
   readonly pkg: {
     readonly groupPath?: string;
     readonly id?: string;
+    readonly kind?: PackageKind;
     readonly name?: string;
   } | null | undefined;
 };
@@ -72,28 +74,35 @@ v4 = {
   "name": "groupPath",
   "storageKey": null
 },
-v5 = [
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "kind",
+  "storageKey": null
+},
+v6 = [
   {
     "kind": "Variable",
     "name": "id",
     "variableName": "versionId"
   }
 ],
-v6 = {
+v7 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "version",
   "storageKey": null
 },
-v7 = {
+v8 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "status",
   "storageKey": null
 },
-v8 = {
+v9 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -120,7 +129,8 @@ return {
             "selections": [
               (v2/*: any*/),
               (v3/*: any*/),
-              (v4/*: any*/)
+              (v4/*: any*/),
+              (v5/*: any*/)
             ],
             "type": "Package",
             "abstractKey": null
@@ -130,7 +140,7 @@ return {
       },
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v6/*: any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -140,8 +150,8 @@ return {
             "kind": "InlineFragment",
             "selections": [
               (v2/*: any*/),
-              (v6/*: any*/),
-              (v7/*: any*/)
+              (v7/*: any*/),
+              (v8/*: any*/)
             ],
             "type": "PackageVersion",
             "abstractKey": null
@@ -167,13 +177,14 @@ return {
         "name": "node",
         "plural": false,
         "selections": [
-          (v8/*: any*/),
+          (v9/*: any*/),
           (v2/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               (v3/*: any*/),
-              (v4/*: any*/)
+              (v4/*: any*/),
+              (v5/*: any*/)
             ],
             "type": "Package",
             "abstractKey": null
@@ -183,19 +194,19 @@ return {
       },
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v6/*: any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v8/*: any*/),
+          (v9/*: any*/),
           (v2/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v6/*: any*/),
-              (v7/*: any*/)
+              (v7/*: any*/),
+              (v8/*: any*/)
             ],
             "type": "PackageVersion",
             "abstractKey": null
@@ -206,16 +217,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "778c6a31790f876a4287e8bde2d741b2",
+    "cacheID": "2bed401e8f199cd544d011a9b5248ee7",
     "id": null,
     "metadata": {},
     "name": "EditPackageVersionQuery",
     "operationKind": "query",
-    "text": "query EditPackageVersionQuery(\n  $packageId: String!\n  $versionId: String!\n) {\n  pkg: node(id: $packageId) {\n    __typename\n    ... on Package {\n      id\n      name\n      groupPath\n    }\n    id\n  }\n  node(id: $versionId) {\n    __typename\n    ... on PackageVersion {\n      id\n      version\n      status\n    }\n    id\n  }\n}\n"
+    "text": "query EditPackageVersionQuery(\n  $packageId: String!\n  $versionId: String!\n) {\n  pkg: node(id: $packageId) {\n    __typename\n    ... on Package {\n      id\n      name\n      groupPath\n      kind\n    }\n    id\n  }\n  node(id: $versionId) {\n    __typename\n    ... on PackageVersion {\n      id\n      version\n      status\n    }\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "92f3ab4009c68dbe0aeb598923912234";
+(node as any).hash = "dd2ca9847630de07c6040bceded4dc2a";
 
 export default node;

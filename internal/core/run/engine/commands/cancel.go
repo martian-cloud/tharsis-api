@@ -130,7 +130,8 @@ func (c *CancelRun) Execute(ctx context.Context, input *types.ExecuteInput) erro
 	return nil
 }
 
-// cancelActivePhase cancels the run's earliest non-final phase (plan, then apply).
+// cancelActivePhase cancels the run's earliest non-final phase (plan, then apply, then a trailing
+// post-apply policy stage).
 // It cancels that phase's job and, once the work has actually stopped — the job is
 // gone or already final, or this is a force cancel — transitions the node to
 // canceled, which cascades the run (and any not-yet-started downstream node) to
@@ -165,6 +166,13 @@ func cancelActivePhase(ctx context.Context, dbClient *db.Client, run *models.Run
 		// during post_plan_running does not wrongly cancel the not-yet-started apply and orphan
 		// a check's job.
 		return cancelStageChecks(ctx, dbClient, run, models.RunTaskStageNamePostPlan, force)
+	case anyNonFinalCheckAtStage(run, models.RunTaskStageNamePreApply):
+		// One or more pre-apply policy checks are the run's active phase (the apply has not yet
+		// started — it is still in created). This branch must come before the apply branch for the
+		// same reason the pre-plan branch precedes the plan branch: without it, a cancel during
+		// pre_apply_running would cancel the not-yet-started apply instead and orphan the check's
+		// job.
+		return cancelStageChecks(ctx, dbClient, run, models.RunTaskStageNamePreApply, force)
 	case run.Apply != nil && !run.Apply.Status.IsFinalStatus():
 		cancelNode, err := cancelLatestJob(ctx, dbClient, run.Apply.LatestJobID, force)
 		if err != nil {
@@ -178,6 +186,13 @@ func cancelActivePhase(ctx context.Context, dbClient *db.Client, run *models.Run
 			return nil, errors.Wrap(err, "failed to cancel run apply")
 		}
 		return changes, nil
+	case anyNonFinalCheckAtStage(run, models.RunTaskStageNamePostApply):
+		// One or more post-apply policy checks are the run's active phase (the apply already
+		// finished). Canceling here cancels the check's job and, once the work has stopped, the run
+		// itself (statemachine.SetRunStatus(RunCanceled) inside cancelStageChecks) — there is no
+		// "applied but post-apply canceled" status, so a run canceled here reports canceled outright
+		// even though its apply already succeeded, per the normal enforcement projection.
+		return cancelStageChecks(ctx, dbClient, run, models.RunTaskStageNamePostApply, force)
 	default:
 		return nil, nil
 	}

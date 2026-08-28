@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a7c0beb1715d7afb410e2c7d0dd7ee7f>>
+ * @generated SignedSource<<cce99cfb0b07a548ad3eff2f03a3fc46>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,7 +12,7 @@ import { ReaderFragment } from 'relay-runtime';
 export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
 export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
 export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
-export type RunStatus = "applied" | "apply_queued" | "apply_queuing" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "plan_queuing" | "planned" | "planned_and_finished" | "planning" | "post_plan_awaiting_decision" | "post_plan_completed" | "post_plan_running" | "pre_apply_awaiting_decision" | "pre_apply_completed" | "pre_apply_queuing" | "pre_apply_running" | "pre_plan_awaiting_decision" | "pre_plan_completed" | "pre_plan_queuing" | "pre_plan_running" | "%future added value";
+export type RunStatus = "applied" | "apply_queued" | "apply_queuing" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "plan_queuing" | "planned" | "planned_and_finished" | "planning" | "post_apply_running" | "post_plan_awaiting_decision" | "post_plan_running" | "pre_apply_awaiting_decision" | "pre_apply_completed" | "pre_apply_queuing" | "pre_apply_running" | "pre_plan_awaiting_decision" | "pre_plan_completed" | "pre_plan_queuing" | "pre_plan_running" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunDetailsApplyStageFragment_apply$data = {
   readonly apply: {
@@ -49,6 +49,7 @@ export type RunDetailsApplyStageFragment_apply$data = {
         readonly " $fragmentSpreads": FragmentRefs<"CheckResultsPanelFragment_checkResult">;
       }>;
     };
+    readonly " $fragmentSpreads": FragmentRefs<"StateVersionFileFragment_stateVersion">;
   } | null | undefined;
   readonly status: RunStatus;
   readonly " $fragmentSpreads": FragmentRefs<"ForceCancelRunAlertFragment_run" | "RunVariablesFragment_variables">;
@@ -280,6 +281,11 @@ return {
             }
           ],
           "storageKey": null
+        },
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "StateVersionFileFragment_stateVersion"
         }
       ],
       "storageKey": null
@@ -290,6 +296,6 @@ return {
 };
 })();
 
-(node as any).hash = "3313520a049167fa3f8180a79f1d47cd";
+(node as any).hash = "b9c1bc23bbdd3710e8bd2c3809533e3c";
 
 export default node;

@@ -93,6 +93,60 @@ func TestStateVersions_CreateStateVersion(t *testing.T) {
 	}
 }
 
+// TestStateVersions_UpdateStateVersion exercises the round trip of the JSON rendering's object key:
+// absent on creation, recorded by an update, and read back by a subsequent fetch. It also pins the
+// optimistic lock, since the executor's upload races nothing but a stale caller would still be a bug.
+func TestStateVersions_UpdateStateVersion(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-sv-update",
+		FullPath:  "test-group-sv-update",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-sv-update",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.Nil(t, err)
+
+	stateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
+		WorkspaceID:    workspace.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		ObjectStoreKey: "workspaces/ws/state_versions/raw",
+	})
+	require.Nil(t, err)
+
+	// A state version starts with no JSON rendering; only a later upload records one.
+	assert.Nil(t, stateVersion.JSONObjectStoreKey)
+
+	jsonKey := "workspaces/ws/state_versions/abc.json"
+	stateVersion.JSONObjectStoreKey = &jsonKey
+
+	updated, err := testClient.client.StateVersions.UpdateStateVersion(ctx, stateVersion)
+	require.Nil(t, err)
+	require.NotNil(t, updated.JSONObjectStoreKey)
+	assert.Equal(t, jsonKey, *updated.JSONObjectStoreKey)
+	assert.Equal(t, stateVersion.Metadata.Version+1, updated.Metadata.Version)
+	// The raw state key must survive an update that only carries the rendering.
+	assert.Equal(t, "workspaces/ws/state_versions/raw", updated.ObjectStoreKey)
+
+	fetched, err := testClient.client.StateVersions.GetStateVersionByID(ctx, stateVersion.Metadata.ID)
+	require.Nil(t, err)
+	require.NotNil(t, fetched.JSONObjectStoreKey)
+	assert.Equal(t, jsonKey, *fetched.JSONObjectStoreKey)
+
+	// stateVersion still carries the pre-update resource version, so reusing it must be rejected.
+	_, err = testClient.client.StateVersions.UpdateStateVersion(ctx, stateVersion)
+	assert.Equal(t, ErrOptimisticLockError, err)
+}
+
 func TestStateVersions_GetStateVersionByID(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)

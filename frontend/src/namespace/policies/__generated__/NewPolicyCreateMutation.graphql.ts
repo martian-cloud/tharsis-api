@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<acad2bb1cb9c278876be70f52bed1200>>
+ * @generated SignedSource<<5f62aa72d0635716227cc60dc770c052>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,7 +14,7 @@ export type PolicyEnforcementLevel = "ADVISORY" | "HARD_MANDATORY" | "SOFT_MANDA
 export type PolicyKind = "OPA" | "%future added value";
 export type PolicyScopeRuleAction = "EXCLUDE" | "INCLUDE" | "%future added value";
 export type PolicyScopeRuleType = "GROUP" | "MANAGED_IDENTITY" | "WORKSPACE" | "%future added value";
-export type PolicyStage = "POST_APPLY" | "POST_PLAN" | "PRE_PLAN" | "%future added value";
+export type PolicyStage = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_PLAN" | "%future added value";
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type SpeculativeRunEnforcementLevel = "ADVISORY" | "HARD_MANDATORY" | "%future added value";
 export type CreatePolicyInput = {

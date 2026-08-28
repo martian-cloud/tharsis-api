@@ -107,7 +107,7 @@ func (n *RunNode) init() {
 		// stage node), then project the stage's status transitions onto the run. The stage
 		// pending/running/awaiting_override/completed/errored statuses map to the run's per-stage
 		// statuses; canceled/skipped are settled by the run (handleRunTerminated /
-		// handlePlanSucceeded) and are deliberately not projected.
+		// skipCreatedNodes) and are deliberately not projected.
 		stage.init()
 		stage.registerListener(string(models.RunTaskStagePending), func() error { return n.handleStagePending(stage) })
 		stage.registerListener(string(models.RunTaskStageRunning), func() error { return n.handleStageRunning(stage) })
@@ -117,9 +117,14 @@ func (n *RunNode) init() {
 	}
 
 	// The run node also listens to its own transitions: a run that reaches a final
-	// state with its apply never started marks the apply skipped, and re-entering a
-	// queuing phase resets any node skipped by an earlier termination (a retry).
-	n.registerListener(string(models.RunPlannedAndFinished), n.skipUnstartedApply)
+	// state settles the nodes that never started, and re-entering a queuing phase
+	// resets any node skipped by an earlier termination (a retry).
+	//
+	// planned_and_finished ends the run with its apply phase never entered — a no-change plan, or a
+	// speculative run — so the apply and every stage that has not run (the post-plan stage on a
+	// no-change plan, plus the pre-apply/post-apply stages, which gate an apply that will never
+	// happen) are skipped. Leaving them in created would advertise evaluations that are never coming.
+	n.registerListener(string(models.RunPlannedAndFinished), n.skipCreatedNodes)
 	// A run that errors skips every node that never started (still created); canceled and discarded
 	// additionally cancel any node that was active (started but not final). Discarding a run blocked at
 	// a policy gate therefore cancels that gate's stage and the checks it was blocked on: the run is
@@ -267,10 +272,11 @@ func (n *RunNode) handleRunTerminated() error {
 }
 
 // skipCreatedNodes marks every task stage that never started (still in created) as skipped when the
-// run reaches a terminal state (errored, canceled, or discarded). Each stage cascades the skip to
-// its own created checks. A created node was never evaluated, so skipped records that it will not
-// run for this outcome — canceled would misrepresent a node that never started. On a retry these
-// skipped nodes are reset to created (resetSkippedChildren) so the run can flow through them again.
+// run reaches a terminal state (planned_and_finished, errored, canceled, or discarded). Each stage
+// cascades the skip to its own created checks. A created node was never evaluated, so skipped records
+// that it will not run for this outcome — canceled would misrepresent a node that never started. On a
+// retry these skipped nodes are reset to created (resetSkippedChildren) so the run can flow through
+// them again.
 func (n *RunNode) skipCreatedNodes() error {
 	if err := n.skipUnstartedPlan(); err != nil {
 		return err
@@ -397,17 +403,14 @@ func (n *RunNode) handlePlanRunning() error {
 func (n *RunNode) handlePlanSucceeded() error {
 	postStage := n.TaskStage(models.RunTaskStageNamePostPlan)
 	// A plan that produced no changes has nothing to apply, so a run that could have applied one is
-	// finished here: skip the post-plan stage (if it never started) so it settles its own checks, then
-	// finish the run. Policy is not bypassed by doing so, because there is no apply left for it to gate.
+	// finished here. Policy is not bypassed by finishing: there is no apply left for it to gate, and
+	// the stages that will now never run — the post-plan stage and the apply-phase stages — are settled
+	// as skipped when the run reaches planned_and_finished (skipCreatedNodes), each cascading the skip
+	// to its own checks.
 	//
 	// A speculative run is the exception and still evaluates, because it never had an apply to gate in
 	// the first place — its whole output is the verdict.
 	if !n.plan.hasChanges && n.apply != nil {
-		if postStage != nil && postStage.Status() == models.RunTaskStageCreated {
-			if err := postStage.SetStatus(models.RunTaskStageSkipped); err != nil {
-				return err
-			}
-		}
 		return n.SetStatus(models.RunPlannedAndFinished)
 	}
 	// The plan produced changes, or produced none on a speculative run. A run with a post-plan stage
@@ -476,10 +479,11 @@ func (n *RunNode) startApplyPhase() error {
 }
 
 // handleStageRunning projects a stage entering running onto the run: pre_plan_running,
-// post_plan_running or pre_apply_running by stage. In the forward flow a gated stage was just admitted
-// (its *_queuing status already fired), so this records the move to *_running. It also restores any
-// nodes that were skipped downstream of an earlier failure (the later stages and the apply) so a
-// retried run can flow through them again — a no-op in the forward flow, where nothing is skipped.
+// post_plan_running, pre_apply_running or post_apply_running by stage. In the forward flow a gated
+// stage was just admitted (its *_queuing status already fired), so this records the move to
+// *_running. It also restores any nodes that were skipped downstream of an earlier failure (the later
+// stages and the apply) so a retried run can flow through them again — a no-op in the forward flow,
+// where nothing is skipped.
 func (n *RunNode) handleStageRunning(stage *TaskStageNode) error {
 	if err := n.resetSkippedChildren(); err != nil {
 		return err
@@ -491,6 +495,8 @@ func (n *RunNode) handleStageRunning(stage *TaskStageNode) error {
 		return n.SetStatus(models.RunPostPlanRunning)
 	case models.RunTaskStageNamePreApply:
 		return n.SetStatus(models.RunPreApplyRunning)
+	case models.RunTaskStageNamePostApply:
+		return n.SetStatus(models.RunPostApplyRunning)
 	}
 	return nil
 }
@@ -498,7 +504,9 @@ func (n *RunNode) handleStageRunning(stage *TaskStageNode) error {
 // handleStageAwaitingOverride projects a stage blocked on a human override onto the run as that stage's
 // *_awaiting_decision status. The run releases its workspace slot at each of these (see the workspace
 // lock manager), so clearing the gate returns the run to the next gated node's *_queuing status to be
-// re-admitted.
+// re-admitted. There is no post_apply case: a post-apply policy is restricted to advisory enforcement
+// (models.Policy.Validate), so a post-apply check can never soft-fail and reach awaiting_override in
+// the first place.
 func (n *RunNode) handleStageAwaitingOverride(stage *TaskStageNode) error {
 	switch stage.StageName() {
 	case models.RunTaskStageNamePrePlan:
@@ -517,7 +525,11 @@ func (n *RunNode) handleStageAwaitingOverride(stage *TaskStageNode) error {
 //   - post_plan: the run moves to post_plan_completed and advances toward the apply (manual ->
 //     planned, auto-apply -> the apply phase, speculative -> planned_and_finished);
 //   - pre_apply: the run moves to pre_apply_completed and the still-created apply is readied,
-//     projecting onto apply_queuing for admission.
+//     projecting onto apply_queuing for admission;
+//   - post_apply: the run moves to post_apply_completed and then straight to applied. Both are
+//     recorded status changes, but post_apply_completed is never the run's resting status — this
+//     handler always advances past it in the same pass, which is what makes it safe for the status to
+//     be absent from the GraphQL and protobuf RunStatus enums despite living in models.AllRunStatuses.
 func (n *RunNode) handleStageCompleted(stage *TaskStageNode) error {
 	switch stage.StageName() {
 	case models.RunTaskStageNamePrePlan:
@@ -546,6 +558,14 @@ func (n *RunNode) handleStageCompleted(stage *TaskStageNode) error {
 			return n.apply.SetStatus(models.ApplyPending)
 		}
 		return nil
+	case models.RunTaskStageNamePostApply:
+		if err := n.SetStatus(models.RunPostApplyCompleted); err != nil {
+			return err
+		}
+		// The apply already succeeded (this stage only ever starts from handleApplySucceeded), and
+		// post-apply's advisory-only enforcement means a failure here never blocks the run, so the run
+		// always finishes.
+		return n.SetStatus(models.RunApplied)
 	}
 	return nil
 }
@@ -579,6 +599,15 @@ func (n *RunNode) handleApplyRunning() error {
 }
 
 func (n *RunNode) handleApplySucceeded() error {
+	postApplyStage := n.TaskStage(models.RunTaskStageNamePostApply)
+	// A run with a post-apply stage must run it before settling on applied — the stage moves to
+	// running and queues its checks (their policy-eval jobs are created by the job-creation
+	// transformer), projecting the run onto post_apply_running. Reaching applied is deferred until the
+	// stage completes (handleStageCompleted), mirroring how a post-plan stage defers a finished plan.
+	if postApplyStage != nil {
+		return postApplyStage.SetStatus(models.RunTaskStageRunning)
+	}
+	// No post-apply policy: the run finishes here.
 	return n.SetStatus(models.RunApplied)
 }
 

@@ -61,6 +61,9 @@ type NamespaceFavoriteFilter struct {
 	UserIDs              []string
 	NamespacePath        *string
 	Search               *string
+	// RootNamespaceMemberships limits results to favorites of namespaces at or under one of the
+	// caller's root member namespaces. An empty (non-nil) slice matches nothing.
+	RootNamespaceMemberships []models.MembershipNamespace
 }
 
 // GetNamespaceFavoritesInput is the input for listing namespace favorites
@@ -163,6 +166,9 @@ func (f *namespaceFavorites) GetNamespaceFavorites(ctx context.Context, input *G
 		}
 		if input.Filter.Search != nil {
 			ex = ex.Append(goqu.I("namespaces.path").ILike("%" + *input.Filter.Search + "%"))
+		}
+		if input.Filter.RootNamespaceMemberships != nil {
+			ex = ex.Append(membershipFilterByRootNamespaces(input.Filter.RootNamespaceMemberships))
 		}
 	}
 

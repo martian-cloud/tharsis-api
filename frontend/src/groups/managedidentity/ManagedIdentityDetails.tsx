@@ -13,6 +13,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useAgentCopilot } from '../../ai/AgentCopilotProvider';
+import { parseBase64Json } from '../../common/base64';
 import config from '../../common/config';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import TRNButton from '../../common/TRNButton';
@@ -279,7 +280,7 @@ function ManagedIdentityDetails(props: Props) {
     };
 
     if (data.managedIdentity && id && data.managedIdentity.groupPath === group.fullPath) {
-        const payload = JSON.parse(atob(data.managedIdentity.data));
+        const payload = parseBase64Json(data.managedIdentity.data);
         return (
             <Box>
                 <NamespaceBreadcrumbs

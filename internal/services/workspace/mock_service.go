@@ -50,9 +50,9 @@ func (_m *MockService) CreateConfigurationVersion(ctx context.Context, options *
 	return r0, r1
 }
 
-// CreateStateVersion provides a mock function with given fields: ctx, stateVersion, data
-func (_m *MockService) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string) (*models.StateVersion, error) {
-	ret := _m.Called(ctx, stateVersion, data)
+// CreateStateVersion provides a mock function with given fields: ctx, stateVersion, data, jsonData
+func (_m *MockService) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string, jsonData *string) (*models.StateVersion, error) {
+	ret := _m.Called(ctx, stateVersion, data, jsonData)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateStateVersion")
@@ -60,19 +60,19 @@ func (_m *MockService) CreateStateVersion(ctx context.Context, stateVersion *mod
 
 	var r0 *models.StateVersion
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, string) (*models.StateVersion, error)); ok {
-		return rf(ctx, stateVersion, data)
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, string, *string) (*models.StateVersion, error)); ok {
+		return rf(ctx, stateVersion, data, jsonData)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, string) *models.StateVersion); ok {
-		r0 = rf(ctx, stateVersion, data)
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, string, *string) *models.StateVersion); ok {
+		r0 = rf(ctx, stateVersion, data, jsonData)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.StateVersion)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.StateVersion, string) error); ok {
-		r1 = rf(ctx, stateVersion, data)
+	if rf, ok := ret.Get(1).(func(context.Context, *models.StateVersion, string, *string) error); ok {
+		r1 = rf(ctx, stateVersion, data, jsonData)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -511,6 +511,36 @@ func (_m *MockService) GetStateVersionInventory(ctx context.Context, stateVersio
 
 	if rf, ok := ret.Get(1).(func(context.Context, *models.StateVersion) error); ok {
 		r1 = rf(ctx, stateVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStateVersionJSONContent provides a mock function with given fields: ctx, stateVersionID
+func (_m *MockService) GetStateVersionJSONContent(ctx context.Context, stateVersionID string) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, stateVersionID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStateVersionJSONContent")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (io.ReadCloser, error)); ok {
+		return rf(ctx, stateVersionID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) io.ReadCloser); ok {
+		r0 = rf(ctx, stateVersionID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, stateVersionID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1039,6 +1069,24 @@ func (_m *MockService) UploadConfigurationVersion(ctx context.Context, configura
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader) error); ok {
 		r0 = rf(ctx, configurationVersionID, reader)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UploadStateVersionJSON provides a mock function with given fields: ctx, stateVersionID, reader
+func (_m *MockService) UploadStateVersionJSON(ctx context.Context, stateVersionID string, reader io.Reader) error {
+	ret := _m.Called(ctx, stateVersionID, reader)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadStateVersionJSON")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader) error); ok {
+		r0 = rf(ctx, stateVersionID, reader)
 	} else {
 		r0 = ret.Error(0)
 	}

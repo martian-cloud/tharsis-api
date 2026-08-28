@@ -13,7 +13,9 @@ type StateVersion struct {
 	RunID          *string
 	CreatedBy      string
 	ObjectStoreKey string
-	Metadata       ResourceMetadata
+	// JSONObjectStoreKey locates the "terraform show -json" rendering of this state version
+	JSONObjectStoreKey *string
+	Metadata           ResourceMetadata
 }
 
 // GetID returns the Metadata ID.
