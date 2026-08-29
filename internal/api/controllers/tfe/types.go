@@ -495,13 +495,14 @@ const (
 	RunPostPlanAwaitingDecision RunStatus = "post_plan_awaiting_decision"
 	RunPostPlanCompleted        RunStatus = "post_plan_completed"
 	RunPostPlanRunning          RunStatus = "post_plan_running"
-	// go-tfe v1.51.0 defines pre_apply_running/pre_apply_completed but no
-	// pre_apply_awaiting_decision — a pre-apply override gate is reported as policy_override, the same
-	// way a pre-plan one is. (post_apply_* run statuses only arrive in go-tfe v1.105.0.)
+
 	RunPreApplyCompleted RunStatus = "pre_apply_completed"
 	RunPreApplyRunning   RunStatus = "pre_apply_running"
 	RunPrePlanCompleted  RunStatus = "pre_plan_completed"
 	RunPrePlanRunning    RunStatus = "pre_plan_running"
+
+	RunPostApplyRunning   RunStatus = "post_apply_running"
+	RunPostApplyCompleted RunStatus = "post_apply_completed"
 
 	RunQueuing      RunStatus = "queuing"
 	RunQueuingApply RunStatus = "queuing_apply"
@@ -514,7 +515,8 @@ var allRunStatuses = []RunStatus{
 	RunApplied, RunApplyQueued, RunApplying, RunCanceled, RunConfirmed, RunCostEstimated,
 	RunCostEstimating, RunDiscarded, RunErrored, RunPending, RunPlanQueued, RunPlanned,
 	RunPlannedAndFinished, RunPlanning, RunPolicyChecked, RunPolicyChecking, RunPolicyOverride,
-	RunPolicySoftFailed, RunPostPlanAwaitingDecision, RunPostPlanCompleted, RunPostPlanRunning,
+	RunPolicySoftFailed, RunPostApplyCompleted, RunPostApplyRunning, RunPostPlanAwaitingDecision,
+	RunPostPlanCompleted, RunPostPlanRunning,
 	RunPreApplyCompleted, RunPreApplyRunning, RunPrePlanCompleted, RunPrePlanRunning,
 	RunQueuing, RunQueuingApply,
 }

@@ -164,6 +164,12 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 			return fmt.Errorf("failed to create new state version %v", csvErr)
 		}
 		a.jobLogger.Infof("Created new state version %s", sv.Metadata.Id)
+
+		// Store the "terraform show -json" rendering of the state alongside the state itself. This is
+		// the representation external consumers read (policy evaluation, integrations); the raw file is
+		// Terraform's internal serialization. Rendering has to happen here because it needs the provider
+		// schemas to decode each resource's attributes, and this working directory already has them.
+		a.uploadStateVersionJSON(ctx, tf, sv.Metadata.Id, stateOutputPath)
 	} else {
 		a.jobLogger.Infof("No state version was created because state file is empty")
 	}
@@ -182,6 +188,27 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 
 	a.jobLogger.Flush()
 	return nil
+}
+
+// uploadStateVersionJSON renders the state file that the apply just wrote into the documented
+// "terraform show -json" state representation and stores it against the state version. Every failure
+// is logged and swallowed: the state itself is already persisted, so the job's outcome must not hinge
+// on this secondary artifact.
+func (a *ApplyHandler) uploadStateVersionJSON(ctx context.Context, tf *tfexec.Terraform, stateVersionID, statePath string) {
+	// Detach stdout while rendering so the state does not land in the job log, then restore it for any
+	// remaining commands. This mirrors how the plan stage brackets ShowPlanFile.
+	tf.SetStdout(nil)
+	defer tf.SetStdout(a.jobLogger)
+
+	stateJSON, err := tf.ShowStateFile(ctx, statePath)
+	if err != nil {
+		a.jobLogger.Errorf("failed to render state file as JSON; policies and integrations will not see a state representation for this run: %v", err)
+		return
+	}
+
+	if err := a.client.UploadStateVersionJSON(ctx, stateVersionID, stateJSON); err != nil {
+		a.jobLogger.Errorf("failed to upload state version JSON: %v", err)
+	}
 }
 
 func (a *ApplyHandler) downloadPlanCache(ctx context.Context, downloadPath string) error {

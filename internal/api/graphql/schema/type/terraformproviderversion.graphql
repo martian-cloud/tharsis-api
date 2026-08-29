@@ -41,7 +41,7 @@ type TerraformProviderVersion implements Node {
   shaSumsUploaded: Boolean!
   shaSumsSigUploaded: Boolean!
   readmeUploaded: Boolean!
-  readme: String!
+  readme: String! @complexity(value: 1)
   platforms: [TerraformProviderPlatform!]!
   latest: Boolean!
   createdBy: String!

@@ -69,7 +69,7 @@ type TerraformModuleConfigurationDetailsModuleCall {
 
 type TerraformModuleConfigurationDetails {
   path: String!
-  readme: String!
+  readme: String! @complexity(value: 1)
   requiredCore: [String!]!
   variables: [TerraformModuleConfigurationDetailsVariable!]!
   outputs: [TerraformModuleConfigurationDetailsOutput!]!

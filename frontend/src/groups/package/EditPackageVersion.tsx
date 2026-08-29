@@ -10,6 +10,7 @@ import { useAppHeaderHeight } from '../../contexts/AppHeaderHeightProvider';
 import { MutationError } from '../../common/error';
 import { UploadPackageVersion } from './NewPackageVersion';
 import { fetchPolicyFiles } from '../../packages/PackageVersionFiles';
+import OPASampleInputsPanel from './OPASampleInputsPanel';
 import PackageFilesEditor from './PackageFilesEditor';
 import { PolicyFile, newPolicyFile } from './policyFiles';
 import { EditPackageVersionQuery } from './__generated__/EditPackageVersionQuery.graphql';
@@ -21,6 +22,8 @@ const query = graphql`
           id
           name
           groupPath
+          # kind gates the OPA authoring aids: the sample input panel only makes sense for a policy.
+          kind
         }
       }
       node(id: $versionId) {
@@ -50,6 +53,7 @@ function EditPackageVersion() {
                 packageId={pkg.id!}
                 name={pkg.name!}
                 groupPath={pkg.groupPath!}
+                kind={pkg.kind!}
                 versionId={versionId as string}
                 version={version}
             />}
@@ -66,11 +70,12 @@ interface FormProps {
     packageId: string;
     name: string;
     groupPath: string;
+    kind: string;
     versionId: string;
     version: string;
 }
 
-function EditPackageVersionForm({ packageId, name, groupPath, versionId, version }: FormProps) {
+function EditPackageVersionForm({ packageId, name, groupPath, kind, versionId, version }: FormProps) {
     // The group shell owns the page layout, so widen it rather than nesting another provider
     // (a nested provider would still be capped by the outer max width).
     usePageLayout('fullscreen');
@@ -80,6 +85,7 @@ function EditPackageVersionForm({ packageId, name, groupPath, versionId, version
 
     // files is null until the existing pkg has been downloaded and extracted.
     const [files, setFiles] = useState<PolicyFile[] | null>(null);
+    const [showSampleInput, setShowSampleInput] = useState(false);
     const [error, setError] = useState<MutationError>();
     const [uploading, setUploading] = useState(false);
 
@@ -131,12 +137,24 @@ function EditPackageVersionForm({ packageId, name, groupPath, versionId, version
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: `calc(100vh - ${headerHeight}px - 32px)` }}>
-            <Box marginBottom={2}>
-                <Box display="flex" alignItems="center" gap={1}>
-                    <Typography variant="h6">{name}</Typography>
-                    <Chip variant="outlined" size="small" label={`editing ${version}`} />
+            <Box marginBottom={2} display="flex" justifyContent="space-between" alignItems="flex-start" gap={2}>
+                <Box minWidth={0}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <Typography variant="h6">{name}</Typography>
+                        <Chip variant="outlined" size="small" label={`editing ${version}`} />
+                    </Box>
+                    <Typography variant="caption" color="textSecondary">{groupPath}</Typography>
                 </Box>
-                <Typography variant="caption" color="textSecondary">{groupPath}</Typography>
+                {kind === 'OPA_POLICY' && (
+                    <Button
+                        variant="outlined"
+                        color="secondary"
+                        onClick={() => setShowSampleInput(prev => !prev)}
+                        sx={{ flexShrink: 0 }}
+                    >
+                        {showSampleInput ? 'Hide sample inputs' : 'Show sample inputs'}
+                    </Button>
+                )}
             </Box>
 
             {error && <Alert sx={{ marginBottom: 2 }} severity={error.severity}>{error.message}</Alert>}
@@ -151,10 +169,14 @@ function EditPackageVersionForm({ packageId, name, groupPath, versionId, version
                 helperText="Editing a version's pkg does not change its version number."
             />
 
-            <Box sx={{ flexGrow: 1, minHeight: 0, marginTop: 2 }}>
-                {files == null
-                    ? <Box display="flex" justifyContent="center" padding={4}><CircularProgress /></Box>
-                    : <PackageFilesEditor files={files} onChange={setFiles} />}
+            <Box sx={{ flexGrow: 1, minHeight: 0, marginTop: 2, display: 'flex', gap: 2 }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    {files == null
+                        ? <Box display="flex" justifyContent="center" padding={4}><CircularProgress /></Box>
+                        : <PackageFilesEditor files={files} onChange={setFiles} />}
+                </Box>
+
+                {kind === 'OPA_POLICY' && showSampleInput && <OPASampleInputsPanel />}
             </Box>
 
             <Box marginTop={2}>

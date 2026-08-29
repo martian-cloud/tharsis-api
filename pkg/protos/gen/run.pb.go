@@ -77,6 +77,12 @@ func (RunSortableField) EnumDescriptor() ([]byte, []int) {
 }
 
 // RunStatus defines the status of a Run.
+//
+// post_plan_completed and post_apply_completed are deliberately absent: both are internal,
+// transient state-machine statuses (see internal/models/run.go and the state machine's
+// handleStageCompleted) that the run passes through and immediately advances beyond within the same
+// state-machine pass, so a persisted run is never observed resting on either one. Field 20 was
+// POST_PLAN_COMPLETED before this was understood and must not be reused.
 type RunStatus int32
 
 const (
@@ -100,11 +106,11 @@ const (
 	RunStatus_PRE_PLAN_COMPLETED          RunStatus = 17
 	RunStatus_POST_PLAN_RUNNING           RunStatus = 18
 	RunStatus_POST_PLAN_AWAITING_DECISION RunStatus = 19
-	RunStatus_POST_PLAN_COMPLETED         RunStatus = 20
-	RunStatus_PRE_APPLY_QUEUING           RunStatus = 21
-	RunStatus_PRE_APPLY_RUNNING           RunStatus = 22
-	RunStatus_PRE_APPLY_AWAITING_DECISION RunStatus = 23
-	RunStatus_PRE_APPLY_COMPLETED         RunStatus = 24
+	RunStatus_PRE_APPLY_QUEUING           RunStatus = 20
+	RunStatus_PRE_APPLY_RUNNING           RunStatus = 21
+	RunStatus_PRE_APPLY_AWAITING_DECISION RunStatus = 22
+	RunStatus_PRE_APPLY_COMPLETED         RunStatus = 23
+	RunStatus_POST_APPLY_RUNNING          RunStatus = 24
 )
 
 // Enum value maps for RunStatus.
@@ -130,11 +136,11 @@ var (
 		17: "PRE_PLAN_COMPLETED",
 		18: "POST_PLAN_RUNNING",
 		19: "POST_PLAN_AWAITING_DECISION",
-		20: "POST_PLAN_COMPLETED",
-		21: "PRE_APPLY_QUEUING",
-		22: "PRE_APPLY_RUNNING",
-		23: "PRE_APPLY_AWAITING_DECISION",
-		24: "PRE_APPLY_COMPLETED",
+		20: "PRE_APPLY_QUEUING",
+		21: "PRE_APPLY_RUNNING",
+		22: "PRE_APPLY_AWAITING_DECISION",
+		23: "PRE_APPLY_COMPLETED",
+		24: "POST_APPLY_RUNNING",
 	}
 	RunStatus_value = map[string]int32{
 		"UNSPECIFIED":                 0,
@@ -157,11 +163,11 @@ var (
 		"PRE_PLAN_COMPLETED":          17,
 		"POST_PLAN_RUNNING":           18,
 		"POST_PLAN_AWAITING_DECISION": 19,
-		"POST_PLAN_COMPLETED":         20,
-		"PRE_APPLY_QUEUING":           21,
-		"PRE_APPLY_RUNNING":           22,
-		"PRE_APPLY_AWAITING_DECISION": 23,
-		"PRE_APPLY_COMPLETED":         24,
+		"PRE_APPLY_QUEUING":           20,
+		"PRE_APPLY_RUNNING":           21,
+		"PRE_APPLY_AWAITING_DECISION": 22,
+		"PRE_APPLY_COMPLETED":         23,
+		"POST_APPLY_RUNNING":          24,
 	}
 )
 
@@ -2281,7 +2287,7 @@ const file_run_proto_rawDesc = "" +
 	"\x0eCREATED_AT_ASC\x10\x00\x12\x13\n" +
 	"\x0fCREATED_AT_DESC\x10\x01\x12\x12\n" +
 	"\x0eUPDATED_AT_ASC\x10\x02\x12\x13\n" +
-	"\x0fUPDATED_AT_DESC\x10\x03*\x88\x04\n" +
+	"\x0fUPDATED_AT_DESC\x10\x03*\x87\x04\n" +
 	"\tRunStatus\x12\x0f\n" +
 	"\vUNSPECIFIED\x10\x00\x12\v\n" +
 	"\aPENDING\x10\x01\x12\x0f\n" +
@@ -2303,12 +2309,12 @@ const file_run_proto_rawDesc = "" +
 	"\x1aPRE_PLAN_AWAITING_DECISION\x10\x10\x12\x16\n" +
 	"\x12PRE_PLAN_COMPLETED\x10\x11\x12\x15\n" +
 	"\x11POST_PLAN_RUNNING\x10\x12\x12\x1f\n" +
-	"\x1bPOST_PLAN_AWAITING_DECISION\x10\x13\x12\x17\n" +
-	"\x13POST_PLAN_COMPLETED\x10\x14\x12\x15\n" +
-	"\x11PRE_APPLY_QUEUING\x10\x15\x12\x15\n" +
-	"\x11PRE_APPLY_RUNNING\x10\x16\x12\x1f\n" +
-	"\x1bPRE_APPLY_AWAITING_DECISION\x10\x17\x12\x17\n" +
-	"\x13PRE_APPLY_COMPLETED\x10\x18*O\n" +
+	"\x1bPOST_PLAN_AWAITING_DECISION\x10\x13\x12\x15\n" +
+	"\x11PRE_APPLY_QUEUING\x10\x14\x12\x15\n" +
+	"\x11PRE_APPLY_RUNNING\x10\x15\x12\x1f\n" +
+	"\x1bPRE_APPLY_AWAITING_DECISION\x10\x16\x12\x17\n" +
+	"\x13PRE_APPLY_COMPLETED\x10\x17\x12\x16\n" +
+	"\x12POST_APPLY_RUNNING\x10\x18*O\n" +
 	"\x0fPolicyCheckType\x12!\n" +
 	"\x1dPOLICY_CHECK_TYPE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15POLICY_CHECK_TYPE_OPA\x10\x01*\xc3\x01\n" +

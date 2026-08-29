@@ -1,9 +1,6 @@
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import Editor from '@monaco-editor/react';
-// Side-effect import: configures Monaco to load locally (bundled) rather than
-// from the CDN, which our CSP (script-src 'self') blocks. Must run before <Editor>.
 import { usePageLayout } from '@/layout/PageLayoutContext';
-import { Alert, Box, Button, Chip, CircularProgress, Link, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, Link, TextField, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { createTarGzip } from 'nanotar';
 import { useContext, useEffect, useState } from 'react';
@@ -13,14 +10,14 @@ import AuthServiceContext from '../../auth/AuthServiceContext';
 import AuthenticationService from '../../auth/AuthenticationService';
 import cfg from '../../common/config';
 import { MutationError } from '../../common/error';
-import '../../common/monaco';
 import { useAppHeaderHeight } from '../../contexts/AppHeaderHeightProvider';
 import { fetchPolicyFiles } from '../../packages/PackageVersionFiles';
+import OPASampleInputsPanel from './OPASampleInputsPanel';
 import PackageFilesEditor from './PackageFilesEditor';
 import { PolicyFile, newPolicyFile } from './policyFiles';
 import { NewPackageVersionCreateMutation } from './__generated__/NewPackageVersionCreateMutation.graphql';
 import { NewPackageVersionQuery } from './__generated__/NewPackageVersionQuery.graphql';
-import { SAMPLE_OPA_INPUTS, SAMPLE_OPA_POLICY } from './opaSamples';
+import { SAMPLE_OPA_POLICY } from './opaSamples';
 
 const query = graphql`
     query NewPackageVersionQuery($id: String!) {
@@ -129,9 +126,7 @@ function NewPackageVersionForm({ packageId, name, groupPath, kind, seedVersionId
 
     const [version, setVersion] = useState('');
     const [showSampleInput, setShowSampleInput] = useState(false);
-    const [sampleInputId, setSampleInputId] = useState(SAMPLE_OPA_INPUTS[0].id);
 
-    const selectedSample = SAMPLE_OPA_INPUTS.find(sample => sample.id === sampleInputId) ?? SAMPLE_OPA_INPUTS[0];
     // files is null until the seed has been resolved: either the latest version's files have been
     // downloaded and extracted, or there is nothing to copy and the starter policy is used.
     const [files, setFiles] = useState<PolicyFile[] | null>(null);
@@ -288,51 +283,7 @@ function NewPackageVersionForm({ packageId, name, groupPath, kind, seedVersionId
                         : <PackageFilesEditor files={files} onChange={setFiles} />}
                 </Box>
 
-                {kind === 'OPA_POLICY' && showSampleInput && (
-                    <Paper
-                        variant="outlined"
-                        sx={{ width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column' }}
-                    >
-                        <Stack
-                            direction="row"
-                            alignItems="center"
-                            justifyContent="space-between"
-                            gap={1}
-                            sx={{ px: 2, py: 1, borderBottom: 1, borderColor: 'divider', bgcolor: 'action.hover', minHeight: 48 }}
-                        >
-                            <TextField
-                                select
-                                size="small"
-                                label="OPA Input Example"
-                                value={sampleInputId}
-                                onChange={event => setSampleInputId(event.target.value)}
-                                fullWidth
-                            >
-                                {SAMPLE_OPA_INPUTS.map(sample => (
-                                    <MenuItem key={sample.id} value={sample.id}>{sample.label}</MenuItem>
-                                ))}
-                            </TextField>
-                        </Stack>
-                        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
-                            <Editor
-                                height="100%"
-                                theme="vs-dark"
-                                defaultLanguage="json"
-                                path={`sample-${selectedSample.id}.json`}
-                                value={selectedSample.content}
-                                onMount={(editor, monaco) => editor.getModel()?.pushEOL(monaco.editor.EndOfLineSequence.LF)}
-                                options={{
-                                    readOnly: true,
-                                    fontSize: 12,
-                                    minimap: { enabled: false },
-                                    scrollBeyondLastLine: false,
-                                    automaticLayout: true,
-                                    wordWrap: 'on',
-                                }}
-                            />
-                        </Box>
-                    </Paper>
-                )}
+                {kind === 'OPA_POLICY' && showSampleInput && <OPASampleInputsPanel />}
             </Box>
 
             <Box marginTop={2} display="flex" alignItems="center" justifyContent="space-between" gap={2}>

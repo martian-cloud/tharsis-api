@@ -249,6 +249,32 @@ func (r *StateVersionResolver) Data(ctx context.Context) (string, error) {
 	return encoded, err
 }
 
+// JSONData resolves the "terraform show -json" representation of the state version. It returns nil
+// rather than an error when no representation is stored
+func (r *StateVersionResolver) JSONData(ctx context.Context) (*string, error) {
+	reader, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionJSONContent(ctx, r.stateVersion.Metadata.ID)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	defer reader.Close()
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	// Returned as JSON text, not base64 like data above: data is carried as an opaque blob, whereas
+	// this is a JSON document by definition, so encoding it would inflate the payload by a third and
+	// force every client through a decode step before parsing.
+	jsonData := string(data)
+
+	return &jsonData, nil
+}
+
 // CreatedBy resolver.
 func (r *StateVersionResolver) CreatedBy() string {
 	return r.stateVersion.CreatedBy
@@ -312,7 +338,7 @@ func createStateVersionMutation(ctx context.Context, input *CreateStateVersionIn
 		RunID:       &run.Metadata.ID,
 	}
 
-	stateVersion, err := serviceCatalog.WorkspaceService.CreateStateVersion(ctx, &stateVersionCreateOptions, input.State)
+	stateVersion, err := serviceCatalog.WorkspaceService.CreateStateVersion(ctx, &stateVersionCreateOptions, input.State, nil)
 	if err != nil {
 		return nil, err
 	}

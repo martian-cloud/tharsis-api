@@ -310,6 +310,40 @@ func TestPolicy_Validate(t *testing.T) {
 			policy:          validOPA(func(p *Policy) { p.OPAData.Stage = "" }),
 			expectErrorCode: errors.EInvalid,
 		},
+		{
+			name:   "post_apply with advisory enforcement is accepted",
+			policy: validOPA(func(p *Policy) { p.OPAData.Stage = RunTaskStageNamePostApply }),
+		},
+		{
+			name: "post_apply with soft_mandatory enforcement is rejected",
+			policy: validOPA(func(p *Policy) {
+				p.OPAData.Stage = RunTaskStageNamePostApply
+				p.OPAData.EnforcementLevel = PolicyEnforcementSoftMandatory
+				p.RequiredApprovals = 1
+				p.AllowedUserIDs = []string{"user-1"}
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "post_apply with hard_mandatory enforcement is rejected",
+			policy: validOPA(func(p *Policy) {
+				p.OPAData.Stage = RunTaskStageNamePostApply
+				p.OPAData.EnforcementLevel = PolicyEnforcementHardMandatory
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "post_apply with hard_mandatory speculative enforcement is rejected",
+			policy: validOPA(func(p *Policy) {
+				p.OPAData.Stage = RunTaskStageNamePostApply
+				p.OPAData.SpeculativeRunEnforcementLevel = PolicyEnforcementHardMandatory
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:   "pre_apply with advisory enforcement is accepted",
+			policy: validOPA(func(p *Policy) { p.OPAData.Stage = RunTaskStageNamePreApply }),
+		},
 	}
 
 	for _, tt := range tests {

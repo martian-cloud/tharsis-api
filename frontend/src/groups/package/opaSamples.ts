@@ -4,8 +4,10 @@
 // so authors have a correct, self-teaching starting point. The paths must stay in
 // sync with buildInputDocument in internal/jobexecutor/policyeval.go, which is
 // what actually assembles the document: `input.run.*` (run metadata *and* the
-// variables), `input.tfplan.*` (the plan, wrapped, and only at the post_plan
-// stage), plus the top-level `input.schemaVersion` and `input.stage`.
+// variables), `input.tfplan.*` (the plan, wrapped, present at every stage except
+// pre_plan), `input.tfstate.*` (the state's "terraform show -json" representation,
+// present only at the post_apply stage, and only when one was stored), plus the
+// top-level `input.schemaVersion` and `input.stage`.
 //
 // NOTE: this is a JS template literal, so the Rego examples deliberately use
 // double-quoted regex strings rather than backtick raw strings (a backtick here
@@ -18,7 +20,8 @@ export const SAMPLE_OPA_POLICY = `# Tharsis policy (Rego)
 #
 # The input document available to every policy:
 #   input.schemaVersion   Version of this input document's schema (currently 1).
-#   input.stage           Stage being evaluated: "pre_plan" or "post_plan".
+#   input.stage           Stage being evaluated: "pre_plan", "post_plan",
+#                         "pre_apply", or "post_apply".
 #   input.run             Run metadata: id, createdBy, isDestroy, refresh,
 #                         refreshOnly, speculative, terraformVersion,
 #                         targetAddresses, moduleSource, moduleVersion,
@@ -31,12 +34,29 @@ export const SAMPLE_OPA_POLICY = `# Tharsis policy (Rego)
 #                         the variable has none.
 #   input.tfplan          The Terraform plan JSON, e.g.
 #                         input.tfplan.resource_changes.
+#   input.tfstate         The Terraform state, in the same "terraform show -json"
+#                         representation as the plan above rather than the raw
+#                         state file: root resources are under
+#                         input.tfstate.values.root_module.resources[], each with
+#                         address, mode, type, name and its attribute values in
+#                         .values; resources in child modules nest under
+#                         .child_modules[], recursively.
 #
-# Two things worth knowing before you write a rule:
+# Three things worth knowing before you write a rule:
 #
-#   * input.tfplan exists ONLY at the post_plan stage — a pre_plan check runs
+#   * input.tfplan exists at every stage EXCEPT pre_plan — a pre_plan check runs
 #     before there is a plan. Plan rules are simply undefined (they never fire)
-#     at pre_plan, so a policy can safely be attached to both stages.
+#     at pre_plan, so a policy can safely be attached to any stage.
+#   * input.tfstate exists ONLY at the post_apply stage, since that is the only
+#     stage that evaluates after state has been written. A post_apply policy can
+#     only be enforced at Advisory — the apply has already happened, so there is
+#     no run outcome left for a stronger level to block. Treat it as usually
+#     present rather than guaranteed: state written by a runner that predates the
+#     JSON representation, or pushed directly through the state API, has none, and
+#     the key is then omitted rather than the check being failed. Rules that read
+#     it are undefined in that case, so they neither fire nor error — if a rule
+#     must not pass silently on missing state, assert on the key first with a
+#     rule whose body is: not input.tfstate
 #   * The optional run fields (moduleSource, moduleVersion, moduleDigest,
 #     configurationVersionId) are always present but are null when unset, so test
 #     them against null rather than against ""; targetAddresses is null or empty
@@ -123,6 +143,15 @@ import rego.v1
 #     count(targets) > 0
 #     msg := sprintf("Targeted runs are not permitted; %v address(es) were targeted.", [count(targets)])
 # }
+
+# 10) Flag any resource left without an "Environment" tag once state is
+#     written. This can only run at post_apply, and post_apply is always
+#     Advisory, so it records findings without blocking anything.
+# deny contains msg if {
+#     resource := input.tfstate.values.root_module.resources[_]
+#     not resource.values.tags.Environment
+#     msg := sprintf("Applied resource '%v' has no 'Environment' tag.", [resource.address])
+# }
 `;
 
 
@@ -131,8 +160,9 @@ import rego.v1
 // page so authors can see the exact shape their Rego rules reference. Each one
 // mirrors buildInputDocument in internal/jobexecutor/policyeval.go field for
 // field, including the parts that trip authors up: variables nested under
-// `run`, optional run fields present as null, string-valued variables, and a
-// pre_plan document with no `tfplan` key at all.
+// `run`, optional run fields present as null, string-valued variables, a
+// pre_plan document with no `tfplan` key at all, and a post_apply document
+// carrying both `tfplan` and `tfstate`.
 export const SAMPLE_OPA_INPUTS: { id: string; label: string; content: string }[] = [
     {
         id: 'post-plan-create',
@@ -239,6 +269,63 @@ export const SAMPLE_OPA_INPUTS: { id: string; label: string; content: string }[]
                 variables: [
                     { key: 'environment', category: 'terraform', sensitive: false, namespacePath: 'my-group', value: 'dev' },
                 ],
+            },
+        }, null, 2),
+    },
+    {
+        id: 'post-apply',
+        label: 'Post-apply — tfplan and tfstate',
+        content: JSON.stringify({
+            schemaVersion: 1,
+            stage: 'post_apply',
+            run: {
+                id: 'run-4',
+                createdBy: 'user@example.com',
+                isDestroy: false,
+                refresh: true,
+                refreshOnly: false,
+                speculative: false,
+                terraformVersion: '1.9.8',
+                targetAddresses: null,
+                moduleSource: 'registry.terraform.io/example/s3/aws',
+                moduleVersion: '1.0.0',
+                moduleDigest: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                configurationVersionId: null,
+                workspacePath: 'my-group/prod',
+                workspaceId: 'ws-2',
+                variables: [
+                    { key: 'environment', category: 'terraform', sensitive: false, namespacePath: 'my-group/prod', value: 'prod' },
+                ],
+            },
+            tfplan: {
+                format_version: '1.2',
+                terraform_version: '1.9.8',
+                resource_changes: [
+                    {
+                        address: 'aws_s3_bucket.data',
+                        type: 'aws_s3_bucket',
+                        name: 'data',
+                        provider_name: 'registry.terraform.io/hashicorp/aws',
+                        change: { actions: ['create'], before: null, after: { bucket: 'my-data-bucket', acl: 'private', tags: {} } },
+                    },
+                ],
+            },
+            tfstate: {
+                format_version: '1.0',
+                terraform_version: '1.9.8',
+                values: {
+                    root_module: {
+                        resources: [
+                            {
+                                address: 'aws_s3_bucket.data',
+                                type: 'aws_s3_bucket',
+                                name: 'data',
+                                provider_name: 'registry.terraform.io/hashicorp/aws',
+                                values: { bucket: 'my-data-bucket', acl: 'private', tags: {} },
+                            },
+                        ],
+                    },
+                },
             },
         }, null, 2),
     },

@@ -26,7 +26,9 @@ const RUN_STAGE_NAMES = {
     pre_plan: 'Pre-Plan',
     plan: 'Plan',
     post_plan: 'Post-Plan',
-    apply: 'Apply'
+    pre_apply: 'Pre-Apply',
+    apply: 'Apply',
+    post_apply: 'Post-Apply'
 } as any;
 
 // The run statuses that mean "ready, but waiting for the workspace slot" — one per workspace-gated
@@ -72,9 +74,6 @@ function RunDetails(props: Props) {
                 taskStages {
                     stageName
                     status
-                    policyChecks {
-                        status
-                    }
                 }
                 apply {
                     status
@@ -82,9 +81,6 @@ function RunDetails(props: Props) {
                 workspace {
                     fullPath
                     locked
-                    metadata {
-                        updatedAt
-                    }
                 }
                 ...RunDetailsSidebarFragment_details
                 ...RunDetailsPlanStageFragment_plan
@@ -175,7 +171,9 @@ function RunDetails(props: Props) {
                         <Route path="pre_plan" element={<RunDetailsRunTaskStage stageName="PRE_PLAN" fragmentRef={queryData.run} onError={onError} />} />
                         <Route path="plan" element={<RunDetailsPlanStage fragmentRef={queryData.run} onError={onError} />} />
                         <Route path="post_plan" element={<RunDetailsRunTaskStage stageName="POST_PLAN" fragmentRef={queryData.run} onError={onError} />} />
+                        <Route path="pre_apply" element={<RunDetailsRunTaskStage stageName="PRE_APPLY" fragmentRef={queryData.run} onError={onError} />} />
                         <Route path="apply" element={<RunDetailsApplyStage fragmentRef={queryData.run} onError={onError} />} />
+                        <Route path="post_apply" element={<RunDetailsRunTaskStage stageName="POST_APPLY" fragmentRef={queryData.run} onError={onError} />} />
                     </Routes>
                 </Box>
             </Box>

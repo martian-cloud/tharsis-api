@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	StateVersions_GetStateVersionByID_FullMethodName       = "/martiancloud.tharsis.api.state_version.StateVersions/GetStateVersionByID"
+	StateVersions_GetRunStateVersion_FullMethodName        = "/martiancloud.tharsis.api.state_version.StateVersions/GetRunStateVersion"
 	StateVersions_GetStateVersions_FullMethodName          = "/martiancloud.tharsis.api.state_version.StateVersions/GetStateVersions"
 	StateVersions_CreateStateVersion_FullMethodName        = "/martiancloud.tharsis.api.state_version.StateVersions/CreateStateVersion"
 	StateVersions_GetStateVersionOutputByID_FullMethodName = "/martiancloud.tharsis.api.state_version.StateVersions/GetStateVersionOutputByID"
@@ -34,6 +35,9 @@ const (
 type StateVersionsClient interface {
 	// GetStateVersionByID returns a StateVersion by an ID.
 	GetStateVersionByID(ctx context.Context, in *GetStateVersionByIDRequest, opts ...grpc.CallOption) (*StateVersion, error)
+	// GetRunStateVersion returns the StateVersion a Run's apply created. Returns NOT_FOUND when the run
+	// wrote no state, which is not an error condition for callers that only need it when it exists.
+	GetRunStateVersion(ctx context.Context, in *GetRunStateVersionRequest, opts ...grpc.CallOption) (*StateVersion, error)
 	// GetStateVersions returns a paginated list of StateVersions for a workspace.
 	GetStateVersions(ctx context.Context, in *GetStateVersionsRequest, opts ...grpc.CallOption) (*GetStateVersionsResponse, error)
 	// CreateStateVersion creates a new StateVersion.
@@ -56,6 +60,16 @@ func (c *stateVersionsClient) GetStateVersionByID(ctx context.Context, in *GetSt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(StateVersion)
 	err := c.cc.Invoke(ctx, StateVersions_GetStateVersionByID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stateVersionsClient) GetRunStateVersion(ctx context.Context, in *GetRunStateVersionRequest, opts ...grpc.CallOption) (*StateVersion, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StateVersion)
+	err := c.cc.Invoke(ctx, StateVersions_GetRunStateVersion_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +124,9 @@ func (c *stateVersionsClient) GetStateVersionOutputs(ctx context.Context, in *Ge
 type StateVersionsServer interface {
 	// GetStateVersionByID returns a StateVersion by an ID.
 	GetStateVersionByID(context.Context, *GetStateVersionByIDRequest) (*StateVersion, error)
+	// GetRunStateVersion returns the StateVersion a Run's apply created. Returns NOT_FOUND when the run
+	// wrote no state, which is not an error condition for callers that only need it when it exists.
+	GetRunStateVersion(context.Context, *GetRunStateVersionRequest) (*StateVersion, error)
 	// GetStateVersions returns a paginated list of StateVersions for a workspace.
 	GetStateVersions(context.Context, *GetStateVersionsRequest) (*GetStateVersionsResponse, error)
 	// CreateStateVersion creates a new StateVersion.
@@ -130,6 +147,9 @@ type UnimplementedStateVersionsServer struct{}
 
 func (UnimplementedStateVersionsServer) GetStateVersionByID(context.Context, *GetStateVersionByIDRequest) (*StateVersion, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetStateVersionByID not implemented")
+}
+func (UnimplementedStateVersionsServer) GetRunStateVersion(context.Context, *GetRunStateVersionRequest) (*StateVersion, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRunStateVersion not implemented")
 }
 func (UnimplementedStateVersionsServer) GetStateVersions(context.Context, *GetStateVersionsRequest) (*GetStateVersionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetStateVersions not implemented")
@@ -178,6 +198,24 @@ func _StateVersions_GetStateVersionByID_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(StateVersionsServer).GetStateVersionByID(ctx, req.(*GetStateVersionByIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StateVersions_GetRunStateVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRunStateVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateVersionsServer).GetRunStateVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StateVersions_GetRunStateVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateVersionsServer).GetRunStateVersion(ctx, req.(*GetRunStateVersionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -264,6 +302,10 @@ var StateVersions_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStateVersionByID",
 			Handler:    _StateVersions_GetStateVersionByID_Handler,
+		},
+		{
+			MethodName: "GetRunStateVersion",
+			Handler:    _StateVersions_GetRunStateVersion_Handler,
 		},
 		{
 			MethodName: "GetStateVersions",

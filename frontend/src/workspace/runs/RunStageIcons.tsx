@@ -66,9 +66,13 @@ function RunStageIcons({ fragmentRef }: Props) {
         s.push({ name: 'Plan', status: data.plan.status, path: `${runPath}/plan` });
         const postPlan = data.taskStages.find(t => t.stageName === 'POST_PLAN');
         if (postPlan) s.push({ name: 'Post-Plan', status: postPlan.status, path: `${runPath}/${taskStagePath(postPlan.stageName)}` });
+        const preApply = data.taskStages.find(t => t.stageName === 'PRE_APPLY');
+        if (preApply) s.push({ name: 'Pre-Apply', status: preApply.status, path: `${runPath}/${taskStagePath(preApply.stageName)}` });
         // A speculative run has no apply at all, which is what makes the segment conditional rather
         // than the apply's status.
         if (data.apply) s.push({ name: 'Apply', status: data.apply.status, path: `${runPath}/apply` });
+        const postApply = data.taskStages.find(t => t.stageName === 'POST_APPLY');
+        if (postApply) s.push({ name: 'Post-Apply', status: postApply.status, path: `${runPath}/${taskStagePath(postApply.stageName)}` });
         return s;
     }, [data, runPath]);
 

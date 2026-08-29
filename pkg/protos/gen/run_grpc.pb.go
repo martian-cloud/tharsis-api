@@ -60,8 +60,8 @@ type RunsClient interface {
 	GetApplyByID(ctx context.Context, in *GetApplyByIDRequest, opts ...grpc.CallOption) (*Apply, error)
 	// UpdatePlan updates a Plan.
 	UpdatePlan(ctx context.Context, in *UpdatePlanRequest, opts ...grpc.CallOption) (*Plan, error)
-	// ReportRunPolicyOutcomes records the policy-set outcomes for a run's post-plan stage node
-	// and sets the stage verdict.
+	// ReportRunPolicyOutcomes records the policy-set outcomes for a run's policy check node (at any
+	// stage) and sets the check verdict.
 	ReportRunPolicyOutcomes(ctx context.Context, in *ReportRunPolicyOutcomesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// UpdateApply updates an Apply.
 	UpdateApply(ctx context.Context, in *UpdateApplyRequest, opts ...grpc.CallOption) (*Apply, error)
@@ -254,8 +254,8 @@ type RunsServer interface {
 	GetApplyByID(context.Context, *GetApplyByIDRequest) (*Apply, error)
 	// UpdatePlan updates a Plan.
 	UpdatePlan(context.Context, *UpdatePlanRequest) (*Plan, error)
-	// ReportRunPolicyOutcomes records the policy-set outcomes for a run's post-plan stage node
-	// and sets the stage verdict.
+	// ReportRunPolicyOutcomes records the policy-set outcomes for a run's policy check node (at any
+	// stage) and sets the check verdict.
 	ReportRunPolicyOutcomes(context.Context, *ReportRunPolicyOutcomesRequest) (*emptypb.Empty, error)
 	// UpdateApply updates an Apply.
 	UpdateApply(context.Context, *UpdateApplyRequest) (*Apply, error)

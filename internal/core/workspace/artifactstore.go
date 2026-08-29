@@ -25,6 +25,8 @@ type ArtifactStore interface {
 	DownloadStateVersion(ctx context.Context, stateVersion *models.StateVersion, writer io.WriterAt) error
 	GetStateVersion(ctx context.Context, stateVersion *models.StateVersion) (io.ReadCloser, error)
 	UploadStateVersion(ctx context.Context, stateVersion *models.StateVersion, body io.Reader) (db.RetainObjectRefFunc, string, error)
+	UploadStateVersionJSON(ctx context.Context, stateVersion *models.StateVersion, body io.Reader) (db.RetainObjectRefFunc, string, error)
+	GetStateVersionJSON(ctx context.Context, stateVersion *models.StateVersion) (io.ReadCloser, error)
 	DownloadPlanCache(ctx context.Context, run *models.Run, writer io.WriterAt) error
 	UploadPlanCache(ctx context.Context, run *models.Run, body io.Reader) (db.RetainObjectRefFunc, string, error)
 	UploadPlanJSON(ctx context.Context, run *models.Run, body io.Reader) (db.RetainObjectRefFunc, string, error)
@@ -76,6 +78,31 @@ func (a *artifactStore) UploadStateVersion(ctx context.Context, stateVersion *mo
 
 func (a *artifactStore) DownloadStateVersion(ctx context.Context, stateVersion *models.StateVersion, writer io.WriterAt) error {
 	return a.download(ctx, stateVersion.ObjectStoreKey, writer)
+}
+
+// UploadStateVersionJSON stores the "terraform show -json" rendering of a state version, which the
+// job executor uploads after the state version itself already exists. A fresh key per upload keeps a
+// re-upload from overwriting an object a reader may be streaming; the superseded object stays linked
+// to the state version and is collected with it.
+func (a *artifactStore) UploadStateVersionJSON(ctx context.Context, stateVersion *models.StateVersion, body io.Reader) (db.RetainObjectRefFunc, string, error) {
+	key := stateVersionJSONObjectKey(stateVersion.WorkspaceID, uuid.New().String())
+	if err := a.upload(ctx, key, body); err != nil {
+		return nil, "", err
+	}
+
+	return func(ctx context.Context, ownerID string) error {
+		return a.objectStoreRefs.LinkRef(ctx, key, db.ObjectStoreRefOwnerStateVersion, ownerID)
+	}, key, nil
+}
+
+// GetStateVersionJSON streams the state version's JSON rendering. The caller must check that
+// JSONObjectStoreKey is set first; a nil key means no rendering was ever uploaded.
+func (a *artifactStore) GetStateVersionJSON(ctx context.Context, stateVersion *models.StateVersion) (io.ReadCloser, error) {
+	result, err := a.getObjectStream(ctx, ptr.ToString(stateVersion.JSONObjectStoreKey))
+	if err != nil {
+		return nil, err
+	}
+	return result.Body, nil
 }
 
 func (a *artifactStore) GetConfigurationVersion(ctx context.Context, configurationVersion *models.ConfigurationVersion) (io.ReadCloser, int64, error) {
@@ -223,6 +250,10 @@ func configurationVersionObjectKey(workspaceID, id string) string {
 
 func stateVersionObjectKey(workspaceID, id string) string {
 	return fmt.Sprintf("workspaces/%s/state_versions/%s", workspaceID, id)
+}
+
+func stateVersionJSONObjectKey(workspaceID, id string) string {
+	return fmt.Sprintf("workspaces/%s/state_versions/%s.json", workspaceID, id)
 }
 
 func planJSONObjectKey(workspaceID, runID, id string) string {

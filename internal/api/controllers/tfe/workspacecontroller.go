@@ -282,7 +282,11 @@ func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.
 
 	options := models.StateVersion{WorkspaceID: workspaceID}
 
-	sv, err := c.workspaceService.CreateStateVersion(r.Context(), &options, *req.State)
+	// json-state is the "terraform show -json" rendering the CLI produces alongside the state. It is
+	// passed through as-is: the service decodes it and stores it in the same transaction as the state
+	// version, so a malformed or unstorable rendering leaves nothing behind and the created state
+	// version already carries hosted-json-state-download-url in this response.
+	sv, err := c.workspaceService.CreateStateVersion(r.Context(), &options, *req.State, req.JSONState)
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return

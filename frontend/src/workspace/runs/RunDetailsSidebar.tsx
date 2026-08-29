@@ -158,10 +158,14 @@ function RunDetailsSidebar(props: Props) {
     // entry is active.
     const prePlanStage = data.taskStages.find(s => s.stageName === 'PRE_PLAN');
     const postPlanStage = data.taskStages.find(s => s.stageName === 'POST_PLAN');
+    const preApplyStage = data.taskStages.find(s => s.stageName === 'PRE_APPLY');
+    const postApplyStage = data.taskStages.find(s => s.stageName === 'POST_APPLY');
     const PlanStatusIcon = RunStageStatusTypes[data.plan.status.toLowerCase()].icon;
     const PrePlanStatusIcon = prePlanStage ? RunStageStatusTypes[prePlanStage.status.toLowerCase()].icon : null;
     const PolicyStatusIcon = postPlanStage ? RunStageStatusTypes[postPlanStage.status.toLowerCase()].icon : null;
+    const PreApplyStatusIcon = preApplyStage ? RunStageStatusTypes[preApplyStage.status.toLowerCase()].icon : null;
     const ApplyStatusIcon = data.apply ? RunStageStatusTypes[data.apply.status.toLowerCase()].icon : null;
+    const PostApplyStatusIcon = postApplyStage ? RunStageStatusTypes[postApplyStage.status.toLowerCase()].icon : null;
 
     return (
         <Drawer
@@ -303,8 +307,8 @@ function RunDetailsSidebar(props: Props) {
                             <Typography variant="body2" color="text.primary">Plan</Typography>
                         </Box>
 
-                        {/* Connector: Plan → Policy (or Plan → Apply if no policy) */}
-                        {(postPlanStage || data.apply) && (
+                        {/* Connector: Plan → Post-Plan (or Plan → Pre-Apply/Apply if no post-plan policy) */}
+                        {(postPlanStage || preApplyStage || data.apply) && (
                             <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
                         )}
 
@@ -319,13 +323,29 @@ function RunDetailsSidebar(props: Props) {
                                 <PolicyStatusIcon sx={{ flexShrink: 0 }} />
                                 <Typography variant="body2" color="text.primary">Post-Plan</Typography>
                             </Box>
+                            {(preApplyStage || data.apply) && (
+                                <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
+                            )}
+                        </>}
+
+                        {/* Policy (pre-apply) */}
+                        {preApplyStage && PreApplyStatusIcon && <>
+                            <Box
+                                component={LinkRouter}
+                                to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/${taskStagePath(preApplyStage.stageName)}`}
+                                replace
+                                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === taskStagePath(preApplyStage.stageName) ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
+                            >
+                                <PreApplyStatusIcon sx={{ flexShrink: 0 }} />
+                                <Typography variant="body2" color="text.primary">Pre-Apply</Typography>
+                            </Box>
                             {data.apply && (
                                 <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
                             )}
                         </>}
 
                         {/* Apply */}
-                        {data.apply && ApplyStatusIcon && (
+                        {data.apply && ApplyStatusIcon && <>
                             <Box
                                 component={LinkRouter}
                                 to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/apply`}
@@ -334,6 +354,22 @@ function RunDetailsSidebar(props: Props) {
                             >
                                 <ApplyStatusIcon sx={{ flexShrink: 0 }} />
                                 <Typography variant="body2" color="text.primary">Apply</Typography>
+                            </Box>
+                            {postApplyStage && (
+                                <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
+                            )}
+                        </>}
+
+                        {/* Policy (post-apply) */}
+                        {postApplyStage && PostApplyStatusIcon && (
+                            <Box
+                                component={LinkRouter}
+                                to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/${taskStagePath(postApplyStage.stageName)}`}
+                                replace
+                                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === taskStagePath(postApplyStage.stageName) ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
+                            >
+                                <PostApplyStatusIcon sx={{ flexShrink: 0 }} />
+                                <Typography variant="body2" color="text.primary">Post-Apply</Typography>
                             </Box>
                         )}
                     </Box>

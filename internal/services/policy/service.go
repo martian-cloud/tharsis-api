@@ -51,15 +51,6 @@ type GetPoliciesInput struct {
 }
 
 // UpdatePolicyInput is the input for updating the mutable fields of an existing policy.
-// Name, GroupID, and Kind are immutable after creation. OPAData carries the mutable OPA-specific
-// fields (PackageSource, PackageVersionConstraint, PackageDigest, Stage, EnforcementLevel,
-// SpeculativeRunEnforcementLevel) and replaces the stored data wholesale, so PackageSource and Stage
-// must be supplied with it.
-//
-// Scope, RequiredApprovals, and the three approver lists are pointers so a partial update can leave
-// them untouched: a nil pointer means "do not change this field", while a non-nil pointer (including
-// a pointer to an empty slice) replaces the stored value. Without this a client updating only the
-// description would silently clear a policy's entire approval configuration.
 type UpdatePolicyInput struct {
 	ID                       string
 	Description              *string
@@ -86,10 +77,8 @@ func (u *UpdatePolicyInput) Validate() error {
 		if u.OPAData.PackageSource == "" {
 			return errors.New("packageSource is required when opaData is supplied", errors.WithErrorCode(errors.EInvalid))
 		}
-		// The stage is mutable, but the PolicyStage enum is wider than what run creation resolves
-		// policies for, so a policy stored at another stage would save and then never fire.
-		if u.OPAData.Stage != models.RunTaskStageNamePrePlan && u.OPAData.Stage != models.RunTaskStageNamePostPlan {
-			return errors.New("policy stage %s not yet supported", u.OPAData.Stage, errors.WithErrorCode(errors.EInvalid))
+		if !u.OPAData.Stage.IsValid() {
+			return errors.New("policy stage %s is not a valid run stage", u.OPAData.Stage, errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 
@@ -381,8 +370,8 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 		if input.OPAData == nil {
 			return nil, errors.New("opaData is required when creating an OPA policy", errors.WithErrorCode(errors.EInvalid))
 		}
-		if input.OPAData.Stage != models.RunTaskStageNamePrePlan && input.OPAData.Stage != models.RunTaskStageNamePostPlan {
-			return nil, errors.New("policy stage %s not yet supported", input.OPAData.Stage, errors.WithErrorCode(errors.EInvalid))
+		if !input.OPAData.Stage.IsValid() {
+			return nil, errors.New("policy stage %s is not a valid run stage", input.OPAData.Stage, errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 
@@ -502,6 +491,18 @@ func (s *service) UpdatePolicy(ctx context.Context, input *UpdatePolicyInput) (*
 		}
 	}
 
+	// A change to the enforcement level invalidates the approval configuration: approvals gate the
+	// override of a run blocked at soft mandatory (see models.Policy.Validate, which rejects approvers
+	// at any other level), so a level change either strands them or silently re-arms them. Whatever the
+	// caller did not supply is therefore reset rather than carried over, which is what lets a caller
+	// move a policy off soft mandatory by naming only the new level. Anything the caller did supply
+	// still wins, so changing the level and setting approvals in one call is honoured as sent.
+	//
+	// Computed before the OPA data below replaces the stored level, and only meaningful when the caller
+	// supplied OPA data at all — a partial update that leaves the level alone changes nothing here.
+	enforcementLevelChanged := policy.Kind == models.PolicyKindOPA && input.OPAData != nil &&
+		policy.OPAData != nil && input.OPAData.EnforcementLevel != policy.OPAData.EnforcementLevel
+
 	// Apply only the fields the caller supplied. Description is a pointer whose nil already means
 	// "clear it" in this API, so it is assigned as-is; the remaining pointers distinguish "not
 	// provided" (nil, leave the stored value) from "provided" (replace it, an empty slice clearing it).
@@ -511,15 +512,23 @@ func (s *service) UpdatePolicy(ctx context.Context, input *UpdatePolicyInput) (*
 	}
 	if input.RequiredApprovals != nil {
 		policy.RequiredApprovals = *input.RequiredApprovals
+	} else if enforcementLevelChanged {
+		policy.RequiredApprovals = 0
 	}
 	if input.AllowedUserIDs != nil {
 		policy.AllowedUserIDs = *input.AllowedUserIDs
+	} else if enforcementLevelChanged {
+		policy.AllowedUserIDs = nil
 	}
 	if input.AllowedServiceAccountIDs != nil {
 		policy.AllowedServiceAccountIDs = *input.AllowedServiceAccountIDs
+	} else if enforcementLevelChanged {
+		policy.AllowedServiceAccountIDs = nil
 	}
 	if input.AllowedTeamIDs != nil {
 		policy.AllowedTeamIDs = *input.AllowedTeamIDs
+	} else if enforcementLevelChanged {
+		policy.AllowedTeamIDs = nil
 	}
 
 	// Update the mutable OPA-specific fields. A stage change only affects runs created afterwards:

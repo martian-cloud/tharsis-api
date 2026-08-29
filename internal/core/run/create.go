@@ -139,18 +139,20 @@ func Create(
 	}
 
 	// Resolve the policies that apply to this run BEFORE creating it, so the task stage nodes — and
-	// the policy check nodes they own, with their policy snapshots — can be attached at creation time
-	// (run nodes, including each check's policies JSONB, are inserted by CreateRun). Resolve every
-	// supported stage; each stage with ≥1 applicable policy gets its own task stage owning one OPA
-	// check (the state machine gates the pre-plan stage before the plan and the post-plan stage after
-	// it).
-	var taskStages []*models.RunTaskStage
-	for _, stageName := range []models.RunTaskStageName{
+	// the policy check nodes they own, with their policy snapshots
+	stageNames := []models.RunTaskStageName{
 		models.RunTaskStageNamePrePlan,
 		models.RunTaskStageNamePostPlan,
-	} {
-		// Only OPA is supported today, so each stage yields a single check; future policy types add
-		// sibling checks under the same task stage.
+	}
+	if !isSpeculative {
+		stageNames = append(stageNames,
+			models.RunTaskStageNamePreApply,
+			models.RunTaskStageNamePostApply,
+		)
+	}
+
+	var taskStages []*models.RunTaskStage
+	for _, stageName := range stageNames {
 		stagePolicies, err := resolveRunPolicies(ctx, dbClient, ws, managedIdentities, stageName, isSpeculative)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to resolve run policies")

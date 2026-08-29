@@ -83,17 +83,30 @@ var runTransitions = map[models.RunStatus][]models.RunStatus{
 	// The apply, mirroring the plan: admitted (queuing -> queued), then claimed by a runner.
 	models.RunApplyQueuing: {models.RunApplyQueued, models.RunErrored, models.RunCanceled},
 	models.RunApplyQueued:  {models.RunApplying, models.RunErrored, models.RunCanceled},
-	models.RunApplying:     {models.RunApplied, models.RunErrored, models.RunCanceled},
+	// A finished apply lands on applied directly (no post-apply stage) or on post_apply_running (a
+	// post-apply stage must clear first). Mirrors RunPlanning's edge onto RunPostPlanRunning.
+	models.RunApplying: {models.RunApplied, models.RunPostApplyRunning, models.RunErrored, models.RunCanceled},
+	// The post-apply policy stage brackets the run between applying and applied, mirroring the
+	// post-plan stage: not separately gated (it inherits the apply's slot), so no *_queuing status.
+	// post_apply_completed is transient — the stage's completed handler sets it and then immediately
+	// advances the run to applied within the same state-machine pass (see handleStageCompleted), so a
+	// persisted run is never observed resting there. There is deliberately no
+	// post_apply_awaiting_decision: a post-apply policy is restricted to advisory enforcement
+	// (models.Policy.Validate), so no post-apply check can ever soft-fail and block on a human
+	// override.
+	models.RunPostApplyRunning:   {models.RunPostApplyCompleted, models.RunErrored, models.RunCanceled},
+	models.RunPostApplyCompleted: {models.RunApplied, models.RunCanceled},
 	// A retry returns an errored/canceled run to the *_queuing status of whichever node was retried —
 	// the node resets to pending, so the run is waiting for the slot again, never straight to *_queued —
-	// or to post_plan_running, the ungated stage that re-runs directly on the plan's slot.
+	// or to post_plan_running / post_apply_running, the ungated stages that re-run directly on the plan's
+	// or apply's slot.
 	models.RunErrored: {
 		models.RunPlanQueuing, models.RunApplyQueuing,
-		models.RunPrePlanQueuing, models.RunPostPlanRunning, models.RunPreApplyQueuing,
+		models.RunPrePlanQueuing, models.RunPostPlanRunning, models.RunPreApplyQueuing, models.RunPostApplyRunning,
 	},
 	models.RunCanceled: {
 		models.RunPlanQueuing, models.RunApplyQueuing,
-		models.RunPrePlanQueuing, models.RunPostPlanRunning, models.RunPreApplyQueuing,
+		models.RunPrePlanQueuing, models.RunPostPlanRunning, models.RunPreApplyQueuing, models.RunPostApplyRunning,
 	},
 	// discarded is otherwise terminal, but a discard may be reversed (undiscard): a run discarded from
 	// planned returns to planned, and one discarded at a policy gate re-runs that gate — the discard

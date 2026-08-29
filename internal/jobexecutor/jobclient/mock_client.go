@@ -327,6 +327,24 @@ func (_m *MockClient) DownloadStateVersion(ctx context.Context, stateVersionID s
 	return r0
 }
 
+// DownloadStateVersionJSON provides a mock function with given fields: ctx, stateVersionID, writer
+func (_m *MockClient) DownloadStateVersionJSON(ctx context.Context, stateVersionID string, writer io.Writer) error {
+	ret := _m.Called(ctx, stateVersionID, writer)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DownloadStateVersionJSON")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Writer) error); ok {
+		r0 = rf(ctx, stateVersionID, writer)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetAssignedManagedIdentities provides a mock function with given fields: ctx, workspaceID
 func (_m *MockClient) GetAssignedManagedIdentities(ctx context.Context, workspaceID string) ([]*gen.ManagedIdentity, error) {
 	ret := _m.Called(ctx, workspaceID)
@@ -560,6 +578,36 @@ func (_m *MockClient) GetRun(ctx context.Context, id string) (*gen.Run, error) {
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunStateVersion provides a mock function with given fields: ctx, runID
+func (_m *MockClient) GetRunStateVersion(ctx context.Context, runID string) (*gen.StateVersion, error) {
+	ret := _m.Called(ctx, runID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunStateVersion")
+	}
+
+	var r0 *gen.StateVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*gen.StateVersion, error)); ok {
+		return rf(ctx, runID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *gen.StateVersion); ok {
+		r0 = rf(ctx, runID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*gen.StateVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, runID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -848,6 +896,24 @@ func (_m *MockClient) UploadProviderPlatformPackageToMirror(ctx context.Context,
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader) error); ok {
 		r0 = rf(ctx, versionMirrorID, os, arch, reader)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UploadStateVersionJSON provides a mock function with given fields: ctx, stateVersionID, tfState
+func (_m *MockClient) UploadStateVersionJSON(ctx context.Context, stateVersionID string, tfState *tfjson.State) error {
+	ret := _m.Called(ctx, stateVersionID, tfState)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadStateVersionJSON")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *tfjson.State) error); ok {
+		r0 = rf(ctx, stateVersionID, tfState)
 	} else {
 		r0 = ret.Error(0)
 	}

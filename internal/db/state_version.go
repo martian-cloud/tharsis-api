@@ -76,13 +76,15 @@ type StateVersions interface {
 	GetStateVersionByTRN(ctx context.Context, trnValue string) (*models.StateVersion, error)
 	// CreateStateVersion will create a new stateVersion
 	CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion) (*models.StateVersion, error)
+	// UpdateStateVersion updates an existing state version.
+	UpdateStateVersion(ctx context.Context, stateVersion *models.StateVersion) (*models.StateVersion, error)
 }
 
 type stateVersions struct {
 	dbClient *Client
 }
 
-var stateVersionFieldList = append(metadataFieldList, "workspace_id", "run_id", "created_by", "object_store_key")
+var stateVersionFieldList = append(metadataFieldList, "workspace_id", "run_id", "created_by", "object_store_key", "json_object_store_key")
 
 // NewStateVersions returns an instance of the StateVersion interface
 func NewStateVersions(dbClient *Client) StateVersions {
@@ -209,14 +211,15 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 		With("state_versions",
 			dialect.Insert("state_versions").
 				Rows(goqu.Record{
-					"id":               newResourceID(),
-					"version":          initialResourceVersion,
-					"created_at":       timestamp,
-					"updated_at":       timestamp,
-					"workspace_id":     stateVersion.WorkspaceID,
-					"run_id":           stateVersion.RunID,
-					"created_by":       stateVersion.CreatedBy,
-					"object_store_key": nullableString(stateVersion.ObjectStoreKey),
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"workspace_id":          stateVersion.WorkspaceID,
+					"run_id":                stateVersion.RunID,
+					"created_by":            stateVersion.CreatedBy,
+					"object_store_key":      nullableString(stateVersion.ObjectStoreKey),
+					"json_object_store_key": stateVersion.JSONObjectStoreKey,
 				}).Returning("*"),
 		).Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})))
@@ -232,6 +235,45 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 	return createdStateVersion, nil
+}
+
+// UpdateStateVersion updates a state version, bumping its resource version. Only the mutable fields
+// are written: the raw state object key is set once at creation and never changes, so it is left
+// alone here.
+func (s *stateVersions) UpdateStateVersion(ctx context.Context, stateVersion *models.StateVersion) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateStateVersion")
+	defer span.End()
+
+	timestamp := currentTime()
+
+	sql, args, err := toSQLWithTag("state_version.UpdateStateVersion", dialect.From("state_versions").
+		Prepared(true).
+		With("state_versions",
+			dialect.Update("state_versions").
+				Set(
+					goqu.Record{
+						"version":               goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":            timestamp,
+						"json_object_store_key": stateVersion.JSONObjectStoreKey,
+					},
+				).Where(goqu.Ex{"id": stateVersion.Metadata.ID, "version": stateVersion.Metadata.Version}).
+				Returning("*"),
+		).Select(s.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	updatedStateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrOptimisticLockError
+		}
+		s.dbClient.logger.WithContextFields(ctx).Error(err)
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+
+	return updatedStateVersion, nil
 }
 
 func (s *stateVersions) getStateVersion(ctx context.Context, ex goqu.Ex) (*models.StateVersion, error) {
@@ -293,6 +335,7 @@ func scanStateVersion(row scanner) (*models.StateVersion, error) {
 		&stateVersion.RunID,
 		&stateVersion.CreatedBy,
 		&objectStoreKey,
+		&stateVersion.JSONObjectStoreKey,
 		&workspacePath,
 	)
 	if err != nil {

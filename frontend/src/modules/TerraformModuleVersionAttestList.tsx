@@ -2,6 +2,7 @@ import { useState } from 'react';
 import graphql from 'babel-plugin-relay/macro'
 import { ConnectionHandler, useMutation, usePaginationFragment } from "react-relay/hooks";
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Typography, useTheme } from "@mui/material";
+import { parseBase64Json } from '../common/base64';
 import { ResponsiveTable } from '../common/ResponsiveTable';
 import ListSkeleton from '../skeletons/ListSkeleton';
 import { useSnackbar } from 'notistack';
@@ -44,7 +45,11 @@ function DataDialog({ onCloseDataDialog, encodedData }: DataDialogProps) {
             <DialogContent dividers>
                 <Box sx={{ fontSize: 14, overflowX: 'auto' }}>
                     <SyntaxHighlighter language="json" style={a11yDark}>
-                        {JSON.stringify(JSON.parse(atob(JSON.parse(atob(encodedData))['payload'])), null, 2)}
+                        {/*
+                          * A DSSE envelope: the outer document is base64, and its "payload" field is
+                          * base64 again, so both layers need the UTF-8-aware decode.
+                          */}
+                        {JSON.stringify(parseBase64Json(parseBase64Json<{ payload: string }>(encodedData).payload), null, 2)}
                     </SyntaxHighlighter>
                 </Box>
             </DialogContent>

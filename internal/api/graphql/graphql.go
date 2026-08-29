@@ -31,14 +31,6 @@ const (
 	maxQueryNestedLevels = 20
 )
 
-// fieldOverrides is initialized map passed into GetQueryComplexity
-var fieldOverrides = map[string]int{
-	"readme":                   1,
-	"runnerAvailabilityStatus": 5,
-	"inventory":                5,
-	"messages":                 5, // override for policyCheck.policy.messages
-}
-
 type queryComplexityResult struct {
 	Throttled          bool `json:"throttled"`
 	RequestedQueryCost int  `json:"requestedQueryCost"`
@@ -129,6 +121,17 @@ func NewGraphQL(
 		graphql.SubscribeResolverTimeout(time.Second*10),
 	)
 
+	// The complexity calculator is built once and reused for every request. It indexes the schema's
+	// types as it encounters them, so sharing one instance avoids repeating that per request. It is
+	// safe for concurrent use.
+	complexityOpts := complexity.DefaultOptions()
+	complexityOpts.MaxNestedLevels = maxQueryNestedLevels
+
+	queryComplexityCalculator, err := complexity.NewCalculator(schema.ASTSchema(), &complexityOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create query complexity calculator %v", err)
+	}
+
 	httpHandler := httpHandler{
 		schema:         schema,
 		logger:         logger,
@@ -137,8 +140,9 @@ func NewGraphQL(
 			resolverState: resolverState,
 			loaders:       loaderCollection,
 		},
-		maxGraphqlComplexity: maxGraphqlComplexity,
-		maxBodySize:          maxBodySize,
+		maxGraphqlComplexity:      maxGraphqlComplexity,
+		maxBodySize:               maxBodySize,
+		queryComplexityCalculator: queryComplexityCalculator,
 	}
 
 	return &GraphQL{
@@ -166,12 +170,13 @@ func (h *GraphQL) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type httpHandler struct {
-	schema               *graphql.Schema
-	logger               logger.Logger
-	ctxGenerator         *contextGenerator
-	rateLimitStore       ratelimitstore.Store
-	maxGraphqlComplexity int
-	maxBodySize          int
+	schema                    *graphql.Schema
+	logger                    logger.Logger
+	ctxGenerator              *contextGenerator
+	rateLimitStore            ratelimitstore.Store
+	queryComplexityCalculator *complexity.Calculator
+	maxGraphqlComplexity      int
+	maxBodySize               int
 }
 
 var (
@@ -302,32 +307,32 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *httpHandler) calculateQueryComplexity(ctx context.Context, q query, subject string) (*queryComplexityResult, error) {
-	// calculate query complexity
-	complexity, err := complexity.GetQueryComplexity(q.Query, q.Variables, fieldOverrides, maxQueryNestedLevels)
+	// calculate query complexity. Per field costs come from @complexity directives in the schema.
+	queryCost, err := h.queryComplexityCalculator.Calculate(q.Query, q.Variables)
 	if err != nil {
 		return nil, err
 	}
-	queryComplexityHistogram.Observe(float64(complexity))
+	queryComplexityHistogram.Observe(float64(queryCost))
 
 	// Max Complexity of 0 disables rate limiting
 	if h.maxGraphqlComplexity == 0 {
 		return &queryComplexityResult{
 			Throttled:          false,
-			RequestedQueryCost: complexity,
+			RequestedQueryCost: queryCost,
 			MaxQueryCost:       h.maxGraphqlComplexity,
 			Remaining:          0,
 		}, nil
 	}
 
 	// TakeMany determines if the query needs to be rate limited
-	_, remaining, _, ok, err := h.rateLimitStore.TakeMany(ctx, "graphql-"+subject, uint64(complexity))
+	_, remaining, _, ok, err := h.rateLimitStore.TakeMany(ctx, "graphql-"+subject, uint64(queryCost))
 	if err != nil {
 		return nil, err
 	}
 
 	return &queryComplexityResult{
 		Throttled:          !ok,
-		RequestedQueryCost: complexity,
+		RequestedQueryCost: queryCost,
 		MaxQueryCost:       h.maxGraphqlComplexity,
 		Remaining:          int(remaining),
 	}, nil

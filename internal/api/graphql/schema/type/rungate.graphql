@@ -73,7 +73,7 @@ type RunGate implements Node {
   metadata: ResourceMetadata!
   status: RunGateStatus!
   type: RunGateType!
-  approvalRules: [RunGateApprovalRule!]!
+  approvalRules: [RunGateApprovalRule!]! @complexity(value: 0)
   approvals: [RunGateApproval!]!
   """
   The subject that bypassed this gate's approval requirements — a user's email or a service

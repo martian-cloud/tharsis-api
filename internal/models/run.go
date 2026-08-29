@@ -52,9 +52,11 @@ const (
 	RunPreApplyAwaitingDecision RunStatus = "pre_apply_awaiting_decision"
 	RunPreApplyCompleted        RunStatus = "pre_apply_completed"
 	// The apply. Gated on the workspace, then on a runner.
-	RunApplyQueuing RunStatus = "apply_queuing"
-	RunApplyQueued  RunStatus = "apply_queued"
-	RunApplying     RunStatus = "applying"
+	RunApplyQueuing       RunStatus = "apply_queuing"
+	RunApplyQueued        RunStatus = "apply_queued"
+	RunApplying           RunStatus = "applying"
+	RunPostApplyRunning   RunStatus = "post_apply_running"
+	RunPostApplyCompleted RunStatus = "post_apply_completed"
 	// Terminal statuses.
 	RunApplied            RunStatus = "applied"
 	RunPlannedAndFinished RunStatus = "planned_and_finished"
@@ -74,6 +76,7 @@ var AllRunStatuses = []RunStatus{
 	RunPlanned,
 	RunPreApplyQueuing, RunPreApplyRunning, RunPreApplyAwaitingDecision, RunPreApplyCompleted,
 	RunApplyQueuing, RunApplyQueued, RunApplying,
+	RunPostApplyRunning, RunPostApplyCompleted,
 	RunApplied, RunPlannedAndFinished, RunCanceled, RunDiscarded, RunErrored,
 }
 

@@ -25,11 +25,11 @@ export const STATUS_MAP: Record<string, { label: string }> = {
   pre_plan_completed: { label: 'Pre-Plan Complete' },
   post_plan_running: { label: 'Post Planning' },
   post_plan_awaiting_decision: { label: 'Awaiting Approval' },
-  post_plan_completed: { label: 'Post-Plan Complete' },
   pre_apply_queuing: { label: 'Waiting to be queued' },
   pre_apply_running: { label: 'Pre Applying' },
   pre_apply_awaiting_decision: { label: 'Awaiting Approval' },
   pre_apply_completed: { label: 'Pre-Apply Complete' },
+  post_apply_running: { label: 'Post Applying' },
 };
 
 const ADVISORY_FAILURES_TOOLTIP = "One or more advisory policies failed.";

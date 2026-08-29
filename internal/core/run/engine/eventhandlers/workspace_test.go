@@ -202,6 +202,46 @@ func TestWorkspaceLockManager_HandleRunChanges(t *testing.T) {
 			expectEnqueue:      false,
 		},
 		{
+			// A run whose apply finished and now has a post-apply stage running is not yet complete
+			// (IsComplete is false while the stage evaluates), is not planned, and is not any of the
+			// three *_awaiting_decision statuses — post_apply has no such status, since it is
+			// advisory-only. It must therefore keep the workspace slot through the stage, mirroring how
+			// post_plan_running holds the plan's slot.
+			name: "run with a running post-apply stage does not release the workspace",
+			run: &models.Run{
+				Metadata:    models.ResourceMetadata{ID: wsTestRunID},
+				WorkspaceID: wsTestWorkspaceID,
+				Apply:       &models.Apply{Status: models.ApplyFinished},
+				Status:      models.RunPostApplyRunning,
+				TaskStages: []*models.RunTaskStage{
+					{StageName: models.RunTaskStageNamePostApply, Status: models.RunTaskStageRunning},
+				},
+			},
+			nodeChanges:        []statemachine.NodeStatusChange{statemachine.RunStatusChange{OldStatus: models.RunApplying, NewStatus: models.RunPostApplyRunning}},
+			expectGetWorkspace: false,
+			expectUpdate:       false,
+			expectEnqueue:      false,
+		},
+		{
+			// Once the post-apply stage clears and the run reaches applied, the workspace it holds is
+			// released the same way any other completed non-speculative run's is.
+			name: "run reaching applied after a post-apply stage releases the workspace",
+			run: &models.Run{
+				Metadata:    models.ResourceMetadata{ID: wsTestRunID},
+				WorkspaceID: wsTestWorkspaceID,
+				Apply:       &models.Apply{Status: models.ApplyFinished},
+				Status:      models.RunApplied,
+				TaskStages: []*models.RunTaskStage{
+					{StageName: models.RunTaskStageNamePostApply, Status: models.RunTaskStageCompleted},
+				},
+			},
+			workspace:               &models.Workspace{CurrentApplyRunID: ptr.String(wsTestRunID)},
+			expectGetWorkspace:      true,
+			expectUpdate:            true,
+			expectCurrentApplyRunID: "",
+			expectEnqueue:           true,
+		},
+		{
 			name: "force-canceled apply marks workspace dirty",
 			run: &models.Run{
 				Metadata:      models.ResourceMetadata{ID: wsTestRunID},

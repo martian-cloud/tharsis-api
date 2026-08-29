@@ -44,6 +44,7 @@ export default [
         URL: 'readonly',
         URLSearchParams: 'readonly',
         Blob: 'readonly',
+        TextDecoder: 'readonly',
         Worker: 'readonly',
         ResizeObserver: 'readonly',
         RequestInfo: 'readonly',

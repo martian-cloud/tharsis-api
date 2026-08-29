@@ -31,8 +31,8 @@ service Runs {
   rpc GetApplyByID(apply.GetApplyByIDRequest) returns (apply.Apply);
   // UpdatePlan updates a Plan.
   rpc UpdatePlan(plan.UpdatePlanRequest) returns (plan.Plan);
-  // ReportRunPolicyOutcomes records the policy-set outcomes for a run's post-plan stage node
-  // and sets the stage verdict.
+  // ReportRunPolicyOutcomes records the policy-set outcomes for a run's policy check node (at any
+  // stage) and sets the check verdict.
   rpc ReportRunPolicyOutcomes(ReportRunPolicyOutcomesRequest) returns (google.protobuf.Empty);
   // UpdateApply updates an Apply.
   rpc UpdateApply(apply.UpdateApplyRequest) returns (apply.Apply);
@@ -74,11 +74,11 @@ enum RunStatus {
   PRE_PLAN_COMPLETED            = 17;
   POST_PLAN_RUNNING             = 18;
   POST_PLAN_AWAITING_DECISION   = 19;
-  POST_PLAN_COMPLETED           = 20;
-  PRE_APPLY_QUEUING             = 21;
-  PRE_APPLY_RUNNING             = 22;
-  PRE_APPLY_AWAITING_DECISION   = 23;
-  PRE_APPLY_COMPLETED           = 24;
+  PRE_APPLY_QUEUING             = 20;
+  PRE_APPLY_RUNNING             = 21;
+  PRE_APPLY_AWAITING_DECISION   = 22;
+  PRE_APPLY_COMPLETED           = 23;
+  POST_APPLY_RUNNING            = 24;
 }
 
 // PolicyCheckType identifies the policy engine a check runs.

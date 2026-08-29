@@ -20,12 +20,19 @@ import (
 
 const (
 	contentTypeOctetStream = "application/octet-stream"
+	contentTypeJSON        = "application/json"
 )
 
 // ErrPackageNotFound is returned by DownloadPackage when the requested package version cannot be
 // found (it has been deleted, is not fully uploaded, or the caller cannot view it). Callers can
 // detect it with errors.Is.
 var ErrPackageNotFound = errors.New("package not found")
+
+// ErrStateVersionJSONNotFound is returned by DownloadStateVersionJSON when the state version has no
+// JSON rendering stored. This is an expected condition rather than a failure — nothing uploads one for
+// state pushed through the TFE endpoint or by a job executor older than the feature — so callers can
+// detect it with errors.Is and proceed without the rendering.
+var ErrStateVersionJSONNotFound = errors.New("state version JSON not found")
 
 var _ RESTClient = (*restClient)(nil)
 
@@ -107,6 +114,18 @@ type DownloadStateVersionInput struct {
 	Writer         io.Writer
 }
 
+// UploadStateVersionJSONInput is the input for uploading a state version's JSON rendering.
+type UploadStateVersionJSONInput struct {
+	StateVersionID string
+	Reader         io.Reader
+}
+
+// DownloadStateVersionJSONInput is the input for downloading a state version's JSON rendering.
+type DownloadStateVersionJSONInput struct {
+	StateVersionID string
+	Writer         io.Writer
+}
+
 // DownloadPlanCacheInput is the input for downloading a plan cache.
 type DownloadPlanCacheInput struct {
 	PlanID string
@@ -138,6 +157,8 @@ type RESTClient interface {
 	UploadPlanCache(ctx context.Context, input *UploadPlanCacheInput) error
 	UploadPlanData(ctx context.Context, input *UploadPlanDataInput) error
 	DownloadStateVersion(ctx context.Context, input *DownloadStateVersionInput) error
+	UploadStateVersionJSON(ctx context.Context, input *UploadStateVersionJSONInput) error
+	DownloadStateVersionJSON(ctx context.Context, input *DownloadStateVersionJSONInput) error
 	DownloadPlanCache(ctx context.Context, input *DownloadPlanCacheInput) error
 	DownloadPlanJSON(ctx context.Context, input *DownloadPlanJSONInput) error
 	DownloadPackage(ctx context.Context, input *DownloadPackageInput) error
@@ -190,16 +211,28 @@ func NewRESTClient(cfg *RESTClientConfig) (RESTClient, error) {
 	}, nil
 }
 
-// UploadConfigurationVersion uploads a directory as a tar.gz file.
-func (c *restClient) UploadConfigurationVersion(ctx context.Context, input *UploadConfigurationVersionInput) error {
+// tfeServiceURL resolves the base URL of the TFE-compatible API from the service discovery document.
+// Endpoints that Terraform itself would call live under that prefix rather than under /v1, so its
+// location comes from discovery instead of being assumed.
+func (c *restClient) tfeServiceURL(ctx context.Context) (*url.URL, error) {
 	discovered, err := c.serviceDiscoverer.DiscoverTFEServices(ctx, c.baseURL.String())
 	if err != nil {
-		return fmt.Errorf("failed to discover tfe v2 service: %w", err)
+		return nil, fmt.Errorf("failed to discover tfe v2 service: %w", err)
 	}
 
 	serviceURL, ok := discovered.Services[provider.TFEServiceID]
 	if !ok {
-		return fmt.Errorf("service url for %q not found", provider.TFEServiceID)
+		return nil, fmt.Errorf("service url for %q not found", provider.TFEServiceID)
+	}
+
+	return serviceURL, nil
+}
+
+// UploadConfigurationVersion uploads a directory as a tar.gz file.
+func (c *restClient) UploadConfigurationVersion(ctx context.Context, input *UploadConfigurationVersionInput) error {
+	serviceURL, err := c.tfeServiceURL(ctx)
+	if err != nil {
+		return err
 	}
 
 	s, err := slug.New(input.DirectoryPath)
@@ -226,14 +259,9 @@ func (c *restClient) UploadConfigurationVersion(ctx context.Context, input *Uplo
 
 // DownloadConfigurationVersion downloads a configuration version.
 func (c *restClient) DownloadConfigurationVersion(ctx context.Context, input *DownloadConfigurationVersionInput) error {
-	discovered, err := c.serviceDiscoverer.DiscoverTFEServices(ctx, c.baseURL.String())
+	serviceURL, err := c.tfeServiceURL(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to discover tfe v2 service: %w", err)
-	}
-
-	serviceURL, ok := discovered.Services[provider.TFEServiceID]
-	if !ok {
-		return fmt.Errorf("service url for %q not found", provider.TFEServiceID)
+		return err
 	}
 
 	downloadURL := serviceURL.JoinPath("configuration-versions", input.ConfigVersionID, "content").String()
@@ -354,14 +382,9 @@ func (c *restClient) UploadPlanData(ctx context.Context, input *UploadPlanDataIn
 
 // DownloadStateVersion downloads a state version.
 func (c *restClient) DownloadStateVersion(ctx context.Context, input *DownloadStateVersionInput) error {
-	discovered, err := c.serviceDiscoverer.DiscoverTFEServices(ctx, c.baseURL.String())
+	serviceURL, err := c.tfeServiceURL(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to discover tfe v2 service: %w", err)
-	}
-
-	serviceURL, ok := discovered.Services[provider.TFEServiceID]
-	if !ok {
-		return fmt.Errorf("service url for %q not found", provider.TFEServiceID)
+		return err
 	}
 
 	downloadURL := serviceURL.JoinPath("state-versions", input.StateVersionID, "content").String()
@@ -369,16 +392,70 @@ func (c *restClient) DownloadStateVersion(ctx context.Context, input *DownloadSt
 	return c.doGet(ctx, downloadURL, input.Writer, contentTypeOctetStream)
 }
 
-// DownloadPlanCache downloads a plan cache binary.
-func (c *restClient) DownloadPlanCache(ctx context.Context, input *DownloadPlanCacheInput) error {
-	discovered, err := c.serviceDiscoverer.DiscoverTFEServices(ctx, c.baseURL.String())
+// UploadStateVersionJSON uploads the "terraform show -json" rendering of a state version. This is a
+// separate request from creating the state version because that call carries the raw state inside a
+// single size-limited gRPC message; the rendering is typically larger than the state itself.
+func (c *restClient) UploadStateVersionJSON(ctx context.Context, input *UploadStateVersionJSONInput) error {
+	serviceURL, err := c.tfeServiceURL(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to discover tfe v2 service: %w", err)
+		return err
 	}
 
-	serviceURL, ok := discovered.Services[provider.TFEServiceID]
-	if !ok {
-		return fmt.Errorf("service url for %q not found", provider.TFEServiceID)
+	uploadURL := serviceURL.JoinPath("state-versions", input.StateVersionID, "content.json").String()
+
+	return c.doPut(ctx, uploadURL, input.Reader, -1)
+}
+
+// DownloadStateVersionJSON downloads a state version's JSON rendering. A state version with no
+// rendering stored returns ErrStateVersionJSONNotFound, which callers are expected to treat as "not
+// available" rather than as a failure.
+func (c *restClient) DownloadStateVersionJSON(ctx context.Context, input *DownloadStateVersionJSONInput) error {
+	serviceURL, err := c.tfeServiceURL(ctx)
+	if err != nil {
+		return err
+	}
+
+	downloadURL := serviceURL.JoinPath("state-versions", input.StateVersionID, "content.json").String()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	if err != nil {
+		return err
+	}
+
+	authToken, err := c.tokenResolver.Token(ctx)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+authToken)
+	req.Header.Set("Accept", contentTypeJSON)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("%w: %s", ErrStateVersionJSONNotFound, string(bodyBytes))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("download failed with status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	_, err = io.Copy(input.Writer, resp.Body)
+
+	return err
+}
+
+// DownloadPlanCache downloads a plan cache binary.
+func (c *restClient) DownloadPlanCache(ctx context.Context, input *DownloadPlanCacheInput) error {
+	serviceURL, err := c.tfeServiceURL(ctx)
+	if err != nil {
+		return err
 	}
 
 	downloadURL := serviceURL.JoinPath("plans", input.PlanID, "content").String()
@@ -388,14 +465,9 @@ func (c *restClient) DownloadPlanCache(ctx context.Context, input *DownloadPlanC
 
 // DownloadPlanJSON downloads a plan's JSON representation.
 func (c *restClient) DownloadPlanJSON(ctx context.Context, input *DownloadPlanJSONInput) error {
-	discovered, err := c.serviceDiscoverer.DiscoverTFEServices(ctx, c.baseURL.String())
+	serviceURL, err := c.tfeServiceURL(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to discover tfe v2 service: %w", err)
-	}
-
-	serviceURL, ok := discovered.Services[provider.TFEServiceID]
-	if !ok {
-		return fmt.Errorf("service url for %q not found", provider.TFEServiceID)
+		return err
 	}
 
 	downloadURL := serviceURL.JoinPath("plans", input.PlanID, "json-output").String()

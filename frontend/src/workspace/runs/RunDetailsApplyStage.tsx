@@ -24,6 +24,7 @@ import RunDetailsStageTabEmptyState from './RunDetailsStageTabEmptyState';
 import RunStageStatusTypes from './RunStageStatusTypes';
 import RunVariables from './RunVariables';
 import CheckResultsPanel from './CheckResultsPanel';
+import StateVersionFile from '../state/StateVersionFile';
 import { RunDetailsApplyStageApplyRunMutation } from './__generated__/RunDetailsApplyStageApplyRunMutation.graphql';
 import { RunDetailsApplyStageCancelRunMutation } from './__generated__/RunDetailsApplyStageCancelRunMutation.graphql';
 import { RunDetailsApplyStageFragment_apply$key } from './__generated__/RunDetailsApplyStageFragment_apply.graphql';
@@ -94,7 +95,7 @@ function RunDetailsApplyStage(props: Props) {
     // The tab lives in the URL like the plan stage's. Sanitize it: a stale value
     // carried over from the plan page (e.g. ?tab=changes) falls back to logs.
     const tabParam = searchParams.get('tab');
-    const tab = tabParam === 'variables' ? 'variables' : 'logs';
+    const tab = tabParam === 'variables' || tabParam === 'state' ? tabParam : 'logs';
 
     const data = useFragment<RunDetailsApplyStageFragment_apply$key>(
         graphql`
@@ -138,6 +139,7 @@ function RunDetailsApplyStage(props: Props) {
                         ...CheckResultsPanelFragment_checkResult
                     }
                 }
+                ...StateVersionFileFragment_stateVersion
             }
         }
       `, props.fragmentRef)
@@ -342,6 +344,12 @@ function RunDetailsApplyStage(props: Props) {
         'No logs are available because the apply was not run' :
         'Logs will be displayed once the apply has started';
 
+    // A run only has a state version once its apply has written state, so the tab is empty before
+    // then — and permanently so for an apply that never ran or wrote nothing.
+    const stateEmptyMessage = apply.status === 'finished' ?
+        'This apply did not write a state version' :
+        'State will be displayed once the apply has completed';
+
     return (
         <Box>
             {apply.currentJob?.cancelRequested && apply.status !== 'canceled' && <ForceCancelRunAlert fragmentRef={data} />}
@@ -364,6 +372,7 @@ function RunDetailsApplyStage(props: Props) {
                     <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
                         <Tab label="Logs" value="logs" />
                         <Tab label="Variables" value="variables" />
+                        <Tab label="State" value="state" />
                     </Tabs>
                 </Box>
                 {tab === 'logs' && <Box>
@@ -381,6 +390,13 @@ function RunDetailsApplyStage(props: Props) {
                 {tab === 'variables' && <Box marginTop={2}>
                     <RunVariables fragmentRef={data} />
                 </Box>}
+                {tab === 'state' && (data.stateVersion ?
+                    <Suspense fallback={<Box sx={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress /></Box>}>
+                        <StateVersionFile fragmentRef={data.stateVersion} />
+                    </Suspense> :
+                    <Box marginTop={2}>
+                        <RunDetailsStageTabEmptyState message={stateEmptyMessage} />
+                    </Box>)}
             </Box>
             {jobDialogOpen && <RunJobDialog
                 runId={data.id}

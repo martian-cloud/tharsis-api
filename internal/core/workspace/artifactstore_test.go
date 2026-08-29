@@ -368,6 +368,60 @@ func TestUploadStateVersion(t *testing.T) {
 	}
 }
 
+// TestUploadStateVersionJSON verifies the JSON rendering lands under the workspace's state_versions
+// prefix with a .json suffix — a distinct key from the raw state, so the two artifacts never collide —
+// and is retained against the state version so it is collected with it.
+func TestUploadStateVersionJSON(t *testing.T) {
+	tests := []struct {
+		name          string
+		retErr        error
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "success",
+		},
+		{
+			name:          "internal error",
+			retErr:        errInternal,
+			expectErrCode: errors.EInternal,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			buf := bytes.NewBufferString(`{"format_version":"1.0"}`)
+			sv := models.StateVersion{Metadata: models.ResourceMetadata{ID: "1"}, WorkspaceID: "ws-1"}
+
+			var uploadedKey string
+			mockObjectStore := objectstore.MockObjectStore{}
+			mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) {
+					uploadedKey = args.Get(1).(string)
+				}).Return(test.retErr)
+
+			mockRefs := db.NewMockObjectStoreRefs(t)
+			if test.retErr == nil {
+				mockRefs.On("LinkRef", mock.Anything, mock.Anything, db.ObjectStoreRefOwnerStateVersion, sv.Metadata.ID).Return(nil)
+			}
+
+			retainFn, key, err := NewArtifactStore(&mockObjectStore, mockRefs).UploadStateVersionJSON(ctx, &sv, buf)
+			if err != nil {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err), "Unexpected error occurred")
+				return
+			}
+
+			assert.NotNil(t, retainFn)
+			assert.Equal(t, uploadedKey, key)
+			assert.True(t, strings.HasPrefix(key, "workspaces/ws-1/state_versions/"), "unexpected key %q", key)
+			assert.True(t, strings.HasSuffix(key, ".json"), "unexpected key %q", key)
+			assert.NoError(t, retainFn(ctx, sv.Metadata.ID))
+		})
+	}
+}
+
 // TestUploadPolicyCheckPolicyMessages verifies a policy's violation messages land under the run's
 // policy_messages prefix with a fresh key per upload, retained against the run so they are collected
 // with it.

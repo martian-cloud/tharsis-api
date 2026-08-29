@@ -829,13 +829,29 @@ func (s *service) GetNamespaceFavorites(ctx context.Context, input *GetNamespace
 		return nil, errors.New("only users can get namespace favorites", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
+	// The listing is already restricted to the caller's own favorites, but a favorite outlives the
+	// membership that justified creating it: a user removed from a namespace would keep seeing — and
+	// keep being able to page through — a path they can no longer view. Restricting to the caller's
+	// root member namespaces and their descendants keeps the listing in step with what the caller can
+	// actually see today. A nil slice applies no membership filter, which is what admin mode gets,
+	// since it can view every namespace anyway.
+	var rootNamespaceMemberships []models.MembershipNamespace
+	if !userCaller.IsAdminModeActivated(ctx) {
+		rootNamespaces, rErr := userCaller.GetRootNamespaceMemberships(ctx)
+		if rErr != nil {
+			return nil, errors.Wrap(rErr, "failed to get root namespace memberships", errors.WithSpan(span))
+		}
+		rootNamespaceMemberships = rootNamespaces
+	}
+
 	return s.dbClient.NamespaceFavorites.GetNamespaceFavorites(ctx, &db.GetNamespaceFavoritesInput{
 		Sort:              input.Sort,
 		PaginationOptions: input.PaginationOptions,
 		Filter: &db.NamespaceFavoriteFilter{
-			UserIDs:       []string{userCaller.User.Metadata.ID},
-			NamespacePath: input.NamespacePath,
-			Search:        input.Search,
+			UserIDs:                  []string{userCaller.User.Metadata.ID},
+			NamespacePath:            input.NamespacePath,
+			Search:                   input.Search,
+			RootNamespaceMemberships: rootNamespaceMemberships,
 		},
 	})
 }

@@ -17,7 +17,8 @@ var nonDiscardableStatuses = []models.RunStatus{
 	models.RunPlanQueuing, models.RunPlanQueued, models.RunPlanning,
 	models.RunPostPlanRunning,
 	models.RunPreApplyQueuing, models.RunPreApplyRunning, models.RunPreApplyCompleted,
-	models.RunApplyQueuing, models.RunApplyQueued, models.RunApplying, models.RunApplied,
+	models.RunApplyQueuing, models.RunApplyQueued, models.RunApplying,
+	models.RunPostApplyRunning, models.RunApplied,
 	models.RunErrored, models.RunCanceled,
 }
 
@@ -158,6 +159,44 @@ func TestRunTransitions_PreApply(t *testing.T) {
 	// discard canceled, so the run returns to pre_apply_queuing to be re-admitted.
 	assert.True(t, canTransitionTo(runTransitions, models.RunPreApplyAwaitingDecision, models.RunDiscarded), "pre_apply_awaiting_decision -> discarded should be allowed")
 	assert.True(t, canTransitionTo(runTransitions, models.RunDiscarded, models.RunPreApplyQueuing), "discarded -> pre_apply_queuing (undiscard re-runs the gate) should be allowed")
+}
+
+func TestRunTransitions_PostApply(t *testing.T) {
+	// The post-apply stage is not workspace-gated (it inherits the apply's slot, mirroring post-plan),
+	// so it starts running directly once the apply finishes — no *_queuing status of its own.
+	assert.True(t, canTransitionTo(runTransitions, models.RunApplying, models.RunPostApplyRunning), "applying -> post_apply_running should be allowed")
+	// An apply with no post-apply stage finishes the run directly.
+	assert.True(t, canTransitionTo(runTransitions, models.RunApplying, models.RunApplied), "applying -> applied should be allowed")
+
+	// post_apply_completed is transient: the stage's completed handler passes straight through it to
+	// applied within the same state-machine pass. It is still a legal, recorded transition (the run's
+	// status-change history and event stream observe it even though no persisted run rests there).
+	assert.True(t, canTransitionTo(runTransitions, models.RunPostApplyRunning, models.RunPostApplyCompleted), "post_apply_running -> post_apply_completed should be allowed")
+	assert.True(t, canTransitionTo(runTransitions, models.RunPostApplyCompleted, models.RunApplied), "post_apply_completed -> applied should be allowed")
+
+	// post_apply is advisory-only (models.Policy.Validate), so no check can ever soft-fail and block on
+	// a human override: there is no post_apply_awaiting_decision status at all, and therefore no
+	// discard reachable from a post-apply gate.
+	assert.False(t, canTransitionTo(runTransitions, models.RunPostApplyRunning, models.RunDiscarded), "post_apply_running -> discarded should not be allowed")
+	assert.False(t, canTransitionTo(runTransitions, models.RunPostApplyCompleted, models.RunDiscarded), "post_apply_completed -> discarded should not be allowed")
+
+	// A hard failure of the post-apply eval job still errors the run — the apply already wrote state,
+	// but there is no dedicated status carrying that nuance, mirroring every other hard-mandatory
+	// failure. A cancel while the stage runs cancels the run outright too.
+	assert.True(t, canTransitionTo(runTransitions, models.RunPostApplyRunning, models.RunErrored), "post_apply_running -> errored should be allowed")
+	assert.True(t, canTransitionTo(runTransitions, models.RunPostApplyRunning, models.RunCanceled), "post_apply_running -> canceled should be allowed")
+	assert.True(t, canTransitionTo(runTransitions, models.RunPostApplyCompleted, models.RunCanceled), "post_apply_completed -> canceled should be allowed")
+
+	// A retry returns an errored/canceled run straight to post_apply_running, the ungated stage that
+	// re-runs directly on the apply's slot — never to a *_queuing/_queued status, and never back to
+	// applied or pending.
+	for _, s := range []models.RunStatus{models.RunErrored, models.RunCanceled} {
+		assert.Truef(t, canTransitionTo(runTransitions, s, models.RunPostApplyRunning), "%s -> post_apply_running (stage retry) should be allowed", s)
+	}
+
+	// applied is terminal: nothing transitions out of it, including back into post-apply.
+	assert.False(t, canTransitionTo(runTransitions, models.RunApplied, models.RunPostApplyRunning), "applied -> post_apply_running should not be allowed")
+	assert.False(t, canTransitionTo(runTransitions, models.RunApplied, models.RunErrored), "applied -> errored should not be allowed")
 }
 
 func TestTaskStageTransitions_Admission(t *testing.T) {

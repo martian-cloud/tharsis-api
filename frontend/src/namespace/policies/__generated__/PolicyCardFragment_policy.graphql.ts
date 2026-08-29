@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9ce63958a918a68463000561210fbb49>>
+ * @generated SignedSource<<bcd17f4645367d042a20b246e55fda29>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,7 +12,7 @@ import { ReaderFragment } from 'relay-runtime';
 export type PolicyEnforcementLevel = "ADVISORY" | "HARD_MANDATORY" | "SOFT_MANDATORY" | "%future added value";
 export type PolicyKind = "OPA" | "%future added value";
 export type PolicyScopeRuleAction = "EXCLUDE" | "INCLUDE" | "%future added value";
-export type PolicyStage = "POST_APPLY" | "POST_PLAN" | "PRE_PLAN" | "%future added value";
+export type PolicyStage = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_PLAN" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type PolicyCardFragment_policy$data = {
   readonly allowedServiceAccounts: ReadonlyArray<{

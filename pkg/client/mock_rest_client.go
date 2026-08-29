@@ -103,6 +103,24 @@ func (_m *MockRESTClient) DownloadStateVersion(ctx context.Context, input *Downl
 	return r0
 }
 
+// DownloadStateVersionJSON provides a mock function with given fields: ctx, input
+func (_m *MockRESTClient) DownloadStateVersionJSON(ctx context.Context, input *DownloadStateVersionJSONInput) error {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DownloadStateVersionJSON")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *DownloadStateVersionJSONInput) error); ok {
+		r0 = rf(ctx, input)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UploadConfigurationVersion provides a mock function with given fields: ctx, input
 func (_m *MockRESTClient) UploadConfigurationVersion(ctx context.Context, input *UploadConfigurationVersionInput) error {
 	ret := _m.Called(ctx, input)
@@ -257,6 +275,24 @@ func (_m *MockRESTClient) UploadProviderReadme(ctx context.Context, input *Uploa
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *UploadProviderReadmeInput) error); ok {
+		r0 = rf(ctx, input)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UploadStateVersionJSON provides a mock function with given fields: ctx, input
+func (_m *MockRESTClient) UploadStateVersionJSON(ctx context.Context, input *UploadStateVersionJSONInput) error {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadStateVersionJSON")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *UploadStateVersionJSONInput) error); ok {
 		r0 = rf(ctx, input)
 	} else {
 		r0 = ret.Error(0)

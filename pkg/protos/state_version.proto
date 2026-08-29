@@ -12,6 +12,9 @@ import "state_version_output.proto";
 service StateVersions {
   // GetStateVersionByID returns a StateVersion by an ID.
   rpc GetStateVersionByID(GetStateVersionByIDRequest) returns (StateVersion);
+  // GetRunStateVersion returns the StateVersion a Run's apply created. Returns NOT_FOUND when the run
+  // wrote no state, which is not an error condition for callers that only need it when it exists.
+  rpc GetRunStateVersion(GetRunStateVersionRequest) returns (StateVersion);
   // GetStateVersions returns a paginated list of StateVersions for a workspace.
   rpc GetStateVersions(GetStateVersionsRequest) returns (GetStateVersionsResponse);
   // CreateStateVersion creates a new StateVersion.
@@ -33,6 +36,11 @@ enum StateVersionSortableField {
 // GetStateVersionByIDRequest is the input for retrieving a StateVersion by its ID.
 message GetStateVersionByIDRequest {
   string id = 1;
+}
+
+// GetRunStateVersionRequest is the input for retrieving the StateVersion created by a Run.
+message GetRunStateVersionRequest {
+  string run_id = 1;
 }
 
 // GetStateVersionsRequest is the input for retrieving a paginated list of StateVersions.

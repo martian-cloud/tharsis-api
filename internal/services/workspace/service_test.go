@@ -1739,6 +1739,211 @@ func TestGetStateVersionInventory(t *testing.T) {
 	})
 }
 
+// TestUploadStateVersionJSON covers the second-request upload of a state version's JSON rendering:
+// it is gated on the same permission as creating state, the object is written before the row is
+// updated so a failed update leaves only a collectable orphan, and the recorded key is the one the
+// artifact store minted.
+func TestUploadStateVersionJSON(t *testing.T) {
+	stateVersionID := "state-version-1"
+	workspaceID := "workspace-1"
+	jsonKey := "workspaces/workspace-1/state_versions/abc.json"
+	testLogger, _ := logger.NewForTest()
+
+	stored := func() *models.StateVersion {
+		return &models.StateVersion{
+			Metadata:    models.ResourceMetadata{ID: stateVersionID, Version: 1},
+			WorkspaceID: workspaceID,
+		}
+	}
+
+	setupCaller := func(ctx context.Context, t *testing.T, permErr error) context.Context {
+		mockCaller := auth.MockCaller{}
+		mockCaller.Test(t)
+		mockCaller.On("RequirePermission", mock.Anything, models.CreateStateVersionPermission, mock.Anything).
+			Return(permErr)
+		return auth.WithCaller(ctx, &mockCaller)
+	}
+
+	t.Run("auth failure", func(t *testing.T) {
+		svc := &service{dbClient: &db.Client{}}
+
+		err := svc.UploadStateVersionJSON(t.Context(), stateVersionID, strings.NewReader("{}"))
+		assert.Equal(t, errors.EUnauthorized, errors.ErrorCode(err))
+	})
+
+	t.Run("state version not found", func(t *testing.T) {
+		mockStateVersions := db.NewMockStateVersions(t)
+		mockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(nil, nil)
+
+		// The caller is authenticated but no permission check should be reached: the workspace to check
+		// against is not known until the state version is loaded.
+		mockCaller := auth.MockCaller{}
+		mockCaller.Test(t)
+		ctx := auth.WithCaller(t.Context(), &mockCaller)
+
+		svc := &service{dbClient: &db.Client{StateVersions: mockStateVersions}}
+
+		err := svc.UploadStateVersionJSON(ctx, stateVersionID, strings.NewReader("{}"))
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+	})
+
+	t.Run("permission denied", func(t *testing.T) {
+		mockStateVersions := db.NewMockStateVersions(t)
+		mockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(stored(), nil)
+
+		ctx := setupCaller(t.Context(), t, errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
+		svc := &service{dbClient: &db.Client{StateVersions: mockStateVersions}}
+
+		err := svc.UploadStateVersionJSON(ctx, stateVersionID, strings.NewReader("{}"))
+		assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
+	})
+
+	t.Run("upload error", func(t *testing.T) {
+		mockStateVersions := db.NewMockStateVersions(t)
+		mockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(stored(), nil)
+
+		mockArtifactStore := coreworkspace.NewMockArtifactStore(t)
+		mockArtifactStore.On("UploadStateVersionJSON", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, "", errors.New("store error", errors.WithErrorCode(errors.EInternal)))
+
+		ctx := setupCaller(t.Context(), t, nil)
+		svc := &service{dbClient: &db.Client{StateVersions: mockStateVersions}, artifactStore: mockArtifactStore}
+
+		err := svc.UploadStateVersionJSON(ctx, stateVersionID, strings.NewReader("{}"))
+		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	})
+
+	t.Run("success records the key and links the ref", func(t *testing.T) {
+		var updated *models.StateVersion
+		var linkedOwnerID string
+
+		mockStateVersions := db.NewMockStateVersions(t)
+		mockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(stored(), nil)
+		mockStateVersions.On("UpdateStateVersion", mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				updated = args.Get(1).(*models.StateVersion)
+			}).Return(stored(), nil)
+
+		mockArtifactStore := coreworkspace.NewMockArtifactStore(t)
+		mockArtifactStore.On("UploadStateVersionJSON", mock.Anything, mock.Anything, mock.Anything).
+			Return(db.RetainObjectRefFunc(func(_ context.Context, ownerID string) error {
+				linkedOwnerID = ownerID
+				return nil
+			}), jsonKey, nil)
+
+		// The update and the ref link must land in one transaction that commits.
+		mockTransactions := db.NewMockTransactions(t)
+		mockTransactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+		mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+		mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+		ctx := setupCaller(t.Context(), t, nil)
+		svc := &service{
+			logger:        testLogger,
+			dbClient:      &db.Client{StateVersions: mockStateVersions, Transactions: mockTransactions},
+			artifactStore: mockArtifactStore,
+		}
+
+		require.NoError(t, svc.UploadStateVersionJSON(ctx, stateVersionID, strings.NewReader("{}")))
+		require.NotNil(t, updated)
+		require.NotNil(t, updated.JSONObjectStoreKey)
+		assert.Equal(t, jsonKey, *updated.JSONObjectStoreKey)
+		assert.Equal(t, stateVersionID, linkedOwnerID)
+	})
+
+	// A failure to link the ref must abort the whole thing rather than leaving a row pointing at an
+	// object the janitor is free to collect, so the transaction is never committed.
+	t.Run("retain ref failure rolls back", func(t *testing.T) {
+		mockStateVersions := db.NewMockStateVersions(t)
+		mockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(stored(), nil)
+		mockStateVersions.On("UpdateStateVersion", mock.Anything, mock.Anything).Return(stored(), nil)
+
+		mockArtifactStore := coreworkspace.NewMockArtifactStore(t)
+		mockArtifactStore.On("UploadStateVersionJSON", mock.Anything, mock.Anything, mock.Anything).
+			Return(db.RetainObjectRefFunc(func(_ context.Context, _ string) error {
+				return errors.New("link failed", errors.WithErrorCode(errors.EInternal))
+			}), jsonKey, nil)
+
+		// CommitTx is deliberately not expected: the mock fails the test if it is called.
+		mockTransactions := db.NewMockTransactions(t)
+		mockTransactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+		mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+
+		ctx := setupCaller(t.Context(), t, nil)
+		svc := &service{
+			logger:        testLogger,
+			dbClient:      &db.Client{StateVersions: mockStateVersions, Transactions: mockTransactions},
+			artifactStore: mockArtifactStore,
+		}
+
+		err := svc.UploadStateVersionJSON(ctx, stateVersionID, strings.NewReader("{}"))
+		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	})
+}
+
+// TestGetStateVersionJSONContent verifies that a state version with no rendering stored reports
+// ENotFound rather than reaching the artifact store with an empty key — that is what lets the job
+// executor distinguish "no rendering" from a storage failure and evaluate policies without it.
+func TestGetStateVersionJSONContent(t *testing.T) {
+	stateVersionID := "state-version-1"
+	workspaceID := "workspace-1"
+	jsonKey := "workspaces/workspace-1/state_versions/abc.json"
+
+	setupCaller := func(ctx context.Context, t *testing.T, permErr error) context.Context {
+		mockCaller := auth.MockCaller{}
+		mockCaller.Test(t)
+		mockCaller.On("RequirePermission", mock.Anything, models.ViewStateVersionDataPermission, mock.Anything).
+			Return(permErr)
+		return auth.WithCaller(ctx, &mockCaller)
+	}
+
+	t.Run("auth failure", func(t *testing.T) {
+		svc := &service{dbClient: &db.Client{}}
+
+		_, err := svc.GetStateVersionJSONContent(t.Context(), stateVersionID)
+		assert.Equal(t, errors.EUnauthorized, errors.ErrorCode(err))
+	})
+
+	t.Run("no rendering stored", func(t *testing.T) {
+		mockStateVersions := db.NewMockStateVersions(t)
+		mockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(&models.StateVersion{
+			Metadata:    models.ResourceMetadata{ID: stateVersionID},
+			WorkspaceID: workspaceID,
+		}, nil)
+
+		ctx := setupCaller(t.Context(), t, nil)
+		// No artifact store is wired: reaching it would be the bug this case guards against.
+		svc := &service{dbClient: &db.Client{StateVersions: mockStateVersions}}
+
+		_, err := svc.GetStateVersionJSONContent(ctx, stateVersionID)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+	})
+
+	t.Run("success", func(t *testing.T) {
+		mockStateVersions := db.NewMockStateVersions(t)
+		mockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(&models.StateVersion{
+			Metadata:           models.ResourceMetadata{ID: stateVersionID},
+			WorkspaceID:        workspaceID,
+			JSONObjectStoreKey: &jsonKey,
+		}, nil)
+
+		mockArtifactStore := coreworkspace.NewMockArtifactStore(t)
+		mockArtifactStore.On("GetStateVersionJSON", mock.Anything, mock.Anything).
+			Return(io.NopCloser(strings.NewReader(`{"format_version":"1.0"}`)), nil)
+
+		ctx := setupCaller(t.Context(), t, nil)
+		svc := &service{dbClient: &db.Client{StateVersions: mockStateVersions}, artifactStore: mockArtifactStore}
+
+		reader, err := svc.GetStateVersionJSONContent(ctx, stateVersionID)
+		require.NoError(t, err)
+		defer reader.Close()
+
+		content, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"format_version":"1.0"}`, string(content))
+	})
+}
+
 func TestCreateStateVersion(t *testing.T) {
 	stateVersionID := "state-version-1"
 	workspaceID := "workspace-1"
@@ -1780,11 +1985,18 @@ func TestCreateStateVersion(t *testing.T) {
 		RunID:       &runID,
 	}
 
+	// The rendering cases each need their own model: the service records the rendering's object store
+	// key on the instance it is handed, so sharing one would leak that mutation between subtests.
+	renderingToCreate := &models.StateVersion{WorkspaceID: workspaceID, RunID: &runID}
+	renderingUploadFailToCreate := &models.StateVersion{WorkspaceID: workspaceID, RunID: &runID}
+	goodJSONData := buildEncodedData(`{"format_version": "1.0"}`)
+
 	type testCase struct {
 		authFail                 bool
 		workspacePermissionError error
 		dataUnmarshalError       error
 		uploadError              error
+		jsonUploadError          error
 		linkRefErr               error
 		createError              error
 		dataDecodeError          error
@@ -1793,12 +2005,20 @@ func TestCreateStateVersion(t *testing.T) {
 		injectCreated            *models.StateVersion
 		expectResult             *models.StateVersion
 		data                     []byte
-		name                     string
-		expectErrorCode          errors.CodeType
-		limit                    int
-		injectSVsPerWorkspace    int32
-		outputLimit              int
-		expectStoredOutputs      []string
+		// jsonData is the optional base64 "terraform show -json" rendering sent with the state.
+		jsonData *string
+		name     string
+		// expectJSONKey is whether the row handed to the database carries the rendering's object store
+		// key, which is what makes the rendering land in the same INSERT as the state version.
+		expectJSONKey bool
+		// expectNoWrites asserts the request was rejected before anything was uploaded or a transaction
+		// was opened.
+		expectNoWrites        bool
+		expectErrorCode       errors.CodeType
+		limit                 int
+		injectSVsPerWorkspace int32
+		outputLimit           int
+		expectStoredOutputs   []string
 	}
 
 	/*
@@ -1979,6 +2199,40 @@ func TestCreateStateVersion(t *testing.T) {
 			expectStoredOutputs:   []string{"a", "b", "c"},
 			expectResult:          outputStateVersion,
 		},
+		{
+			// A rendering supplied with the state is uploaded and its key set on the row before the
+			// insert, so the state version is created with the rendering already attached.
+			name:                  "json rendering is stored with the state version",
+			toCreate:              renderingToCreate,
+			data:                  goodData,
+			jsonData:              ptr.String(string(goodJSONData)),
+			injectCreated:         outputStateVersion,
+			limit:                 1000,
+			injectSVsPerWorkspace: 0,
+			expectJSONKey:         true,
+			expectResult:          outputStateVersion,
+		},
+		{
+			// Decoding happens before any write, so a malformed rendering costs nothing: no object is
+			// uploaded and no transaction is opened.
+			name:            "malformed json rendering is rejected before anything is written",
+			toCreate:        toCreate,
+			data:            goodData,
+			jsonData:        ptr.String("not-base64!!"),
+			expectNoWrites:  true,
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			// The rendering is uploaded before the transaction, so a storage failure leaves the state
+			// version uncreated rather than committing it without the rendering the caller asked for.
+			name:            "a failed json rendering upload fails the create",
+			toCreate:        renderingUploadFailToCreate,
+			data:            goodData,
+			jsonData:        ptr.String(string(goodJSONData)),
+			jsonUploadError: errors.New("object store unavailable", errors.WithErrorCode(errors.EInternal)),
+			expectNoWrites:  true,
+			expectErrorCode: errors.EInternal,
+		},
 	}
 
 	for _, test := range tests {
@@ -2052,6 +2306,11 @@ func TestCreateStateVersion(t *testing.T) {
 					return mockObjectStoreRefs.LinkRef(ctx, "workspaces/ws/state_versions/uuid", db.ObjectStoreRefOwnerStateVersion, ownerID)
 				}), "workspaces/ws/state_versions/uuid", test.uploadError).Maybe()
 
+			mockArtifactStore.On("UploadStateVersionJSON", mock.Anything, mock.Anything, mock.Anything).
+				Return(db.RetainObjectRefFunc(func(ctx context.Context, ownerID string) error {
+					return mockObjectStoreRefs.LinkRef(ctx, "workspaces/ws/state_versions/uuid.json", db.ObjectStoreRefOwnerStateVersion, ownerID)
+				}), "workspaces/ws/state_versions/uuid.json", test.jsonUploadError).Maybe()
+
 			testLogger, _ := logger.NewForTest()
 			dbClient := &db.Client{
 				Transactions:        mockTransactions,
@@ -2068,7 +2327,21 @@ func TestCreateStateVersion(t *testing.T) {
 			}
 
 			testDataString := string(test.data)
-			result, err := service.CreateStateVersion(ctx, test.toCreate, testDataString)
+			result, err := service.CreateStateVersion(ctx, test.toCreate, testDataString, test.jsonData)
+
+			if test.expectJSONKey {
+				require.NotNil(t, test.toCreate.JSONObjectStoreKey)
+				assert.Equal(t, "workspaces/ws/state_versions/uuid.json", *test.toCreate.JSONObjectStoreKey)
+				// The key and the object store ref have to be written together: a key with no ref would
+				// let the janitor collect an object the row still points at.
+				mockObjectStoreRefs.AssertCalled(t, "LinkRef", mock.Anything,
+					"workspaces/ws/state_versions/uuid.json", db.ObjectStoreRefOwnerStateVersion, mock.Anything)
+			}
+
+			if test.expectNoWrites {
+				mockArtifactStore.AssertNotCalled(t, "UploadStateVersion", mock.Anything, mock.Anything, mock.Anything)
+				mockTransactions.AssertNotCalled(t, "BeginTx", mock.Anything)
+			}
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
