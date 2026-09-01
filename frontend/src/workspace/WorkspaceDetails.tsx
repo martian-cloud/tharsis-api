@@ -9,6 +9,7 @@ import { ConnectionHandler, ConnectionInterface, GraphQLSubscriptionConfig, Reco
 import NamespaceActivity from '../namespace/activity/NamespaceActivity';
 import NamespaceMemberships from '../namespace/members/NamespaceMemberships';
 import Variables from '../namespace/variables/Variables';
+import CleanupPolicies from '../namespace/cleanuppolicy/CleanupPolicies';
 import ProviderMirrors from '../namespace/providermirror/ProviderMirrors';
 import WorkspaceSettings from './settings/WorkspaceSettings';
 import AssignedManagedIdentityList from './managedidentity/AssignedManagedIdentityList';
@@ -73,6 +74,7 @@ function WorkspaceDetails(props: Props) {
       ...WorkspaceSettingsFragment_workspace
       ...NamespaceActivityFragment_activity
       ...ProviderMirrorsFragment_namespace
+      ...CleanupPoliciesFragment_namespace
     }
 `, fragmentRef);
 
@@ -161,6 +163,7 @@ function WorkspaceDetails(props: Props) {
               <Route path={`${workspacePath}/-/variables/*`} element={<Variables fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/members/*`} element={<NamespaceMemberships fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/provider_mirror/*`} element={<ProviderMirrors fragmentRef={data} />} />
+              <Route path={`${workspacePath}/-/cleanup_policies/*`} element={<CleanupPolicies fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/settings/*`} element={<WorkspaceSettings fragmentRef={data} />} />
             </Routes>
           </PageLayoutProvider>

@@ -5,7 +5,6 @@ import (
 
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/user"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
@@ -183,7 +182,7 @@ type NamespaceUnfavoriteMutationPayloadResolver struct {
 type NamespaceFavoriteInput struct {
 	ClientMutationID *string
 	NamespacePath    string
-	NamespaceType    namespace.Type
+	NamespaceType    models.NamespaceType
 }
 
 func handleNamespaceFavoriteMutationProblem(e error, clientMutationID *string) (*NamespaceFavoriteMutationPayloadResolver, error) {

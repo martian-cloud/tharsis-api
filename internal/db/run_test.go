@@ -24,7 +24,6 @@ func TestRuns_CreateRun(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group and workspace for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-run",
 		Description: "test group for run",
@@ -145,7 +144,6 @@ func TestRuns_UpdateRun(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group, workspace, and run for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-run-update",
 		Description: "test group for run update",
@@ -243,7 +241,6 @@ func TestRuns_GetRunByID(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a workspace for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-run-get-by-id",
 		Description: "test group for run get by id",
@@ -327,7 +324,6 @@ func TestRuns_GetRuns(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a workspace for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-runs-list",
 		Description: "test group for runs list",
@@ -344,7 +340,6 @@ func TestRuns_GetRuns(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create test runs
 	runs := []models.Run{
 		{
 			WorkspaceID: workspace.Metadata.ID,
@@ -364,6 +359,18 @@ func TestRuns_GetRuns(t *testing.T) {
 		require.NoError(t, err)
 		createdRuns = append(createdRuns, *created)
 	}
+
+	// Link a state version to run[0] and set it as the workspace's current state version.
+	sv, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
+		WorkspaceID: workspace.Metadata.ID,
+		RunID:       &createdRuns[0].Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace.CurrentStateVersionID = sv.Metadata.ID
+	_, err = testClient.client.Workspaces.UpdateWorkspace(ctx, workspace)
+	require.NoError(t, err)
 
 	type testCase struct {
 		name            string
@@ -400,7 +407,6 @@ func TestRuns_GetRunsWithPaginationAndSorting(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a workspace for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-runs-pagination",
 		Description: "test group for runs pagination",
@@ -459,7 +465,6 @@ func TestRuns_GetRunByTRN(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a workspace for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-run-get-by-trn",
 		Description: "test group for run get by trn",
@@ -476,7 +481,6 @@ func TestRuns_GetRunByTRN(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create a run for testing
 	createdRun, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
 		Status:      models.RunPending,
@@ -532,7 +536,6 @@ func TestRuns_GetRunByNodeID(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a workspace for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-run-get-by-node-id",
 		Description: "test group for run get by node id",
@@ -549,7 +552,6 @@ func TestRuns_GetRunByNodeID(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create a run with stages for testing
 	planNodeID := newResourceID()
 	applyNodeID := newResourceID()
 	createdRun, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
@@ -657,9 +659,7 @@ func TestRunGates_GetRunGates_Eligibility(t *testing.T) {
 		return run
 	}
 
-	// A gate is one-to-one with the policy-check node it governs, enforced by the unique index
-	// index_run_gates_on_policy_check_id, so every gate here needs its own check ID. The rule name is
-	// unique per gate in this test, so it doubles as the check identity.
+	// Each gate needs its own check ID (unique index index_run_gates_on_policy_check_id).
 	createGate := func(runID, ruleName string, status models.RunGateStatus, allowedUserIDs []string) *models.RunGate {
 		subjects := make([]*models.RunGateAllowedSubject, len(allowedUserIDs))
 		for i, id := range allowedUserIDs {
@@ -714,17 +714,15 @@ func TestRunGates_GetRunGates_Eligibility(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// gateC: allowed only to a different user -> the approver is not eligible, excluded.
+	// gateC: allowed only to a different user -> not eligible, excluded.
 	runC := createRun()
 	createGate(runC.Metadata.ID, "policy-c1", models.RunGatePending, []string{other.Metadata.ID})
 
-	// gateD: the approver is eligible but the gate is already approved (not pending) -> excluded
-	// by the status filter.
+	// gateD: eligible but not pending -> excluded by the status filter.
 	runD := createRun()
 	createGate(runD.Metadata.ID, "policy-d1", models.RunGateApproved, []string{approver.Metadata.ID})
 
-	// Two teams: the approver belongs to memberTeam only. Team eligibility is resolved by the db
-	// layer from the approver's team_members rows (a subquery), not passed in the filter.
+	// Team eligibility is resolved from team_members rows (a subquery), not passed in the filter.
 	memberTeam, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{Name: "gate-eligibility-member-team"})
 	require.NoError(t, err)
 	nonMemberTeam, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{Name: "gate-eligibility-nonmember-team"})
@@ -756,7 +754,6 @@ func TestRunGates_GetRunGates_Eligibility(t *testing.T) {
 	for _, gate := range result.RunGates {
 		ids = append(ids, gate.Metadata.ID)
 	}
-	// gateA (direct user) and gateE (via the approver's team) are eligible; the rest are excluded.
 	assert.ElementsMatch(t, []string{gateA.Metadata.ID, gateE.Metadata.ID}, ids)
 }
 
@@ -906,6 +903,126 @@ func TestRuns_GetWorkspaceIDForRun(t *testing.T) {
 
 			if test.expectWorkspace {
 				assert.Equal(t, workspace.Metadata.ID, workspaceID)
+			}
+		})
+	}
+}
+
+func TestRuns_DeleteRunBatch(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-delete-runs",
+		FullPath:  "test-group-delete-runs",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-delete-runs",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	makeRun := func(t *testing.T) *models.Run {
+		t.Helper()
+		run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+			WorkspaceID: workspace.Metadata.ID,
+			Status:      models.RunApplied,
+			CreatedBy:   "db-integration-tests",
+			Plan:        models.Plan{ID: newResourceID(), Status: models.PlanQueued},
+		})
+		require.NoError(t, err)
+		return run
+	}
+
+	// Each test case owns its own runs so cases do not interfere.
+	runNoOp := makeRun(t)
+	runIgnore := makeRun(t)
+	runPartial := makeRun(t)
+	runSurvivor := makeRun(t)
+	runMixed := makeRun(t)
+	runMulti1 := makeRun(t)
+	runMulti2 := makeRun(t)
+	runStale := makeRun(t)
+
+	type testCase struct {
+		name         string
+		input        DeleteRunBatchInput
+		shouldBeGone []string
+		shouldExist  []string
+		expectOLE    bool
+	}
+
+	testCases := []testCase{
+		{
+			name:        "empty slice is a no-op",
+			input:       DeleteRunBatchInput{Runs: []*models.Run{}},
+			shouldExist: []string{runNoOp.Metadata.ID},
+		},
+		{
+			name: "non-existent run: OLE, nothing deleted",
+			input: DeleteRunBatchInput{Runs: []*models.Run{
+				{Metadata: models.ResourceMetadata{ID: nonExistentID, Version: 1}},
+			}},
+			shouldExist: []string{runIgnore.Metadata.ID},
+			expectOLE:   true,
+		},
+		{
+			name:         "partial delete — only the specified run is removed",
+			input:        DeleteRunBatchInput{Runs: []*models.Run{runPartial}},
+			shouldBeGone: []string{runPartial.Metadata.ID},
+			shouldExist:  []string{runSurvivor.Metadata.ID},
+		},
+		{
+			name: "batch with non-existent run alongside valid run: OLE, valid one still deleted",
+			input: DeleteRunBatchInput{Runs: []*models.Run{
+				runMixed,
+				{Metadata: models.ResourceMetadata{ID: nonExistentID, Version: 1}},
+			}},
+			shouldBeGone: []string{runMixed.Metadata.ID},
+			expectOLE:    true,
+		},
+		{
+			name:         "delete multiple runs in one call",
+			input:        DeleteRunBatchInput{Runs: []*models.Run{runMulti1, runMulti2}},
+			shouldBeGone: []string{runMulti1.Metadata.ID, runMulti2.Metadata.ID},
+		},
+		{
+			name: "stale version: OLE, nothing deleted",
+			input: DeleteRunBatchInput{Runs: []*models.Run{
+				{Metadata: models.ResourceMetadata{ID: runStale.Metadata.ID, Version: runStale.Metadata.Version - 1}},
+			}},
+			shouldExist: []string{runStale.Metadata.ID},
+			expectOLE:   true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			deletedIDs, err := testClient.client.Runs.DeleteRunBatch(ctx, &test.input)
+
+			if test.expectOLE {
+				assert.Equal(t, errors.EOptimisticLock, errors.ErrorCode(err))
+			} else {
+				require.NoError(t, err)
+			}
+			assert.ElementsMatch(t, test.shouldBeGone, deletedIDs)
+
+			for _, id := range test.shouldBeGone {
+				got, err := testClient.client.Runs.GetRunByID(ctx, id)
+				require.NoError(t, err)
+				assert.Nil(t, got)
+			}
+
+			for _, id := range test.shouldExist {
+				got, err := testClient.client.Runs.GetRunByID(ctx, id)
+				require.NoError(t, err)
+				assert.NotNil(t, got)
 			}
 		})
 	}

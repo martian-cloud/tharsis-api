@@ -6,11 +6,62 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+func TestGetNamespace(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-get-namespace-group",
+		FullPath:  "test-get-namespace-group",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-get-namespace-workspace",
+		FullPath:       "test-get-namespace-group/test-get-namespace-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	t.Run("group path returns NamespaceTypeGroup with the group", func(t *testing.T) {
+		got, err := testClient.client.Namespaces.GetNamespace(ctx, group.FullPath)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, models.NamespaceTypeGroup, got.Type)
+		require.NotNil(t, got.Group)
+		assert.Nil(t, got.Workspace)
+		assert.Equal(t, group.Metadata.ID, got.Group.Metadata.ID)
+		assert.Equal(t, group.FullPath, got.Group.FullPath)
+	})
+
+	t.Run("workspace path returns NamespaceTypeWorkspace with the workspace", func(t *testing.T) {
+		got, err := testClient.client.Namespaces.GetNamespace(ctx, workspace.FullPath)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, models.NamespaceTypeWorkspace, got.Type)
+		require.NotNil(t, got.Workspace)
+		assert.Nil(t, got.Group)
+		assert.Equal(t, workspace.Metadata.ID, got.Workspace.Metadata.ID)
+		assert.Equal(t, workspace.FullPath, got.Workspace.FullPath)
+	})
+
+	t.Run("non-existent path returns nil", func(t *testing.T) {
+		got, err := testClient.client.Namespaces.GetNamespace(ctx, "does-not-exist")
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+}
 
 type namespaceWarmupsInput struct {
 	groups     []models.Group

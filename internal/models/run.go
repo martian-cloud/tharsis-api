@@ -106,6 +106,11 @@ func (s RunStatus) IsFinalStatus() bool {
 	return s == RunApplied || s == RunPlannedAndFinished || s == RunErrored || s == RunCanceled || s == RunDiscarded
 }
 
+// In reports whether s is one of statuses. An empty statuses means "no constraint" and always matches.
+func (s RunStatus) In(statuses []RunStatus) bool {
+	return len(statuses) == 0 || slices.Contains(statuses, s)
+}
+
 // PlanStatus represents the status of a plan node.
 type PlanStatus string
 

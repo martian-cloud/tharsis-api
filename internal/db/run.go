@@ -29,6 +29,7 @@ type Runs interface {
 	CreateRun(ctx context.Context, run *models.Run) (*models.Run, error)
 	UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string) (*models.Run, error)
 	GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, error)
+	DeleteRunBatch(ctx context.Context, input *DeleteRunBatchInput) ([]string, error)
 }
 
 // RunSortableField represents the fields that a workspace can be sorted by
@@ -60,6 +61,12 @@ func (r RunSortableField) getSortDirection() pagination.SortDirection {
 	return pagination.AscSort
 }
 
+// DeleteRunBatchInput configures safety guards for batch run deletion.
+type DeleteRunBatchInput struct {
+	// Runs is the set of runs to delete.
+	Runs []*models.Run
+}
+
 // RunFilter contains the supported fields for filtering Run resources
 type RunFilter struct {
 	TimeRangeStart *time.Time
@@ -75,6 +82,7 @@ type RunFilter struct {
 	NodeIDs                  []string
 	WorkspaceAssessment      *bool
 	IncludeNestedRuns        *bool
+	HasStateVersion          *bool
 }
 
 // GetRunsInput is the input for listing runs
@@ -633,6 +641,15 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 		if input.Filter.WorkspaceAssessment != nil {
 			ex = ex.Append(goqu.I("runs.is_assessment_run").Eq(*input.Filter.WorkspaceAssessment))
 		}
+
+		if input.Filter.HasStateVersion != nil {
+			stateVersionSub := goqu.From("state_versions").Select(goqu.L("1")).Where(goqu.I("state_versions.run_id").Eq(goqu.I("runs.id")))
+			if *input.Filter.HasStateVersion {
+				ex = ex.Append(goqu.L("EXISTS ?", stateVersionSub))
+			} else {
+				ex = ex.Append(goqu.L("NOT EXISTS ?", stateVersionSub))
+			}
+		}
 	}
 
 	query := selectEx.Where(ex)
@@ -856,6 +873,59 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string
 	return updatedRun, nil
 }
 
+// DeleteRunBatch deletes the given runs, matching each on (id, version) for optimistic locking. If
+// fewer rows are deleted than were requested, it returns ErrOptimisticLockError alongside whatever was
+// actually deleted.
+func (r *runs) DeleteRunBatch(ctx context.Context, input *DeleteRunBatchInput) ([]string, error) {
+	ctx, span := tracer.Start(ctx, "db.DeleteRunBatch")
+	defer span.End()
+
+	if len(input.Runs) == 0 {
+		return nil, nil
+	}
+
+	candidateEx := make([]goqu.Expression, len(input.Runs))
+	for i, run := range input.Runs {
+		candidateEx[i] = goqu.And(
+			goqu.C("id").Eq(run.Metadata.ID),
+			goqu.C("version").Eq(run.Metadata.Version),
+		)
+	}
+
+	sql, args, err := dialect.Delete("runs").
+		Prepared(true).
+		Where(goqu.Or(candidateEx...)).
+		Returning("id").
+		ToSQL()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	rows, err := r.dbClient.getConnection(ctx).Query(ctx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+	defer rows.Close()
+
+	deletedIDs := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
+		}
+		deletedIDs = append(deletedIDs, id)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to read rows", errors.WithSpan(span))
+	}
+
+	if len(deletedIDs) != len(input.Runs) {
+		return deletedIDs, ErrOptimisticLockError
+	}
+
+	return deletedIDs, nil
+}
 func (r *runs) getRun(ctx context.Context, ex goqu.Ex) (*models.Run, error) {
 	ctx, span := tracer.Start(ctx, "db.getRun")
 	defer span.End()

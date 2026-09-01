@@ -452,6 +452,8 @@ func TestTerraformModules_GetModulesWithPaginationAndSorting(t *testing.T) {
 		TerraformModuleSortableFieldNameDesc,
 		TerraformModuleSortableFieldUpdatedAtAsc,
 		TerraformModuleSortableFieldUpdatedAtDesc,
+		TerraformModuleSortableFieldCreatedAtAsc,
+		TerraformModuleSortableFieldCreatedAtDesc,
 	}
 
 	testResourcePaginationAndSorting(ctx, t, resourceCount, sortableFields, func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error) {

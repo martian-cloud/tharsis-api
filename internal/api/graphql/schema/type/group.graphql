@@ -142,6 +142,7 @@ type Group implements Node, Namespace {
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
   providerMirrorEnabled: NamespaceProviderMirrorEnabled!
   outputVisibility: NamespaceOutputVisibility!
+  effectiveCleanupPolicies: [CleanupPolicy!]!
   memberships: [NamespaceMembership!]!
   variables: [NamespaceVariable!]!
   policies(

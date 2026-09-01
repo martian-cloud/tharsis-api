@@ -62,6 +62,36 @@ func (_m *MockTerraformProviderVersions) DeleteProviderVersion(ctx context.Conte
 	return r0
 }
 
+// DeleteProviderVersionBatch provides a mock function with given fields: ctx, input
+func (_m *MockTerraformProviderVersions) DeleteProviderVersionBatch(ctx context.Context, input *DeleteProviderVersionBatchInput) ([]string, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteProviderVersionBatch")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *DeleteProviderVersionBatchInput) ([]string, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *DeleteProviderVersionBatchInput) []string); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *DeleteProviderVersionBatchInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetProviderVersionByID provides a mock function with given fields: ctx, id
 func (_m *MockTerraformProviderVersions) GetProviderVersionByID(ctx context.Context, id string) (*models.TerraformProviderVersion, error) {
 	ret := _m.Called(ctx, id)

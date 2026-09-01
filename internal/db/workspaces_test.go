@@ -496,6 +496,24 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 		createdWorkspaces = append(createdWorkspaces, *created)
 	}
 
+	// second group + workspace for NamespacePathPrefix tests
+	groupB, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-workspaces-list-b",
+		Description: "second group for workspace list tests",
+		FullPath:    "test-group-workspaces-list-b",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	wsInGroupB, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-list-b",
+		GroupID:        groupB.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+	_ = wsInGroupB
+
 	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
 		Username: "test-user-workspaces",
 		Email:    "test-user-workspaces@test.com",
@@ -519,7 +537,7 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 		{
 			name:        "get all workspaces",
 			input:       &GetWorkspacesInput{},
-			expectCount: len(createdWorkspaces),
+			expectCount: len(createdWorkspaces) + 1, // +1 for wsInGroupB
 		},
 		{
 			name: "filter by group ID",
@@ -564,7 +582,7 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 					Locked: ptr.Bool(false),
 				},
 			},
-			expectCount: len(createdWorkspaces),
+			expectCount: len(createdWorkspaces) + 1, // +1 for wsInGroupB
 		},
 		{
 			name: "filter by dirty",
@@ -573,7 +591,7 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 					Dirty: ptr.Bool(false),
 				},
 			},
-			expectCount: len(createdWorkspaces),
+			expectCount: len(createdWorkspaces) + 1, // +1 for wsInGroupB
 		},
 		{
 			name: "filter by has state version",
@@ -582,7 +600,7 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 					HasStateVersion: ptr.Bool(false),
 				},
 			},
-			expectCount: len(createdWorkspaces),
+			expectCount: len(createdWorkspaces) + 1, // +1 for wsInGroupB
 		},
 		{
 			name: "filter by favorite user",
@@ -600,7 +618,34 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 					ExcludeFavoriteUserID: &user.Metadata.ID,
 				},
 			},
+			expectCount: 2, // createdWorkspaces[1] + wsInGroupB
+		},
+		{
+			name: "filter by namespace path prefix — matches all workspaces under group",
+			input: &GetWorkspacesInput{
+				Filter: &WorkspaceFilter{
+					NamespacePathPrefix: &group.FullPath,
+				},
+			},
+			expectCount: len(createdWorkspaces),
+		},
+		{
+			name: "filter by namespace path prefix — single workspace in other group",
+			input: &GetWorkspacesInput{
+				Filter: &WorkspaceFilter{
+					NamespacePathPrefix: &groupB.FullPath,
+				},
+			},
 			expectCount: 1,
+		},
+		{
+			name: "filter by namespace path prefix — no match",
+			input: &GetWorkspacesInput{
+				Filter: &WorkspaceFilter{
+					NamespacePathPrefix: ptr.String("nonexistent-prefix"),
+				},
+			},
+			expectCount: 0,
 		},
 	}
 

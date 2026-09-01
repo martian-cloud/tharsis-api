@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<98d85fe224f5ed138a523f4009d89702>>
+ * @generated SignedSource<<7150f0c5e31e955896f5ef68d9127f31>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,7 @@ export type ActivityEventListFragment_connection$data = {
       readonly target: {
         readonly __typename: string;
       } | null | undefined;
-      readonly " $fragmentSpreads": FragmentRefs<"ActivityEventFederatedRegistryTargetFragment_event" | "ActivityEventGPGKeyTargetFragment_event" | "ActivityEventGroupTargetFragment_event" | "ActivityEventManagedIdentityAccessRuleTargetFragment_event" | "ActivityEventManagedIdentityTargetFragment_event" | "ActivityEventNamespaceMembershipTargetFragment_event" | "ActivityEventPackageTargetFragment_event" | "ActivityEventPackageVersionTargetFragment_event" | "ActivityEventPolicyTargetFragment_event" | "ActivityEventRoleTargetFragment_event" | "ActivityEventRunGateTargetFragment_event" | "ActivityEventRunTargetFragment_event" | "ActivityEventRunnerTargetFragment_event" | "ActivityEventServiceAccountTargetFragment_event" | "ActivityEventStateVersionTargetFragment_event" | "ActivityEventTargetNotFoundFragment_event" | "ActivityEventTeamTargetFragment_event" | "ActivityEventTerraformModuleTargetFragment_event" | "ActivityEventTerraformModuleVersionTargetFragment_event" | "ActivityEventTerraformProviderTargetFragment_event" | "ActivityEventTerraformProviderVersionMirrorTargetFragment_event" | "ActivityEventVCSProviderTargetFragment_event" | "ActivityEventVariableTargetFragment_event" | "ActivityEventWorkspaceTargetFragment_event">;
+      readonly " $fragmentSpreads": FragmentRefs<"ActivityEventCleanupPolicyTargetFragment_event" | "ActivityEventFederatedRegistryTargetFragment_event" | "ActivityEventGPGKeyTargetFragment_event" | "ActivityEventGroupTargetFragment_event" | "ActivityEventManagedIdentityAccessRuleTargetFragment_event" | "ActivityEventManagedIdentityTargetFragment_event" | "ActivityEventNamespaceMembershipTargetFragment_event" | "ActivityEventPackageTargetFragment_event" | "ActivityEventPackageVersionTargetFragment_event" | "ActivityEventPolicyTargetFragment_event" | "ActivityEventRoleTargetFragment_event" | "ActivityEventRunGateTargetFragment_event" | "ActivityEventRunTargetFragment_event" | "ActivityEventRunnerTargetFragment_event" | "ActivityEventServiceAccountTargetFragment_event" | "ActivityEventStateVersionTargetFragment_event" | "ActivityEventTargetNotFoundFragment_event" | "ActivityEventTeamTargetFragment_event" | "ActivityEventTerraformModuleTargetFragment_event" | "ActivityEventTerraformModuleVersionTargetFragment_event" | "ActivityEventTerraformProviderTargetFragment_event" | "ActivityEventTerraformProviderVersionMirrorTargetFragment_event" | "ActivityEventTerraformProviderVersionTargetFragment_event" | "ActivityEventVCSProviderTargetFragment_event" | "ActivityEventVariableTargetFragment_event" | "ActivityEventWorkspaceTargetFragment_event">;
     } | null | undefined;
   } | null | undefined> | null | undefined;
   readonly " $fragmentType": "ActivityEventListFragment_connection";
@@ -97,6 +97,11 @@ const node: ReaderFragment = {
             {
               "args": null,
               "kind": "FragmentSpread",
+              "name": "ActivityEventCleanupPolicyTargetFragment_event"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
               "name": "ActivityEventGPGKeyTargetFragment_event"
             },
             {
@@ -133,6 +138,11 @@ const node: ReaderFragment = {
               "args": null,
               "kind": "FragmentSpread",
               "name": "ActivityEventTerraformProviderTargetFragment_event"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActivityEventTerraformProviderVersionTargetFragment_event"
             },
             {
               "args": null,
@@ -205,6 +215,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "bc0f71617fa01e98d0ce390e259d6cf7";
+(node as any).hash = "80b28d38ffb39e053aefdc06ba927479";
 
 export default node;

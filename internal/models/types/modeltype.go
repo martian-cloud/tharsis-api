@@ -21,6 +21,7 @@ var (
 	AnnouncementModelType                    = ModelType{trnType: trn.TypeAnnouncement, gidCode: "AN"}
 	AsymSigningKeyModelType                  = ModelType{trnType: trn.TypeAsymSigningKey, gidCode: "ASK"}
 	ConfigurationVersionModelType            = ModelType{trnType: trn.TypeConfigurationVersion, gidCode: "C"}
+	CleanupPolicyModelType                   = ModelType{trnType: trn.TypeCleanupPolicy, gidCode: "CP"}
 	FederatedRegistryModelType               = ModelType{trnType: trn.TypeFederatedRegistry, gidCode: "FR"}
 	GPGKeyModelType                          = ModelType{trnType: trn.TypeGPGKey, gidCode: "GPG"}
 	GroupModelType                           = ModelType{trnType: trn.TypeGroup, gidCode: "G"}

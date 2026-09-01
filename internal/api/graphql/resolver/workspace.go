@@ -586,6 +586,11 @@ func (r *WorkspaceResolver) OutputVisibility(ctx context.Context) (*namespace.Ou
 	return getServiceCatalog(ctx).WorkspaceService.GetOutputVisibilitySetting(ctx, r.workspace)
 }
 
+// EffectiveCleanupPolicies resolver
+func (r *WorkspaceResolver) EffectiveCleanupPolicies(ctx context.Context) ([]*CleanupPolicyResolver, error) {
+	return getCleanupPolicies(ctx, r.workspace.FullPath)
+}
+
 // DEPRECATED: use node query instead
 func workspaceQuery(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceResolver, error) {
 	ws, err := getServiceCatalog(ctx).WorkspaceService.GetWorkspaceByTRN(ctx, trn.TypeWorkspace.Build(args.FullPath))

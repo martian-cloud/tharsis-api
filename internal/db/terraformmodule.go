@@ -33,6 +33,8 @@ type TerraformModuleSortableField string
 const (
 	TerraformModuleSortableFieldNameAsc             TerraformModuleSortableField = "NAME_ASC"
 	TerraformModuleSortableFieldNameDesc            TerraformModuleSortableField = "NAME_DESC"
+	TerraformModuleSortableFieldCreatedAtAsc        TerraformModuleSortableField = "CREATED_AT_ASC"
+	TerraformModuleSortableFieldCreatedAtDesc       TerraformModuleSortableField = "CREATED_AT_DESC"
 	TerraformModuleSortableFieldUpdatedAtAsc        TerraformModuleSortableField = "UPDATED_AT_ASC"
 	TerraformModuleSortableFieldUpdatedAtDesc       TerraformModuleSortableField = "UPDATED_AT_DESC"
 	TerraformModuleSortableFieldFieldGroupLevelAsc  TerraformModuleSortableField = "GROUP_LEVEL_ASC"
@@ -43,6 +45,8 @@ func (ts TerraformModuleSortableField) getFieldDescriptor() *pagination.FieldDes
 	switch ts {
 	case TerraformModuleSortableFieldNameAsc, TerraformModuleSortableFieldNameDesc:
 		return &pagination.FieldDescriptor{Key: "name", Table: "terraform_modules", Col: "name"}
+	case TerraformModuleSortableFieldCreatedAtAsc, TerraformModuleSortableFieldCreatedAtDesc:
+		return &pagination.FieldDescriptor{Key: "created_at", Table: "terraform_modules", Col: "created_at"}
 	case TerraformModuleSortableFieldUpdatedAtAsc, TerraformModuleSortableFieldUpdatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "updated_at", Table: "terraform_modules", Col: "updated_at"}
 	case TerraformModuleSortableFieldFieldGroupLevelAsc, TerraformModuleSortableFieldFieldGroupLevelDesc:

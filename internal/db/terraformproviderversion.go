@@ -25,6 +25,7 @@ type TerraformProviderVersions interface {
 	CreateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error)
 	UpdateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error)
 	DeleteProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) error
+	DeleteProviderVersionBatch(ctx context.Context, input *DeleteProviderVersionBatchInput) ([]string, error)
 }
 
 // TerraformProviderVersionSortableField represents the fields that a provider version can be sorted by
@@ -59,6 +60,12 @@ func (ts TerraformProviderVersionSortableField) getSortDirection() pagination.So
 		return pagination.DescSort
 	}
 	return pagination.AscSort
+}
+
+// DeleteProviderVersionBatchInput configures batch provider version deletion.
+type DeleteProviderVersionBatchInput struct {
+	// ProviderVersions is the set of provider versions to delete.
+	ProviderVersions []*models.TerraformProviderVersion
 }
 
 // TerraformProviderVersionFilter contains the supported fields for filtering TerraformProviderVersion resources
@@ -357,6 +364,59 @@ func (t *terraformProviderVersions) DeleteProviderVersion(ctx context.Context, p
 	}
 
 	return nil
+}
+
+// DeleteProviderVersionBatch deletes the given provider versions, matching each on (id, version). If
+// fewer rows are deleted than were requested, it returns ErrOptimisticLockError alongside whatever was
+// actually deleted.
+func (t *terraformProviderVersions) DeleteProviderVersionBatch(ctx context.Context, input *DeleteProviderVersionBatchInput) ([]string, error) {
+	ctx, span := tracer.Start(ctx, "db.DeleteProviderVersionBatch")
+	defer span.End()
+
+	if len(input.ProviderVersions) == 0 {
+		return nil, nil
+	}
+
+	candidateEx := make([]goqu.Expression, len(input.ProviderVersions))
+	for i, pv := range input.ProviderVersions {
+		candidateEx[i] = goqu.And(
+			goqu.C("id").Eq(pv.Metadata.ID),
+			goqu.C("version").Eq(pv.Metadata.Version),
+		)
+	}
+
+	sql, args, err := dialect.Delete("terraform_provider_versions").
+		Prepared(true).
+		Where(goqu.Or(candidateEx...)).
+		Returning("id").
+		ToSQL()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	rows, err := t.dbClient.getConnection(ctx).Query(ctx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+	defer rows.Close()
+
+	deletedIDs := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
+		}
+		deletedIDs = append(deletedIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to read rows", errors.WithSpan(span))
+	}
+
+	if len(deletedIDs) != len(input.ProviderVersions) {
+		return deletedIDs, ErrOptimisticLockError
+	}
+
+	return deletedIDs, nil
 }
 
 func (t *terraformProviderVersions) getProviderVersion(ctx context.Context, exp goqu.Ex) (*models.TerraformProviderVersion, error) {

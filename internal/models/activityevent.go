@@ -63,6 +63,7 @@ const (
 	TargetPackageVersion                 ActivityEventTargetType = "PACKAGE_VERSION"
 	TargetPolicy                         ActivityEventTargetType = "POLICY"
 	TargetRunGate                        ActivityEventTargetType = "RUN_GATE"
+	TargetCleanupPolicy                  ActivityEventTargetType = "CLEANUP_POLICY"
 )
 
 // ActivityEventCreateNamespaceMembershipPayload helps with custom

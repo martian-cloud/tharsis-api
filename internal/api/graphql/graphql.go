@@ -113,6 +113,7 @@ func NewGraphQL(
 	resolver.RegisterPolicyLoader(loaderCollection)
 	resolver.RegisterPackageLoader(loaderCollection)
 	resolver.RegisterPackageVersionLoader(loaderCollection)
+	resolver.RegisterCleanupPolicyLoader(loaderCollection)
 
 	schema := graphql.MustParseSchema(schemaStr, resolver.NewRootResolver(), graphql.UseFieldResolvers(),
 		graphql.Tracer(&otel.Tracer{

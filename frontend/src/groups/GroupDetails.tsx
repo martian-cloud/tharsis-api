@@ -30,6 +30,7 @@ import ServiceAccounts from './serviceaccount/ServiceAccounts';
 import VCSProviders from './vcsprovider/VCSProviders';
 import FederatedRegistries from './federatedregistry/FederatedRegistries';
 import GPGKeys from './keys/GPGKeys';
+import CleanupPolicies from '../namespace/cleanuppolicy/CleanupPolicies';
 import ProviderMirrors from '../namespace/providermirror/ProviderMirrors';
 import NamespaceActivity from '../namespace/activity/NamespaceActivity';
 import GroupNotificationPreference from '../notifications/GroupNotificationPreference';
@@ -80,6 +81,7 @@ function GroupDetails(props: Props) {
             ...NamespaceMembershipsFragment_memberships
             ...GPGKeysFragment_group
             ...ProviderMirrorsFragment_namespace
+            ...CleanupPoliciesFragment_namespace
             ...NamespaceActivityFragment_activity
             ...GroupSettingsFragment_group
         }
@@ -117,6 +119,7 @@ function GroupDetails(props: Props) {
                             <Route path={`${groupPath}/-/vcs_providers/*`} element={<VCSProviders fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/federated_registries/*`} element={<FederatedRegistries fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/provider_mirror/*`} element={<ProviderMirrors fragmentRef={data} />} />
+                            <Route path={`${groupPath}/-/cleanup_policies/*`} element={<CleanupPolicies fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/variables/*`} element={<Variables fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/members/*`} element={<NamespaceMemberships fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/keys/*`} element={<GPGKeys fragmentRef={data} />} />

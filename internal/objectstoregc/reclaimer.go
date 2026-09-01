@@ -2,6 +2,7 @@ package objectstoregc
 
 import (
 	"context"
+	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
@@ -17,6 +18,8 @@ var (
 	refsDeleted         = metric.NewCounter("janitor_refs_deleted_total", "Number of orphaned object store refs successfully deleted.")
 	refsDeadLetterCount = metric.NewCounter("janitor_refs_dead_letter_total", "Number of refs discarded after exceeding max claim count.")
 	objectDeleteErrors  = metric.NewCounter("janitor_object_delete_errors_total", "Number of object store delete failures.")
+	refsClaimed         = metric.NewCounter("janitor_refs_claimed_total", "Number of orphaned refs claimed per cycle (input queue depth).")
+	sweepDuration       = metric.NewHistogram("janitor_sweep_duration_seconds", "Duration of each Reclaim call in seconds.", 0.01, 2, 10)
 )
 
 // Reclaimer deletes the objects behind orphaned object_store_refs (whose owner FK was nulled by a
@@ -37,10 +40,15 @@ func NewReclaimer(refs db.ObjectStoreRefs, store pkgobjectstore.ObjectStore, log
 // batch delete failure leaves that batch's refs for a later retry (leases expire); a ref that
 // exceeds maxClaimCount is discarded after a best-effort delete so a poison key can't block the queue.
 func (r *Reclaimer) Reclaim(ctx context.Context, limit uint) error {
+	start := time.Now()
+	defer func() { sweepDuration.Observe(time.Since(start).Seconds()) }()
+
 	refs, err := r.refs.ClaimOrphanedRefs(ctx, limit)
 	if err != nil {
 		return err
 	}
+
+	refsClaimed.Add(float64(len(refs)))
 
 	batch := make([]db.ObjectStoreRef, 0, len(refs))
 	keys := make([]string, 0, len(refs))

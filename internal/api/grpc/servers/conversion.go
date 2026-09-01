@@ -19,8 +19,15 @@ var maxQueryLimit int32 = 100
 // prefixing values with the enum name), e.g. POLICY_CHECK_STATUS_SOFT_FAILED. This lets a
 // new enum value flow through by convention instead of a per-value switch. Empty or unknown
 // values fall back to 0 (the enum's *_UNSPECIFIED zero value).
-func enumToPB[E ~int32](v string, valueMap map[string]int32, prefix string) E {
-	return E(valueMap[prefix+strings.ToUpper(v)])
+func enumToPB[E ~int32, D ~string](v D, valueMap map[string]int32, prefix string) E {
+	return E(valueMap[prefix+strings.ToUpper(string(v))])
+}
+
+// enumFromPB strips the protobuf prefix from a .String() value and lowercases it to
+// recover the snake_case domain constant, e.g. "RUN_TASK_STAGE_NAME_QUEUED" with prefix
+// "RUN_TASK_STAGE_NAME_" → "queued". Pass an empty prefix for enums that have none.
+func enumFromPB[D ~string, E interface{ String() string }](v E, prefix string) D {
+	return D(strings.ToLower(strings.TrimPrefix(v.String(), prefix)))
 }
 
 /* Conversions from ProtoBuf models */

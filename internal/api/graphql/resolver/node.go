@@ -548,6 +548,18 @@ func (r *NodeResolver) ToAnnouncement() (*AnnouncementResolver, bool) {
 	}
 }
 
+// ToCleanupPolicy resolver
+func (r *NodeResolver) ToCleanupPolicy() (*CleanupPolicyResolver, bool) {
+	switch res := r.result.(type) {
+	case *CleanupPolicyResolver:
+		return res, true
+	case *models.CleanupPolicy:
+		return &CleanupPolicyResolver{policy: res}, true
+	default:
+		return nil, false
+	}
+}
+
 func node(ctx context.Context, value string) (*NodeResolver, error) {
 	model, err := getServiceCatalog(ctx).FetchModel(ctx, value)
 	if err != nil {

@@ -15,8 +15,8 @@ import (
 )
 
 // getValue implements the sortableField interface for TerraformModuleVersionSortableField
-func (tmv TerraformModuleVersionSortableField) getValue() string {
-	return string(tmv)
+func (ts TerraformModuleVersionSortableField) getValue() string {
+	return string(ts)
 }
 
 func TestTerraformModuleVersions_CreateModuleVersion(t *testing.T) {
@@ -24,7 +24,6 @@ func TestTerraformModuleVersions_CreateModuleVersion(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group and module for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-module-version",
 		Description: "test group for module version",
@@ -97,7 +96,6 @@ func TestTerraformModuleVersions_UpdateModuleVersion(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group, module, and module version for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-module-version-update",
 		Description: "test group for module version update",
@@ -175,7 +173,6 @@ func TestTerraformModuleVersions_DeleteModuleVersion(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group, module, and module version for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-module-version-delete",
 		Description: "test group for module version delete",
@@ -238,7 +235,6 @@ func TestTerraformModuleVersions_DeleteModuleVersion(t *testing.T) {
 
 			require.Nil(t, err)
 
-			// Verify module version was deleted
 			moduleVersion, err := testClient.client.TerraformModuleVersions.GetModuleVersionByID(ctx, test.id)
 			assert.Nil(t, moduleVersion)
 			assert.Nil(t, err)
@@ -251,7 +247,6 @@ func TestTerraformModuleVersions_GetModuleVersionByID(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group and module for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-module-version-get-by-id",
 		Description: "test group for module version get by id",
@@ -269,7 +264,6 @@ func TestTerraformModuleVersions_GetModuleVersionByID(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create a module version for testing
 	createdModuleVersion, err := testClient.client.TerraformModuleVersions.CreateModuleVersion(ctx, &models.TerraformModuleVersion{
 		ModuleID:        terraformModule.Metadata.ID,
 		SemanticVersion: "1.0.0",
@@ -327,7 +321,6 @@ func TestTerraformModuleVersions_GetModuleVersions(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group and module for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-module-versions-list",
 		Description: "test group for module versions list",
@@ -345,7 +338,6 @@ func TestTerraformModuleVersions_GetModuleVersions(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create test module versions
 	moduleVersions := []models.TerraformModuleVersion{
 		{
 			ModuleID:        terraformModule.Metadata.ID,
@@ -440,7 +432,6 @@ func TestTerraformModuleVersions_GetModuleVersionsWithPaginationAndSorting(t *te
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group and module for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-module-versions-pagination",
 		Description: "test group for module versions pagination",
@@ -503,7 +494,6 @@ func TestTerraformModuleVersions_GetModuleVersionByTRN(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group and module for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-module-version-get-by-trn",
 		Description: "test group for module version get by trn",
@@ -521,7 +511,6 @@ func TestTerraformModuleVersions_GetModuleVersionByTRN(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create a module version for testing
 	createdModuleVersion, err := testClient.client.TerraformModuleVersions.CreateModuleVersion(ctx, &models.TerraformModuleVersion{
 		ModuleID:        terraformModule.Metadata.ID,
 		SemanticVersion: "1.0.0",
@@ -569,6 +558,129 @@ func TestTerraformModuleVersions_GetModuleVersionByTRN(t *testing.T) {
 				assert.Equal(t, createdModuleVersion.Metadata.ID, moduleVersion.Metadata.ID)
 			} else {
 				assert.Nil(t, moduleVersion)
+			}
+		})
+	}
+}
+
+func TestTerraformModuleVersions_DeleteModuleVersionBatch(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-delete-module-versions",
+		FullPath:  "test-group-delete-module-versions",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	module, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-delete-versions",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		System:      "aws",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	versionSeq := 0
+	makeVersion := func(t *testing.T) *models.TerraformModuleVersion {
+		t.Helper()
+		versionSeq++
+		v, err := testClient.client.TerraformModuleVersions.CreateModuleVersion(ctx, &models.TerraformModuleVersion{
+			SemanticVersion: fmt.Sprintf("%d.0.0", versionSeq),
+			ModuleID:        module.Metadata.ID,
+			SHASum:          []byte(fmt.Sprintf("sha-%d", versionSeq)),
+			CreatedBy:       "db-integration-tests",
+		})
+		require.NoError(t, err)
+		return v
+	}
+
+	// Each test case owns its own versions so cases do not interfere.
+	vNoOp := makeVersion(t)
+	vIgnore := makeVersion(t)
+	vPartial := makeVersion(t)
+	vSurvivor := makeVersion(t)
+	vMixed := makeVersion(t)
+	vMulti1 := makeVersion(t)
+	vMulti2 := makeVersion(t)
+	vStale := makeVersion(t)
+
+	type testCase struct {
+		name         string
+		input        DeleteModuleVersionBatchInput
+		shouldBeGone []string
+		shouldExist  []string
+		expectOLE    bool
+	}
+
+	testCases := []testCase{
+		{
+			name:        "empty slice is a no-op",
+			input:       DeleteModuleVersionBatchInput{ModuleVersions: []*models.TerraformModuleVersion{}},
+			shouldExist: []string{vNoOp.Metadata.ID},
+		},
+		{
+			name: "non-existent version: OLE, nothing deleted",
+			input: DeleteModuleVersionBatchInput{ModuleVersions: []*models.TerraformModuleVersion{
+				{Metadata: models.ResourceMetadata{ID: nonExistentID, Version: 1}},
+			}},
+			shouldExist: []string{vIgnore.Metadata.ID},
+			expectOLE:   true,
+		},
+		{
+			name:         "partial delete — only the specified version is removed",
+			input:        DeleteModuleVersionBatchInput{ModuleVersions: []*models.TerraformModuleVersion{vPartial}},
+			shouldBeGone: []string{vPartial.Metadata.ID},
+			shouldExist:  []string{vSurvivor.Metadata.ID},
+		},
+		{
+			name: "batch with non-existent version alongside valid version: OLE, valid one still deleted",
+			input: DeleteModuleVersionBatchInput{ModuleVersions: []*models.TerraformModuleVersion{
+				vMixed,
+				{Metadata: models.ResourceMetadata{ID: nonExistentID, Version: 1}},
+			}},
+			shouldBeGone: []string{vMixed.Metadata.ID},
+			expectOLE:    true,
+		},
+		{
+			name:         "delete multiple versions in one call",
+			input:        DeleteModuleVersionBatchInput{ModuleVersions: []*models.TerraformModuleVersion{vMulti1, vMulti2}},
+			shouldBeGone: []string{vMulti1.Metadata.ID, vMulti2.Metadata.ID},
+		},
+		{
+			name: "stale version: OLE, nothing deleted",
+			input: DeleteModuleVersionBatchInput{ModuleVersions: []*models.TerraformModuleVersion{
+				{Metadata: models.ResourceMetadata{ID: vStale.Metadata.ID, Version: vStale.Metadata.Version - 1}},
+			}},
+			shouldExist: []string{vStale.Metadata.ID},
+			expectOLE:   true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			deletedIDs, err := testClient.client.TerraformModuleVersions.DeleteModuleVersionBatch(ctx, &test.input)
+
+			if test.expectOLE {
+				assert.Equal(t, errors.EOptimisticLock, errors.ErrorCode(err))
+			} else {
+				require.NoError(t, err)
+			}
+			assert.ElementsMatch(t, test.shouldBeGone, deletedIDs)
+
+			for _, id := range test.shouldBeGone {
+				got, err := testClient.client.TerraformModuleVersions.GetModuleVersionByID(ctx, id)
+				require.NoError(t, err)
+				assert.Nil(t, got)
+			}
+
+			for _, id := range test.shouldExist {
+				got, err := testClient.client.TerraformModuleVersions.GetModuleVersionByID(ctx, id)
+				require.NoError(t, err)
+				assert.NotNil(t, got)
 			}
 		})
 	}

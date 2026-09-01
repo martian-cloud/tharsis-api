@@ -44,6 +44,36 @@ func (_m *MockRuns) CreateRun(ctx context.Context, run *models.Run) (*models.Run
 	return r0, r1
 }
 
+// DeleteRunBatch provides a mock function with given fields: ctx, input
+func (_m *MockRuns) DeleteRunBatch(ctx context.Context, input *DeleteRunBatchInput) ([]string, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteRunBatch")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *DeleteRunBatchInput) ([]string, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *DeleteRunBatchInput) []string); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *DeleteRunBatchInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRunByID provides a mock function with given fields: ctx, id
 func (_m *MockRuns) GetRunByID(ctx context.Context, id string) (*models.Run, error) {
 	ret := _m.Called(ctx, id)

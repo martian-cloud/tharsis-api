@@ -25,6 +25,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/cleanup"
 	packageregistrycore "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/packageregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine"
@@ -53,6 +54,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/adminlogtail"
 	agentsvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/agent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/announcement"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cleanuppolicy"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
@@ -257,6 +259,13 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	objectstoregc.NewJanitor(logger, dbClient, pluginCatalog.ObjectStore, maintenanceMonitor).Start(ctx)
 
+	// Start namespace cleanup policy sweeper
+	cleanup.NewScheduler(
+		dbClient,
+		logger,
+		maintenanceMonitor,
+	).Start(ctx)
+
 	// Services.
 	var (
 		activityService            = activityevent.NewService(dbClient, logger)
@@ -276,6 +285,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, taskManager)
 		packageRegistryService     = packageregistry.NewService(logger, dbClient, limits, packageStore)
 		policySetService           = policy.NewService(logger, dbClient, limits)
+		cleanupPolicyService       = cleanuppolicy.NewService(logger, dbClient)
 		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits)
 		scimService                = scim.NewService(logger, dbClient, signingKeyManager, cfg.OauthProviders)
 		federatedRegistryService   = federatedregistry.NewService(logger, dbClient, limits, signingKeyManager)
@@ -312,6 +322,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	serviceCatalog := &services.Catalog{
 		ActivityEventService:             activityService,
+		CleanupPolicyService:             cleanupPolicyService,
 		AdminLogTailService:              adminLogTailService,
 		AnnouncementService:              announcementService,
 		CLIService:                       cliService,

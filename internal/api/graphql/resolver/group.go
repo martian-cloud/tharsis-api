@@ -500,6 +500,11 @@ func (r *GroupResolver) OutputVisibility(ctx context.Context) (*namespace.Output
 	return getServiceCatalog(ctx).GroupService.GetOutputVisibilitySetting(ctx, r.group)
 }
 
+// EffectiveCleanupPolicies resolver
+func (r *GroupResolver) EffectiveCleanupPolicies(ctx context.Context) ([]*CleanupPolicyResolver, error) {
+	return getCleanupPolicies(ctx, r.group.FullPath)
+}
+
 // CreatedBy resolver
 func (r *GroupResolver) CreatedBy() string {
 	return r.group.CreatedBy

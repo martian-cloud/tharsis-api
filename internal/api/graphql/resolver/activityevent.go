@@ -426,6 +426,13 @@ func (r *ActivityEventResolver) loadTarget(ctx context.Context) (*NodeResolver, 
 			return nil, err
 		}
 		return &NodeResolver{result: &ManagedIdentityAccessRuleResolver{rule: rule}}, nil
+	case models.TargetCleanupPolicy:
+		// Use resource loader to get cleanup policy
+		policy, err := loadCleanupPolicy(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &CleanupPolicyResolver{policy: policy}}, nil
 	case models.TargetNamespaceMembership:
 		// Use resource loader to get namespace membership
 		namespaceMembership, err := loadNamespaceMembership(ctx, r.activityEvent.TargetID)

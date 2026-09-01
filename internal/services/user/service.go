@@ -122,13 +122,13 @@ type GetNamespaceFavoritesInput struct {
 // CreateNamespaceFavoriteInput is the input for creating a namespace favorite
 type CreateNamespaceFavoriteInput struct {
 	NamespacePath string
-	NamespaceType namespace.Type
+	NamespaceType models.NamespaceType
 }
 
 // DeleteNamespaceFavoriteInput is the input for deleting a namespace favorite
 type DeleteNamespaceFavoriteInput struct {
 	NamespacePath string
-	NamespaceType namespace.Type
+	NamespaceType models.NamespaceType
 }
 
 const (
@@ -879,7 +879,7 @@ func (s *service) CreateNamespaceFavorite(ctx context.Context, input *CreateName
 	var workspaceID *string
 
 	switch input.NamespaceType {
-	case namespace.TypeGroup:
+	case models.NamespaceTypeGroup:
 		if err := userCaller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(namespacePath)); err != nil {
 			return nil, err
 		}
@@ -891,7 +891,7 @@ func (s *service) CreateNamespaceFavorite(ctx context.Context, input *CreateName
 			return nil, errors.New("namespace path does not correspond to a group", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 		groupID = &group.Metadata.ID
-	case namespace.TypeWorkspace:
+	case models.NamespaceTypeWorkspace:
 		if err := userCaller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(namespacePath)); err != nil {
 			return nil, err
 		}
@@ -966,7 +966,7 @@ func (s *service) DeleteNamespaceFavorite(ctx context.Context, input *DeleteName
 	namespacePath := input.NamespacePath
 
 	switch input.NamespaceType {
-	case namespace.TypeGroup:
+	case models.NamespaceTypeGroup:
 		if err := userCaller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(namespacePath)); err != nil {
 			return err
 		}
@@ -977,7 +977,7 @@ func (s *service) DeleteNamespaceFavorite(ctx context.Context, input *DeleteName
 		if group == nil {
 			return errors.New("namespace path does not correspond to a group", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
-	case namespace.TypeWorkspace:
+	case models.NamespaceTypeWorkspace:
 		if err := userCaller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(namespacePath)); err != nil {
 			return err
 		}

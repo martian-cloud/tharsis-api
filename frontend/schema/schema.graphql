@@ -1,3 +1,5 @@
+directive @complexity(value: Int!) on FIELD_DEFINITION
+
 input ActivateAdminModeInput {
   clientMutationId: String
   durationMinutes: Int
@@ -101,6 +103,7 @@ enum ActivityEventSort {
 }
 
 enum ActivityEventTargetType {
+  CLEANUP_POLICY
   FEDERATED_REGISTRY
   GPG_KEY
   GROUP
@@ -519,25 +522,6 @@ input CancelRunInput {
   runId: String!
 }
 
-type TerraformCheckResult {
-  name: String!
-  objects: [TerraformCheckResultObject!]!
-  status: TerraformCheckResultStatus!
-}
-
-type TerraformCheckResultObject {
-  address: String!
-  failureMessages: [String!]!
-  status: TerraformCheckResultStatus!
-}
-
-enum TerraformCheckResultStatus {
-  ERROR
-  FAIL
-  PASS
-  UNKNOWN
-}
-
 input ClaimJobInput {
   clientMutationId: String
   runnerId: String
@@ -549,6 +533,37 @@ type ClaimJobPayload {
   jobId: String
   problems: [Problem!]!
   token: String
+}
+
+type CleanupPolicy implements Node {
+  disabled: Boolean!
+  id: ID!
+  kind: CleanupRuleKind!
+  lastSweepCompletedAt: Time
+  metadata: ResourceMetadata!
+  namespacePath: String!
+  runPolicyData: RunCleanupPolicyData
+  terraformModulePolicyData: TerraformModuleCleanupPolicyData
+  terraformProviderPolicyData: TerraformProviderCleanupPolicyData
+}
+
+type CleanupPolicyMutationPayload {
+  cleanupPolicy: CleanupPolicy
+  clientMutationId: String
+  namespace: Namespace
+  problems: [Problem!]!
+}
+
+enum CleanupRuleKind {
+  RUNS
+  TERRAFORM_MODULES
+  TERRAFORM_PROVIDERS
+}
+
+enum CleanupStrategy {
+  AGE
+  COUNT
+  PROTECT
 }
 
 type Config {
@@ -668,6 +683,16 @@ type CreateAnnouncementPayload {
   announcement: Announcement
   clientMutationId: String
   problems: [Problem!]!
+}
+
+input CreateCleanupPolicyInput {
+  clientMutationId: String
+  disabled: Boolean
+  kind: CleanupRuleKind!
+  namespacePath: String!
+  runPolicyData: RunCleanupPolicyDataInput
+  terraformModulePolicyData: TerraformModuleCleanupPolicyDataInput
+  terraformProviderPolicyData: TerraformProviderCleanupPolicyDataInput
 }
 
 input CreateConfigurationVersionInput {
@@ -1177,6 +1202,12 @@ type DeleteAnnouncementPayload {
   problems: [Problem!]!
 }
 
+input DeleteCleanupPolicyInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+}
+
 input DeleteFederatedRegistryInput {
   clientMutationId: String
   id: String!
@@ -1579,6 +1610,7 @@ type Group implements Namespace & Node {
   descendentGroups(after: String, before: String, first: Int, last: Int, sort: GroupSort): GroupConnection!
   description: String!
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
+  effectiveCleanupPolicies: [CleanupPolicy!]!
   federatedRegistries(after: String, before: String, first: Int, last: Int, sort: FederatedRegistrySort): FederatedRegistryConnection!
   fullPath: String!
   gpgKeys(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: GPGKeySort): GPGKeyConnection!
@@ -1927,6 +1959,7 @@ type Mutation {
   createAgentRun(input: CreateAgentRunInput!): CreateAgentRunPayload!
   createAgentSession(input: CreateAgentSessionInput!): CreateAgentSessionPayload!
   createAnnouncement(input: CreateAnnouncementInput!): CreateAnnouncementPayload!
+  createCleanupPolicy(input: CreateCleanupPolicyInput!): CleanupPolicyMutationPayload!
   createConfigurationVersion(input: CreateConfigurationVersionInput!): ConfigurationVersionMutationPayload!
   createFederatedRegistry(input: CreateFederatedRegistryInput!): FederatedRegistryMutationPayload!
   createFederatedRegistryTokens(input: CreateFederatedRegistryTokensInput!): CreateFederatedRegistryTokensPayload! @deprecated(reason: "Use the gRPC API instead.")
@@ -1965,6 +1998,7 @@ type Mutation {
   createWorkspaceVCSProviderLink(input: CreateWorkspaceVCSProviderLinkInput!): CreateWorkspaceVCSProviderLinkPayload!
   deactivateAdminMode(input: DeactivateAdminModeInput!): UpdateUserAdminStatusPayload!
   deleteAnnouncement(input: DeleteAnnouncementInput!): DeleteAnnouncementPayload!
+  deleteCleanupPolicy(input: DeleteCleanupPolicyInput!): CleanupPolicyMutationPayload!
   deleteFederatedRegistry(input: DeleteFederatedRegistryInput!): FederatedRegistryMutationPayload!
   deleteGPGKey(input: DeleteGPGKeyInput!): DeleteGPGKeyPayload!
   deleteGroup(input: DeleteGroupInput!): DeleteGroupPayload!
@@ -2022,6 +2056,7 @@ type Mutation {
   unfavoriteNamespace(input: NamespaceFavoriteInput!): NamespaceUnfavoriteMutationPayload!
   unlockWorkspace(input: UnlockWorkspaceInput!): UnlockWorkspacePayload!
   updateAnnouncement(input: UpdateAnnouncementInput!): UpdateAnnouncementPayload!
+  updateCleanupPolicy(input: UpdateCleanupPolicyInput!): CleanupPolicyMutationPayload!
   updateFederatedRegistry(input: UpdateFederatedRegistryInput!): FederatedRegistryMutationPayload!
   updateGroup(input: UpdateGroupInput!): UpdateGroupPayload!
   updateManagedIdentity(input: UpdateManagedIdentityInput!): UpdateManagedIdentityPayload!
@@ -2049,6 +2084,7 @@ interface Namespace {
   activityEvents(actions: [ActivityEventAction!], after: String, before: String, first: Int, includeNested: Boolean, last: Int, serviceAccountId: String, serviceAccountPath: String, sort: ActivityEventSort, targetTypes: [ActivityEventTargetType!], timeRangeEnd: Time, timeRangeStart: Time, userId: String, username: String): ActivityEventConnection!
   description: String!
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
+  effectiveCleanupPolicies: [CleanupPolicy!]!
   fullPath: String!
   id: ID!
   managedIdentities(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: ManagedIdentitySort): ManagedIdentityConnection!
@@ -2804,6 +2840,34 @@ type Run implements Node {
   workspace: Workspace!
 }
 
+type RunCleanupPolicyData {
+  rules: [RunCleanupRule!]!
+}
+
+input RunCleanupPolicyDataInput {
+  rules: [RunCleanupRuleInput!]!
+}
+
+type RunCleanupRule {
+  assessment: Boolean
+  deleteAfterDays: Int!
+  description: String!
+  keepMin: Int!
+  speculative: Boolean
+  status: [RunStatus!]!
+  strategy: CleanupStrategy!
+}
+
+input RunCleanupRuleInput {
+  assessment: Boolean
+  deleteAfterDays: Int!
+  description: String!
+  keepMin: Int!
+  speculative: Boolean
+  status: [RunStatus!]!
+  strategy: CleanupStrategy!
+}
+
 type RunConnection {
   edges: [RunEdge]
   pageInfo: PageInfo!
@@ -3357,6 +3421,25 @@ type TerraformCLIVersions {
   versions: [String!]!
 }
 
+type TerraformCheckResult {
+  name: String!
+  objects: [TerraformCheckResultObject!]!
+  status: TerraformCheckResultStatus!
+}
+
+type TerraformCheckResultObject {
+  address: String!
+  failureMessages: [String!]!
+  status: TerraformCheckResultStatus!
+}
+
+enum TerraformCheckResultStatus {
+  ERROR
+  FAIL
+  PASS
+  UNKNOWN
+}
+
 type TerraformModule implements Node {
   attestations(after: String, before: String, digest: String, first: Int, last: Int, sort: TerraformModuleAttestationSort): TerraformModuleAttestationConnection!
   createdBy: String!
@@ -3404,6 +3487,32 @@ enum TerraformModuleAttestationSort {
   CREATED_AT_DESC
   PREDICATE_TYPE_ASC
   PREDICATE_TYPE_DESC
+}
+
+type TerraformModuleCleanupPolicyData {
+  rules: [TerraformModuleCleanupRule!]!
+}
+
+input TerraformModuleCleanupPolicyDataInput {
+  rules: [TerraformModuleCleanupRuleInput!]!
+}
+
+type TerraformModuleCleanupRule {
+  deleteAfterDays: Int!
+  description: String!
+  nameGlob: String!
+  strategy: CleanupStrategy!
+  systemGlob: String!
+  versionGlob: String!
+}
+
+input TerraformModuleCleanupRuleInput {
+  deleteAfterDays: Int!
+  description: String!
+  nameGlob: String!
+  strategy: CleanupStrategy!
+  systemGlob: String!
+  versionGlob: String!
 }
 
 type TerraformModuleConfigurationDetails {
@@ -3542,6 +3651,30 @@ type TerraformProvider implements Node {
   resourcePath: String!
   source: String!
   versions(after: String, before: String, first: Int, last: Int, sort: TerraformProviderVersionSort): TerraformProviderVersionConnection!
+}
+
+type TerraformProviderCleanupPolicyData {
+  rules: [TerraformProviderCleanupRule!]!
+}
+
+input TerraformProviderCleanupPolicyDataInput {
+  rules: [TerraformProviderCleanupRuleInput!]!
+}
+
+type TerraformProviderCleanupRule {
+  deleteAfterDays: Int!
+  description: String!
+  nameGlob: String!
+  strategy: CleanupStrategy!
+  versionGlob: String!
+}
+
+input TerraformProviderCleanupRuleInput {
+  deleteAfterDays: Int!
+  description: String!
+  nameGlob: String!
+  strategy: CleanupStrategy!
+  versionGlob: String!
 }
 
 type TerraformProviderConnection {
@@ -3690,6 +3823,16 @@ type UpdateAnnouncementPayload {
   announcement: Announcement
   clientMutationId: String
   problems: [Problem!]!
+}
+
+input UpdateCleanupPolicyInput {
+  clientMutationId: String
+  disabled: Boolean
+  id: ID!
+  metadata: ResourceMetadataInput
+  runPolicyData: RunCleanupPolicyDataInput
+  terraformModulePolicyData: TerraformModuleCleanupPolicyDataInput
+  terraformProviderPolicyData: TerraformProviderCleanupPolicyDataInput
 }
 
 input UpdateFederatedRegistryInput {
@@ -4185,6 +4328,7 @@ type Workspace implements Namespace & Node {
   destroyed: Boolean!
   dirtyState: Boolean!
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
+  effectiveCleanupPolicies: [CleanupPolicy!]!
   fullPath: String!
   group: Group!
   groupPath: String!

@@ -22,6 +22,14 @@ const ACTION_TEXT = {
 
 const RESOURCE_TYPES = {
     VARIABLE: 'Variable',
+    CLEANUP_POLICY: 'Cleanup policy',
+} as any;
+
+// Maps child resource enum identifiers (that lack a proper display name) to their display labels.
+const UNNAMED_CHILD_RESOURCE_LABELS = {
+    TERRAFORM_MODULES: 'Terraform modules',
+    TERRAFORM_PROVIDERS: 'Terraform providers',
+    RUNS: 'runs',
 } as any;
 
 const MEMBER_TYPES = {
@@ -190,7 +198,10 @@ function ActivityEventWorkspaceTarget({ fragmentRef }: Props) {
     } else if ('REMOVE_MEMBERSHIP' === data.action) {
         primary = <React.Fragment>{MEMBER_TYPES[payload?.member?.__typename] || 'Unknown member type'} <Typography component="span" sx={{ fontWeight: 500 }}>{getMemberIdentifier(payload?.member)}</Typography> removed from workspace {namespaceLink}</React.Fragment>;
     } else if (data.action === 'DELETE_CHILD_RESOURCE') {
-        primary = <React.Fragment>{RESOURCE_TYPES[payload.type] || 'Unknown resource type'} with name <Typography component="span" sx={{ fontWeight: 500 }}>{payload.name}</Typography> deleted from workspace {namespaceLink}</React.Fragment>;
+        const unnamedLabel = UNNAMED_CHILD_RESOURCE_LABELS[payload.name];
+        const label = unnamedLabel ?? payload.name ?? 'unknown';
+        const connector = unnamedLabel ? 'for' : 'with name';
+        primary = <React.Fragment>{RESOURCE_TYPES[payload.type] || 'Unknown resource type'} {connector} <Typography component="span" sx={{ fontWeight: 500 }}>{label}</Typography> deleted from workspace {namespaceLink}</React.Fragment>;
     } else if ('MIGRATE' === data.action) {
         primary = <React.Fragment>Workspace {namespaceLink} {actionText} <Typography component="span" sx={{ fontWeight: 500 }}>{payload?.previousGroupPath}</Typography></React.Fragment>;
     }
