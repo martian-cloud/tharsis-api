@@ -26,6 +26,7 @@ type TerraformModuleVersions interface {
 	CreateModuleVersion(ctx context.Context, moduleVersion *models.TerraformModuleVersion) (*models.TerraformModuleVersion, error)
 	UpdateModuleVersion(ctx context.Context, moduleVersion *models.TerraformModuleVersion) (*models.TerraformModuleVersion, error)
 	DeleteModuleVersion(ctx context.Context, moduleVersion *models.TerraformModuleVersion) error
+	DeleteModuleVersionBatch(ctx context.Context, input *DeleteModuleVersionBatchInput) ([]string, error)
 }
 
 // TerraformModuleVersionSortableField represents the fields that a module version can be sorted by
@@ -55,6 +56,12 @@ func (ts TerraformModuleVersionSortableField) getSortDirection() pagination.Sort
 		return pagination.DescSort
 	}
 	return pagination.AscSort
+}
+
+// DeleteModuleVersionBatchInput configures batch module version deletion.
+type DeleteModuleVersionBatchInput struct {
+	// ModuleVersions is the set of module versions to delete.
+	ModuleVersions []*models.TerraformModuleVersion
 }
 
 // TerraformModuleVersionFilter contains the supported fields for filtering TerraformModuleVersion resources
@@ -400,6 +407,59 @@ func (t *terraformModuleVersions) DeleteModuleVersion(ctx context.Context, modul
 	}
 
 	return nil
+}
+
+// DeleteModuleVersionBatch deletes the given module versions, matching each on (id, version). If fewer
+// rows are deleted than were requested, it returns ErrOptimisticLockError alongside whatever was
+// actually deleted.
+func (t *terraformModuleVersions) DeleteModuleVersionBatch(ctx context.Context, input *DeleteModuleVersionBatchInput) ([]string, error) {
+	ctx, span := tracer.Start(ctx, "db.DeleteModuleVersionBatch")
+	defer span.End()
+
+	if len(input.ModuleVersions) == 0 {
+		return nil, nil
+	}
+
+	candidateEx := make([]goqu.Expression, len(input.ModuleVersions))
+	for i, mv := range input.ModuleVersions {
+		candidateEx[i] = goqu.And(
+			goqu.C("id").Eq(mv.Metadata.ID),
+			goqu.C("version").Eq(mv.Metadata.Version),
+		)
+	}
+
+	sql, args, err := dialect.Delete("terraform_module_versions").
+		Prepared(true).
+		Where(goqu.Or(candidateEx...)).
+		Returning("id").
+		ToSQL()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	rows, err := t.dbClient.getConnection(ctx).Query(ctx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+	defer rows.Close()
+
+	deletedIDs := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
+		}
+		deletedIDs = append(deletedIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to read rows", errors.WithSpan(span))
+	}
+
+	if len(deletedIDs) != len(input.ModuleVersions) {
+		return deletedIDs, ErrOptimisticLockError
+	}
+
+	return deletedIDs, nil
 }
 
 func (t *terraformModuleVersions) getModuleVersion(ctx context.Context, exp goqu.Ex) (*models.TerraformModuleVersion, error) {

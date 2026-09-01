@@ -5,7 +5,7 @@ import ActivityIcon from '@mui/icons-material/TimelineOutlined';
 import VariablesIcon from '@mui/icons-material/WindowOutlined';
 import { Avatar, Box, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { AccountLockOutline as ManagedIdentityIcon, ContentDuplicate as ProviderMirrorIcon, RocketLaunchOutline as RunIcon, ShieldLockOutline as PolicyIcon } from 'mdi-material-ui';
+import { AccountLockOutline as ManagedIdentityIcon, ContentDuplicate as ProviderMirrorIcon, DeleteClockOutline as CleanupPolicyIcon, RocketLaunchOutline as RunIcon, ShieldLockOutline as PolicyIcon } from 'mdi-material-ui';
 import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
 
@@ -38,6 +38,7 @@ const NAV_SECTIONS = [
         label: 'Administration',
         items: [
             { route: 'provider_mirror', label: 'Provider Mirror', icon: <ProviderMirrorIcon /> },
+            { route: 'cleanup_policies', label: 'Cleanup Policies', icon: <CleanupPolicyIcon /> },
             { route: 'settings', label: 'Settings', icon: <SettingsIcon /> },
         ],
     },

@@ -1215,6 +1215,44 @@ func (r RootResolver) DeleteGPGKey(ctx context.Context, args *struct{ Input Dele
 	return response, nil
 }
 
+/* Cleanup Policy Queries and Mutations */
+
+// CreateCleanupPolicy creates a new cleanup policy
+func (r RootResolver) CreateCleanupPolicy(ctx context.Context, args *struct {
+	Input CreateCleanupPolicyInput
+}) (*CleanupPolicyMutationPayloadResolver, error) {
+	response, err := createCleanupPolicyMutation(ctx, &args.Input)
+	if err != nil {
+		return handleCleanupPolicyMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateCleanupPolicy updates a cleanup policy
+func (r RootResolver) UpdateCleanupPolicy(ctx context.Context, args *struct {
+	Input UpdateCleanupPolicyInput
+}) (*CleanupPolicyMutationPayloadResolver, error) {
+	response, err := updateCleanupPolicyMutation(ctx, &args.Input)
+	if err != nil {
+		return handleCleanupPolicyMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteCleanupPolicy deletes a cleanup policy
+func (r RootResolver) DeleteCleanupPolicy(ctx context.Context, args *struct {
+	Input DeleteCleanupPolicyInput
+}) (*CleanupPolicyMutationPayloadResolver, error) {
+	response, err := deleteCleanupPolicyMutation(ctx, &args.Input)
+	if err != nil {
+		return handleCleanupPolicyMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* TerraformCLIVersions queries and mutations */
 
 // TerraformCLIVersions queries for available TerraformCLIVersions.

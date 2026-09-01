@@ -1883,7 +1883,7 @@ func TestCreateNamespaceFavorite(t *testing.T) {
 			}(),
 			input: &CreateNamespaceFavoriteInput{
 				NamespacePath: "test-namespace",
-				NamespaceType: namespace.TypeGroup,
+				NamespaceType: models.NamespaceTypeGroup,
 			},
 			mockGroup: &models.Group{
 				Metadata: models.ResourceMetadata{ID: "group-id"},
@@ -1905,7 +1905,7 @@ func TestCreateNamespaceFavorite(t *testing.T) {
 			}(),
 			input: &CreateNamespaceFavoriteInput{
 				NamespacePath: "test-group/test-workspace",
-				NamespaceType: namespace.TypeWorkspace,
+				NamespaceType: models.NamespaceTypeWorkspace,
 			},
 		},
 		{
@@ -1915,7 +1915,7 @@ func TestCreateNamespaceFavorite(t *testing.T) {
 			},
 			input: &CreateNamespaceFavoriteInput{
 				NamespacePath: "test-namespace",
-				NamespaceType: namespace.TypeGroup,
+				NamespaceType: models.NamespaceTypeGroup,
 			},
 			expectError:     true,
 			expectErrorCode: errors.EForbidden,
@@ -1923,7 +1923,7 @@ func TestCreateNamespaceFavorite(t *testing.T) {
 		{
 			name:            "unauthenticated caller cannot create favorite",
 			caller:          nil,
-			input:           &CreateNamespaceFavoriteInput{NamespacePath: "test-namespace", NamespaceType: namespace.TypeGroup},
+			input:           &CreateNamespaceFavoriteInput{NamespacePath: "test-namespace", NamespaceType: models.NamespaceTypeGroup},
 			expectError:     true,
 			expectErrorCode: errors.EUnauthorized,
 		},
@@ -1940,7 +1940,7 @@ func TestCreateNamespaceFavorite(t *testing.T) {
 			}(),
 			input: &CreateNamespaceFavoriteInput{
 				NamespacePath: "test-namespace",
-				NamespaceType: namespace.TypeGroup,
+				NamespaceType: models.NamespaceTypeGroup,
 			},
 			mockGroup: &models.Group{
 				Metadata: models.ResourceMetadata{ID: "group-id"},
@@ -1959,9 +1959,9 @@ func TestCreateNamespaceFavorite(t *testing.T) {
 			mockWorkspaces := db.NewMockWorkspaces(t)
 
 			if !tc.expectError {
-				if tc.input.NamespaceType == namespace.TypeGroup {
+				if tc.input.NamespaceType == models.NamespaceTypeGroup {
 					mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(tc.input.NamespacePath)).Return(tc.mockGroup, nil)
-				} else if tc.input.NamespaceType == namespace.TypeWorkspace {
+				} else if tc.input.NamespaceType == models.NamespaceTypeWorkspace {
 					mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, trn.TypeWorkspace.Build(tc.input.NamespacePath)).Return(&models.Workspace{
 						Metadata: models.ResourceMetadata{ID: "workspace-id"},
 						FullPath: tc.input.NamespacePath,
@@ -2048,7 +2048,7 @@ func TestDeleteNamespaceFavorite(t *testing.T) {
 			}(),
 			input: &DeleteNamespaceFavoriteInput{
 				NamespacePath: "test-namespace",
-				NamespaceType: namespace.TypeGroup,
+				NamespaceType: models.NamespaceTypeGroup,
 			},
 			mockFavorites: &db.NamespaceFavoritesResult{
 				NamespaceFavorites: []models.NamespaceFavorite{
@@ -2077,7 +2077,7 @@ func TestDeleteNamespaceFavorite(t *testing.T) {
 			}(),
 			input: &DeleteNamespaceFavoriteInput{
 				NamespacePath: "test-group/test-workspace",
-				NamespaceType: namespace.TypeWorkspace,
+				NamespaceType: models.NamespaceTypeWorkspace,
 			},
 			mockFavorites: &db.NamespaceFavoritesResult{
 				NamespaceFavorites: []models.NamespaceFavorite{
@@ -2098,7 +2098,7 @@ func TestDeleteNamespaceFavorite(t *testing.T) {
 			},
 			input: &DeleteNamespaceFavoriteInput{
 				NamespacePath: "test-namespace",
-				NamespaceType: namespace.TypeGroup,
+				NamespaceType: models.NamespaceTypeGroup,
 			},
 			expectError:     true,
 			expectErrorCode: errors.EForbidden,
@@ -2106,7 +2106,7 @@ func TestDeleteNamespaceFavorite(t *testing.T) {
 		{
 			name:            "unauthenticated caller cannot delete favorite",
 			caller:          nil,
-			input:           &DeleteNamespaceFavoriteInput{NamespacePath: "test-namespace", NamespaceType: namespace.TypeGroup},
+			input:           &DeleteNamespaceFavoriteInput{NamespacePath: "test-namespace", NamespaceType: models.NamespaceTypeGroup},
 			expectError:     true,
 			expectErrorCode: errors.EUnauthorized,
 		},
@@ -2125,7 +2125,7 @@ func TestDeleteNamespaceFavorite(t *testing.T) {
 			}(),
 			input: &DeleteNamespaceFavoriteInput{
 				NamespacePath: "test-namespace",
-				NamespaceType: namespace.TypeGroup,
+				NamespaceType: models.NamespaceTypeGroup,
 			},
 			mockFavorites: &db.NamespaceFavoritesResult{
 				NamespaceFavorites: []models.NamespaceFavorite{},
@@ -2147,7 +2147,7 @@ func TestDeleteNamespaceFavorite(t *testing.T) {
 			}(),
 			input: &DeleteNamespaceFavoriteInput{
 				NamespacePath: "test-namespace",
-				NamespaceType: namespace.TypeGroup,
+				NamespaceType: models.NamespaceTypeGroup,
 			},
 			mockFavorites: &db.NamespaceFavoritesResult{
 				NamespaceFavorites: []models.NamespaceFavorite{
@@ -2173,12 +2173,12 @@ func TestDeleteNamespaceFavorite(t *testing.T) {
 			mockGroups := db.NewMockGroups(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
 			if tc.input != nil && tc.expectErrorCode != errors.EForbidden && tc.expectErrorCode != errors.EUnauthorized {
-				if tc.input.NamespaceType == namespace.TypeGroup {
+				if tc.input.NamespaceType == models.NamespaceTypeGroup {
 					mockGroups.On("GetGroupByTRN", mock.Anything, trn.TypeGroup.Build(tc.input.NamespacePath)).Return(&models.Group{
 						Metadata: models.ResourceMetadata{ID: "group-id"},
 						FullPath: tc.input.NamespacePath,
 					}, nil)
-				} else if tc.input.NamespaceType == namespace.TypeWorkspace {
+				} else if tc.input.NamespaceType == models.NamespaceTypeWorkspace {
 					mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, trn.TypeWorkspace.Build(tc.input.NamespacePath)).Return(&models.Workspace{
 						Metadata: models.ResourceMetadata{ID: "workspace-id"},
 						FullPath: tc.input.NamespacePath,

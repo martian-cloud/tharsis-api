@@ -4,7 +4,20 @@ import ActivityIcon from '@mui/icons-material/TimelineOutlined';
 import VariablesIcon from '@mui/icons-material/WindowOutlined';
 import { Avatar, Box, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { ServerNetwork as FederatedRegistryIcon, KeyVariant as KeyIcon, AccountLockOutline as ManagedIdentityIcon, PackageVariantClosed as PackageIcon, ShieldLockOutline as PolicyIcon, ContentDuplicate as ProviderMirrorIcon, RocketLaunchOutline as RunIcon, RobotOutline as RunnersIcon, LanConnect as ServiceAccountIcon, CubeOutline as TerraformModuleIcon, SourceMerge as VCSProviderIcon } from 'mdi-material-ui';
+import {
+    ServerNetwork as FederatedRegistryIcon,
+    KeyVariant as KeyIcon,
+    AccountLockOutline as ManagedIdentityIcon,
+    PackageVariantClosed as PackageIcon,
+    ShieldLockOutline as PolicyIcon,
+    ContentDuplicate as ProviderMirrorIcon,
+    RocketLaunchOutline as RunIcon,
+    RobotOutline as RunnersIcon,
+    LanConnect as ServiceAccountIcon,
+    CubeOutline as TerraformModuleIcon,
+    SourceMerge as VCSProviderIcon,
+    DeleteClockOutline as CleanupPolicyIcon
+} from 'mdi-material-ui';
 import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
 
@@ -48,6 +61,7 @@ const NAV_SECTIONS = [
             { route: 'runners', label: 'Runner Agents', icon: <RunnersIcon /> },
             { route: 'provider_mirror', label: 'Provider Mirror', icon: <ProviderMirrorIcon /> },
             { route: 'vcs_providers', label: 'VCS Providers', icon: <VCSProviderIcon /> },
+            { route: 'cleanup_policies', label: 'Cleanup Policies', icon: <CleanupPolicyIcon /> },
             { route: 'settings', label: 'Settings', icon: <SettingsIcon /> },
         ],
     },

@@ -191,6 +191,7 @@ type Workspace implements Node, Namespace {
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
   providerMirrorEnabled: NamespaceProviderMirrorEnabled!
   outputVisibility: NamespaceOutputVisibility!
+  effectiveCleanupPolicies: [CleanupPolicy!]!
 }
 
 input CreateWorkspaceInput {

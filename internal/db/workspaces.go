@@ -77,6 +77,7 @@ type WorkspaceFilter struct {
 	Dirty                          *bool
 	HasStateVersion                *bool
 	WorkspacePath                  *string
+	NamespacePathPrefix            *string
 	LabelFilters                   []WorkspaceLabelFilter
 	FavoriteUserID                 *string
 	ExcludeFavoriteUserID          *string
@@ -183,6 +184,13 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 
 		if input.Filter.WorkspacePath != nil {
 			ex = ex.Append(goqu.I("namespaces.path").Eq(*input.Filter.WorkspacePath))
+		}
+
+		if input.Filter.NamespacePathPrefix != nil {
+			ex = ex.Append(goqu.Or(
+				goqu.I("namespaces.path").Eq(*input.Filter.NamespacePathPrefix),
+				goqu.I("namespaces.path").Like(escapeLikePattern(*input.Filter.NamespacePathPrefix)+"/%"),
+			))
 		}
 
 		if input.Filter.PathLessThan != nil {

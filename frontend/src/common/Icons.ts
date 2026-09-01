@@ -18,10 +18,12 @@ import {
     KeyVariant as KeyIcon,
     Terraform as TerraformIcon,
     RobotOutline as RunnerIcon,
-    ServerNetwork as FederatedRegistryIcon
+    ServerNetwork as FederatedRegistryIcon,
+    DeleteClockOutline as CleanupPolicyIcon,
 } from 'mdi-material-ui';
 
 export {
+    CleanupPolicyIcon,
     GroupIcon,
     WorkspaceIcon,
     MemberIcon,

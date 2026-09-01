@@ -15,8 +15,8 @@ import (
 )
 
 // getValue implements the sortableField interface for TerraformProviderVersionSortableField
-func (tpv TerraformProviderVersionSortableField) getValue() string {
-	return string(tpv)
+func (ts TerraformProviderVersionSortableField) getValue() string {
+	return string(ts)
 }
 
 func TestTerraformProviderVersions_CreateProviderVersion(t *testing.T) {
@@ -24,7 +24,6 @@ func TestTerraformProviderVersions_CreateProviderVersion(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group and provider for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-provider-version",
 		Description: "test group for provider version",
@@ -90,7 +89,6 @@ func TestTerraformProviderVersions_UpdateProviderVersion(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group, provider, and provider version for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-provider-version-update",
 		Description: "test group for provider version update",
@@ -173,7 +171,6 @@ func TestTerraformProviderVersions_DeleteProviderVersion(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group, provider, and provider version for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-provider-version-delete",
 		Description: "test group for provider version delete",
@@ -240,7 +237,6 @@ func TestTerraformProviderVersions_DeleteProviderVersion(t *testing.T) {
 
 			require.Nil(t, err)
 
-			// Verify provider version was deleted
 			providerVersion, err := testClient.client.TerraformProviderVersions.GetProviderVersionByID(ctx, test.id)
 			assert.Nil(t, providerVersion)
 			assert.Nil(t, err)
@@ -253,7 +249,6 @@ func TestTerraformProviderVersions_GetProviderVersionByID(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group for the terraform provider
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-provider-version-get-by-id",
 		Description: "test group for provider version get by id",
@@ -262,7 +257,6 @@ func TestTerraformProviderVersions_GetProviderVersionByID(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create a terraform provider for the version
 	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
 		Name:        "test-provider-version-get-by-id",
 		GroupID:     group.Metadata.ID,
@@ -272,7 +266,6 @@ func TestTerraformProviderVersions_GetProviderVersionByID(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create a terraform provider version for testing
 	createdProviderVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
@@ -328,7 +321,6 @@ func TestTerraformProviderVersions_GetProviderVersions(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group for the terraform provider
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-provider-versions-list",
 		Description: "test group for provider versions list",
@@ -337,7 +329,6 @@ func TestTerraformProviderVersions_GetProviderVersions(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create a terraform provider for the versions
 	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
 		Name:        "test-provider-versions-list",
 		GroupID:     group.Metadata.ID,
@@ -347,7 +338,6 @@ func TestTerraformProviderVersions_GetProviderVersions(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create test terraform provider versions
 	versions := []models.TerraformProviderVersion{
 		{
 			SemanticVersion: "1.0.0",
@@ -429,7 +419,6 @@ func TestTerraformProviderVersions_GetProviderVersionsWithPaginationAndSorting(t
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group for the terraform provider
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-provider-versions-pagination",
 		Description: "test group for provider versions pagination",
@@ -438,7 +427,6 @@ func TestTerraformProviderVersions_GetProviderVersionsWithPaginationAndSorting(t
 	})
 	require.NoError(t, err)
 
-	// Create a terraform provider for the versions
 	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
 		Name:        "test-provider-versions-pagination",
 		GroupID:     group.Metadata.ID,
@@ -459,8 +447,6 @@ func TestTerraformProviderVersions_GetProviderVersionsWithPaginationAndSorting(t
 	}
 
 	sortableFields := []sortableField{
-		TerraformProviderVersionSortableFieldVersionAsc,
-		TerraformProviderVersionSortableFieldVersionDesc,
 		TerraformProviderVersionSortableFieldUpdatedAtAsc,
 		TerraformProviderVersionSortableFieldUpdatedAtDesc,
 		TerraformProviderVersionSortableFieldCreatedAtAsc,
@@ -493,7 +479,6 @@ func TestTerraformProviderVersions_GetProviderVersionByTRN(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create a group for the terraform provider
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-provider-version-trn",
 		Description: "test group for provider version trn",
@@ -502,7 +487,6 @@ func TestTerraformProviderVersions_GetProviderVersionByTRN(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create a terraform provider for the version
 	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
 		Name:        "test-provider-version-trn",
 		GroupID:     group.Metadata.ID,
@@ -512,7 +496,6 @@ func TestTerraformProviderVersions_GetProviderVersionByTRN(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create a terraform provider version for testing
 	createdProviderVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
@@ -558,6 +541,127 @@ func TestTerraformProviderVersions_GetProviderVersionByTRN(t *testing.T) {
 				assert.Equal(t, test.trn, providerVersion.Metadata.TRN)
 			} else {
 				assert.Nil(t, providerVersion)
+			}
+		})
+	}
+}
+
+func TestTerraformProviderVersions_DeleteProviderVersionBatch(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-delete-provider-versions",
+		FullPath:  "test-group-delete-provider-versions",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+		Name:        "test-provider-delete-versions",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	versionSeq := 0
+	makeVersion := func(t *testing.T) *models.TerraformProviderVersion {
+		t.Helper()
+		versionSeq++
+		pv, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
+			SemanticVersion: fmt.Sprintf("%d.0.0", versionSeq),
+			ProviderID:      provider.Metadata.ID,
+			CreatedBy:       "db-integration-tests",
+		})
+		require.NoError(t, err)
+		return pv
+	}
+
+	// Each test case owns its own versions so cases do not interfere.
+	pvNoOp := makeVersion(t)
+	pvIgnore := makeVersion(t)
+	pvPartial := makeVersion(t)
+	pvSurvivor := makeVersion(t)
+	pvMixed := makeVersion(t)
+	pvMulti1 := makeVersion(t)
+	pvMulti2 := makeVersion(t)
+	pvStale := makeVersion(t)
+
+	type testCase struct {
+		name         string
+		input        DeleteProviderVersionBatchInput
+		shouldBeGone []string
+		shouldExist  []string
+		expectOLE    bool
+	}
+
+	testCases := []testCase{
+		{
+			name:        "empty slice is a no-op",
+			input:       DeleteProviderVersionBatchInput{ProviderVersions: []*models.TerraformProviderVersion{}},
+			shouldExist: []string{pvNoOp.Metadata.ID},
+		},
+		{
+			name: "non-existent version: OLE, nothing deleted",
+			input: DeleteProviderVersionBatchInput{ProviderVersions: []*models.TerraformProviderVersion{
+				{Metadata: models.ResourceMetadata{ID: nonExistentID, Version: 1}},
+			}},
+			shouldExist: []string{pvIgnore.Metadata.ID},
+			expectOLE:   true,
+		},
+		{
+			name:         "partial delete — only the specified version is removed",
+			input:        DeleteProviderVersionBatchInput{ProviderVersions: []*models.TerraformProviderVersion{pvPartial}},
+			shouldBeGone: []string{pvPartial.Metadata.ID},
+			shouldExist:  []string{pvSurvivor.Metadata.ID},
+		},
+		{
+			name: "batch with non-existent version alongside valid version: OLE, valid one still deleted",
+			input: DeleteProviderVersionBatchInput{ProviderVersions: []*models.TerraformProviderVersion{
+				pvMixed,
+				{Metadata: models.ResourceMetadata{ID: nonExistentID, Version: 1}},
+			}},
+			shouldBeGone: []string{pvMixed.Metadata.ID},
+			expectOLE:    true,
+		},
+		{
+			name:         "delete multiple versions in one call",
+			input:        DeleteProviderVersionBatchInput{ProviderVersions: []*models.TerraformProviderVersion{pvMulti1, pvMulti2}},
+			shouldBeGone: []string{pvMulti1.Metadata.ID, pvMulti2.Metadata.ID},
+		},
+		{
+			name: "stale version: OLE, nothing deleted",
+			input: DeleteProviderVersionBatchInput{ProviderVersions: []*models.TerraformProviderVersion{
+				{Metadata: models.ResourceMetadata{ID: pvStale.Metadata.ID, Version: pvStale.Metadata.Version - 1}},
+			}},
+			shouldExist: []string{pvStale.Metadata.ID},
+			expectOLE:   true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			deletedIDs, err := testClient.client.TerraformProviderVersions.DeleteProviderVersionBatch(ctx, &test.input)
+
+			if test.expectOLE {
+				assert.Equal(t, errors.EOptimisticLock, errors.ErrorCode(err))
+			} else {
+				require.NoError(t, err)
+			}
+			assert.ElementsMatch(t, test.shouldBeGone, deletedIDs)
+
+			for _, id := range test.shouldBeGone {
+				got, err := testClient.client.TerraformProviderVersions.GetProviderVersionByID(ctx, id)
+				require.NoError(t, err)
+				assert.Nil(t, got)
+			}
+
+			for _, id := range test.shouldExist {
+				got, err := testClient.client.TerraformProviderVersions.GetProviderVersionByID(ctx, id)
+				require.NoError(t, err)
+				assert.NotNil(t, got)
 			}
 		})
 	}

@@ -96,6 +96,10 @@ var (
 	CreatePolicyPermission                  = registerPermission(types.PolicyModelType, CreateAction, true)
 	UpdatePolicyPermission                  = registerPermission(types.PolicyModelType, UpdateAction, true)
 	DeletePolicyPermission                  = registerPermission(types.PolicyModelType, DeleteAction, true)
+	ViewCleanupPolicyPermission             = registerPermission(types.CleanupPolicyModelType, ViewAction, true)
+	CreateCleanupPolicyPermission           = registerPermission(types.CleanupPolicyModelType, CreateAction, true)
+	UpdateCleanupPolicyPermission           = registerPermission(types.CleanupPolicyModelType, UpdateAction, true)
+	DeleteCleanupPolicyPermission           = registerPermission(types.CleanupPolicyModelType, DeleteAction, true)
 )
 
 // Action is an enum representing a CRUD action.

@@ -62,6 +62,36 @@ func (_m *MockTerraformModuleVersions) DeleteModuleVersion(ctx context.Context, 
 	return r0
 }
 
+// DeleteModuleVersionBatch provides a mock function with given fields: ctx, input
+func (_m *MockTerraformModuleVersions) DeleteModuleVersionBatch(ctx context.Context, input *DeleteModuleVersionBatchInput) ([]string, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteModuleVersionBatch")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *DeleteModuleVersionBatchInput) ([]string, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *DeleteModuleVersionBatchInput) []string); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *DeleteModuleVersionBatchInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetModuleVersionByID provides a mock function with given fields: ctx, id
 func (_m *MockTerraformModuleVersions) GetModuleVersionByID(ctx context.Context, id string) (*models.TerraformModuleVersion, error) {
 	ret := _m.Called(ctx, id)

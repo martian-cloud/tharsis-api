@@ -201,6 +201,10 @@ var defaultRolePermissions = map[DefaultRoleID][]Permission{
 		CreatePolicyPermission,
 		UpdatePolicyPermission,
 		DeletePolicyPermission,
+		ViewCleanupPolicyPermission,
+		CreateCleanupPolicyPermission,
+		UpdateCleanupPolicyPermission,
+		DeleteCleanupPolicyPermission,
 	},
 	// Deployer Role.
 	DeployerRoleID: {
@@ -260,6 +264,7 @@ var defaultRolePermissions = map[DefaultRoleID][]Permission{
 		UpdatePackagePermission,
 		DeletePackagePermission,
 		ViewPolicyPermission,
+		ViewCleanupPolicyPermission,
 	},
 	// Publisher Role.
 	// Allows publishing terraform modules and providers with read access to all resources — no run/deployment permissions.
@@ -292,6 +297,7 @@ var defaultRolePermissions = map[DefaultRoleID][]Permission{
 		UpdatePackagePermission,
 		DeletePackagePermission,
 		ViewPolicyPermission,
+		ViewCleanupPolicyPermission,
 	},
 	// Viewer Role.
 	ViewerRoleID: {
@@ -314,5 +320,6 @@ var defaultRolePermissions = map[DefaultRoleID][]Permission{
 		ViewFederatedRegistryPermission,
 		ViewPackagePermission,
 		ViewPolicyPermission,
+		ViewCleanupPolicyPermission,
 	},
 }

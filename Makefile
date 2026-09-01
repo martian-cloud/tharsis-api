@@ -7,7 +7,7 @@ PACKAGES := $(shell go list -tags noui ./... | grep -vE '/vendor/|/node_modules/
 LDFLAGS := -ldflags "-X main.Version=${VERSION} -X main.BuildTimestamp=${BUILD_TIMESTAMP}"
 
 DB_URI ?= pgx://postgres:postgres@localhost:5432/tharsis?sslmode=disable#gitleaks:allow
-MIGRATE := docker run -v $(shell pwd)/internal/db/migrations:/migrations --network host migrate/migrate:v4.18.3 -path=/migrations/ -database "$(DB_URI)"
+MIGRATE := docker run --user $(shell id -u):$(shell id -g) -v $(shell pwd)/internal/db/migrations:/migrations --network host migrate/migrate:v4.18.3 -path=/migrations/ -database "$(DB_URI)"
 
 # Build targets
 .PHONY: build-tharsis
@@ -159,12 +159,12 @@ migrate-down: ## revert database to the last migration step
 .PHONY: migrate-new
 migrate-new: ## create a new database migration
 	@read -p "Enter the name of the new migration: " name; \
-	$(MIGRATE) create -ext sql -dir /migrations/ $${name// /_}
+	$(MIGRATE) create -ext sql -dir /migrations/ "$$(echo "$$name" | tr ' ' '_')"
 
 .PHONY: migrate-force
 migrate-force: ## forces migrate version but doesn't run migration
 	@read -p "Enter the version to force the migration to: " version; \
-	$(MIGRATE) force $${version// /_}
+	$(MIGRATE) force "$$version"
 
 .PHONY: migrate-reset
 migrate-reset: ## reset database and re-run all migrations

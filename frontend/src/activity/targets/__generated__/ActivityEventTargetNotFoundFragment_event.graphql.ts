@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c2d3bb0c2931437736535a1de4da40bc>>
+ * @generated SignedSource<<9c8f0c901dd098f0bc95522f9ec3a4a5>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,7 +9,7 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type ActivityEventTargetType = "FEDERATED_REGISTRY" | "GPG_KEY" | "GROUP" | "MANAGED_IDENTITY" | "MANAGED_IDENTITY_ACCESS_RULE" | "NAMESPACE_MEMBERSHIP" | "PACKAGE" | "PACKAGE_VERSION" | "POLICY" | "ROLE" | "RUN" | "RUNNER" | "RUN_GATE" | "SERVICE_ACCOUNT" | "STATE_VERSION" | "TEAM" | "TEAM_MEMBER" | "TERRAFORM_MODULE" | "TERRAFORM_MODULE_VERSION" | "TERRAFORM_PROVIDER" | "TERRAFORM_PROVIDER_VERSION" | "TERRAFORM_PROVIDER_VERSION_MIRROR" | "VARIABLE" | "VCS_PROVIDER" | "WORKSPACE" | "%future added value";
+export type ActivityEventTargetType = "CLEANUP_POLICY" | "FEDERATED_REGISTRY" | "GPG_KEY" | "GROUP" | "MANAGED_IDENTITY" | "MANAGED_IDENTITY_ACCESS_RULE" | "NAMESPACE_MEMBERSHIP" | "PACKAGE" | "PACKAGE_VERSION" | "POLICY" | "ROLE" | "RUN" | "RUNNER" | "RUN_GATE" | "SERVICE_ACCOUNT" | "STATE_VERSION" | "TEAM" | "TEAM_MEMBER" | "TERRAFORM_MODULE" | "TERRAFORM_MODULE_VERSION" | "TERRAFORM_PROVIDER" | "TERRAFORM_PROVIDER_VERSION" | "TERRAFORM_PROVIDER_VERSION_MIRROR" | "VARIABLE" | "VCS_PROVIDER" | "WORKSPACE" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type ActivityEventTargetNotFoundFragment_event$data = {
   readonly targetType: ActivityEventTargetType;

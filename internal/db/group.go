@@ -51,6 +51,7 @@ type GroupFilter struct {
 	GroupIDs                 []string
 	RootOnly                 bool
 	GroupPaths               []string
+	NamespacePathPrefix      *string
 	FavoriteUserID           *string
 	ExcludeFavoriteUserID    *string
 }
@@ -191,6 +192,13 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 
 		if len(input.Filter.GroupPaths) > 0 {
 			ex = ex.Append(goqu.I("namespaces.path").In(input.Filter.GroupPaths))
+		}
+
+		if input.Filter.NamespacePathPrefix != nil {
+			ex = ex.Append(goqu.Or(
+				goqu.I("namespaces.path").Eq(*input.Filter.NamespacePathPrefix),
+				goqu.I("namespaces.path").Like(escapeLikePattern(*input.Filter.NamespacePathPrefix)+"/%"),
+			))
 		}
 
 	}

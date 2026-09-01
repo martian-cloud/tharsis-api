@@ -291,3 +291,14 @@ func (r *NamespaceResolver) OutputVisibility(ctx context.Context) (*namespace.Ou
 	}
 	return nil, r.invalidNamespaceType()
 }
+
+// EffectiveCleanupPolicies resolver
+func (r *NamespaceResolver) EffectiveCleanupPolicies(ctx context.Context) ([]*CleanupPolicyResolver, error) {
+	switch v := r.result.(type) {
+	case *GroupResolver:
+		return v.EffectiveCleanupPolicies(ctx)
+	case *WorkspaceResolver:
+		return v.EffectiveCleanupPolicies(ctx)
+	}
+	return nil, r.invalidNamespaceType()
+}

@@ -1,0 +1,138 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.cleanup_policy;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "run.proto";
+import "google/protobuf/empty.proto";
+
+// CleanupPolicies implements all functionality related to a Tharsis CleanupPolicy.
+service CleanupPolicies {
+  // GetCleanupPolicyByID returns a CleanupPolicy by an ID.
+  rpc GetCleanupPolicyByID(GetCleanupPolicyByIDRequest) returns (CleanupPolicy);
+  // GetEffectiveCleanupPolicies returns the effective cleanup policies configured on a namespace.
+  rpc GetEffectiveCleanupPolicies(GetEffectiveCleanupPoliciesRequest) returns (GetEffectiveCleanupPoliciesResponse);
+  // CreateCleanupPolicy creates a new CleanupPolicy.
+  rpc CreateCleanupPolicy(CreateCleanupPolicyRequest) returns (CleanupPolicy);
+  // UpdateCleanupPolicy returns the updated CleanupPolicy.
+  rpc UpdateCleanupPolicy(UpdateCleanupPolicyRequest) returns (CleanupPolicy);
+  // DeleteCleanupPolicy deletes a CleanupPolicy.
+  rpc DeleteCleanupPolicy(DeleteCleanupPolicyRequest) returns (google.protobuf.Empty);
+}
+
+// CleanupRuleKind identifies which resource type a cleanup policy applies to.
+enum CleanupRuleKind {
+  CLEANUP_RULE_KIND_UNSPECIFIED         = 0;
+  CLEANUP_RULE_KIND_TERRAFORM_MODULES   = 1;
+  CLEANUP_RULE_KIND_TERRAFORM_PROVIDERS = 2;
+  CLEANUP_RULE_KIND_RUNS                = 3;
+}
+
+// CleanupStrategy selects the cleanup strategy applied to a rule's matches.
+enum CleanupStrategy {
+  CLEANUP_STRATEGY_UNSPECIFIED = 0;
+  CLEANUP_STRATEGY_COUNT       = 1;
+  CLEANUP_STRATEGY_AGE         = 2;
+  CLEANUP_STRATEGY_PROTECT     = 3;
+}
+
+// GetCleanupPolicyByIDRequest is the input for retrieving a CleanupPolicy by its ID.
+message GetCleanupPolicyByIDRequest {
+  string id = 1;
+}
+
+// GetEffectiveCleanupPoliciesRequest is the input for retrieving a namespace's effective CleanupPolicies.
+message GetEffectiveCleanupPoliciesRequest {
+  string namespace_path = 1;
+}
+
+// CreateCleanupPolicyRequest is the input for creating a new CleanupPolicy. Only the
+// data matching kind may be set.
+message CreateCleanupPolicyRequest {
+  string                                      namespace_path                 = 1;
+  CleanupRuleKind                             kind                           = 2;
+  optional bool                               disabled                       = 3;
+  optional TerraformModuleCleanupPolicyData   terraform_module_policy_data   = 4;
+  optional TerraformProviderCleanupPolicyData terraform_provider_policy_data = 5;
+  optional RunCleanupPolicyData               run_policy_data                = 6;
+}
+
+// UpdateCleanupPolicyRequest is the input for updating a CleanupPolicy. Only the
+// data matching the policy's kind may be set.
+message UpdateCleanupPolicyRequest {
+  string                                      id                             = 1;
+  optional int64                              version                        = 2;
+  optional bool                               disabled                       = 3;
+  optional TerraformModuleCleanupPolicyData   terraform_module_policy_data   = 4;
+  optional TerraformProviderCleanupPolicyData terraform_provider_policy_data = 5;
+  optional RunCleanupPolicyData               run_policy_data                = 6;
+}
+
+// DeleteCleanupPolicyRequest is the input for deleting a CleanupPolicy.
+message DeleteCleanupPolicyRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+}
+
+// TerraformModuleCleanupRule is a cleanup rule for a group's Terraform module versions.
+message TerraformModuleCleanupRule {
+  CleanupStrategy strategy          = 1;
+  string          description       = 2;
+  string          name_glob         = 3;
+  string          system_glob       = 4;
+  string          version_glob      = 5;
+  int32           delete_after_days = 6;
+}
+
+// TerraformProviderCleanupRule is a cleanup rule for a group's Terraform provider versions.
+message TerraformProviderCleanupRule {
+  CleanupStrategy strategy          = 1;
+  string          description       = 2;
+  string          name_glob         = 3;
+  string          version_glob      = 4;
+  int32           delete_after_days = 5;
+}
+
+// RunCleanupRule is a cleanup rule for a workspace's runs.
+message RunCleanupRule {
+  CleanupStrategy strategy                 = 1;
+  string          description              = 2;
+  optional bool   speculative              = 3;
+  optional bool   assessment               = 4;
+  repeated run.RunStatus status            = 5;
+  int32                  keep_min          = 6;
+  int32                  delete_after_days = 7;
+}
+
+// TerraformModuleCleanupPolicyData holds the rules for a terraform_modules cleanup policy.
+message TerraformModuleCleanupPolicyData {
+  repeated TerraformModuleCleanupRule rules = 1;
+}
+
+// TerraformProviderCleanupPolicyData holds the rules for a terraform_providers cleanup policy.
+message TerraformProviderCleanupPolicyData {
+  repeated TerraformProviderCleanupRule rules = 1;
+}
+
+// RunCleanupPolicyData holds the rules for a runs cleanup policy.
+message RunCleanupPolicyData {
+  repeated RunCleanupRule rules = 1;
+}
+
+// CleanupPolicy is the cleanup policy for one resource kind within a namespace.
+message CleanupPolicy {
+  metadata.ResourceMetadata                   metadata                       = 1;
+  string                                      namespace_path                 = 2;
+  bool                                        disabled                       = 3;
+  CleanupRuleKind                             kind                           = 4;
+  optional TerraformModuleCleanupPolicyData   terraform_module_policy_data   = 5;
+  optional TerraformProviderCleanupPolicyData terraform_provider_policy_data = 6;
+  optional RunCleanupPolicyData               run_policy_data                = 7;
+}
+
+// GetEffectiveCleanupPoliciesResponse is the list of effective CleanupPolicies.
+message GetEffectiveCleanupPoliciesResponse {
+  repeated CleanupPolicy policies = 1;
+}

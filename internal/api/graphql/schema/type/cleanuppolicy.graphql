@@ -1,0 +1,134 @@
+enum CleanupRuleKind {
+  TERRAFORM_MODULES
+  TERRAFORM_PROVIDERS
+  RUNS
+}
+
+enum CleanupStrategy {
+  COUNT
+  AGE
+  PROTECT
+}
+
+type CleanupPolicyMutationPayload {
+  clientMutationId: String
+  cleanupPolicy: CleanupPolicy
+  namespace: Namespace
+  problems: [Problem!]!
+}
+
+type TerraformModuleCleanupPolicyData {
+  rules: [TerraformModuleCleanupRule!]!
+}
+
+type TerraformModuleCleanupRule {
+  strategy: CleanupStrategy!
+  description: String!
+  nameGlob: String!
+  systemGlob: String!
+  versionGlob: String!
+  deleteAfterDays: Int!
+}
+
+type TerraformProviderCleanupPolicyData {
+  rules: [TerraformProviderCleanupRule!]!
+}
+
+type TerraformProviderCleanupRule {
+  strategy: CleanupStrategy!
+  description: String!
+  nameGlob: String!
+  versionGlob: String!
+  deleteAfterDays: Int!
+}
+
+type RunCleanupPolicyData {
+  rules: [RunCleanupRule!]!
+}
+
+type RunCleanupRule {
+  strategy: CleanupStrategy!
+  description: String!
+  speculative: Boolean
+  assessment: Boolean
+  status: [RunStatus!]!
+  keepMin: Int!
+  deleteAfterDays: Int!
+}
+
+type CleanupPolicy implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  namespacePath: String!
+  kind: CleanupRuleKind!
+  disabled: Boolean!
+  lastSweepCompletedAt: Time
+  terraformModulePolicyData: TerraformModuleCleanupPolicyData
+  terraformProviderPolicyData: TerraformProviderCleanupPolicyData
+  runPolicyData: RunCleanupPolicyData
+}
+
+input CreateCleanupPolicyInput {
+  clientMutationId: String
+  namespacePath: String!
+  kind: CleanupRuleKind!
+  disabled: Boolean
+  terraformModulePolicyData: TerraformModuleCleanupPolicyDataInput
+  terraformProviderPolicyData: TerraformProviderCleanupPolicyDataInput
+  runPolicyData: RunCleanupPolicyDataInput
+}
+
+input UpdateCleanupPolicyInput {
+  clientMutationId: String
+  metadata: ResourceMetadataInput
+  id: ID!
+  disabled: Boolean
+  terraformModulePolicyData: TerraformModuleCleanupPolicyDataInput
+  terraformProviderPolicyData: TerraformProviderCleanupPolicyDataInput
+  runPolicyData: RunCleanupPolicyDataInput
+}
+
+input DeleteCleanupPolicyInput {
+  clientMutationId: String
+  metadata: ResourceMetadataInput
+  id: ID!
+}
+
+input TerraformModuleCleanupPolicyDataInput {
+  rules: [TerraformModuleCleanupRuleInput!]!
+}
+
+input TerraformModuleCleanupRuleInput {
+  strategy: CleanupStrategy!
+  description: String!
+  nameGlob: String!
+  systemGlob: String!
+  versionGlob: String!
+  deleteAfterDays: Int!
+}
+
+input TerraformProviderCleanupPolicyDataInput {
+  rules: [TerraformProviderCleanupRuleInput!]!
+}
+
+input TerraformProviderCleanupRuleInput {
+  strategy: CleanupStrategy!
+  description: String!
+  nameGlob: String!
+  versionGlob: String!
+  deleteAfterDays: Int!
+}
+
+input RunCleanupPolicyDataInput {
+  rules: [RunCleanupRuleInput!]!
+}
+
+input RunCleanupRuleInput {
+  strategy: CleanupStrategy!
+  description: String!
+  speculative: Boolean
+  assessment: Boolean
+  status: [RunStatus!]!
+  keepMin: Int!
+  deleteAfterDays: Int!
+}

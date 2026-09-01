@@ -160,21 +160,11 @@ type Mutation {
   deletePackageVersion(
     input: DeletePackageVersionInput!
   ): PackageVersionMutationPayload!
-  createPolicy(
-    input: CreatePolicyInput!
-  ): PolicyMutationPayload!
-  updatePolicy(
-    input: UpdatePolicyInput!
-  ): PolicyMutationPayload!
-  deletePolicy(
-    input: DeletePolicyInput!
-  ): PolicyMutationPayload!
-  approveRunGate(
-    input: ApproveRunGateInput!
-  ): RunGateMutationPayload!
-  overrideRunGate(
-    input: OverrideRunGateInput!
-  ): RunGateMutationPayload!
+  createPolicy(input: CreatePolicyInput!): PolicyMutationPayload!
+  updatePolicy(input: UpdatePolicyInput!): PolicyMutationPayload!
+  deletePolicy(input: DeletePolicyInput!): PolicyMutationPayload!
+  approveRunGate(input: ApproveRunGateInput!): RunGateMutationPayload!
+  overrideRunGate(input: OverrideRunGateInput!): RunGateMutationPayload!
   createTerraformModuleAttestation(
     input: CreateTerraformModuleAttestationInput
   ): CreateTerraformModuleAttestationPayload!
@@ -295,4 +285,13 @@ type Mutation {
   deactivateAdminMode(
     input: DeactivateAdminModeInput!
   ): UpdateUserAdminStatusPayload!
+  createCleanupPolicy(
+    input: CreateCleanupPolicyInput!
+  ): CleanupPolicyMutationPayload!
+  updateCleanupPolicy(
+    input: UpdateCleanupPolicyInput!
+  ): CleanupPolicyMutationPayload!
+  deleteCleanupPolicy(
+    input: DeleteCleanupPolicyInput!
+  ): CleanupPolicyMutationPayload!
 }

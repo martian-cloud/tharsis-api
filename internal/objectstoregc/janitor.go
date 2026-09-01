@@ -7,9 +7,12 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 )
+
+var janitorFailuresTotal = metric.NewCounter("janitor_failures_total", "Number of janitor cycle failures (maintenance check errors and reclaim errors).")
 
 const (
 	batchSize        = 1000
@@ -63,11 +66,13 @@ func (j *Janitor) Start(ctx context.Context) {
 				inMaintenance, err := j.maintenanceMonitor.InMaintenanceMode(ctx)
 				if err != nil {
 					j.logger.Errorf("janitor failed to check maintenance mode: %v", err)
+					janitorFailuresTotal.Inc()
 				}
 
 				if err == nil && !inMaintenance {
 					if err := j.reclaimer.Reclaim(ctx, batchSize); err != nil {
 						j.logger.Errorf("janitor failed to reclaim orphaned objects: %v", err)
+						janitorFailuresTotal.Inc()
 					}
 					sleepSeconds = rand.IntN(maxSleepSeconds-minSleepSeconds) + minSleepSeconds
 				}

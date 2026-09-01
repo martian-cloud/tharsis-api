@@ -6,9 +6,18 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
+	"go.opentelemetry.io/otel/attribute"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+// NamespaceResult holds a resolved namespace — exactly one of Group or Workspace is non-nil.
+type NamespaceResult struct {
+	Type      models.NamespaceType
+	Group     *models.Group
+	Workspace *models.Workspace
+}
 
 type namespaceRow struct {
 	id          string
@@ -19,6 +28,51 @@ type namespaceRow struct {
 }
 
 var namespaceFieldList = []interface{}{"id", "version", "path", "group_id", "workspace_id"}
+
+// Namespaces exposes namespace-level lookups backed by the namespaces table.
+type Namespaces interface {
+	GetNamespace(ctx context.Context, path string) (*NamespaceResult, error)
+}
+
+type namespacesModule struct {
+	dbClient *Client
+}
+
+// NewNamespaces returns an instance of the Namespaces interface.
+func NewNamespaces(dbClient *Client) Namespaces {
+	return &namespacesModule{dbClient: dbClient}
+}
+
+func (n *namespacesModule) GetNamespace(ctx context.Context, path string) (*NamespaceResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetNamespace")
+	span.SetAttributes(attribute.String("path", path))
+	defer span.End()
+
+	row, err := getNamespaceByPath(ctx, n.dbClient.getConnection(ctx), path)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get namespace by path", errors.WithSpan(span))
+	}
+
+	if row == nil {
+		return nil, nil
+	}
+
+	if row.groupID != "" {
+		group, err := n.dbClient.Groups.GetGroupByID(ctx, row.groupID)
+		if err != nil {
+			return nil, errors.Wrap(err, "faile dot get group for namespace", errors.WithSpan(span))
+		}
+
+		return &NamespaceResult{Type: models.NamespaceTypeGroup, Group: group}, nil
+	}
+
+	ws, err := n.dbClient.Workspaces.GetWorkspaceByID(ctx, row.workspaceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace for namespace", errors.WithSpan(span))
+	}
+
+	return &NamespaceResult{Type: models.NamespaceTypeWorkspace, Workspace: ws}, nil
+}
 
 func getNamespaceByGroupID(ctx context.Context, conn connection, groupID string) (*namespaceRow, error) {
 	ctx, span := tracer.Start(ctx, "db.getNamespaceByGroupID")

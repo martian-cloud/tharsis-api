@@ -44,6 +44,7 @@ const (
 	TypeApply                           Type = "apply"
 	TypeAsymSigningKey                  Type = "asym_signing_key"
 	TypeConfigurationVersion            Type = "configuration_version"
+	TypeCleanupPolicy                   Type = "cleanup_policy"
 	TypeFederatedRegistry               Type = "federated_registry"
 	TypeGPGKey                          Type = "gpg_key"
 	TypeGroup                           Type = "group"

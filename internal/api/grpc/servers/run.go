@@ -544,8 +544,8 @@ func toPBTaskStages(run *models.Run) []*pb.RunTaskStage {
 	for _, stage := range stages {
 		pbStage := &pb.RunTaskStage{
 			Id:           stage.GetGlobalID(),
-			StageName:    enumToPB[pb.RunTaskStageName](string(stage.StageName), pb.RunTaskStageName_value, "RUN_TASK_STAGE_NAME_"),
-			Status:       enumToPB[pb.RunTaskStageStatus](string(stage.Status), pb.RunTaskStageStatus_value, "RUN_TASK_STAGE_STATUS_"),
+			StageName:    enumToPB[pb.RunTaskStageName](stage.StageName, pb.RunTaskStageName_value, "RUN_TASK_STAGE_NAME_"),
+			Status:       enumToPB[pb.RunTaskStageStatus](stage.Status, pb.RunTaskStageStatus_value, "RUN_TASK_STAGE_STATUS_"),
 			PolicyChecks: make([]*pb.PolicyCheck, 0, len(stage.PolicyChecks)),
 		}
 		for _, check := range stage.PolicyChecks {
@@ -560,9 +560,9 @@ func toPBTaskStages(run *models.Run) []*pb.RunTaskStage {
 func toPBPolicyCheck(check *models.PolicyCheck) *pb.PolicyCheck {
 	pbCheck := &pb.PolicyCheck{
 		Id:        check.GetGlobalID(),
-		CheckType: enumToPB[pb.PolicyCheckType](string(check.CheckType), pb.PolicyCheckType_value, "POLICY_CHECK_TYPE_"),
-		StageName: enumToPB[pb.RunTaskStageName](string(check.StageName), pb.RunTaskStageName_value, "RUN_TASK_STAGE_NAME_"),
-		Status:    enumToPB[pb.PolicyCheckStatus](string(check.Status), pb.PolicyCheckStatus_value, "POLICY_CHECK_STATUS_"),
+		CheckType: enumToPB[pb.PolicyCheckType](check.CheckType, pb.PolicyCheckType_value, "POLICY_CHECK_TYPE_"),
+		StageName: enumToPB[pb.RunTaskStageName](check.StageName, pb.RunTaskStageName_value, "RUN_TASK_STAGE_NAME_"),
+		Status:    enumToPB[pb.PolicyCheckStatus](check.Status, pb.PolicyCheckStatus_value, "POLICY_CHECK_STATUS_"),
 		Policies:  make([]*pb.PolicyCheckPolicy, 0, len(check.Policies)),
 	}
 	if check.LatestJobID != nil {
@@ -577,8 +577,8 @@ func toPBPolicyCheck(check *models.PolicyCheck) *pb.PolicyCheck {
 			Id:                       p.ID,
 			PackageSource:            p.PackageSource,
 			PackageVersionConstraint: p.PackageVersionConstraint,
-			EnforcementLevel:         enumToPB[pb.PolicyEnforcementLevel](string(p.EnforcementLevel), pb.PolicyEnforcementLevel_value, "POLICY_ENFORCEMENT_LEVEL_"),
-			Status:                   enumToPB[pb.PolicyCheckPolicyStatus](string(p.Status), pb.PolicyCheckPolicyStatus_value, "POLICY_CHECK_POLICY_STATUS_"),
+			EnforcementLevel:         enumToPB[pb.PolicyEnforcementLevel](p.EnforcementLevel, pb.PolicyEnforcementLevel_value, "POLICY_ENFORCEMENT_LEVEL_"),
+			Status:                   enumToPB[pb.PolicyCheckPolicyStatus](p.Status, pb.PolicyCheckPolicyStatus_value, "POLICY_CHECK_POLICY_STATUS_"),
 			PackageDigest:            p.PackageDigest,
 			Provenance: &pb.PolicyCheckPolicyProvenance{
 				GroupId:   p.Provenance.GroupID,

@@ -77,12 +77,6 @@ func (RunSortableField) EnumDescriptor() ([]byte, []int) {
 }
 
 // RunStatus defines the status of a Run.
-//
-// post_plan_completed and post_apply_completed are deliberately absent: both are internal,
-// transient state-machine statuses (see internal/models/run.go and the state machine's
-// handleStageCompleted) that the run passes through and immediately advances beyond within the same
-// state-machine pass, so a persisted run is never observed resting on either one. Field 20 was
-// POST_PLAN_COMPLETED before this was understood and must not be reused.
 type RunStatus int32
 
 const (

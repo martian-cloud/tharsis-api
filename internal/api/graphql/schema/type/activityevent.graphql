@@ -34,6 +34,7 @@ enum ActivityEventTargetType {
   GROUP
   MANAGED_IDENTITY
   MANAGED_IDENTITY_ACCESS_RULE
+  CLEANUP_POLICY
   NAMESPACE_MEMBERSHIP
   RUN
   SERVICE_ACCOUNT
@@ -153,7 +154,7 @@ type ActivityEventUpdateRunGatePayload {
 }
 
 union ActivityEventPayload =
-    ActivityEventCreateNamespaceMembershipPayload
+  | ActivityEventCreateNamespaceMembershipPayload
   | ActivityEventUpdateNamespaceMembershipPayload
   | ActivityEventRemoveNamespaceMembershipPayload
   | ActivityEventDeleteChildResourcePayload

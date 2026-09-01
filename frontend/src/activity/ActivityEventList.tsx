@@ -8,6 +8,7 @@ import ActivityEventGPGKeyTarget from './targets/ActivityEventGPGKeyTarget';
 import ActivityEventGroupTarget from './targets/ActivityEventGroupTarget';
 import ActivityEventManagedIdentityAccessRuleTarget from './targets/ActivityEventManagedIdentityAccessRule';
 import ActivityEventManagedIdentityTarget from './targets/ActivityEventManagedIdentityTarget';
+import ActivityEventCleanupPolicyTarget from './targets/ActivityEventCleanupPolicyTarget';
 import ActivityEventNamespaceMembershipTarget from './targets/ActivityEventNamespaceMembershipTarget';
 import ActivityEventPackageTarget from './targets/ActivityEventPackageTarget';
 import ActivityEventPackageVersionTarget from './targets/ActivityEventPackageVersionTarget';
@@ -21,6 +22,7 @@ import ActivityEventRoleTarget from './targets/ActivityEventRoleTarget';
 import ActivityEventTerraformModuleTarget from './targets/ActivityEventTerraformModuleTarget';
 import ActivityEventTerraformModuleVersionTarget from './targets/ActivityEventTerraformModuleVersionTarget';
 import ActivityEventTerraformProviderTarget from './targets/ActivityEventTerraformProviderTarget';
+import ActivityEventTerraformProviderVersionTarget from './targets/ActivityEventTerraformProviderVersionTarget';
 import ActivityEventVariableTarget from './targets/ActivityEventVariableTarget';
 import ActivityEventVCSProviderTarget from './targets/ActivityEventVCSProviderTarget';
 import ActivityEventWorkspaceTarget from './targets/ActivityEventWorkspaceTarget';
@@ -34,6 +36,7 @@ const TARGET_COMPONENT_MAP = {
     Group: ActivityEventGroupTarget,
     ManagedIdentity: ActivityEventManagedIdentityTarget,
     NamespaceMembership: ActivityEventNamespaceMembershipTarget,
+    CleanupPolicy: ActivityEventCleanupPolicyTarget,
     GPGKey: ActivityEventGPGKeyTarget,
     ManagedIdentityAccessRule: ActivityEventManagedIdentityAccessRuleTarget,
     ServiceAccount: ActivityEventServiceAccountTarget,
@@ -43,6 +46,7 @@ const TARGET_COMPONENT_MAP = {
     StateVersion: ActivityEventStateVersionTarget,
     Team: ActivityEventTeamTarget,
     TerraformProvider: ActivityEventTerraformProviderTarget,
+    TerraformProviderVersion: ActivityEventTerraformProviderVersionTarget,
     TerraformModule: ActivityEventTerraformModuleTarget,
     TerraformModuleVersion: ActivityEventTerraformModuleVersionTarget,
     VCSProvider: ActivityEventVCSProviderTarget,
@@ -74,6 +78,7 @@ function ActivityEventList({ fragmentRef, loadNext, hasNext }: Props) {
                     ...ActivityEventGroupTargetFragment_event
                     ...ActivityEventManagedIdentityTargetFragment_event
                     ...ActivityEventNamespaceMembershipTargetFragment_event
+                    ...ActivityEventCleanupPolicyTargetFragment_event
                     ...ActivityEventGPGKeyTargetFragment_event
                     ...ActivityEventManagedIdentityAccessRuleTargetFragment_event
                     ...ActivityEventServiceAccountTargetFragment_event
@@ -82,6 +87,7 @@ function ActivityEventList({ fragmentRef, loadNext, hasNext }: Props) {
                     ...ActivityEventStateVersionTargetFragment_event
                     ...ActivityEventTeamTargetFragment_event
                     ...ActivityEventTerraformProviderTargetFragment_event
+                    ...ActivityEventTerraformProviderVersionTargetFragment_event
                     ...ActivityEventTerraformModuleTargetFragment_event
                     ...ActivityEventTerraformModuleVersionTargetFragment_event
                     ...ActivityEventVCSProviderTargetFragment_event
@@ -98,7 +104,6 @@ function ActivityEventList({ fragmentRef, loadNext, hasNext }: Props) {
             }
         }
     `, fragmentRef);
-
     return (
         <InfiniteScroll
             dataLength={data.edges?.length ?? 0}

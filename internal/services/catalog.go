@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/adminlogtail"
 	agentsvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/agent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/announcement"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cleanuppolicy"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
@@ -58,6 +59,7 @@ type Catalog struct {
 	JobService                       job.Service
 	MaintenanceModeService           maintenance.Service
 	ManagedIdentityService           managedidentity.Service
+	CleanupPolicyService             cleanuppolicy.Service
 	NamespaceMembershipService       namespacemembership.Service
 	PackageService                   packageregistry.Service
 	PolicyService                    policy.Service
@@ -252,6 +254,16 @@ func (c *Catalog) Init() {
 		},
 		func(ctx context.Context, value string) (models.Model, error) {
 			return c.PackageService.GetPackageVersionByTRN(ctx, value)
+		},
+	)
+
+	// Namespace Cleanup Policy Service
+	c.addModelFetchers(types.CleanupPolicyModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.CleanupPolicyService.GetCleanupPolicyByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.CleanupPolicyService.GetCleanupPolicyByTRN(ctx, value)
 		},
 	)
 

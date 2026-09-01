@@ -68,7 +68,7 @@ function NewManagedIdentity(props: Props) {
                         allowedServiceAccounts: rule.allowedServiceAccounts.map((sa: any) => (sa.resourcePath)) || [],
                         allowedUsers: rule.allowedUsers.map((user: any) => (user.username)) || [],
                         allowedTeams: rule.allowedTeams.map((team: any) => (team.name)) || [],
-                        moduleAttestationPolicies: rule.moduleAttestationPolicies.map((att: any) => ({...att, predicateType: att.predicateType === '' ? undefined : att.predicateType}))
+                        moduleAttestationPolicies: rule.moduleAttestationPolicies.map((att: any) => ({ ...att, predicateType: att.predicateType === '' ? undefined : att.predicateType }))
                     })),
                     groupPath: group.fullPath
                 },

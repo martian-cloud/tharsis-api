@@ -442,6 +442,8 @@ func TestTerraformProviders_GetProvidersWithPaginationAndSorting(t *testing.T) {
 		TerraformProviderSortableFieldNameDesc,
 		TerraformProviderSortableFieldUpdatedAtAsc,
 		TerraformProviderSortableFieldUpdatedAtDesc,
+		TerraformProviderSortableFieldCreatedAtAsc,
+		TerraformProviderSortableFieldCreatedAtDesc,
 	}
 
 	testResourcePaginationAndSorting(ctx, t, resourceCount, sortableFields, func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error) {

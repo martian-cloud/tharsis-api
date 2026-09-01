@@ -40,6 +40,7 @@ const retryPolicy = `{
 			{"service": "martiancloud.tharsis.api.group.Groups"},
 			{"service": "martiancloud.tharsis.api.job.Jobs"},
 			{"service": "martiancloud.tharsis.api.managed_identity.ManagedIdentities"},
+			{"service": "martiancloud.tharsis.api.cleanup_policy.CleanupPolicies"},
 			{"service": "martiancloud.tharsis.api.namespace_membership.NamespaceMemberships"},
 			{"service": "martiancloud.tharsis.api.namespace_variable.NamespaceVariables"},
 			{"service": "martiancloud.tharsis.api.package.Packages"},
@@ -126,6 +127,7 @@ type GRPCClient struct {
 	GroupsClient                   pb.GroupsClient
 	JobsClient                     pb.JobsClient
 	ManagedIdentitiesClient        pb.ManagedIdentitiesClient
+	CleanupPoliciesClient          pb.CleanupPoliciesClient
 	NamespaceMembershipsClient     pb.NamespaceMembershipsClient
 	NamespaceVariablesClient       pb.NamespaceVariablesClient
 	PackagesClient                 pb.PackagesClient
@@ -296,6 +298,7 @@ func NewGRPCClient(ctx context.Context, c *GRPCClientConfig) (*GRPCClient, error
 		GroupsClient:                   pb.NewGroupsClient(clientConn),
 		JobsClient:                     pb.NewJobsClient(clientConn),
 		ManagedIdentitiesClient:        pb.NewManagedIdentitiesClient(clientConn),
+		CleanupPoliciesClient:          pb.NewCleanupPoliciesClient(clientConn),
 		NamespaceMembershipsClient:     pb.NewNamespaceMembershipsClient(clientConn),
 		NamespaceVariablesClient:       pb.NewNamespaceVariablesClient(clientConn),
 		PackagesClient:                 pb.NewPackagesClient(clientConn),

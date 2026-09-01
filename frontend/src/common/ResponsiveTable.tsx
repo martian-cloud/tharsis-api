@@ -79,6 +79,8 @@ export interface ResponsiveCell {
     align?: TableCellProps['align'];
     // primary cells render prominently (no label) at the top of the card.
     primary?: boolean;
+    // footer cells render as a full-width row at the bottom of the card in mobile mode.
+    footer?: boolean;
 }
 
 interface ResponsiveRowProps {
@@ -93,8 +95,9 @@ export function ResponsiveRow({ cells }: ResponsiveRowProps) {
     if (card) {
         // Primary content goes top-left, label-less cells (actions) top-right, labeled fields stack below.
         const primaryCells = cells.filter((cell) => cell.primary);
-        const actionCells = cells.filter((cell) => !cell.primary && !cell.label);
-        const labeledCells = cells.filter((cell) => !cell.primary && cell.label);
+        const actionCells = cells.filter((cell) => !cell.primary && !cell.label && !cell.footer);
+        const labeledCells = cells.filter((cell) => !cell.primary && !!cell.label);
+        const footerCells = cells.filter((cell) => cell.footer);
 
         return (
             <Paper variant="outlined" sx={{ p: 2, overflowWrap: 'anywhere', backgroundColor: 'transparent' }}>
@@ -112,11 +115,16 @@ export function ResponsiveRow({ cells }: ResponsiveRowProps) {
                         </Box>
                     )}
                     {labeledCells.map((cell, index) => (
-                        <Box key={index} display="flex" alignItems="center" gap={2} sx={{ minWidth: 0 }}>
+                        <Box key={index} display="flex" alignItems="center" gap={1} sx={{ minWidth: 0 }}>
                             <Typography variant="body2" color="textSecondary" sx={{ minWidth: 100, flexShrink: 0 }}>{cell.label}</Typography>
                             <Box sx={{ minWidth: 0 }}>{cell.content}</Box>
                         </Box>
                     ))}
+                    {footerCells.length > 0 && (
+                        <Box display="flex" justifyContent="flex-end" gap={1} sx={{ pt: 2 }}>
+                            {footerCells.map((cell, index) => <Box key={index}>{cell.content}</Box>)}
+                        </Box>
+                    )}
                 </Stack>
             </Paper>
         );

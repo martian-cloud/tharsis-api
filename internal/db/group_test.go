@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/google/uuid"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -280,6 +280,16 @@ func TestGroups_GetGroups(t *testing.T) {
 		require.NoError(t, err)
 		createdGroups = append(createdGroups, *created)
 	}
+
+	// child group under createdGroups[0] for NamespacePathPrefix tests
+	childGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "child-group",
+		ParentID:  createdGroups[0].Metadata.ID,
+		FullPath:  "test-group-list-1/child-group",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
 	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
 		Username: "test-user-groups",
 		Email:    "test-user-groups@test.com",
@@ -303,7 +313,7 @@ func TestGroups_GetGroups(t *testing.T) {
 		{
 			name:        "get all groups",
 			input:       &GetGroupsInput{},
-			expectCount: len(createdGroups),
+			expectCount: len(createdGroups) + 1, // +1 for childGroup
 		},
 		{
 			name: "get groups with favorite filter",
@@ -321,7 +331,34 @@ func TestGroups_GetGroups(t *testing.T) {
 					ExcludeFavoriteUserID: &user.Metadata.ID,
 				},
 			},
+			expectCount: 2, // childGroup + createdGroups[1]
+		},
+		{
+			name: "filter by namespace path prefix — matches parent and children",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					NamespacePathPrefix: &createdGroups[0].FullPath,
+				},
+			},
+			expectCount: 2, // createdGroups[0] + childGroup
+		},
+		{
+			name: "filter by namespace path prefix — exact leaf match, no children",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					NamespacePathPrefix: &childGroup.FullPath,
+				},
+			},
 			expectCount: 1,
+		},
+		{
+			name: "filter by namespace path prefix — no match",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					NamespacePathPrefix: ptr.String("nonexistent-prefix"),
+				},
+			},
+			expectCount: 0,
 		},
 	}
 
