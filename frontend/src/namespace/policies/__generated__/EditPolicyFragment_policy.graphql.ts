@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c4e9114cae2571c6fc61f761986cc9f2>>
+ * @generated SignedSource<<905998887adfa22a8e74b2d4d2c4c1e5>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,7 @@
 
 import { ReaderFragment } from 'relay-runtime';
 export type PolicyEnforcementLevel = "ADVISORY" | "HARD_MANDATORY" | "SOFT_MANDATORY" | "%future added value";
-export type PolicyKind = "OPA" | "%future added value";
+export type PolicyKind = "MODULE_ATTESTATION" | "OPA" | "%future added value";
 export type PolicyScopeRuleAction = "EXCLUDE" | "INCLUDE" | "%future added value";
 export type PolicyScopeRuleType = "GROUP" | "MANAGED_IDENTITY" | "WORKSPACE" | "%future added value";
 export type PolicyStage = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_PLAN" | "%future added value";
@@ -34,6 +34,14 @@ export type EditPolicyFragment_policy$data = {
   readonly description: string;
   readonly id: string;
   readonly kind: PolicyKind;
+  readonly moduleAttestationData: {
+    readonly enforcementLevel: PolicyEnforcementLevel;
+    readonly predicateType: string | null | undefined;
+    readonly publicKey: string;
+    readonly speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel;
+    readonly stage: PolicyStage;
+    readonly verifyStateLineage: boolean;
+  } | null | undefined;
   readonly name: string;
   readonly opaData: {
     readonly enforcementLevel: PolicyEnforcementLevel;
@@ -69,6 +77,27 @@ v1 = {
   "args": null,
   "kind": "ScalarField",
   "name": "name",
+  "storageKey": null
+},
+v2 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "stage",
+  "storageKey": null
+},
+v3 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "enforcementLevel",
+  "storageKey": null
+},
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "speculativeRunEnforcementLevel",
   "storageKey": null
 };
 return {
@@ -129,27 +158,44 @@ return {
           "name": "packageDigest",
           "storageKey": null
         },
+        (v2/*: any*/),
+        (v3/*: any*/),
+        (v4/*: any*/)
+      ],
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "concreteType": "ModuleAttestationPolicyData",
+      "kind": "LinkedField",
+      "name": "moduleAttestationData",
+      "plural": false,
+      "selections": [
         {
           "alias": null,
           "args": null,
           "kind": "ScalarField",
-          "name": "stage",
+          "name": "publicKey",
           "storageKey": null
         },
         {
           "alias": null,
           "args": null,
           "kind": "ScalarField",
-          "name": "enforcementLevel",
+          "name": "predicateType",
           "storageKey": null
         },
         {
           "alias": null,
           "args": null,
           "kind": "ScalarField",
-          "name": "speculativeRunEnforcementLevel",
+          "name": "verifyStateLineage",
           "storageKey": null
-        }
+        },
+        (v2/*: any*/),
+        (v3/*: any*/),
+        (v4/*: any*/)
       ],
       "storageKey": null
     },
@@ -250,6 +296,6 @@ return {
 };
 })();
 
-(node as any).hash = "ffededdc7f23a0df29a6732766c08890";
+(node as any).hash = "75162bd19ee2cec33050f4daf90b0406";
 
 export default node;

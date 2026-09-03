@@ -30,8 +30,9 @@ func NewRunGateManager(logger logger.Logger, dbClient *db.Client) *RunGateManage
 }
 
 // HandleRunChanges implements RunChangeHandler. It creates gates when a run's policy check reaches
-// awaiting_override, and closes out any still-pending gates when the run reaches a terminal status
-// (e.g. discarded, canceled, or errored) so an abandoned run never lingers in an approver's inbox.
+// awaiting_override, and closes out any still-pending gates when the check that was blocked is settled
+// without a decision (retried or canceled) or the run reaches a terminal status (e.g. discarded,
+// canceled, or errored) so an abandoned run never lingers in an approver's inbox.
 func (h *RunGateManager) HandleRunChanges(ctx context.Context, changes []types.RunChange) error {
 	for _, change := range changes {
 		run := change.Run
@@ -47,6 +48,18 @@ func (h *RunGateManager) HandleRunChanges(ctx context.Context, changes []types.R
 					// A check only reaches pending from errored, canceled or soft_failed, and one that
 					// has never run goes created -> queued, so this transition is exactly a retry.
 					if err := h.deleteGateForCheck(ctx, run, c.CheckID); err != nil {
+						return err
+					}
+				case models.PolicyCheckCanceled:
+					// The check was settled without its gate ever being decided — its stage errored or
+					// the run was canceled/discarded under it — so the decision the gate was collecting
+					// can no longer change anything. Cancel it here, at the check, as well as at the run
+					// (closePendingGatesForRun): the run-level sweep only sees gates that already exist
+					// when the run terminates, and a check can soft-fail and be canceled in the same
+					// batch of changes. Canceling rather than deleting matches the run-level sweep and
+					// keeps the gate and its approvals as history; a retry of the check deletes it,
+					// because the verdict those approvals were given against is then re-evaluated.
+					if err := h.cancelPendingGateForCheck(ctx, run, c.CheckID); err != nil {
 						return err
 					}
 				}
@@ -75,7 +88,30 @@ func (h *RunGateManager) closePendingGatesForRun(ctx context.Context, run *model
 		return errors.Wrap(err, "failed to get run gates")
 	}
 
-	gates := gatesResult.RunGates
+	return h.cancelPendingGates(ctx, run, gatesResult.RunGates,
+		"Canceled a pending run gate because its run reached a terminal status.")
+}
+
+// cancelPendingGateForCheck cancels the still-pending gate of a policy check that was canceled, so a
+// check that will never be decided leaves no gate behind in its approvers' queue. It is scoped to the
+// one check rather than the run because a run can hold a gate per stage, and a sibling's gate may still
+// be awaiting a legitimate decision.
+func (h *RunGateManager) cancelPendingGateForCheck(ctx context.Context, run *models.Run, checkID string) error {
+	gatesResult, err := h.dbClient.RunGates.GetRunGates(ctx, &db.GetRunGatesInput{
+		Filter: &db.RunGateFilter{PolicyCheckIDs: []string{checkID}},
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to get run gates")
+	}
+
+	return h.cancelPendingGates(ctx, run, gatesResult.RunGates,
+		"Canceled a pending run gate because its policy check was canceled.")
+}
+
+// cancelPendingGates moves every pending gate in gates to canceled, leaving any gate that already
+// carries a decision (approved, overridden, rejected) untouched — it records something that happened,
+// which cancellation would erase. Only pending gates are touched, so it is idempotent.
+func (h *RunGateManager) cancelPendingGates(ctx context.Context, run *models.Run, gates []models.RunGate, reason string) error {
 	for i := range gates {
 		gate := &gates[i]
 		if gate.Status != models.RunGatePending {
@@ -85,9 +121,10 @@ func (h *RunGateManager) closePendingGatesForRun(ctx context.Context, run *model
 		if _, err := h.dbClient.RunGates.UpdateRunGate(ctx, gate); err != nil {
 			return errors.Wrap(err, "failed to cancel pending run gate")
 		}
-		h.logger.WithContextFields(ctx).Infow("Canceled a pending run gate because its run reached a terminal status.",
+		h.logger.WithContextFields(ctx).Infow(reason,
 			"runID", run.Metadata.ID,
 			"runGateID", gate.Metadata.ID,
+			"policyCheckID", gate.PolicyCheckID,
 			"runStatus", run.Status,
 		)
 	}
@@ -129,6 +166,17 @@ func (h *RunGateManager) deleteGateForCheck(ctx context.Context, run *models.Run
 func (h *RunGateManager) createGatesForRun(ctx context.Context, run *models.Run, checkID string) error {
 	check := run.PolicyCheckByID(checkID)
 	if check == nil {
+		return nil
+	}
+
+	// A gate is only opened for a block that still stands. The soft failure that triggers this is a
+	// change, not the current state: by the time it is handled the check may already have been settled
+	// and the run ended — a check can soft-fail and be canceled in the same batch of changes when a
+	// sibling check in its stage has failed a hard gate, and the run's terminal change is handled before
+	// the check's (changes arrive in tree order, run first). Creating a gate then would leave it pending
+	// in its approvers' queue forever, with no decision left for it to affect: the run-level sweep has
+	// already passed, and its check is canceled.
+	if check.Status != models.PolicyCheckSoftFailed {
 		return nil
 	}
 
@@ -208,6 +256,8 @@ func runGateTypeForCheck(checkType models.PolicyKind) (models.RunGateType, error
 	switch checkType {
 	case models.PolicyKindOPA:
 		return models.RunGateTypeOPAPolicy, nil
+	case models.PolicyKindModuleAttestation:
+		return models.RunGateTypeModuleAttestation, nil
 	default:
 		return "", errors.New("unsupported policy check type %q for run gate", checkType)
 	}

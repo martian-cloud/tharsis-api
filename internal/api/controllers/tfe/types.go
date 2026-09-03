@@ -614,6 +614,7 @@ type TaskStage struct {
 	Stage             string              `jsonapi:"attr,stage"`
 	Status            string              `jsonapi:"attr,status"`
 	PolicyEvaluations []*PolicyEvaluation `jsonapi:"relation,policy-evaluations"`
+	TaskResults       []*TaskResult       `jsonapi:"relation,task-results"`
 }
 
 // PolicyEvaluation mirrors the go-tfe policy-evaluation type. ResultCount is a nested struct
@@ -621,11 +622,33 @@ type TaskStage struct {
 // of the jsonapi tag the client reads ("passed"/"advisory-failed"), so the CLI decodes it as zero —
 // the cause of the "0 policies evaluated" line even when a policy has failed. The json tags on
 // PolicyResultCount make the nested count round-trip.
+//
+// PolicyEvaluations only ever holds OPA checks (see tharsisTaskStageToTaskStage): go-tfe's
+// PolicyKind enum names only opa and sentinel, so a check this API cannot describe with either word
+// is not a policy evaluation as far as a go-tfe client is concerned. It is reported as a TaskResult
+// instead, which carries no such kind constraint.
 type PolicyEvaluation struct {
 	ID          string             `jsonapi:"primary,policy-evaluations"`
 	Status      string             `jsonapi:"attr,status"`
 	PolicyKind  string             `jsonapi:"attr,policy-kind"`
 	ResultCount *PolicyResultCount `jsonapi:"attr,result-count"`
+}
+
+// TaskResult mirrors the go-tfe task-result type (see gotfe.TaskResult), trimmed to the fields
+// Tharsis populates. It is how a non-OPA policy check (module attestation today) is surfaced on a
+// task stage: go-tfe's run-task feature is meant for third-party checks run alongside Sentinel/OPA
+// policy evaluation, which is exactly the shape a Tharsis-native, non-policy-as-code check fits —
+// unlike PolicyEvaluation, a TaskResult carries no policy-kind vocabulary to misrepresent it under.
+// TaskName/TaskID are synthesized from the check's own kind and stable node id, since Tharsis has no
+// registered gotfe.RunTask record backing this — one is not needed for the CLI to render name,
+// status, and message.
+type TaskResult struct {
+	ID                            string `jsonapi:"primary,task-results"`
+	Status                        string `jsonapi:"attr,status"`
+	Message                       string `jsonapi:"attr,message"`
+	TaskID                        string `jsonapi:"attr,task-id"`
+	TaskName                      string `jsonapi:"attr,task-name"`
+	WorkspaceTaskEnforcementLevel string `jsonapi:"attr,workspace-task-enforcement-level"`
 }
 
 // PolicySetOutcome mirrors the go-tfe policy-set-outcome type. The go-tfe policy-set-outcome types

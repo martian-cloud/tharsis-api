@@ -289,34 +289,88 @@ type PolicyCheckPolicyProvenance struct {
 	PolicyTRN string `json:"policyTrn"`
 }
 
+// PolicyCheckOPAData is the OPA-specific snapshot of a policy a check evaluates.
+// PackageVersionConstraint is snapshotted unresolved (empty means the latest uploaded version): the
+// policy-eval job resolves it to a concrete package version when the check runs.
+type PolicyCheckOPAData struct {
+	PackageSource            string  `json:"packageSource"`
+	PackageVersionConstraint string  `json:"packageVersionConstraint"`
+	PackageDigest            *string `json:"packageDigest,omitempty"`
+}
+
+// Copy creates a deep copy of the PolicyCheckOPAData. Nil copies to nil.
+func (d *PolicyCheckOPAData) Copy() *PolicyCheckOPAData {
+	if d == nil {
+		return nil
+	}
+	return &PolicyCheckOPAData{
+		PackageSource:            d.PackageSource,
+		PackageVersionConstraint: d.PackageVersionConstraint,
+		PackageDigest:            d.PackageDigest,
+	}
+}
+
+func policyCheckOPADataEqual(a, b *PolicyCheckOPAData) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.PackageSource == b.PackageSource &&
+		a.PackageVersionConstraint == b.PackageVersionConstraint &&
+		ptrStringEqual(a.PackageDigest, b.PackageDigest)
+}
+
+// PolicyCheckModuleAttestationData is the module-attestation snapshot of a policy a check evaluates.
+type PolicyCheckModuleAttestationData struct {
+	PublicKey          string  `json:"publicKey"`
+	PredicateType      *string `json:"predicateType,omitempty"`
+	VerifyStateLineage bool    `json:"verifyStateLineage,omitempty"`
+}
+
+// Copy creates a deep copy of the PolicyCheckModuleAttestationData. Nil copies to nil.
+func (d *PolicyCheckModuleAttestationData) Copy() *PolicyCheckModuleAttestationData {
+	if d == nil {
+		return nil
+	}
+	return &PolicyCheckModuleAttestationData{
+		PublicKey:          d.PublicKey,
+		PredicateType:      d.PredicateType,
+		VerifyStateLineage: d.VerifyStateLineage,
+	}
+}
+
+func policyCheckModuleAttestationDataEqual(a, b *PolicyCheckModuleAttestationData) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.PublicKey == b.PublicKey &&
+		ptrStringEqual(a.PredicateType, b.PredicateType) &&
+		a.VerifyStateLineage == b.VerifyStateLineage
+}
+
 // PolicyCheckPolicy is the snapshot of a single policy a policy check evaluates, together
 // with its result. There is one entry per valid policy (no de-duplication), each with its own
-// stable ID, Source (owner), EnforcementLevel, optional PackageDigest lock, and — for soft-mandatory
-// policies — the approver snapshot (RequiredApprovals + allowed principal ids) used to gate an
-// override.
+// stable ID, EnforcementLevel, kind-specific data, and — for soft-mandatory policies — the approver
+// snapshot (RequiredApprovals + allowed principal ids) used to gate an override.
 // Name and Description are copied from the policy at run creation so the run keeps reporting the
 // policy as it was evaluated, even after the policy is renamed, re-described, or deleted.
-// PackageVersionConstraint is snapshotted unresolved (empty means the latest uploaded version): the
-// policy-eval job resolves it to a concrete package version when the check runs, and records that
-// version in its job log. Status is empty and MessagesObjectStoreKey nil until the policy-eval job
-// reports the result.
+// Exactly one of OPAData and ModuleAttestationData is set, determined by the owning check's
+// CheckType. Status is empty and MessagesObjectStoreKey nil until the check reports its result.
 // Entries are stored as elements of the check's Policies JSONB column, so adding a field here needs
 // no migration — it is simply absent (and therefore zero) on checks created before it existed.
 type PolicyCheckPolicy struct {
-	ID                       string                      `json:"id"`
-	Name                     string                      `json:"name,omitempty"`
-	Description              string                      `json:"description,omitempty"`
-	PackageSource            string                      `json:"packageSource"`
-	PackageVersionConstraint string                      `json:"packageVersionConstraint"`
-	EnforcementLevel         PolicyEnforcementLevel      `json:"enforcementLevel"`
-	Provenance               PolicyCheckPolicyProvenance `json:"provenance"`
-	PackageDigest            *string                     `json:"packageDigest,omitempty"`
-	RequiredApprovals        int                         `json:"requiredApprovals,omitempty"`
-	AllowedUserIDs           []string                    `json:"allowedUserIds,omitempty"`
-	AllowedServiceAccountIDs []string                    `json:"allowedServiceAccountIds,omitempty"`
-	AllowedTeamIDs           []string                    `json:"allowedTeamIds,omitempty"`
-	Status                   PolicyCheckPolicyStatus     `json:"status"`
-	MessagesObjectStoreKey   *string                     `json:"messagesObjectStoreKey,omitempty"`
+	ID                       string                            `json:"id"`
+	Name                     string                            `json:"name,omitempty"`
+	Description              string                            `json:"description,omitempty"`
+	EnforcementLevel         PolicyEnforcementLevel            `json:"enforcementLevel"`
+	Provenance               PolicyCheckPolicyProvenance       `json:"provenance"`
+	OPAData                  *PolicyCheckOPAData               `json:"opaData,omitempty"`
+	ModuleAttestationData    *PolicyCheckModuleAttestationData `json:"moduleAttestationData,omitempty"`
+	RequiredApprovals        int                               `json:"requiredApprovals,omitempty"`
+	AllowedUserIDs           []string                          `json:"allowedUserIds,omitempty"`
+	AllowedServiceAccountIDs []string                          `json:"allowedServiceAccountIds,omitempty"`
+	AllowedTeamIDs           []string                          `json:"allowedTeamIds,omitempty"`
+	Status                   PolicyCheckPolicyStatus           `json:"status"`
+	MessagesObjectStoreKey   *string                           `json:"messagesObjectStoreKey,omitempty"`
 }
 
 var _ Model = (*Run)(nil)
@@ -454,21 +508,28 @@ func (n *PolicyCheck) GetGlobalID() string {
 	return RunNodeGID(n.ID)
 }
 
-// Copy creates a deep copy of the PolicyCheck.
+// Copy creates a deep copy of the PolicyCheck, including its child policies.
 func (n *PolicyCheck) Copy() RunNode {
-	return &PolicyCheck{
+	cp := &PolicyCheck{
 		LatestJobID:     n.LatestJobID,
 		ID:              n.ID,
 		StageName:       n.StageName,
 		CheckType:       n.CheckType,
 		Status:          n.Status,
-		Policies:        clonePolicyCheckPolicies(n.Policies),
-		MessagesSummary: n.MessagesSummary.clone(),
+		MessagesSummary: n.MessagesSummary.Copy(),
 	}
+	if n.Policies != nil {
+		cp.Policies = make([]*PolicyCheckPolicy, len(n.Policies))
+		for i, p := range n.Policies {
+			cp.Policies[i] = p.Copy()
+		}
+	}
+	return cp
 }
 
-// clone deep-copies the summary, including its message slice. Nil clones to nil.
-func (s *PolicyCheckMessagesSummary) clone() *PolicyCheckMessagesSummary {
+// Copy creates a deep copy of the PolicyCheckMessagesSummary, including its message slice.
+// Nil copies to nil.
+func (s *PolicyCheckMessagesSummary) Copy() *PolicyCheckMessagesSummary {
 	if s == nil {
 		return nil
 	}
@@ -487,20 +548,27 @@ func policyCheckMessagesSummaryEqual(a, b *PolicyCheckMessagesSummary) bool {
 	return a.Truncated == b.Truncated && slices.Equal(a.Messages, b.Messages)
 }
 
-// clonePolicyCheckPolicies deep-copies the policies slice, including each entry's approver id slices.
-func clonePolicyCheckPolicies(in []*PolicyCheckPolicy) []*PolicyCheckPolicy {
-	if in == nil {
+// Copy creates a deep copy of the PolicyCheckPolicy, including its approver id slices and
+// kind-specific data. Nil copies to nil.
+func (p *PolicyCheckPolicy) Copy() *PolicyCheckPolicy {
+	if p == nil {
 		return nil
 	}
-	out := make([]*PolicyCheckPolicy, len(in))
-	for i, p := range in {
-		cp := *p
-		cp.AllowedUserIDs = slices.Clone(p.AllowedUserIDs)
-		cp.AllowedServiceAccountIDs = slices.Clone(p.AllowedServiceAccountIDs)
-		cp.AllowedTeamIDs = slices.Clone(p.AllowedTeamIDs)
-		out[i] = &cp
+	return &PolicyCheckPolicy{
+		ID:                       p.ID,
+		Name:                     p.Name,
+		Description:              p.Description,
+		EnforcementLevel:         p.EnforcementLevel,
+		Provenance:               p.Provenance,
+		OPAData:                  p.OPAData.Copy(),
+		ModuleAttestationData:    p.ModuleAttestationData.Copy(),
+		RequiredApprovals:        p.RequiredApprovals,
+		AllowedUserIDs:           slices.Clone(p.AllowedUserIDs),
+		AllowedServiceAccountIDs: slices.Clone(p.AllowedServiceAccountIDs),
+		AllowedTeamIDs:           slices.Clone(p.AllowedTeamIDs),
+		Status:                   p.Status,
+		MessagesObjectStoreKey:   p.MessagesObjectStoreKey,
 	}
-	return out
 }
 
 // ShallowCompare compares this PolicyCheck with another RunNode.
@@ -524,14 +592,13 @@ func (n *PolicyCheck) ShallowCompare(other RunNode) bool {
 }
 
 // policyCheckPolicyEqual reports whether two PolicyCheckPolicy values are equal, including the
-// owner source and approver snapshot.
+// owner source, kind-specific data, and approver snapshot.
 func policyCheckPolicyEqual(a, b *PolicyCheckPolicy) bool {
 	return a.ID == b.ID &&
-		a.PackageSource == b.PackageSource &&
-		a.PackageVersionConstraint == b.PackageVersionConstraint &&
 		a.EnforcementLevel == b.EnforcementLevel &&
 		a.Provenance == b.Provenance &&
-		ptrStringEqual(a.PackageDigest, b.PackageDigest) &&
+		policyCheckOPADataEqual(a.OPAData, b.OPAData) &&
+		policyCheckModuleAttestationDataEqual(a.ModuleAttestationData, b.ModuleAttestationData) &&
 		a.RequiredApprovals == b.RequiredApprovals &&
 		a.Status == b.Status &&
 		ptrStringEqual(a.MessagesObjectStoreKey, b.MessagesObjectStoreKey) &&

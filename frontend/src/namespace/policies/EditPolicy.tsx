@@ -9,7 +9,7 @@ import NamespaceBreadcrumbs from '../NamespaceBreadcrumbs';
 import { EditPolicyFragment_policy$key } from './__generated__/EditPolicyFragment_policy.graphql';
 import { EditPolicyMutation } from './__generated__/EditPolicyMutation.graphql';
 import { EditPolicyQuery } from './__generated__/EditPolicyQuery.graphql';
-import PolicyForm, { buildApproverInput, isMissingApprovers, PolicyFormData } from './PolicyForm';
+import PolicyForm, { buildApproverInput, buildKindDataInput, hasRequiredKindData, isMissingApprovers, PolicyFormData } from './PolicyForm';
 import { ScopeRuleActionValue, ScopeRuleTypeValue, toScopeRuleInputs } from './scopeRules';
 
 // The policy the form is seeded from is loaded by id rather than handed down from the list, so this
@@ -50,6 +50,14 @@ function EditPolicy({ ownerPath, groupPath }: Props) {
                 enforcementLevel
                 speculativeRunEnforcementLevel
             }
+            moduleAttestationData {
+                publicKey
+                predicateType
+                verifyStateLineage
+                stage
+                enforcementLevel
+                speculativeRunEnforcementLevel
+            }
             scope {
                 type
                 action
@@ -62,6 +70,9 @@ function EditPolicy({ ownerPath, groupPath }: Props) {
     `, queryData.node);
 
     const packageSource = policy?.opaData?.packageSource ?? '';
+    // The two kind-specific data objects are mutually exclusive, so whichever is present carries the
+    // fields (stage, enforcement levels) that are common in shape but stored per kind.
+    const kindData = policy?.opaData ?? policy?.moduleAttestationData;
 
     const initialFormData: PolicyFormData | null = policy
         ? {
@@ -73,21 +84,28 @@ function EditPolicy({ ownerPath, groupPath }: Props) {
             kind: policy.kind as PolicyFormData['kind'],
             name: policy.name,
             description: policy.description,
-            // A policy stores only its package's source, so the option is synthetic: everything the
-            // dropdown would show about the package is left empty and only the source is submitted.
-            package: {
-                id: '',
-                label: packageSource,
-                packageSource,
-                visibility: '',
-                description: '',
+            opa: {
+                // A policy stores only its package's source, so the option is synthetic: everything the
+                // dropdown would show about the package is left empty and only the source is submitted.
+                package: {
+                    id: '',
+                    label: packageSource,
+                    packageSource,
+                    visibility: '',
+                    description: '',
+                },
+                packageVersionConstraint: policy.opaData?.packageVersionConstraint ?? '',
+                packageDigest: policy.opaData?.packageDigest ?? '',
             },
-            packageVersionConstraint: policy.opaData?.packageVersionConstraint ?? '',
-            packageDigest: policy.opaData?.packageDigest ?? '',
-            stage: (policy.opaData?.stage ?? 'POST_PLAN') as PolicyFormData['stage'],
-            enforcementLevel: (policy.opaData?.enforcementLevel ?? 'ADVISORY') as PolicyFormData['enforcementLevel'],
+            moduleAttestation: {
+                publicKey: policy.moduleAttestationData?.publicKey ?? '',
+                predicateType: policy.moduleAttestationData?.predicateType ?? '',
+                verifyStateLineage: policy.moduleAttestationData?.verifyStateLineage ?? false,
+            },
+            stage: (kindData?.stage ?? 'POST_PLAN') as PolicyFormData['stage'],
+            enforcementLevel: (kindData?.enforcementLevel ?? 'ADVISORY') as PolicyFormData['enforcementLevel'],
             speculativeRunEnforcementLevel:
-                (policy.opaData?.speculativeRunEnforcementLevel ?? 'ADVISORY') as PolicyFormData['speculativeRunEnforcementLevel'],
+                (kindData?.speculativeRunEnforcementLevel ?? 'ADVISORY') as PolicyFormData['speculativeRunEnforcementLevel'],
             requiredApprovals: policy.requiredApprovals,
             allowedUsers: (policy.allowedUsers ?? []).map(u => ({ id: u.id, email: u.email, username: u.username })),
             allowedTeams: (policy.allowedTeams ?? []).map(t => ({ id: t.id, name: t.name })),
@@ -122,6 +140,14 @@ function EditPolicy({ ownerPath, groupPath }: Props) {
                         enforcementLevel
                         speculativeRunEnforcementLevel
                     }
+                    moduleAttestationData {
+                        publicKey
+                        predicateType
+                        verifyStateLineage
+                        stage
+                        enforcementLevel
+                        speculativeRunEnforcementLevel
+                    }
                     createdBy
                     requiredApprovals
                     scope {
@@ -144,7 +170,7 @@ function EditPolicy({ ownerPath, groupPath }: Props) {
     }
 
     const onSave = () => {
-        if (isMissingApprovers(formData)) return;
+        if (!hasRequiredKindData(formData) || isMissingApprovers(formData)) return;
         setError(undefined);
 
         const approverInput = buildApproverInput(formData);
@@ -154,14 +180,7 @@ function EditPolicy({ ownerPath, groupPath }: Props) {
                 input: {
                     id: policy.id,
                     description: formData.description || null,
-                    opaData: {
-                        packageSource: formData.package!.packageSource,
-                        packageVersionConstraint: formData.packageVersionConstraint.trim() || null,
-                        packageDigest: formData.packageDigest.trim() || null,
-                        enforcementLevel: formData.enforcementLevel,
-                        speculativeRunEnforcementLevel: formData.speculativeRunEnforcementLevel,
-                        stage: formData.stage,
-                    },
+                    ...buildKindDataInput(formData),
                     scope: toScopeRuleInputs(formData.scope),
                     ...approverInput,
                 },
@@ -207,7 +226,7 @@ function EditPolicy({ ownerPath, groupPath }: Props) {
                     variant="outlined"
                     color="primary"
                     sx={{ marginRight: 2 }}
-                    disabled={!formData.package?.packageSource}
+                    disabled={!hasRequiredKindData(formData)}
                     onClick={onSave}
                 >
                     Save Changes

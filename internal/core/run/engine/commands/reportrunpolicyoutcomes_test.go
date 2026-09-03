@@ -23,10 +23,10 @@ import (
 // keyed by its stable id. EnforcementLevel drives the verdict.
 func policyCheckPolicy(id string, level models.PolicyEnforcementLevel) *models.PolicyCheckPolicy {
 	return &models.PolicyCheckPolicy{
-		ID:                       id,
-		PackageVersionConstraint: "~> 1.0",
-		EnforcementLevel:         level,
-		Status:                   models.PolicyCheckPolicyPending,
+		ID:               id,
+		OPAData:          &models.PolicyCheckOPAData{PackageVersionConstraint: "~> 1.0"},
+		EnforcementLevel: level,
+		Status:           models.PolicyCheckPolicyPending,
 	}
 }
 

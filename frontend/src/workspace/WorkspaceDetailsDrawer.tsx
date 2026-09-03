@@ -38,7 +38,7 @@ const NAV_SECTIONS = [
         label: 'Administration',
         items: [
             { route: 'provider_mirror', label: 'Provider Mirror', icon: <ProviderMirrorIcon /> },
-            { route: 'cleanup_policies', label: 'Cleanup Policies', icon: <CleanupPolicyIcon /> },
+            { route: 'cleanup_policies', label: 'Cleanup', icon: <CleanupPolicyIcon /> },
             { route: 'settings', label: 'Settings', icon: <SettingsIcon /> },
         ],
     },

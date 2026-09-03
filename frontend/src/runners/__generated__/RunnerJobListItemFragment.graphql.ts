@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<16e429d160f8053dff38289d95741970>>
+ * @generated SignedSource<<eff764fab2eaf84532ae5779d58447f2>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,8 @@
 
 import { ReaderFragment } from 'relay-runtime';
 export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
-export type JobType = "apply" | "plan" | "%future added value";
+export type JobType = "apply" | "opa" | "plan" | "%future added value";
+export type RunTaskStageName = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_PLAN" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunnerJobListItemFragment$data = {
   readonly id: string;
@@ -18,6 +19,9 @@ export type RunnerJobListItemFragment$data = {
     readonly createdAt: any;
     readonly updatedAt: any;
   };
+  readonly opaData: {
+    readonly taskStageName: RunTaskStageName | null | undefined;
+  } | null | undefined;
   readonly run: {
     readonly id: string;
   };
@@ -67,6 +71,24 @@ return {
       "args": null,
       "kind": "ScalarField",
       "name": "type",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "concreteType": "JobOPAData",
+      "kind": "LinkedField",
+      "name": "opaData",
+      "plural": false,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "taskStageName",
+          "storageKey": null
+        }
+      ],
       "storageKey": null
     },
     {
@@ -176,6 +198,6 @@ return {
 };
 })();
 
-(node as any).hash = "d3d2845d1f08a140a01e24146f3523de";
+(node as any).hash = "614a39152293ec5b3cb3f61e728e8e6f";
 
 export default node;

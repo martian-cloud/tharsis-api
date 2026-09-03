@@ -85,6 +85,7 @@ enum RunStatus {
 enum PolicyCheckType {
   POLICY_CHECK_TYPE_UNSPECIFIED = 0;
   POLICY_CHECK_TYPE_OPA         = 1;
+  POLICY_CHECK_TYPE_MODULE_ATTESTATION = 2;
 }
 
 // RunTaskStageName identifies which stage of a run a policy check evaluates at.
@@ -275,24 +276,39 @@ message PolicyCheck {
   RunTaskStageName           stage_name    = 6;
 }
 
+// OPAPolicyCheckData is the OPA-specific snapshot of a policy a check evaluates.
+// package_version_constraint is resolved to a concrete package version by the evaluator when the
+// check runs — an empty constraint means the latest uploaded version. package_digest, when set, is
+// the hex sha256 the package must match.
+message OPAPolicyCheckData {
+  string package_source = 1;
+  string package_version_constraint = 2;
+  optional string package_digest = 3;
+}
+
+// ModuleAttestationPolicyCheckData is the module-attestation snapshot of a policy a check evaluates.
+// These checks are evaluated in the API rather than by a runner, so this is carried for completeness.
+message ModuleAttestationPolicyCheckData {
+  string public_key = 1;
+  optional string predicate_type = 2;
+  bool verify_state_lineage = 3;
+}
+
 // PolicyCheckPolicy is one policy attachment a check evaluates, with its result. There is one entry
 // per valid attachment (no de-duplication); id is the stable per-attachment identity the evaluator
-// echoes when reporting outcomes. package_version_constraint is resolved to a concrete package
-// version by the evaluator when the check runs — an empty constraint means the latest uploaded
-// version. package_digest, when set, is the hex sha256 the package must match. status is empty
-// until the check is evaluated. (Approver fields live server-side only.)
+// echoes when reporting outcomes. Exactly one of opa_data and module_attestation_data is set,
+// determined by the owning check's type. status is empty until the check is evaluated.
 //
 // The violation messages a previous evaluation reported are deliberately absent: the runner never
 // read them, and they are held in object storage, so carrying them here would cost a fetch per
 // policy on every run sent to a runner.
 message PolicyCheckPolicy {
   string id             = 1;
-  string package_source = 2;
-  string package_version_constraint = 3;
-  PolicyEnforcementLevel enforcement_level = 4;
-  PolicyCheckPolicyStatus status           = 5;
-  optional string package_digest   = 6;
-  PolicyCheckPolicyProvenance provenance = 7;
+  PolicyEnforcementLevel enforcement_level = 2;
+  PolicyCheckPolicyStatus status           = 3;
+  PolicyCheckPolicyProvenance provenance = 4;
+  optional OPAPolicyCheckData opa_data = 5;
+  optional ModuleAttestationPolicyCheckData module_attestation_data = 6;
 }
 
 // PolicyCheckPolicyProvenance records the group that owns a policy attachment and the stable TRN

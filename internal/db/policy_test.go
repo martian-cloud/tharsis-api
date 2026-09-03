@@ -113,6 +113,68 @@ func TestPolicies_CreatePolicy(t *testing.T) {
 	}
 }
 
+// TestPolicies_CreateModuleAttestationPolicy verifies the module attestation kind round-trips through
+// the kind_data JSONB column and is selectable by the stage filter, which reads kind_data->>'stage'.
+func TestPolicies_CreateModuleAttestationPolicy(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-attestation",
+		FullPath:  "test-group-attestation",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	predicateType := "https://slsa.dev/provenance/v1"
+	created, err := testClient.client.Policies.CreatePolicy(ctx, &models.Policy{
+		GroupID: group.Metadata.ID,
+		Name:    "require-provenance",
+		Kind:    models.PolicyKindModuleAttestation,
+		ModuleAttestationData: &models.ModuleAttestationPolicyData{
+			PublicKey:                      "-----BEGIN PUBLIC KEY-----\nkey-body\n-----END PUBLIC KEY-----",
+			PredicateType:                  &predicateType,
+			VerifyStateLineage:             true,
+			EnforcementLevel:               models.PolicyEnforcementHardMandatory,
+			SpeculativeRunEnforcementLevel: models.PolicyEnforcementHardMandatory,
+			Stage:                          models.RunTaskStageNamePrePlan,
+		},
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+	require.NotNil(t, created)
+
+	assert.Equal(t, models.PolicyKindModuleAttestation, created.Kind)
+	assert.Nil(t, created.OPAData)
+	require.NotNil(t, created.ModuleAttestationData)
+	assert.Equal(t, predicateType, *created.ModuleAttestationData.PredicateType)
+	assert.True(t, created.ModuleAttestationData.VerifyStateLineage)
+	assert.Equal(t, models.RunTaskStageNamePrePlan, created.ModuleAttestationData.Stage)
+	assert.Equal(t, models.PolicyEnforcementHardMandatory, created.ModuleAttestationData.EnforcementLevel)
+
+	fetched, err := testClient.client.Policies.GetPolicyByID(ctx, created.Metadata.ID)
+	require.Nil(t, err)
+	require.NotNil(t, fetched)
+	require.NotNil(t, fetched.ModuleAttestationData)
+	assert.Equal(t, created.ModuleAttestationData.PublicKey, fetched.ModuleAttestationData.PublicKey)
+
+	prePlan := models.RunTaskStageNamePrePlan
+	result, err := testClient.client.Policies.GetPolicies(ctx, &GetPoliciesInput{
+		Filter: &PolicyFilter{GroupIDs: []string{group.Metadata.ID}, Stage: &prePlan},
+	})
+	require.Nil(t, err)
+	require.Len(t, result.Policies, 1)
+	assert.Equal(t, created.Metadata.ID, result.Policies[0].Metadata.ID)
+
+	postPlan := models.RunTaskStageNamePostPlan
+	result, err = testClient.client.Policies.GetPolicies(ctx, &GetPoliciesInput{
+		Filter: &PolicyFilter{GroupIDs: []string{group.Metadata.ID}, Stage: &postPlan},
+	})
+	require.Nil(t, err)
+	assert.Empty(t, result.Policies)
+}
+
 func TestPolicies_UpdatePolicy(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)

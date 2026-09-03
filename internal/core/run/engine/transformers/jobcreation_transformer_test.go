@@ -177,6 +177,114 @@ func TestJobCreationTransformer_Transform_ErrorsWhenMaxJobDurationMissing(t *tes
 	assert.Error(t, err)
 }
 
+func TestJobCreationTransformer_Transform_CreatesPolicyCheckJobForOPACheck(t *testing.T) {
+	ctx := context.Background()
+
+	check := &models.PolicyCheck{
+		ID:        "check-1",
+		StageName: models.RunTaskStageNamePrePlan,
+		CheckType: models.PolicyKindOPA,
+		Status:    models.PolicyCheckQueued,
+	}
+	run := &models.Run{
+		Metadata:    models.ResourceMetadata{ID: "run-1"},
+		WorkspaceID: "ws-1",
+		TaskStages: []*models.RunTaskStage{{
+			StageName:    models.RunTaskStageNamePrePlan,
+			PolicyChecks: []*models.PolicyCheck{check},
+		}},
+	}
+
+	ws := &models.Workspace{
+		Metadata:       models.ResourceMetadata{ID: "ws-1"},
+		MaxJobDuration: maxJobDuration(60),
+	}
+
+	mockWorkspaces := db.NewMockWorkspaces(t)
+	mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "ws-1").Return(ws, nil)
+
+	mockJobs := db.NewMockJobs(t)
+	mockJobs.On("CreateJob", mock.Anything, mock.MatchedBy(func(j *models.Job) bool {
+		return j.Type == models.JobOPAType && j.OPAData != nil && j.OPAData.PolicyCheckID == "check-1"
+	})).Return(&models.Job{Metadata: models.ResourceMetadata{ID: "job-opa"}}, nil)
+
+	mockLogStreams := db.NewMockLogStreams(t)
+	mockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
+
+	resolver := namespace.NewMockInheritedSettingResolver(t)
+	resolver.On("GetRunnerTags", mock.Anything, ws).Return(&namespace.RunnerTagsSetting{Value: []string{}}, nil)
+	resolver.On("GetProviderMirrorEnabled", mock.Anything, ws).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil)
+
+	dbClient := &db.Client{
+		Workspaces: mockWorkspaces,
+		Jobs:       mockJobs,
+		LogStreams: mockLogStreams,
+	}
+
+	transformer := NewJobCreationTransformer(dbClient, resolver)
+
+	change := types.RunChange{
+		Run: run,
+		NodeStatusChanges: []statemachine.NodeStatusChange{statemachine.PolicyCheckStatusChange{
+			NewStatus: models.PolicyCheckQueued,
+			CheckID:   "check-1",
+			Path:      check.GetPath(),
+		}},
+	}
+
+	err := transformer.Transform(ctx, []types.RunChange{change}, nil)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, check.LatestJobID)
+	assert.Equal(t, "job-opa", *check.LatestJobID)
+}
+
+// TestJobCreationTransformer_Transform_CreatesNoJobForModuleAttestationCheck is the negative control
+// for the OPA-only job creation guard: a module attestation check entering queued must create no job
+// at all, since it evaluates in-API off the work queue. Leaving CreateJob unregistered on the mock
+// means the test fails loudly if the transformer ever calls it for this check type.
+func TestJobCreationTransformer_Transform_CreatesNoJobForModuleAttestationCheck(t *testing.T) {
+	ctx := context.Background()
+
+	check := &models.PolicyCheck{
+		ID:        "check-1",
+		StageName: models.RunTaskStageNamePrePlan,
+		CheckType: models.PolicyKindModuleAttestation,
+		Status:    models.PolicyCheckQueued,
+	}
+	run := &models.Run{
+		Metadata:    models.ResourceMetadata{ID: "run-1"},
+		WorkspaceID: "ws-1",
+		TaskStages: []*models.RunTaskStage{{
+			StageName:    models.RunTaskStageNamePrePlan,
+			PolicyChecks: []*models.PolicyCheck{check},
+		}},
+	}
+
+	// No mock expectations at all: any db call here is a bug.
+	dbClient := &db.Client{
+		Workspaces: db.NewMockWorkspaces(t),
+		Jobs:       db.NewMockJobs(t),
+		LogStreams: db.NewMockLogStreams(t),
+	}
+	resolver := namespace.NewMockInheritedSettingResolver(t)
+
+	transformer := NewJobCreationTransformer(dbClient, resolver)
+
+	change := types.RunChange{
+		Run: run,
+		NodeStatusChanges: []statemachine.NodeStatusChange{statemachine.PolicyCheckStatusChange{
+			NewStatus: models.PolicyCheckQueued,
+			CheckID:   "check-1",
+			Path:      check.GetPath(),
+		}},
+	}
+
+	err := transformer.Transform(ctx, []types.RunChange{change}, nil)
+	assert.NoError(t, err)
+	assert.Nil(t, check.LatestJobID)
+}
+
 func TestJobCreationTransformer_Transform_ErrorsWhenWorkspaceNotFound(t *testing.T) {
 	ctx := context.Background()
 

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8287fd1c14ebcde977b992741498bad5>>
+ * @generated SignedSource<<c5934f4d7546cf3addd43de912d29646>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -45,7 +45,21 @@ v2 = {
   "name": "id",
   "storageKey": null
 },
-v3 = [
+v3 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "stage",
+  "storageKey": null
+},
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "enforcementLevel",
+  "storageKey": null
+},
+v5 = [
   (v2/*: any*/)
 ];
 return {
@@ -165,20 +179,35 @@ return {
                         "name": "packageVersionConstraint",
                         "storageKey": null
                       },
+                      (v3/*: any*/),
+                      (v4/*: any*/)
+                    ],
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "ModuleAttestationPolicyData",
+                    "kind": "LinkedField",
+                    "name": "moduleAttestationData",
+                    "plural": false,
+                    "selections": [
                       {
                         "alias": null,
                         "args": null,
                         "kind": "ScalarField",
-                        "name": "stage",
+                        "name": "publicKey",
                         "storageKey": null
                       },
                       {
                         "alias": null,
                         "args": null,
                         "kind": "ScalarField",
-                        "name": "enforcementLevel",
+                        "name": "predicateType",
                         "storageKey": null
-                      }
+                      },
+                      (v3/*: any*/),
+                      (v4/*: any*/)
                     ],
                     "storageKey": null
                   },
@@ -214,7 +243,7 @@ return {
                     "kind": "LinkedField",
                     "name": "allowedUsers",
                     "plural": true,
-                    "selections": (v3/*: any*/),
+                    "selections": (v5/*: any*/),
                     "storageKey": null
                   },
                   {
@@ -224,7 +253,7 @@ return {
                     "kind": "LinkedField",
                     "name": "allowedTeams",
                     "plural": true,
-                    "selections": (v3/*: any*/),
+                    "selections": (v5/*: any*/),
                     "storageKey": null
                   },
                   {
@@ -234,7 +263,7 @@ return {
                     "kind": "LinkedField",
                     "name": "allowedServiceAccounts",
                     "plural": true,
-                    "selections": (v3/*: any*/),
+                    "selections": (v5/*: any*/),
                     "storageKey": null
                   }
                 ],
@@ -251,12 +280,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "38f0754b3f4ce1b526c30235874ea6a8",
+    "cacheID": "978dbf441f4c5bc2d3afd0653f2c68d3",
     "id": null,
     "metadata": {},
     "name": "ManagedIdentityPoliciesQuery",
     "operationKind": "query",
-    "text": "query ManagedIdentityPoliciesQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...ManagedIdentityPoliciesPoliciesFragment_managedIdentity\n    id\n  }\n}\n\nfragment ManagedIdentityPoliciesPoliciesFragment_managedIdentity on ManagedIdentity {\n  referencingPolicies {\n    id\n    ...PolicyCardFragment_policy\n  }\n}\n\nfragment PolicyCardFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    stage\n    enforcementLevel\n  }\n  scope {\n    action\n  }\n  groupPath\n  allowedUsers {\n    id\n  }\n  allowedTeams {\n    id\n  }\n  allowedServiceAccounts {\n    id\n  }\n}\n"
+    "text": "query ManagedIdentityPoliciesQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...ManagedIdentityPoliciesPoliciesFragment_managedIdentity\n    id\n  }\n}\n\nfragment ManagedIdentityPoliciesPoliciesFragment_managedIdentity on ManagedIdentity {\n  referencingPolicies {\n    id\n    ...PolicyCardFragment_policy\n  }\n}\n\nfragment PolicyCardFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    stage\n    enforcementLevel\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    stage\n    enforcementLevel\n  }\n  scope {\n    action\n  }\n  groupPath\n  allowedUsers {\n    id\n  }\n  allowedTeams {\n    id\n  }\n  allowedServiceAccounts {\n    id\n  }\n}\n"
   }
 };
 })();

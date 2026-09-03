@@ -105,7 +105,11 @@ func TestTharsisRunStatusToTFE_Exhaustive(t *testing.T) {
 }
 
 // TestTharsisRunToRun_TaskStages verifies a run's pre-plan and post-plan policy checks are surfaced
-// as distinct task stages, each carrying one OPA policy evaluation with the mapped status.
+// as distinct task stages, each carrying one policy evaluation per check with the mapped status and
+// TestTharsisRunToRun_TaskStages verifies a run's pre-plan and post-plan policy checks are surfaced
+// as distinct task stages. An OPA check becomes a policy evaluation with the mapped status; a
+// module attestation check becomes a task result instead -- go-tfe has no policy-kind word for it,
+// so it must not appear among the policy evaluations at all.
 func TestTharsisRunToRun_TaskStages(t *testing.T) {
 	run := &models.Run{
 		Metadata:    models.ResourceMetadata{ID: "run-1"},
@@ -115,6 +119,11 @@ func TestTharsisRunToRun_TaskStages(t *testing.T) {
 		TaskStages: []*models.RunTaskStage{
 			{ID: "pre-stage", StageName: models.RunTaskStageNamePrePlan, Status: models.RunTaskStageAwaitingOverride, PolicyChecks: []*models.PolicyCheck{
 				{ID: "pre-1", StageName: models.RunTaskStageNamePrePlan, CheckType: models.PolicyKindOPA, Status: models.PolicyCheckSoftFailed},
+				{
+					ID: "pre-2", StageName: models.RunTaskStageNamePrePlan, CheckType: models.PolicyKindModuleAttestation, Status: models.PolicyCheckPassed,
+					MessagesSummary: &models.PolicyCheckMessagesSummary{Messages: []string{"attestation verified"}},
+					Policies:        []*models.PolicyCheckPolicy{{EnforcementLevel: models.PolicyEnforcementHardMandatory}},
+				},
 			}},
 			{ID: "post-stage", StageName: models.RunTaskStageNamePostPlan, Status: models.RunTaskStageCompleted, PolicyChecks: []*models.PolicyCheck{
 				{ID: "post-1", StageName: models.RunTaskStageNamePostPlan, CheckType: models.PolicyKindOPA, Status: models.PolicyCheckPassed},
@@ -138,15 +147,76 @@ func TestTharsisRunToRun_TaskStages(t *testing.T) {
 	pre := byStage[string(gotfe.PrePlan)]
 	require.NotNil(t, pre)
 	assert.Equal(t, string(gotfe.TaskStageAwaitingOverride), pre.Status)
+	// Only the OPA check is a policy evaluation.
 	require.Len(t, pre.PolicyEvaluations, 1)
 	assert.Equal(t, string(gotfe.OPA), pre.PolicyEvaluations[0].PolicyKind)
 	assert.Equal(t, string(gotfe.PolicyEvaluationFailed), pre.PolicyEvaluations[0].Status)
+	// The module attestation check is a task result, not a policy evaluation.
+	require.Len(t, pre.TaskResults, 1)
+	assert.Equal(t, string(gotfe.TaskPassed), pre.TaskResults[0].Status)
+	assert.Equal(t, "Module Attestation", pre.TaskResults[0].TaskName)
+	assert.Equal(t, "attestation verified", pre.TaskResults[0].Message)
+	assert.Equal(t, string(gotfe.Mandatory), pre.TaskResults[0].WorkspaceTaskEnforcementLevel)
 
 	post := byStage[string(gotfe.PostPlan)]
 	require.NotNil(t, post)
 	assert.Equal(t, string(gotfe.TaskStagePassed), post.Status)
 	require.Len(t, post.PolicyEvaluations, 1)
+	assert.Equal(t, string(gotfe.OPA), post.PolicyEvaluations[0].PolicyKind)
 	assert.Equal(t, string(gotfe.PolicyEvaluationPassed), post.PolicyEvaluations[0].Status)
+	assert.Empty(t, post.TaskResults, "an all-OPA stage has no task results")
+}
+
+// TestTharsisPolicyCheckStatusToTaskResultStatus verifies every Tharsis policy check status maps to
+// a go-tfe task-result status the CLI understands, including the two collapses this mapping makes:
+// a soft-failed and an overridden check both report failed (go-tfe task results have no
+// soft-failed/overridden concept -- see tharsisPolicyCheckStatusToTaskResultStatus), and a canceled
+// or skipped check reports unreachable.
+func TestTharsisPolicyCheckStatusToTaskResultStatus(t *testing.T) {
+	cases := map[models.PolicyCheckStatus]gotfe.TaskResultStatus{
+		models.PolicyCheckCreated:    gotfe.TaskPending,
+		models.PolicyCheckPending:    gotfe.TaskPending,
+		models.PolicyCheckQueued:     gotfe.TaskPending,
+		models.PolicyCheckRunning:    gotfe.TaskRunning,
+		models.PolicyCheckPassed:     gotfe.TaskPassed,
+		models.PolicyCheckSoftFailed: gotfe.TaskFailed,
+		models.PolicyCheckOverridden: gotfe.TaskFailed,
+		models.PolicyCheckErrored:    gotfe.TaskErrored,
+		models.PolicyCheckCanceled:   gotfe.TaskUnreachable,
+		models.PolicyCheckSkipped:    gotfe.TaskUnreachable,
+	}
+
+	for status, want := range cases {
+		assert.Equal(t, want, tharsisPolicyCheckStatusToTaskResultStatus(status), "status %q", status)
+	}
+}
+
+// TestTharsisPolicyCheckEnforcementToTFETask verifies enforcement collapses onto go-tfe's two-level
+// TaskEnforcementLevel: soft_mandatory reports mandatory, same as hard_mandatory, since go-tfe run
+// tasks have no in-between and Tharsis's override already happens at the task-stage level regardless
+// of which mandatory level a check declares. advisory only wins when every policy on the check is
+// advisory.
+func TestTharsisPolicyCheckEnforcementToTFETask(t *testing.T) {
+	tests := []struct {
+		name   string
+		levels []models.PolicyEnforcementLevel
+		want   gotfe.TaskEnforcementLevel
+	}{
+		{name: "all advisory", levels: []models.PolicyEnforcementLevel{models.PolicyEnforcementAdvisory, models.PolicyEnforcementAdvisory}, want: gotfe.Advisory},
+		{name: "soft mandatory present", levels: []models.PolicyEnforcementLevel{models.PolicyEnforcementAdvisory, models.PolicyEnforcementSoftMandatory}, want: gotfe.Mandatory},
+		{name: "hard mandatory present", levels: []models.PolicyEnforcementLevel{models.PolicyEnforcementHardMandatory}, want: gotfe.Mandatory},
+		{name: "no policies defaults to advisory", levels: nil, want: gotfe.Advisory},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			check := &models.PolicyCheck{}
+			for _, level := range tt.levels {
+				check.Policies = append(check.Policies, &models.PolicyCheckPolicy{EnforcementLevel: level})
+			}
+			assert.Equal(t, tt.want, tharsisPolicyCheckEnforcementToTFETask(check))
+		})
+	}
 }
 
 // TestTharsisPolicyCheckToPolicySetOutcomes verifies a policy check is surfaced as a single
@@ -157,8 +227,8 @@ func TestTharsisPolicyCheckToPolicySetOutcomes(t *testing.T) {
 		ID:     "check-1",
 		Status: models.PolicyCheckSoftFailed,
 		Policies: []*models.PolicyCheckPolicy{
-			{ID: "pol-net", PackageSource: "acme/net", Status: models.PolicyCheckPolicyPassed, EnforcementLevel: models.PolicyEnforcementAdvisory, Provenance: models.PolicyCheckPolicyProvenance{PolicyTRN: "trn:policy:acme/net"}},
-			{ID: "pol-sec", PackageSource: "acme/sec", Status: models.PolicyCheckPolicyFailed, EnforcementLevel: models.PolicyEnforcementSoftMandatory, Provenance: models.PolicyCheckPolicyProvenance{PolicyTRN: "trn:policy:acme/sec"}},
+			{ID: "pol-net", OPAData: &models.PolicyCheckOPAData{PackageSource: "acme/net"}, Status: models.PolicyCheckPolicyPassed, EnforcementLevel: models.PolicyEnforcementAdvisory, Provenance: models.PolicyCheckPolicyProvenance{PolicyTRN: "trn:policy:acme/net"}},
+			{ID: "pol-sec", OPAData: &models.PolicyCheckOPAData{PackageSource: "acme/sec"}, Status: models.PolicyCheckPolicyFailed, EnforcementLevel: models.PolicyEnforcementSoftMandatory, Provenance: models.PolicyCheckPolicyProvenance{PolicyTRN: "trn:policy:acme/sec"}},
 		},
 	}
 
@@ -190,7 +260,7 @@ func TestPolicySetOutcomes_RoundTripToGoTFE(t *testing.T) {
 		ID:     "check-1",
 		Status: models.PolicyCheckSoftFailed,
 		Policies: []*models.PolicyCheckPolicy{
-			{ID: "pol-sec", PackageSource: "acme/sec", Status: models.PolicyCheckPolicyFailed, EnforcementLevel: models.PolicyEnforcementSoftMandatory, Provenance: models.PolicyCheckPolicyProvenance{PolicyTRN: "trn:policy:acme/sec"}},
+			{ID: "pol-sec", OPAData: &models.PolicyCheckOPAData{PackageSource: "acme/sec"}, Status: models.PolicyCheckPolicyFailed, EnforcementLevel: models.PolicyEnforcementSoftMandatory, Provenance: models.PolicyCheckPolicyProvenance{PolicyTRN: "trn:policy:acme/sec"}},
 		},
 	}
 	messages := map[string][]string{"pol-sec": {"denied by rule X"}}
@@ -237,6 +307,37 @@ func TestTaskStage_ResultCountRoundTripToGoTFE(t *testing.T) {
 	assert.Equal(t, gotfe.OPA, out.PolicyEvaluations[0].PolicyKind)
 	require.NotNil(t, out.PolicyEvaluations[0].ResultCount)
 	assert.Equal(t, 1, out.PolicyEvaluations[0].ResultCount.MandatoryFailed, "result count must decode (not 0)")
+}
+
+// TestTaskStage_ModuleAttestationTaskResultRoundTripToGoTFE guards the jsonapi round trip for a
+// module attestation check: it must decode as a TaskResult on the go-tfe TaskStage, with its
+// status/message/task-name/enforcement-level attributes intact, and must not appear among
+// PolicyEvaluations at all.
+func TestTaskStage_ModuleAttestationTaskResultRoundTripToGoTFE(t *testing.T) {
+	stage := &models.RunTaskStage{
+		ID:        "stage-1",
+		StageName: models.RunTaskStageNamePrePlan,
+		Status:    models.RunTaskStageCompleted,
+		PolicyChecks: []*models.PolicyCheck{
+			{
+				ID: "check-1", CheckType: models.PolicyKindModuleAttestation, Status: models.PolicyCheckPassed,
+				MessagesSummary: &models.PolicyCheckMessagesSummary{Messages: []string{"attestation verified"}},
+				Policies:        []*models.PolicyCheckPolicy{{EnforcementLevel: models.PolicyEnforcementHardMandatory}},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, jsonapi.MarshalPayload(&buf, tharsisTaskStageToTaskStage(stage)))
+
+	out := new(gotfe.TaskStage)
+	require.NoError(t, jsonapi.UnmarshalPayload(&buf, out))
+	assert.Empty(t, out.PolicyEvaluations, "a module attestation check is not a policy evaluation")
+	require.Len(t, out.TaskResults, 1)
+	assert.Equal(t, gotfe.TaskPassed, out.TaskResults[0].Status)
+	assert.Equal(t, "attestation verified", out.TaskResults[0].Message)
+	assert.Equal(t, "Module Attestation", out.TaskResults[0].TaskName)
+	assert.Equal(t, gotfe.Mandatory, out.TaskResults[0].WorkspaceTaskEnforcementLevel)
 }
 
 // TestTharsisPolicyResultCount tallies per-policy results into the go-tfe result count.

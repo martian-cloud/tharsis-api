@@ -137,12 +137,8 @@ func (n *TaskStageNode) handleCheckQueued() error {
 }
 
 // handleVerdict re-evaluates the aggregate verdict across ALL of the stage's checks whenever any
-// check reaches a terminal or blocking status:
-//   - any errored check fails the stage;
-//   - if all remaining checks are awaiting_override (none still running/queued), the stage is
-//     awaiting_override (human approval needed);
-//   - once every check has cleared (passed or overridden), the stage is completed;
-//   - if any check is still running or queued, no change (stage stays running).
+// check reaches a terminal or blocking status. The stage waits for every check to settle before it
+// projects anything.
 //
 // skipped and canceled checks are settled by the run (a check is only skipped/canceled at run
 // termination, which drives the stage status directly), so they neither block the verdict nor count
@@ -151,28 +147,28 @@ func (n *TaskStageNode) handleCheckQueued() error {
 //
 // The stage's status listeners project each of these onto the run.
 func (n *TaskStageNode) handleVerdict() error {
-	for _, check := range n.policyChecks {
-		if check.Status() == models.PolicyCheckErrored {
-			return n.SetStatus(models.RunTaskStageErrored)
-		}
-	}
-
-	allCleared := true
+	var anyErrored, anySoftFailed bool
 	for _, check := range n.policyChecks {
 		switch check.Status() {
 		case models.PolicyCheckPassed, models.PolicyCheckOverridden:
 			// cleared
+		case models.PolicyCheckErrored:
+			anyErrored = true
 		case models.PolicyCheckSoftFailed:
-			allCleared = false
+			anySoftFailed = true
 		case models.PolicyCheckSkipped, models.PolicyCheckCanceled:
 			// Settled by the run; neither blocks the verdict nor counts as cleared.
 		default:
-			// A check is still running or queued: no verdict yet.
+			// A check has not reached a final state (created, pending, queued or running): no verdict
+			// yet, so the stage waits for it rather than projecting a partial result onto the run.
 			return nil
 		}
 	}
 
-	if !allCleared {
+	switch {
+	case anyErrored:
+		return n.SetStatus(models.RunTaskStageErrored)
+	case anySoftFailed:
 		return n.SetStatus(models.RunTaskStageAwaitingOverride)
 	}
 	return n.SetStatus(models.RunTaskStageCompleted)
@@ -247,10 +243,11 @@ func (n *TaskStageNode) SetStatus(status models.RunTaskStageStatus) error {
 	case models.RunTaskStageCanceled:
 		return n.cancelActiveChecks()
 	case models.RunTaskStageErrored:
-		// One check erroring fails the whole stage (handleVerdict), which leaves this stage's other
-		// checks stranded mid-flight in a multi-check stage. Settle them the same way a cancel does —
-		// active checks canceled, unstarted ones skipped — so no sibling hangs in running/queued after
-		// the stage has already errored. The errored check itself is final and is left untouched.
+		// The stage only errors once every check has settled (handleVerdict), so nothing is left
+		// queued or running here — but a sibling can be sitting at soft_failed, awaiting an override
+		// for a gate the stage has already failed. cancelActiveChecks settles those (a soft_failed
+		// check is canceled, an unstarted one skipped) so no check is left advertising a decision that
+		// can no longer change the outcome. The errored check itself is final and is left untouched.
 		return n.cancelActiveChecks()
 	}
 	return nil

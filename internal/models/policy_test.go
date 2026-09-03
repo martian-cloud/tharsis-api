@@ -133,6 +133,34 @@ func TestPolicy_Validate(t *testing.T) {
 			expectErrorCode: errors.EInvalid,
 		},
 		{
+			// verifyValidName's own length ceiling (64), asserted here so a change to it is
+			// caught through the policy's own Validate rather than only in models_test.go.
+			name:   "name at exactly max length is valid",
+			policy: validOPA(func(p *Policy) { p.Name = strings.Repeat("a", 64) }),
+		},
+		{
+			name:            "name exceeding max length is rejected",
+			policy:          validOPA(func(p *Policy) { p.Name = strings.Repeat("a", 65) }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			// Confirms Name is actually run through verifyValidName's character-set rule, not just
+			// checked for length -- a name with an uppercase letter would have passed the old
+			// non-empty-only check.
+			name:            "name with an invalid character is rejected",
+			policy:          validOPA(func(p *Policy) { p.Name = "My Policy" }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:   "description at exactly max length is valid",
+			policy: validOPA(func(p *Policy) { p.Description = ptr.String(strings.Repeat("a", maxDescriptionLength)) }),
+		},
+		{
+			name:            "description exceeding max length is rejected",
+			policy:          validOPA(func(p *Policy) { p.Description = ptr.String(strings.Repeat("a", maxDescriptionLength+1)) }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
 			name:            "missing kind",
 			policy:          validOPA(func(p *Policy) { p.Kind = "" }),
 			expectErrorCode: errors.EInvalid,
@@ -301,6 +329,24 @@ func TestPolicy_Validate(t *testing.T) {
 			expectErrorCode: errors.EInvalid,
 		},
 		{
+			name:   "package source at exactly max length is valid",
+			policy: validOPA(func(p *Policy) { p.OPAData.PackageSource = strings.Repeat("a", policyPackageSourceMaxLength) }),
+		},
+		{
+			name:            "package source exceeding max length is rejected",
+			policy:          validOPA(func(p *Policy) { p.OPAData.PackageSource = strings.Repeat("a", policyPackageSourceMaxLength+1) }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "version constraint exceeding max length is rejected",
+			policy: validOPA(func(p *Policy) {
+				// Padded with valid constraint syntax so a length check has to be what catches it,
+				// rather than goversion failing to parse an oversized value on its own.
+				p.OPAData.PackageVersionConstraint = ptr.String(">= " + strings.Repeat("1", policyVersionConstraintMaxLength) + ".0.0")
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
 			name:            "invalid stage is rejected",
 			policy:          validOPA(func(p *Policy) { p.OPAData.Stage = RunTaskStageName("bogus") }),
 			expectErrorCode: errors.EInvalid,
@@ -344,6 +390,39 @@ func TestPolicy_Validate(t *testing.T) {
 			name:   "pre_apply with advisory enforcement is accepted",
 			policy: validOPA(func(p *Policy) { p.OPAData.Stage = RunTaskStageNamePreApply }),
 		},
+		{
+			name:            "unsupported kind is rejected",
+			policy:          validOPA(func(p *Policy) { p.Kind = "cel" }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "scope pattern at exactly max length is valid",
+			policy: validOPA(func(p *Policy) {
+				p.Scope = []*ScopeRule{
+					{Type: ScopeRuleTypeWorkspace, Action: ScopeRuleActionInclude, Pattern: strings.Repeat("a", policyScopePatternMaxLength)},
+				}
+			}),
+		},
+		{
+			name: "scope pattern exceeding max length is rejected",
+			policy: validOPA(func(p *Policy) {
+				p.Scope = []*ScopeRule{
+					{Type: ScopeRuleTypeWorkspace, Action: ScopeRuleActionInclude, Pattern: strings.Repeat("a", policyScopePatternMaxLength+1)},
+				}
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			// A later rule's oversized pattern must be caught too, not just the first.
+			name: "an oversized pattern on a later scope rule is rejected",
+			policy: validOPA(func(p *Policy) {
+				p.Scope = []*ScopeRule{
+					{Type: ScopeRuleTypeWorkspace, Action: ScopeRuleActionInclude, Pattern: "acme/*"},
+					{Type: ScopeRuleTypeGroup, Action: ScopeRuleActionExclude, Pattern: strings.Repeat("a", policyScopePatternMaxLength+1)},
+				}
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
 	}
 
 	for _, tt := range tests {
@@ -357,6 +436,211 @@ func TestPolicy_Validate(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// testPublicKeyPEM is a PEM-encoded ECDSA P-256 public key, generated for these tests.
+const testPublicKeyPEM = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEu59Z9BvlQFMCMobNuJI4qWkTV3NA
+JDtumfHKBfqi9VTde0OZeGGRgJfw9qI3Ogea6hXLZMKtsXNpXtDGOgWbiQ==
+-----END PUBLIC KEY-----`
+
+func TestPolicy_Validate_ModuleAttestation(t *testing.T) {
+	validAttestation := func(mutate func(*Policy)) *Policy {
+		p := &Policy{
+			GroupID: "group-1",
+			Name:    "require-provenance",
+			Kind:    PolicyKindModuleAttestation,
+			ModuleAttestationData: &ModuleAttestationPolicyData{
+				PublicKey:                      testPublicKeyPEM,
+				PredicateType:                  ptr.String("https://slsa.dev/provenance/v1"),
+				EnforcementLevel:               PolicyEnforcementHardMandatory,
+				SpeculativeRunEnforcementLevel: PolicyEnforcementHardMandatory,
+				Stage:                          RunTaskStageNamePrePlan,
+			},
+		}
+		if mutate != nil {
+			mutate(p)
+		}
+		return p
+	}
+
+	tests := []struct {
+		name            string
+		policy          *Policy
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:   "valid hard mandatory pre_plan policy",
+			policy: validAttestation(nil),
+		},
+		{
+			name:   "pre_apply stage is accepted",
+			policy: validAttestation(func(p *Policy) { p.ModuleAttestationData.Stage = RunTaskStageNamePreApply }),
+		},
+		{
+			name: "omitted predicate type means any",
+			policy: validAttestation(func(p *Policy) {
+				p.ModuleAttestationData.PredicateType = nil
+			}),
+		},
+		{
+			name:   "verify state lineage is accepted",
+			policy: validAttestation(func(p *Policy) { p.ModuleAttestationData.VerifyStateLineage = true }),
+		},
+		{
+			name: "advisory enforcement is accepted",
+			policy: validAttestation(func(p *Policy) {
+				p.ModuleAttestationData.EnforcementLevel = PolicyEnforcementAdvisory
+				p.ModuleAttestationData.SpeculativeRunEnforcementLevel = PolicyEnforcementAdvisory
+			}),
+		},
+		{
+			// Parity with OPA: soft mandatory participates in gates, so approvers are allowed.
+			name: "soft mandatory with approvers is accepted",
+			policy: validAttestation(func(p *Policy) {
+				p.ModuleAttestationData.EnforcementLevel = PolicyEnforcementSoftMandatory
+				p.ModuleAttestationData.SpeculativeRunEnforcementLevel = PolicyEnforcementAdvisory
+				p.RequiredApprovals = 1
+				p.AllowedUserIDs = []string{"user-1"}
+			}),
+		},
+		{
+			name: "approvers on a non soft mandatory policy are rejected",
+			policy: validAttestation(func(p *Policy) {
+				p.RequiredApprovals = 1
+				p.AllowedUserIDs = []string{"user-1"}
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "more required approvals than possible approvers is rejected",
+			policy: validAttestation(func(p *Policy) {
+				p.ModuleAttestationData.EnforcementLevel = PolicyEnforcementSoftMandatory
+				p.ModuleAttestationData.SpeculativeRunEnforcementLevel = PolicyEnforcementAdvisory
+				p.RequiredApprovals = 3
+				p.AllowedUserIDs = []string{"user-1"}
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "missing attestation data",
+			policy:          validAttestation(func(p *Policy) { p.ModuleAttestationData = nil }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "missing public key",
+			policy:          validAttestation(func(p *Policy) { p.ModuleAttestationData.PublicKey = "" }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "public key exceeding max length is rejected",
+			policy: validAttestation(func(p *Policy) {
+				// Padded past the max with otherwise-valid PEM content so a length check has to be
+				// what catches it, rather than PEM parsing failing on its own.
+				p.ModuleAttestationData.PublicKey = testPublicKeyPEM + strings.Repeat("\n", policyPublicKeyMaxLength)
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "public key that is not PEM",
+			policy:          validAttestation(func(p *Policy) { p.ModuleAttestationData.PublicKey = "not-a-key" }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "PEM armor with a corrupt body",
+			policy: validAttestation(func(p *Policy) {
+				p.ModuleAttestationData.PublicKey = "-----BEGIN PUBLIC KEY-----\nnope\n-----END PUBLIC KEY-----"
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "empty predicate type",
+			policy:          validAttestation(func(p *Policy) { p.ModuleAttestationData.PredicateType = ptr.String("") }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "predicate type at exactly max length is valid",
+			policy: validAttestation(func(p *Policy) {
+				p.ModuleAttestationData.PredicateType = ptr.String(strings.Repeat("a", policyPredicateTypeMaxLength))
+			}),
+		},
+		{
+			name: "predicate type exceeding max length is rejected",
+			policy: validAttestation(func(p *Policy) {
+				p.ModuleAttestationData.PredicateType = ptr.String(strings.Repeat("a", policyPredicateTypeMaxLength+1))
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			// A module is verified before it is used, so these stages could not stop anything.
+			name:            "post_plan stage is rejected",
+			policy:          validAttestation(func(p *Policy) { p.ModuleAttestationData.Stage = RunTaskStageNamePostPlan }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "post_apply stage is rejected",
+			policy:          validAttestation(func(p *Policy) { p.ModuleAttestationData.Stage = RunTaskStageNamePostApply }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "unrecognized stage is rejected",
+			policy:          validAttestation(func(p *Policy) { p.ModuleAttestationData.Stage = "mid_plan" }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "unsupported enforcement level",
+			policy:          validAttestation(func(p *Policy) { p.ModuleAttestationData.EnforcementLevel = "mandatory" }),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			// Soft mandatory cannot be approved past on a run with no apply, same rule as OPA.
+			name: "soft mandatory speculative level is rejected",
+			policy: validAttestation(func(p *Policy) {
+				p.ModuleAttestationData.SpeculativeRunEnforcementLevel = PolicyEnforcementSoftMandatory
+			}),
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.policy.Validate()
+			if tt.expectErrorCode != "" {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestPolicy_KindAccessors verifies the kind-agnostic accessors read from whichever data is set, so
+// callers do not have to switch on kind themselves.
+func TestPolicy_KindAccessors(t *testing.T) {
+	opa := &Policy{Kind: PolicyKindOPA, OPAData: &OPAPolicyData{
+		EnforcementLevel:               PolicyEnforcementSoftMandatory,
+		SpeculativeRunEnforcementLevel: PolicyEnforcementAdvisory,
+		Stage:                          RunTaskStageNamePostPlan,
+	}}
+	assert.Equal(t, PolicyEnforcementSoftMandatory, opa.EnforcementLevel())
+	assert.Equal(t, PolicyEnforcementAdvisory, opa.SpeculativeRunEnforcementLevel())
+	assert.Equal(t, RunTaskStageNamePostPlan, opa.Stage())
+
+	attestation := &Policy{Kind: PolicyKindModuleAttestation, ModuleAttestationData: &ModuleAttestationPolicyData{
+		EnforcementLevel:               PolicyEnforcementHardMandatory,
+		SpeculativeRunEnforcementLevel: PolicyEnforcementHardMandatory,
+		Stage:                          RunTaskStageNamePreApply,
+	}}
+	assert.Equal(t, PolicyEnforcementHardMandatory, attestation.EnforcementLevel())
+	assert.Equal(t, PolicyEnforcementHardMandatory, attestation.SpeculativeRunEnforcementLevel())
+	assert.Equal(t, RunTaskStageNamePreApply, attestation.Stage())
+
+	// No data at all reads as empty rather than panicking, which is what lets Validate report the
+	// missing data itself.
+	empty := &Policy{Kind: PolicyKindOPA}
+	assert.Empty(t, empty.EnforcementLevel())
+	assert.Empty(t, empty.Stage())
 }
 
 func TestPolicy_MatchesRun(t *testing.T) {

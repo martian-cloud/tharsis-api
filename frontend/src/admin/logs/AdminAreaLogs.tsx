@@ -539,11 +539,9 @@ function AdminAreaLogsContent() {
             <Typography variant="h5" gutterBottom>API Logs</Typography>
             <Typography variant="body2" sx={{ marginBottom: 2 }}>{DESCRIPTION}</Typography>
 
-            <Paper sx={{
+            <Paper variant="outlined" sx={{
                 borderBottomLeftRadius: 0,
                 borderBottomRightRadius: 0,
-                border: 1,
-                borderColor: 'divider',
             }}>
                 <Box
                     padding={2}

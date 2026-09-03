@@ -128,6 +128,13 @@ func (p *PolicyEvalHandler) Execute(ctx context.Context) error {
 	if check == nil {
 		return fmt.Errorf("run %s has no OPA policy check node to report policy outcomes for", p.run.Metadata.Id)
 	}
+	// This handler only knows how to evaluate OPA (rego) policy sets. Job creation and the check's
+	// own policies are both grouped by kind before this ever runs, so a mismatch here means the two
+	// have drifted out of sync — fail loudly rather than silently evaluate nothing.
+	if check.CheckType != pb.PolicyCheckType_POLICY_CHECK_TYPE_OPA {
+		return fmt.Errorf("policy check %s is not an OPA policy check (got %s); refusing to evaluate a dropped policy gate",
+			check.Id, check.CheckType)
+	}
 
 	// Policy evaluation only reads variable values/keys for OPA input; it never needs actual
 	// sensitive values.
@@ -320,14 +327,6 @@ func (p *PolicyEvalHandler) downloadPlanJSON(ctx context.Context) (interface{}, 
 // state version this run's apply created. It is keyed off the run, not off the workspace's current
 // state version: those diverge as soon as anything else writes state after the apply (a rollback or a
 // direct state push), and the policy must be evaluated against what this run actually produced.
-//
-// It returns nil, without an error, whenever no representation is available: the run wrote no state at
-// all, or its state version has no JSON rendering stored because it was written by a job executor
-// predating that upload, or by a client that never produces one. The key is then omitted from the input
-// document rather than failing the check, so a mixed-version fleet keeps evaluating policies while
-// runners roll out. The trade-off is real and deliberate: a rule that reads input.tfstate is simply
-// undefined when the representation is missing, so it neither fires nor errors. The absence is logged
-// to the job log so it is diagnosable from the run.
 func (p *PolicyEvalHandler) downloadStateJSON(ctx context.Context) (interface{}, error) {
 	stateVersion, err := p.client.GetRunStateVersion(ctx, p.run.Metadata.Id)
 	if err != nil {
@@ -461,12 +460,20 @@ func policiesFromCheck(check *pb.PolicyCheck) ([]evalPolicy, error) {
 		if err != nil {
 			return nil, err
 		}
+		// An OPA check's policies always carry opa_data; without it there is no package to evaluate,
+		// so fail rather than evaluate an empty package source. This handler only supports the OPA
+		// policy type — name the actual kind found when it is a recognized one, such as module
+		// attestation, rather than leaving the caller to guess why opa_data is missing.
+		opaData := policy.GetOpaData()
+		if opaData == nil {
+			return nil, fmt.Errorf("policy %s has no OPA data", policy.Id)
+		}
 		policies = append(policies, evalPolicy{
 			policyID:          policy.Id,
 			policyPath:        policyTRN.Path(),
-			packageSource:     policy.PackageSource,
-			versionConstraint: policy.PackageVersionConstraint,
-			digest:            policy.GetPackageDigest(),
+			packageSource:     opaData.PackageSource,
+			versionConstraint: opaData.PackageVersionConstraint,
+			digest:            opaData.GetPackageDigest(),
 		})
 	}
 	return policies, nil

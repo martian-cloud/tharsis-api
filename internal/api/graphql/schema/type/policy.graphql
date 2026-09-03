@@ -1,5 +1,6 @@
 enum PolicyKind {
   OPA
+  MODULE_ATTESTATION
 }
 
 enum PolicyStage {
@@ -101,6 +102,35 @@ type OPAPolicyData {
 }
 
 """
+ModuleAttestationPolicyData holds the module-attestation-specific configuration for a policy. The
+module a run deploys must carry an in-toto attestation signed by publicKey; when predicateType is set
+the attestation's predicate type must match it as well.
+"""
+type ModuleAttestationPolicyData {
+  """
+  publicKey is a PEM-encoded public key the attestation's signature must verify against.
+  """
+  publicKey: String!
+  """
+  predicateType, when set, is the in-toto predicate type the attestation must declare. Null means any
+  predicate type satisfies the policy.
+  """
+  predicateType: String
+  """
+  verifyStateLineage additionally requires the workspace's current state to have been written by a run
+  using the same module source, so state cannot be carried over from an unattested module.
+  """
+  verifyStateLineage: Boolean!
+  stage: PolicyStage!
+  enforcementLevel: PolicyEnforcementLevel!
+  """
+  speculativeRunEnforcementLevel is the level this policy is enforced at on a run with no apply — a
+  speculative plan, or an assessment run — in place of enforcementLevel.
+  """
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
+}
+
+"""
 Policy attaches a policy package to an owning group and controls where it evaluates
 via its scope rules. Empty scope = applies to all workspaces under the owning group.
 """
@@ -116,7 +146,11 @@ type Policy implements Node {
   name: String!
   description: String!
   kind: PolicyKind!
+  """
+  Exactly one of opaData and moduleAttestationData is set, matching kind.
+  """
   opaData: OPAPolicyData
+  moduleAttestationData: ModuleAttestationPolicyData
   scope: [PolicyScopeRule!]!
   """
   Approvers may override a soft-mandatory failure of this policy. Only meaningful when
@@ -178,6 +212,31 @@ input OPAPolicyDataInput {
   speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
 }
 
+"""
+ModuleAttestationPolicyDataInput holds the module-attestation-specific fields for create/update
+mutations.
+
+Supplying moduleAttestationData replaces it wholesale, so every field that always has a value must be
+sent. predicateType stays nullable because omitting it is how a caller says "any predicate type".
+
+stage is restricted to PRE_PLAN or PRE_APPLY: the module is verified before it is used, so a check
+after the plan or apply would come too late to stop anything.
+"""
+input ModuleAttestationPolicyDataInput {
+  publicKey: String!
+  predicateType: String
+  verifyStateLineage: Boolean!
+  stage: PolicyStage!
+  enforcementLevel: PolicyEnforcementLevel!
+  """
+  speculativeRunEnforcementLevel replaces enforcementLevel on a run with no apply — a speculative plan,
+  or an assessment run. It is required, and required separately from enforcementLevel, because a
+  failure on a run nobody can apply cannot be approved past: the policy has to say whether it is
+  recorded (ADVISORY) or blocks the run outright (HARD_MANDATORY).
+  """
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
+}
+
 input CreatePolicyInput {
   clientMutationId: String
   kind: PolicyKind!
@@ -185,6 +244,7 @@ input CreatePolicyInput {
   name: String!
   description: String
   opaData: OPAPolicyDataInput
+  moduleAttestationData: ModuleAttestationPolicyDataInput
   scope: [PolicyScopeRuleInput!]
   requiredApprovals: Int
   allowedUsers: [String!]
@@ -202,6 +262,7 @@ input UpdatePolicyInput {
   id: String!
   description: String
   opaData: OPAPolicyDataInput
+  moduleAttestationData: ModuleAttestationPolicyDataInput
   scope: [PolicyScopeRuleInput!]
   requiredApprovals: Int
   allowedUsers: [String!]

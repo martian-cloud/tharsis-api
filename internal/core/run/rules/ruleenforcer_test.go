@@ -743,6 +743,7 @@ func TestEnforceRules(t *testing.T) {
 					ID: runID,
 				},
 				IsDestroy: true,
+				Status:    models.RunApplied,
 			},
 		},
 		{

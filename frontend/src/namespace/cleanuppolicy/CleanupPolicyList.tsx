@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react';
-import { Box, Button, Paper, Typography, useTheme } from '@mui/material';
+import { Box, Button, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
+import { useMemo, useState } from 'react';
 import { useLazyLoadQuery } from 'react-relay/hooks';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import NamespaceBreadcrumbs from '../NamespaceBreadcrumbs';
+import { CleanupPolicyListQuery } from './__generated__/CleanupPolicyListQuery.graphql';
 import CleanupPolicyListItem from './CleanupPolicyListItem';
 import { CLEANUP_POLICY_KINDS } from './rules';
 import { CleanupPolicyKind } from './types';
-import { CleanupPolicyListQuery } from './__generated__/CleanupPolicyListQuery.graphql';
+
+const DESCRIPTION = 'Automatically delete resources you no longer need. Each cleanup policy covers one resource kind and applies here and to every namespace beneath it, until a descendant defines its own policy for that kind.';
 
 const query = graphql`
     query CleanupPolicyListQuery($namespacePath: String!) {
@@ -72,6 +74,8 @@ function CleanupPolicyList({ namespacePath }: Props) {
         [kinds, effectivePolicies],
     );
 
+    const hasPolicies = activeListKinds.length > 0;
+
     return (
         <Box>
             <NamespaceBreadcrumbs
@@ -79,37 +83,35 @@ function CleanupPolicyList({ namespacePath }: Props) {
                 childRoutes={[{ title: 'cleanup policies', path: 'cleanup_policies' }]}
             />
 
-            <Box sx={{
-                display: 'flex',
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                mb: 2,
-                [theme.breakpoints.down('md')]: {
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    '& > *': { marginBottom: 2 },
-                }
-            }}>
-                <Box>
-                    <Typography variant="h5" gutterBottom>Cleanup Policies</Typography>
-                    <Typography variant="body2">
-                        Delete resources you no longer need. A policy covers one kind of resource and applies to this namespace and everything under it, until a namespace sets its own.
-                    </Typography>
-                </Box>
-                {hasCreatableKinds && (
+            {hasPolicies && (
+                <Box sx={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    mb: 2,
+                    [theme.breakpoints.down('md')]: {
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        '& > *': { marginBottom: 2 },
+                    }
+                }}>
                     <Box>
-                        <Button sx={{ minWidth: 220 }} component={RouterLink} variant="outlined" to="new">
-                            New Cleanup Policy
-                        </Button>
+                        <Typography variant="h5" gutterBottom>Cleanup</Typography>
+                        <Typography variant="body2">
+                            {DESCRIPTION}
+                        </Typography>
                     </Box>
-                )}
-            </Box>
+                    {hasCreatableKinds && (
+                        <Box>
+                            <Button sx={{ minWidth: 220 }} component={RouterLink} variant="outlined" to="new">
+                                New Cleanup Policy
+                            </Button>
+                        </Box>
+                    )}
+                </Box>
+            )}
 
-            {activeListKinds.length === 0 ? (
-                <Paper sx={{ p: 3, textAlign: 'center' }}>
-                    <Typography color="textSecondary">No cleanup policies have been configured.</Typography>
-                </Paper>
-            ) : (
+            {hasPolicies ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {activeListKinds.map(k => {
                         const kindDef = CLEANUP_POLICY_KINDS[k];
@@ -127,6 +129,20 @@ function CleanupPolicyList({ namespacePath }: Props) {
                             />
                         );
                     })}
+                </Box>
+            ) : (
+                <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+                    <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+                        <Typography variant="h6">Get started with cleanup policies</Typography>
+                        <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
+                            {DESCRIPTION}
+                        </Typography>
+                        {hasCreatableKinds && (
+                            <Button component={RouterLink} variant="outlined" to="new">
+                                New Cleanup Policy
+                            </Button>
+                        )}
+                    </Box>
                 </Box>
             )}
         </Box>

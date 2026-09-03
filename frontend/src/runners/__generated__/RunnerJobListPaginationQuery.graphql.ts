@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<193efaa8e94a5fb43fed5e16894acf59>>
+ * @generated SignedSource<<82381a06158c86f9ca647251feb7d7e9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -171,6 +171,24 @@ return {
                           {
                             "alias": null,
                             "args": null,
+                            "concreteType": "JobOPAData",
+                            "kind": "LinkedField",
+                            "name": "opaData",
+                            "plural": false,
+                            "selections": [
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "taskStageName",
+                                "storageKey": null
+                              }
+                            ],
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
                             "concreteType": "Run",
                             "kind": "LinkedField",
                             "name": "run",
@@ -333,12 +351,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "3e3da1237da856d6cbab0d460a97f127",
+    "cacheID": "115866f32c1999a4997845e08304b280",
     "id": null,
     "metadata": {},
     "name": "RunnerJobListPaginationQuery",
     "operationKind": "query",
-    "text": "query RunnerJobListPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...RunnerJobListFragment_jobs\n    id\n  }\n}\n\nfragment RunnerJobListFragment_jobs on Runner {\n  type\n  jobs(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...RunnerJobListItemFragment\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n\nfragment RunnerJobListItemFragment on Job {\n  id\n  status\n  type\n  run {\n    id\n  }\n  timestamps {\n    queuedAt\n    pendingAt\n    runningAt\n    finishedAt\n  }\n  workspace {\n    name\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    updatedAt\n  }\n}\n"
+    "text": "query RunnerJobListPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...RunnerJobListFragment_jobs\n    id\n  }\n}\n\nfragment RunnerJobListFragment_jobs on Runner {\n  type\n  jobs(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...RunnerJobListItemFragment\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n\nfragment RunnerJobListItemFragment on Job {\n  id\n  status\n  type\n  opaData {\n    taskStageName\n  }\n  run {\n    id\n  }\n  timestamps {\n    queuedAt\n    pendingAt\n    runningAt\n    finishedAt\n  }\n  workspace {\n    name\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    updatedAt\n  }\n}\n"
   }
 };
 })();

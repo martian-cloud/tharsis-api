@@ -1,4 +1,4 @@
-import { Box, List, Paper, Typography, useTheme } from '@mui/material';
+import { Box, List, Paper, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import ListSkeleton from '../../../skeletons/ListSkeleton';
@@ -22,7 +22,6 @@ interface Props {
 }
 
 function ManagedIdentityAliasesList({ fragmentRef }: Props) {
-    const theme = useTheme();
 
     const { data, loadNext, hasNext } = usePaginationFragment<ManagedIdentityAliasesListPaginationQuery, ManagedIdentityAliasesListFragment_managedIdentity$key>(
         graphql`
@@ -49,7 +48,7 @@ function ManagedIdentityAliasesList({ fragmentRef }: Props) {
 
     return (edges.length > 0) ?
         <Box>
-            <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
+            <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                 <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
                     <Typography variant="subtitle1">
                     {edges.length} alias{edges.length === 1 ? '' : 'es'}</Typography>

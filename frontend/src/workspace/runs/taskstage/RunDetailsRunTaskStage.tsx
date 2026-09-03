@@ -9,7 +9,7 @@ import RunTaskStagePolicyCheckPanel from './RunTaskStagePolicyCheckPanel';
 import RunTaskStagePolicyCheckPolicyCard from './RunTaskStagePolicyCheckPolicyCard';
 import RunTaskStageStatusPanel from './RunTaskStageStatusPanel';
 import { RunDetailsRunTaskStageFragment_taskStage$key } from './__generated__/RunDetailsRunTaskStageFragment_taskStage.graphql';
-import { stageLabel } from './policyCheck';
+import { isPolicyCheckNotStarted, stageLabel } from './policyCheck';
 
 interface Props {
     // Which policy stage this route renders. Supplied by the route rather than read from the URL,
@@ -37,6 +37,8 @@ function RunDetailsRunTaskStage(props: Props) {
                 status
                 ...RunTaskStageStatusPanelFragment_taskStage
                 policyChecks {
+                    checkType
+                    status
                     currentJob {
                         cancelRequested
                         ...NoRunnerAlertFragment_job
@@ -63,7 +65,7 @@ function RunDetailsRunTaskStage(props: Props) {
       `, props.fragmentRef);
 
     const taskStage = data.taskStages.find(s => s.stageName === props.stageName);
-    const check = taskStage?.policyChecks[0];
+    const checks = taskStage?.policyChecks ?? [];
 
     if (!taskStage) {
         // Runs created before the policy feature (or with no attached policies) have no
@@ -78,7 +80,7 @@ function RunDetailsRunTaskStage(props: Props) {
         );
     }
 
-    if (!check) {
+    if (checks.length === 0) {
         // The policy stage exists but has no policy checks to display.
         return (
             <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
@@ -87,12 +89,19 @@ function RunDetailsRunTaskStage(props: Props) {
         );
     }
 
-    const policies = check.policies;
+    // A cancel requested against any sibling check's job is a run-level condition, so it is shown
+    // once above every check rather than repeated per check.
+    const cancelRequested = checks.some(check => check.currentJob?.cancelRequested);
+
+    // Flattened across every sibling check so all their policies render as one combined list below
+    // the panels, rather than a "Policies" section repeated per check. Each policy is paired with
+    // its own check's runGate — the card needs the gate that would actually be blocking it, and a
+    // stage scoped by both an OPA and a module attestation policy has one gate per check.
+    const allPolicies = checks.flatMap(check => check.policies.map(policy => ({ check, policy })));
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {check.currentJob?.cancelRequested && taskStage.status !== 'CANCELED' && <ForceCancelRunAlert fragmentRef={data} />}
-            {check.currentJob && <NoRunnerAlert fragmentRef={check.currentJob} />}
+            {cancelRequested && taskStage.status !== 'CANCELED' && <ForceCancelRunAlert fragmentRef={data} />}
             <RunDetailsStageHeader
                 stage={stageLabel(taskStage.stageName)}
                 triggeredAt={data.metadata.createdAt as string}
@@ -101,20 +110,30 @@ function RunDetailsRunTaskStage(props: Props) {
 
             <RunTaskStageStatusPanel runId={data.id} fragmentRef={taskStage} onError={props.onError} />
 
-            <RunTaskStagePolicyCheckPanel
-                runId={data.id}
-                fragmentRef={check}
-                onError={props.onError}
-            />
+            {/* Every sibling check's panel first — a stage scoped by both an OPA and a module
+                attestation policy shows both, each with its own verdict — then one combined list of
+                every policy across every check below. A check still created/pending has no
+                policy-eval job yet, so its panel has nothing to show; it renders once the check has
+                entered the queue instead of appearing empty. */}
+            {checks.filter(check => !isPolicyCheckNotStarted(check.status)).map(check => (
+                <Box key={check.checkType} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {check.currentJob && <NoRunnerAlert fragmentRef={check.currentJob} />}
+                    <RunTaskStagePolicyCheckPanel
+                        runId={data.id}
+                        fragmentRef={check}
+                        onError={props.onError}
+                    />
+                </Box>
+            ))}
 
             <Box component="section" sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 2 }}>
                 <Typography variant="h6" component="h2" sx={{ fontWeight: 400, m: 0 }}>Policies</Typography>
-                {policies.length === 0 && (
+                {allPolicies.length === 0 && (
                     <Typography variant="body2" color="textSecondary">
                         No policies were evaluated for this run
                     </Typography>
                 )}
-                {policies.map(policy => (
+                {allPolicies.map(({ check, policy }) => (
                     <RunTaskStagePolicyCheckPolicyCard key={policy.id} policyRef={policy} gateRef={check.runGate} />
                 ))}
             </Box>

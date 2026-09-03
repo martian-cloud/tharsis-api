@@ -134,6 +134,32 @@ type PolicyCheck {
 }
 
 """
+PolicyCheckOPAData is the OPA-specific snapshot of a policy a check evaluates.
+"""
+type PolicyCheckOPAData {
+  packageSource: String!
+  """
+  packageVersionConstraint is the policy's package version constraint, snapshotted unresolved. Empty
+  means the latest uploaded version. The concrete version a check evaluated is recorded in that
+  policy check's job log, not here, because each check resolves the constraint when it runs.
+  """
+  packageVersionConstraint: String!
+  """
+  packageDigest, when set, is the hex sha256 the package must match at eval time.
+  """
+  packageDigest: String
+}
+
+"""
+PolicyCheckModuleAttestationData is the module-attestation snapshot of a policy a check evaluates.
+"""
+type PolicyCheckModuleAttestationData {
+  publicKey: String!
+  predicateType: String
+  verifyStateLineage: Boolean!
+}
+
+"""
 PolicyCheckPolicy is one policy a policy check evaluates, together with its result. There
 is one entry per valid policy (no de-duplication); source is the owner whose policy
 contributed it. status is empty until the check has been evaluated.
@@ -147,13 +173,12 @@ type PolicyCheckPolicy {
   """
   name: String!
   description: String!
-  packageSource: String!
   """
-  packageVersionConstraint is the policy's package version constraint, snapshotted unresolved. Empty
-  means the latest uploaded version. The concrete version a check evaluated is recorded in that
-  policy check's job log, not here, because each check resolves the constraint when it runs.
+  Exactly one of opaData and moduleAttestationData is set, determined by the owning check's
+  checkType.
   """
-  packageVersionConstraint: String!
+  opaData: PolicyCheckOPAData
+  moduleAttestationData: PolicyCheckModuleAttestationData
   enforcementLevel: PolicyEnforcementLevel!
   status: String!
   """

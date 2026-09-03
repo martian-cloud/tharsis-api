@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import graphql from 'babel-plugin-relay/macro'
 import { ConnectionHandler, useMutation, usePaginationFragment } from "react-relay/hooks";
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Typography, useTheme } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Typography } from "@mui/material";
 import { parseBase64Json } from '../common/base64';
 import { ResponsiveTable } from '../common/ResponsiveTable';
 import ListSkeleton from '../skeletons/ListSkeleton';
@@ -66,7 +66,6 @@ function DataDialog({ onCloseDataDialog, encodedData }: DataDialogProps) {
 }
 
 function TerraformModuleVersionAttestList({ fragmentRef }: Props) {
-    const theme = useTheme();
     const { enqueueSnackbar } = useSnackbar();
     const [attestToDelete, setAttestToDelete] = useState<string | null>(null);
     const [attestationDataToDisplay, setAttestationDataToDisplay] = useState<string | null>(null);
@@ -135,7 +134,7 @@ function TerraformModuleVersionAttestList({ fragmentRef }: Props) {
 
     return (edges.length > 0) ?
         <Box>
-            <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
+            <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                 <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
                     <Typography variant="subtitle1">
                         {edges.length} attestation{edges.length === 1 ? '' : 's'}

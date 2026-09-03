@@ -50,19 +50,75 @@ func TestTaskStage_AggregateVerdict_AllClearedCompletes(t *testing.T) {
 	assert.Equal(t, models.RunPlanned, run.Status())
 }
 
-// TestTaskStage_AggregateVerdict_OneErroredFailsStage verifies that a single errored check fails the
-// whole stage (and the run), regardless of the other checks' status.
-func TestTaskStage_AggregateVerdict_OneErroredFailsStage(t *testing.T) {
+// TestTaskStage_AggregateVerdict_OneErroredWaitsForSibling verifies that an errored check does not
+// fail the stage while a sibling is still in flight: the stage waits, and only errors once every
+// check has reached a final state.
+func TestTaskStage_AggregateVerdict_OneErroredWaitsForSibling(t *testing.T) {
 	run, stage := newMultiCheckPostPlanRun()
 	drivePlanToFinished(t, run)
 
-	a := stage.PolicyChecks()[0]
+	a, b := stage.PolicyChecks()[0], stage.PolicyChecks()[1]
 	require.NoError(t, a.SetStatus(models.PolicyCheckRunning))
+	require.NoError(t, b.SetStatus(models.PolicyCheckRunning))
+	require.NoError(t, a.SetStatus(models.PolicyCheckErrored))
+
+	// One check errored, the sibling is still running: no verdict yet, so neither the stage nor the
+	// run has settled.
+	assert.Equal(t, models.RunTaskStageRunning, stage.Status())
+	assert.Equal(t, models.RunPostPlanRunning, run.Status())
+	assert.Equal(t, models.PolicyCheckRunning, b.Status())
+
+	require.NoError(t, b.SetStatus(models.PolicyCheckPassed))
+
+	// The sibling settled: the errored check now fails the stage and the run.
+	assert.Equal(t, models.RunTaskStageErrored, stage.Status())
+	assert.Equal(t, models.RunErrored, run.Status())
+	assert.Equal(t, models.ApplySkipped, run.Apply().Status())
+}
+
+// TestTaskStage_AggregateVerdict_ErroredWaitsForQueuedSibling verifies the wait also covers a sibling
+// that has not started evaluating yet (still queued, its policy-eval job awaiting a runner).
+func TestTaskStage_AggregateVerdict_ErroredWaitsForQueuedSibling(t *testing.T) {
+	run, stage := newMultiCheckPostPlanRun()
+	drivePlanToFinished(t, run)
+
+	a, b := stage.PolicyChecks()[0], stage.PolicyChecks()[1]
+	require.Equal(t, models.PolicyCheckQueued, b.Status())
+
+	require.NoError(t, a.SetStatus(models.PolicyCheckRunning))
+	require.NoError(t, a.SetStatus(models.PolicyCheckErrored))
+
+	assert.Equal(t, models.RunTaskStageRunning, stage.Status())
+	assert.Equal(t, models.RunPostPlanRunning, run.Status())
+
+	require.NoError(t, b.SetStatus(models.PolicyCheckRunning))
+	require.NoError(t, b.SetStatus(models.PolicyCheckErrored))
+
+	assert.Equal(t, models.RunTaskStageErrored, stage.Status())
+	assert.Equal(t, models.RunErrored, run.Status())
+}
+
+// TestTaskStage_AggregateVerdict_ErroredBeatsSoftFail verifies the severity order once every check is
+// settled: a hard failure errors the stage even though a sibling soft-failed, and the soft-failed
+// sibling is canceled rather than left awaiting a decision the outcome no longer depends on.
+func TestTaskStage_AggregateVerdict_ErroredBeatsSoftFail(t *testing.T) {
+	run, stage := newMultiCheckPostPlanRun()
+	drivePlanToFinished(t, run)
+
+	a, b := stage.PolicyChecks()[0], stage.PolicyChecks()[1]
+	require.NoError(t, a.SetStatus(models.PolicyCheckRunning))
+	require.NoError(t, b.SetStatus(models.PolicyCheckRunning))
+	require.NoError(t, b.SetStatus(models.PolicyCheckSoftFailed))
+
+	// Only the soft failure so far, with the sibling still running: still no verdict.
+	assert.Equal(t, models.RunTaskStageRunning, stage.Status())
+	assert.Equal(t, models.RunPostPlanRunning, run.Status())
+
 	require.NoError(t, a.SetStatus(models.PolicyCheckErrored))
 
 	assert.Equal(t, models.RunTaskStageErrored, stage.Status())
 	assert.Equal(t, models.RunErrored, run.Status())
-	assert.Equal(t, models.ApplySkipped, run.Apply().Status())
+	assert.Equal(t, models.PolicyCheckCanceled, b.Status())
 }
 
 // TestTaskStage_AggregateVerdict_SoftFailAwaits verifies that with one check passed and another

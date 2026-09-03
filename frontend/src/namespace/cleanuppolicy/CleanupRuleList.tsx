@@ -130,7 +130,7 @@ function CleanupRuleList<R extends CleanupRule>({
                         fullWidth size="small" color="inherit" variant="outlined"
                         startIcon={<AddIcon />}
                         onClick={onRequestAdd}
-                        sx={{ mt: 2, borderStyle: 'dashed', color: 'text.secondary', borderColor: 'divider' }}
+                        sx={{ mt: 2, borderStyle: 'dashed', color: 'secondary.main', borderColor: 'divider' }}
                     >
                         Add rule
                     </Button>

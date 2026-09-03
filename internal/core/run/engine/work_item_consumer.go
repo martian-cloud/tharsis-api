@@ -73,6 +73,14 @@ func NewWorkItemConsumer(logger logger.Logger, dbClient *db.Client, eventManager
 			}
 			return s.handleDiscardStalePlannedRunsForWorkspace(ctx, payload)
 		},
+		db.EvaluateRunPolicyCheckType: func(ctx context.Context, item *db.WorkItem) error {
+			payload, ok := item.ToEvaluateRunPolicyCheckPayload()
+			if !ok {
+				s.logger.Errorf("invalid payload for work item %s", item.ID)
+				return nil
+			}
+			return s.processor.ProcessCommand(ctx, s.factory.NewEvaluateRunPolicyCheck(payload.RunID, payload.PolicyCheckID))
+		},
 	}
 
 	return s

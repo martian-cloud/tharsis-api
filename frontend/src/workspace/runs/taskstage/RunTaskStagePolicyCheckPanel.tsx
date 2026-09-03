@@ -1,6 +1,5 @@
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import CheckIcon from '@mui/icons-material/Check';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LockOpenOutlinedIcon from '@mui/icons-material/LockOpenOutlined';
 import SubjectIcon from '@mui/icons-material/Subject';
@@ -15,6 +14,7 @@ import { useSearchParams } from 'react-router-dom';
 import Pill, { resolvePaletteColor } from '../../../common/Pill';
 import Timestamp from '../../../common/Timestamp';
 import { MutationError } from '../../../common/error';
+import { checkTypeLabel } from '../../../namespace/policies/policyDisplay';
 import JobLogs from '../JobLogs';
 import RunStageStatusTypes from '../RunStageStatusTypes';
 import RunTaskStageOverrideProgressBox from './RunTaskStageOverrideProgressBox';
@@ -26,7 +26,7 @@ import RunTaskStageRetryPolicyCheckButton from './RunTaskStageRetryPolicyCheckBu
 import RunTaskStageRunGateDecisionButtons from './RunTaskStageRunGateDecisionButtons';
 import RunTaskStageSectionLabel from './RunTaskStageSectionLabel';
 import { RunTaskStagePolicyCheckPanelFragment_check$key } from './__generated__/RunTaskStagePolicyCheckPanelFragment_check.graphql';
-import { POLICY_FAILED, POLICY_PASSED, gateProgress, isPolicyCheckFinal } from './policyCheck';
+import { POLICY_FAILED, gateProgress, isPolicyCheckFinal } from './policyCheck';
 
 // Statuses a check can be retried from; the API rejects every other state. A soft-failed check is
 // retryable alongside the two failure states because re-evaluating is the right resolution once the
@@ -84,6 +84,7 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
             policies {
                 id
                 status
+                enforcementLevel
             }
             # The check's preview of what its policies reported, rather than each policy's full
             # messages field — those are read from object storage one policy at a time, and the cards
@@ -173,12 +174,18 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
             : null;
     }, [check.currentJob]);
 
-    const statusType = RunStageStatusTypes[status.toLowerCase()] ?? { label: 'unknown', color: 'runStatus.unknown' };
+    const failed = policies.filter(p => p.status === POLICY_FAILED);
+
+    // A check whose only failures are advisory still reports PASSED — advisory failures never gate
+    // or block anything — but showing a plain "Passed" pill next to the failed-policy count below it
+    // reads as contradictory. Called out in its own warning-toned status instead, distinct from a
+    // clean pass with nothing to flag.
+    const hasAdvisoryFailures = failed.some(p => p.enforcementLevel === 'ADVISORY');
+    const statusType = status === 'PASSED' && hasAdvisoryFailures
+        ? { label: 'Passed with advisories', color: 'runStatus.awaiting_decision' }
+        : RunStageStatusTypes[status.toLowerCase()] ?? { label: 'unknown', color: 'runStatus.unknown' };
     const softFailed = status === 'SOFT_FAILED';
     const retryable = RETRYABLE.includes(status);
-
-    const passed = policies.filter(p => p.status === POLICY_PASSED);
-    const failed = policies.filter(p => p.status === POLICY_FAILED);
 
     const pendingGate = gate?.status === 'PENDING' ? gate : undefined;
 
@@ -204,16 +211,19 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
-                            <Typography variant="h6">
-                                {checkType} policy check
+                            <Typography variant="subtitle1">
+                                {checkTypeLabel(checkType)} Policy Results
                             </Typography>
                             <Pill color={resolvePaletteColor(theme, statusType.color)}>
                                 {statusType.label}
                             </Pill>
                         </Box>
-                        {durationMs && <Typography variant="body2" sx={{ color: theme.palette.text.disabled }}>
+                        {/* The evaluated-count summary doesn't depend on a job existing; the duration
+                            half does, and is simply absent for a check with no job (an in-API check,
+                            or one that hasn't reported yet). */}
+                        {policies.length > 0 && <Typography variant="body2" sx={{ color: theme.palette.text.disabled }}>
                             Evaluated {policies.length} polic{policies.length === 1 ? 'y' : 'ies'}
-                            {!!durationMs && ` · took ${humanizeDuration(durationMs)}`}
+                            {durationMs !== null && ` · took ${humanizeDuration(durationMs)}`}
                         </Typography>}
                     </Box>
                 </Box>
@@ -240,21 +250,13 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
 
             {/* Counts. A verdict of zero says nothing, so each side shows only when it has something
                 to report — and the divider goes too when the check has yet to evaluate anything. */}
-            {(passed.length > 0 || failed.length > 0) && (
+            {(failed.length > 0) && (
                 <Divided gap={0}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flexWrap: 'wrap' }}>
-                        {passed.length > 0 && (
-                            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: theme.typography.body1.fontSize, fontWeight: 600, color: theme.palette.success.main }}>
-                                <CheckCircleOutlineIcon sx={{ width: 16, height: 16 }} />
-                                {passed.length} policy passed
-                            </Box>
-                        )}
-                        {failed.length > 0 && (
-                            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: theme.typography.body1.fontSize, fontWeight: 600, color: theme.palette.error.main }}>
-                                <CancelOutlinedIcon sx={{ width: 16, height: 16 }} />
-                                {failed.length} policy failed
-                            </Box>
-                        )}
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: theme.typography.body2.fontSize, fontWeight: 600, color: theme.palette.error.main }}>
+                            <CancelOutlinedIcon sx={{ width: 16, height: 16 }} />
+                            {failed.length} policy failed
+                        </Box>
                     </Box>
                 </Divided>
             )}
@@ -366,99 +368,97 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
                 </Divided>
             )}
 
-            {/* Job logs disclosure */}
-            <Box sx={{ mt: 2, pt: 1.75, borderTop: `1px solid ${theme.palette.divider}` }}>
-                {currentJobId ? (
-                    <>
-                        {/* The toggle label and the chevron are separate controls so the actions
-                            between them are not nested inside a button. */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Box
-                                component="button"
-                                onClick={() => setLogsOpen(open => !open)}
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 0.75,
-                                    background: 'none',
-                                    border: 'none',
-                                    padding: 0,
-                                    cursor: 'pointer',
-                                    fontSize: theme.typography.body2.fontSize,
-                                    fontFamily: 'inherit',
-                                    color: theme.palette.primary.main,
-                                    '&:hover': { textDecoration: 'underline' },
-                                }}
-                            >
-                                <SubjectIcon sx={{ width: 15, height: 15 }} />
-                                {logsOpen ? 'Hide job logs' : 'View job logs'}
-                            </Box>
-                            <Box sx={{ flex: 1 }} />
-                            {/* Actions that only make sense against logs on screen: picking an
-                                earlier job to read, and re-evaluating a check whose logs say why it
-                                needs re-evaluating. Retry is deliberately kept out of the header
-                                actions at the top of the panel, which decide the check as it stands
-                                (approve, reject, override) — a retry throws that evaluation away. */}
-                            {logsOpen && (
+            {/* Job logs disclosure. A check with no job — one that evaluates in-API rather than on a
+                runner (e.g. module attestation), or one that simply hasn't reported yet — has no
+                logs, no previous-jobs history, and no duration to show. It also has nothing to
+                retry: retry re-runs the job, and a check with no job has none to re-run. So the
+                whole disclosure, retry included, is omitted rather than rendered empty. */}
+            {currentJobId && (
+                <Box sx={{ mt: 2, pt: 1.75, borderTop: `1px solid ${theme.palette.divider}` }}>
+                    {/* The toggle label and the chevron are separate controls so the actions
+                        between them are not nested inside a button. */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box
+                            component="button"
+                            onClick={() => setLogsOpen(open => !open)}
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.75,
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                fontSize: theme.typography.body2.fontSize,
+                                fontFamily: 'inherit',
+                                color: theme.palette.secondary.main,
+                                '&:hover': { textDecoration: 'underline' },
+                            }}
+                        >
+                            <SubjectIcon sx={{ width: 15, height: 15 }} />
+                            {logsOpen ? 'Hide job logs' : 'View job logs'}
+                        </Box>
+                        <Box sx={{ flex: 1 }} />
+                        {/* Actions that only make sense against logs on screen: picking an
+                            earlier job to read, and re-evaluating a check whose logs say why it
+                            needs re-evaluating. Retry is deliberately kept out of the header
+                            actions at the top of the panel, which decide the check as it stands
+                            (approve, reject, override) — a retry throws that evaluation away. */}
+                        {logsOpen && (
+                            <>
+                                <RunTaskStagePolicyCheckPreviousJobsMenu
+                                    runId={runId}
+                                    nodePath={nodePath}
+                                    currentJobId={currentJobId}
+                                    previousJobCount={previousJobCount}
+                                    selectedJobId={pinnedJobId}
+                                    onSelectJob={setPinnedJob}
+                                />
+                                {retryable && (
+                                    <RunTaskStageRetryPolicyCheckButton runId={runId} nodePath={nodePath} onError={onError} />
+                                )}
+                            </>
+                        )}
+                        <IconButton
+                            size="small"
+                            aria-label={logsOpen ? 'Collapse job logs' : 'Expand job logs'}
+                            onClick={() => setLogsOpen(open => !open)}
+                        >
+                            <ExpandMoreIcon
+                                sx={{ width: 18, height: 18, transform: logsOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }}
+                            />
+                        </IconButton>
+                    </Box>
+                    {/* Mounted only once opened so the logs query isn't fired on page load. */}
+                    <Collapse in={logsOpen} unmountOnExit>
+                        <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            {logsOpen && effectiveJobId && (
                                 <>
-                                    <RunTaskStagePolicyCheckPreviousJobsMenu
-                                        runId={runId}
-                                        nodePath={nodePath}
-                                        currentJobId={currentJobId}
-                                        previousJobCount={previousJobCount}
-                                        selectedJobId={pinnedJobId}
-                                        onSelectJob={setPinnedJob}
-                                    />
-                                    {retryable && (
-                                        <RunTaskStageRetryPolicyCheckButton runId={runId} nodePath={nodePath} onError={onError} />
-                                    )}
+                                    {viewingEarlierJob && <Alert severity="warning">
+                                        Showing logs for an earlier job{' '}
+                                        <MuiLink
+                                            component="button"
+                                            color="inherit"
+                                            underline="always"
+                                            onClick={() => setPinnedJob(undefined)}
+                                            sx={{ fontFamily: 'inherit', fontSize: 'inherit', verticalAlign: 'baseline' }}
+                                        >
+                                            (view latest job)
+                                        </MuiLink>
+                                    </Alert>}
+                                    <Suspense fallback={
+                                        <Box sx={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <CircularProgress />
+                                        </Box>
+                                    }>
+                                        <JobLogs jobId={effectiveJobId} scrollMode="container" height={LOGS_HEIGHT} />
+                                    </Suspense>
                                 </>
                             )}
-                            <IconButton
-                                size="small"
-                                aria-label={logsOpen ? 'Collapse job logs' : 'Expand job logs'}
-                                onClick={() => setLogsOpen(open => !open)}
-                            >
-                                <ExpandMoreIcon
-                                    sx={{ width: 18, height: 18, transform: logsOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }}
-                                />
-                            </IconButton>
                         </Box>
-                        {/* Mounted only once opened so the logs query isn't fired on page load. */}
-                        <Collapse in={logsOpen} unmountOnExit>
-                            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                {logsOpen && effectiveJobId && (
-                                    <>
-                                        {viewingEarlierJob && <Alert severity="warning">
-                                            Showing logs for an earlier job{' '}
-                                            <MuiLink
-                                                component="button"
-                                                color="inherit"
-                                                underline="always"
-                                                onClick={() => setPinnedJob(undefined)}
-                                                sx={{ fontFamily: 'inherit', fontSize: 'inherit', verticalAlign: 'baseline' }}
-                                            >
-                                                (view latest job)
-                                            </MuiLink>
-                                        </Alert>}
-                                        <Suspense fallback={
-                                            <Box sx={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <CircularProgress />
-                                            </Box>
-                                        }>
-                                            <JobLogs jobId={effectiveJobId} scrollMode="container" height={LOGS_HEIGHT} />
-                                        </Suspense>
-                                    </>
-                                )}
-                            </Box>
-                        </Collapse>
-                    </>
-                ) : (
-                    <Typography variant="body2" sx={{ color: theme.palette.text.disabled }}>
-                        No job has run for the policy stage yet
-                    </Typography>
-                )}
-            </Box>
+                    </Collapse>
+                </Box>
+            )}
         </Paper>
     );
 }

@@ -116,7 +116,7 @@ function TerraformProviderSearch(props: Props) {
             onKeyPress={onKeyPress}
           />
         </Box>
-        <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
+        <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
           <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
             <Typography variant="subtitle1">
               {data.terraformProviders.totalCount} provider{data.terraformProviders.totalCount === 1 ? '' : 's'}

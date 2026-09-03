@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<826d24ba7df02e8624b4b169917fec92>>
+ * @generated SignedSource<<f898a95309988b81102a084056a52fb7>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,7 @@
 
 import { ReaderFragment } from 'relay-runtime';
 export type ActivityEventAction = "ADD" | "ADD_MEMBER" | "APPLY" | "CANCEL" | "CREATE" | "CREATE_MEMBERSHIP" | "DELETE" | "DELETE_CHILD_RESOURCE" | "LOCK" | "MIGRATE" | "REMOVE" | "REMOVE_MEMBER" | "REMOVE_MEMBERSHIP" | "SET_VARIABLES" | "UNLOCK" | "UPDATE" | "UPDATE_MEMBER" | "%future added value";
-export type JobType = "apply" | "plan" | "%future added value";
+export type JobType = "apply" | "opa" | "plan" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type ActivityEventManagedIdentityAccessRuleTargetFragment_event$data = {
   readonly action: ActivityEventAction;

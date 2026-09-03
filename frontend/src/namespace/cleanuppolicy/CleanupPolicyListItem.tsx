@@ -2,6 +2,7 @@ import { Box, Button, Chip, Collapse, IconButton, Link, Paper, Stack, Tooltip, T
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import graphql from 'babel-plugin-relay/macro';
+import { darken, useTheme } from '@mui/material/styles';
 import { useFragment } from 'react-relay/hooks';
 import { Link as RouterLink } from 'react-router-dom';
 import Timestamp from '../../common/Timestamp';
@@ -74,6 +75,7 @@ function CleanupPolicyListItem({
     expanded,
     onToggle,
 }: Props) {
+    const theme = useTheme();
     const policy = useFragment(policyFragment, policyRef);
     const kind = policy.kind as CleanupPolicyKind;
     const kindDef = CLEANUP_POLICY_KINDS[kind];
@@ -84,7 +86,7 @@ function CleanupPolicyListItem({
     const lastSweepCompletedAt = policy.lastSweepCompletedAt ?? undefined;
 
     return (
-        <Box sx={{ border: 1, borderRadius: 1, borderColor: 'divider' }}>
+        <Paper>
             <Box
                 sx={{
                     display: 'flex', flexDirection: { xs: 'column', sm: 'row' },
@@ -99,12 +101,10 @@ function CleanupPolicyListItem({
                         {disabled && (
                             <Chip size="small" color="warning" label="Disabled" />
                         )}
-                        {rules.length > 0 && (
+                        {rules.length > 0 && !!lastSweepCompletedAt && (
                             <Chip
                                 size="small" variant="outlined"
-                                label={lastSweepCompletedAt
-                                    ? <>Last swept <Timestamp timestamp={lastSweepCompletedAt} format="relative" /></>
-                                    : 'Last swept never'}
+                                label={<>Last swept <Timestamp timestamp={lastSweepCompletedAt} format="relative" /></>}
                             />
                         )}
                     </Stack>
@@ -129,6 +129,7 @@ function CleanupPolicyListItem({
                         {inheritedFrom ? (
                             <Tooltip title="Create a policy that takes precedence over the inherited one">
                                 <Button
+                                    color="secondary"
                                     size="small" variant="outlined"
                                     component={RouterLink}
                                     to={`new?kind=${kind.toLowerCase()}`}
@@ -139,6 +140,7 @@ function CleanupPolicyListItem({
                         ) : (
                             <Tooltip title="Edit the cleanup policy">
                                 <Button
+                                    color="secondary"
                                     size="small" variant="outlined"
                                     component={RouterLink}
                                     to={`${kind.toLowerCase()}/edit`}
@@ -159,8 +161,8 @@ function CleanupPolicyListItem({
             <Collapse in={expanded}>
                 <Box sx={{ px: 2, pb: 2 }}>
                     {rules.length === 0 ? (
-                        <Paper sx={{ p: 2 }}>
-                            <Typography>No cleanup rules are configured.</Typography>
+                        <Paper elevation={1} sx={{ p: 2, background: darken(theme.palette.background.paper, 0.10) }}>
+                            <Typography>No cleanup rules are configured for this policy</Typography>
                         </Paper>
                     ) : (
                         // onChange is omitted — CleanupRuleList treats absent onChange as read-only.
@@ -185,7 +187,7 @@ function CleanupPolicyListItem({
                     )}
                 </Box>
             </Collapse >
-        </Box >
+        </Paper>
     );
 }
 

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<1710f6d26173e23ea04873c055e3b38f>>
+ * @generated SignedSource<<8aca5cfab3c9eb76c5ac87cf83b6c62a>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,6 +10,7 @@
 
 import { ReaderFragment } from 'relay-runtime';
 export type PolicyCheckStatus = "CANCELED" | "CREATED" | "ERRORED" | "OVERRIDDEN" | "PASSED" | "PENDING" | "QUEUED" | "RUNNING" | "SKIPPED" | "SOFT_FAILED" | "%future added value";
+export type PolicyEnforcementLevel = "ADVISORY" | "HARD_MANDATORY" | "SOFT_MANDATORY" | "%future added value";
 export type RunGateDecision = "APPROVE" | "REJECT" | "%future added value";
 export type RunGateStatus = "APPROVED" | "CANCELED" | "OVERRIDDEN" | "PENDING" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
@@ -31,6 +32,7 @@ export type RunTaskStagePolicyCheckPanelFragment_check$data = {
   };
   readonly nodePath: string;
   readonly policies: ReadonlyArray<{
+    readonly enforcementLevel: PolicyEnforcementLevel;
     readonly id: string;
     readonly status: string;
   }>;
@@ -188,7 +190,14 @@ return {
       "plural": true,
       "selections": [
         (v1/*: any*/),
-        (v0/*: any*/)
+        (v0/*: any*/),
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "enforcementLevel",
+          "storageKey": null
+        }
       ],
       "storageKey": null
     },
@@ -391,6 +400,6 @@ return {
 };
 })();
 
-(node as any).hash = "27e2a7e0242a7c4760ed2733214c73d4";
+(node as any).hash = "9b0e25b37219b74402399f89d6b9003c";
 
 export default node;

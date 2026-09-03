@@ -55,6 +55,8 @@ type RunGateType string
 const (
 	// RunGateTypeOPAPolicy is a gate governing an OPA policy check.
 	RunGateTypeOPAPolicy RunGateType = "opa_policy"
+	// RunGateTypeModuleAttestation is a gate governing a module attestation policy check.
+	RunGateTypeModuleAttestation RunGateType = "module_attestation"
 )
 
 // RunGateApprovalRule is the durable approval requirement for a single policy that soft-failed on
@@ -148,7 +150,7 @@ func (g *RunGate) ResolveMetadata(key string) (*string, error) {
 // must name the subject that overrode it; a gate cleared any other way leaves both nil).
 func (g *RunGate) Validate() error {
 	switch g.Type {
-	case RunGateTypeOPAPolicy:
+	case RunGateTypeOPAPolicy, RunGateTypeModuleAttestation:
 	default:
 		return errors.New("run gate type %s is not supported", g.Type, errors.WithErrorCode(errors.EInvalid))
 	}

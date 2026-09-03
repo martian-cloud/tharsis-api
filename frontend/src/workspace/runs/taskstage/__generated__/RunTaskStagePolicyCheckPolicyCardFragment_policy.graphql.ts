@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<10cbf07dac9c331fb0bc06bd0a02ed85>>
+ * @generated SignedSource<<dd300b97d38959776c450b1d554aedd9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,9 +16,16 @@ export type RunTaskStagePolicyCheckPolicyCardFragment_policy$data = {
   readonly enforcementLevel: PolicyEnforcementLevel;
   readonly id: string;
   readonly messages: ReadonlyArray<string>;
+  readonly moduleAttestationData: {
+    readonly predicateType: string | null | undefined;
+    readonly publicKey: string;
+    readonly verifyStateLineage: boolean;
+  } | null | undefined;
   readonly name: string;
-  readonly packageSource: string;
-  readonly packageVersionConstraint: string;
+  readonly opaData: {
+    readonly packageSource: string;
+    readonly packageVersionConstraint: string;
+  } | null | undefined;
   readonly policy: {
     readonly groupPath: string;
     readonly id: string;
@@ -66,15 +73,58 @@ return {
     {
       "alias": null,
       "args": null,
-      "kind": "ScalarField",
-      "name": "packageSource",
+      "concreteType": "PolicyCheckOPAData",
+      "kind": "LinkedField",
+      "name": "opaData",
+      "plural": false,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "packageSource",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "packageVersionConstraint",
+          "storageKey": null
+        }
+      ],
       "storageKey": null
     },
     {
       "alias": null,
       "args": null,
-      "kind": "ScalarField",
-      "name": "packageVersionConstraint",
+      "concreteType": "PolicyCheckModuleAttestationData",
+      "kind": "LinkedField",
+      "name": "moduleAttestationData",
+      "plural": false,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "publicKey",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "predicateType",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "verifyStateLineage",
+          "storageKey": null
+        }
+      ],
       "storageKey": null
     },
     {
@@ -141,6 +191,6 @@ return {
 };
 })();
 
-(node as any).hash = "de644c0e5ababd7b3d60e35a006a31ce";
+(node as any).hash = "41e25af0eed7af33093a0d775040c2c8";
 
 export default node;

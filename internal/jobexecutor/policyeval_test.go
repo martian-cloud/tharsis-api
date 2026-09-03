@@ -143,11 +143,10 @@ deny contains msg if {
 
 	handler := newTestHandler(client, []*pb.PolicyCheckPolicy{
 		{
-			Id:                       "pol-1",
-			PackageSource:            "security",
-			PackageVersionConstraint: ">= 1.0.0",
-			EnforcementLevel:         pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY,
-			Provenance:               &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
+			Id:               "pol-1",
+			OpaData:          &pb.OPAPolicyCheckData{PackageSource: "security", PackageVersionConstraint: ">= 1.0.0"},
+			EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY,
+			Provenance:       &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
 		},
 	})
 	require.NoError(t, handler.Execute(ctx))
@@ -196,11 +195,10 @@ deny contains msg if {
 
 	handler := newTestHandler(client, []*pb.PolicyCheckPolicy{
 		{
-			Id:                       "pol-1",
-			PackageSource:            "security",
-			PackageVersionConstraint: ">= 1.0.0",
-			EnforcementLevel:         pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY,
-			Provenance:               &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
+			Id:               "pol-1",
+			OpaData:          &pb.OPAPolicyCheckData{PackageSource: "security", PackageVersionConstraint: ">= 1.0.0"},
+			EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY,
+			Provenance:       &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
 		},
 	})
 	require.NoError(t, handler.Execute(ctx))
@@ -244,11 +242,10 @@ deny contains msg if {
 
 	handler := newTestHandler(client, []*pb.PolicyCheckPolicy{
 		{
-			Id:                       "pol-1",
-			PackageSource:            "security",
-			PackageVersionConstraint: ">= 1.0.0",
-			EnforcementLevel:         pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY,
-			Provenance:               &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
+			Id:               "pol-1",
+			OpaData:          &pb.OPAPolicyCheckData{PackageSource: "security", PackageVersionConstraint: ">= 1.0.0"},
+			EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY,
+			Provenance:       &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
 		},
 	})
 
@@ -288,7 +285,7 @@ deny contains msg if {
 	}).Return(nil)
 
 	handler := newTestHandler(client, []*pb.PolicyCheckPolicy{
-		{Id: "pol-1", PackageSource: "security", PackageVersionConstraint: ">= 1.0.0", EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_ADVISORY, Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"}},
+		{Id: "pol-1", OpaData: &pb.OPAPolicyCheckData{PackageSource: "security", PackageVersionConstraint: ">= 1.0.0"}, EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_ADVISORY, Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"}},
 	})
 	require.NoError(t, handler.Execute(ctx))
 
@@ -319,7 +316,7 @@ func TestPolicyEvalHandler_Execute_UnresolvableConstraintFails(t *testing.T) {
 	}).Return(nil)
 
 	handler := newTestHandler(client, []*pb.PolicyCheckPolicy{
-		{Id: "pol-1", PackageSource: "gone", PackageVersionConstraint: ">= 2.0.0", EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY, Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/gone"}},
+		{Id: "pol-1", OpaData: &pb.OPAPolicyCheckData{PackageSource: "gone", PackageVersionConstraint: ">= 2.0.0"}, EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY, Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/gone"}},
 	})
 	require.NoError(t, handler.Execute(ctx))
 
@@ -356,7 +353,7 @@ func TestPolicyEvalHandler_Execute_DeletedPolicyFails(t *testing.T) {
 
 	// An empty constraint means latest, which the mock resolves to 2.0.0.
 	handler := newTestHandler(client, []*pb.PolicyCheckPolicy{
-		{Id: "pol-1", PackageSource: "gone", EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY, Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/gone"}},
+		{Id: "pol-1", OpaData: &pb.OPAPolicyCheckData{PackageSource: "gone"}, EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY, Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/gone"}},
 	})
 	require.NoError(t, handler.Execute(ctx))
 
@@ -393,7 +390,7 @@ func TestPolicyEvalHandler_Execute_DigestMatch(t *testing.T) {
 
 	digestStr := hex.EncodeToString(sum[:])
 	handler := newTestHandler(client, []*pb.PolicyCheckPolicy{
-		{Id: "pol-1", PackageSource: "security", PackageVersionConstraint: ">= 1.0.0", EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY, PackageDigest: &digestStr, Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"}},
+		{Id: "pol-1", OpaData: &pb.OPAPolicyCheckData{PackageSource: "security", PackageVersionConstraint: ">= 1.0.0", PackageDigest: &digestStr}, EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY, Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"}},
 	})
 	require.NoError(t, handler.Execute(ctx))
 
@@ -428,7 +425,7 @@ func TestPolicyEvalHandler_Execute_DigestMismatch(t *testing.T) {
 	staleDigest := hex.EncodeToString(make([]byte, 32))
 
 	handler := newTestHandler(client, []*pb.PolicyCheckPolicy{
-		{Id: "pol-1", PackageSource: "security", PackageVersionConstraint: ">= 1.0.0", EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_SOFT_MANDATORY, PackageDigest: &staleDigest, Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"}},
+		{Id: "pol-1", OpaData: &pb.OPAPolicyCheckData{PackageSource: "security", PackageVersionConstraint: ">= 1.0.0", PackageDigest: &staleDigest}, EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_SOFT_MANDATORY, Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"}},
 	})
 	require.NoError(t, handler.Execute(ctx))
 
@@ -445,16 +442,18 @@ func TestPoliciesFromCheck(t *testing.T) {
 	check := &pb.PolicyCheck{
 		Policies: []*pb.PolicyCheckPolicy{
 			{
-				Id:                       "pol-1",
-				PackageSource:            "security",
-				PackageVersionConstraint: "~> 1.0",
-				PackageDigest:            &digest1,
-				Provenance:               &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/require-tags"},
+				Id: "pol-1",
+				OpaData: &pb.OPAPolicyCheckData{
+					PackageSource:            "security",
+					PackageVersionConstraint: "~> 1.0",
+					PackageDigest:            &digest1,
+				},
+				Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/require-tags"},
 			},
 			{
-				Id:            "pol-2",
-				PackageSource: "cost",
-				Provenance:    &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/budget"},
+				Id:         "pol-2",
+				OpaData:    &pb.OPAPolicyCheckData{PackageSource: "cost"},
+				Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/budget"},
 			},
 		},
 	}
@@ -471,6 +470,24 @@ func TestPoliciesFromCheck(t *testing.T) {
 	assert.Equal(t, "pol-2", policies[1].policyID)
 	assert.Equal(t, "group/budget", policies[1].policyPath)
 	assert.Empty(t, policies[1].versionConstraint) // empty constraint means latest
+}
+
+// TestPoliciesFromCheck_MissingOPAData verifies a policy with no OPA data is rejected rather than
+// evaluated against an empty package source. An OPA job is only ever given OPA-kind policies, so this
+// is a data-integrity failure.
+func TestPoliciesFromCheck_MissingOPAData(t *testing.T) {
+	check := &pb.PolicyCheck{
+		Policies: []*pb.PolicyCheckPolicy{
+			{
+				Id:         "pol-1",
+				Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/require-tags"},
+			},
+		},
+	}
+
+	_, err := policiesFromCheck(check)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no OPA data")
 }
 
 // TestExtractPolicyBundle_ComputesShaSum verifies extractPolicyBundle records the SHA-256 of the raw
@@ -611,11 +628,10 @@ deny contains msg if {
 					StageName: pb.RunTaskStageName_RUN_TASK_STAGE_NAME_PRE_PLAN,
 					Status:    pb.PolicyCheckStatus_POLICY_CHECK_STATUS_RUNNING,
 					Policies: []*pb.PolicyCheckPolicy{{
-						Id:                       "pol-1",
-						PackageSource:            "security",
-						PackageVersionConstraint: ">= 1.0.0",
-						EnforcementLevel:         pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY,
-						Provenance:               &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
+						Id:               "pol-1",
+						OpaData:          &pb.OPAPolicyCheckData{PackageSource: "security", PackageVersionConstraint: ">= 1.0.0"},
+						EnforcementLevel: pb.PolicyEnforcementLevel_POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY,
+						Provenance:       &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
 					}},
 				}},
 			}},
@@ -692,9 +708,9 @@ deny contains msg if {
 		cancellableCtx: context.Background(),
 		run: newApplyPhaseCheckRun(pb.RunTaskStageName_RUN_TASK_STAGE_NAME_PRE_APPLY, []*pb.PolicyCheckPolicy{
 			{
-				Id:            "pol-1",
-				PackageSource: "security",
-				Provenance:    &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
+				Id:         "pol-1",
+				OpaData:    &pb.OPAPolicyCheckData{PackageSource: "security"},
+				Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
 			},
 		}),
 		workspace: &pb.Workspace{Metadata: &pb.ResourceMetadata{Id: "ws-1"}, FullPath: "group/ws"},
@@ -752,9 +768,9 @@ deny contains msg if {
 		cancellableCtx: context.Background(),
 		run: newApplyPhaseCheckRun(pb.RunTaskStageName_RUN_TASK_STAGE_NAME_POST_APPLY, []*pb.PolicyCheckPolicy{
 			{
-				Id:            "pol-1",
-				PackageSource: "security",
-				Provenance:    &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
+				Id:         "pol-1",
+				OpaData:    &pb.OPAPolicyCheckData{PackageSource: "security"},
+				Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
 			},
 		}),
 		workspace: &pb.Workspace{
@@ -800,9 +816,9 @@ func TestPolicyEvalHandler_Execute_PostApplyWithoutStateVersionOmitsTFState(t *t
 		cancellableCtx: context.Background(),
 		run: newApplyPhaseCheckRun(pb.RunTaskStageName_RUN_TASK_STAGE_NAME_POST_APPLY, []*pb.PolicyCheckPolicy{
 			{
-				Id:            "pol-1",
-				PackageSource: "security",
-				Provenance:    &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
+				Id:         "pol-1",
+				OpaData:    &pb.OPAPolicyCheckData{PackageSource: "security"},
+				Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
 			},
 		}),
 		workspace: &pb.Workspace{
@@ -843,9 +859,9 @@ func TestPolicyEvalHandler_Execute_PostApplyStateVersionLookupErrorFails(t *test
 		cancellableCtx: context.Background(),
 		run: newApplyPhaseCheckRun(pb.RunTaskStageName_RUN_TASK_STAGE_NAME_POST_APPLY, []*pb.PolicyCheckPolicy{
 			{
-				Id:            "pol-1",
-				PackageSource: "security",
-				Provenance:    &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
+				Id:         "pol-1",
+				OpaData:    &pb.OPAPolicyCheckData{PackageSource: "security"},
+				Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
 			},
 		}),
 		workspace: &pb.Workspace{Metadata: &pb.ResourceMetadata{Id: "ws-1"}, FullPath: "group/ws"},
@@ -886,9 +902,9 @@ func TestPolicyEvalHandler_Execute_PostApplyStateVersionJSONNotFoundOmitsTFState
 		cancellableCtx: context.Background(),
 		run: newApplyPhaseCheckRun(pb.RunTaskStageName_RUN_TASK_STAGE_NAME_POST_APPLY, []*pb.PolicyCheckPolicy{
 			{
-				Id:            "pol-1",
-				PackageSource: "security",
-				Provenance:    &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
+				Id:         "pol-1",
+				OpaData:    &pb.OPAPolicyCheckData{PackageSource: "security"},
+				Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
 			},
 		}),
 		workspace: &pb.Workspace{
@@ -932,9 +948,9 @@ func TestPolicyEvalHandler_Execute_PostApplyStateVersionJSONErrorFails(t *testin
 		cancellableCtx: context.Background(),
 		run: newApplyPhaseCheckRun(pb.RunTaskStageName_RUN_TASK_STAGE_NAME_POST_APPLY, []*pb.PolicyCheckPolicy{
 			{
-				Id:            "pol-1",
-				PackageSource: "security",
-				Provenance:    &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
+				Id:         "pol-1",
+				OpaData:    &pb.OPAPolicyCheckData{PackageSource: "security"},
+				Provenance: &pb.PolicyCheckPolicyProvenance{PolicyTrn: "trn:policy:group/security"},
 			},
 		}),
 		workspace: &pb.Workspace{

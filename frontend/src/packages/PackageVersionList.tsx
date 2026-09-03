@@ -1,5 +1,5 @@
 import NoResults from '@/common/NoResults';
-import { Box, List, Paper, Typography, useTheme } from '@mui/material';
+import { Box, List, Paper, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { usePaginationFragment } from "react-relay/hooks";
@@ -17,7 +17,6 @@ interface Props {
 // list is read-only and the same on the group and registry pages.
 function PackageVersionList(props: Props) {
     const { onSelectVersion } = props;
-    const theme = useTheme();
 
     const { data, loadNext, hasNext } = usePaginationFragment<PackageVersionListPaginationQuery, PackageVersionListFragment_package$key>(
         graphql`
@@ -49,7 +48,7 @@ function PackageVersionList(props: Props) {
 
     return (
         <Box>
-            <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
+            <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                 <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
                     <Typography variant="subtitle1">
                         {edges.length} version{edges.length === 1 ? '' : 's'}

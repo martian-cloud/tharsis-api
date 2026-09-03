@@ -25,6 +25,7 @@ enum RunnerAvailabilityStatus {
 enum JobType {
   plan
   apply
+  opa
 }
 
 type JobConnection {
@@ -57,11 +58,18 @@ type ClaimJobPayload {
   token: String
 }
 
+type JobOPAData {
+  # The run stage this job's policy check evaluates at (e.g. PRE_PLAN, POST_PLAN).
+  taskStageName: RunTaskStageName
+}
+
 type Job implements Node {
   id: ID!
   metadata: ResourceMetadata!
   status: JobStatus!
   type: JobType!
+  # OPA-specific data, or null for a plan/apply job, which has no owning policy check.
+  opaData: JobOPAData
   run: Run!
   workspace: Workspace!
   timestamps: JobTimestamps!

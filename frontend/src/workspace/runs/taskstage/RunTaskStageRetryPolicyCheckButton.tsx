@@ -55,6 +55,7 @@ function RunTaskStageRetryPolicyCheckButton({ runId, nodePath, onError }: Props)
 
     return (
         <LoadingButton
+            color="secondary"
             loading={commitRetryRunNodeInFlight}
             size="small"
             variant="outlined"

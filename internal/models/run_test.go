@@ -203,6 +203,53 @@ func TestPolicyCheck_MessagesSummary_CopyAndCompare(t *testing.T) {
 	assert.False(t, orig.ShallowCompare(empty))
 }
 
+// TestPolicyCheckPolicy_KindData_CopyAndCompare covers the kind-specific snapshots: a copy must not
+// share their pointers, and ShallowCompare must see a change inside one — otherwise a policy whose
+// package or public key changed would not be written back.
+func TestPolicyCheckPolicy_KindData_CopyAndCompare(t *testing.T) {
+	predicateType := "https://slsa.dev/provenance/v1"
+	orig := &PolicyCheck{
+		ID:        "check-1",
+		StageName: RunTaskStageNamePrePlan,
+		CheckType: PolicyKindOPA,
+		Policies: []*PolicyCheckPolicy{
+			{
+				ID:      "pol-opa",
+				OPAData: &PolicyCheckOPAData{PackageSource: "acme/sec", PackageVersionConstraint: "~> 1.0"},
+			},
+			{
+				ID: "pol-attest",
+				ModuleAttestationData: &PolicyCheckModuleAttestationData{
+					PublicKey:          "-----BEGIN PUBLIC KEY-----\nabc\n-----END PUBLIC KEY-----",
+					PredicateType:      &predicateType,
+					VerifyStateLineage: true,
+				},
+			},
+		},
+	}
+
+	cp, ok := orig.Copy().(*PolicyCheck)
+	require.True(t, ok)
+	require.True(t, orig.ShallowCompare(cp), "a fresh copy should compare equal")
+	assert.NotSame(t, orig.Policies[0].OPAData, cp.Policies[0].OPAData)
+	assert.NotSame(t, orig.Policies[1].ModuleAttestationData, cp.Policies[1].ModuleAttestationData)
+
+	cp.Policies[0].OPAData.PackageSource = "acme/other"
+	assert.Equal(t, "acme/sec", orig.Policies[0].OPAData.PackageSource)
+	assert.False(t, orig.ShallowCompare(cp), "a changed package source should be detected")
+
+	lineage, ok := orig.Copy().(*PolicyCheck)
+	require.True(t, ok)
+	lineage.Policies[1].ModuleAttestationData.VerifyStateLineage = false
+	assert.False(t, orig.ShallowCompare(lineage), "a changed lineage flag should be detected")
+
+	// Present-but-empty and absent are different snapshots, so the nil check cannot be skipped.
+	absent, ok := orig.Copy().(*PolicyCheck)
+	require.True(t, ok)
+	absent.Policies[0].OPAData = nil
+	assert.False(t, orig.ShallowCompare(absent))
+}
+
 func TestRun_HasChanges(t *testing.T) {
 	tests := []struct {
 		name           string
