@@ -271,6 +271,28 @@ func TestHandleDiscardStalePlannedRunsForWorkspace_DiscardsPlanned(t *testing.T)
 	mockProcessor.AssertNumberOfCalls(t, "ProcessCommand", 1)
 }
 
+// TestHandleWorkItem_DispatchesEvaluateRunPolicyCheck verifies the EVALUATE_RUN_POLICY_CHECK work
+// item type dispatches to an EvaluateRunPolicyCheck command built from its payload, through the
+// same processor path every other work item type uses.
+func TestHandleWorkItem_DispatchesEvaluateRunPolicyCheck(t *testing.T) {
+	ctx := context.Background()
+
+	mockProcessor := NewMockCmdProcessor(t)
+	mockProcessor.On("ProcessCommand", mock.Anything, mock.MatchedBy(func(cmd interface{}) bool {
+		evalCmd, ok := cmd.(*commands.EvaluateRunPolicyCheck)
+		return ok && evalCmd.RunID == "run-1" && evalCmd.PolicyCheckID == "check-1"
+	})).Return(nil).Once()
+
+	s := newWorkItemConsumerForTest(&db.Client{}, mockProcessor)
+
+	err := s.handleWorkItem(ctx, &db.WorkItem{
+		Type:    db.EvaluateRunPolicyCheckType,
+		Payload: &db.EvaluateRunPolicyCheckPayload{RunID: "run-1", PolicyCheckID: "check-1"},
+	})
+	assert.NoError(t, err)
+	mockProcessor.AssertNumberOfCalls(t, "ProcessCommand", 1)
+}
+
 func TestClaimAndProcess_AcknowledgesAfterHandling(t *testing.T) {
 	ctx := context.Background()
 

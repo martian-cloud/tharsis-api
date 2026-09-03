@@ -163,7 +163,7 @@ function GPGKeyList(props: Props) {
                         </Box>
                     </Box>
                 </Box>
-                <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
+                <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                     <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
                         <Typography variant="subtitle1">
                             {data?.gpgKeys.totalCount} key{data?.gpgKeys.totalCount === 1 ? '' : 's'}

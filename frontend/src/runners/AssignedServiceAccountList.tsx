@@ -259,7 +259,7 @@ function AssignedServiceAccountList({ fragmentRef }: Props) {
             </Paper>
                 :
                 <Box sx={{ p: 2 }}>
-                    <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
+                    <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                         <Box padding={2}>
                             <Typography variant="subtitle1">
                                 {data?.assignedServiceAccounts.totalCount} assigned service account{data?.assignedServiceAccounts.totalCount !== 1 && 's'}

@@ -242,6 +242,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 			runeventhandlers.NewAssessmentRunHandler(logger, dbClient),
 			runeventhandlers.NewStalePlannedRunDiscarder(logger, dbClient),
 			runeventhandlers.NewRunGateManager(logger, dbClient),
+			runeventhandlers.NewPolicyCheckWorkItemEnqueuer(logger, dbClient),
 		},
 		[]runtypes.RunChangeHandler{
 			runeventhandlers.NewFailedRunEmailHandler(logger, dbClient, taskManager, emailClient, notificationManager),

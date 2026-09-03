@@ -23,15 +23,17 @@ import (
 )
 
 // CreatePolicyInput is the input for creating a new policy. The policy is always owned by a group
-// (GroupID is required). Kind identifies the policy engine; OPAData must be provided for OPA
-// policies. Scope controls where the policy fires; an empty Scope creates a policy that applies
-// everywhere under the owning group.
+// (GroupID is required). Kind identifies the policy engine, and the matching kind data must be
+// provided: OPAData for OPA policies, ModuleAttestationData for module attestation policies. Scope
+// controls where the policy fires; an empty Scope creates a policy that applies everywhere under the
+// owning group.
 type CreatePolicyInput struct {
 	GroupID                  string // required: the owning group ID
 	Name                     string // required: human-readable identifier, unique within the group
 	Description              *string
 	Kind                     models.PolicyKind
 	OPAData                  *models.OPAPolicyData
+	ModuleAttestationData    *models.ModuleAttestationPolicyData
 	Scope                    []*models.ScopeRule
 	RequiredApprovals        int
 	AllowedUserIDs           []string
@@ -55,6 +57,7 @@ type UpdatePolicyInput struct {
 	ID                       string
 	Description              *string
 	OPAData                  *models.OPAPolicyData
+	ModuleAttestationData    *models.ModuleAttestationPolicyData
 	Scope                    *[]*models.ScopeRule
 	RequiredApprovals        *int
 	AllowedUserIDs           *[]string
@@ -80,6 +83,11 @@ func (u *UpdatePolicyInput) Validate() error {
 		if !u.OPAData.Stage.IsValid() {
 			return errors.New("policy stage %s is not a valid run stage", u.OPAData.Stage, errors.WithErrorCode(errors.EInvalid))
 		}
+	}
+
+	if u.ModuleAttestationData != nil && u.ModuleAttestationData.PublicKey == "" {
+		return errors.New("publicKey is required when moduleAttestationData is supplied",
+			errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil
@@ -366,13 +374,21 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 		return nil, err
 	}
 
-	if input.Kind == models.PolicyKindOPA {
+	switch input.Kind {
+	case models.PolicyKindOPA:
 		if input.OPAData == nil {
 			return nil, errors.New("opaData is required when creating an OPA policy", errors.WithErrorCode(errors.EInvalid))
 		}
 		if !input.OPAData.Stage.IsValid() {
 			return nil, errors.New("policy stage %s is not a valid run stage", input.OPAData.Stage, errors.WithErrorCode(errors.EInvalid))
 		}
+	case models.PolicyKindModuleAttestation:
+		if input.ModuleAttestationData == nil {
+			return nil, errors.New("moduleAttestationData is required when creating a module attestation policy",
+				errors.WithErrorCode(errors.EInvalid))
+		}
+	default:
+		return nil, errors.New("policy kind %s is not supported", input.Kind, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if err = validateScopeRules(input.Scope); err != nil {
@@ -389,6 +405,7 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 		Description:              input.Description,
 		Kind:                     input.Kind,
 		OPAData:                  input.OPAData,
+		ModuleAttestationData:    input.ModuleAttestationData,
 		Scope:                    input.Scope,
 		RequiredApprovals:        input.RequiredApprovals,
 		AllowedUserIDs:           input.AllowedUserIDs,
@@ -498,10 +515,20 @@ func (s *service) UpdatePolicy(ctx context.Context, input *UpdatePolicyInput) (*
 	// move a policy off soft mandatory by naming only the new level. Anything the caller did supply
 	// still wins, so changing the level and setting approvals in one call is honoured as sent.
 	//
-	// Computed before the OPA data below replaces the stored level, and only meaningful when the caller
-	// supplied OPA data at all — a partial update that leaves the level alone changes nothing here.
-	enforcementLevelChanged := policy.Kind == models.PolicyKindOPA && input.OPAData != nil &&
-		policy.OPAData != nil && input.OPAData.EnforcementLevel != policy.OPAData.EnforcementLevel
+	// Computed before the kind data below replaces the stored level, and only meaningful when the caller
+	// supplied kind data at all — a partial update that leaves the level alone changes nothing here.
+	var suppliedEnforcementLevel models.PolicyEnforcementLevel
+	switch policy.Kind {
+	case models.PolicyKindOPA:
+		if input.OPAData != nil {
+			suppliedEnforcementLevel = input.OPAData.EnforcementLevel
+		}
+	case models.PolicyKindModuleAttestation:
+		if input.ModuleAttestationData != nil {
+			suppliedEnforcementLevel = input.ModuleAttestationData.EnforcementLevel
+		}
+	}
+	enforcementLevelChanged := suppliedEnforcementLevel != "" && suppliedEnforcementLevel != policy.EnforcementLevel()
 
 	// Apply only the fields the caller supplied. Description is a pointer whose nil already means
 	// "clear it" in this API, so it is assigned as-is; the remaining pointers distinguish "not
@@ -531,8 +558,9 @@ func (s *service) UpdatePolicy(ctx context.Context, input *UpdatePolicyInput) (*
 		policy.AllowedTeamIDs = nil
 	}
 
-	// Update the mutable OPA-specific fields. A stage change only affects runs created afterwards:
-	// a run's policy checks are built when the run starts, from the stage each policy had then.
+	// Update the mutable kind-specific fields. A stage change only affects runs created afterwards:
+	// a run's policy checks are built when the run starts, from the stage each policy had then. Kind
+	// itself is immutable, so data of the other kind is ignored rather than switching the policy over.
 	if policy.Kind == models.PolicyKindOPA && input.OPAData != nil && policy.OPAData != nil {
 		policy.OPAData.PackageSource = input.OPAData.PackageSource
 		policy.OPAData.PackageVersionConstraint = input.OPAData.PackageVersionConstraint
@@ -540,6 +568,14 @@ func (s *service) UpdatePolicy(ctx context.Context, input *UpdatePolicyInput) (*
 		policy.OPAData.EnforcementLevel = input.OPAData.EnforcementLevel
 		policy.OPAData.SpeculativeRunEnforcementLevel = input.OPAData.SpeculativeRunEnforcementLevel
 		policy.OPAData.Stage = input.OPAData.Stage
+	}
+	if policy.Kind == models.PolicyKindModuleAttestation && input.ModuleAttestationData != nil && policy.ModuleAttestationData != nil {
+		policy.ModuleAttestationData.PublicKey = input.ModuleAttestationData.PublicKey
+		policy.ModuleAttestationData.PredicateType = input.ModuleAttestationData.PredicateType
+		policy.ModuleAttestationData.VerifyStateLineage = input.ModuleAttestationData.VerifyStateLineage
+		policy.ModuleAttestationData.EnforcementLevel = input.ModuleAttestationData.EnforcementLevel
+		policy.ModuleAttestationData.SpeculativeRunEnforcementLevel = input.ModuleAttestationData.SpeculativeRunEnforcementLevel
+		policy.ModuleAttestationData.Stage = input.ModuleAttestationData.Stage
 	}
 
 	if vErr := policy.Validate(); vErr != nil {

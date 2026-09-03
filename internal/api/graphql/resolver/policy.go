@@ -111,6 +111,15 @@ func (r *PolicyResolver) OPAData() *OPAPolicyDataResolver {
 	return &OPAPolicyDataResolver{data: r.policy.OPAData}
 }
 
+// ModuleAttestationData resolver returns module-attestation-specific data, or nil for policies of
+// another kind.
+func (r *PolicyResolver) ModuleAttestationData() *ModuleAttestationPolicyDataResolver {
+	if r.policy.ModuleAttestationData == nil {
+		return nil
+	}
+	return &ModuleAttestationPolicyDataResolver{data: r.policy.ModuleAttestationData}
+}
+
 // Scope resolver returns the policy's scope rules.
 func (r *PolicyResolver) Scope() []*PolicyScopeRuleResolver {
 	resolvers := make([]*PolicyScopeRuleResolver, len(r.policy.Scope))
@@ -157,6 +166,46 @@ func (r *OPAPolicyDataResolver) EnforcementLevel() string {
 
 // SpeculativeRunEnforcementLevel resolver returns the level used on a run with no apply.
 func (r *OPAPolicyDataResolver) SpeculativeRunEnforcementLevel() string {
+	return toGraphqlEnum(string(r.data.SpeculativeRunEnforcementLevel))
+}
+
+/* ModuleAttestationPolicyData Resolver */
+
+// ModuleAttestationPolicyDataResolver resolves module-attestation-specific policy data.
+type ModuleAttestationPolicyDataResolver struct {
+	data *models.ModuleAttestationPolicyData
+}
+
+// PublicKey resolver
+func (r *ModuleAttestationPolicyDataResolver) PublicKey() string {
+	return r.data.PublicKey
+}
+
+// PredicateType resolver returns nil when any predicate type satisfies the policy.
+func (r *ModuleAttestationPolicyDataResolver) PredicateType() *string {
+	if r.data.PredicateType == nil || *r.data.PredicateType == "" {
+		return nil
+	}
+	return r.data.PredicateType
+}
+
+// VerifyStateLineage resolver
+func (r *ModuleAttestationPolicyDataResolver) VerifyStateLineage() bool {
+	return r.data.VerifyStateLineage
+}
+
+// Stage resolver
+func (r *ModuleAttestationPolicyDataResolver) Stage() string {
+	return toGraphqlEnum(string(r.data.Stage))
+}
+
+// EnforcementLevel resolver
+func (r *ModuleAttestationPolicyDataResolver) EnforcementLevel() string {
+	return toGraphqlEnum(string(r.data.EnforcementLevel))
+}
+
+// SpeculativeRunEnforcementLevel resolver returns the level used on a run with no apply.
+func (r *ModuleAttestationPolicyDataResolver) SpeculativeRunEnforcementLevel() string {
 	return toGraphqlEnum(string(r.data.SpeculativeRunEnforcementLevel))
 }
 
@@ -391,6 +440,18 @@ type OPAPolicyDataInput struct {
 	SpeculativeRunEnforcementLevel string
 }
 
+// ModuleAttestationPolicyDataInput is the GraphQL input for module-attestation-specific policy
+// configuration. PredicateType stays a pointer because omitting it means any predicate type is
+// accepted.
+type ModuleAttestationPolicyDataInput struct {
+	PublicKey                      string
+	PredicateType                  *string
+	VerifyStateLineage             bool
+	Stage                          string
+	EnforcementLevel               string
+	SpeculativeRunEnforcementLevel string
+}
+
 // CreatePolicyInput contains the input for creating a group-owned policy.
 type CreatePolicyInput struct {
 	ClientMutationID       *string
@@ -399,6 +460,7 @@ type CreatePolicyInput struct {
 	Name                   string
 	Description            *string
 	OPAData                *OPAPolicyDataInput
+	ModuleAttestationData  *ModuleAttestationPolicyDataInput
 	Scope                  *[]PolicyScopeRuleInput
 	RequiredApprovals      *int32
 	AllowedUsers           *[]string
@@ -419,11 +481,28 @@ type UpdatePolicyInput struct {
 	ID                     string
 	Description            *string
 	OPAData                *OPAPolicyDataInput
+	ModuleAttestationData  *ModuleAttestationPolicyDataInput
 	Scope                  *[]PolicyScopeRuleInput
 	RequiredApprovals      *int32
 	AllowedUsers           *[]string
 	AllowedServiceAccounts *[]string
 	AllowedTeams           *[]string
+}
+
+// toModelModuleAttestationData converts the GraphQL input to its model form, returning nil when the
+// caller did not supply it (meaning "leave unchanged" on update).
+func toModelModuleAttestationData(in *ModuleAttestationPolicyDataInput) *models.ModuleAttestationPolicyData {
+	if in == nil {
+		return nil
+	}
+	return &models.ModuleAttestationPolicyData{
+		PublicKey:                      in.PublicKey,
+		PredicateType:                  in.PredicateType,
+		VerifyStateLineage:             in.VerifyStateLineage,
+		Stage:                          models.RunTaskStageName(fromGraphqlEnum(in.Stage)),
+		EnforcementLevel:               models.PolicyEnforcementLevel(fromGraphqlEnum(in.EnforcementLevel)),
+		SpeculativeRunEnforcementLevel: models.PolicyEnforcementLevel(fromGraphqlEnum(in.SpeculativeRunEnforcementLevel)),
+	}
 }
 
 func handlePolicyMutationProblem(e error, clientMutationID *string) (*PolicyMutationPayloadResolver, error) {
@@ -471,8 +550,9 @@ func createPolicyMutation(ctx context.Context, input *CreatePolicyInput) (*Polic
 	svcInput := &policy.CreatePolicyInput{
 		GroupID:                  groupID,
 		Name:                     input.Name,
-		Kind:                     models.PolicyKindOPA,
+		Kind:                     models.PolicyKind(fromGraphqlEnum(input.Kind)),
 		OPAData:                  opaData,
+		ModuleAttestationData:    toModelModuleAttestationData(input.ModuleAttestationData),
 		Scope:                    toModelScopeRules(input.Scope),
 		AllowedUserIDs:           allowedUserIDs,
 		AllowedServiceAccountIDs: allowedServiceAccountIDs,
@@ -555,8 +635,9 @@ func updatePolicyMutation(ctx context.Context, input *UpdatePolicyInput) (*Polic
 	}
 
 	svcInput := &policy.UpdatePolicyInput{
-		ID:      id,
-		OPAData: opaData,
+		ID:                    id,
+		OPAData:               opaData,
+		ModuleAttestationData: toModelModuleAttestationData(input.ModuleAttestationData),
 	}
 	if input.Description != nil {
 		svcInput.Description = input.Description

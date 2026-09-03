@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a23a51360dd2945a5e5be219fffa2fbd>>
+ * @generated SignedSource<<e07d0cc02bc5669fad5940952872a894>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,7 +9,7 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
-export type JobType = "apply" | "plan" | "%future added value";
+export type JobType = "apply" | "opa" | "plan" | "%future added value";
 export type ManagedIdentityAccessRuleType = "eligible_principals" | "module_attestation" | "%future added value";
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type UpdateManagedIdentityAccessRuleInput = {

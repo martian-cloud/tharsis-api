@@ -58,7 +58,7 @@ function CleanupPolicyForm({ kind, data, onChange, onValidationChange, error }: 
                     A {kindDef.label.toLowerCase()} sweep will not claim or delete anything while this policy is disabled.
                 </Typography>
                 <Stack direction="row" alignItems="center" spacing={1.5}>
-                    <Switch checked={!data.disabled} onChange={e => onChange({ ...data, disabled: !e.target.checked })} />
+                    <Switch color="secondary" checked={!data.disabled} onChange={e => onChange({ ...data, disabled: !e.target.checked })} />
                     <Typography variant="body2">{data.disabled ? 'Disabled' : 'Enabled'}</Typography>
                 </Stack>
             </CleanupPolicyFormSection>

@@ -171,7 +171,7 @@ function VCSProviderList(props: Props) {
                         onKeyPress={onKeyPress}
                     />
                 </Box>
-                <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
+                <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                     <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
                         <Typography variant="subtitle1">
                             {data?.vcsProviders.totalCount} VCS provider{data?.vcsProviders.totalCount === 1 ? '' : 's'}

@@ -221,7 +221,7 @@ func (m *policies) CreatePolicy(ctx context.Context, policy *models.Policy) (*mo
 		return nil, errors.Wrap(err, "failed to marshal policy scope", errors.WithSpan(span))
 	}
 
-	kindDataJSON, err := json.Marshal(policy.OPAData)
+	kindDataJSON, err := marshalPolicyKindData(policy)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal policy kind_data", errors.WithSpan(span))
 	}
@@ -313,7 +313,7 @@ func (m *policies) UpdatePolicy(ctx context.Context, policy *models.Policy) (*mo
 		return nil, errors.Wrap(err, "failed to marshal policy scope", errors.WithSpan(span))
 	}
 
-	kindDataJSON, err := json.Marshal(policy.OPAData)
+	kindDataJSON, err := marshalPolicyKindData(policy)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal policy kind_data", errors.WithSpan(span))
 	}
@@ -569,6 +569,19 @@ func (m *policies) scanChildIDsByPolicy(ctx context.Context, table, col string, 
 	return result, rows.Err()
 }
 
+// marshalPolicyKindData marshals the kind-specific data into the kind_data column. The stage field is
+// queried directly as kind_data->>'stage' (see the Stage filter), so every kind must tag it "stage".
+func marshalPolicyKindData(policy *models.Policy) ([]byte, error) {
+	switch policy.Kind {
+	case models.PolicyKindOPA:
+		return json.Marshal(policy.OPAData)
+	case models.PolicyKindModuleAttestation:
+		return json.Marshal(policy.ModuleAttestationData)
+	default:
+		return nil, fmt.Errorf("unsupported policy kind %s", policy.Kind)
+	}
+}
+
 func scanPolicy(row scanner) (*models.Policy, error) {
 	policy := &models.Policy{}
 
@@ -600,6 +613,11 @@ func scanPolicy(row scanner) (*models.Policy, error) {
 		case models.PolicyKindOPA:
 			policy.OPAData = &models.OPAPolicyData{}
 			if err := json.Unmarshal(kindDataJSON, policy.OPAData); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal policy kind_data: %w", err)
+			}
+		case models.PolicyKindModuleAttestation:
+			policy.ModuleAttestationData = &models.ModuleAttestationPolicyData{}
+			if err := json.Unmarshal(kindDataJSON, policy.ModuleAttestationData); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal policy kind_data: %w", err)
 			}
 		}

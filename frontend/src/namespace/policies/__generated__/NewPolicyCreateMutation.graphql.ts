@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5f62aa72d0635716227cc60dc770c052>>
+ * @generated SignedSource<<8250c2ae9583c12f5cc67552a4519bd0>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,7 +11,7 @@
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type PolicyEnforcementLevel = "ADVISORY" | "HARD_MANDATORY" | "SOFT_MANDATORY" | "%future added value";
-export type PolicyKind = "OPA" | "%future added value";
+export type PolicyKind = "MODULE_ATTESTATION" | "OPA" | "%future added value";
 export type PolicyScopeRuleAction = "EXCLUDE" | "INCLUDE" | "%future added value";
 export type PolicyScopeRuleType = "GROUP" | "MANAGED_IDENTITY" | "WORKSPACE" | "%future added value";
 export type PolicyStage = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_PLAN" | "%future added value";
@@ -25,10 +25,19 @@ export type CreatePolicyInput = {
   description?: string | null | undefined;
   groupId: string;
   kind: PolicyKind;
+  moduleAttestationData?: ModuleAttestationPolicyDataInput | null | undefined;
   name: string;
   opaData?: OPAPolicyDataInput | null | undefined;
   requiredApprovals?: number | null | undefined;
   scope?: ReadonlyArray<PolicyScopeRuleInput> | null | undefined;
+};
+export type ModuleAttestationPolicyDataInput = {
+  enforcementLevel: PolicyEnforcementLevel;
+  predicateType?: string | null | undefined;
+  publicKey: string;
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel;
+  stage: PolicyStage;
+  verifyStateLineage: boolean;
 };
 export type OPAPolicyDataInput = {
   enforcementLevel: PolicyEnforcementLevel;
@@ -136,6 +145,27 @@ v7 = {
   "args": null,
   "kind": "ScalarField",
   "name": "name",
+  "storageKey": null
+},
+v8 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "stage",
+  "storageKey": null
+},
+v9 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "enforcementLevel",
+  "storageKey": null
+},
+v10 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "speculativeRunEnforcementLevel",
   "storageKey": null
 };
 return {
@@ -267,27 +297,44 @@ return {
                     "name": "packageDigest",
                     "storageKey": null
                   },
+                  (v8/*: any*/),
+                  (v9/*: any*/),
+                  (v10/*: any*/)
+                ],
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "concreteType": "ModuleAttestationPolicyData",
+                "kind": "LinkedField",
+                "name": "moduleAttestationData",
+                "plural": false,
+                "selections": [
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "stage",
+                    "name": "publicKey",
                     "storageKey": null
                   },
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "enforcementLevel",
+                    "name": "predicateType",
                     "storageKey": null
                   },
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "speculativeRunEnforcementLevel",
+                    "name": "verifyStateLineage",
                     "storageKey": null
-                  }
+                  },
+                  (v8/*: any*/),
+                  (v9/*: any*/),
+                  (v10/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -407,12 +454,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "9b5d5b1f46b8dab28c9cd8d5f11cf924",
+    "cacheID": "9ae655ea5b350d19193af20a1b4d92c4",
     "id": null,
     "metadata": {},
     "name": "NewPolicyCreateMutation",
     "operationKind": "mutation",
-    "text": "mutation NewPolicyCreateMutation(\n  $input: CreatePolicyInput!\n) {\n  createPolicy(input: $input) {\n    policy {\n      id\n      groupPath\n      ...PolicyDetailsFragment_policy\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment PolicyDetailsFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    packageDigest\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  scope {\n    type\n    action\n    pattern\n  }\n  groupPath\n  allowedUsers {\n    id\n    email\n    username\n  }\n  allowedTeams {\n    id\n    name\n  }\n  allowedServiceAccounts {\n    id\n    name\n    resourcePath\n  }\n}\n"
+    "text": "mutation NewPolicyCreateMutation(\n  $input: CreatePolicyInput!\n) {\n  createPolicy(input: $input) {\n    policy {\n      id\n      groupPath\n      ...PolicyDetailsFragment_policy\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment PolicyDetailsFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    packageDigest\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    verifyStateLineage\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  scope {\n    type\n    action\n    pattern\n  }\n  groupPath\n  allowedUsers {\n    id\n    email\n    username\n  }\n  allowedTeams {\n    id\n    name\n  }\n  allowedServiceAccounts {\n    id\n    name\n    resourcePath\n  }\n}\n"
   }
 };
 })();

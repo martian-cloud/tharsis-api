@@ -5,8 +5,10 @@ import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from 'react-relay/hooks';
 import { WorkspaceIcon } from '../common/Icons';
 import MiddleDot from '../common/MiddleDot';
+import Pill from '../common/Pill';
 import Timestamp from '../common/Timestamp';
 import { MutationError } from '../common/error';
+import { checkTypeLabel } from '../namespace/policies/policyDisplay';
 import Link from '../routes/Link';
 import { taskStagePath } from '../workspace/runs/runStageNavigation';
 import RunTaskStageRunGateDecisionButtons from '../workspace/runs/taskstage/RunTaskStageRunGateDecisionButtons';
@@ -89,9 +91,12 @@ function ApprovalGateCard({ fragmentRef, connectionIds, onDecided, onError }: Pr
                         />
                         <Typography variant="subtitle1" fontWeight={500}>
                             <Link color="inherit" to={checkPath}>
-                                {check.checkType} policy check
+                                Policy check
                             </Link>
                         </Typography>
+                        <Pill variant="outline" size="small" sx={{ ml: 1 }}>
+                            {checkTypeLabel(check.checkType)}
+                        </Pill>
                         <MiddleDot />
                         <Timestamp variant="body2" color="textSecondary" timestamp={gate.metadata.createdAt as string} />
                     </Box>

@@ -196,6 +196,37 @@ func (r *JobResolver) Type() string {
 	return string(r.job.Type)
 }
 
+// OPAData resolver returns OPA-specific job data, or nil for a plan/apply job — those have no
+// owning policy check.
+func (r *JobResolver) OPAData() *JobOPADataResolver {
+	if r.job.Type != models.JobOPAType || r.job.OPAData == nil {
+		return nil
+	}
+	return &JobOPADataResolver{job: r.job}
+}
+
+// JobOPADataResolver resolves OPA-specific data for a job.
+type JobOPADataResolver struct {
+	job *models.Job
+}
+
+// TaskStageName resolver returns the run stage this job's policy check evaluates at, or nil if the
+// check can no longer be found (e.g. it was somehow removed after the job was created).
+func (r *JobOPADataResolver) TaskStageName(ctx context.Context) (*string, error) {
+	run, err := loadRun(ctx, r.job.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	check := run.PolicyCheckByID(r.job.OPAData.PolicyCheckID)
+	if check == nil {
+		return nil, nil
+	}
+
+	stageName := toGraphqlEnum(string(check.StageName))
+	return &stageName, nil
+}
+
 // RunnerPath resolver
 func (r *JobResolver) RunnerPath() *string {
 	return r.job.RunnerPath

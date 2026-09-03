@@ -1,6 +1,6 @@
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { Box, Typography, useTheme } from '@mui/material';
-import RunTaskStageSectionLabel from '../workspace/runs/taskstage/RunTaskStageSectionLabel';
+import { darken } from '@mui/material/styles';
 
 interface Props {
     // The failure messages across the check, one entry per violation.
@@ -26,18 +26,14 @@ function ApprovalGateFindings({ messages, truncated }: Props) {
     return (
         <Box
             sx={{
-                // Ruled off from the header above and the run context below, so the findings read as their
-                // own band of the card. The padding on each side matches the margin outside it, which puts
-                // each rule centred between the two blocks it separates rather than crowding one.
                 mt: 2,
-                pt: 2,
-                borderTop: `1px solid ${theme.palette.divider}`,
+                p: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 1,
+                background: darken(theme.palette.background.paper, 0.10)
             }}
         >
-            <RunTaskStageSectionLabel>Findings</RunTaskStageSectionLabel>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                 {messages.map((message, i) => (
                     <Box key={i} sx={{ display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
@@ -45,7 +41,7 @@ function ApprovalGateFindings({ messages, truncated }: Props) {
                             block. Neutral, not error-coloured: one row per finding would be a lot of red
                             for a card that is only ever shown because something failed. */}
                         <ErrorOutlineIcon sx={{ width: 14, height: 14, mt: '3px', flexShrink: 0, color: theme.palette.text.secondary }} />
-                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{message}</Typography>
+                        <Typography variant="body2" color="textSecondary" sx={{ whiteSpace: 'pre-wrap' }}>{message}</Typography>
                     </Box>
                 ))}
             </Box>

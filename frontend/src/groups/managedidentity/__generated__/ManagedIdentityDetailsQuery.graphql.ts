@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<1ce841f82427b7324da705f61d3a79e5>>
+ * @generated SignedSource<<d12e3266edb33eb979b2b42109fa3a00>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,7 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type JobType = "apply" | "plan" | "%future added value";
+export type JobType = "apply" | "opa" | "plan" | "%future added value";
 export type ManagedIdentityDetailsQuery$variables = {
   after?: string | null | undefined;
   before?: string | null | undefined;

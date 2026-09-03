@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<835c067552310e0378ad9788afa0b8a5>>
+ * @generated SignedSource<<d69488f9994d26450df14c33e78bdcfe>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,6 +9,7 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
+export type PolicyCheckStatus = "CANCELED" | "CREATED" | "ERRORED" | "OVERRIDDEN" | "PASSED" | "PENDING" | "QUEUED" | "RUNNING" | "SKIPPED" | "SOFT_FAILED" | "%future added value";
 export type RunTaskStageName = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_PLAN" | "%future added value";
 export type RunTaskStageStatus = "AWAITING_OVERRIDE" | "CANCELED" | "COMPLETED" | "CREATED" | "ERRORED" | "PENDING" | "RUNNING" | "SKIPPED" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
@@ -20,6 +21,7 @@ export type RunDetailsRunTaskStageFragment_taskStage$data = {
   };
   readonly taskStages: ReadonlyArray<{
     readonly policyChecks: ReadonlyArray<{
+      readonly checkType: string;
       readonly currentJob: {
         readonly cancelRequested: boolean;
         readonly " $fragmentSpreads": FragmentRefs<"NoRunnerAlertFragment_job">;
@@ -35,6 +37,7 @@ export type RunDetailsRunTaskStageFragment_taskStage$data = {
         }>;
         readonly " $fragmentSpreads": FragmentRefs<"RunTaskStagePolicyCheckPolicyCardFragment_gate">;
       } | null | undefined;
+      readonly status: PolicyCheckStatus;
       readonly " $fragmentSpreads": FragmentRefs<"RunTaskStagePolicyCheckPanelFragment_check">;
     }>;
     readonly stageName: RunTaskStageName;
@@ -133,6 +136,14 @@ return {
             {
               "alias": null,
               "args": null,
+              "kind": "ScalarField",
+              "name": "checkType",
+              "storageKey": null
+            },
+            (v1/*: any*/),
+            {
+              "alias": null,
+              "args": null,
               "concreteType": "Job",
               "kind": "LinkedField",
               "name": "currentJob",
@@ -222,6 +233,6 @@ return {
 };
 })();
 
-(node as any).hash = "06a0b1ab098cf572bd5c9af125f116ac";
+(node as any).hash = "1a13fd247a69eda594936aea5a8c1280";
 
 export default node;

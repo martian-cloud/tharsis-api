@@ -573,18 +573,30 @@ func toPBPolicyCheck(check *models.PolicyCheck) *pb.PolicyCheck {
 		p := check.Policies[i]
 		// The messages a previous evaluation reported are not sent: the runner does not read them,
 		// and they live in object storage (see PolicyCheckPolicy in run.proto).
-		pbCheck.Policies = append(pbCheck.Policies, &pb.PolicyCheckPolicy{
-			Id:                       p.ID,
-			PackageSource:            p.PackageSource,
-			PackageVersionConstraint: p.PackageVersionConstraint,
-			EnforcementLevel:         enumToPB[pb.PolicyEnforcementLevel](p.EnforcementLevel, pb.PolicyEnforcementLevel_value, "POLICY_ENFORCEMENT_LEVEL_"),
-			Status:                   enumToPB[pb.PolicyCheckPolicyStatus](p.Status, pb.PolicyCheckPolicyStatus_value, "POLICY_CHECK_POLICY_STATUS_"),
-			PackageDigest:            p.PackageDigest,
+		pbPolicy := &pb.PolicyCheckPolicy{
+			Id:               p.ID,
+			EnforcementLevel: enumToPB[pb.PolicyEnforcementLevel](p.EnforcementLevel, pb.PolicyEnforcementLevel_value, "POLICY_ENFORCEMENT_LEVEL_"),
+			Status:           enumToPB[pb.PolicyCheckPolicyStatus](p.Status, pb.PolicyCheckPolicyStatus_value, "POLICY_CHECK_POLICY_STATUS_"),
 			Provenance: &pb.PolicyCheckPolicyProvenance{
 				GroupId:   p.Provenance.GroupID,
 				PolicyTrn: p.Provenance.PolicyTRN,
 			},
-		})
+		}
+		if p.OPAData != nil {
+			pbPolicy.OpaData = &pb.OPAPolicyCheckData{
+				PackageSource:            p.OPAData.PackageSource,
+				PackageVersionConstraint: p.OPAData.PackageVersionConstraint,
+				PackageDigest:            p.OPAData.PackageDigest,
+			}
+		}
+		if p.ModuleAttestationData != nil {
+			pbPolicy.ModuleAttestationData = &pb.ModuleAttestationPolicyCheckData{
+				PublicKey:          p.ModuleAttestationData.PublicKey,
+				PredicateType:      p.ModuleAttestationData.PredicateType,
+				VerifyStateLineage: p.ModuleAttestationData.VerifyStateLineage,
+			}
+		}
+		pbCheck.Policies = append(pbCheck.Policies, pbPolicy)
 	}
 	return pbCheck
 }

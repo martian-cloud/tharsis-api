@@ -61,7 +61,7 @@ const NAV_SECTIONS = [
             { route: 'runners', label: 'Runner Agents', icon: <RunnersIcon /> },
             { route: 'provider_mirror', label: 'Provider Mirror', icon: <ProviderMirrorIcon /> },
             { route: 'vcs_providers', label: 'VCS Providers', icon: <VCSProviderIcon /> },
-            { route: 'cleanup_policies', label: 'Cleanup Policies', icon: <CleanupPolicyIcon /> },
+            { route: 'cleanup_policies', label: 'Cleanup', icon: <CleanupPolicyIcon /> },
             { route: 'settings', label: 'Settings', icon: <SettingsIcon /> },
         ],
     },

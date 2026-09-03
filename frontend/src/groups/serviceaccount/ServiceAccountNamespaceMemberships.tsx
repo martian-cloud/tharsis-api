@@ -77,7 +77,7 @@ function ServiceAccountNamespaceMemberships({ serviceAccountId }: Props) {
 
     return (
         <Box>
-            <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
+            <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                 <Box padding={2}>
                     <Typography variant="subtitle1">
                         {data?.namespaceMemberships.totalCount} namespace membership{data?.namespaceMemberships.totalCount !== 1 && 's'}

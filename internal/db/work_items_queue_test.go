@@ -122,3 +122,34 @@ func TestWorkItemsQueue_ClaimWorkItems_UnlimitedClaims(t *testing.T) {
 
 	assert.Equal(t, 1, countWorkItems(ctx, t, testClient, added.ID), "unlimited item must never be reaped")
 }
+
+// TestWorkItemsQueue_EvaluateRunPolicyCheckPayload verifies the EvaluateRunPolicyCheckPayload
+// round-trips through the payload JSONB column: it comes back typed via
+// ToEvaluateRunPolicyCheckPayload with its fields intact.
+func TestWorkItemsQueue_EvaluateRunPolicyCheckPayload(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	added, err := testClient.client.WorkItemsQueue.AddWorkItemToQueue(ctx, &AddWorkItemToQueueInput{
+		Type: EvaluateRunPolicyCheckType,
+		Payload: &EvaluateRunPolicyCheckPayload{
+			RunID:         "run-eval",
+			PolicyCheckID: "check-eval",
+		},
+	})
+	require.NoError(t, err)
+
+	items, err := testClient.client.WorkItemsQueue.ClaimWorkItems(ctx, &ClaimWorkItemsInput{
+		Type:  EvaluateRunPolicyCheckType,
+		Limit: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, added.ID, items[0].ID)
+
+	payload, ok := items[0].ToEvaluateRunPolicyCheckPayload()
+	require.True(t, ok)
+	assert.Equal(t, "run-eval", payload.RunID)
+	assert.Equal(t, "check-eval", payload.PolicyCheckID)
+}

@@ -16,6 +16,17 @@ export function isPolicyCheckFinal(status: string): boolean {
     return !NOT_FINAL_POLICY_CHECK_STATUSES.includes(status);
 }
 
+// PolicyCheckStatus values reached before the check has entered the queue: the run/task stage
+// exists, but no policy-eval job has been created yet (mirrors PolicyCheckStatus.NotStarted on the
+// backend). There is nothing yet for the panel to show at these statuses — no job, no progress, not
+// even something a runner could be waiting to pick up — so callers hold off rendering it until the
+// check has moved past them.
+const NOT_STARTED_POLICY_CHECK_STATUSES = ['CREATED', 'PENDING'];
+
+export function isPolicyCheckNotStarted(status: string): boolean {
+    return NOT_STARTED_POLICY_CHECK_STATUSES.includes(status);
+}
+
 // stageLabel turns a RunTaskStageName into the display label used in the stage card and the stage
 // header, which have to agree. The return type is narrowed to the literals RunDetailsStageHeader
 // accepts, since it shares this vocabulary with the plan and apply stages.
@@ -27,6 +38,7 @@ export function stageLabel(stageName: string): 'Pre-Plan' | 'Post-Plan' | 'Pre-A
         default: return 'Post-Plan';
     }
 }
+
 
 // approvalsForRule returns the decisions that cover a given rule. coveredRules exists precisely
 // because one decision can satisfy several rules at once.

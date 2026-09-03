@@ -201,6 +201,132 @@ func TestCreatePolicy_StageGate(t *testing.T) {
 	}
 }
 
+// TestCreatePolicy_KindGate verifies the service requires the kind data matching the requested kind
+// and rejects an unsupported kind outright, so neither can reach the database.
+func TestCreatePolicy_KindGate(t *testing.T) {
+	const groupID = "group-id"
+
+	// A real key, since the model parses it as part of validation.
+	const publicKeyPEM = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEu59Z9BvlQFMCMobNuJI4qWkTV3NA
+JDtumfHKBfqi9VTde0OZeGGRgJfw9qI3Ogea6hXLZMKtsXNpXtDGOgWbiQ==
+-----END PUBLIC KEY-----`
+
+	attestationData := func() *models.ModuleAttestationPolicyData {
+		return &models.ModuleAttestationPolicyData{
+			PublicKey:                      publicKeyPEM,
+			EnforcementLevel:               models.PolicyEnforcementHardMandatory,
+			SpeculativeRunEnforcementLevel: models.PolicyEnforcementHardMandatory,
+			Stage:                          models.RunTaskStageNamePrePlan,
+		}
+	}
+
+	tests := []struct {
+		name          string
+		input         *CreatePolicyInput
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "module attestation policy accepted",
+			input: &CreatePolicyInput{
+				GroupID:               groupID,
+				Name:                  "require-provenance",
+				Kind:                  models.PolicyKindModuleAttestation,
+				ModuleAttestationData: attestationData(),
+			},
+		},
+		{
+			name: "module attestation kind without its data rejected",
+			input: &CreatePolicyInput{
+				GroupID: groupID,
+				Name:    "require-provenance",
+				Kind:    models.PolicyKindModuleAttestation,
+			},
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name: "post_apply stage rejected for module attestation",
+			input: &CreatePolicyInput{
+				GroupID: groupID,
+				Name:    "require-provenance",
+				Kind:    models.PolicyKindModuleAttestation,
+				ModuleAttestationData: func() *models.ModuleAttestationPolicyData {
+					d := attestationData()
+					d.Stage = models.RunTaskStageNamePostApply
+					return d
+				}(),
+			},
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name: "unsupported kind rejected",
+			input: &CreatePolicyInput{
+				GroupID: groupID,
+				Name:    "mystery",
+				Kind:    models.PolicyKind("cel"),
+			},
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name: "empty kind rejected",
+			input: &CreatePolicyInput{
+				GroupID: groupID,
+				Name:    "mystery",
+			},
+			expectErrCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+
+			mockGroups := db.NewMockGroups(t)
+			mockGroups.On("GetGroupByID", mock.Anything, groupID).
+				Return(&models.Group{Metadata: models.ResourceMetadata{ID: groupID}, FullPath: "my-group"}, nil)
+
+			mockPolicies := db.NewMockPolicies(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockResourceLimits := db.NewMockResourceLimits(t)
+
+			// Leaving these unregistered for the rejected cases asserts nothing was written.
+			if test.expectErrCode == "" {
+				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, mockCaller), nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockPolicies.On("CreatePolicy", mock.Anything, mock.Anything).
+					Return(&models.Policy{Metadata: models.ResourceMetadata{ID: "policy-id"}}, nil)
+				mockPolicies.On("GetPolicies", mock.Anything, mock.Anything).
+					Return(&db.PoliciesResult{PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)}}, nil)
+				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+					Return(&models.ResourceLimit{Value: 100}, nil)
+			}
+
+			dbClient := db.Client{
+				Groups:         mockGroups,
+				Policies:       mockPolicies,
+				Transactions:   mockTransactions,
+				ResourceLimits: mockResourceLimits,
+			}
+
+			testLogger, _ := logger.NewForTest()
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient))
+
+			_, err := service.CreatePolicy(auth.WithCaller(ctx, mockCaller), test.input)
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
 // TestCreatePolicy_PostApplyAdvisoryOnly verifies that a post_apply policy is only accepted at
 // advisory enforcement: state has already been written by the time a post-apply check evaluates, so
 // there is no run outcome left for a stronger level to protect. The gate lives on the model's own

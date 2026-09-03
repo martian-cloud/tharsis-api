@@ -142,14 +142,11 @@ func TestCreate_AttachesPostPlanStageWhenPolicyApplies(t *testing.T) {
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
-	// Run creation resolves every stage; the DB filters policies by stage, so only the post_plan
-	// query returns the policy (pre_plan returns none). Mirror that here so a single check attaches.
-	stageIs := func(stage models.RunTaskStageName) interface{} {
-		return mock.MatchedBy(func(in *db.GetPoliciesInput) bool {
-			return in.Filter != nil && in.Filter.Stage != nil && *in.Filter.Stage == stage
-		})
-	}
-	env.policies.On("GetPolicies", ctx, stageIs(models.RunTaskStageNamePostPlan)).Return(&db.PoliciesResult{Policies: []*models.Policy{
+	// Run creation resolves every stage's policies with a single query (no stage filter); only the
+	// post_plan policy is returned, so only that stage's check attaches.
+	env.policies.On("GetPolicies", ctx, mock.MatchedBy(func(in *db.GetPoliciesInput) bool {
+		return in.Filter != nil && in.Filter.Stage == nil
+	})).Return(&db.PoliciesResult{Policies: []*models.Policy{
 		{
 			Metadata:    models.ResourceMetadata{ID: "attach-1"},
 			GroupID:     "g-ancestor",
@@ -167,11 +164,6 @@ func TestCreate_AttachesPostPlanStageWhenPolicyApplies(t *testing.T) {
 			},
 		},
 	}}, nil)
-	env.policies.On("GetPolicies", ctx, stageIs(models.RunTaskStageNamePrePlan)).Return(&db.PoliciesResult{}, nil)
-	// This run has an apply (non-speculative), so the apply-phase stages are resolved too; return no
-	// policies from either so only the post-plan stage attaches.
-	env.policies.On("GetPolicies", ctx, stageIs(models.RunTaskStageNamePreApply)).Return(&db.PoliciesResult{}, nil)
-	env.policies.On("GetPolicies", ctx, stageIs(models.RunTaskStageNamePostApply)).Return(&db.PoliciesResult{}, nil)
 
 	// Capture the run model handed to CreateRun to assert the stage node is attached.
 	var capturedRun *models.Run
@@ -205,12 +197,14 @@ func TestCreate_AttachesPostPlanStageWhenPolicyApplies(t *testing.T) {
 	// policy as it was evaluated.
 	require.Len(t, check.Policies, 1)
 	assert.Equal(t, &models.PolicyCheckPolicy{
-		ID:                       "attach-1",
-		Name:                     "deny-destroy-production",
-		Description:              "Destroy runs are not permitted in production workspaces.",
-		PackageSource:            "my-group/my-package",
-		PackageVersionConstraint: "~> 1.0",
-		EnforcementLevel:         models.PolicyEnforcementSoftMandatory,
+		ID:          "attach-1",
+		Name:        "deny-destroy-production",
+		Description: "Destroy runs are not permitted in production workspaces.",
+		OPAData: &models.PolicyCheckOPAData{
+			PackageSource:            "my-group/my-package",
+			PackageVersionConstraint: "~> 1.0",
+		},
+		EnforcementLevel: models.PolicyEnforcementSoftMandatory,
 		Provenance: models.PolicyCheckPolicyProvenance{
 			GroupID:   "g-ancestor",
 			PolicyTRN: "",
@@ -221,7 +215,7 @@ func TestCreate_AttachesPostPlanStageWhenPolicyApplies(t *testing.T) {
 
 // TestCreate_AttachesAllFourStagesWhenPoliciesApply verifies that a non-speculative run resolves
 // policies at all four stages — pre_plan, post_plan, pre_apply, post_apply — attaching one task
-// stage per stage with an applicable policy, in run order.
+// stage per stage with an applicable policy, in run order, from a single batched query.
 func TestCreate_AttachesAllFourStagesWhenPoliciesApply(t *testing.T) {
 	ctx := callerCtx()
 	env := newCreateTestEnv(t)
@@ -233,11 +227,6 @@ func TestCreate_AttachesAllFourStagesWhenPoliciesApply(t *testing.T) {
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
 
-	stageIs := func(stage models.RunTaskStageName) interface{} {
-		return mock.MatchedBy(func(in *db.GetPoliciesInput) bool {
-			return in.Filter != nil && in.Filter.Stage != nil && *in.Filter.Stage == stage
-		})
-	}
 	policyForStage := func(id string, stage models.RunTaskStageName) *models.Policy {
 		return &models.Policy{
 			Metadata: models.ResourceMetadata{ID: id},
@@ -252,14 +241,16 @@ func TestCreate_AttachesAllFourStagesWhenPoliciesApply(t *testing.T) {
 			},
 		}
 	}
+	var allPolicies []*models.Policy
 	for _, stage := range []models.RunTaskStageName{
 		models.RunTaskStageNamePrePlan, models.RunTaskStageNamePostPlan,
 		models.RunTaskStageNamePreApply, models.RunTaskStageNamePostApply,
 	} {
-		env.policies.On("GetPolicies", ctx, stageIs(stage)).Return(&db.PoliciesResult{
-			Policies: []*models.Policy{policyForStage("p-"+string(stage), stage)},
-		}, nil)
+		allPolicies = append(allPolicies, policyForStage("p-"+string(stage), stage))
 	}
+	env.policies.On("GetPolicies", ctx, mock.MatchedBy(func(in *db.GetPoliciesInput) bool {
+		return in.Filter != nil && in.Filter.Stage == nil
+	})).Return(&db.PoliciesResult{Policies: allPolicies}, nil)
 
 	var capturedRun *models.Run
 	env.runs.On("CreateRun", ctx, mock.Anything).Return(func(_ context.Context, run *models.Run) *models.Run {
@@ -288,10 +279,11 @@ func TestCreate_AttachesAllFourStagesWhenPoliciesApply(t *testing.T) {
 	}, gotOrder, "stages must attach in run order")
 }
 
-// TestCreate_SpeculativeRunSkipsApplyPhaseStages verifies that a speculative run never resolves
-// pre_apply/post_apply policies at all — not merely that it ends up with no apply-phase stages,
-// but that the apply-phase GetPolicies queries are never issued, since a speculative run has no
-// apply node for such a stage to ever gate.
+// TestCreate_SpeculativeRunSkipsApplyPhaseStages verifies that a speculative run never attaches a
+// pre_apply/post_apply task stage, even though the single batched query fetches policies at every
+// stage: resolveRunPolicies is only asked to resolve pre_plan/post_plan for a speculative run, so an
+// apply-phase policy present in that same batched result is dropped rather than attached — a
+// speculative run has no apply node for such a stage to ever gate.
 func TestCreate_SpeculativeRunSkipsApplyPhaseStages(t *testing.T) {
 	ctx := callerCtx()
 	env := newCreateTestEnv(t)
@@ -302,12 +294,22 @@ func TestCreate_SpeculativeRunSkipsApplyPhaseStages(t *testing.T) {
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
-	// Only pre_plan/post_plan queries are expected; an unexpected pre_apply/post_apply query fails
-	// the test via the mock's strict expectations.
-	env.policies.On("GetPolicies", ctx, mock.MatchedBy(func(in *db.GetPoliciesInput) bool {
-		return in.Filter != nil && in.Filter.Stage != nil &&
-			(*in.Filter.Stage == models.RunTaskStageNamePrePlan || *in.Filter.Stage == models.RunTaskStageNamePostPlan)
-	})).Return(&db.PoliciesResult{Policies: []*models.Policy{}}, nil)
+	// The single query returns a policy scoped to pre_apply, proving it is dropped in application
+	// code (because a speculative run never asks to resolve that stage) rather than never fetched.
+	env.policies.On("GetPolicies", ctx, mock.Anything).Return(&db.PoliciesResult{Policies: []*models.Policy{
+		{
+			Metadata: models.ResourceMetadata{ID: "apply-only"},
+			GroupID:  "g-ancestor",
+			Kind:     models.PolicyKindOPA,
+			Name:     "apply-only",
+			OPAData: &models.OPAPolicyData{
+				PackageSource:                  "my-group/my-package",
+				Stage:                          models.RunTaskStageNamePreApply,
+				EnforcementLevel:               models.PolicyEnforcementAdvisory,
+				SpeculativeRunEnforcementLevel: models.PolicyEnforcementAdvisory,
+			},
+		},
+	}}, nil)
 
 	var capturedRun *models.Run
 	env.runs.On("CreateRun", ctx, mock.Anything).Return(func(_ context.Context, run *models.Run) *models.Run {
@@ -332,7 +334,7 @@ func TestCreate_SpeculativeRunSkipsApplyPhaseStages(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotNil(t, capturedRun)
-	assert.Empty(t, capturedRun.TaskStages, "a speculative run with no matching pre/post-plan policies attaches no stages")
+	assert.Empty(t, capturedRun.TaskStages, "a speculative run must never attach an apply-phase stage, even for a pre_apply policy present in the batched fetch")
 	assert.Nil(t, capturedRun.Apply, "a speculative run has no apply node")
 }
 
@@ -372,9 +374,12 @@ func TestCreate_OPAKindWithNilOPADataFailsRunCreation(t *testing.T) {
 	env.runs.AssertNotCalled(t, "CreateRun", mock.Anything, mock.Anything)
 }
 
-// TestCreate_NonOPAKindPolicyIsSkipped verifies that a policy whose kind isn't OPA is legitimately
-// skipped (no check attached, no error) rather than being mistaken for a data-integrity violation.
-func TestCreate_NonOPAKindPolicyIsSkipped(t *testing.T) {
+// TestCreate_UnsupportedKindFailsRunCreation verifies that a policy whose kind is neither OPA nor
+// module_attestation is treated as a data-integrity violation rather than silently skipped: Policy.
+// Validate already rejects any other kind at write time, so reaching this code with one means the
+// gate was dropped some other way (direct DB write, a downgrade after a kind's removal), and Create
+// must fail rather than let the run proceed as if the policy never existed.
+func TestCreate_UnsupportedKindFailsRunCreation(t *testing.T) {
 	ctx := callerCtx()
 	env := newCreateTestEnv(t)
 
@@ -384,17 +389,155 @@ func TestCreate_NonOPAKindPolicyIsSkipped(t *testing.T) {
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
-	// A future/non-OPA policy kind with no OPAData: legitimately skipped, so no check attaches and
-	// run creation proceeds normally.
+	// The stages are resolved in order (pre_plan first); return the unsupported-kind policy from any
+	// stage query so resolution hits it. post_plan may not be reached once the first stage errors, so
+	// leave its expectation optional.
 	env.policies.On("GetPolicies", ctx, mock.Anything).Return(&db.PoliciesResult{Policies: []*models.Policy{
 		{
 			Metadata: models.ResourceMetadata{ID: "future-1", TRN: "trn:policy:group/future"},
 			GroupID:  "g-ancestor",
 			Kind:     models.PolicyKind("sentinel"),
 			Name:     "future-kind",
-			OPAData:  nil,
+		},
+	}}, nil).Maybe()
+
+	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+
+	require.Error(t, err)
+	assert.Nil(t, run)
+	assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	env.runs.AssertNotCalled(t, "CreateRun", mock.Anything, mock.Anything)
+}
+
+// TestCreate_UnsupportedKindAtAnUnrelatedStageDoesNotFailRunCreation verifies that a policy of an
+// unrecognized kind attached to a stage the run is not resolving is skipped rather than hard-failing
+// run creation. This is the regression case for resolveRunPolicies checking kind support before
+// filtering by stage: with that ordering, a future-kind policy scoped to pre_apply/post_apply would
+// have hard-failed even a speculative run that never touches either -- a landmine reachable the
+// moment a third kind exists, even though it never fires while only OPA and module_attestation do.
+func TestCreate_UnsupportedKindAtAnUnrelatedStageDoesNotFailRunCreation(t *testing.T) {
+	ctx := callerCtx()
+	env := newCreateTestEnv(t)
+
+	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
+		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
+	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
+		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
+	}}, nil)
+	// Scoped to pre_apply, so it is present in the batched fetch (see resolveRunPolicies' comment on
+	// GetWorkspaceAssignedPolicies) but a speculative run never asks to resolve that stage -- the same
+	// setup TestCreate_SpeculativeRunSkipsApplyPhaseStages uses for a *known* kind. OPAData is only
+	// present here to give the fixture a resolvable stage (Policy.Stage() reads it regardless of
+	// Kind); a real future kind would carry its own stage field the same way.
+	env.policies.On("GetPolicies", ctx, mock.Anything).Return(&db.PoliciesResult{Policies: []*models.Policy{
+		{
+			Metadata: models.ResourceMetadata{ID: "future-2", TRN: "trn:policy:group/future-2"},
+			GroupID:  "g-ancestor",
+			Kind:     models.PolicyKind("sentinel"),
+			Name:     "future-kind-unrelated-stage",
+			OPAData:  &models.OPAPolicyData{Stage: models.RunTaskStageNamePreApply},
 		},
 	}}, nil)
+
+	var capturedRun *models.Run
+	env.runs.On("CreateRun", ctx, mock.Anything).Return(func(_ context.Context, run *models.Run) *models.Run {
+		capturedRun = run
+		run.Metadata.ID = "run-1"
+		run.Metadata.CreationTimestamp = ptr.Time(time.Now().UTC())
+		return run
+	}, nil)
+	env.runs.On("GetRuns", ctx, mock.Anything).
+		Return(&db.RunsResult{PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)}}, nil)
+	env.limitChecker.On("CheckLimit", ctx, limits.ResourceLimitRunsPerWorkspacePerTimePeriod, mock.Anything).Return(nil)
+	env.activityEvts.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
+	moduleSource := "registry/group/module"
+	speculative := true
+	_, err := env.create(ctx, &CreateRunInput{
+		Subject:      "u",
+		WorkspaceID:  "ws-1",
+		ModuleSource: &moduleSource,
+		Speculative:  &speculative,
+	})
+	require.NoError(t, err)
+
+	require.NotNil(t, capturedRun)
+	assert.Empty(t, capturedRun.TaskStages, "the unsupported-kind policy's pre_apply stage is not one a speculative run resolves, so it must be dropped rather than hard-failing")
+}
+
+// TestCreate_ModuleAttestationKindWithNilDataFailsRunCreation mirrors the OPA data-integrity guard
+// for the module_attestation kind: a policy of that kind with no ModuleAttestationData must fail run
+// creation rather than silently dropping the gate.
+func TestCreate_ModuleAttestationKindWithNilDataFailsRunCreation(t *testing.T) {
+	ctx := callerCtx()
+	env := newCreateTestEnv(t)
+
+	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
+		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
+	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
+		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
+	}}, nil)
+	env.policies.On("GetPolicies", ctx, mock.Anything).Return(&db.PoliciesResult{Policies: []*models.Policy{
+		{
+			Metadata:              models.ResourceMetadata{ID: "broken-1", TRN: "trn:policy:group/broken"},
+			GroupID:               "g-ancestor",
+			Kind:                  models.PolicyKindModuleAttestation,
+			Name:                  "hydration-regression",
+			ModuleAttestationData: nil,
+		},
+	}}, nil).Maybe()
+
+	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+
+	require.Error(t, err)
+	assert.Nil(t, run)
+	assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	env.runs.AssertNotCalled(t, "CreateRun", mock.Anything, mock.Anything)
+}
+
+// TestCreate_StageWithBothKindsProducesTwoChecksWithDistinctPaths verifies that a stage with both an
+// OPA and a module attestation policy produces two sibling PolicyCheck nodes under one task stage,
+// each with its own path and holding only its own kind's policy.
+func TestCreate_StageWithBothKindsProducesTwoChecksWithDistinctPaths(t *testing.T) {
+	ctx := callerCtx()
+	env := newCreateTestEnv(t)
+
+	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
+		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
+	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
+		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
+	}}, nil)
+
+	predicateType := "https://slsa.dev/provenance/v1"
+	prePlanPolicies := []*models.Policy{
+		{
+			Metadata: models.ResourceMetadata{ID: "opa-1", TRN: "trn:policy:group/opa"},
+			GroupID:  "g-ancestor",
+			Kind:     models.PolicyKindOPA,
+			Name:     "opa-policy",
+			OPAData: &models.OPAPolicyData{
+				PackageSource:    "my-package",
+				EnforcementLevel: models.PolicyEnforcementHardMandatory,
+				Stage:            models.RunTaskStageNamePrePlan,
+			},
+		},
+		{
+			Metadata: models.ResourceMetadata{ID: "attest-1", TRN: "trn:policy:group/attest"},
+			GroupID:  "g-ancestor",
+			Kind:     models.PolicyKindModuleAttestation,
+			Name:     "attestation-policy",
+			ModuleAttestationData: &models.ModuleAttestationPolicyData{
+				PublicKey:        "-----BEGIN PUBLIC KEY-----\nkey\n-----END PUBLIC KEY-----",
+				PredicateType:    &predicateType,
+				EnforcementLevel: models.PolicyEnforcementHardMandatory,
+				Stage:            models.RunTaskStageNamePrePlan,
+			},
+		},
+	}
+	env.policies.On("GetPolicies", ctx, mock.Anything).Return(&db.PoliciesResult{Policies: prePlanPolicies}, nil)
 
 	var capturedRun *models.Run
 	env.runs.On("CreateRun", ctx, mock.Anything).Return(func(_ context.Context, run *models.Run) *models.Run {
@@ -412,7 +555,24 @@ func TestCreate_NonOPAKindPolicyIsSkipped(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotNil(t, capturedRun)
-	assert.Empty(t, capturedRun.TaskStages, "a non-OPA policy kind should be skipped, attaching no task stage")
+	var prePlanStage *models.RunTaskStage
+	for _, stage := range capturedRun.TaskStages {
+		if stage.StageName == models.RunTaskStageNamePrePlan {
+			prePlanStage = stage
+		}
+	}
+	require.NotNil(t, prePlanStage, "pre_plan stage must be attached")
+	require.Len(t, prePlanStage.PolicyChecks, 2)
+
+	opaCheck := prePlanStage.PolicyChecks[0]
+	attestationCheck := prePlanStage.PolicyChecks[1]
+	assert.Equal(t, models.PolicyKindOPA, opaCheck.CheckType)
+	assert.Equal(t, models.PolicyKindModuleAttestation, attestationCheck.CheckType)
+	assert.NotEqual(t, opaCheck.GetPath(), attestationCheck.GetPath())
+	require.Len(t, opaCheck.Policies, 1)
+	require.Len(t, attestationCheck.Policies, 1)
+	assert.Equal(t, "opa-1", opaCheck.Policies[0].ID)
+	assert.Equal(t, "attest-1", attestationCheck.Policies[0].ID)
 }
 
 // TestCreate_NoStageNodeWhenNoPolicies verifies a run with no policies gets no
@@ -512,12 +672,7 @@ func TestCreate_SpeculativeUsesSpeculativeEnforcementLevel(t *testing.T) {
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
 
-	// The DB filters policies by stage, so return one policy per stage.
-	stageIs := func(stage models.RunTaskStageName) interface{} {
-		return mock.MatchedBy(func(in *db.GetPoliciesInput) bool {
-			return in.Filter != nil && in.Filter.Stage != nil && *in.Filter.Stage == stage
-		})
-	}
+	// A single query returns every stage's policies at once; return one per stage to exercise both.
 	policyAt := func(id string, stage models.RunTaskStageName, speculative models.PolicyEnforcementLevel) *models.Policy {
 		return &models.Policy{
 			Metadata: models.ResourceMetadata{ID: id},
@@ -532,11 +687,11 @@ func TestCreate_SpeculativeUsesSpeculativeEnforcementLevel(t *testing.T) {
 			},
 		}
 	}
-	env.policies.On("GetPolicies", ctx, stageIs(models.RunTaskStageNamePrePlan)).Return(&db.PoliciesResult{
-		Policies: []*models.Policy{policyAt("pre-1", models.RunTaskStageNamePrePlan, models.PolicyEnforcementHardMandatory)},
-	}, nil)
-	env.policies.On("GetPolicies", ctx, stageIs(models.RunTaskStageNamePostPlan)).Return(&db.PoliciesResult{
-		Policies: []*models.Policy{policyAt("post-1", models.RunTaskStageNamePostPlan, models.PolicyEnforcementAdvisory)},
+	env.policies.On("GetPolicies", ctx, mock.Anything).Return(&db.PoliciesResult{
+		Policies: []*models.Policy{
+			policyAt("pre-1", models.RunTaskStageNamePrePlan, models.PolicyEnforcementHardMandatory),
+			policyAt("post-1", models.RunTaskStageNamePostPlan, models.PolicyEnforcementAdvisory),
+		},
 	}, nil)
 
 	var capturedRun *models.Run

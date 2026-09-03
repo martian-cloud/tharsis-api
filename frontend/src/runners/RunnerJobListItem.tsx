@@ -7,6 +7,7 @@ import Timestamp from '../common/Timestamp';
 import Link from '../routes/Link';
 import { RunnerJobListItemFragment$key } from './__generated__/RunnerJobListItemFragment.graphql';
 import JobStatusChip from '../workspace/runs/JobStatusChip';
+import { taskStagePath } from '../workspace/runs/runStageNavigation';
 
 interface Props {
     fragmentRef: RunnerJobListItemFragment$key
@@ -18,6 +19,12 @@ function RunnerJobListItem({ fragmentRef }: Props) {
             id
             status
             type
+            # Null for a plan/apply job — those link by type instead, straight to the run's plan or
+            # apply page. Set for an OPA job, which has no page of its own: it links to the task
+            # stage page that owns its policy check.
+            opaData {
+                taskStageName
+            }
             run {
                 id
             }
@@ -42,7 +49,11 @@ function RunnerJobListItem({ fragmentRef }: Props) {
     const duration = timestamps?.finishedAt ?
         moment.duration(moment(timestamps.finishedAt as moment.MomentInput).diff(moment(timestamps.runningAt as moment.MomentInput))) : null;
 
-    const jobLink = `/groups/${data.workspace.fullPath}/-/runs/${data.run.id}/${data.type}`;
+    // A plan/apply job has its own page named by type ("plan"/"apply"). An OPA job does not — it
+    // links to the task stage page that owns its policy check instead.
+    const runPath = `/groups/${data.workspace.fullPath}/-/runs/${data.run.id}`;
+    const taskStageName = data.opaData?.taskStageName;
+    const jobLink = taskStageName ? `${runPath}/${taskStagePath(taskStageName)}` : `${runPath}/${data.type}`;
 
     return (
         <ResponsiveRow cells={[

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8ab94b830e16e38414cf6d09963e6bae>>
+ * @generated SignedSource<<25fcd1d1c5a5292ed816c10110d150cb>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,7 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 export type PolicyEnforcementLevel = "ADVISORY" | "HARD_MANDATORY" | "SOFT_MANDATORY" | "%future added value";
-export type PolicyKind = "OPA" | "%future added value";
+export type PolicyKind = "MODULE_ATTESTATION" | "OPA" | "%future added value";
 export type PolicyScopeRuleAction = "EXCLUDE" | "INCLUDE" | "%future added value";
 export type PolicyScopeRuleType = "GROUP" | "MANAGED_IDENTITY" | "WORKSPACE" | "%future added value";
 export type PolicyStage = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_PLAN" | "%future added value";
@@ -23,9 +23,18 @@ export type UpdatePolicyInput = {
   clientMutationId?: string | null | undefined;
   description?: string | null | undefined;
   id: string;
+  moduleAttestationData?: ModuleAttestationPolicyDataInput | null | undefined;
   opaData?: OPAPolicyDataInput | null | undefined;
   requiredApprovals?: number | null | undefined;
   scope?: ReadonlyArray<PolicyScopeRuleInput> | null | undefined;
+};
+export type ModuleAttestationPolicyDataInput = {
+  enforcementLevel: PolicyEnforcementLevel;
+  predicateType?: string | null | undefined;
+  publicKey: string;
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel;
+  stage: PolicyStage;
+  verifyStateLineage: boolean;
 };
 export type OPAPolicyDataInput = {
   enforcementLevel: PolicyEnforcementLevel;
@@ -65,6 +74,14 @@ export type EditPolicyMutation$data = {
       readonly groupPath: string;
       readonly id: string;
       readonly kind: PolicyKind;
+      readonly moduleAttestationData: {
+        readonly enforcementLevel: PolicyEnforcementLevel;
+        readonly predicateType: string | null | undefined;
+        readonly publicKey: string;
+        readonly speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel;
+        readonly stage: PolicyStage;
+        readonly verifyStateLineage: boolean;
+      } | null | undefined;
       readonly name: string;
       readonly opaData: {
         readonly enforcementLevel: PolicyEnforcementLevel;
@@ -119,10 +136,31 @@ v3 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
+  "name": "stage",
+  "storageKey": null
+},
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "enforcementLevel",
+  "storageKey": null
+},
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "speculativeRunEnforcementLevel",
+  "storageKey": null
+},
+v6 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
   "name": "type",
   "storageKey": null
 },
-v4 = [
+v7 = [
   {
     "alias": null,
     "args": [
@@ -190,27 +228,44 @@ v4 = [
                 "name": "packageDigest",
                 "storageKey": null
               },
+              (v3/*: any*/),
+              (v4/*: any*/),
+              (v5/*: any*/)
+            ],
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "concreteType": "ModuleAttestationPolicyData",
+            "kind": "LinkedField",
+            "name": "moduleAttestationData",
+            "plural": false,
+            "selections": [
               {
                 "alias": null,
                 "args": null,
                 "kind": "ScalarField",
-                "name": "stage",
+                "name": "publicKey",
                 "storageKey": null
               },
               {
                 "alias": null,
                 "args": null,
                 "kind": "ScalarField",
-                "name": "enforcementLevel",
+                "name": "predicateType",
                 "storageKey": null
               },
               {
                 "alias": null,
                 "args": null,
                 "kind": "ScalarField",
-                "name": "speculativeRunEnforcementLevel",
+                "name": "verifyStateLineage",
                 "storageKey": null
-              }
+              },
+              (v3/*: any*/),
+              (v4/*: any*/),
+              (v5/*: any*/)
             ],
             "storageKey": null
           },
@@ -236,7 +291,7 @@ v4 = [
             "name": "scope",
             "plural": true,
             "selections": [
-              (v3/*: any*/),
+              (v6/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -345,7 +400,7 @@ v4 = [
             "name": "field",
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v6/*: any*/)
         ],
         "storageKey": null
       }
@@ -359,7 +414,7 @@ return {
     "kind": "Fragment",
     "metadata": null,
     "name": "EditPolicyMutation",
-    "selections": (v4/*: any*/),
+    "selections": (v7/*: any*/),
     "type": "Mutation",
     "abstractKey": null
   },
@@ -368,19 +423,19 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
     "name": "EditPolicyMutation",
-    "selections": (v4/*: any*/)
+    "selections": (v7/*: any*/)
   },
   "params": {
-    "cacheID": "02be772cccee056b10090add91c0cf7c",
+    "cacheID": "99b5df3830970bb2bcb7ae60757a8b8a",
     "id": null,
     "metadata": {},
     "name": "EditPolicyMutation",
     "operationKind": "mutation",
-    "text": "mutation EditPolicyMutation(\n  $input: UpdatePolicyInput!\n) {\n  updatePolicy(input: $input) {\n    policy {\n      id\n      name\n      description\n      kind\n      opaData {\n        packageSource\n        packageVersionConstraint\n        packageDigest\n        stage\n        enforcementLevel\n        speculativeRunEnforcementLevel\n      }\n      createdBy\n      requiredApprovals\n      scope {\n        type\n        action\n        pattern\n      }\n      groupPath\n      allowedUsers {\n        id\n        email\n        username\n      }\n      allowedTeams {\n        id\n        name\n      }\n      allowedServiceAccounts {\n        id\n        name\n        resourcePath\n      }\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
+    "text": "mutation EditPolicyMutation(\n  $input: UpdatePolicyInput!\n) {\n  updatePolicy(input: $input) {\n    policy {\n      id\n      name\n      description\n      kind\n      opaData {\n        packageSource\n        packageVersionConstraint\n        packageDigest\n        stage\n        enforcementLevel\n        speculativeRunEnforcementLevel\n      }\n      moduleAttestationData {\n        publicKey\n        predicateType\n        verifyStateLineage\n        stage\n        enforcementLevel\n        speculativeRunEnforcementLevel\n      }\n      createdBy\n      requiredApprovals\n      scope {\n        type\n        action\n        pattern\n      }\n      groupPath\n      allowedUsers {\n        id\n        email\n        username\n      }\n      allowedTeams {\n        id\n        name\n      }\n      allowedServiceAccounts {\n        id\n        name\n        resourcePath\n      }\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "54bbf8e6b17c8caf999d461437a15b83";
+(node as any).hash = "20dede52a8f53c4bfdfab29835e4d924";
 
 export default node;

@@ -12,7 +12,7 @@ import ConfirmationDialog from '../../common/ConfirmationDialog';
 import Gravatar from '../../common/Gravatar';
 import Pill from '../../common/Pill';
 import NamespaceBreadcrumbs from '../NamespaceBreadcrumbs';
-import { ENFORCEMENT_LEVEL_LABELS, STAGE_LABELS } from './PolicyForm';
+import { ENFORCEMENT_LEVEL_LABELS, KIND_LABELS, STAGE_LABELS } from './policyDisplay';
 import { SCOPE_TYPE_LABELS, scopeActionColor } from './scopeRules';
 import { PolicyDetailsDeleteMutation } from './__generated__/PolicyDetailsDeleteMutation.graphql';
 import { PolicyDetailsFragment_policy$key } from './__generated__/PolicyDetailsFragment_policy.graphql';
@@ -30,17 +30,6 @@ const query = graphql`
         }
     }
 `;
-
-function enforcementLevelColor(level: string, theme: Theme): string {
-    switch (level) {
-        case 'HARD_MANDATORY':
-            return theme.palette.error.main;
-        case 'SOFT_MANDATORY':
-            return theme.palette.warning.main;
-        default:
-            return theme.palette.info.main;
-    }
-}
 
 function scopePillSx(action: string, theme: Theme) {
     const color = scopeActionColor(action, theme);
@@ -177,6 +166,14 @@ function PolicyDetails({ ownerId, ownerPath, currentGroupPath }: Props) {
                 enforcementLevel
                 speculativeRunEnforcementLevel
             }
+            moduleAttestationData {
+                publicKey
+                predicateType
+                verifyStateLineage
+                stage
+                enforcementLevel
+                speculativeRunEnforcementLevel
+            }
             scope {
                 type
                 action
@@ -214,8 +211,14 @@ function PolicyDetails({ ownerId, ownerPath, currentGroupPath }: Props) {
     const ownerGroupPath = policy.groupPath;
     const inherited = ownerGroupPath !== currentGroupPath;
     const opa = policy.opaData;
-    const enforcementLevel = opa?.enforcementLevel ?? '';
-    const speculativeLevel = opa?.speculativeRunEnforcementLevel ?? '';
+    const attestation = policy.moduleAttestationData;
+    // The two kind-specific data objects are mutually exclusive, so whichever is present carries the
+    // fields (stage, enforcement levels) that are common in shape but stored per kind.
+    const kindData = opa ?? attestation;
+    const enforcementLevel = kindData?.enforcementLevel ?? '';
+    const enforcementLevelColors = theme.palette.enforcementLevel;
+    const enforcementLevelColor = enforcementLevelColors[enforcementLevel as keyof typeof enforcementLevelColors] ?? enforcementLevelColors.ADVISORY;
+    const speculativeLevel = kindData?.speculativeRunEnforcementLevel ?? '';
     // requiredApprovals and the allowed-subject lists only mean anything for a soft-mandatory policy:
     // advisory failures never block and hard-mandatory ones can never be overridden.
     const showApprovals = enforcementLevel === 'SOFT_MANDATORY';
@@ -276,7 +279,7 @@ function PolicyDetails({ ownerId, ownerPath, currentGroupPath }: Props) {
                             {policy.name}
                         </Typography>
                         {enforcementLevel && (
-                            <Pill variant="tint" size="small" color={enforcementLevelColor(enforcementLevel, theme)}>
+                            <Pill variant="tint" size="small" color={enforcementLevelColor}>
                                 {ENFORCEMENT_LEVEL_LABELS[enforcementLevel] ?? enforcementLevel}
                             </Pill>
                         )}
@@ -343,8 +346,8 @@ function PolicyDetails({ ownerId, ownerPath, currentGroupPath }: Props) {
             <Paper variant="outlined" sx={{ padding: 3 }}>
                 <SectionHeader divider={false}>General</SectionHeader>
                 <FieldGrid>
-                    <Field label="Policy Type" value={policy.kind} />
-                    <Field label="Run Stage" value={opa?.stage ? (STAGE_LABELS[opa.stage] ?? opa.stage) : '—'} mono />
+                    <Field label="Policy Type" value={KIND_LABELS[policy.kind] ?? policy.kind} />
+                    <Field label="Run Stage" value={kindData?.stage ? (STAGE_LABELS[kindData.stage] ?? kindData.stage) : '—'} mono />
                     <Field label="Created By" value={policy.createdBy} />
                 </FieldGrid>
 
@@ -354,48 +357,70 @@ function PolicyDetails({ ownerId, ownerPath, currentGroupPath }: Props) {
                     <Field label="Speculative & Assessment Runs" value={speculativeLevel ? (ENFORCEMENT_LEVEL_LABELS[speculativeLevel] ?? speculativeLevel) : '—'} />
                 </FieldGrid>
 
-                <SectionHeader>Package</SectionHeader>
-                <FieldGrid>
-                    <Field label="Package Source" value={opa?.packageSource ?? '—'} mono />
-                    <Field label="Package Version" value={opa?.packageVersionConstraint || 'latest'} mono />
-                    {/* The digest spans the grid — it is too long to sit in a third of the row — and
-                        carries the LOCKED marker on its label, because a pinned digest is what makes
-                        the version above immovable. It is always shown: whether the package floats or
-                        is pinned is the point, so an absent digest has to say so rather than vanish. */}
-                    <Box sx={{ gridColumn: '1 / -1' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', mb: '7px' }}>
-                            <Typography variant="caption" component="div" sx={{ ...FIELD_LABEL_SX, mb: 0, color: theme.palette.text.secondary }}>
-                                Package Digest
-                            </Typography>
-                            <Box
-                                component="span"
-                                sx={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    padding: '2px 9px',
-                                    borderRadius: '5px',
-                                    fontSize: theme.typography.caption.fontSize,
-                                    fontWeight: 700,
-                                    letterSpacing: '0.05em',
-                                    ...(opa?.packageDigest
-                                        ? { background: alpha(theme.palette.primary.main, 0.14), color: theme.palette.primary.main }
-                                        : { background: alpha(theme.palette.text.secondary, 0.14), color: theme.palette.text.secondary }),
-                                }}
-                            >
-                                {opa?.packageDigest ? 'LOCKED' : 'UNPINNED'}
+                {opa && <>
+                    <SectionHeader>Package</SectionHeader>
+                    <FieldGrid>
+                        <Field label="Package Source" value={opa.packageSource} mono />
+                        <Field label="Package Version" value={opa.packageVersionConstraint || 'latest'} mono />
+                        {/* The digest spans the grid — it is too long to sit in a third of the row — and
+                            carries the LOCKED marker on its label, because a pinned digest is what makes
+                            the version above immovable. It is always shown: whether the package floats or
+                            is pinned is the point, so an absent digest has to say so rather than vanish. */}
+                        <Box sx={{ gridColumn: '1 / -1' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', mb: '7px' }}>
+                                <Typography variant="caption" component="div" sx={{ ...FIELD_LABEL_SX, mb: 0, color: theme.palette.text.secondary }}>
+                                    Package Digest
+                                </Typography>
+                                <Box
+                                    component="span"
+                                    sx={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        padding: '2px 9px',
+                                        borderRadius: '5px',
+                                        fontSize: theme.typography.caption.fontSize,
+                                        fontWeight: 700,
+                                        letterSpacing: '0.05em',
+                                        ...(opa.packageDigest
+                                            ? { background: alpha(theme.palette.primary.main, 0.14), color: theme.palette.primary.main }
+                                            : { background: alpha(theme.palette.text.secondary, 0.14), color: theme.palette.text.secondary }),
+                                    }}
+                                >
+                                    {opa.packageDigest ? 'LOCKED' : 'UNPINNED'}
+                                </Box>
                             </Box>
+                            {opa.packageDigest ? (
+                                <Typography variant="code" component="div" sx={{ color: theme.palette.text.primary, wordBreak: 'break-all', lineHeight: 1.5 }}>
+                                    {opa.packageDigest}
+                                </Typography>
+                            ) : (
+                                <Typography variant="body2" sx={{ color: theme.palette.text.secondary, lineHeight: 1.5 }}>
+                                    Not set — the package is resolved by version at run creation.
+                                </Typography>
+                            )}
                         </Box>
-                        {opa?.packageDigest ? (
-                            <Typography variant="code" component="div" sx={{ color: theme.palette.text.primary, wordBreak: 'break-all', lineHeight: 1.5 }}>
-                                {opa.packageDigest}
+                    </FieldGrid>
+                </>}
+
+                {attestation && <>
+                    <SectionHeader>Module Attestation</SectionHeader>
+                    <FieldGrid>
+                        <Field label="Predicate Type" value={attestation.predicateType || 'Any'} mono />
+                        <Field label="Verify State Lineage" value={attestation.verifyStateLineage ? 'Yes' : 'No'} />
+                        <Box sx={{ gridColumn: '1 / -1' }}>
+                            <Typography variant="caption" component="div" sx={{ ...FIELD_LABEL_SX, color: theme.palette.text.secondary }}>
+                                Public Key
                             </Typography>
-                        ) : (
-                            <Typography variant="body2" sx={{ color: theme.palette.text.secondary, lineHeight: 1.5 }}>
-                                Not set — the package is resolved by version at run creation.
+                            <Typography
+                                variant="code"
+                                component="div"
+                                sx={{ color: theme.palette.text.primary, wordBreak: 'break-all', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}
+                            >
+                                {attestation.publicKey}
                             </Typography>
-                        )}
-                    </Box>
-                </FieldGrid>
+                        </Box>
+                    </FieldGrid>
+                </>}
 
                 <SectionHeader mb="14px">Scope Rules</SectionHeader>
                 {scope.length === 0 ? (

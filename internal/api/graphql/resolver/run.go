@@ -425,14 +425,62 @@ func (r *PolicyCheckPolicyResolver) Description() string {
 	return r.policy.Description
 }
 
+// OPAData resolver returns the OPA-specific snapshot, null on a check of another type.
+func (r *PolicyCheckPolicyResolver) OPAData() *PolicyCheckOPADataResolver {
+	if r.policy.OPAData == nil {
+		return nil
+	}
+	return &PolicyCheckOPADataResolver{data: r.policy.OPAData}
+}
+
+// ModuleAttestationData resolver returns the module-attestation snapshot, null on a check of another
+// type.
+func (r *PolicyCheckPolicyResolver) ModuleAttestationData() *PolicyCheckModuleAttestationDataResolver {
+	if r.policy.ModuleAttestationData == nil {
+		return nil
+	}
+	return &PolicyCheckModuleAttestationDataResolver{data: r.policy.ModuleAttestationData}
+}
+
+// PolicyCheckOPADataResolver resolves the OPA-specific snapshot of a policy a check evaluates.
+type PolicyCheckOPADataResolver struct {
+	data *models.PolicyCheckOPAData
+}
+
 // PackageSource resolver.
-func (r *PolicyCheckPolicyResolver) PackageSource() string {
-	return r.policy.PackageSource
+func (r *PolicyCheckOPADataResolver) PackageSource() string {
+	return r.data.PackageSource
 }
 
 // PackageVersionConstraint resolver.
-func (r *PolicyCheckPolicyResolver) PackageVersionConstraint() string {
-	return r.policy.PackageVersionConstraint
+func (r *PolicyCheckOPADataResolver) PackageVersionConstraint() string {
+	return r.data.PackageVersionConstraint
+}
+
+// PackageDigest resolver.
+func (r *PolicyCheckOPADataResolver) PackageDigest() *string {
+	return r.data.PackageDigest
+}
+
+// PolicyCheckModuleAttestationDataResolver resolves the module-attestation snapshot of a policy a
+// check evaluates.
+type PolicyCheckModuleAttestationDataResolver struct {
+	data *models.PolicyCheckModuleAttestationData
+}
+
+// PublicKey resolver.
+func (r *PolicyCheckModuleAttestationDataResolver) PublicKey() string {
+	return r.data.PublicKey
+}
+
+// PredicateType resolver.
+func (r *PolicyCheckModuleAttestationDataResolver) PredicateType() *string {
+	return r.data.PredicateType
+}
+
+// VerifyStateLineage resolver.
+func (r *PolicyCheckModuleAttestationDataResolver) VerifyStateLineage() bool {
+	return r.data.VerifyStateLineage
 }
 
 // EnforcementLevel resolver returns the effective (strictest across sources) level.

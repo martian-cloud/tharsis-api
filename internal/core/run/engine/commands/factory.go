@@ -178,6 +178,20 @@ func (f *Factory) NewReportRunPolicyOutcomes(policyCheckID string, outcomes []Ru
 	}
 }
 
+// NewEvaluateRunPolicyCheck creates an EvaluateRunPolicyCheck command.
+func (f *Factory) NewEvaluateRunPolicyCheck(runID, policyCheckID string) *EvaluateRunPolicyCheck {
+	return &EvaluateRunPolicyCheck{
+		ReportRunPolicyOutcomes: ReportRunPolicyOutcomes{
+			dbClient:      f.dbClient,
+			artifactStore: f.artifactStore,
+			PolicyCheckID: policyCheckID,
+		},
+		dbClient:       f.dbClient,
+		moduleResolver: f.moduleResolver,
+		RunID:          runID,
+	}
+}
+
 // NewUpdateApply creates an UpdateApply command.
 func (f *Factory) NewUpdateApply(applyID string, errorMessage *string) *UpdateApply {
 	return &UpdateApply{dbClient: f.dbClient, ApplyID: applyID, ErrorMessage: errorMessage}

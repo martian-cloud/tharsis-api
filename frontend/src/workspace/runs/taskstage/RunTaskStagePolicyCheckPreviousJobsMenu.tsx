@@ -54,6 +54,7 @@ function RunTaskStagePolicyCheckPreviousJobsMenu({ runId, nodePath, currentJobId
                 component="button"
                 underline="hover"
                 variant="body2"
+                color="secondary"
                 sx={{ whiteSpace: 'nowrap', fontFamily: 'inherit' }}
                 onClick={event => setAnchorEl(event.currentTarget)}
             >

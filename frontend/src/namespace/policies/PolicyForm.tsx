@@ -1,19 +1,24 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { Alert, Avatar, Box, Button, Divider, FormControl, IconButton, InputLabel, List, ListItem, ListItemText, MenuItem, Select, Stack, styled, TextField, Typography, useTheme } from '@mui/material';
+import { Alert, Avatar, Box, Button, Checkbox, Divider, FormControlLabel, IconButton, List, ListItem, ListItemText, Stack, styled, TextField, Typography, useTheme } from '@mui/material';
 import { useRef } from 'react';
 import { MutationError } from '../../common/error';
 import Gravatar from '../../common/Gravatar';
 import PanelButton from '../../common/PanelButton';
 import PrincipalAutocomplete, { Option, ServiceAccountOption, TeamOption, UserOption } from '../../groups/managedidentity/rules/PrincipalAutocomplete';
 import PackageAutocomplete, { PackageOption } from '../../groups/package/PackageAutocomplete';
+import EnforcementLevelSelects from './EnforcementLevelSelects';
+import { ENFORCEMENT_LEVEL_LABELS, KIND_LABELS, STAGE_LABELS } from './policyDisplay';
 import PolicyFormScopeRule from './PolicyFormScopeRule';
 import { blankScopeRule, isScopeRuleComplete, ScopeRuleFormData } from './scopeRules';
+import StageSelector from './StageSelector';
 
 // The empty string is the unselected state: a policy's type has no sensible default, so it has to be
 // chosen before there is anything else to fill in.
-export type PolicyKind = '' | 'OPA';
-export type PolicyStage = 'PRE_PLAN' | 'POST_PLAN' | 'PRE_APPLY' | 'POST_APPLY';
+export type PolicyKind = '' | 'OPA' | 'MODULE_ATTESTATION';
+// Likewise, the stage has no sensible default — evaluating too early or too late has real
+// consequences — so it also starts unselected rather than silently picking one for the user.
+export type PolicyStage = '' | 'PRE_PLAN' | 'POST_PLAN' | 'PRE_APPLY' | 'POST_APPLY';
 export type PolicyEnforcementLevel = 'ADVISORY' | 'SOFT_MANDATORY' | 'HARD_MANDATORY';
 // A run with no apply cannot be enforced at SOFT_MANDATORY: an override there would unblock nothing,
 // and nobody is waiting on a speculative plan or a scheduled assessment run to approve one. The api
@@ -27,13 +32,27 @@ const StyledAvatar = styled(Avatar)(() => ({
     backgroundColor: 'avatar.default',
 }));
 
+// OPAPolicyFormData is OPA's own configuration, parallel to ModuleAttestationPolicyFormData below.
+export interface OPAPolicyFormData {
+    package: PackageOption | null;
+    packageVersionConstraint: string;
+    packageDigest: string;
+}
+
+// ModuleAttestationPolicyFormData is module attestation's own configuration, parallel to
+// OPAPolicyFormData above.
+export interface ModuleAttestationPolicyFormData {
+    publicKey: string;
+    predicateType: string;
+    verifyStateLineage: boolean;
+}
+
 export interface PolicyFormData {
     kind: PolicyKind;
     name: string;
     description: string;
-    package: PackageOption | null;
-    packageVersionConstraint: string;
-    packageDigest: string;
+    opa: OPAPolicyFormData;
+    moduleAttestation: ModuleAttestationPolicyFormData;
     stage: PolicyStage;
     enforcementLevel: PolicyEnforcementLevel;
     speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel;
@@ -48,10 +67,17 @@ export const DEFAULT_POLICY_FORM_DATA: PolicyFormData = {
     kind: '',
     name: '',
     description: '',
-    package: null,
-    packageVersionConstraint: '',
-    packageDigest: '',
-    stage: 'POST_PLAN',
+    opa: {
+        package: null,
+        packageVersionConstraint: '',
+        packageDigest: '',
+    },
+    moduleAttestation: {
+        publicKey: '',
+        predicateType: '',
+        verifyStateLineage: false,
+    },
+    stage: '',
     enforcementLevel: 'ADVISORY',
     speculativeRunEnforcementLevel: 'ADVISORY',
     // Zero means a soft failure is overridable by anyone holding the permission, with no gate to wait
@@ -63,25 +89,44 @@ export const DEFAULT_POLICY_FORM_DATA: PolicyFormData = {
     scope: [],
 };
 
-// KIND_OPTIONS lists the supported policy types. OPA is the only one today; further types are added
-// here alongside their own configuration section in the form.
+// KIND_OPTIONS lists the supported policy types; further types are added here alongside their own
+// configuration section in the form. Labels come from KIND_LABELS (see policyDisplay) so the option
+// text always matches what every other view calls the same kind.
 const KIND_OPTIONS: { value: PolicyKind, label: string, description: string }[] = [
-    { value: 'OPA', label: 'OPA', description: 'Open Policy Agent (Rego) policy evaluated against runs.' },
+    { value: 'OPA', label: KIND_LABELS.OPA, description: 'Open Policy Agent (Rego) policy evaluated against runs.' },
+    {
+        value: 'MODULE_ATTESTATION',
+        label: KIND_LABELS.MODULE_ATTESTATION,
+        description: 'Requires the module a run deploys to carry an in-toto attestation signed by a specified key.',
+    },
 ];
 
-// STAGE_OPTIONS exposes the policy evaluation stages the backend supports.
-const STAGE_OPTIONS: { value: PolicyStage, label: string }[] = [
-    { value: 'PRE_PLAN', label: 'Pre Plan' },
-    { value: 'POST_PLAN', label: 'Post Plan' },
-    { value: 'PRE_APPLY', label: 'Pre Apply' },
-    { value: 'POST_APPLY', label: 'Post Apply' },
+// ALL_STAGE_OPTIONS exposes every policy evaluation stage the backend supports. Labels come from
+// STAGE_LABELS (see policyDisplay) so the option text always matches what every other view calls the
+// same stage.
+const ALL_STAGE_OPTIONS: { value: PolicyStage, label: string, description: string }[] = [
+    { value: 'PRE_PLAN', label: STAGE_LABELS.PRE_PLAN, description: 'Evaluated before the plan is generated.' },
+    { value: 'POST_PLAN', label: STAGE_LABELS.POST_PLAN, description: 'Evaluated against the generated plan, before apply.' },
+    { value: 'PRE_APPLY', label: STAGE_LABELS.PRE_APPLY, description: 'Evaluated immediately before apply runs.' },
+    { value: 'POST_APPLY', label: STAGE_LABELS.POST_APPLY, description: 'Evaluated after apply, once state has been written.' },
 ];
 
-// The stage label, keyed by the GraphQL enum value, so any other view that shows a policy's stage
-// (the policy card, the detail page) matches this form's wording instead of showing the raw constant.
-export const STAGE_LABELS: Record<string, string> = Object.fromEntries(
-    STAGE_OPTIONS.map(o => [o.value, o.label])
-);
+// stageOptionsForKind restricts the offered stages to the ones the chosen kind's data can actually
+// evaluate at. A module is verified before it is used, so a post-plan or post-apply check would come
+// too late to stop anything — the api rejects those stages for this kind (see
+// models.ModuleAttestationStages on the backend).
+export function stageOptionsForKind(kind: PolicyKind): { value: PolicyStage, label: string, description: string }[] {
+    if (kind === 'MODULE_ATTESTATION') {
+        return ALL_STAGE_OPTIONS.filter(opt => opt.value === 'PRE_PLAN' || opt.value === 'PRE_APPLY');
+    }
+    return ALL_STAGE_OPTIONS;
+}
+
+// STAGE_COLUMN_COUNT is every kind's stage grid sized the same, to the full stage list, rather than
+// each kind's own (possibly narrower) option count — so a kind offering fewer stages doesn't get
+// wider columns than one offering all of them, and the grid does not reflow if a kind's option list
+// changes.
+export const STAGE_COLUMN_COUNT = ALL_STAGE_OPTIONS.length;
 
 // isPostApplyStage reports whether the given stage is restricted to advisory enforcement: state has
 // already been written by the time a post-apply check evaluates, so there is no run outcome left for
@@ -91,23 +136,22 @@ export function isPostApplyStage(stage: PolicyStage): boolean {
     return stage === 'POST_APPLY';
 }
 
-const ENFORCEMENT_OPTIONS: { value: PolicyEnforcementLevel, label: string, description: string }[] = [
-    { value: 'ADVISORY', label: 'Advisory', description: 'Failures are logged but never block the run.' },
-    { value: 'SOFT_MANDATORY', label: 'Soft Mandatory', description: 'Failures block the run but can be overridden.' },
-    { value: 'HARD_MANDATORY', label: 'Hard Mandatory', description: 'Failures always block the run and cannot be overridden.' },
+// ENFORCEMENT_OPTIONS lists the enforcement levels a policy can be created or edited with. Labels
+// come from ENFORCEMENT_LEVEL_LABELS (see policyDisplay) so the option text always matches what
+// every other view calls the same level.
+export const ENFORCEMENT_OPTIONS: { value: PolicyEnforcementLevel, label: string, description: string }[] = [
+    { value: 'ADVISORY', label: ENFORCEMENT_LEVEL_LABELS.ADVISORY, description: 'Failures are logged but never block the run.' },
+    { value: 'SOFT_MANDATORY', label: ENFORCEMENT_LEVEL_LABELS.SOFT_MANDATORY, description: 'Failures block the run but can be overridden.' },
+    { value: 'HARD_MANDATORY', label: ENFORCEMENT_LEVEL_LABELS.HARD_MANDATORY, description: 'Failures always block the run and cannot be overridden.' },
 ];
 
-// Mirrors STAGE_LABELS, for the enforcement level. Also used for the speculative level, whose values
-// are a subset.
-export const ENFORCEMENT_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
-    ENFORCEMENT_OPTIONS.map(o => [o.value, o.label])
-);
-
 // A speculative plan and an assessment run are both plan-only, so the two options are the only things
-// a failure can do to one: be recorded, or stop it happening at all.
-const SPECULATIVE_ENFORCEMENT_OPTIONS: { value: SpeculativeRunEnforcementLevel, label: string, description: string }[] = [
-    { value: 'ADVISORY', label: 'Advisory', description: 'Failures are logged but never block a speculative plan or an assessment run.' },
-    { value: 'HARD_MANDATORY', label: 'Hard Mandatory', description: 'Failures always block a speculative plan or an assessment run, and cannot be overridden.' },
+// a failure can do to one: be recorded, or stop it happening at all. Labels come from
+// ENFORCEMENT_LEVEL_LABELS (see policyDisplay) so the option text always matches what every other
+// view calls the same level.
+export const SPECULATIVE_ENFORCEMENT_OPTIONS: { value: SpeculativeRunEnforcementLevel, label: string, description: string }[] = [
+    { value: 'ADVISORY', label: ENFORCEMENT_LEVEL_LABELS.ADVISORY, description: 'Failures are logged but never block a speculative plan or an assessment run.' },
+    { value: 'HARD_MANDATORY', label: ENFORCEMENT_LEVEL_LABELS.HARD_MANDATORY, description: 'Failures always block a speculative plan or an assessment run, and cannot be overridden.' },
 ];
 
 // The api requires a policy that asks for approvals to name at least one principal who can give them,
@@ -117,6 +161,47 @@ export function isMissingApprovers(data: PolicyFormData): boolean {
     return data.enforcementLevel === 'SOFT_MANDATORY'
         && data.requiredApprovals > 0
         && data.allowedUsers.length + data.allowedTeams.length + data.allowedServiceAccounts.length === 0;
+}
+
+// hasRequiredKindData reports whether the fields the chosen kind's data can't be submitted without
+// have been filled in: the stage (there is no sensible default for it), plus a package for OPA or a
+// public key for module attestation. Callers use this to disable their submit button until it is.
+export function hasRequiredKindData(data: PolicyFormData): boolean {
+    if (!data.stage) {
+        return false;
+    }
+    return data.kind === 'MODULE_ATTESTATION'
+        ? !!data.moduleAttestation.publicKey.trim()
+        : !!data.opa.package?.packageSource;
+}
+
+// buildKindDataInput builds the opaData or moduleAttestationData half of the create/update mutation
+// input from the form, whichever the chosen kind uses. Called after hasRequiredKindData confirms the
+// kind's required field is present, which is why the stage cast below is safe.
+export function buildKindDataInput(data: PolicyFormData) {
+    const stage = data.stage as Exclude<PolicyStage, ''>;
+    if (data.kind === 'MODULE_ATTESTATION') {
+        return {
+            moduleAttestationData: {
+                publicKey: data.moduleAttestation.publicKey.trim(),
+                predicateType: data.moduleAttestation.predicateType.trim() || null,
+                verifyStateLineage: data.moduleAttestation.verifyStateLineage,
+                stage,
+                enforcementLevel: data.enforcementLevel,
+                speculativeRunEnforcementLevel: data.speculativeRunEnforcementLevel,
+            },
+        };
+    }
+    return {
+        opaData: {
+            packageSource: data.opa.package!.packageSource,
+            packageVersionConstraint: data.opa.packageVersionConstraint.trim() || null,
+            packageDigest: data.opa.packageDigest.trim() || null,
+            stage,
+            enforcementLevel: data.enforcementLevel,
+            speculativeRunEnforcementLevel: data.speculativeRunEnforcementLevel,
+        },
+    };
 }
 
 export function buildApproverInput(data: PolicyFormData) {
@@ -162,11 +247,17 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
     const scopeRows = data.scope.length > 0 ? data.scope : [blankRow];
 
     // PanelButton's disabled prop only styles it, so edit mode has to be enforced here as well —
-    // the same guard ManagedIdentityForm applies to its type panels.
+    // the same guard ManagedIdentityForm applies to its type panels. Switching kind can leave the
+    // stage on a value the new kind doesn't support (e.g. module attestation dropped from
+    // post_apply), so it is reset back to unselected rather than left stale, or silently defaulted
+    // to some other stage, on screen.
     const onKindChange = (kind: PolicyKind) => {
-        if (!editMode) {
-            onChange({ ...data, kind });
+        if (editMode) {
+            return;
         }
+        const validStages = stageOptionsForKind(kind);
+        const stage = validStages.some(opt => opt.value === data.stage) ? data.stage : '';
+        onChange({ ...data, kind, stage });
     };
 
     const onScopeRuleChange = (rule: ScopeRuleFormData) => {
@@ -287,6 +378,39 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                 <Typography variant="subtitle1" gutterBottom>OPA Configuration</Typography>
                 <Divider light />
                 <Box sx={{ mt: 2, mb: 4 }}>
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="subtitle2" gutterBottom>Stage</Typography>
+                        <StageSelector
+                            stage={data.stage}
+                            options={stageOptionsForKind(data.kind)}
+                            columnCount={STAGE_COLUMN_COUNT}
+                            onSelect={stage => {
+                                // Post-apply can only be advisory (state has already been written by
+                                // the time it evaluates), so switching to it pins both enforcement
+                                // levels rather than leaving a stale, now-invalid selection on screen.
+                                // Pinning apply runs to advisory takes the approvals with it, the same
+                                // as choosing that level directly.
+                                onChange(isPostApplyStage(stage)
+                                    ? clearApprovals({ ...data, stage, enforcementLevel: 'ADVISORY', speculativeRunEnforcementLevel: 'ADVISORY' })
+                                    : { ...data, stage });
+                            }}
+                        />
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="subtitle2" mb={2}>Enforcement Level</Typography>
+                        <EnforcementLevelSelects
+                            enforcementLevel={data.enforcementLevel}
+                            speculativeRunEnforcementLevel={data.speculativeRunEnforcementLevel}
+                            disabled={isPostApplyStage(data.stage)}
+                            onEnforcementLevelChange={level => {
+                                // The approvals below belong to the level being left behind, so
+                                // they go with it — including when the new level is soft
+                                // mandatory, where the section reappears configured fresh.
+                                onChange(clearApprovals({ ...data, enforcementLevel: level }));
+                            }}
+                            onSpeculativeRunEnforcementLevelChange={level => onChange({ ...data, speculativeRunEnforcementLevel: level })}
+                        />
+                    </Box>
                     <Typography variant="subtitle2" gutterBottom>Package</Typography>
                     {/* The field stays on screen pre-filled in both modes rather than collapsing to a chip
                 once a package is chosen: it accepts free-form input, which is captured as it is typed,
@@ -294,13 +418,13 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                     <Box sx={{ mb: 2 }}>
                         <PackageAutocomplete
                             groupPath={groupPath}
-                            value={data.package}
-                            onSelected={(value) => onChange({ ...data, package: value })}
+                            value={data.opa.package}
+                            onSelected={(value) => onChange({ ...data, opa: { ...data.opa, package: value } })}
                             filterOptions={(options) => options}
                         />
                         {/* The field itself already shows the fully-qualified source, so this is only a hint
                     for an empty field — including that an unpublished package may be named by hand. */}
-                        {!data.package?.packageSource && <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>
+                        {!data.opa.package?.packageSource && <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>
                             Pick a package, or type the source of one that is not published yet, e.g. my-group/sub-group/my-package.
                         </Typography>}
                     </Box>
@@ -311,8 +435,8 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                             label="Version constraint"
                             placeholder="e.g. 1.0.0 or ^1.0"
                             helperText="Leave blank to always use the latest version."
-                            value={data.packageVersionConstraint}
-                            onChange={event => onChange({ ...data, packageVersionConstraint: event.target.value })}
+                            value={data.opa.packageVersionConstraint}
+                            onChange={event => onChange({ ...data, opa: { ...data.opa, packageVersionConstraint: event.target.value } })}
                         />
                     </Box>
                     <Box sx={{ mb: 2 }}>
@@ -322,83 +446,77 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                             label="Digest (optional)"
                             placeholder="hex sha256"
                             helperText="Paste a version's checksum to fail the run if the policy content changes."
-                            value={data.packageDigest}
-                            onChange={event => onChange({ ...data, packageDigest: event.target.value })}
+                            value={data.opa.packageDigest}
+                            onChange={event => onChange({ ...data, opa: { ...data.opa, packageDigest: event.target.value } })}
+                        />
+                    </Box>
+                </Box>
+            </>}
+
+            {/* Module attestation's own configuration, parallel to the OPA section above — what gets
+                sent as moduleAttestationData. Its stage options exclude post-plan/post-apply (see
+                stageOptionsForKind), so there is no post-apply-advisory clamp to apply here. */}
+            {data.kind === 'MODULE_ATTESTATION' && <>
+                <Typography variant="subtitle1" gutterBottom>Module Attestation Configuration</Typography>
+                <Divider light />
+                <Box sx={{ mt: 2, mb: 4 }}>
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>Stage</Typography>
+                        <StageSelector
+                            stage={data.stage}
+                            options={stageOptionsForKind(data.kind)}
+                            columnCount={STAGE_COLUMN_COUNT}
+                            onSelect={stage => onChange({ ...data, stage })}
                         />
                     </Box>
                     <Box sx={{ mb: 2 }}>
-                        <FormControl size="small" sx={{ minWidth: 160 }}>
-                            <InputLabel>Stage</InputLabel>
-                            <Select
-                                label="Stage"
-                                value={data.stage}
-                                onChange={event => {
-                                    const stage = event.target.value as PolicyStage;
-                                    // Post-apply can only be advisory (state has already been written by
-                                    // the time it evaluates), so switching to it pins both enforcement
-                                    // levels rather than leaving a stale, now-invalid selection on screen.
-                                    // Pinning apply runs to advisory takes the approvals with it, the same
-                                    // as choosing that level directly.
-                                    onChange(isPostApplyStage(stage)
-                                        ? clearApprovals({ ...data, stage, enforcementLevel: 'ADVISORY', speculativeRunEnforcementLevel: 'ADVISORY' })
-                                        : { ...data, stage });
-                                }}
-                            >
-                                {STAGE_OPTIONS.map(opt => (
-                                    <MenuItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    </Box>
-                    <Box>
                         <Typography variant="subtitle2" mb={2}>Enforcement Level</Typography>
-                        {isPostApplyStage(data.stage) && <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 1 }}>
-                            Post-apply policies can only be enforced at Advisory: state has already been written by the time this stage evaluates, so there is no run outcome left for a stronger level to block.
-                        </Typography>}
-                        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 1 }}>
-                            <FormControl size="small" sx={{ minWidth: 420 }} disabled={isPostApplyStage(data.stage)}>
-                                <InputLabel>Apply Runs</InputLabel>
-                                <Select
-                                    label="Apply Runs"
-                                    value={data.enforcementLevel}
-                                    onChange={event => {
-                                        const level = event.target.value as PolicyEnforcementLevel;
-                                        // The approvals below belong to the level being left behind, so
-                                        // they go with it — including when the new level is soft
-                                        // mandatory, where the section reappears configured fresh.
-                                        onChange(clearApprovals({ ...data, enforcementLevel: level }));
-                                    }}
-                                >
-                                    {ENFORCEMENT_OPTIONS.map(opt => (
-                                        <MenuItem key={opt.value} value={opt.value}>
-                                            <ListItemText
-                                                primary={opt.label}
-                                                secondary={ENFORCEMENT_OPTIONS.find(o => o.value === opt.value)?.description}
-                                            />
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <FormControl size="small" sx={{ minWidth: 420 }} disabled={isPostApplyStage(data.stage)}>
-                                <InputLabel>Speculative & Assessment Runs</InputLabel>
-                                <Select
-                                    label="Speculative & Assessment Runs"
-                                    value={data.speculativeRunEnforcementLevel}
-                                    onChange={event => onChange({ ...data, speculativeRunEnforcementLevel: event.target.value as SpeculativeRunEnforcementLevel })}
-                                >
-                                    {SPECULATIVE_ENFORCEMENT_OPTIONS.map(opt => (
-                                        <MenuItem key={opt.value} value={opt.value}>
-                                            <ListItemText
-                                                primary={opt.label}
-                                                secondary={ENFORCEMENT_OPTIONS.find(o => o.value === opt.value)?.description}
-                                            />
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Box>
+                        <EnforcementLevelSelects
+                            enforcementLevel={data.enforcementLevel}
+                            speculativeRunEnforcementLevel={data.speculativeRunEnforcementLevel}
+                            onEnforcementLevelChange={level => onChange(clearApprovals({ ...data, enforcementLevel: level }))}
+                            onSpeculativeRunEnforcementLevelChange={level => onChange({ ...data, speculativeRunEnforcementLevel: level })}
+                        />
+                    </Box>
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>Public Key</Typography>
+                        <TextField
+                            size="small"
+                            fullWidth
+                            required
+                            multiline
+                            rows={6}
+                            placeholder="-----BEGIN PUBLIC KEY-----"
+                            helperText="The PEM-encoded public key the module's attestation signature must verify against. Supports ECDSA and RSA public keys."
+                            value={data.moduleAttestation.publicKey}
+                            onChange={event => onChange({ ...data, moduleAttestation: { ...data.moduleAttestation, publicKey: event.target.value } })}
+                        />
+                    </Box>
+                    <Box sx={{ mb: 2 }}>
+                        <TextField
+                            size="small"
+                            fullWidth
+                            label="In-Toto Predicate type (optional)"
+                            placeholder="e.g. https://slsa.dev/provenance/v1"
+                            helperText="Leave blank to accept any predicate type."
+                            value={data.moduleAttestation.predicateType}
+                            onChange={event => onChange({ ...data, moduleAttestation: { ...data.moduleAttestation, predicateType: event.target.value } })}
+                        />
+                    </Box>
+                    <Box sx={{ mb: 2 }}>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={data.moduleAttestation.verifyStateLineage}
+                                    onChange={event => onChange({ ...data, moduleAttestation: { ...data.moduleAttestation, verifyStateLineage: event.target.checked } })}
+                                />
+                            }
+                            label="Verify state lineage"
+                        />
+                        <Typography variant="caption" color="textSecondary" display="block">
+                            Also require the workspace's current state to have been written by a run using the same module source,
+                            so state cannot be carried over from an unattested module.
+                        </Typography>
                     </Box>
                 </Box>
             </>}

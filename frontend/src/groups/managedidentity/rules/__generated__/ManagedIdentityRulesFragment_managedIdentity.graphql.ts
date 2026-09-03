@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7ccb29be71a097b966cc74fe9872f26d>>
+ * @generated SignedSource<<2007860b9dfcd239b70d4ce971c3fc29>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,7 +9,7 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type JobType = "apply" | "plan" | "%future added value";
+export type JobType = "apply" | "opa" | "plan" | "%future added value";
 export type ManagedIdentityAccessRuleType = "eligible_principals" | "module_attestation" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type ManagedIdentityRulesFragment_managedIdentity$data = {

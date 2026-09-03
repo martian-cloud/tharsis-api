@@ -7,7 +7,10 @@ interface Props {
     confirmLabel: string;
     cancelLabel?: string;
     confirmDisabled?: boolean;
-    confirmColor?: 'error' | 'primary';
+    // Defaults to error, since most confirmations guard something destructive. success is for a
+    // confirmation whose action is the positive outcome (approving a run gate), and primary for one
+    // that is neither — a decision the dialog records rather than a change it destroys.
+    confirmColor?: 'error' | 'primary' | 'success';
     confirmInProgress: boolean;
     onConfirm: () => void;
     onClose: () => void;

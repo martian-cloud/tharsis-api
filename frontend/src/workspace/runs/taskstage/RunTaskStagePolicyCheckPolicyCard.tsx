@@ -10,6 +10,7 @@ import { useFragment } from 'react-relay/hooks';
 import { Link as RouterLink } from 'react-router-dom';
 import RunTaskStagePolicyApproversBox from './RunTaskStagePolicyApproversBox';
 import Pill from '../../../common/Pill';
+import { ENFORCEMENT_LEVEL_LABELS } from '../../../namespace/policies/policyDisplay';
 import { RunTaskStagePolicyCheckPolicyCardFragment_gate$key } from './__generated__/RunTaskStagePolicyCheckPolicyCardFragment_gate.graphql';
 import { RunTaskStagePolicyCheckPolicyCardFragment_policy$key } from './__generated__/RunTaskStagePolicyCheckPolicyCardFragment_policy.graphql';
 import { POLICY_FAILED, POLICY_PASSED } from './policyCheck';
@@ -54,6 +55,16 @@ function DetailValue({ children }: { children: ReactNode }) {
     );
 }
 
+// Strips the PEM armor and returns a short head of the key body, so a card shows something
+// identifiable without the full key. The tooltip carries the whole thing.
+function publicKeyPreview(publicKey: string): string {
+    const body = publicKey
+        .split('\n')
+        .filter(line => line && !line.startsWith('-----'))
+        .join('');
+    return body.length > 24 ? `${body.slice(0, 24)}…` : body;
+}
+
 function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef }: Props) {
     const theme = useTheme();
 
@@ -66,9 +77,16 @@ function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef }: Props) {
             # was evaluated. Both are empty on checks created before the fields existed.
             name
             description
-            packageSource
-            # The constraint as snapshotted, not a resolved version — empty means latest.
-            packageVersionConstraint
+            opaData {
+                packageSource
+                # The constraint as snapshotted, not a resolved version — empty means latest.
+                packageVersionConstraint
+            }
+            moduleAttestationData {
+                publicKey
+                predicateType
+                verifyStateLineage
+            }
             enforcementLevel
             status
             # One entry per violation. Read from object storage per policy, which is why the panel
@@ -96,6 +114,9 @@ function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef }: Props) {
         }
       `, gateRef);
 
+    const enforcementLevelColors = theme.palette.enforcementLevel;
+    const enfColor = enforcementLevelColors[policy.enforcementLevel as keyof typeof enforcementLevelColors] ?? enforcementLevelColors.ADVISORY;
+
     const failed = policy.status === POLICY_FAILED;
     const passed = policy.status === POLICY_PASSED;
     // An unevaluated policy (status is '' until the check reports) gets no verdict pill at all rather
@@ -104,14 +125,9 @@ function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef }: Props) {
 
     return (
         <Paper
-            variant="outlined"
             component="article"
             sx={{
-                // A step below the panels above rather than level with them: these cards are a list
-                // of details under those panels, not peers of them. Lighter than the page all the
-                // same, so the gap between two cards reads as a channel and they separate from each
-                // other — which a fill level with the page cannot do, whichever direction it moves.
-                background: darken(theme.palette.background.paper, 0.20),
+                background: darken(theme.palette.background.paper, 0.10),
                 padding: 2,
                 display: 'flex',
                 flexDirection: 'column',
@@ -123,10 +139,10 @@ function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef }: Props) {
                     {/* The snapshot's name, falling back to the package for checks created before the
                         name was snapshotted. */}
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                        {policy.name || policy.packageSource}
+                        {policy.name || policy.opaData?.packageSource}
                     </Typography>
-                    <Pill variant="outline">
-                        {policy.enforcementLevel.replace(/_/g, ' ').toLowerCase()}
+                    <Pill variant="tint" size="small" color={enfColor}>
+                        {ENFORCEMENT_LEVEL_LABELS[policy.enforcementLevel] ?? policy.enforcementLevel}
                     </Pill>
                     {(failed || passed) && (
                         // ml auto rather than a spacer element, so the verdict stays right-aligned
@@ -155,25 +171,42 @@ function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef }: Props) {
             <Box
                 sx={{
                     display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: '0.7fr 1.5fr 0.8fr' },
+                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fit, minmax(200px, 1fr))' },
                     gap: '16px 24px',
                 }}
             >
                 <DetailCell label="Policy type">
-                    <DetailValue>OPA</DetailValue>
+                    <DetailValue>{policy.opaData ? 'OPA' : 'Module attestation'}</DetailValue>
                 </DetailCell>
-                <DetailCell label="Package source">
-                    <DetailValue>{policy.packageSource}</DetailValue>
-                </DetailCell>
-                <DetailCell label="Package version">
-                    {/* Says outright that this is a constraint: the check resolves it when it runs, so
-                        the version that was really evaluated is only in the job log. */}
-                    <Tooltip title="The version constraint this policy was pinned to. The concrete version evaluated is recorded in the policy check's job log.">
-                        <span>
-                            <DetailValue>{policy.packageVersionConstraint || 'latest'}</DetailValue>
-                        </span>
-                    </Tooltip>
-                </DetailCell>
+                {policy.opaData && <>
+                    <DetailCell label="Package source">
+                        <DetailValue>{policy.opaData.packageSource}</DetailValue>
+                    </DetailCell>
+                    <DetailCell label="Package version">
+                        {/* Says outright that this is a constraint: the check resolves it when it runs, so
+                            the version that was really evaluated is only in the job log. */}
+                        <Tooltip title="The version constraint this policy was pinned to. The concrete version evaluated is recorded in the policy check's job log.">
+                            <span>
+                                <DetailValue>{policy.opaData.packageVersionConstraint || 'latest'}</DetailValue>
+                            </span>
+                        </Tooltip>
+                    </DetailCell>
+                </>}
+                {policy.moduleAttestationData && <>
+                    <DetailCell label="Predicate type">
+                        <DetailValue>{policy.moduleAttestationData.predicateType || 'any'}</DetailValue>
+                    </DetailCell>
+                    <DetailCell label="Verify state lineage">
+                        <DetailValue>{policy.moduleAttestationData.verifyStateLineage ? 'yes' : 'no'}</DetailValue>
+                    </DetailCell>
+                    <DetailCell label="Public key">
+                        <Tooltip title={policy.moduleAttestationData.publicKey}>
+                            <Box sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <DetailValue>{publicKeyPreview(policy.moduleAttestationData.publicKey)}</DetailValue>
+                            </Box>
+                        </Tooltip>
+                    </DetailCell>
+                </>}
             </Box>
 
             {gate && <RunTaskStagePolicyApproversBox gateRef={gate} policyId={policy.id} />}
@@ -260,7 +293,7 @@ function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef }: Props) {
                             alignItems: 'center',
                             gap: '5px',
                             fontWeight: 600,
-                            color: theme.palette.primary.main,
+                            color: theme.palette.secondary.main,
                             textDecoration: 'none',
                             flexShrink: 0,
                             '&:hover': { textDecoration: 'underline' },

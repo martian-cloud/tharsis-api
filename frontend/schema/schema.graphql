@@ -854,6 +854,7 @@ input CreatePolicyInput {
   description: String
   groupId: String!
   kind: PolicyKind!
+  moduleAttestationData: ModuleAttestationPolicyDataInput
   name: String!
   opaData: OPAPolicyDataInput
   requiredApprovals: Int
@@ -1687,6 +1688,7 @@ type Job implements Node {
   logs(limit: Int!, startOffset: Int!): String!
   maxJobDuration: Int!
   metadata: ResourceMetadata!
+  opaData: JobOPAData
   outdatedJobProtocolVersion: Boolean!
   properties: [KeyValueEntry!]!
   run: Run!
@@ -1741,6 +1743,10 @@ input JobLogStreamSubscriptionInput {
   lastSeenLogSize: Int
 }
 
+type JobOPAData {
+  taskStageName: RunTaskStageName
+}
+
 enum JobSort {
   CREATED_AT_ASC
   CREATED_AT_DESC
@@ -1772,6 +1778,7 @@ type JobTimestamps {
 
 enum JobType {
   apply
+  opa
   plan
 }
 
@@ -2288,6 +2295,15 @@ input OIDCTrustPolicyInput {
   issuer: String!
 }
 
+type ModuleAttestationPolicyData {
+  enforcementLevel: PolicyEnforcementLevel!
+  predicateType: String
+  publicKey: String!
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
+  stage: PolicyStage!
+  verifyStateLineage: Boolean!
+}
+
 type OPAPolicyData {
   enforcementLevel: PolicyEnforcementLevel!
   packageDigest: String
@@ -2295,6 +2311,15 @@ type OPAPolicyData {
   packageVersionConstraint: String
   speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
   stage: PolicyStage!
+}
+
+input ModuleAttestationPolicyDataInput {
+  enforcementLevel: PolicyEnforcementLevel!
+  predicateType: String
+  publicKey: String!
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
+  stage: PolicyStage!
+  verifyStateLineage: Boolean!
 }
 
 input OPAPolicyDataInput {
@@ -2520,6 +2545,7 @@ type Policy implements Node {
   id: ID!
   kind: PolicyKind!
   metadata: ResourceMetadata!
+  moduleAttestationData: ModuleAttestationPolicyData
   name: String!
   opaData: OPAPolicyData
   requiredApprovals: Int!
@@ -2544,14 +2570,26 @@ type PolicyCheckMessagesSummary {
   truncated: Boolean!
 }
 
+type PolicyCheckModuleAttestationData {
+  predicateType: String
+  publicKey: String!
+  verifyStateLineage: Boolean!
+}
+
+type PolicyCheckOPAData {
+  packageDigest: String
+  packageSource: String!
+  packageVersionConstraint: String!
+}
+
 type PolicyCheckPolicy {
   description: String!
   enforcementLevel: PolicyEnforcementLevel!
   id: String!
   messages: [String!]!
+  moduleAttestationData: PolicyCheckModuleAttestationData
   name: String!
-  packageSource: String!
-  packageVersionConstraint: String!
+  opaData: PolicyCheckOPAData
   policy: Policy
   provenance: PolicyCheckPolicyProvenance!
   status: String!
@@ -2593,6 +2631,7 @@ enum PolicyEnforcementLevel {
 }
 
 enum PolicyKind {
+  MODULE_ATTESTATION
   OPA
 }
 
@@ -2952,6 +2991,7 @@ enum RunGateStatus {
 
 enum RunGateType {
   OPA_POLICY
+  MODULE_ATTESTATION
 }
 
 type RunMutationPayload {
@@ -3918,6 +3958,7 @@ input UpdatePolicyInput {
   clientMutationId: String
   description: String
   id: String!
+  moduleAttestationData: ModuleAttestationPolicyDataInput
   opaData: OPAPolicyDataInput
   requiredApprovals: Int
   scope: [PolicyScopeRuleInput!]

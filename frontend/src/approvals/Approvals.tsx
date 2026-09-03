@@ -68,6 +68,7 @@ function ApprovalList() {
                 to="/"
                 underline="hover"
                 variant="body2"
+                color="textSecondary"
                 sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.875, mb: 2 }}
             >
                 <ArrowBackIcon sx={{ width: 16, height: 16 }} />

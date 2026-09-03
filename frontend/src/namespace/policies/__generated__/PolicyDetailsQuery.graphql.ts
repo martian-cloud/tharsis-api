@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<dcfbfbb3f40552b0f36bc425243a7ac1>>
+ * @generated SignedSource<<c763f6ecfd174d5b58924f1ad4224ea2>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -50,6 +50,27 @@ v3 = {
   "args": null,
   "kind": "ScalarField",
   "name": "name",
+  "storageKey": null
+},
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "stage",
+  "storageKey": null
+},
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "enforcementLevel",
+  "storageKey": null
+},
+v6 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "speculativeRunEnforcementLevel",
   "storageKey": null
 };
 return {
@@ -169,27 +190,44 @@ return {
                     "name": "packageDigest",
                     "storageKey": null
                   },
+                  (v4/*: any*/),
+                  (v5/*: any*/),
+                  (v6/*: any*/)
+                ],
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "concreteType": "ModuleAttestationPolicyData",
+                "kind": "LinkedField",
+                "name": "moduleAttestationData",
+                "plural": false,
+                "selections": [
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "stage",
+                    "name": "publicKey",
                     "storageKey": null
                   },
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "enforcementLevel",
+                    "name": "predicateType",
                     "storageKey": null
                   },
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "speculativeRunEnforcementLevel",
+                    "name": "verifyStateLineage",
                     "storageKey": null
-                  }
+                  },
+                  (v4/*: any*/),
+                  (v5/*: any*/),
+                  (v6/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -301,12 +339,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "68dfb9fb2446a5f6750c075e637d40e5",
+    "cacheID": "e8556104ce0cbc142e5201d1c7fa93a4",
     "id": null,
     "metadata": {},
     "name": "PolicyDetailsQuery",
     "operationKind": "query",
-    "text": "query PolicyDetailsQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Policy {\n      ...PolicyDetailsFragment_policy\n    }\n    id\n  }\n}\n\nfragment PolicyDetailsFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    packageDigest\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  scope {\n    type\n    action\n    pattern\n  }\n  groupPath\n  allowedUsers {\n    id\n    email\n    username\n  }\n  allowedTeams {\n    id\n    name\n  }\n  allowedServiceAccounts {\n    id\n    name\n    resourcePath\n  }\n}\n"
+    "text": "query PolicyDetailsQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Policy {\n      ...PolicyDetailsFragment_policy\n    }\n    id\n  }\n}\n\nfragment PolicyDetailsFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    packageDigest\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    verifyStateLineage\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  scope {\n    type\n    action\n    pattern\n  }\n  groupPath\n  allowedUsers {\n    id\n    email\n    username\n  }\n  allowedTeams {\n    id\n    name\n  }\n  allowedServiceAccounts {\n    id\n    name\n    resourcePath\n  }\n}\n"
   }
 };
 })();

@@ -130,7 +130,7 @@ function NamespaceMembershipList(props: Props) {
   return (
     <Box>
       {(search !== '' || filteredNamespaceMemberships.length > 0) && <Box>
-        <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
+        <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
           <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
             <Typography variant="subtitle1">{filteredNamespaceMemberships.length} member{filteredNamespaceMemberships.length === 1 ? '' : 's'}</Typography>
           </Box>

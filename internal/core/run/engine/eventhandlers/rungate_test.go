@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -48,6 +49,26 @@ func awaitingOverrideRun(policies []*models.PolicyCheckPolicy) *models.Run {
 	}
 }
 
+// moduleAttestationAwaitingOverrideRun mirrors awaitingOverrideRun but for a module attestation
+// check, so gate-creation/type-mapping tests can reuse the same policy fixtures.
+func moduleAttestationAwaitingOverrideRun(policies []*models.PolicyCheckPolicy) *models.Run {
+	return &models.Run{
+		Metadata:    models.ResourceMetadata{ID: gateTestRunID},
+		WorkspaceID: "ws-1",
+		TaskStages: []*models.RunTaskStage{{
+			StageName: models.RunTaskStageNamePostPlan,
+			Status:    models.RunTaskStageAwaitingOverride,
+			PolicyChecks: []*models.PolicyCheck{{
+				ID:        gateTestCheckID,
+				StageName: models.RunTaskStageNamePostPlan,
+				CheckType: models.PolicyKindModuleAttestation,
+				Status:    models.PolicyCheckSoftFailed,
+				Policies:  policies,
+			}},
+		}},
+	}
+}
+
 func awaitingOverrideChange(run *models.Run) []types.RunChange {
 	return []types.RunChange{{
 		Run: run,
@@ -82,7 +103,7 @@ func retriedCheckChange(run *models.Run, from models.PolicyCheckStatus) []types.
 func softFailedPolicy() *models.PolicyCheckPolicy {
 	return &models.PolicyCheckPolicy{
 		ID:                "policy-1",
-		PackageSource:     "my-policy-set",
+		OPAData:           &models.PolicyCheckOPAData{PackageSource: "my-policy-set"},
 		EnforcementLevel:  models.PolicyEnforcementSoftMandatory,
 		Status:            models.PolicyCheckPolicyFailed,
 		RequiredApprovals: 2,
@@ -302,6 +323,296 @@ func TestRunGateManager_DeletesGateWhenCheckRetried(t *testing.T) {
 			mockRunGates.AssertNotCalled(t, "CreateRunGate", mock.Anything, mock.Anything)
 		})
 	}
+}
+
+// TestRunGateManager_CreatesGateForModuleAttestationCheck verifies a soft-failed module attestation
+// check produces a gate of type module_attestation, exercising runGateTypeForCheck's mapping through
+// the full gate-creation path rather than in isolation.
+func TestRunGateManager_CreatesGateForModuleAttestationCheck(t *testing.T) {
+	logr, _ := logger.NewForTest()
+	ctx := context.Background()
+
+	mockRunGates := db.NewMockRunGates(t)
+	mockUsers := db.NewMockUsers(t)
+	mockTeams := db.NewMockTeams(t)
+
+	mockRunGates.On("GetRunGates", mock.Anything, mock.MatchedBy(checkScopedGateQuery)).
+		Return(&db.RunGatesResult{RunGates: []models.RunGate{}}, nil)
+	mockUsers.On("GetUsers", mock.Anything, mock.MatchedBy(func(in *db.GetUsersInput) bool {
+		return in.Filter != nil && len(in.Filter.UserIDs) == 1 && in.Filter.UserIDs[0] == gateTestUserID
+	})).Return(&db.UsersResult{Users: []models.User{{
+		Metadata: models.ResourceMetadata{ID: gateTestUserID, TRN: "trn:user:alice"},
+		Username: "alice",
+	}}}, nil)
+	mockTeams.On("GetTeams", mock.Anything, mock.MatchedBy(func(in *db.GetTeamsInput) bool {
+		return in.Filter != nil && len(in.Filter.TeamIDs) == 1 && in.Filter.TeamIDs[0] == gateTestTeamID
+	})).Return(&db.TeamsResult{Teams: []models.Team{{
+		Metadata: models.ResourceMetadata{ID: gateTestTeamID, TRN: "trn:team:my-team"},
+		Name:     "my-team",
+	}}}, nil)
+
+	mockRunGates.On("CreateRunGate", mock.Anything, mock.MatchedBy(func(gate *models.RunGate) bool {
+		return gate.RunID == gateTestRunID && gate.Type == models.RunGateTypeModuleAttestation
+	})).Return(&models.RunGate{}, nil).Once()
+
+	dbClient := &db.Client{RunGates: mockRunGates, Users: mockUsers, Teams: mockTeams}
+	handler := NewRunGateManager(logr, dbClient)
+
+	require.NoError(t, handler.HandleRunChanges(ctx,
+		awaitingOverrideChange(moduleAttestationAwaitingOverrideRun([]*models.PolicyCheckPolicy{softFailedPolicy()}))))
+
+	mockRunGates.AssertExpectations(t)
+}
+
+// TestRunGateManager_DeletesGateWhenModuleAttestationCheckRetried mirrors
+// TestRunGateManager_DeletesGateWhenCheckRetried for a module attestation check: the gate deletion on
+// retry is keyed by policy check ID, not check kind, so it must behave identically.
+func TestRunGateManager_DeletesGateWhenModuleAttestationCheckRetried(t *testing.T) {
+	logr, _ := logger.NewForTest()
+	ctx := context.Background()
+
+	existing := models.RunGate{
+		Metadata:      models.ResourceMetadata{ID: "gate-stale", Version: 3},
+		RunID:         gateTestRunID,
+		PolicyCheckID: gateTestCheckID,
+		Type:          models.RunGateTypeModuleAttestation,
+		Status:        models.RunGatePending,
+	}
+
+	mockRunGates := db.NewMockRunGates(t)
+	mockRunGates.On("GetRunGates", mock.Anything, mock.MatchedBy(checkScopedGateQuery)).
+		Return(&db.RunGatesResult{RunGates: []models.RunGate{existing}}, nil)
+	mockRunGates.On("DeleteRunGate", mock.Anything, mock.MatchedBy(func(g *models.RunGate) bool {
+		return g.Metadata.ID == existing.Metadata.ID && g.Metadata.Version == existing.Metadata.Version
+	})).Return(nil).Once()
+
+	dbClient := &db.Client{RunGates: mockRunGates}
+	handler := NewRunGateManager(logr, dbClient)
+
+	require.NoError(t, handler.HandleRunChanges(ctx,
+		retriedCheckChange(moduleAttestationAwaitingOverrideRun([]*models.PolicyCheckPolicy{softFailedPolicy()}), models.PolicyCheckSoftFailed)))
+
+	mockRunGates.AssertExpectations(t)
+}
+
+// TestRunGateManager_CancelsGateWhenCheckCanceled covers a check that is settled without its gate ever
+// being decided: its stage errored, or the run was canceled/discarded under it. The gate must leave the
+// approvers' queue, and canceling it (rather than deleting, which is the retry path) keeps it and its
+// approvals as history.
+func TestRunGateManager_CancelsGateWhenCheckCanceled(t *testing.T) {
+	logr, _ := logger.NewForTest()
+	ctx := context.Background()
+
+	existing := models.RunGate{
+		Metadata:      models.ResourceMetadata{ID: "gate-abandoned", Version: 2},
+		RunID:         gateTestRunID,
+		PolicyCheckID: gateTestCheckID,
+		Type:          models.RunGateTypeOPAPolicy,
+		Status:        models.RunGatePending,
+	}
+
+	mockRunGates := db.NewMockRunGates(t)
+	mockRunGates.On("GetRunGates", mock.Anything, mock.MatchedBy(checkScopedGateQuery)).
+		Return(&db.RunGatesResult{RunGates: []models.RunGate{existing}}, nil)
+	mockRunGates.On("UpdateRunGate", mock.Anything, mock.MatchedBy(func(g *models.RunGate) bool {
+		return g.Metadata.ID == existing.Metadata.ID && g.Status == models.RunGateCanceled
+	})).Return(&models.RunGate{}, nil).Once()
+
+	dbClient := &db.Client{RunGates: mockRunGates}
+	handler := NewRunGateManager(logr, dbClient)
+
+	run := awaitingOverrideRun([]*models.PolicyCheckPolicy{softFailedPolicy()})
+	run.AllPolicyChecks()[0].Status = models.PolicyCheckCanceled
+	require.NoError(t, handler.HandleRunChanges(ctx, []types.RunChange{{
+		Run: run,
+		NodeStatusChanges: []statemachine.NodeStatusChange{
+			statemachine.PolicyCheckStatusChange{
+				OldStatus: models.PolicyCheckSoftFailed,
+				NewStatus: models.PolicyCheckCanceled,
+				CheckID:   gateTestCheckID,
+			},
+		},
+	}}))
+
+	mockRunGates.AssertExpectations(t)
+	mockRunGates.AssertNotCalled(t, "DeleteRunGate", mock.Anything, mock.Anything)
+}
+
+// TestRunGateManager_NoGateForCheckSoftFailedAndCanceledInSameBatch guards the leak a multi-check stage
+// can produce: one check fails a hard gate while a sibling soft-fails, so the sibling's soft failure and
+// its cancellation land in the SAME batch of changes as the run's terminal status. The changes arrive in
+// tree order (run first), so the run-level sweep has already run by the time the soft failure is handled
+// — a gate created then would sit pending in an approver's queue forever, for a canceled check on an
+// errored run. The batch is produced by the real state machine rather than hand-written, so it stays
+// honest about the order the handler actually sees.
+func TestRunGateManager_NoGateForCheckSoftFailedAndCanceledInSameBatch(t *testing.T) {
+	logr, _ := logger.NewForTest()
+	ctx := context.Background()
+
+	run := &models.Run{
+		Metadata:    models.ResourceMetadata{ID: gateTestRunID},
+		WorkspaceID: "ws-1",
+		Status:      models.RunPostPlanRunning,
+		Plan:        models.Plan{ID: "plan-1", Status: models.PlanFinished, HasChanges: true},
+		Apply:       &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+		TaskStages: []*models.RunTaskStage{{
+			ID:        "stage-post",
+			StageName: models.RunTaskStageNamePostPlan,
+			Status:    models.RunTaskStageRunning,
+			PolicyChecks: []*models.PolicyCheck{
+				{ID: "check-hard", StageName: models.RunTaskStageNamePostPlan, CheckType: models.PolicyKindOPA, Status: models.PolicyCheckRunning},
+				{
+					ID:        gateTestCheckID,
+					StageName: models.RunTaskStageNamePostPlan,
+					CheckType: models.PolicyKindModuleAttestation,
+					Status:    models.PolicyCheckRunning,
+					Policies:  []*models.PolicyCheckPolicy{softFailedPolicy()},
+				},
+			},
+		}},
+	}
+
+	// The hard failure alone settles nothing: the stage waits for its sibling, so no gate and no
+	// terminal run status yet.
+	_, err := statemachine.SetPolicyCheckStatus(run, "post_plan.opa", models.PolicyCheckErrored)
+	require.NoError(t, err)
+	require.Equal(t, models.RunPostPlanRunning, run.Status)
+
+	// The sibling soft-fails, which settles the stage: it errors on the hard failure and cancels the
+	// soft-failed sibling, all in this one batch.
+	changes, err := statemachine.SetPolicyCheckStatus(run, "post_plan.module_attestation", models.PolicyCheckSoftFailed)
+	require.NoError(t, err)
+	require.Equal(t, models.RunErrored, run.Status)
+
+	// The batch carries the run's terminal status BEFORE the sibling's soft failure — the ordering that
+	// makes this leak possible.
+	var sawRunErrored bool
+	var softFailedAfterRunErrored bool
+	for _, c := range changes {
+		switch sc := c.(type) {
+		case statemachine.RunStatusChange:
+			if sc.NewStatus == models.RunErrored {
+				sawRunErrored = true
+			}
+		case statemachine.PolicyCheckStatusChange:
+			if sc.NewStatus == models.PolicyCheckSoftFailed && sawRunErrored {
+				softFailedAfterRunErrored = true
+			}
+		}
+	}
+	require.True(t, softFailedAfterRunErrored, "the batch must carry the soft failure after the run's terminal status")
+
+	mockRunGates := db.NewMockRunGates(t)
+	// Both cleanup sweeps find nothing: no gate was ever created for this run.
+	mockRunGates.On("GetRunGates", mock.Anything, mock.Anything).
+		Return(&db.RunGatesResult{RunGates: []models.RunGate{}}, nil)
+
+	// The approver lookups gate creation would perform are allowed but not required, so the only thing
+	// that can keep CreateRunGate from being called is the handler refusing to open a gate for a check
+	// whose block no longer stands. CreateRunGate is deliberately left unmocked: a call fails the test.
+	mockUsers := db.NewMockUsers(t)
+	mockUsers.On("GetUsers", mock.Anything, mock.Anything).
+		Return(&db.UsersResult{Users: []models.User{{
+			Metadata: models.ResourceMetadata{ID: gateTestUserID, TRN: "trn:user:alice"},
+			Username: "alice",
+		}}}, nil).Maybe()
+	mockTeams := db.NewMockTeams(t)
+	mockTeams.On("GetTeams", mock.Anything, mock.Anything).
+		Return(&db.TeamsResult{Teams: []models.Team{{
+			Metadata: models.ResourceMetadata{ID: gateTestTeamID, TRN: "trn:team:my-team"},
+			Name:     "my-team",
+		}}}, nil).Maybe()
+
+	dbClient := &db.Client{RunGates: mockRunGates, Users: mockUsers, Teams: mockTeams}
+	handler := NewRunGateManager(logr, dbClient)
+
+	require.NoError(t, handler.HandleRunChanges(ctx, []types.RunChange{{Run: run, NodeStatusChanges: changes}}))
+
+	mockRunGates.AssertNotCalled(t, "CreateRunGate", mock.Anything, mock.Anything)
+}
+
+// TestRunGateTypeForCheck exhaustively covers the check-type-to-gate-type mapping: both supported
+// policy kinds map to their own gate type, and anything else is rejected rather than defaulting.
+func TestRunGateTypeForCheck(t *testing.T) {
+	tests := []struct {
+		checkType    models.PolicyKind
+		wantGateType models.RunGateType
+		expectErr    bool
+	}{
+		{checkType: models.PolicyKindOPA, wantGateType: models.RunGateTypeOPAPolicy},
+		{checkType: models.PolicyKindModuleAttestation, wantGateType: models.RunGateTypeModuleAttestation},
+		{checkType: models.PolicyKind("sentinel"), expectErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.checkType), func(t *testing.T) {
+			gateType, err := runGateTypeForCheck(tt.checkType)
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantGateType, gateType)
+		})
+	}
+}
+
+// TestRetryLoop_ClosesForModuleAttestationCheck proves the Task 4/Task 7 loop actually closes: a
+// retry's pending transition both deletes the stale gate and (once the ungated stage restarts and
+// re-queues the check in the same pass) causes PolicyCheckWorkItemEnqueuer to enqueue a fresh work
+// item — the same NodeStatusChanges RetryRunNode would produce are consumed by both handlers.
+func TestRetryLoop_ClosesForModuleAttestationCheck(t *testing.T) {
+	logr, _ := logger.NewForTest()
+	ctx := context.Background()
+
+	run := moduleAttestationAwaitingOverrideRun([]*models.PolicyCheckPolicy{softFailedPolicy()})
+	run.Status = models.RunPostPlanAwaitingDecision
+	checkPath := run.AllPolicyChecks()[0].GetPath()
+
+	// Mirrors what RetryRunNode does: set the check back to pending. Since the stage (post_plan) is
+	// not workspace-gated, this cascades synchronously through the stage restarting and re-queuing the
+	// check, so the returned changes include both the pending and the queued transition.
+	changes, err := statemachine.SetPolicyCheckStatus(run, checkPath, models.PolicyCheckPending)
+	require.NoError(t, err)
+
+	var sawQueued bool
+	for _, c := range changes {
+		if pc, ok := c.(statemachine.PolicyCheckStatusChange); ok && pc.NewStatus == models.PolicyCheckQueued {
+			sawQueued = true
+		}
+	}
+	require.True(t, sawQueued, "an ungated stage must re-queue the check in the same pass as the retry")
+
+	runChanges := []types.RunChange{{Run: run, NodeStatusChanges: changes}}
+
+	existing := models.RunGate{
+		Metadata:      models.ResourceMetadata{ID: "gate-stale", Version: 1},
+		RunID:         gateTestRunID,
+		PolicyCheckID: gateTestCheckID,
+		Type:          models.RunGateTypeModuleAttestation,
+		Status:        models.RunGatePending,
+	}
+	mockRunGates := db.NewMockRunGates(t)
+	mockRunGates.On("GetRunGates", mock.Anything, mock.MatchedBy(checkScopedGateQuery)).
+		Return(&db.RunGatesResult{RunGates: []models.RunGate{existing}}, nil)
+	mockRunGates.On("DeleteRunGate", mock.Anything, mock.MatchedBy(func(g *models.RunGate) bool {
+		return g.Metadata.ID == existing.Metadata.ID
+	})).Return(nil).Once()
+
+	gateHandler := NewRunGateManager(logr, &db.Client{RunGates: mockRunGates})
+	require.NoError(t, gateHandler.HandleRunChanges(ctx, runChanges))
+	mockRunGates.AssertExpectations(t)
+
+	mockWIQ := db.NewMockWorkItemsQueue(t)
+	mockWIQ.On("AddWorkItemToQueue", mock.Anything, mock.MatchedBy(func(in *db.AddWorkItemToQueueInput) bool {
+		payload, ok := in.Payload.(*db.EvaluateRunPolicyCheckPayload)
+		return in.Type == db.EvaluateRunPolicyCheckType &&
+			ok && payload.RunID == gateTestRunID && payload.PolicyCheckID == gateTestCheckID
+	})).Return(&db.WorkItem{}, nil).Once()
+
+	enqueuer := NewPolicyCheckWorkItemEnqueuer(logr, &db.Client{WorkItemsQueue: mockWIQ})
+	require.NoError(t, enqueuer.HandleRunChanges(ctx, runChanges))
+	mockWIQ.AssertExpectations(t)
 }
 
 // TestRunGateManager_RetryWithoutGateIsNoOp covers the common retry: a check that never had a gate

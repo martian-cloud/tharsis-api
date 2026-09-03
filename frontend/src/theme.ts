@@ -77,6 +77,11 @@ declare module '@mui/material/styles' {
             ERROR: string;
             UNKNOWN: string;
         };
+        enforcementLevel: {
+            ADVISORY: string;
+            SOFT_MANDATORY: string;
+            HARD_MANDATORY: string;
+        };
         avatar: {
             default: string;
             serviceAccount: string;
@@ -94,6 +99,7 @@ declare module '@mui/material/styles' {
         jobStatus?: Palette['jobStatus'];
         planDiff?: Palette['planDiff'];
         checkResult?: Palette['checkResult'];
+        enforcementLevel?: Palette['enforcementLevel'];
         avatar?: Palette['avatar'];
         announcement?: Palette['announcement'];
     }
@@ -183,6 +189,13 @@ export default createTheme({
             ERROR: '#fbbf24',
             UNKNOWN: '#9ca3af',
         },
+        // advisory is informational, soft mandatory is a warning since it can still be overridden, and
+        // hard mandatory is the one that always blocks.
+        enforcementLevel: {
+            ADVISORY: 'rgba(255,255,255,0.7)',
+            SOFT_MANDATORY: '#fbbf24',
+            HARD_MANDATORY: '#f87171',
+        },
         avatar: {
             default: teal[200],
             serviceAccount: '#d8b4fe',
@@ -217,6 +230,11 @@ export default createTheme({
         }
     },
     components: {
+        MuiPaper: {
+            defaultProps: {
+                elevation: 0,
+            },
+        },
         MuiAppBar: {
             styleOverrides: {
                 root: ({ theme }) => ({

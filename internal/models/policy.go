@@ -3,9 +3,11 @@ package models
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"slices"
 
 	goversion "github.com/hashicorp/go-version"
 	"github.com/ryanuber/go-glob"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -14,6 +16,26 @@ import (
 
 var _ Model = (*Policy)(nil)
 
+const (
+	// policyPackageSourceMaxLength bounds OPAPolicyData.PackageSource, a module-source-style
+	// string (e.g. a registry path or URL).
+	policyPackageSourceMaxLength = 512
+	// policyVersionConstraintMaxLength bounds OPAPolicyData.PackageVersionConstraint, a short
+	// go-version constraint expression such as ">= 1.0.0, < 2.0.0".
+	policyVersionConstraintMaxLength = 128
+	// policyPublicKeyMaxLength bounds ModuleAttestationPolicyData.PublicKey, a PEM-encoded public
+	// key. An RSA-4096 key -- larger than any of the RSA, ECDSA, or Ed25519 keys
+	// cryptoutils.UnmarshalPEMToPublicKey accepts -- PEM-encodes to roughly 800 bytes, so this
+	// leaves headroom without leaving the length gate so loose that it stops meaning anything.
+	policyPublicKeyMaxLength = 2048
+	// policyPredicateTypeMaxLength bounds ModuleAttestationPolicyData.PredicateType, an in-toto
+	// predicate type URI.
+	policyPredicateTypeMaxLength = 512
+	// policyScopePatternMaxLength bounds ScopeRule.Pattern, matching cleanupMaxPatternLength's
+	// role for a similarly free-form glob/TRN pattern.
+	policyScopePatternMaxLength = 512
+)
+
 // PolicyKind identifies the policy engine type.
 type PolicyKind string
 
@@ -21,6 +43,8 @@ type PolicyKind string
 const (
 	// PolicyKindOPA is an Open Policy Agent policy.
 	PolicyKindOPA PolicyKind = "opa"
+	// PolicyKindModuleAttestation requires the module a run deploys to carry an in-toto attestation.
+	PolicyKindModuleAttestation PolicyKind = "module_attestation"
 )
 
 // OPAPolicyData holds OPA-specific policy configuration.
@@ -34,6 +58,23 @@ type OPAPolicyData struct {
 	SpeculativeRunEnforcementLevel PolicyEnforcementLevel `json:"speculative_run_enforcement_level"`
 	Stage                          RunTaskStageName       `json:"stage"`
 }
+
+// ModuleAttestationPolicyData holds module-attestation-specific policy configuration. The module a
+// run deploys must carry an in-toto attestation signed by PublicKey; when PredicateType is set the
+// attestation's predicate type must match it as well. VerifyStateLineage additionally requires the
+// workspace's current state to have been written by a run using the same module source.
+type ModuleAttestationPolicyData struct {
+	PublicKey                      string                 `json:"public_key"`
+	PredicateType                  *string                `json:"predicate_type"`
+	VerifyStateLineage             bool                   `json:"verify_state_lineage"`
+	EnforcementLevel               PolicyEnforcementLevel `json:"enforcement_level"`
+	SpeculativeRunEnforcementLevel PolicyEnforcementLevel `json:"speculative_run_enforcement_level"`
+	Stage                          RunTaskStageName       `json:"stage"`
+}
+
+// ModuleAttestationStages are the stages a module attestation policy may evaluate at. The module is
+// verified before it is used, so a post-plan or post-apply check would come too late to stop anything.
+var ModuleAttestationStages = []RunTaskStageName{RunTaskStageNamePrePlan, RunTaskStageNamePreApply}
 
 // PolicyEnforcementLevel controls how a policy failure affects a run.
 type PolicyEnforcementLevel string
@@ -180,9 +221,10 @@ type Policy struct {
 	Name string
 	// Description is an optional description of the policy.
 	Description *string
-	// Kind identifies the policy engine type.
+	// Kind identifies the policy engine type, and which of the *Data fields below is set.
 	Kind                     PolicyKind
 	OPAData                  *OPAPolicyData
+	ModuleAttestationData    *ModuleAttestationPolicyData
 	Scope                    []*ScopeRule
 	RequiredApprovals        int
 	AllowedUserIDs           []string
@@ -190,6 +232,40 @@ type Policy struct {
 	AllowedTeamIDs           []string
 	CreatedBy                string
 	Metadata                 ResourceMetadata
+}
+
+// EnforcementLevel returns the policy's declared enforcement level, or the empty level when the
+// kind-specific data is missing.
+func (p *Policy) EnforcementLevel() PolicyEnforcementLevel {
+	switch {
+	case p.OPAData != nil:
+		return p.OPAData.EnforcementLevel
+	case p.ModuleAttestationData != nil:
+		return p.ModuleAttestationData.EnforcementLevel
+	}
+	return ""
+}
+
+// SpeculativeRunEnforcementLevel returns the level the policy is enforced at on a run with no apply.
+func (p *Policy) SpeculativeRunEnforcementLevel() PolicyEnforcementLevel {
+	switch {
+	case p.OPAData != nil:
+		return p.OPAData.SpeculativeRunEnforcementLevel
+	case p.ModuleAttestationData != nil:
+		return p.ModuleAttestationData.SpeculativeRunEnforcementLevel
+	}
+	return ""
+}
+
+// Stage returns the run stage the policy evaluates at.
+func (p *Policy) Stage() RunTaskStageName {
+	switch {
+	case p.OPAData != nil:
+		return p.OPAData.Stage
+	case p.ModuleAttestationData != nil:
+		return p.ModuleAttestationData.Stage
+	}
+	return ""
 }
 
 // GetID returns the Metadata ID.
@@ -263,111 +339,201 @@ func (p *Policy) MatchesManagedIdentity(miPaths []string) bool {
 	return false
 }
 
-// Validate returns an error if the model is not valid: GroupID and Name must be non-empty, Kind
-// must be set, OPAData must be present for OPA policies, the enforcement level must be supported,
-// the version constraint (if any) must parse, the digest (if any) must be a hex sha256, and
-// approvers may only be set on a soft-mandatory policy and must be able to meet requiredApprovals.
+// Validate returns an error if the model is not valid: GroupID and Name must be non-empty, Kind must
+// be a supported kind with its matching data present and valid, and approvers may only be set on a
+// soft-mandatory policy and must be able to meet requiredApprovals.
 func (p *Policy) Validate() error {
 	if p.GroupID == "" {
 		return errors.New("policy must have a group owner", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	if p.Name == "" {
-		return errors.New("policy name is required", errors.WithErrorCode(errors.EInvalid))
+	if err := verifyValidName(p.Name); err != nil {
+		return err
+	}
+
+	if p.Description != nil && len(*p.Description) > maxDescriptionLength {
+		return errors.New("policy description exceeds the maximum length (%d)", maxDescriptionLength, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if p.Kind == "" {
 		return errors.New("policy kind is required", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	if p.Kind == PolicyKindOPA {
-		if p.OPAData == nil {
-			return errors.New("OPA policy data is required for opa kind", errors.WithErrorCode(errors.EInvalid))
-		}
-		if p.OPAData.PackageSource == "" {
-			return errors.New("OPA policy package source is required", errors.WithErrorCode(errors.EInvalid))
-		}
-		if !p.OPAData.Stage.IsValid() {
-			return errors.New("OPA policy stage %q is not a valid run stage", p.OPAData.Stage,
-				errors.WithErrorCode(errors.EInvalid))
-		}
-		if err := ValidPolicyEnforcementLevel(p.OPAData.EnforcementLevel); err != nil {
+	switch p.Kind {
+	case PolicyKindOPA:
+		if err := p.validateOPAData(); err != nil {
 			return err
 		}
-		if err := ValidSpeculativeRunEnforcementLevel(p.OPAData.SpeculativeRunEnforcementLevel); err != nil {
+	case PolicyKindModuleAttestation:
+		if err := p.validateModuleAttestationData(); err != nil {
 			return err
 		}
-		// A post-apply check evaluates after state has already been written, so there is no run outcome
-		// left for a stronger enforcement level to protect: neither a soft nor a hard gate can block
-		// anything the apply hasn't already done. Both enforcement fields are therefore restricted to
-		// advisory for this stage.
-		if p.OPAData.Stage == RunTaskStageNamePostApply {
-			if p.OPAData.EnforcementLevel != PolicyEnforcementAdvisory {
-				return errors.New("post_apply policy enforcement level must be %s", PolicyEnforcementAdvisory,
-					errors.WithErrorCode(errors.EInvalid))
-			}
-			if p.OPAData.SpeculativeRunEnforcementLevel != PolicyEnforcementAdvisory {
-				return errors.New("post_apply policy speculative run enforcement level must be %s", PolicyEnforcementAdvisory,
-					errors.WithErrorCode(errors.EInvalid))
-			}
-		}
-		if p.OPAData.PackageVersionConstraint != nil && *p.OPAData.PackageVersionConstraint != "" {
-			if _, err := goversion.NewConstraint(*p.OPAData.PackageVersionConstraint); err != nil {
-				return errors.New("policy version constraint %q is invalid", *p.OPAData.PackageVersionConstraint,
-					errors.WithErrorCode(errors.EInvalid))
-			}
-		}
-		if p.OPAData.PackageDigest != nil {
-			if b, err := hex.DecodeString(*p.OPAData.PackageDigest); err != nil || len(b) != sha256.Size {
-				return errors.New("policy digest must be a hex-encoded sha256 checksum",
-					errors.WithErrorCode(errors.EInvalid))
-			}
-		}
-		// An approver appears once per policy: the approver tables hold one row per (policy, principal),
-		// and naming a principal twice does not make it two approvers. Rejected rather than collapsed so
-		// the caller finds out their list was not understood the way they wrote it -- silently dropping
-		// the repeat would also silently change what requiredApprovals is measured against.
-		for _, dup := range []struct {
-			kind string
-			ids  []string
-		}{
-			{"user", p.AllowedUserIDs},
-			{"service account", p.AllowedServiceAccountIDs},
-			{"team", p.AllowedTeamIDs},
-		} {
-			if id := firstDuplicateID(dup.ids); id != "" {
-				return errors.New("%s %s is listed as an approver more than once", dup.kind, id,
-					errors.WithErrorCode(errors.EInvalid))
-			}
-		}
+	default:
+		return errors.New("policy kind %s is not supported", p.Kind, errors.WithErrorCode(errors.EInvalid))
+	}
 
-		// Approvers only make sense for soft-mandatory policies.
-		allowedUsers := len(p.AllowedUserIDs)
-		allowedServiceAccounts := len(p.AllowedServiceAccountIDs)
-		allowedTeams := len(p.AllowedTeamIDs)
-		subjectCount := allowedUsers + allowedServiceAccounts + allowedTeams
+	if err := validateScopePatternLengths(p.Scope); err != nil {
+		return err
+	}
 
-		hasApprovers := p.RequiredApprovals > 0 || subjectCount > 0
-		if hasApprovers && p.OPAData.EnforcementLevel != PolicyEnforcementSoftMandatory {
-			return errors.New("approvers may only be set on a soft_mandatory policy",
+	return p.validateApprovers()
+}
+
+// validateScopePatternLengths returns an error if any scope rule's pattern exceeds
+// policyScopePatternMaxLength. This only bounds length; the rule's type, action, and pattern
+// shape (TRN vs. glob) are the service layer's responsibility (see validateScopeRules in
+// internal/services/policy), since rejecting an otherwise-valid pattern for its type would
+// require knowing the TRN types the model package intentionally leaves to the caller.
+func validateScopePatternLengths(scope []*ScopeRule) error {
+	for i, r := range scope {
+		if len(r.Pattern) > policyScopePatternMaxLength {
+			return errors.New("scope rule %d pattern exceeds the maximum length (%d)", i, policyScopePatternMaxLength,
 				errors.WithErrorCode(errors.EInvalid))
 		}
-		if (p.RequiredApprovals > 0) != (subjectCount > 0) {
-			return errors.New("approvers require both requiredApprovals >= 1 and at least one allowed subject",
+	}
+	return nil
+}
+
+func (p *Policy) validateOPAData() error {
+	if p.OPAData == nil {
+		return errors.New("OPA policy data is required for opa kind", errors.WithErrorCode(errors.EInvalid))
+	}
+	if p.OPAData.PackageSource == "" {
+		return errors.New("OPA policy package source is required", errors.WithErrorCode(errors.EInvalid))
+	}
+	if len(p.OPAData.PackageSource) > policyPackageSourceMaxLength {
+		return errors.New("OPA policy package source exceeds the maximum length (%d)", policyPackageSourceMaxLength,
+			errors.WithErrorCode(errors.EInvalid))
+	}
+	if !p.OPAData.Stage.IsValid() {
+		return errors.New("OPA policy stage %q is not a valid run stage", p.OPAData.Stage,
+			errors.WithErrorCode(errors.EInvalid))
+	}
+	if err := ValidPolicyEnforcementLevel(p.OPAData.EnforcementLevel); err != nil {
+		return err
+	}
+	if err := ValidSpeculativeRunEnforcementLevel(p.OPAData.SpeculativeRunEnforcementLevel); err != nil {
+		return err
+	}
+	// A post-apply check evaluates after state has already been written, so there is no run outcome
+	// left for a stronger enforcement level to protect: neither a soft nor a hard gate can block
+	// anything the apply hasn't already done. Both enforcement fields are therefore restricted to
+	// advisory for this stage.
+	if p.OPAData.Stage == RunTaskStageNamePostApply {
+		if p.OPAData.EnforcementLevel != PolicyEnforcementAdvisory {
+			return errors.New("post_apply policy enforcement level must be %s", PolicyEnforcementAdvisory,
 				errors.WithErrorCode(errors.EInvalid))
 		}
-		// A user or service account approves at most once -- a second decision from the same principal
-		// replaces the first -- so with no team subject the approver list is a ceiling on how many
-		// approvals a gate can ever collect. Requiring more than that parks every run the policy soft-fails
-		// with no way to reach the count, so it is rejected when the policy is written rather than
-		// discovered on a stuck run. A team subject lifts the ceiling: its approvals come from live
-		// membership, which is not known here and can change after the policy is written.
-		if allowedTeams == 0 && p.RequiredApprovals > allowedUsers+allowedServiceAccounts {
-			return errors.New(
-				"requiredApprovals is %d but the policy allows only %d approver(s), so the requirement can never be met",
-				p.RequiredApprovals, allowedUsers+allowedServiceAccounts,
+		if p.OPAData.SpeculativeRunEnforcementLevel != PolicyEnforcementAdvisory {
+			return errors.New("post_apply policy speculative run enforcement level must be %s", PolicyEnforcementAdvisory,
 				errors.WithErrorCode(errors.EInvalid))
 		}
+	}
+	if p.OPAData.PackageVersionConstraint != nil && *p.OPAData.PackageVersionConstraint != "" {
+		if len(*p.OPAData.PackageVersionConstraint) > policyVersionConstraintMaxLength {
+			return errors.New("policy version constraint exceeds the maximum length (%d)", policyVersionConstraintMaxLength,
+				errors.WithErrorCode(errors.EInvalid))
+		}
+		if _, err := goversion.NewConstraint(*p.OPAData.PackageVersionConstraint); err != nil {
+			return errors.New("policy version constraint %q is invalid", *p.OPAData.PackageVersionConstraint,
+				errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+	if p.OPAData.PackageDigest != nil {
+		// A hex-encoded sha256 checksum is exactly 64 characters, so this already bounds the
+		// field's length; no separate max-length constant is needed alongside it.
+		if b, err := hex.DecodeString(*p.OPAData.PackageDigest); err != nil || len(b) != sha256.Size {
+			return errors.New("policy digest must be a hex-encoded sha256 checksum",
+				errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+	return nil
+}
+
+func (p *Policy) validateModuleAttestationData() error {
+	data := p.ModuleAttestationData
+	if data == nil {
+		return errors.New("module attestation policy data is required for module_attestation kind",
+			errors.WithErrorCode(errors.EInvalid))
+	}
+	if data.PublicKey == "" {
+		return errors.New("module attestation policy public key is required", errors.WithErrorCode(errors.EInvalid))
+	}
+	if len(data.PublicKey) > policyPublicKeyMaxLength {
+		return errors.New("module attestation policy public key exceeds the maximum length (%d)", policyPublicKeyMaxLength,
+			errors.WithErrorCode(errors.EInvalid))
+	}
+	// Parsed when the policy is written so an unusable key fails here rather than on every run the
+	// policy applies to.
+	if _, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(data.PublicKey)); err != nil {
+		return errors.New("module attestation policy public key must be a PEM-encoded public key",
+			errors.WithErrorCode(errors.EInvalid))
+	}
+	// A set-but-empty predicate type would match no attestation; omitting it is how a caller says
+	// "any predicate type".
+	if data.PredicateType != nil && *data.PredicateType == "" {
+		return errors.New("module attestation policy predicate type must not be empty when supplied",
+			errors.WithErrorCode(errors.EInvalid))
+	}
+	if data.PredicateType != nil && len(*data.PredicateType) > policyPredicateTypeMaxLength {
+		return errors.New("module attestation policy predicate type exceeds the maximum length (%d)", policyPredicateTypeMaxLength,
+			errors.WithErrorCode(errors.EInvalid))
+	}
+	if !slices.Contains(ModuleAttestationStages, data.Stage) {
+		return errors.New("module attestation policy stage %q must be one of %v", data.Stage, ModuleAttestationStages,
+			errors.WithErrorCode(errors.EInvalid))
+	}
+	if err := ValidPolicyEnforcementLevel(data.EnforcementLevel); err != nil {
+		return err
+	}
+	return ValidSpeculativeRunEnforcementLevel(data.SpeculativeRunEnforcementLevel)
+}
+
+func (p *Policy) validateApprovers() error {
+	// An approver appears once per policy: the approver tables hold one row per (policy, principal),
+	// and naming a principal twice does not make it two approvers. Rejected rather than collapsed so
+	// the caller finds out their list was not understood the way they wrote it -- silently dropping
+	// the repeat would also silently change what requiredApprovals is measured against.
+	for _, dup := range []struct {
+		kind string
+		ids  []string
+	}{
+		{"user", p.AllowedUserIDs},
+		{"service account", p.AllowedServiceAccountIDs},
+		{"team", p.AllowedTeamIDs},
+	} {
+		if id := firstDuplicateID(dup.ids); id != "" {
+			return errors.New("%s %s is listed as an approver more than once", dup.kind, id,
+				errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+
+	// Approvers only make sense for soft-mandatory policies.
+	allowedUsers := len(p.AllowedUserIDs)
+	allowedServiceAccounts := len(p.AllowedServiceAccountIDs)
+	allowedTeams := len(p.AllowedTeamIDs)
+	subjectCount := allowedUsers + allowedServiceAccounts + allowedTeams
+
+	hasApprovers := p.RequiredApprovals > 0 || subjectCount > 0
+	if hasApprovers && p.EnforcementLevel() != PolicyEnforcementSoftMandatory {
+		return errors.New("approvers may only be set on a soft_mandatory policy",
+			errors.WithErrorCode(errors.EInvalid))
+	}
+	if (p.RequiredApprovals > 0) != (subjectCount > 0) {
+		return errors.New("approvers require both requiredApprovals >= 1 and at least one allowed subject",
+			errors.WithErrorCode(errors.EInvalid))
+	}
+	// A user or service account approves at most once -- a second decision from the same principal
+	// replaces the first -- so with no team subject the approver list is a ceiling on how many
+	// approvals a gate can ever collect. Requiring more than that parks every run the policy soft-fails
+	// with no way to reach the count, so it is rejected when the policy is written rather than
+	// discovered on a stuck run. A team subject lifts the ceiling: its approvals come from live
+	// membership, which is not known here and can change after the policy is written.
+	if allowedTeams == 0 && p.RequiredApprovals > allowedUsers+allowedServiceAccounts {
+		return errors.New(
+			"requiredApprovals is %d but the policy allows only %d approver(s), so the requirement can never be met",
+			p.RequiredApprovals, allowedUsers+allowedServiceAccounts,
+			errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil

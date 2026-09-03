@@ -225,10 +225,15 @@ func tharsisRunStatusToTFE(status models.RunStatus) RunStatus {
 	}
 }
 
-// tharsisTaskStageToTaskStage converts a Tharsis task stage into a go-tfe TaskStage carrying one OPA
-// PolicyEvaluation per policy check the stage owns. The task stage's ID is the persisted stage node
-// GID, giving it stable identity independent of its checks. See TaskStage and PolicyEvaluation for why
-// these are local mirror types rather than the go-tfe ones.
+// tharsisTaskStageToTaskStage converts a Tharsis task stage into a go-tfe TaskStage. Each check is
+// routed by its engine kind: an OPA check becomes a PolicyEvaluation (go-tfe's PolicyKind enum names
+// only opa and sentinel, so that relation is the right shape only for a check one of those words
+// actually describes); every other kind (module attestation today) becomes a TaskResult instead --
+// go-tfe's run-task feature already exists to carry a non-policy-as-code check's status and message
+// alongside policy evaluations in the same stage, without forcing it under a policy-kind vocabulary
+// it does not belong to. The task stage's ID is the persisted stage node GID, giving it stable
+// identity independent of its checks. See TaskStage, PolicyEvaluation, and TaskResult for why these
+// are local mirror types rather than the go-tfe ones.
 func tharsisTaskStageToTaskStage(stage *models.RunTaskStage) *TaskStage {
 	ts := &TaskStage{
 		ID:     stage.GetGlobalID(),
@@ -236,20 +241,104 @@ func tharsisTaskStageToTaskStage(stage *models.RunTaskStage) *TaskStage {
 		Status: string(tharsisTaskStageStatusToTFE(stage.Status)),
 	}
 	for _, check := range stage.PolicyChecks {
-		count := tharsisPolicyResultCount(check)
-		ts.PolicyEvaluations = append(ts.PolicyEvaluations, &PolicyEvaluation{
-			ID:         check.GetGlobalID(),
-			Status:     string(tharsisPolicyCheckStatusToPolicyEvaluationStatus(check.Status)),
-			PolicyKind: string(gotfe.OPA),
-			ResultCount: &PolicyResultCount{
-				AdvisoryFailed:  count.AdvisoryFailed,
-				MandatoryFailed: count.MandatoryFailed,
-				Passed:          count.Passed,
-				Errored:         count.Errored,
-			},
-		})
+		if check.CheckType == models.PolicyKindOPA {
+			ts.PolicyEvaluations = append(ts.PolicyEvaluations, tharsisPolicyCheckToPolicyEvaluation(check))
+			continue
+		}
+		ts.TaskResults = append(ts.TaskResults, tharsisPolicyCheckToTaskResult(check))
 	}
 	return ts
+}
+
+// tharsisPolicyCheckToPolicyEvaluation converts an OPA policy check into a go-tfe PolicyEvaluation.
+func tharsisPolicyCheckToPolicyEvaluation(check *models.PolicyCheck) *PolicyEvaluation {
+	count := tharsisPolicyResultCount(check)
+	return &PolicyEvaluation{
+		ID:         check.GetGlobalID(),
+		Status:     string(tharsisPolicyCheckStatusToPolicyEvaluationStatus(check.Status)),
+		PolicyKind: string(gotfe.OPA),
+		ResultCount: &PolicyResultCount{
+			AdvisoryFailed:  count.AdvisoryFailed,
+			MandatoryFailed: count.MandatoryFailed,
+			Passed:          count.Passed,
+			Errored:         count.Errored,
+		},
+	}
+}
+
+// tharsisPolicyCheckToTaskResult converts a non-OPA policy check (module attestation today) into a
+// go-tfe TaskResult. TaskID/TaskName are synthesized from the check's own stable id and kind --
+// there is no registered gotfe.RunTask backing this, and none is needed for the CLI to render a
+// name, status, and message. Message reuses the check's already-loaded MessagesSummary rather than
+// fetching each policy's full messages from object storage, matching how this endpoint reads
+// everywhere else it lists checks rather than inspecting one (contrast ListPolicySetOutcomes, which
+// is fetched only for a single evaluation a caller opened and can afford the extra reads).
+func tharsisPolicyCheckToTaskResult(check *models.PolicyCheck) *TaskResult {
+	var message string
+	if check.MessagesSummary != nil {
+		message = strings.Join(check.MessagesSummary.Messages, "\n")
+	}
+
+	return &TaskResult{
+		ID:                            check.GetGlobalID(),
+		Status:                        string(tharsisPolicyCheckStatusToTaskResultStatus(check.Status)),
+		Message:                       message,
+		TaskID:                        check.GetGlobalID(),
+		TaskName:                      tharsisPolicyKindTaskName(check.CheckType),
+		WorkspaceTaskEnforcementLevel: string(tharsisPolicyCheckEnforcementToTFETask(check)),
+	}
+}
+
+// tharsisPolicyKindTaskName names the synthesized run task a non-OPA check is reported under. Kept
+// as its own lookup (rather than a raw string(checkType) cast) so the displayed name is decoupled
+// from the stored kind string and can read naturally even if a future kind's stored value would not.
+func tharsisPolicyKindTaskName(checkType models.PolicyKind) string {
+	switch checkType {
+	case models.PolicyKindModuleAttestation:
+		return "Module Attestation"
+	default:
+		return string(checkType)
+	}
+}
+
+// tharsisPolicyCheckStatusToTaskResultStatus maps a policy check status onto the go-tfe task-result
+// status. go-tfe's TaskResultStatus has no soft-failed or overridden value -- a run task's
+// enforcement is either advisory (never blocks) or mandatory (always blocks until overridden at the
+// task-stage level), so soft-failed and overridden both report as the same "failed" a mandatory task
+// reports while blocking; the task stage's own awaiting_override/passed status is what actually
+// distinguishes an overridden check from one still blocking. canceled has no closer equivalent than
+// unreachable, TFE's word for a result that will never run.
+func tharsisPolicyCheckStatusToTaskResultStatus(status models.PolicyCheckStatus) gotfe.TaskResultStatus {
+	switch status {
+	case models.PolicyCheckRunning:
+		return gotfe.TaskRunning
+	case models.PolicyCheckPassed:
+		return gotfe.TaskPassed
+	case models.PolicyCheckSoftFailed, models.PolicyCheckOverridden:
+		return gotfe.TaskFailed
+	case models.PolicyCheckErrored:
+		return gotfe.TaskErrored
+	case models.PolicyCheckCanceled, models.PolicyCheckSkipped:
+		return gotfe.TaskUnreachable
+	default: // created, queued, pending
+		return gotfe.TaskPending
+	}
+}
+
+// tharsisPolicyCheckEnforcementToTFETask collapses a check's per-policy enforcement levels onto
+// go-tfe's two-level TaskEnforcementLevel. go-tfe run tasks have no soft-mandatory equivalent -- a
+// run task is either advisory (never blocks) or mandatory (always blocks until overridden), and
+// Tharsis's override already happens at the task-stage level regardless of enforcement level -- so
+// soft_mandatory collapses to Mandatory here, the same as hard_mandatory. advisory is reported only
+// when every one of the check's policies is advisory; the strictest level any policy declares is
+// what actually governs whether the check can block, so it is what the task reports.
+func tharsisPolicyCheckEnforcementToTFETask(check *models.PolicyCheck) gotfe.TaskEnforcementLevel {
+	for _, p := range check.Policies {
+		if p.EnforcementLevel != models.PolicyEnforcementAdvisory {
+			return gotfe.Mandatory
+		}
+	}
+	return gotfe.Advisory
 }
 
 // tharsisPolicyResultCount tallies a check's per-policy results into a go-tfe PolicyResultCount.

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<469e60a3a19170c27a0b033a62f59080>>
+ * @generated SignedSource<<8cd87f547c26ac918522107ab7c947b8>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -50,6 +50,27 @@ v3 = {
   "args": null,
   "kind": "ScalarField",
   "name": "name",
+  "storageKey": null
+},
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "stage",
+  "storageKey": null
+},
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "enforcementLevel",
+  "storageKey": null
+},
+v6 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "speculativeRunEnforcementLevel",
   "storageKey": null
 };
 return {
@@ -162,27 +183,44 @@ return {
                     "name": "packageDigest",
                     "storageKey": null
                   },
+                  (v4/*: any*/),
+                  (v5/*: any*/),
+                  (v6/*: any*/)
+                ],
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "concreteType": "ModuleAttestationPolicyData",
+                "kind": "LinkedField",
+                "name": "moduleAttestationData",
+                "plural": false,
+                "selections": [
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "stage",
+                    "name": "publicKey",
                     "storageKey": null
                   },
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "enforcementLevel",
+                    "name": "predicateType",
                     "storageKey": null
                   },
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "speculativeRunEnforcementLevel",
+                    "name": "verifyStateLineage",
                     "storageKey": null
-                  }
+                  },
+                  (v4/*: any*/),
+                  (v5/*: any*/),
+                  (v6/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -287,12 +325,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "52d547c7c245d6f9f6f760c895b049ed",
+    "cacheID": "858e48c7a3be9d98c2784ce114967a62",
     "id": null,
     "metadata": {},
     "name": "EditPolicyQuery",
     "operationKind": "query",
-    "text": "query EditPolicyQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Policy {\n      ...EditPolicyFragment_policy\n    }\n    id\n  }\n}\n\nfragment EditPolicyFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    packageDigest\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  scope {\n    type\n    action\n    pattern\n  }\n  allowedUsers {\n    id\n    email\n    username\n  }\n  allowedTeams {\n    id\n    name\n  }\n  allowedServiceAccounts {\n    id\n    name\n    resourcePath\n  }\n}\n"
+    "text": "query EditPolicyQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Policy {\n      ...EditPolicyFragment_policy\n    }\n    id\n  }\n}\n\nfragment EditPolicyFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    packageDigest\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    verifyStateLineage\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  scope {\n    type\n    action\n    pattern\n  }\n  allowedUsers {\n    id\n    email\n    username\n  }\n  allowedTeams {\n    id\n    name\n  }\n  allowedServiceAccounts {\n    id\n    name\n    resourcePath\n  }\n}\n"
   }
 };
 })();

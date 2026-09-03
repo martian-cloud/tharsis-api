@@ -547,7 +547,8 @@ func (c *runController) ListRunPolicyChecks(w http.ResponseWriter, r *http.Reque
 }
 
 // ListRunTaskStages returns the run's task stages (one per policy stage), each carrying an OPA
-// policy evaluation. This is the newer go-tfe surface for policy results; the legacy policy-checks
+// policy evaluation per OPA check it owns and a task result per non-OPA check (module attestation
+// today) it owns. This is the newer go-tfe surface for policy results; the legacy policy-checks
 // endpoints remain for override and log streaming.
 func (c *runController) ListRunTaskStages(w http.ResponseWriter, r *http.Request) {
 	runID := gid.FromGlobalID(chi.URLParam(r, "id"))
@@ -604,8 +605,9 @@ func (c *runController) GetTaskStage(w http.ResponseWriter, r *http.Request) {
 	c.respWriter.RespondWithJSONAPI(r.Context(), w, tharsisTaskStageToTaskStage(stage), http.StatusOK)
 }
 
-// ListTaskStagePolicyEvaluations returns the policy evaluations of a task stage (one OPA evaluation
-// per policy check the stage owns), identified by the task stage node's id.
+// ListTaskStagePolicyEvaluations returns a task stage's OPA policy evaluations, identified by the
+// task stage node's id. A non-OPA check (module attestation today) is not among them -- it is
+// surfaced through the stage's task-results relation instead (see tharsisTaskStageToTaskStage).
 func (c *runController) ListTaskStagePolicyEvaluations(w http.ResponseWriter, r *http.Request) {
 	stageID := gid.FromGlobalID(chi.URLParam(r, "id"))
 

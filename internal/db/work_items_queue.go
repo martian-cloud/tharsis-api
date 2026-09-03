@@ -24,6 +24,7 @@ type WorkItemType string
 const (
 	QueuePendingRunsForWorkspaceType        WorkItemType = "QUEUE_PENDING_RUNS_FOR_WORKSPACE"
 	DiscardStalePlannedRunsForWorkspaceType WorkItemType = "DISCARD_STALE_PLANNED_RUNS_FOR_WORKSPACE"
+	EvaluateRunPolicyCheckType              WorkItemType = "EVALUATE_RUN_POLICY_CHECK"
 )
 
 // workItemPayloadFactories maps each work-item type to a constructor for its payload,
@@ -33,6 +34,7 @@ const (
 var workItemPayloadFactories = map[WorkItemType]func() any{
 	QueuePendingRunsForWorkspaceType:        func() any { return &QueuePendingRunsForWorkspacePayload{} },
 	DiscardStalePlannedRunsForWorkspaceType: func() any { return &DiscardStalePlannedRunsForWorkspacePayload{} },
+	EvaluateRunPolicyCheckType:              func() any { return &EvaluateRunPolicyCheckPayload{} },
 }
 
 // QueuePendingRunsForWorkspacePayload represents the payload for a QueuePendingRunsForWorkspace work item.
@@ -49,6 +51,15 @@ type QueuePendingRunsForWorkspacePayload struct {
 type DiscardStalePlannedRunsForWorkspacePayload struct {
 	WorkspaceID      string    `json:"workspaceId"`
 	ApplyCompletedAt time.Time `json:"applyCompletedAt"`
+}
+
+// EvaluateRunPolicyCheckPayload represents the payload for an EvaluateRunPolicyCheck work item: a
+// policy check that entered queued and evaluates in-API rather than via a job (module attestation
+// today). RunID and PolicyCheckID together let the consumer re-derive current state at delivery time
+// rather than trusting a stale snapshot in the payload.
+type EvaluateRunPolicyCheckPayload struct {
+	RunID         string `json:"runId"`
+	PolicyCheckID string `json:"policyCheckId"`
 }
 
 // ClaimWorkItemsInput is the input for claiming work items.
@@ -87,6 +98,12 @@ func (w *WorkItem) ToQueuePendingRunsForWorkspacePayload() (*QueuePendingRunsFor
 // ToDiscardStalePlannedRunsForWorkspacePayload returns the payload as a DiscardStalePlannedRunsForWorkspacePayload.
 func (w *WorkItem) ToDiscardStalePlannedRunsForWorkspacePayload() (*DiscardStalePlannedRunsForWorkspacePayload, bool) {
 	payload, ok := w.Payload.(*DiscardStalePlannedRunsForWorkspacePayload)
+	return payload, ok
+}
+
+// ToEvaluateRunPolicyCheckPayload returns the payload as an EvaluateRunPolicyCheckPayload.
+func (w *WorkItem) ToEvaluateRunPolicyCheckPayload() (*EvaluateRunPolicyCheckPayload, bool) {
+	payload, ok := w.Payload.(*EvaluateRunPolicyCheckPayload)
 	return payload, ok
 }
 

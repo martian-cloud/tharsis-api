@@ -5,18 +5,10 @@ package rules
 
 import (
 	"context"
-	"crypto"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/in-toto/in-toto-golang/in_toto"
-	ssldsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
-	"github.com/sigstore/sigstore/pkg/cryptoutils"
-	"github.com/sigstore/sigstore/pkg/signature"
-	"github.com/sigstore/sigstore/pkg/signature/dsse"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -236,6 +228,7 @@ func EligiblePrincipal(ctx context.Context, allowedUserIDs, allowedServiceAccoun
 	return eligible, nil
 }
 
+// enforceModuleAttestationRuleType checks a managed identity's module attestation rule
 func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, rule *models.ManagedIdentityAccessRule, input *RunDetails) (string, error) {
 	if input.ModuleSource == nil || !input.ModuleSource.IsTharsisModule() {
 		return "managed identity module attestation rule is only supported for modules in a tharsis registry", nil
@@ -249,33 +242,13 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 		return "", errors.New("module semantic version must be defined when checking module attestation rules for a module in the Tharsis registry")
 	}
 
-	// Perform some additional checks with the state version to ensure it hasn't been altered
-	// except with a run created from the same module source.
-	if rule.VerifyStateLineage && input.CurrentStateVersionID != nil {
-		stateVersion, err := dbClient.StateVersions.GetStateVersionByID(ctx, *input.CurrentStateVersionID)
+	if rule.VerifyStateLineage {
+		diag, err := verifyStateLineage(ctx, dbClient, input.CurrentStateVersionID, input.ModuleSource)
 		if err != nil {
 			return "", err
 		}
-
-		if stateVersion == nil {
-			return "", fmt.Errorf("failed to get state version with ID %s", *input.CurrentStateVersionID)
-		}
-
-		if stateVersion.RunID == nil {
-			return "workspace's current state version was modified manually which is not permitted when using a module attestation rule with the verify state lineage setting set to true", nil
-		}
-
-		run, err := dbClient.Runs.GetRunByID(ctx, *stateVersion.RunID)
-		if err != nil {
-			return "", err
-		}
-
-		if run == nil {
-			return "", fmt.Errorf("failed to get run with ID %s associated with state version %s", *stateVersion.RunID, *input.CurrentStateVersionID)
-		}
-
-		if !run.IsDestroy && (run.ModuleSource == nil || *run.ModuleSource != input.ModuleSource.Source()) {
-			return "workspace's current state version was either not created by a module source or a different module source than expected, and the verify state lineage setting is set to true", nil
+		if diag != "" {
+			return diag, nil
 		}
 	}
 
@@ -286,88 +259,15 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 		return "", err
 	}
 
-	diagnostics := []string{}
-
-	// Verify that all attestation policies for the rule are satisfied
+	// Every attestation policy on the rule must be satisfied (AND), unlike the single public key
+	// a ModuleAttestation policy carries.
 	for _, policy := range rule.ModuleAttestationPolicies {
-		foundMatch := false
-
-		pub, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(policy.PublicKey))
+		diag, err := verifyAttestationSatisfied(ctx, attestations, moduleDigest, policy.PublicKey, policy.PredicateType)
 		if err != nil {
 			return "", err
 		}
-
-		verifier, err := signature.LoadVerifier(pub, crypto.SHA256)
-		if err != nil {
-			return "", err
-		}
-
-		for _, attestation := range attestations {
-			decodedSig, err := base64.StdEncoding.DecodeString(attestation)
-			if err != nil {
-				return "", fmt.Errorf("failed to decode attestation signature: %v", err)
-			}
-
-			// Verify the signature on the attestation against the provided public key
-			env := ssldsse.Envelope{}
-			if err = json.Unmarshal(decodedSig, &env); err != nil {
-				return "", fmt.Errorf("failed to unmarshal dsse envelope: %v", err)
-			}
-
-			dssev, err := ssldsse.NewEnvelopeVerifier(&dsse.VerifierAdapter{SignatureVerifier: verifier})
-			if err != nil {
-				return "", fmt.Errorf("failed to create new dsse envelope verifier: %v", err)
-			}
-
-			// Verify signature
-			if _, err = dssev.Verify(ctx, &env); err != nil {
-				diagnostics = append(diagnostics, "signature is not valid for required public key")
-				continue
-			}
-
-			// Get the expected digest from the attestation
-			decodedPredicate, err := base64.StdEncoding.DecodeString(env.Payload)
-			if err != nil {
-				return "", fmt.Errorf("failed to decode dsse payload: %v", err)
-			}
-			var statement in_toto.Statement
-			if err := json.Unmarshal(decodedPredicate, &statement); err != nil {
-				return "", fmt.Errorf("failed to decode attestation predicate: %v", err)
-			}
-
-			// Compare the actual and expected
-			if statement.Subject == nil {
-				diagnostics = append(diagnostics, "no subject in intoto statement")
-				continue
-			}
-
-			// Verify a subject exists that matches the module digest
-			foundSubject := false
-			for _, subj := range statement.Subject {
-				shaSum, ok := subj.Digest["sha256"]
-				if ok && (shaSum == moduleDigest) {
-					foundSubject = true
-					break
-				}
-			}
-
-			if !foundSubject {
-				diagnostics = append(diagnostics, fmt.Sprintf("subject with digest %s not found in module attestation", moduleDigest))
-				continue
-			}
-
-			// Verify predicate type if it's defined in the policy
-			if policy.PredicateType != nil && statement.PredicateType != *policy.PredicateType {
-				diagnostics = append(diagnostics, fmt.Sprintf("invalid predicate type, expected=%s actual=%s", *policy.PredicateType, statement.PredicateType))
-				continue
-			}
-
-			foundMatch = true
-			break
-		}
-
-		if !foundMatch {
-			return fmt.Sprintf("no attestation is present for module matching managed identity rule: %s", strings.Join(diagnostics, ": ")), nil
+		if diag != "" {
+			return fmt.Sprintf("no attestation is present for module matching managed identity rule: %s", diag), nil
 		}
 	}
 

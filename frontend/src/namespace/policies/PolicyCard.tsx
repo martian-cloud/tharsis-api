@@ -1,6 +1,5 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { Box, IconButton, Menu, MenuItem, Paper, Tooltip, Typography, useTheme } from '@mui/material';
-import { type Theme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import { useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
@@ -8,7 +7,7 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import Pill from '../../common/Pill';
 import Link from '../../routes/Link';
 import { PolicyCardFragment_policy$key } from './__generated__/PolicyCardFragment_policy.graphql';
-import { ENFORCEMENT_LEVEL_LABELS, STAGE_LABELS } from './PolicyForm';
+import { ENFORCEMENT_LEVEL_LABELS, KIND_LABELS, STAGE_LABELS } from './policyDisplay';
 import { type ScopeRuleActionValue, scopeActionColor } from './scopeRules';
 
 const FIELD_LABEL_SX = {
@@ -17,17 +16,6 @@ const FIELD_LABEL_SX = {
     letterSpacing: '0.07em',
     mb: '4px',
 };
-
-function enforcementLevelColor(level: string, theme: Theme): string {
-    const l = level.toLowerCase();
-    if (l === 'hard_mandatory') {
-        return theme.palette.error.main;
-    }
-    if (l === 'soft_mandatory') {
-        return theme.palette.warning.main;
-    }
-    return theme.palette.info.main;
-}
 
 // How many scope rules of one action a policy has, coloured to match the action's pill on the policy
 // detail page. Only rendered for a non-zero count: a policy with no exclusions says nothing about
@@ -72,6 +60,12 @@ function PolicyCard({ fragmentRef, showGroupPath, showActions = true, onDelete }
                 stage
                 enforcementLevel
             }
+            moduleAttestationData {
+                publicKey
+                predicateType
+                stage
+                enforcementLevel
+            }
             scope {
                 action
             }
@@ -84,13 +78,20 @@ function PolicyCard({ fragmentRef, showGroupPath, showActions = true, onDelete }
 
     const ownerPath = policy.groupPath;
     const opa = policy.opaData;
-    const enfColor = opa ? enforcementLevelColor(opa.enforcementLevel, theme) : undefined;
-    const enfLabel = opa ? (ENFORCEMENT_LEVEL_LABELS[opa.enforcementLevel] ?? opa.enforcementLevel) : '';
+    const attestation = policy.moduleAttestationData;
+    // The two kind-specific data objects are mutually exclusive, so whichever is present carries the
+    // fields (stage, enforcement level) that are common in shape but stored per kind.
+    const kindData = opa ?? attestation;
+    const enforcementLevelColors = theme.palette.enforcementLevel;
+    const enfColor = kindData
+        ? enforcementLevelColors[kindData.enforcementLevel as keyof typeof enforcementLevelColors] ?? enforcementLevelColors.ADVISORY
+        : undefined;
+    const enfLabel = kindData ? (ENFORCEMENT_LEVEL_LABELS[kindData.enforcementLevel] ?? kindData.enforcementLevel) : '';
 
     // Approval only ever clears a soft-mandatory failure: nothing else can be overridden that way, so
     // no other enforcement level requires approvers at all. Named for what it means rather than for
     // what it used to gate — the section itself is always rendered now.
-    const usesApprovals = opa?.enforcementLevel === 'SOFT_MANDATORY';
+    const usesApprovals = kindData?.enforcementLevel === 'SOFT_MANDATORY';
     const allowedUsers = policy.allowedUsers ?? [];
     const allowedTeams = policy.allowedTeams ?? [];
     const allowedServiceAccounts = policy.allowedServiceAccounts ?? [];
@@ -142,7 +143,7 @@ function PolicyCard({ fragmentRef, showGroupPath, showActions = true, onDelete }
                     >
                         {policy.name}
                     </Typography>
-                    {opa && (
+                    {kindData && (
                         <Pill variant="tint" size="small" color={enfColor}>
                             {enfLabel}
                         </Pill>
@@ -205,7 +206,7 @@ function PolicyCard({ fragmentRef, showGroupPath, showActions = true, onDelete }
                         Policy Type
                     </Typography>
                     <Typography variant="code" sx={{ color: theme.palette.text.primary }}>
-                        {policy.kind}
+                        {KIND_LABELS[policy.kind] ?? policy.kind}
                     </Typography>
                 </Box>
                 <Box>
@@ -213,25 +214,37 @@ function PolicyCard({ fragmentRef, showGroupPath, showActions = true, onDelete }
                         Run Stage
                     </Typography>
                     <Typography variant="code" sx={{ color: theme.palette.text.primary }}>
-                        {opa?.stage ? (STAGE_LABELS[opa.stage] ?? opa.stage) : '—'}
+                        {kindData?.stage ? (STAGE_LABELS[kindData.stage] ?? kindData.stage) : '—'}
                     </Typography>
                 </Box>
-                <Box sx={{ gridColumn: '1 / 3'}}>
-                    <Typography variant="caption" component="div" sx={{ ...FIELD_LABEL_SX, color: theme.palette.text.secondary }}>
-                        Package Source
-                    </Typography>
-                    <Typography variant="code" sx={{ color: theme.palette.text.primary }}>
-                        {opa?.packageSource ?? '—'}
-                    </Typography>
-                </Box>
-                <Box sx={{ gridColumn: '1 / 3'}}>
-                    <Typography variant="caption" component="div" sx={{ ...FIELD_LABEL_SX, color: theme.palette.text.secondary }}>
-                        Package Version
-                    </Typography>
-                    <Typography variant="code" sx={{ color: theme.palette.text.primary }}>
-                        {opa?.packageVersionConstraint ?? 'latest'}
-                    </Typography>
-                </Box>
+                {opa && <>
+                    <Box sx={{ gridColumn: '1 / 3'}}>
+                        <Typography variant="caption" component="div" sx={{ ...FIELD_LABEL_SX, color: theme.palette.text.secondary }}>
+                            Package Source
+                        </Typography>
+                        <Typography variant="code" sx={{ color: theme.palette.text.primary }}>
+                            {opa.packageSource}
+                        </Typography>
+                    </Box>
+                    <Box sx={{ gridColumn: '1 / 3'}}>
+                        <Typography variant="caption" component="div" sx={{ ...FIELD_LABEL_SX, color: theme.palette.text.secondary }}>
+                            Package Version
+                        </Typography>
+                        <Typography variant="code" sx={{ color: theme.palette.text.primary }}>
+                            {opa.packageVersionConstraint || 'latest'}
+                        </Typography>
+                    </Box>
+                </>}
+                {attestation && <>
+                    <Box sx={{ gridColumn: '1 / 3'}}>
+                        <Typography variant="caption" component="div" sx={{ ...FIELD_LABEL_SX, color: theme.palette.text.secondary }}>
+                            Predicate Type
+                        </Typography>
+                        <Typography variant="code" sx={{ color: theme.palette.text.primary }}>
+                            {attestation.predicateType || 'Any'}
+                        </Typography>
+                    </Box>
+                </>}
             </Box>
 
             {/* Scope: which run contexts the policy applies to. Unconditional, unlike the approvers

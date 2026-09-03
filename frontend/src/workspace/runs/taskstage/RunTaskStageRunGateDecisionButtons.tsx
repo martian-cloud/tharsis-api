@@ -1,5 +1,6 @@
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 import { Button, ButtonGroup, Menu, MenuItem, TextField, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useState } from 'react';
@@ -23,9 +24,7 @@ interface Props {
     onError: (error: MutationError) => void;
 }
 
-// RunTaskStageRunGateDecisionButtons is the Approve / Reject pair for a pending run gate. Rejection is advisory
-// on the API: it records the decision but leaves the gate pending so another eligible approver can
-// still approve, which is why Reject is styled as a secondary action rather than a destructive one.
+// RunTaskStageRunGateDecisionButtons is the Approve / Reject pair for a pending run gate.
 function RunTaskStageRunGateDecisionButtons({ gateId, canOverride, connectionIds, onDecided, onError }: Props) {
     const [commitApprove, commitApproveInFlight] = useMutation<RunTaskStageRunGateDecisionButtonsApproveMutation>(graphql`
         mutation RunTaskStageRunGateDecisionButtonsApproveMutation($input: ApproveRunGateInput!, $connections: [ID!]!) {
@@ -101,11 +100,17 @@ function RunTaskStageRunGateDecisionButtons({ gateId, canOverride, connectionIds
 
     return (
         <>
-            <Button size="small" variant="outlined" color="inherit" onClick={() => setDecision('REJECT')}>
+            <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                startIcon={<CloseIcon />}
+                onClick={() => setDecision('REJECT')}
+            >
                 Reject
             </Button>
             {canOverride ? (
-                <ButtonGroup variant="contained" color="primary" size="small">
+                <ButtonGroup variant="outlined" color="success" size="small">
                     <Button startIcon={<CheckIcon />} onClick={() => setDecision('APPROVE')}>
                         Approve
                     </Button>
@@ -120,7 +125,8 @@ function RunTaskStageRunGateDecisionButtons({ gateId, canOverride, connectionIds
             ) : (
                 <Button
                     size="small"
-                    variant="contained"
+                    variant="outlined"
+                    color="success"
                     startIcon={<CheckIcon />}
                     onClick={() => setDecision('APPROVE')}
                 >
@@ -152,7 +158,7 @@ function RunTaskStageRunGateDecisionButtons({ gateId, canOverride, connectionIds
             {decision && <ConfirmationDialog
                 title={decision === 'APPROVE' ? 'Approve Gate' : 'Reject Gate'}
                 maxWidth="sm"
-                confirmColor={decision === 'APPROVE' ? 'primary' : 'error'}
+                confirmColor={decision === 'APPROVE' ? 'success' : 'primary'}
                 confirmLabel={decision === 'APPROVE' ? 'Approve' : 'Reject'}
                 confirmInProgress={commitApproveInFlight}
                 onConfirm={() => submitDecision(true)}

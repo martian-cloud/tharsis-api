@@ -93,7 +93,7 @@ function RunnerJobList() {
             </Paper>
                 :
                 <Box sx={{ p: 2 }}>
-                    <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>
+                    <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                         <Box padding={2}>
                             <Typography variant="subtitle1">
                                 {edges.length} job{edges.length !== 1 && 's'}
@@ -109,7 +109,7 @@ function RunnerJobList() {
                         <ResponsiveTable
                             ariaLabel="runner jobs"
                             minWidth={650}
-                            columns={[{ label: 'Status' }, { label: 'ID' }, { label: 'Stage' }, { label: 'Workspace' }, { label: 'Duration' }, { label: 'Created' }]}
+                            columns={[{ label: 'Status' }, { label: 'ID' }, { label: 'Type' }, { label: 'Workspace' }, { label: 'Duration' }, { label: 'Created' }]}
                         >
                             {edges.map((edge: any) => (
                                 <RunnerJobListItem

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<3e7d68ce85dcb5149b90c85c0ec6e472>>
+ * @generated SignedSource<<61198651549450ac2a29f37a1251f043>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -86,7 +86,21 @@ v4 = [
     "value": "CREATED_AT_DESC"
   }
 ],
-v5 = [
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "stage",
+  "storageKey": null
+},
+v6 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "enforcementLevel",
+  "storageKey": null
+},
+v7 = [
   (v3/*: any*/)
 ];
 return {
@@ -231,20 +245,35 @@ return {
                                 "name": "packageVersionConstraint",
                                 "storageKey": null
                               },
+                              (v5/*: any*/),
+                              (v6/*: any*/)
+                            ],
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "concreteType": "ModuleAttestationPolicyData",
+                            "kind": "LinkedField",
+                            "name": "moduleAttestationData",
+                            "plural": false,
+                            "selections": [
                               {
                                 "alias": null,
                                 "args": null,
                                 "kind": "ScalarField",
-                                "name": "stage",
+                                "name": "publicKey",
                                 "storageKey": null
                               },
                               {
                                 "alias": null,
                                 "args": null,
                                 "kind": "ScalarField",
-                                "name": "enforcementLevel",
+                                "name": "predicateType",
                                 "storageKey": null
-                              }
+                              },
+                              (v5/*: any*/),
+                              (v6/*: any*/)
                             ],
                             "storageKey": null
                           },
@@ -273,7 +302,7 @@ return {
                             "kind": "LinkedField",
                             "name": "allowedUsers",
                             "plural": true,
-                            "selections": (v5/*: any*/),
+                            "selections": (v7/*: any*/),
                             "storageKey": null
                           },
                           {
@@ -283,7 +312,7 @@ return {
                             "kind": "LinkedField",
                             "name": "allowedTeams",
                             "plural": true,
-                            "selections": (v5/*: any*/),
+                            "selections": (v7/*: any*/),
                             "storageKey": null
                           },
                           {
@@ -293,7 +322,7 @@ return {
                             "kind": "LinkedField",
                             "name": "allowedServiceAccounts",
                             "plural": true,
-                            "selections": (v5/*: any*/),
+                            "selections": (v7/*: any*/),
                             "storageKey": null
                           },
                           (v2/*: any*/)
@@ -372,12 +401,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "8ee48f44af1c417da936bb150fd1211f",
+    "cacheID": "5368e243b3804f572897ad7ad782c91b",
     "id": null,
     "metadata": {},
     "name": "PolicyListPaginationQuery",
     "operationKind": "query",
-    "text": "query PolicyListPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...PolicyListFragment_policies\n    id\n  }\n}\n\nfragment PolicyCardFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    stage\n    enforcementLevel\n  }\n  scope {\n    action\n  }\n  groupPath\n  allowedUsers {\n    id\n  }\n  allowedTeams {\n    id\n  }\n  allowedServiceAccounts {\n    id\n  }\n}\n\nfragment PolicyListFragment_policies on Group {\n  policies(first: $first, after: $after, includeInherited: true, sort: CREATED_AT_DESC) {\n    totalCount\n    edges {\n      node {\n        id\n        groupPath\n        ...PolicyCardFragment_policy\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n"
+    "text": "query PolicyListPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...PolicyListFragment_policies\n    id\n  }\n}\n\nfragment PolicyCardFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    stage\n    enforcementLevel\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    stage\n    enforcementLevel\n  }\n  scope {\n    action\n  }\n  groupPath\n  allowedUsers {\n    id\n  }\n  allowedTeams {\n    id\n  }\n  allowedServiceAccounts {\n    id\n  }\n}\n\nfragment PolicyListFragment_policies on Group {\n  policies(first: $first, after: $after, includeInherited: true, sort: CREATED_AT_DESC) {\n    totalCount\n    edges {\n      node {\n        id\n        groupPath\n        ...PolicyCardFragment_policy\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n"
   }
 };
 })();

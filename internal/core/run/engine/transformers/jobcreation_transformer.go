@@ -62,7 +62,9 @@ func (t *JobCreationTransformer) Transform(ctx context.Context, changeList []typ
 					continue
 				}
 				check := run.PolicyCheckByPath(c.Path)
-				if check == nil {
+				if check == nil || check.CheckType != models.PolicyKindOPA {
+					// A non-OPA check evaluates in-API off the work queue (see
+					// PolicyCheckWorkItemEnqueuer); no job is ever created for it.
 					continue
 				}
 				job, err := t.createJob(ctx, run, models.JobOPAType, &models.OPAJobData{PolicyCheckID: check.ID})

@@ -118,11 +118,10 @@ function FederatedRegistryList({ fragmentRef }: Props) {
                         </Box>
                         <Box>{NewButton}</Box>
                     </Box>
-                    <Paper sx={{
+                    <Paper variant="outlined" sx={{
                         mt: 2,
                         borderBottomLeftRadius: 0,
                         borderBottomRightRadius: 0,
-                        border: `1px solid ${theme.palette.divider}`
                     }}>
                         <Box p={2} display="flex" alignItems="center" justifyContent="space-between">
                             <Typography variant="subtitle1">
