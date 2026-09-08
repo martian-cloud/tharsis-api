@@ -160,9 +160,9 @@ func (s *RunServer) CreateRun(ctx context.Context, req *pb.CreateRunRequest) (*p
 		TerraformVersion:       req.GetTerraformVersion(),
 		Speculative:            req.Speculative,
 		TargetAddresses:        req.TargetAddresses,
-		// proto3 bool can't express "unset"; always pass an explicit value (gRPC
-		// keeps its current behavior — omitted refresh stays false).
-		Refresh:                  ptr.Bool(req.Refresh),
+		// refresh is optional; nil (unset) means run creation applies the default
+		// of true (Terraform's default). An explicit false is honored.
+		Refresh:                  req.Refresh,
 		RefreshOnly:              req.RefreshOnly,
 		Variables:                variables,
 		ModuleSource:             req.ModuleSource,

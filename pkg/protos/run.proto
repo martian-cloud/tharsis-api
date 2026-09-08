@@ -165,7 +165,7 @@ message CreateRunRequest {
   optional string           terraform_version        = 4;
   optional bool             speculative              = 5;
   repeated string           target_addresses         = 6;
-  bool                      refresh                  = 7;
+  optional bool             refresh                  = 7;
   bool                      refresh_only             = 8;
   repeated RunVariableInput variables                = 9;
   optional string           module_source            = 10;

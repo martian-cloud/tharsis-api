@@ -679,7 +679,7 @@ type CreateRunRequest struct {
 	TerraformVersion       *string                `protobuf:"bytes,4,opt,name=terraform_version,json=terraformVersion,proto3,oneof" json:"terraform_version,omitempty"`
 	Speculative            *bool                  `protobuf:"varint,5,opt,name=speculative,proto3,oneof" json:"speculative,omitempty"`
 	TargetAddresses        []string               `protobuf:"bytes,6,rep,name=target_addresses,json=targetAddresses,proto3" json:"target_addresses,omitempty"`
-	Refresh                bool                   `protobuf:"varint,7,opt,name=refresh,proto3" json:"refresh,omitempty"`
+	Refresh                *bool                  `protobuf:"varint,7,opt,name=refresh,proto3,oneof" json:"refresh,omitempty"`
 	RefreshOnly            bool                   `protobuf:"varint,8,opt,name=refresh_only,json=refreshOnly,proto3" json:"refresh_only,omitempty"`
 	Variables              []*RunVariableInput    `protobuf:"bytes,9,rep,name=variables,proto3" json:"variables,omitempty"`
 	ModuleSource           *string                `protobuf:"bytes,10,opt,name=module_source,json=moduleSource,proto3,oneof" json:"module_source,omitempty"`
@@ -770,8 +770,8 @@ func (x *CreateRunRequest) GetTargetAddresses() []string {
 }
 
 func (x *CreateRunRequest) GetRefresh() bool {
-	if x != nil {
-		return x.Refresh
+	if x != nil && x.Refresh != nil {
+		return *x.Refresh
 	}
 	return false
 }
@@ -2246,7 +2246,7 @@ const file_run_proto_rawDesc = "" +
 	"\x05_sortB\x0f\n" +
 	"\r_workspace_idB\v\n" +
 	"\t_group_idB\x16\n" +
-	"\x14_include_nested_runs\"\xf5\x05\n" +
+	"\x14_include_nested_runs\"\x86\x06\n" +
 	"\x10CreateRunRequest\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12=\n" +
 	"\x18configuration_version_id\x18\x02 \x01(\tH\x00R\x16configurationVersionId\x88\x01\x01\x12\x1d\n" +
@@ -2254,19 +2254,21 @@ const file_run_proto_rawDesc = "" +
 	"is_destroy\x18\x03 \x01(\bR\tisDestroy\x120\n" +
 	"\x11terraform_version\x18\x04 \x01(\tH\x01R\x10terraformVersion\x88\x01\x01\x12%\n" +
 	"\vspeculative\x18\x05 \x01(\bH\x02R\vspeculative\x88\x01\x01\x12)\n" +
-	"\x10target_addresses\x18\x06 \x03(\tR\x0ftargetAddresses\x12\x18\n" +
-	"\arefresh\x18\a \x01(\bR\arefresh\x12!\n" +
+	"\x10target_addresses\x18\x06 \x03(\tR\x0ftargetAddresses\x12\x1d\n" +
+	"\arefresh\x18\a \x01(\bH\x03R\arefresh\x88\x01\x01\x12!\n" +
 	"\frefresh_only\x18\b \x01(\bR\vrefreshOnly\x12L\n" +
 	"\tvariables\x18\t \x03(\v2..martiancloud.tharsis.api.run.RunVariableInputR\tvariables\x12(\n" +
 	"\rmodule_source\x18\n" +
-	" \x01(\tH\x03R\fmoduleSource\x88\x01\x01\x12*\n" +
-	"\x0emodule_version\x18\v \x01(\tH\x04R\rmoduleVersion\x88\x01\x01\x12A\n" +
-	"\x1ainclude_module_prereleases\x18\f \x01(\bH\x05R\x18includeModulePrereleases\x88\x01\x01\x12\"\n" +
+	" \x01(\tH\x04R\fmoduleSource\x88\x01\x01\x12*\n" +
+	"\x0emodule_version\x18\v \x01(\tH\x05R\rmoduleVersion\x88\x01\x01\x12A\n" +
+	"\x1ainclude_module_prereleases\x18\f \x01(\bH\x06R\x18includeModulePrereleases\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"auto_apply\x18\r \x01(\bH\x06R\tautoApply\x88\x01\x01B\x1b\n" +
+	"auto_apply\x18\r \x01(\bH\aR\tautoApply\x88\x01\x01B\x1b\n" +
 	"\x19_configuration_version_idB\x14\n" +
 	"\x12_terraform_versionB\x0e\n" +
-	"\f_speculativeB\x10\n" +
+	"\f_speculativeB\n" +
+	"\n" +
+	"\b_refreshB\x10\n" +
 	"\x0e_module_sourceB\x11\n" +
 	"\x0f_module_versionB\x1d\n" +
 	"\x1b_include_module_prereleasesB\r\n" +
