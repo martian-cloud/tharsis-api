@@ -30,12 +30,15 @@ func NewStreamableHTTPHandler(opts *ServerOptions) (http.Handler, error) {
 		return nil, err
 	}
 
-	return mcpsdk.NewStreamableHTTPHandler(func(_ *http.Request) *mcpsdk.Server {
+	handler := mcpsdk.NewStreamableHTTPHandler(func(_ *http.Request) *mcpsdk.Server {
 		return server
 	}, &mcpsdk.StreamableHTTPOptions{
 		// Stateless mode allows the server to run across multiple instances without shared session storage.
 		Stateless: true,
-	}), nil
+	})
+
+	// Cross-origin (DNS-rebinding) protection; not applied by default as of go-sdk v1.6.0.
+	return http.NewCrossOriginProtection().Handler(handler), nil
 }
 
 func newServer(opts *ServerOptions) (*mcpsdk.Server, error) {
