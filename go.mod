@@ -57,7 +57,7 @@ require (
 	github.com/martian-cloud/terraform-exec v0.23.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/modelcontextprotocol/go-sdk v1.4.1
+	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/open-policy-agent/opa v1.18.2
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/prometheus/client_golang v1.23.2
@@ -184,7 +184,7 @@ require (
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-containerregistry v0.20.7 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/jsonschema-go v0.4.2 // indirect
+	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.15 // indirect
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
