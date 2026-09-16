@@ -940,7 +940,14 @@ input CreateSCIMTokenInput {
 type CreateSCIMTokenPayload {
   clientMutationId: String
   problems: [Problem!]!
-  token: String
+  scimToken: SCIMToken
+  tokenText: String
+}
+
+type SCIMToken implements Node {
+  createdBy: String!
+  id: ID!
+  metadata: ResourceMetadata!
 }
 
 input CreateServiceAccountInput {
@@ -2719,6 +2726,7 @@ type Query {
   runGatesAwaitingMyDecision(after: String, before: String, first: Int, last: Int, sort: RunGateSort): RunGateConnection!
   runNode(nodePath: String!, runId: String!): RunNode
   runs(after: String, before: String, first: Int, last: Int, sort: RunSort, workspaceAssessment: Boolean, workspaceId: String, workspacePath: String): RunConnection!
+  scimToken: SCIMToken
   search(query: String!): SearchResponse!
   serviceAccount(id: String!): ServiceAccount @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
   sharedRunners(after: String, before: String, first: Int, last: Int, sort: ServiceAccountSort): RunnerConnection!

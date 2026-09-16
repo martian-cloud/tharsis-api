@@ -13,6 +13,7 @@ type Query {
   me: MeResponse
   userPreferences: UserPreferences!
   config: Config!
+  scimToken: SCIMToken
   node(id: String!): Node
   namespace(fullPath: String!): Namespace
   group(fullPath: String!): Group

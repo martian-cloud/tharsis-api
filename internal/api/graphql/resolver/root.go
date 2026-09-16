@@ -1275,10 +1275,15 @@ func (r RootResolver) CreateTerraformCLIDownloadURL(ctx context.Context, args *s
 
 /* SCIM queries and mutations */
 
+// SCIMToken returns the current SCIM token without exposing its nonce.
+func (r RootResolver) SCIMToken(ctx context.Context) (*SCIMTokenResolver, error) {
+	return scimTokenQuery(ctx)
+}
+
 // CreateSCIMToken generates a token specifically for provisioning SCIM resources.
 func (r RootResolver) CreateSCIMToken(ctx context.Context, args *struct {
 	Input CreateSCIMTokenInput
-}) (*CreateSCIMTokenPayload, error) {
+}) (*CreateSCIMTokenPayloadResolver, error) {
 	response, err := createSCIMTokenMutation(ctx, &args.Input)
 	if err != nil {
 		return handleSCIMMutationProblem(err, args.Input.ClientMutationID)

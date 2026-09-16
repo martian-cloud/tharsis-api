@@ -93,9 +93,16 @@ type DeleteSCIMResourceInput struct {
 	ID string // Metadata ID.
 }
 
+// CreateSCIMTokenOutput contains the generated secret and its persisted model.
+type CreateSCIMTokenOutput struct {
+	PlaintextToken []byte
+	SCIMToken      *models.SCIMToken
+}
+
 // Service encapsulates the logic for interacting with the SCIM service.
 type Service interface {
-	CreateSCIMToken(ctx context.Context, idpIssuerURL string) ([]byte, error)
+	GetSCIMToken(ctx context.Context) (*models.SCIMToken, error)
+	CreateSCIMToken(ctx context.Context, idpIssuerURL string) (*CreateSCIMTokenOutput, error)
 	GetSCIMUsers(ctx context.Context, input *GetSCIMUsersInput) ([]models.User, error)
 	CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput) (*models.User, error)
 	UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput) (*models.User, error)
@@ -128,7 +135,39 @@ func NewService(
 	}
 }
 
-func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) ([]byte, error) {
+// GetSCIMToken returns the current SCIM token model.
+func (s *service) GetSCIMToken(ctx context.Context) (*models.SCIMToken, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetSCIMToken")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !caller.IsAdminModeActivated(ctx) {
+		return nil, errors.New(
+			"only admins with admin mode activated can view SCIM token details",
+			errors.WithErrorCode(errors.EForbidden))
+	}
+
+	tokens, err := s.dbClient.SCIMTokens.GetTokens(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get SCIM tokens", errors.WithSpan(span))
+	}
+
+	if len(tokens) == 0 {
+		return nil, errors.New(
+			"SCIM token not found",
+			errors.WithErrorCode(errors.ENotFound),
+			errors.WithSpan(span),
+		)
+	}
+
+	return &tokens[0], nil
+}
+
+func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) (*CreateSCIMTokenOutput, error) {
 	ctx, span := tracer.Start(ctx, "svc.CreateSCIMToken")
 	span.SetAttributes(attribute.String("idpIssuerURL", idpIssuerURL))
 	defer span.End()
@@ -218,19 +257,17 @@ func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) ([]b
 		CreatedBy: caller.GetSubject(),
 	}
 
-	// Returned models is not needed.
-	_, err = s.dbClient.SCIMTokens.CreateToken(txContext, input)
+	createdToken, err := s.dbClient.SCIMTokens.CreateToken(txContext, input)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create token", errors.WithSpan(span))
 	}
-
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a new SCIM token.")
 
-	return scimToken, nil
+	return &CreateSCIMTokenOutput{PlaintextToken: scimToken, SCIMToken: createdToken}, nil
 }
 
 func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMUsersInput) ([]models.User, error) {
