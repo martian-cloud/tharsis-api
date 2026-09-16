@@ -1,6 +1,13 @@
+type SCIMToken implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  createdBy: String!
+}
+
 type CreateSCIMTokenPayload {
   clientMutationId: String
-  token: String
+  tokenText: String
+  scimToken: SCIMToken
   problems: [Problem!]!
 }
 

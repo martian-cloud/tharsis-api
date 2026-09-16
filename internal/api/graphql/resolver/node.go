@@ -32,6 +32,18 @@ func (r *NodeResolver) ID() (graphql.ID, error) {
 	}
 }
 
+// ToSCIMToken resolver
+func (r *NodeResolver) ToSCIMToken() (*SCIMTokenResolver, bool) {
+	switch res := r.result.(type) {
+	case *SCIMTokenResolver:
+		return res, true
+	case *models.SCIMToken:
+		return &SCIMTokenResolver{token: res}, true
+	default:
+		return nil, false
+	}
+}
+
 // ToAgentSession resolver
 func (r *NodeResolver) ToAgentSession() (*AgentSessionResolver, bool) {
 	switch res := r.result.(type) {

@@ -28,6 +28,62 @@ const (
 	externalID = "a1ef8922-aa06-4445-8d1e-9957e6c90ace"
 )
 
+func TestGetSCIMToken(t *testing.T) {
+	existingToken := models.SCIMToken{CreatedBy: "test-user", Metadata: models.ResourceMetadata{ID: resourceUUID}}
+	testCases := []struct {
+		name            string
+		admin           bool
+		existingTokens  []models.SCIMToken
+		expected        *models.SCIMToken
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:           "token record exists",
+			admin:          true,
+			existingTokens: []models.SCIMToken{existingToken},
+			expected:       &existingToken,
+		},
+		{
+			name:            "token record does not exist",
+			admin:           true,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "non-admin cannot view token details",
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockSCIMTokens := db.NewMockSCIMTokens(t)
+			if test.admin {
+				mockSCIMTokens.On("GetTokens", mock.Anything).Return(test.existingTokens, nil)
+			}
+			user := &models.User{Metadata: models.ResourceMetadata{ID: "user-1"}, Admin: test.admin}
+			if test.admin {
+				expiration := time.Now().Add(time.Hour)
+				user.AdminModeExpiration = &expiration
+			}
+			mockUsers := db.NewMockUsers(t)
+			mockUsers.On("GetUserByID", mock.Anything, user.Metadata.ID).Return(user, nil).Maybe()
+			dbClient := &db.Client{SCIMTokens: mockSCIMTokens, Users: mockUsers}
+			caller := auth.NewUserCaller(user, nil, dbClient, nil, nil)
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient, auth.NewMockSigningKeyManager(t), nil)
+
+			actual, err := service.GetSCIMToken(auth.WithCaller(context.Background(), caller))
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				assert.Nil(t, actual)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
+
 func TestCreateSCIMToken(t *testing.T) {
 	existingToken := models.SCIMToken{
 		Nonce: "dc05adc5-4535-4251-9cc3-c01d77cbc9e9",
@@ -107,7 +163,7 @@ func TestCreateSCIMToken(t *testing.T) {
 			if len(test.existingTokens) > 0 {
 				mockScimTokens.On("DeleteToken", ctx, &test.existingTokens[0]).Return(nil)
 			}
-			mockScimTokens.On("CreateToken", ctx, mock.Anything).Return(nil, nil)
+			mockScimTokens.On("CreateToken", ctx, mock.Anything).Return(&models.SCIMToken{CreatedBy: test.caller.GetSubject()}, nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -133,7 +189,7 @@ func TestCreateSCIMToken(t *testing.T) {
 			cfg := &config.Config{OauthProviders: []config.IdpConfig{{IssuerURL: "https://example.com/scim"}}}
 			service := NewService(logger, dbClient, mockSigningKeyManager, cfg.OauthProviders)
 
-			token, err := service.CreateSCIMToken(auth.WithCaller(ctx, caller), test.idpIssuerURL)
+			output, err := service.CreateSCIMToken(auth.WithCaller(ctx, caller), test.idpIssuerURL)
 			if test.expectErrorCode != "" {
 				// Negative case.
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -141,7 +197,8 @@ func TestCreateSCIMToken(t *testing.T) {
 				t.Fatal(err)
 			} else {
 				// Positive case.
-				assert.Equal(t, []byte("signed-token"), token)
+				assert.Equal(t, []byte("signed-token"), output.PlaintextToken)
+				assert.Equal(t, test.caller.GetSubject(), output.SCIMToken.CreatedBy)
 			}
 		})
 	}
