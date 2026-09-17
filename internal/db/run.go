@@ -435,6 +435,7 @@ var runFieldList = append(
 	"is_assessment_run",
 	"variables_object_store_key",
 	"has_advisory_failures",
+	"annotations",
 )
 
 // runNodeColumns is the single ordered source of truth for run_nodes columns, shared by the SELECT
@@ -733,6 +734,11 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 		return nil, errors.Wrap(err, "failed to marshal target addresses", errors.WithSpan(span))
 	}
 
+	annotations, err := json.Marshal(run.Annotations)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal annotations", errors.WithSpan(span))
+	}
+
 	sql, args, err := toSQLWithTag("run.CreateRun", dialect.From("runs").
 		Prepared(true).
 		With("runs",
@@ -762,6 +768,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 					"is_assessment_run":          run.IsAssessmentRun,
 					"variables_object_store_key": run.VariablesObjectStoreKey,
 					"has_advisory_failures":      run.HasAdvisoryFailures,
+					"annotations":                annotations,
 				}).Returning("*"),
 		).Select(r.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})))
@@ -1141,6 +1148,7 @@ func scanRun(row scanner) (*models.Run, error) {
 	var (
 		workspacePath           string
 		variablesObjectStoreKey *string
+		annotationsJSON         []byte
 	)
 	run := &models.Run{}
 	run.TargetAddresses = []string{}
@@ -1170,6 +1178,7 @@ func scanRun(row scanner) (*models.Run, error) {
 		&run.IsAssessmentRun,
 		&variablesObjectStoreKey,
 		&run.HasAdvisoryFailures,
+		&annotationsJSON,
 		&workspacePath,
 	)
 	if err != nil {
@@ -1177,6 +1186,12 @@ func scanRun(row scanner) (*models.Run, error) {
 	}
 
 	run.VariablesObjectStoreKey = variablesObjectStoreKey
+
+	if len(annotationsJSON) > 0 {
+		if uErr := json.Unmarshal(annotationsJSON, &run.Annotations); uErr != nil {
+			return nil, errors.Wrap(uErr, "failed to unmarshal annotations")
+		}
+	}
 
 	run.Metadata.TRN = trn.TypeRun.Build(workspacePath, run.GetGlobalID())
 

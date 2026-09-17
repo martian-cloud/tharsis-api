@@ -39,6 +39,7 @@ type CreateRunInput struct {
 	Speculative            *bool
 	AutoApply              bool
 	TargetAddresses        []string
+	Annotations            []*models.RunAnnotation
 	IsDestroy              bool
 	Refresh                bool
 	RefreshOnly            bool
@@ -197,6 +198,7 @@ func Create(
 		ModuleDigest:            input.ModuleDigest,
 		TerraformVersion:        terraformVersion,
 		TargetAddresses:         input.TargetAddresses,
+		Annotations:             input.Annotations,
 		Refresh:                 input.Refresh,
 		RefreshOnly:             input.RefreshOnly,
 		IsAssessmentRun:         input.IsAssessmentRun,
@@ -211,6 +213,9 @@ func Create(
 	}
 	runModel.TaskStages = taskStages
 
+	if err := runModel.Validate(); err != nil {
+		return nil, err
+	}
 	created, err := dbClient.Runs.CreateRun(ctx, runModel)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create run")

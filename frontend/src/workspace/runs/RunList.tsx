@@ -54,6 +54,7 @@ function RunList({ fragmentRef, hasNext, loadNext, displayWorkspacePath }: Props
                             <TableCell>Run ID</TableCell>
                             {displayWorkspacePath && <TableCell width={200}>Workspace</TableCell>}
                             <TableCell>Type</TableCell>
+                            <TableCell>Annotations</TableCell>
                             <TableCell>Triggerer</TableCell>
                             <TableCell>Stages</TableCell>
                             <TableCell width={100}></TableCell>

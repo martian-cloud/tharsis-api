@@ -12,6 +12,7 @@ import Gravatar from '../../common/Gravatar';
 import TRNButton from '../../common/TRNButton';
 import Timestamp from '../../common/Timestamp';
 import Link from '../../routes/Link';
+import RunAnnotations from './RunAnnotations';
 import RunStageIcons from './RunStageIcons';
 import RunStatusChip from './RunStatusChip';
 import { RunListItemFragment_run$key } from './__generated__/RunListItemFragment_run.graphql';
@@ -48,6 +49,7 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
                 status
             }
             ...RunStageIconsFragment_run
+            ...RunAnnotationsFragment_run
         }
     `, runFragment)
 
@@ -104,6 +106,9 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
                 {!data.apply && <Chip size="small" label={data.assessment ? "Assessment" : "Speculative"} />}
             </TableCell>
             <TableCell>
+                <RunAnnotations fragmentRef={data} emptyPlaceholder="--" maxVisible={3} />
+            </TableCell>
+            <TableCell>
                 <Box display="flex" alignItems="center">
                     <Tooltip title={data.createdBy}>
                         <Box>
@@ -154,6 +159,9 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
                         <Typography variant="body2" color="textSecondary">
                             created <Timestamp variant="inherit" color="inherit" timestamp={data.metadata.createdAt} />
                         </Typography>
+                        <Box mt={0.5}>
+                            <RunAnnotations fragmentRef={data} maxVisible={3} />
+                        </Box>
                     </Stack>
                 }
             />

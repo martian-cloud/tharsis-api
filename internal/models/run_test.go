@@ -430,3 +430,135 @@ func TestRunStatus_IsQueuing(t *testing.T) {
 		assert.Falsef(t, status.IsQueuing(), "%q holds the workspace slot, so it is not queuing", status)
 	}
 }
+
+// strPtr returns a pointer to s, for building annotation links in tests.
+func strPtr(s string) *string { return &s }
+
+// TestRun_Validate_Annotations covers the run annotation validation rules, which match Phobos
+// pipeline annotations. It exercises the API acceptance scenarios for the feature.
+func TestRun_Validate_Annotations(t *testing.T) {
+	longValue := ""
+	for i := 0; i < 257; i++ {
+		longValue += "a"
+	}
+
+	longLink := "https://example.com/"
+	for i := 0; i < 256; i++ {
+		longLink += "a"
+	}
+
+	tests := []struct {
+		name        string
+		annotations []*RunAnnotation
+		wantErr     bool
+	}{
+		{
+			name:        "no annotations",
+			annotations: nil,
+			wantErr:     false,
+		},
+		{
+			name: "single annotation with link",
+			annotations: []*RunAnnotation{
+				{Key: "commit", Value: "a1b2c3d4", Link: strPtr("https://example.com/commit/a1b2c3d4")},
+			},
+			wantErr: false,
+		},
+		{
+			name: "exactly ten annotations is allowed",
+			annotations: func() []*RunAnnotation {
+				out := make([]*RunAnnotation, 10)
+				for i := range out {
+					out[i] = &RunAnnotation{Key: "key" + strconv.Itoa(i), Value: "v"}
+				}
+				return out
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "more than ten annotations is rejected",
+			annotations: func() []*RunAnnotation {
+				out := make([]*RunAnnotation, 11)
+				for i := range out {
+					out[i] = &RunAnnotation{Key: "key" + strconv.Itoa(i), Value: "v"}
+				}
+				return out
+			}(),
+			wantErr: true,
+		},
+		{
+			name:        "empty key is rejected",
+			annotations: []*RunAnnotation{{Key: "", Value: "v"}},
+			wantErr:     true,
+		},
+		{
+			name:        "empty value is rejected",
+			annotations: []*RunAnnotation{{Key: "commit", Value: ""}},
+			wantErr:     true,
+		},
+		{
+			name:        "value longer than 256 characters is rejected",
+			annotations: []*RunAnnotation{{Key: "commit", Value: longValue}},
+			wantErr:     true,
+		},
+		{
+			name:        "invalid key characters are rejected",
+			annotations: []*RunAnnotation{{Key: "Invalid Key!", Value: "v"}},
+			wantErr:     true,
+		},
+		{
+			name: "duplicate keys are allowed",
+			annotations: []*RunAnnotation{
+				{Key: "commit", Value: "a1b2c3d4"},
+				{Key: "commit", Value: "e5f6g7h8"},
+			},
+			wantErr: false,
+		},
+		{
+			name:        "link longer than the max is rejected",
+			annotations: []*RunAnnotation{{Key: "commit", Value: "v", Link: &longLink}},
+			wantErr:     true,
+		},
+		{
+			name:        "a normal link is allowed",
+			annotations: []*RunAnnotation{{Key: "commit", Value: "v", Link: strPtr("https://example.com/x")}},
+			wantErr:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			run := &Run{Annotations: tt.annotations}
+			err := run.Validate()
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestRun_Copy_AnnotationsAreIndependent verifies Copy() deep-copies annotations (including the
+// optional link pointer), so mutating a copy does not affect the original, and ShallowCompare sees
+// the divergence.
+func TestRun_Copy_AnnotationsAreIndependent(t *testing.T) {
+	orig := &Run{
+		Metadata: ResourceMetadata{ID: "run-1"},
+		Plan:     Plan{ID: "plan-1"},
+		Annotations: []*RunAnnotation{
+			{Key: "commit", Value: "a1b2c3d4", Link: strPtr("https://example.com/commit/a1b2c3d4")},
+		},
+	}
+	cp := orig.Copy()
+
+	require.True(t, orig.ShallowCompare(cp), "a fresh copy should compare equal")
+
+	// Mutating the copy's annotation must not affect the original.
+	cp.Annotations[0].Value = "changed"
+	*cp.Annotations[0].Link = "https://example.com/changed"
+
+	assert.Equal(t, "a1b2c3d4", orig.Annotations[0].Value)
+	assert.Equal(t, "https://example.com/commit/a1b2c3d4", *orig.Annotations[0].Link)
+	assert.False(t, orig.ShallowCompare(cp), "a changed annotation should be detected")
+}

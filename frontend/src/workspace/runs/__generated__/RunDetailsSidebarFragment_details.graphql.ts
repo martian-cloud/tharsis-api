@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<43745ef0423379fc8b4c980478753a7c>>
+ * @generated SignedSource<<776ad4bb6c851a4eee664a49b2b69272>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,6 +17,9 @@ export type RunTaskStageName = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_P
 export type RunTaskStageStatus = "AWAITING_OVERRIDE" | "CANCELED" | "COMPLETED" | "CREATED" | "ERRORED" | "PENDING" | "RUNNING" | "SKIPPED" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunDetailsSidebarFragment_details$data = {
+  readonly annotations: ReadonlyArray<{
+    readonly key: string;
+  }>;
   readonly apply: {
     readonly currentJob: {
       readonly cancelRequested: boolean;
@@ -64,6 +67,7 @@ export type RunDetailsSidebarFragment_details$data = {
   readonly workspace: {
     readonly fullPath: string;
   };
+  readonly " $fragmentSpreads": FragmentRefs<"RunAnnotationsFragment_run">;
   readonly " $fragmentType": "RunDetailsSidebarFragment_details";
 };
 export type RunDetailsSidebarFragment_details$key = {
@@ -200,6 +204,29 @@ return {
     {
       "alias": null,
       "args": null,
+      "concreteType": "RunAnnotation",
+      "kind": "LinkedField",
+      "name": "annotations",
+      "plural": true,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "key",
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "RunAnnotationsFragment_run"
+    },
+    {
+      "alias": null,
+      "args": null,
       "concreteType": "Workspace",
       "kind": "LinkedField",
       "name": "workspace",
@@ -298,6 +325,6 @@ return {
 };
 })();
 
-(node as any).hash = "c4ec184921e937ecfba1865e2b1493f6";
+(node as any).hash = "b40bca310f52d35006484557d96452ee";
 
 export default node;

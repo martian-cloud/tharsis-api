@@ -100,6 +100,7 @@ type CreateRunInput struct {
 	TerraformVersion       string
 	Variables              []runvariables.Variable
 	TargetAddresses        []string
+	Annotations            []*models.RunAnnotation
 	IsDestroy              bool
 	// Refresh is optional; nil means "not explicitly set" and resolves to true
 	// (Terraform's default) during run creation.
@@ -612,6 +613,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		TerraformVersion:         options.TerraformVersion,
 		Variables:                options.Variables,
 		TargetAddresses:          options.TargetAddresses,
+		Annotations:              options.Annotations,
 		IsDestroy:                options.IsDestroy,
 		Refresh:                  options.Refresh,
 		RefreshOnly:              options.RefreshOnly,

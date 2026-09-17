@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8dc822fa8c670995a4c2911780e21495>>
+ * @generated SignedSource<<158fde94ea61c6a3ebe0324aa3d2fb52>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -20,7 +20,7 @@ export type HomeRunListItemFragment_run$data = {
   readonly workspace: {
     readonly fullPath: string;
   };
-  readonly " $fragmentSpreads": FragmentRefs<"RunStageIconsFragment_run">;
+  readonly " $fragmentSpreads": FragmentRefs<"RunAnnotationsFragment_run" | "RunStageIconsFragment_run">;
   readonly " $fragmentType": "HomeRunListItemFragment_run";
 };
 export type HomeRunListItemFragment_run$key = {
@@ -95,12 +95,17 @@ const node: ReaderFragment = {
       "args": null,
       "kind": "FragmentSpread",
       "name": "RunStageIconsFragment_run"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "RunAnnotationsFragment_run"
     }
   ],
   "type": "Run",
   "abstractKey": null
 };
 
-(node as any).hash = "596a04e9e11c24a98b4b37007b061265";
+(node as any).hash = "60ea0d8d461b20914e404872c5314044";
 
 export default node;

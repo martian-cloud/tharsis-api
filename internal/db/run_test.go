@@ -1027,3 +1027,113 @@ func TestRuns_DeleteRunBatch(t *testing.T) {
 		})
 	}
 }
+
+// TestRuns_CreateRun_Annotations verifies that run annotations round-trip through the database:
+// they are persisted on create and read back by GetRunByID exactly as stored, including the optional
+// link and duplicate keys. This exercises the JSONB marshal (CreateRun) and scan (scanRun) paths,
+// which the model-level unit tests do not cover.
+func TestRuns_CreateRun_Annotations(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-run-annotations",
+		Description: "test group for run annotations",
+		FullPath:    "test-group-run-annotations",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-run-annotations",
+		GroupID:        group.Metadata.ID,
+		Description:    "test workspace for run annotations",
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.Nil(t, err)
+
+	link := "https://gitlab.example.com/x/-/commit/a1b2c3d4"
+	annotations := []*models.RunAnnotation{
+		{Key: "commit", Value: "a1b2c3d4", Link: &link}, // with link
+		{Key: "ref", Value: "main"},                     // without link
+		{Key: "commit", Value: "e5f6g7h8"},              // duplicate key, preserved in order
+	}
+
+	created, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+		Plan:        models.Plan{Status: models.PlanCreated},
+		Annotations: annotations,
+	})
+	require.Nil(t, err)
+	require.NotNil(t, created)
+
+	// Annotations are returned on the created run, in order, with the link preserved.
+	require.Len(t, created.Annotations, 3)
+	assert.Equal(t, "commit", created.Annotations[0].Key)
+	assert.Equal(t, "a1b2c3d4", created.Annotations[0].Value)
+	require.NotNil(t, created.Annotations[0].Link)
+	assert.Equal(t, link, *created.Annotations[0].Link)
+	assert.Equal(t, "ref", created.Annotations[1].Key)
+	assert.Nil(t, created.Annotations[1].Link)
+	assert.Equal(t, "commit", created.Annotations[2].Key)
+	assert.Equal(t, "e5f6g7h8", created.Annotations[2].Value)
+
+	// Re-read from the database to confirm the annotations were persisted (scan path), not just
+	// echoed from the create request.
+	fetched, err := testClient.client.Runs.GetRunByID(ctx, created.Metadata.ID)
+	require.Nil(t, err)
+	require.NotNil(t, fetched)
+	require.Len(t, fetched.Annotations, 3)
+	assert.Equal(t, created.Annotations[0].Key, fetched.Annotations[0].Key)
+	assert.Equal(t, created.Annotations[0].Value, fetched.Annotations[0].Value)
+	require.NotNil(t, fetched.Annotations[0].Link)
+	assert.Equal(t, link, *fetched.Annotations[0].Link)
+	assert.Equal(t, "ref", fetched.Annotations[1].Key)
+	assert.Nil(t, fetched.Annotations[1].Link)
+	assert.Equal(t, "commit", fetched.Annotations[2].Key)
+	assert.Equal(t, "e5f6g7h8", fetched.Annotations[2].Value)
+}
+
+// TestRuns_CreateRun_NoAnnotations verifies that a run created without annotations reads back with an
+// empty (non-nil) annotations list, matching the JSONB column default of '[]'.
+func TestRuns_CreateRun_NoAnnotations(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-run-no-annotations",
+		Description: "test group for run without annotations",
+		FullPath:    "test-group-run-no-annotations",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-run-no-annotations",
+		GroupID:        group.Metadata.ID,
+		Description:    "test workspace for run without annotations",
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.Nil(t, err)
+
+	created, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+		Plan:        models.Plan{Status: models.PlanCreated},
+	})
+	require.Nil(t, err)
+	require.NotNil(t, created)
+	assert.Empty(t, created.Annotations)
+
+	fetched, err := testClient.client.Runs.GetRunByID(ctx, created.Metadata.ID)
+	require.Nil(t, err)
+	require.NotNil(t, fetched)
+	assert.Empty(t, fetched.Annotations)
+}

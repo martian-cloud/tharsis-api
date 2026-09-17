@@ -14,6 +14,7 @@ import { useFragment } from 'react-relay/hooks';
 import { Link as LinkRouter } from 'react-router-dom';
 import Gravatar from '../common/Gravatar';
 import Timestamp from '../common/Timestamp';
+import RunAnnotations from '../workspace/runs/RunAnnotations';
 import RunStageIcons from '../workspace/runs/RunStageIcons';
 import { HomeRunListItemFragment_run$key } from './__generated__/HomeRunListItemFragment_run.graphql';
 
@@ -42,6 +43,7 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
                 fullPath
             }
             ...RunStageIconsFragment_run
+            ...RunAnnotationsFragment_run
         }
     `, fragmentRef);
 
@@ -106,6 +108,10 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
                         </Tooltip>
                         <Box mt={0.5}>
                             <RunStageIcons fragmentRef={data} />
+                        </Box>
+                        <Box mt={0.5}>
+                            {/* Cap at 3 visible annotations, consistent with the other run views. */}
+                            <RunAnnotations fragmentRef={data} maxVisible={3} />
                         </Box>
                     </Stack>}
             />
