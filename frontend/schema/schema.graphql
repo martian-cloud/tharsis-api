@@ -875,6 +875,7 @@ type CreateRolePayload {
 }
 
 input CreateRunInput {
+  annotations: [RunAnnotationInput!]
   autoApply: Boolean
   clientMutationId: String
   comment: String
@@ -2857,6 +2858,7 @@ enum RoleSort {
 }
 
 type Run implements Node {
+  annotations: [RunAnnotation!]!
   apply: Apply
   assessment: Boolean!
   autoApply: Boolean!
@@ -2885,6 +2887,18 @@ type Run implements Node {
   terraformVersion: String!
   variables: [RunVariable!]!
   workspace: Workspace!
+}
+
+type RunAnnotation {
+  key: String!
+  link: String
+  value: String!
+}
+
+input RunAnnotationInput {
+  key: String!
+  link: String
+  value: String!
 }
 
 type RunCleanupPolicyData {

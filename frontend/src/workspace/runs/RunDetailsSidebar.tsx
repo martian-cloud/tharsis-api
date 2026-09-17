@@ -17,6 +17,7 @@ import TRNButton from '../../common/TRNButton';
 import Link from '../../routes/Link';
 import { RunDetailsSidebarFragment_details$key } from './__generated__/RunDetailsSidebarFragment_details.graphql';
 import { RunDetailsSidebarSetRunAutoApplyMutation } from './__generated__/RunDetailsSidebarSetRunAutoApplyMutation.graphql';
+import RunAnnotations from './RunAnnotations';
 import RunStageStatusTypes from './RunStageStatusTypes';
 import RunStatusChip from './RunStatusChip';
 import { taskStagePath } from './runStageNavigation';
@@ -49,6 +50,10 @@ function RunDetailsSidebar(props: Props) {
         hasAdvisoryFailures
         moduleSource
         moduleVersion
+        annotations {
+          key
+        }
+        ...RunAnnotationsFragment_run
         workspace {
           fullPath
         }
@@ -272,6 +277,10 @@ function RunDetailsSidebar(props: Props) {
                 {data.moduleVersion && <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Module Version</Typography>
                     <Chip size="small" label={data.moduleVersion} />
+                </Box>}
+                {data.annotations.length > 0 && <Box marginBottom={3}>
+                    <Typography sx={{ marginBottom: 1 }}>Annotations</Typography>
+                    <RunAnnotations fragmentRef={data} maxVisible={3} stacked />
                 </Box>}
                 {(data as any)[stage]?.currentJob?.runnerPath && <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Runner</Typography>

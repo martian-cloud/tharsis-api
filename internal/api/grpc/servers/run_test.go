@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
@@ -41,4 +42,45 @@ func TestToPBRunStatus_EveryOtherStatusIsMapped(t *testing.T) {
 		}
 		assert.NotEqualf(t, pb.RunStatus_UNSPECIFIED, toPBRunStatus(status), "%q has no protobuf mapping", status)
 	}
+}
+
+// TestRunAnnotations_ProtoRoundTrip verifies the annotation converters preserve every field
+// (including the optional link and duplicate keys, in order) when going model -> proto -> model.
+func TestRunAnnotations_ProtoRoundTrip(t *testing.T) {
+	link := "https://gitlab.example.com/x/-/commit/a1b2c3d4"
+	original := []*models.RunAnnotation{
+		{Key: "commit", Value: "a1b2c3d4", Link: &link}, // with link
+		{Key: "ref", Value: "main"},                     // without link
+		{Key: "commit", Value: "e5f6g7h8"},              // duplicate key, order preserved
+	}
+
+	pbAnnotations := toPBRunAnnotations(original)
+	require.Len(t, pbAnnotations, 3)
+	assert.Equal(t, "commit", pbAnnotations[0].Key)
+	assert.Equal(t, "a1b2c3d4", pbAnnotations[0].Value)
+	require.NotNil(t, pbAnnotations[0].Link)
+	assert.Equal(t, link, *pbAnnotations[0].Link)
+	assert.Nil(t, pbAnnotations[1].Link)
+
+	roundTripped := fromPBRunAnnotations(pbAnnotations)
+	require.Len(t, roundTripped, 3)
+	for i := range original {
+		assert.Equal(t, original[i].Key, roundTripped[i].Key)
+		assert.Equal(t, original[i].Value, roundTripped[i].Value)
+		if original[i].Link == nil {
+			assert.Nil(t, roundTripped[i].Link)
+		} else {
+			require.NotNil(t, roundTripped[i].Link)
+			assert.Equal(t, *original[i].Link, *roundTripped[i].Link)
+		}
+	}
+}
+
+// TestRunAnnotations_EmptyAndNil verifies both converters map empty/nil input to nil, matching how
+// run creation treats "no annotations".
+func TestRunAnnotations_EmptyAndNil(t *testing.T) {
+	assert.Nil(t, toPBRunAnnotations(nil))
+	assert.Nil(t, toPBRunAnnotations([]*models.RunAnnotation{}))
+	assert.Nil(t, fromPBRunAnnotations(nil))
+	assert.Nil(t, fromPBRunAnnotations([]*pb.RunAnnotation{}))
 }

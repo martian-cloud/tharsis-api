@@ -7,6 +7,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
@@ -662,6 +663,30 @@ func (n *RunTaskStage) ShallowCompare(other RunNode) bool {
 	return n.ID == o.ID && n.StageName == o.StageName && n.Status == o.Status
 }
 
+// Annotation limits, matching Phobos pipeline annotations so the two behave identically.
+const (
+	maxRunAnnotations           = 10
+	maxRunAnnotationValueLength = 256
+	// maxRunAnnotationLinkLength bounds the stored link purely as a storage/DoS guard (not a trust
+	// decision — link content safety is handled at render time by the client). Annotation links are
+	// structured CI-origin URLs (commit/MR/pipeline), so 256 is ample.
+	maxRunAnnotationLinkLength = 256
+)
+
+// RunAnnotation is an immutable key/value pair (with an optional link) attached to a run at creation
+// time. Annotations let a run be traced back to what created it (e.g. commit, repository, triggering
+// job). Multiple annotations may share the same key.
+//
+// Immutability is enforced by the absence of any update path — annotations are set only at creation
+// and there is no mutation API. Do not add one: a future UpdateRun must not modify annotations.
+type RunAnnotation struct {
+	// Fields are ordered pointer-first for struct alignment (fieldalignment); the logical order is
+	// Key, Value, Link, as reflected in the proto, GraphQL, and DB representations.
+	Link  *string `json:"link,omitempty"`
+	Key   string  `json:"key"`
+	Value string  `json:"value"`
+}
+
 // Run represents a terraform run
 // Only one of ConfigurationVersionID, ModuleSource/ModuleVersion can be non-nil.
 // The ModuleVersion field is optional: blank if non-registry or want latest version
@@ -672,6 +697,7 @@ type Run struct {
 	ModuleVersion           *string
 	ModuleSource            *string
 	TargetAddresses         []string
+	Annotations             []*RunAnnotation
 	Plan                    Plan
 	Apply                   *Apply
 	TaskStages              []*RunTaskStage
@@ -715,8 +741,43 @@ func (r *Run) ResolveMetadata(key string) (*string, error) {
 	return r.Metadata.resolveFieldValue(key)
 }
 
-// Validate validates the model.
+// Validate validates the model. Annotation validation lives here (on the model) rather than in the
+// service-layer CreateRunInput.Validate() so it applies uniformly to every run-creation path —
+// GraphQL and gRPC both build the run model and reach core/run.Create, which calls Validate() before
+// persisting. Validating at a single service boundary would miss the gRPC path.
 func (r *Run) Validate() error {
+	return r.validateAnnotations()
+}
+
+// validateAnnotations enforces the run annotation rules, which match Phobos pipeline annotations:
+// at most maxRunAnnotations entries; each key and value non-empty; each key a valid name; each value
+// no longer than maxRunAnnotationValueLength. Duplicate keys are allowed. The optional link's content is
+// not validated by design, matching Phobos — link safety is enforced at render time by the client (the UI
+// only makes http(s) links clickable), so any non-UI consumer must treat the link as untrusted — but its
+// length is bounded as a storage guard.
+func (r *Run) validateAnnotations() error {
+	if len(r.Annotations) > maxRunAnnotations {
+		return errors.New("maximum of %d annotations allowed", maxRunAnnotations, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	for _, annotation := range r.Annotations {
+		if annotation.Key == "" {
+			return errors.New("annotation key cannot be empty", errors.WithErrorCode(errors.EInvalid))
+		}
+		if annotation.Value == "" {
+			return errors.New("annotation value cannot be empty", errors.WithErrorCode(errors.EInvalid))
+		}
+		if err := verifyValidName(annotation.Key); err != nil {
+			return errors.Wrap(err, "invalid annotation key")
+		}
+		if len(annotation.Value) > maxRunAnnotationValueLength {
+			return errors.New("annotation value cannot be longer than %d characters", maxRunAnnotationValueLength, errors.WithErrorCode(errors.EInvalid))
+		}
+		if annotation.Link != nil && len(*annotation.Link) > maxRunAnnotationLinkLength {
+			return errors.New("annotation link cannot be longer than %d characters", maxRunAnnotationLinkLength, errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+
 	return nil
 }
 
@@ -877,6 +938,17 @@ func (r *Run) Copy() *Run {
 			cp.TaskStages[i] = stage.Copy().(*RunTaskStage)
 		}
 	}
+	if r.Annotations != nil {
+		cp.Annotations = make([]*RunAnnotation, len(r.Annotations))
+		for i, a := range r.Annotations {
+			var link *string
+			if a.Link != nil {
+				l := *a.Link
+				link = &l
+			}
+			cp.Annotations[i] = &RunAnnotation{Key: a.Key, Value: a.Value, Link: link}
+		}
+	}
 	return cp
 }
 
@@ -966,7 +1038,23 @@ func (r *Run) ShallowCompare(other *Run) bool {
 		ptrTimeEqual(r.ForceCancelAvailableAt, other.ForceCancelAvailableAt) &&
 		slices.Equal(r.TargetAddresses, other.TargetAddresses) &&
 		slices.Equal(r.ModuleDigest, other.ModuleDigest) &&
-		ptrStringEqual(r.VariablesObjectStoreKey, other.VariablesObjectStoreKey)
+		ptrStringEqual(r.VariablesObjectStoreKey, other.VariablesObjectStoreKey) &&
+		runAnnotationsEqual(r.Annotations, other.Annotations)
+}
+
+// runAnnotationsEqual reports whether two annotation slices are equal, comparing each entry's key,
+// value, and optional link in order. Annotations are ordered and duplicate keys are allowed, so this
+// is an ordered comparison rather than a set comparison.
+func runAnnotationsEqual(a, b []*RunAnnotation) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Key != b[i].Key || a[i].Value != b[i].Value || !ptrStringEqual(a[i].Link, b[i].Link) {
+			return false
+		}
+	}
+	return true
 }
 
 // Copy creates a deep copy of the Plan.

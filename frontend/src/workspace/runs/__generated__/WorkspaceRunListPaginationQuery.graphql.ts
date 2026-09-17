@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<fdae1db9bd51405df292a6ba7b38784a>>
+ * @generated SignedSource<<05ed59829d9c6498fa76faddc03820d9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -279,6 +279,38 @@ return {
                       (v3/*: any*/)
                     ],
                     "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "RunAnnotation",
+                    "kind": "LinkedField",
+                    "name": "annotations",
+                    "plural": true,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "key",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "value",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "link",
+                        "storageKey": null
+                      }
+                    ],
+                    "storageKey": null
                   }
                 ],
                 "storageKey": null
@@ -351,12 +383,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "72a0f8cc2fc0d340854dce8cdf58fd7b",
+    "cacheID": "0ac3531a46456a63d7c85c00f8d59864",
     "id": null,
     "metadata": {},
     "name": "WorkspaceRunListPaginationQuery",
     "operationKind": "query",
-    "text": "query WorkspaceRunListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $workspaceAssessment: Boolean\n  $workspaceId: String\n) {\n  ...WorkspaceRunListFragment_runs\n}\n\nfragment RunListFragment_runConnection on RunConnection {\n  edges {\n    node {\n      id\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  hasAdvisoryFailures\n  workspace {\n    fullPath\n    id\n  }\n  apply {\n    status\n    id\n  }\n  ...RunStageIconsFragment_run\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment WorkspaceRunListFragment_runs on Query {\n  runs(after: $after, before: $before, first: $first, last: $last, workspaceId: $workspaceId, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...RunListFragment_runConnection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
+    "text": "query WorkspaceRunListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $workspaceAssessment: Boolean\n  $workspaceId: String\n) {\n  ...WorkspaceRunListFragment_runs\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunListFragment_runConnection on RunConnection {\n  edges {\n    node {\n      id\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  hasAdvisoryFailures\n  workspace {\n    fullPath\n    id\n  }\n  apply {\n    status\n    id\n  }\n  ...RunStageIconsFragment_run\n  ...RunAnnotationsFragment_run\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment WorkspaceRunListFragment_runs on Query {\n  runs(after: $after, before: $before, first: $first, last: $last, workspaceId: $workspaceId, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...RunListFragment_runConnection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
   }
 };
 })();

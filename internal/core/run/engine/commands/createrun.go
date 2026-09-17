@@ -28,6 +28,7 @@ type NewRunInput struct {
 	Speculative            *bool
 	AutoApply              bool
 	TargetAddresses        []string
+	Annotations            []*models.RunAnnotation
 	IsDestroy              bool
 	// Refresh is optional; nil means "not explicitly set" and resolves to true
 	// (Terraform's default) when the core run-creation input is built in Prepare.
@@ -98,6 +99,7 @@ func (c *CreateRun) Prepare(ctx context.Context) error {
 		Speculative:             c.in.Speculative,
 		AutoApply:               c.in.AutoApply,
 		TargetAddresses:         c.in.TargetAddresses,
+		Annotations:             c.in.Annotations,
 		IsDestroy:               c.in.IsDestroy,
 		Refresh:                 refresh,
 		RefreshOnly:             c.in.RefreshOnly,

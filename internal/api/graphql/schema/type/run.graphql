@@ -242,6 +242,27 @@ type RunVariableSensitiveValue {
   value: String!
 }
 
+"""
+RunAnnotation is an immutable key/value pair (with an optional link) attached to a run at creation,
+letting the run be traced back to what created it. Multiple annotations may share the same key.
+"""
+type RunAnnotation {
+  key: String!
+  value: String!
+  link: String
+}
+
+"""
+RunAnnotationInput is a single annotation supplied when creating a run. The key must be a valid name
+(lowercase alphanumerics with - and _ in non-leading/trailing positions); key and value are required
+and non-empty. The link is optional. Exact length limits are enforced by the server on create.
+"""
+input RunAnnotationInput {
+  key: String!
+  value: String!
+  link: String
+}
+
 type Run implements Node {
   id: ID!
   metadata: ResourceMetadata!
@@ -265,6 +286,12 @@ type Run implements Node {
   comment: String!
   terraformVersion: String!
   targetAddresses: [String!]!
+  """
+  annotations are immutable key/value pairs (with an optional link) attached to the run at creation,
+  letting it be traced back to what created it (e.g. commit, repository, triggering job). Multiple
+  annotations may share the same key.
+  """
+  annotations: [RunAnnotation!]!
   refresh: Boolean!
   refreshOnly: Boolean!
   speculative: Boolean!
@@ -327,6 +354,13 @@ input CreateRunInput {
   terraformVersion: String
   variables: [RunVariableInput!]
   targetAddresses: [String!]
+  """
+  annotations attaches immutable key/value pairs (each with an optional link) to the run. Key and
+  value are required and non-empty; the key must be a valid name (lowercase alphanumerics with - and _
+  in non-leading/trailing positions). Duplicate keys are allowed. Count and length limits are enforced
+  by the server on create.
+  """
+  annotations: [RunAnnotationInput!]
   refresh: Boolean
   refreshOnly: Boolean
   speculative: Boolean

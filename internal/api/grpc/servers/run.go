@@ -160,6 +160,7 @@ func (s *RunServer) CreateRun(ctx context.Context, req *pb.CreateRunRequest) (*p
 		TerraformVersion:       req.GetTerraformVersion(),
 		Speculative:            req.Speculative,
 		TargetAddresses:        req.TargetAddresses,
+		Annotations:            fromPBRunAnnotations(req.Annotations),
 		// refresh is optional; nil (unset) means run creation applies the default
 		// of true (Terraform's default). An explicit false is honored.
 		Refresh:                  req.Refresh,
@@ -504,6 +505,7 @@ func toPBRun(r *models.Run) *pb.Run {
 		DeprecatedStatus: string(r.Status),
 		Status:           toPBRunStatus(r.Status),
 		TargetAddresses:  r.TargetAddresses,
+		Annotations:      toPBRunAnnotations(r.Annotations),
 		TerraformVersion: r.TerraformVersion,
 		WorkspaceId:      gid.ToGlobalID(types.WorkspaceModelType, r.WorkspaceID),
 		Plan:             toPBPlan(r),
@@ -534,6 +536,39 @@ func toPBRun(r *models.Run) *pb.Run {
 	pbRun.TaskStages = toPBTaskStages(r)
 
 	return pbRun
+}
+
+// fromPBRunAnnotations converts ProtoBuf run annotations to their model form. It returns nil for an
+// empty input, matching how run creation treats "no annotations".
+func fromPBRunAnnotations(in []*pb.RunAnnotation) []*models.RunAnnotation {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*models.RunAnnotation, len(in))
+	for i, a := range in {
+		out[i] = &models.RunAnnotation{
+			Key:   a.Key,
+			Value: a.Value,
+			Link:  a.Link,
+		}
+	}
+	return out
+}
+
+// toPBRunAnnotations converts model run annotations to their ProtoBuf form.
+func toPBRunAnnotations(in []*models.RunAnnotation) []*pb.RunAnnotation {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*pb.RunAnnotation, len(in))
+	for i, a := range in {
+		out[i] = &pb.RunAnnotation{
+			Key:   a.Key,
+			Value: a.Value,
+			Link:  a.Link,
+		}
+	}
+	return out
 }
 
 // toPBTaskStages converts a run's task stage nodes (each owning its policy checks) to their ProtoBuf

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8d7e65043d868c434efe9b7f406896ff>>
+ * @generated SignedSource<<c2b51381c4da7942863ba6439607d490>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -278,6 +278,38 @@ return {
                           (v3/*: any*/)
                         ],
                         "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "RunAnnotation",
+                        "kind": "LinkedField",
+                        "name": "annotations",
+                        "plural": true,
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "key",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "value",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "link",
+                            "storageKey": null
+                          }
+                        ],
+                        "storageKey": null
                       }
                     ],
                     "storageKey": null
@@ -339,12 +371,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "fbf862cdb743f31d9adf2e64c4648d4b",
+    "cacheID": "f114f3f7ce2ddd958bbc9e44dcd5716c",
     "id": null,
     "metadata": {},
     "name": "GroupRunListPaginationQuery",
     "operationKind": "query",
-    "text": "query GroupRunListPaginationQuery(\n  $after: String\n  $first: Int\n  $groupPath: String!\n  $includeNestedRuns: Boolean\n  $workspaceAssessment: Boolean\n) {\n  ...GroupRunListFragment_group\n}\n\nfragment GroupRunListFragment_group on Query {\n  group(fullPath: $groupPath) {\n    id\n    runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment, includeNestedRuns: $includeNestedRuns) {\n      edges {\n        node {\n          id\n          __typename\n        }\n        cursor\n      }\n      ...RunListFragment_runConnection\n      pageInfo {\n        endCursor\n        hasNextPage\n      }\n    }\n  }\n}\n\nfragment RunListFragment_runConnection on RunConnection {\n  edges {\n    node {\n      id\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  hasAdvisoryFailures\n  workspace {\n    fullPath\n    id\n  }\n  apply {\n    status\n    id\n  }\n  ...RunStageIconsFragment_run\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
+    "text": "query GroupRunListPaginationQuery(\n  $after: String\n  $first: Int\n  $groupPath: String!\n  $includeNestedRuns: Boolean\n  $workspaceAssessment: Boolean\n) {\n  ...GroupRunListFragment_group\n}\n\nfragment GroupRunListFragment_group on Query {\n  group(fullPath: $groupPath) {\n    id\n    runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment, includeNestedRuns: $includeNestedRuns) {\n      edges {\n        node {\n          id\n          __typename\n        }\n        cursor\n      }\n      ...RunListFragment_runConnection\n      pageInfo {\n        endCursor\n        hasNextPage\n      }\n    }\n  }\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunListFragment_runConnection on RunConnection {\n  edges {\n    node {\n      id\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  hasAdvisoryFailures\n  workspace {\n    fullPath\n    id\n  }\n  apply {\n    status\n    id\n  }\n  ...RunStageIconsFragment_run\n  ...RunAnnotationsFragment_run\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
   }
 };
 })();

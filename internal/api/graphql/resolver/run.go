@@ -175,6 +175,35 @@ func (r *RunResolver) TargetAddresses() []string {
 	return r.run.TargetAddresses
 }
 
+// RunAnnotationResolver resolves a single run annotation.
+type RunAnnotationResolver struct {
+	annotation *models.RunAnnotation
+}
+
+// Key returns the annotation key.
+func (r *RunAnnotationResolver) Key() string {
+	return r.annotation.Key
+}
+
+// Value returns the annotation value.
+func (r *RunAnnotationResolver) Value() string {
+	return r.annotation.Value
+}
+
+// Link returns the annotation's optional link, or nil if none was set.
+func (r *RunAnnotationResolver) Link() *string {
+	return r.annotation.Link
+}
+
+// Annotations returns the run's annotations as resolvers.
+func (r *RunResolver) Annotations() []*RunAnnotationResolver {
+	resolvers := make([]*RunAnnotationResolver, len(r.run.Annotations))
+	for i, a := range r.run.Annotations {
+		resolvers[i] = &RunAnnotationResolver{annotation: a}
+	}
+	return resolvers
+}
+
 // Refresh resolver
 func (r *RunResolver) Refresh() bool {
 	return r.run.Refresh
@@ -860,8 +889,13 @@ type CreateRunInput struct {
 		// DEPRECATED: HCL is DEPRECATED, to be removed in a future release.
 		Hcl *bool
 	}
-	TerraformVersion         *string
-	TargetAddresses          *[]string
+	TerraformVersion *string
+	TargetAddresses  *[]string
+	Annotations      *[]struct {
+		Key   string
+		Value string
+		Link  *string
+	}
 	Refresh                  *bool
 	RefreshOnly              *bool
 	Speculative              *bool
@@ -988,6 +1022,19 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 		runOptions.TargetAddresses = *input.TargetAddresses
 	}
 
+	// Guard on length (not just non-nil) so an explicitly-supplied empty list normalizes to nil,
+	// matching the gRPC path (fromPBRunAnnotations) — both hand core/run.Create the same representation.
+	if input.Annotations != nil && len(*input.Annotations) > 0 {
+		annotations := make([]*models.RunAnnotation, len(*input.Annotations))
+		for i, a := range *input.Annotations {
+			annotations[i] = &models.RunAnnotation{
+				Key:   a.Key,
+				Value: a.Value,
+				Link:  a.Link,
+			}
+		}
+		runOptions.Annotations = annotations
+	}
 	// Pass the optional pointer through; run creation resolves nil to true (Terraform's default).
 	runOptions.Refresh = input.Refresh
 

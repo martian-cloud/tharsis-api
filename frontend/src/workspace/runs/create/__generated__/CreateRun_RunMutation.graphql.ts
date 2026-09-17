@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5b56278c868a554d82d3e6f8c5fccc77>>
+ * @generated SignedSource<<294d2524df90327e95105ddd0bec4192>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,6 +12,7 @@ import { ConcreteRequest } from 'relay-runtime';
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type VariableCategory = "environment" | "terraform" | "%future added value";
 export type CreateRunInput = {
+  annotations?: ReadonlyArray<RunAnnotationInput> | null | undefined;
   autoApply?: boolean | null | undefined;
   clientMutationId?: string | null | undefined;
   comment?: string | null | undefined;
@@ -28,6 +29,11 @@ export type CreateRunInput = {
   variables?: ReadonlyArray<RunVariableInput> | null | undefined;
   workspaceId?: string | null | undefined;
   workspacePath?: string | null | undefined;
+};
+export type RunAnnotationInput = {
+  key: string;
+  link?: string | null | undefined;
+  value: string;
 };
 export type RunVariableInput = {
   category: VariableCategory;
