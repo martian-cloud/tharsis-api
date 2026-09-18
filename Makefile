@@ -6,7 +6,10 @@ BUILD_TIMESTAMP ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 PACKAGES := $(shell go list -tags noui ./... | grep -vE '/vendor/|/node_modules/')
 LDFLAGS := -ldflags "-X main.Version=${VERSION} -X main.BuildTimestamp=${BUILD_TIMESTAMP}"
 
-DB_URI ?= pgx://postgres:postgres@localhost:5432/tharsis?sslmode=disable#gitleaks:allow
+DB_NAME ?= tharsis
+DB_PORT ?= 5432
+
+DB_URI ?= pgx://postgres:postgres@localhost:$(DB_PORT)/$(DB_NAME)?sslmode=disable#gitleaks:allow
 MIGRATE := docker run --user $(shell id -u):$(shell id -g) -v $(shell pwd)/internal/db/migrations:/migrations --network host migrate/migrate:v4.18.3 -path=/migrations/ -database "$(DB_URI)"
 
 # Build targets
@@ -138,13 +141,13 @@ run-tharsis-docker:
 .PHONY: db-start
 db-start: ## start the database server
 	@mkdir -p testdata/postgres
-	docker run --rm --name postgres -v $(shell pwd)/testdata:/testdata \
+	docker run --rm --name $(DB_NAME)-postgres -v $(shell pwd)/testdata:/testdata \
 		-v $(shell pwd)/testdata/postgres:/var/lib/postgresql/data \
-		-e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=tharsis -d -p 5432:5432 postgres:16
+		-e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=$(DB_NAME) -d -p $(DB_PORT):5432 postgres:16
 
 .PHONY: db-stop
 db-stop: ## stop the database server
-	docker stop postgres
+	docker stop $(DB_NAME)-postgres
 
 .PHONY: migrate
 migrate: ## run all new database migrations

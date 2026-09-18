@@ -64,6 +64,7 @@ const (
 	TargetPolicy                         ActivityEventTargetType = "POLICY"
 	TargetRunGate                        ActivityEventTargetType = "RUN_GATE"
 	TargetCleanupPolicy                  ActivityEventTargetType = "CLEANUP_POLICY"
+	TargetWorkspaceRoleBinding           ActivityEventTargetType = "WORKSPACE_ROLE_BINDING"
 )
 
 // ActivityEventCreateNamespaceMembershipPayload helps with custom
@@ -180,6 +181,16 @@ type ActivityEventCreateWorkspacePayload struct {
 // ActivityEventUpdateWorkspacePayload is the custom payload for updating workspace with label changes.
 type ActivityEventUpdateWorkspacePayload struct {
 	LabelChanges *LabelChangePayload `json:"labelChanges,omitempty"`
+}
+
+// ActivityEventSetWorkspaceRoleBindingPayload is the custom payload recorded when a workspace's role
+// binding is created, changed, or removed. It is recorded against the WORKSPACE_ROLE_BINDING target
+// — using the binding's own ID, not the workspace's — since the binding is itself the resource being
+// created/updated/removed. NamespacePath on the enclosing ActivityEvent still records the workspace's
+// parent group, since that's the namespace whose activity feed the event belongs to.
+type ActivityEventSetWorkspaceRoleBindingPayload struct {
+	PreviousRoleID string `json:"previousRoleId,omitempty"`
+	NewRoleID      string `json:"newRoleId,omitempty"`
 }
 
 // ActivityEventCreateTerraformModulePayload is the custom payload for creating a terraform module with labels.

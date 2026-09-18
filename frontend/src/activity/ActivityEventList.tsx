@@ -29,6 +29,7 @@ import ActivityEventWorkspaceTarget from './targets/ActivityEventWorkspaceTarget
 import ActivityEventRunnerTarget from './targets/ActivityEventRunnerTarget';
 import ActivityEventFederatedRegistryTarget from './targets/ActivityEventFederatedRegistryTarget';
 import ActivityEventTerraformProviderVersionMirrorTarget from './targets/ActivityEventTerraformProviderVersionMirrorTarget';
+import ActivityEventWorkspaceRoleBindingTarget from './targets/ActivityEventWorkspaceRoleBindingTarget';
 import { ActivityEventListFragment_connection$key } from './__generated__/ActivityEventListFragment_connection.graphql';
 
 const TARGET_COMPONENT_MAP = {
@@ -56,7 +57,8 @@ const TARGET_COMPONENT_MAP = {
     TerraformProviderVersionMirror: ActivityEventTerraformProviderVersionMirrorTarget,
     Package: ActivityEventPackageTarget,
     PackageVersion: ActivityEventPackageVersionTarget,
-    Policy: ActivityEventPolicyTarget
+    Policy: ActivityEventPolicyTarget,
+    WorkspaceRoleBinding: ActivityEventWorkspaceRoleBindingTarget
 } as any;
 
 interface Props {
@@ -99,6 +101,7 @@ function ActivityEventList({ fragmentRef, loadNext, hasNext }: Props) {
                     ...ActivityEventPackageTargetFragment_event
                     ...ActivityEventPackageVersionTargetFragment_event
                     ...ActivityEventPolicyTargetFragment_event
+                    ...ActivityEventWorkspaceRoleBindingTargetFragment_event
                     ...ActivityEventTargetNotFoundFragment_event
                 }
             }

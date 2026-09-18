@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<783788712329f7bdf267b4309d01857e>>
+ * @generated SignedSource<<471ad1cea95548cb727246b9c087e737>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,6 +16,7 @@ export type RoleAutocompleteQuery$data = {
   readonly roles: {
     readonly edges: ReadonlyArray<{
       readonly node: {
+        readonly description: string;
         readonly id: string;
         readonly name: string;
       } | null | undefined;
@@ -84,6 +85,13 @@ v1 = [
                 "kind": "ScalarField",
                 "name": "name",
                 "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "description",
+                "storageKey": null
               }
             ],
             "storageKey": null
@@ -113,16 +121,16 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "58a19abdac51ae201bb2c2412c27fb6f",
+    "cacheID": "40f38636c39acf0783b85ae621c35a88",
     "id": null,
     "metadata": {},
     "name": "RoleAutocompleteQuery",
     "operationKind": "query",
-    "text": "query RoleAutocompleteQuery(\n  $search: String!\n) {\n  roles(first: 50, search: $search) {\n    edges {\n      node {\n        id\n        name\n      }\n    }\n  }\n}\n"
+    "text": "query RoleAutocompleteQuery(\n  $search: String!\n) {\n  roles(first: 50, search: $search) {\n    edges {\n      node {\n        id\n        name\n        description\n      }\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "0c94924ac958f30d82c32532aaf4ca87";
+(node as any).hash = "30e2bddebef607ef88a6dc8e847914f1";
 
 export default node;

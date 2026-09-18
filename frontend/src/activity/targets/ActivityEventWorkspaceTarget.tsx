@@ -23,6 +23,7 @@ const ACTION_TEXT = {
 const RESOURCE_TYPES = {
     VARIABLE: 'Variable',
     CLEANUP_POLICY: 'Cleanup policy',
+    WORKSPACE_ROLE_BINDING: 'Role binding',
 } as any;
 
 // Maps child resource enum identifiers (that lack a proper display name) to their display labels.

@@ -83,7 +83,7 @@ type ActivityEventMoveManagedIdentityPayload {
   previousGroupPath: String!
 }
 
-union ActivityEventPayload = ActivityEventAddTeamMemberPayload | ActivityEventCreateNamespaceMembershipPayload | ActivityEventCreateTerraformModulePayload | ActivityEventCreateWorkspacePayload | ActivityEventDeleteChildResourcePayload | ActivityEventMigrateGroupPayload | ActivityEventMigrateWorkspacePayload | ActivityEventMoveManagedIdentityPayload | ActivityEventRemoveNamespaceMembershipPayload | ActivityEventRemoveTeamMemberPayload | ActivityEventUpdateNamespaceMembershipPayload | ActivityEventUpdateRunGatePayload | ActivityEventUpdateRunPayload | ActivityEventUpdateTeamMemberPayload | ActivityEventUpdateTerraformModulePayload | ActivityEventUpdateWorkspacePayload
+union ActivityEventPayload = ActivityEventAddTeamMemberPayload | ActivityEventCreateNamespaceMembershipPayload | ActivityEventCreateTerraformModulePayload | ActivityEventCreateWorkspacePayload | ActivityEventDeleteChildResourcePayload | ActivityEventMigrateGroupPayload | ActivityEventMigrateWorkspacePayload | ActivityEventMoveManagedIdentityPayload | ActivityEventRemoveNamespaceMembershipPayload | ActivityEventRemoveTeamMemberPayload | ActivityEventSetWorkspaceRoleBindingPayload | ActivityEventUpdateNamespaceMembershipPayload | ActivityEventUpdateRunGatePayload | ActivityEventUpdateRunPayload | ActivityEventUpdateTeamMemberPayload | ActivityEventUpdateTerraformModulePayload | ActivityEventUpdateWorkspacePayload
 
 type ActivityEventRemoveNamespaceMembershipPayload {
   member: Member
@@ -91,6 +91,11 @@ type ActivityEventRemoveNamespaceMembershipPayload {
 
 type ActivityEventRemoveTeamMemberPayload {
   user: User
+}
+
+type ActivityEventSetWorkspaceRoleBindingPayload {
+  newRoleId: String
+  previousRoleId: String
 }
 
 enum ActivityEventSort {
@@ -129,6 +134,7 @@ enum ActivityEventTargetType {
   VARIABLE
   VCS_PROVIDER
   WORKSPACE
+  WORKSPACE_ROLE_BINDING
 }
 
 type ActivityEventUpdateNamespaceMembershipPayload {
@@ -2065,6 +2071,7 @@ type Mutation {
   setUserNotificationPreference(input: SetUserNotificationPreferenceInput!): SetUserNotificationPreferencePayload!
   setUserPassword(input: SetUserPasswordInput!): SetUserPasswordPayload!
   setVariablesIncludedInTFConfig(input: SetVariablesIncludedInTFConfigInput!): SetVariablesIncludedInTFConfigPayload! @deprecated(reason: "Use the gRPC API instead.")
+  setWorkspaceRoleBinding(input: SetWorkspaceRoleBindingInput!): SetWorkspaceRoleBindingPayload!
   unassignManagedIdentity(input: AssignManagedIdentityInput!): AssignManagedIdentityPayload!
   unassignServiceAccountFromRunner(input: AssignServiceAccountToRunnerInput!): AssignServiceAccountToRunnerPayload!
   undiscardRun(input: UndiscardRunInput!): RunMutationPayload!
@@ -3347,6 +3354,18 @@ type SetVariablesIncludedInTFConfigPayload {
   run: Run
 }
 
+input SetWorkspaceRoleBindingInput {
+  clientMutationId: String
+  roleId: String
+  workspaceId: String!
+}
+
+type SetWorkspaceRoleBindingPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  workspace: Workspace
+}
+
 enum SpeculativeRunEnforcementLevel {
   ADVISORY
   HARD_MANDATORY
@@ -4406,6 +4425,7 @@ type Workspace implements Namespace & Node {
   outputVisibility: NamespaceOutputVisibility!
   preventDestroyPlan: Boolean!
   providerMirrorEnabled: NamespaceProviderMirrorEnabled!
+  roleBinding: WorkspaceRoleBinding
   runnerTags: NamespaceRunnerTags!
   serviceAccounts(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String): ServiceAccountConnection!
   stateVersions(after: String, before: String, first: Int, last: Int, sort: StateVersionSort): StateVersionConnection!
@@ -4462,6 +4482,14 @@ input WorkspaceLabelInput {
 
 input WorkspaceLabelsFilter {
   labels: [WorkspaceLabelInput!]!
+}
+
+type WorkspaceRoleBinding implements Node {
+  createdBy: String!
+  id: ID!
+  metadata: ResourceMetadata!
+  role: Role!
+  workspace: Workspace!
 }
 
 enum WorkspaceSort {

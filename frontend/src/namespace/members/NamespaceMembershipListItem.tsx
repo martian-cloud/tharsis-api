@@ -130,7 +130,7 @@ function NamespaceMembershipListItem(props: Props) {
     );
 
     const roleContent = editMode
-        ? <RoleAutocomplete size="small" onSelected={role => role && setRole(role.name)} />
+        ? <RoleAutocomplete size="small" hideDescription onSelected={role => role && setRole(role.name)} />
         : <Typography variant="body2">{data.role?.name}</Typography>;
 
     const source = membershipNamespacePath === namespacePath

@@ -383,6 +383,20 @@ func (r *WorkspaceResolver) ServiceAccounts(ctx context.Context, args *ServiceAc
 	return NewServiceAccountConnectionResolver(ctx, input)
 }
 
+// RoleBinding resolver: returns the binding for this workspace, or nil if it has none.
+func (r *WorkspaceResolver) RoleBinding(ctx context.Context) (*WorkspaceRoleBindingResolver, error) {
+	binding, err := loadWorkspaceRoleBindingByWorkspaceID(ctx, r.workspace.Metadata.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if binding == nil {
+		return nil, nil
+	}
+
+	return &WorkspaceRoleBindingResolver{workspaceRoleBinding: binding}, nil
+}
+
 // ManagedIdentities resolver
 func (r *WorkspaceResolver) ManagedIdentities(ctx context.Context, args *ManagedIdentityConnectionQueryArgs) (*ManagedIdentityConnectionResolver, error) {
 	if err := args.Validate(); err != nil {

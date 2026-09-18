@@ -549,6 +549,207 @@ func TestGetWorkspaceByTRN(t *testing.T) {
 	}
 }
 
+func TestGetWorkspaceRoleBindingByID(t *testing.T) {
+	bindingID := "binding-1"
+	workspaceID := "workspace-1"
+
+	sampleBinding := &models.WorkspaceRoleBinding{
+		Metadata:    models.ResourceMetadata{ID: bindingID},
+		WorkspaceID: workspaceID,
+		RoleID:      "role-1",
+	}
+
+	type testCase struct {
+		name            string
+		binding         *models.WorkspaceRoleBinding
+		authError       error
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:    "successfully get workspace role binding by ID",
+			binding: sampleBinding,
+		},
+		{
+			name:            "workspace role binding not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view workspace role binding",
+			binding:         sampleBinding,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockBindings := db.NewMockWorkspaceRoleBindings(t)
+
+			mockBindings.On("GetWorkspaceRoleBindingByID", mock.Anything, bindingID).Return(test.binding, nil)
+
+			if test.binding != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspaceRoleBindingPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				WorkspaceRoleBindings: mockBindings,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualBinding, err := service.GetWorkspaceRoleBindingByID(auth.WithCaller(ctx, mockCaller), bindingID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.binding, actualBinding)
+		})
+	}
+}
+
+func TestGetWorkspaceRoleBindingByTRN(t *testing.T) {
+	workspaceID := "workspace-1"
+	bindingTRN := trn.TypeWorkspaceRoleBinding.Build("group/workspace-name")
+
+	sampleBinding := &models.WorkspaceRoleBinding{
+		Metadata:    models.ResourceMetadata{ID: "binding-1", TRN: bindingTRN},
+		WorkspaceID: workspaceID,
+		RoleID:      "role-1",
+	}
+
+	type testCase struct {
+		name            string
+		binding         *models.WorkspaceRoleBinding
+		authError       error
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:    "successfully get workspace role binding by TRN",
+			binding: sampleBinding,
+		},
+		{
+			name:            "workspace role binding not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view workspace role binding",
+			binding:         sampleBinding,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockBindings := db.NewMockWorkspaceRoleBindings(t)
+
+			mockBindings.On("GetWorkspaceRoleBindingByTRN", mock.Anything, bindingTRN).Return(test.binding, nil)
+
+			if test.binding != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspaceRoleBindingPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				WorkspaceRoleBindings: mockBindings,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualBinding, err := service.GetWorkspaceRoleBindingByTRN(auth.WithCaller(ctx, mockCaller), bindingTRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.binding, actualBinding)
+		})
+	}
+}
+
+func TestGetWorkspaceRoleBindingByWorkspaceID(t *testing.T) {
+	workspaceID := "workspace-1"
+
+	sampleBinding := &models.WorkspaceRoleBinding{
+		Metadata:    models.ResourceMetadata{ID: "binding-1"},
+		WorkspaceID: workspaceID,
+		RoleID:      "role-1",
+	}
+
+	type testCase struct {
+		name            string
+		binding         *models.WorkspaceRoleBinding
+		authError       error
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:    "successfully get workspace role binding by workspace ID",
+			binding: sampleBinding,
+		},
+		{
+			name: "workspace has no role binding is not an error",
+		},
+		{
+			name:            "subject is not authorized to view workspace role binding",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockBindings := db.NewMockWorkspaceRoleBindings(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspaceRoleBindingPermission, mock.Anything).Return(test.authError)
+
+			if test.authError == nil {
+				mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, workspaceID).Return(test.binding, nil)
+			}
+
+			dbClient := &db.Client{
+				WorkspaceRoleBindings: mockBindings,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualBinding, err := service.GetWorkspaceRoleBindingByWorkspaceID(auth.WithCaller(ctx, mockCaller), workspaceID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.binding, actualBinding)
+		})
+	}
+}
+
 func TestGetStateVersionByID(t *testing.T) {
 	stateVersionID := "state-version-1"
 	workspaceID := "workspace-1"
@@ -2575,6 +2776,7 @@ func TestMigrateWorkspace(t *testing.T) {
 		isUserAdmin              bool
 		isGroupOwner             bool
 		isCallerDeployerOfParent bool
+		isCallerOwnerOfParent    bool
 	}{
 		{
 			name:                     "successful move",
@@ -2582,6 +2784,7 @@ func TestMigrateWorkspace(t *testing.T) {
 			newParentID:              newParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			isCallerOwnerOfParent:    true,
 			limit:                    5,
 			newParentChildren:        5,
 			expectWorkspace: &models.Workspace{
@@ -2590,6 +2793,18 @@ func TestMigrateWorkspace(t *testing.T) {
 				GroupID:  newParentID,
 				FullPath: newParentPath + "/" + testWorkspaceName,
 			},
+		},
+		{
+			// Migrating a workspace in introduces principals the destination's administrator never
+			// approved and changes path-derived output visibility, so it requires the permission that
+			// governs conferring access at the destination.
+			name:                     "caller cannot create namespace memberships in new parent",
+			inputWorkspace:           testWorkspace,
+			newParentID:              newParentID,
+			isGroupOwner:             true,
+			isCallerDeployerOfParent: true,
+			isCallerOwnerOfParent:    false,
+			expectErrorCode:          errors.EForbidden,
 		},
 		{
 			name:            "caller is not owner of workspace to be moved",
@@ -2612,6 +2827,7 @@ func TestMigrateWorkspace(t *testing.T) {
 			newParentID:              newParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			isCallerOwnerOfParent:    true,
 			limit:                    5,
 			newParentChildren:        6,
 			expectWorkspace: &models.Workspace{
@@ -2628,12 +2844,15 @@ func TestMigrateWorkspace(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			var workspaceAccessError, parentAccessError error
+			var workspaceAccessError, parentAccessError, parentMembershipAccessError error
 			if !test.isGroupOwner {
 				workspaceAccessError = errors.New("test user is not owner of workspace being moved", errors.WithErrorCode(errors.EForbidden))
 			}
 			if !test.isCallerDeployerOfParent {
 				parentAccessError = errors.New("test user is not deployer of old or new parent", errors.WithErrorCode(errors.EForbidden))
+			}
+			if !test.isCallerOwnerOfParent {
+				parentMembershipAccessError = errors.New("test user cannot create namespace memberships in new parent", errors.WithErrorCode(errors.EForbidden))
 			}
 
 			mockAuthorizer := auth.MockAuthorizer{}
@@ -2649,6 +2868,9 @@ func TestMigrateWorkspace(t *testing.T) {
 
 			perms = []models.Permission{models.CreateWorkspacePermission}
 			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(parentAccessError)
+
+			perms = []models.Permission{models.CreateNamespaceMembershipPermission}
+			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(parentMembershipAccessError)
 
 			mockGroups := db.MockGroups{}
 			mockGroups.Test(t)
@@ -3443,4 +3665,652 @@ func TestUnlockWorkspace(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// TestSetWorkspaceRoleBinding_CreateEscalation covers the escalation gate: setting a binding must
+// check BOTH the WorkspaceRoleBinding permission AND the subset of the bound role's permissions, and
+// BOTH checks must be evaluated against the workspace's PARENT namespace, never the workspace itself.
+func TestSetWorkspaceRoleBinding_CreateEscalation(t *testing.T) {
+	workspaceID := "ws-1"
+	groupID := "group-1"
+	groupPath := "group-1-path"
+	roleID := "role-1"
+
+	testWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{ID: workspaceID},
+		GroupID:  groupID,
+		FullPath: groupPath + "/ws-1",
+	}
+
+	// requireEffectivePermissionSuperset resolves the group by ID to get its FullPath for the
+	// GetEffectivePermissions check below -- unrelated to (and not removed by) eliminating the
+	// separate, now-unnecessary GetGroupByID lookup that createOrUpdateWorkspaceRoleBinding used to
+	// make solely to build the activity event's namespace path.
+	testGroup := &models.Group{
+		Metadata: models.ResourceMetadata{ID: groupID},
+		FullPath: groupPath,
+	}
+
+	deployerPerms, ok := models.DeployerRoleID.Permissions()
+	require.True(t, ok)
+
+	tests := []struct {
+		name string
+		// effectivePermissions simulates what GetEffectivePermissions returns for the caller at the
+		// group's namespace path.
+		effectivePermissions map[string]models.Permission
+		hasBindingPermission bool
+		isAdmin              bool
+		expectErrorCode      errors.CodeType
+	}{
+		{
+			name: "owner with the full deployer permission set can bind deployer",
+			effectivePermissions: func() map[string]models.Permission {
+				m := map[string]models.Permission{}
+				for _, p := range deployerPerms {
+					m[p.String()] = p
+				}
+				return m
+			}(),
+			hasBindingPermission: true,
+		},
+		{
+			name:                 "caller without the binding permission is denied even if they hold the role's permissions",
+			hasBindingPermission: false,
+			expectErrorCode:      errors.EForbidden,
+		},
+		{
+			name: "caller holding the binding permission but missing a permission in the role is denied",
+			effectivePermissions: map[string]models.Permission{
+				models.ViewWorkspacePermission.String(): models.ViewWorkspacePermission,
+				// Missing the rest of deployer's permission set.
+			},
+			hasBindingPermission: true,
+			expectErrorCode:      errors.EForbidden,
+		},
+		{
+			// requireEffectivePermissionSuperset must use GTE, not an exact Permission.String()
+			// match: a caller holding variable:update (which GTEs variable:view, see
+			// Permission.GTE) already implies variable:view even though it is not literally in
+			// their held set. Deployer's permission set includes variable:view, so binding it must
+			// be allowed by variable:update alone -- an exact-match check would wrongly deny this.
+			name: "caller holding a superseding permission (variable:update) satisfies a required lesser permission (variable:view) via GTE",
+			effectivePermissions: func() map[string]models.Permission {
+				m := map[string]models.Permission{}
+				for _, p := range deployerPerms {
+					if p.String() == models.ViewVariablePermission.String() {
+						// Deliberately omit the literal variable:view permission, replacing its
+						// coverage with variable:update, which GTEs it.
+						continue
+					}
+					m[p.String()] = p
+				}
+				m[models.UpdateVariablePermission.String()] = models.UpdateVariablePermission
+				return m
+			}(),
+			hasBindingPermission: true,
+		},
+		{
+			// An admin in admin mode is granted the binding permission outright (see
+			// UserCaller.RequirePermission), and requireEffectivePermissionSuperset skips the
+			// subset check entirely for such a caller -- it must not deny an admin with zero
+			// namespace memberships, since GetNamespacePermissions would otherwise (correctly)
+			// report that they hold nothing.
+			name:                 "admin with admin mode active can bind deployer despite holding no memberships",
+			hasBindingPermission: true,
+			isAdmin:              true,
+			effectivePermissions: map[string]models.Permission{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockGroups := db.NewMockGroups(t)
+			mockRoles := db.NewMockRoles(t)
+			mockBindings := db.NewMockWorkspaceRoleBindings(t)
+			mockUsers := db.NewMockUsers(t)
+			mockAuthorizer := auth.NewMockAuthorizer(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockActivityEvents := db.NewMockActivityEvents(t)
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, workspaceID).Return(testWorkspace, nil)
+			mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, workspaceID).Return(nil, nil)
+
+			var adminUser *models.User
+			if test.isAdmin {
+				future := time.Now().Add(time.Hour)
+				adminUser = &models.User{
+					Metadata:            models.ResourceMetadata{ID: "user-1"},
+					Admin:               true,
+					AdminModeExpiration: &future,
+				}
+				// IsAdminModeActivated re-fetches the user to get the latest admin mode expiration.
+				mockUsers.On("GetUserByID", mock.Anything, "user-1").Return(adminUser, nil)
+			}
+
+			// Admin mode grants the binding permission outright, so the authorizer is never
+			// consulted for RequireAccess in that case.
+			if !test.isAdmin {
+				if test.hasBindingPermission {
+					mockAuthorizer.On("RequireAccess", mock.Anything,
+						[]models.Permission{models.CreateWorkspaceRoleBindingPermission}, mock.Anything).Return(nil)
+				} else {
+					mockAuthorizer.On("RequireAccess", mock.Anything,
+						[]models.Permission{models.CreateWorkspaceRoleBindingPermission}, mock.Anything).
+						Return(errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
+				}
+			}
+
+			if test.hasBindingPermission {
+				role := &models.Role{}
+				role.SetPermissions(deployerPerms)
+				mockRoles.On("GetRoleByID", mock.Anything, roleID).Return(role, nil)
+				if !test.isAdmin {
+					mockGroups.On("GetGroupByID", mock.Anything, groupID).Return(testGroup, nil)
+					mockAuthorizer.On("GetEffectivePermissions", mock.Anything, groupPath).
+						Return(test.effectivePermissions, nil)
+				}
+			}
+
+			if test.expectErrorCode == "" {
+				mockTransactions.On("BeginTx", mock.Anything).Return(func(c context.Context) context.Context { return c }, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockBindings.On("CreateWorkspaceRoleBinding", mock.Anything, mock.Anything).
+					Return(&models.WorkspaceRoleBinding{
+						Metadata:    models.ResourceMetadata{ID: "binding-1"},
+						WorkspaceID: workspaceID,
+						RoleID:      roleID,
+					}, nil)
+				// The CREATE event must target the new binding's own ID (WORKSPACE_ROLE_BINDING),
+				// not the workspace.
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.MatchedBy(func(event *models.ActivityEvent) bool {
+					return event.TargetType == models.TargetWorkspaceRoleBinding &&
+						event.TargetID == "binding-1" &&
+						event.Action == models.ActionCreate
+				})).Return(&models.ActivityEvent{}, nil)
+			}
+
+			dbClient := &db.Client{
+				Workspaces:            mockWorkspaces,
+				Groups:                mockGroups,
+				Roles:                 mockRoles,
+				WorkspaceRoleBindings: mockBindings,
+				Users:                 mockUsers,
+				Transactions:          mockTransactions,
+				ActivityEvents:        mockActivityEvents,
+			}
+
+			testLogger, _ := logger.NewForTest()
+
+			svc := &service{
+				dbClient: dbClient,
+				logger:   testLogger,
+			}
+
+			user := adminUser
+			if user == nil {
+				user = &models.User{Metadata: models.ResourceMetadata{ID: "user-1"}}
+			}
+
+			caller := auth.NewUserCaller(
+				user,
+				mockAuthorizer,
+				dbClient,
+				mockMaintenanceMonitor,
+				nil,
+			)
+
+			_, err := svc.SetWorkspaceRoleBinding(auth.WithCaller(ctx, caller), &SetWorkspaceRoleBindingInput{
+				WorkspaceID: workspaceID,
+				RoleID:      &roleID,
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestSetWorkspaceRoleBinding_ChecksParentNotWorkspace guards the bug the design depends on not
+// shipping: both authorization checks (the binding permission, and the subset check via
+// GetEffectivePermissions) must be scoped to the workspace's PARENT group, not the workspace itself.
+// If either checked the workspace instead, a caller whose membership is scoped to only the workspace
+// could confer authority over the parent group — a namespace they may have no access to at all.
+//
+// This is proven by mockAuthorizer.GetEffectivePermissions being expected with groupPath and NOT
+// with the workspace's own FullPath: if the implementation passed the workspace's path instead, this
+// expectation would go unmet and testify would fail the test for an unexpected call.
+func TestSetWorkspaceRoleBinding_ChecksParentNotWorkspace(t *testing.T) {
+	workspaceID := "ws-1"
+	groupID := "group-1"
+	groupPath := "group-1-path"
+	roleID := "role-1"
+
+	testWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{ID: workspaceID},
+		GroupID:  groupID,
+		FullPath: groupPath + "/ws-1",
+	}
+
+	// requireEffectivePermissionSuperset resolves the group by ID to get its FullPath for the
+	// GetEffectivePermissions check below.
+	testGroup := &models.Group{Metadata: models.ResourceMetadata{ID: groupID}, FullPath: groupPath}
+
+	viewerPerms, ok := models.ViewerRoleID.Permissions()
+	require.True(t, ok)
+
+	ctx := context.Background()
+
+	mockWorkspaces := db.NewMockWorkspaces(t)
+	mockGroups := db.NewMockGroups(t)
+	mockRoles := db.NewMockRoles(t)
+	mockBindings := db.NewMockWorkspaceRoleBindings(t)
+	mockAuthorizer := auth.NewMockAuthorizer(t)
+	mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+	mockTransactions := db.NewMockTransactions(t)
+	mockActivityEvents := db.NewMockActivityEvents(t)
+
+	mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+	mockWorkspaces.On("GetWorkspaceByID", mock.Anything, workspaceID).Return(testWorkspace, nil)
+	mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, workspaceID).Return(nil, nil)
+	mockGroups.On("GetGroupByID", mock.Anything, groupID).Return(testGroup, nil)
+
+	// The permission check is scoped via WithGroupID, but a mocked Authorizer cannot distinguish
+	// which functional option produced the constraint, so this expectation alone is not proof of
+	// scope. The proof is the GetEffectivePermissions call below.
+	mockAuthorizer.On("RequireAccess", mock.Anything,
+		[]models.Permission{models.CreateWorkspaceRoleBindingPermission}, mock.Anything).Return(nil)
+
+	role := &models.Role{}
+	role.SetPermissions(viewerPerms)
+	mockRoles.On("GetRoleByID", mock.Anything, roleID).Return(role, nil)
+
+	effective := map[string]models.Permission{}
+	for _, p := range viewerPerms {
+		effective[p.String()] = p
+	}
+	// Expect the call with the GROUP's path. Any other argument (in particular the workspace's own
+	// FullPath) does not match this expectation and testify fails the test.
+	mockAuthorizer.On("GetEffectivePermissions", mock.Anything, groupPath).Return(effective, nil)
+
+	mockTransactions.On("BeginTx", mock.Anything).Return(func(c context.Context) context.Context { return c }, nil)
+	mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+	mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+	mockBindings.On("CreateWorkspaceRoleBinding", mock.Anything, mock.Anything).
+		Return(&models.WorkspaceRoleBinding{
+			Metadata:    models.ResourceMetadata{ID: "binding-1"},
+			WorkspaceID: workspaceID,
+			RoleID:      roleID,
+		}, nil)
+	mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
+		Return(&models.ActivityEvent{}, nil)
+
+	dbClient := &db.Client{
+		Workspaces:            mockWorkspaces,
+		Groups:                mockGroups,
+		Roles:                 mockRoles,
+		WorkspaceRoleBindings: mockBindings,
+		Transactions:          mockTransactions,
+		ActivityEvents:        mockActivityEvents,
+	}
+
+	testLogger, _ := logger.NewForTest()
+
+	_, err := (&service{dbClient: dbClient, logger: testLogger}).SetWorkspaceRoleBinding(
+		auth.WithCaller(ctx, auth.NewUserCaller(
+			&models.User{Metadata: models.ResourceMetadata{ID: "user-1"}},
+			mockAuthorizer,
+			dbClient,
+			mockMaintenanceMonitor,
+			nil,
+		)),
+		&SetWorkspaceRoleBindingInput{WorkspaceID: workspaceID, RoleID: &roleID},
+	)
+
+	require.NoError(t, err)
+}
+
+// TestSetWorkspaceRoleBinding_Remove covers removal: it is gated only on
+// DeleteWorkspaceRoleBindingPermission at the parent namespace, since removing a binding never
+// grants anything and so needs no subset check.
+func TestSetWorkspaceRoleBinding_Remove(t *testing.T) {
+	workspaceID := "ws-1"
+	groupID := "group-1"
+	groupPath := "group-1-path"
+
+	testWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{ID: workspaceID},
+		GroupID:  groupID,
+		FullPath: groupPath + "/ws-1",
+	}
+
+	existingBinding := &models.WorkspaceRoleBinding{
+		Metadata:    models.ResourceMetadata{ID: "binding-1"},
+		WorkspaceID: workspaceID,
+		RoleID:      "role-1",
+	}
+
+	existingRole := &models.Role{
+		Metadata: models.ResourceMetadata{ID: "role-1"},
+		Name:     "deployer",
+	}
+
+	tests := []struct {
+		name            string
+		hasPermission   bool
+		hasExisting     bool
+		expectErrorCode errors.CodeType
+	}{
+		{name: "caller with permission removes an existing binding", hasPermission: true, hasExisting: true},
+		{name: "caller without permission is denied", hasPermission: false, hasExisting: true, expectErrorCode: errors.EForbidden},
+		{name: "removing when no binding exists is a not-found", hasPermission: true, hasExisting: false, expectErrorCode: errors.ENotFound},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockRoles := db.NewMockRoles(t)
+			mockBindings := db.NewMockWorkspaceRoleBindings(t)
+			mockAuthorizer := auth.NewMockAuthorizer(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockActivityEvents := db.NewMockActivityEvents(t)
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, workspaceID).Return(testWorkspace, nil)
+
+			var existing *models.WorkspaceRoleBinding
+			if test.hasExisting {
+				existing = existingBinding
+			}
+			mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, workspaceID).Return(existing, nil)
+
+			if test.hasExisting {
+				if test.hasPermission {
+					mockAuthorizer.On("RequireAccess", mock.Anything,
+						[]models.Permission{models.DeleteWorkspaceRoleBindingPermission}, mock.Anything).Return(nil)
+				} else {
+					mockAuthorizer.On("RequireAccess", mock.Anything,
+						[]models.Permission{models.DeleteWorkspaceRoleBindingPermission}, mock.Anything).
+						Return(errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
+				}
+			}
+
+			if test.expectErrorCode == "" {
+				mockRoles.On("GetRoleByID", mock.Anything, existingBinding.RoleID).Return(existingRole, nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(func(c context.Context) context.Context { return c }, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockBindings.On("DeleteWorkspaceRoleBinding", mock.Anything, existingBinding).Return(nil)
+				// Removing a binding is recorded as a DeleteChildResource event against the
+				// WORKSPACE, not the binding itself — the binding no longer exists once deleted.
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.MatchedBy(func(event *models.ActivityEvent) bool {
+					if event.TargetType != models.TargetWorkspace ||
+						event.TargetID != workspaceID ||
+						event.Action != models.ActionDeleteChildResource {
+						return false
+					}
+					var payload models.ActivityEventDeleteChildResourcePayload
+					if err := json.Unmarshal(event.Payload, &payload); err != nil {
+						return false
+					}
+					return payload.Name == existingRole.Name &&
+						payload.ID == existingBinding.Metadata.ID &&
+						payload.Type == string(models.TargetWorkspaceRoleBinding)
+				})).Return(&models.ActivityEvent{}, nil)
+			}
+
+			dbClient := &db.Client{
+				Workspaces:            mockWorkspaces,
+				Roles:                 mockRoles,
+				WorkspaceRoleBindings: mockBindings,
+				Transactions:          mockTransactions,
+				ActivityEvents:        mockActivityEvents,
+			}
+
+			testLogger, _ := logger.NewForTest()
+
+			svc := &service{
+				dbClient: dbClient,
+				logger:   testLogger,
+			}
+
+			caller := auth.NewUserCaller(
+				&models.User{Metadata: models.ResourceMetadata{ID: "user-1"}},
+				mockAuthorizer,
+				dbClient,
+				mockMaintenanceMonitor,
+				nil,
+			)
+
+			_, err := svc.SetWorkspaceRoleBinding(auth.WithCaller(ctx, caller), &SetWorkspaceRoleBindingInput{
+				WorkspaceID: workspaceID,
+				RoleID:      nil,
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestSetWorkspaceRoleBinding_UpdateRole covers changing an existing binding's role: the activity
+// event must still target the binding's own ID (WORKSPACE_ROLE_BINDING), and must use ActionUpdate
+// (not ActionCreate) with both the previous and new role IDs recorded in the payload, since this is
+// a change to an existing binding, not the binding coming into existence for the first time.
+func TestSetWorkspaceRoleBinding_UpdateRole(t *testing.T) {
+	workspaceID := "ws-1"
+	groupID := "group-1"
+	groupPath := "group-1-path"
+	newRoleID := "role-2"
+
+	testWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{ID: workspaceID},
+		GroupID:  groupID,
+		FullPath: groupPath + "/ws-1",
+	}
+
+	// requireEffectivePermissionSuperset resolves the group by ID to get its FullPath for the
+	// GetEffectivePermissions check below.
+	testGroup := &models.Group{Metadata: models.ResourceMetadata{ID: groupID}, FullPath: groupPath}
+
+	existingBinding := &models.WorkspaceRoleBinding{
+		Metadata:    models.ResourceMetadata{ID: "binding-1"},
+		WorkspaceID: workspaceID,
+		RoleID:      "role-1",
+	}
+
+	deployerPerms, ok := models.DeployerRoleID.Permissions()
+	require.True(t, ok)
+	effective := map[string]models.Permission{}
+	for _, p := range deployerPerms {
+		effective[p.String()] = p
+	}
+
+	ctx := context.Background()
+
+	mockWorkspaces := db.NewMockWorkspaces(t)
+	mockGroups := db.NewMockGroups(t)
+	mockRoles := db.NewMockRoles(t)
+	mockBindings := db.NewMockWorkspaceRoleBindings(t)
+	mockAuthorizer := auth.NewMockAuthorizer(t)
+	mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+	mockTransactions := db.NewMockTransactions(t)
+	mockActivityEvents := db.NewMockActivityEvents(t)
+
+	mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+	mockWorkspaces.On("GetWorkspaceByID", mock.Anything, workspaceID).Return(testWorkspace, nil)
+	mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, workspaceID).Return(existingBinding, nil)
+	mockGroups.On("GetGroupByID", mock.Anything, groupID).Return(testGroup, nil)
+
+	mockAuthorizer.On("RequireAccess", mock.Anything,
+		[]models.Permission{models.UpdateWorkspaceRoleBindingPermission}, mock.Anything).Return(nil)
+
+	role := &models.Role{}
+	role.SetPermissions(deployerPerms)
+	mockRoles.On("GetRoleByID", mock.Anything, newRoleID).Return(role, nil)
+	mockAuthorizer.On("GetEffectivePermissions", mock.Anything, groupPath).Return(effective, nil)
+
+	mockTransactions.On("BeginTx", mock.Anything).Return(func(c context.Context) context.Context { return c }, nil)
+	mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+	mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+	updatedBinding := &models.WorkspaceRoleBinding{
+		Metadata:    existingBinding.Metadata,
+		WorkspaceID: workspaceID,
+		RoleID:      newRoleID,
+	}
+	mockBindings.On("UpdateWorkspaceRoleBinding", mock.Anything, mock.Anything).Return(updatedBinding, nil)
+
+	mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.MatchedBy(func(event *models.ActivityEvent) bool {
+		if event.TargetType != models.TargetWorkspaceRoleBinding ||
+			event.TargetID != existingBinding.Metadata.ID ||
+			event.Action != models.ActionUpdate {
+			return false
+		}
+		var payload models.ActivityEventSetWorkspaceRoleBindingPayload
+		require.NoError(t, json.Unmarshal(event.Payload, &payload))
+		return payload.PreviousRoleID == "role-1" && payload.NewRoleID == newRoleID
+	})).Return(&models.ActivityEvent{}, nil)
+
+	dbClient := &db.Client{
+		Workspaces:            mockWorkspaces,
+		Groups:                mockGroups,
+		Roles:                 mockRoles,
+		WorkspaceRoleBindings: mockBindings,
+		Transactions:          mockTransactions,
+		ActivityEvents:        mockActivityEvents,
+	}
+
+	testLogger, _ := logger.NewForTest()
+
+	_, err := (&service{dbClient: dbClient, logger: testLogger}).SetWorkspaceRoleBinding(
+		auth.WithCaller(ctx, auth.NewUserCaller(
+			&models.User{Metadata: models.ResourceMetadata{ID: "user-1"}},
+			mockAuthorizer,
+			dbClient,
+			mockMaintenanceMonitor,
+			nil,
+		)),
+		&SetWorkspaceRoleBindingInput{WorkspaceID: workspaceID, RoleID: &newRoleID},
+	)
+
+	require.NoError(t, err)
+}
+
+// TestGetWorkspaceRoleBindingsByWorkspaceIDs covers the batch loader's backing service method: it
+// must return only the bindings that exist (workspaces with none are simply absent, not an error),
+// and it must still enforce ViewWorkspaceRoleBindingPermission per result.
+func TestGetWorkspaceRoleBindingsByWorkspaceIDs(t *testing.T) {
+	bindingA := models.WorkspaceRoleBinding{
+		Metadata:    models.ResourceMetadata{ID: "binding-a"},
+		WorkspaceID: "ws-a",
+		RoleID:      "role-1",
+	}
+	bindingB := models.WorkspaceRoleBinding{
+		Metadata:    models.ResourceMetadata{ID: "binding-b"},
+		WorkspaceID: "ws-b",
+		RoleID:      "role-1",
+	}
+
+	t.Run("returns only workspaces that have a binding", func(t *testing.T) {
+		ctx := context.Background()
+
+		mockBindings := db.NewMockWorkspaceRoleBindings(t)
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockAuthorizer := auth.NewMockAuthorizer(t)
+		mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+		mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+		mockBindings.On("GetWorkspaceRoleBindings", mock.Anything, &db.GetWorkspaceRoleBindingsInput{
+			Filter: &db.WorkspaceRoleBindingFilter{WorkspaceIDs: []string{"ws-a", "ws-b", "ws-c"}},
+		}).Return(&db.WorkspaceRoleBindingsResult{
+			WorkspaceRoleBindings: []models.WorkspaceRoleBinding{bindingA, bindingB},
+		}, nil)
+		mockWorkspaces.On("GetWorkspaces", mock.Anything, &db.GetWorkspacesInput{
+			Filter: &db.WorkspaceFilter{WorkspaceIDs: []string{"ws-a", "ws-b"}},
+		}).Return(&db.WorkspacesResult{
+			Workspaces: []models.Workspace{
+				{Metadata: models.ResourceMetadata{ID: "ws-a"}, FullPath: "group-a/ws-a"},
+				{Metadata: models.ResourceMetadata{ID: "ws-b"}, FullPath: "group-b/ws-b"},
+			},
+		}, nil)
+
+		mockAuthorizer.On("RequireAccess", mock.Anything,
+			[]models.Permission{models.ViewWorkspaceRoleBindingPermission}, mock.Anything).Return(nil)
+
+		dbClient := &db.Client{WorkspaceRoleBindings: mockBindings, Workspaces: mockWorkspaces}
+		testLogger, _ := logger.NewForTest()
+		svc := &service{dbClient: dbClient, logger: testLogger}
+
+		caller := auth.NewUserCaller(
+			&models.User{Metadata: models.ResourceMetadata{ID: "user-1"}},
+			mockAuthorizer,
+			dbClient,
+			mockMaintenanceMonitor,
+			nil,
+		)
+
+		result, err := svc.GetWorkspaceRoleBindingsByWorkspaceIDs(auth.WithCaller(ctx, caller), []string{"ws-a", "ws-b", "ws-c"})
+		require.NoError(t, err)
+		assert.Len(t, result, 2)
+	})
+
+	t.Run("denies if the caller lacks permission on any returned binding", func(t *testing.T) {
+		ctx := context.Background()
+
+		mockBindings := db.NewMockWorkspaceRoleBindings(t)
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockAuthorizer := auth.NewMockAuthorizer(t)
+		mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+		mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+		mockBindings.On("GetWorkspaceRoleBindings", mock.Anything, mock.Anything).Return(&db.WorkspaceRoleBindingsResult{
+			WorkspaceRoleBindings: []models.WorkspaceRoleBinding{bindingA},
+		}, nil)
+		mockWorkspaces.On("GetWorkspaces", mock.Anything, &db.GetWorkspacesInput{
+			Filter: &db.WorkspaceFilter{WorkspaceIDs: []string{"ws-a"}},
+		}).Return(&db.WorkspacesResult{
+			Workspaces: []models.Workspace{
+				{Metadata: models.ResourceMetadata{ID: "ws-a"}, FullPath: "group-a/ws-a"},
+			},
+		}, nil)
+
+		mockAuthorizer.On("RequireAccess", mock.Anything,
+			[]models.Permission{models.ViewWorkspaceRoleBindingPermission}, mock.Anything).
+			Return(errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
+
+		dbClient := &db.Client{WorkspaceRoleBindings: mockBindings, Workspaces: mockWorkspaces}
+		testLogger, _ := logger.NewForTest()
+		svc := &service{dbClient: dbClient, logger: testLogger}
+
+		caller := auth.NewUserCaller(
+			&models.User{Metadata: models.ResourceMetadata{ID: "user-1"}},
+			mockAuthorizer,
+			dbClient,
+			mockMaintenanceMonitor,
+			nil,
+		)
+
+		_, err := svc.GetWorkspaceRoleBindingsByWorkspaceIDs(auth.WithCaller(ctx, caller), []string{"ws-a"})
+		require.Error(t, err)
+		assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
+	})
 }

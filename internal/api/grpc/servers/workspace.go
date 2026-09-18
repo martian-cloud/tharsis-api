@@ -305,6 +305,52 @@ func (s *WorkspaceServer) MigrateWorkspace(ctx context.Context, req *pb.MigrateW
 	return toPBWorkspace(migratedWorkspace), nil
 }
 
+// GetWorkspaceRoleBindingByWorkspaceID returns a workspace's role binding, if it has one.
+func (s *WorkspaceServer) GetWorkspaceRoleBindingByWorkspaceID(ctx context.Context, req *pb.GetWorkspaceRoleBindingByWorkspaceIDRequest) (*pb.WorkspaceRoleBinding, error) {
+	workspaceID, err := s.serviceCatalog.FetchModelID(ctx, req.WorkspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	binding, err := s.serviceCatalog.WorkspaceService.GetWorkspaceRoleBindingByWorkspaceID(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if binding == nil {
+		return nil, errors.New("workspace has no role binding", errors.WithErrorCode(errors.ENotFound))
+	}
+
+	return toPBWorkspaceRoleBinding(binding), nil
+}
+
+// SetWorkspaceRoleBinding creates, changes, or removes the role bound to a workspace.
+func (s *WorkspaceServer) SetWorkspaceRoleBinding(ctx context.Context, req *pb.SetWorkspaceRoleBindingRequest) (*pb.WorkspaceRoleBinding, error) {
+	workspaceID, err := s.serviceCatalog.FetchModelID(ctx, req.WorkspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var roleID *string
+	if req.RoleId != nil {
+		resolvedRoleID, rErr := s.serviceCatalog.FetchModelID(ctx, *req.RoleId)
+		if rErr != nil {
+			return nil, rErr
+		}
+		roleID = &resolvedRoleID
+	}
+
+	binding, err := s.serviceCatalog.WorkspaceService.SetWorkspaceRoleBinding(ctx, &workspace.SetWorkspaceRoleBindingInput{
+		WorkspaceID: workspaceID,
+		RoleID:      roleID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBWorkspaceRoleBinding(binding), nil
+}
+
 // SubscribeToWorkspaceEvents subscribes to workspace events.
 func (s *WorkspaceServer) SubscribeToWorkspaceEvents(req *pb.SubscribeToWorkspaceEventsRequest, stream pb.Workspaces_SubscribeToWorkspaceEventsServer) error {
 	ctx := stream.Context()
@@ -353,5 +399,14 @@ func toPBWorkspace(w *models.Workspace) *pb.Workspace {
 		DirtyState:            w.DirtyState,
 		CurrentStateVersionId: currentStateVersionID,
 		Labels:                w.Labels,
+	}
+}
+
+func toPBWorkspaceRoleBinding(b *models.WorkspaceRoleBinding) *pb.WorkspaceRoleBinding {
+	return &pb.WorkspaceRoleBinding{
+		Metadata:    toPBMetadata(&b.Metadata, types.WorkspaceRoleBindingModelType),
+		WorkspaceId: gid.ToGlobalID(types.WorkspaceModelType, b.WorkspaceID),
+		RoleId:      gid.ToGlobalID(types.RoleModelType, b.RoleID),
+		CreatedBy:   b.CreatedBy,
 	}
 }

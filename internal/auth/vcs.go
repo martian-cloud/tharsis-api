@@ -63,6 +63,12 @@ func (v *VCSWorkspaceLinkCaller) UnauthorizedError(_ context.Context, hasViewerA
 	)
 }
 
+// GetNamespacePermissions returns an empty set. A VCS workspace-link caller is not backed by
+// namespace memberships and has no permission set to report.
+func (v *VCSWorkspaceLinkCaller) GetNamespacePermissions(_ context.Context, _ string) ([]*models.Permission, error) {
+	return []*models.Permission{}, nil
+}
+
 // GetRootNamespaceMemberships returns a non-nil empty slice; a VCS workspace-link caller is scoped
 // to a single workspace and has no root namespace memberships. It must be non-nil so the membership
 // filter is applied and denies access — a nil slice would be treated as "no filter".
@@ -93,11 +99,6 @@ func (v *VCSWorkspaceLinkCaller) RequirePermission(ctx context.Context, perm mod
 // RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type
 func (v *VCSWorkspaceLinkCaller) RequireAccessToInheritableResource(ctx context.Context, _ types.ModelType, _ ...func(*constraints)) error {
 	// Return an authorization error since VCS does not need any access to inherited resources.
-	return v.UnauthorizedError(ctx, false)
-}
-
-// RequireRole will return an error if the caller doesn't have the specified role.
-func (v *VCSWorkspaceLinkCaller) RequireRole(ctx context.Context, _ string, _ ...func(*constraints)) error {
 	return v.UnauthorizedError(ctx, false)
 }
 

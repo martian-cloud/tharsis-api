@@ -1,0 +1,10 @@
+UPDATE roles SET description = 'Default owner role.' WHERE id = '623c83ea-23fe-4de6-874a-a99ccf6a76fc';
+UPDATE roles SET description = 'Default deployer role.' WHERE id = '8aa7adba-b769-471f-8ebb-3215f33991cb';
+UPDATE roles SET description = 'Default viewer role.' WHERE id = '52da70fd-37b0-4349-bb64-fb4659bcf5f5';
+DELETE FROM roles WHERE id = 'd1d61904-1255-4e4b-a5ee-4b9543e970b4';
+DROP INDEX IF EXISTS index_roles_on_sort_order;
+ALTER TABLE roles DROP COLUMN IF EXISTS sort_order;
+DELETE FROM activity_events WHERE workspace_role_binding_target_id IS NOT NULL;
+DROP INDEX IF EXISTS index_activity_events_on_workspace_role_binding_target_id;
+ALTER TABLE activity_events DROP COLUMN IF EXISTS workspace_role_binding_target_id;
+DROP TABLE IF EXISTS workspace_role_bindings;

@@ -20,6 +20,7 @@ import Runs from './runs/Runs';
 import StateVersions from './state/StateVersions';
 import WorkspaceDetailsDrawer from './WorkspaceDetailsDrawer';
 import WorkspaceDetailsIndex from './WorkspaceDetailsIndex';
+import WorkspaceRoleBinding from './WorkspaceRoleBinding';
 import { WorkspaceDetailsFragment_workspace$key } from './__generated__/WorkspaceDetailsFragment_workspace.graphql';
 import { WorkspaceDetailsRunSubscription, WorkspaceDetailsRunSubscription$data } from './__generated__/WorkspaceDetailsRunSubscription.graphql';
 import { WorkspaceDetailsWorkspaceEventSubscription } from './__generated__/WorkspaceDetailsWorkspaceEventSubscription.graphql';
@@ -75,6 +76,7 @@ function WorkspaceDetails(props: Props) {
       ...NamespaceActivityFragment_activity
       ...ProviderMirrorsFragment_namespace
       ...CleanupPoliciesFragment_namespace
+      ...WorkspaceRoleBindingFragment_workspace
     }
 `, fragmentRef);
 
@@ -164,6 +166,7 @@ function WorkspaceDetails(props: Props) {
               <Route path={`${workspacePath}/-/members/*`} element={<NamespaceMemberships fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/provider_mirror/*`} element={<ProviderMirrors fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/cleanup_policies/*`} element={<CleanupPolicies fragmentRef={data} />} />
+              <Route path={`${workspacePath}/-/role_binding/*`} element={<WorkspaceRoleBinding fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/settings/*`} element={<WorkspaceSettings fragmentRef={data} />} />
             </Routes>
           </PageLayoutProvider>

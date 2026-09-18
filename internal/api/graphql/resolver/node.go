@@ -488,6 +488,18 @@ func (r *NodeResolver) ToVCSEvent() (*VCSEventResolver, bool) {
 	}
 }
 
+// ToWorkspaceRoleBinding resolver
+func (r *NodeResolver) ToWorkspaceRoleBinding() (*WorkspaceRoleBindingResolver, bool) {
+	switch res := r.result.(type) {
+	case *WorkspaceRoleBindingResolver:
+		return res, true
+	case *models.WorkspaceRoleBinding:
+		return &WorkspaceRoleBindingResolver{workspaceRoleBinding: res}, true
+	default:
+		return nil, false
+	}
+}
+
 // ToRole resolver
 func (r *NodeResolver) ToRole() (*RoleResolver, bool) {
 	switch res := r.result.(type) {

@@ -143,13 +143,19 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 	// Get plan
 	planJSON, err := tf.ShowPlanFile(ctx, planOutputPath)
 	if err != nil {
-		return fmt.Errorf("failed to run show command on plan file %v", err)
+		errMsg := "failed to run show command on plan file %v"
+		// log error here since job logger is not connected to stdout while running these commands
+		p.jobLogger.Errorf(errMsg, err)
+		return fmt.Errorf(errMsg, err)
 	}
 
 	// Provider schemas
 	providerSchemasJSON, err := tf.ProvidersSchema(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to run provider schema command: %v", err)
+		errMsg := "failed to run provider schema command: %v"
+		// log error here since job logger is not connected to stdout while running these commands
+		p.jobLogger.Errorf(errMsg, err)
+		return fmt.Errorf(errMsg, err)
 	}
 
 	tf.SetStdout(p.jobLogger)

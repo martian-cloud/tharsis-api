@@ -83,6 +83,8 @@ func NewGraphQL(
 	resolver.RegisterGroupLoader(loaderCollection)
 	resolver.RegisterWorkspaceLoader(loaderCollection)
 	resolver.RegisterWorkspaceAssessmentLoader(loaderCollection)
+	resolver.RegisterWorkspaceRoleBindingByWorkspaceIDLoader(loaderCollection)
+	resolver.RegisterWorkspaceRoleBindingByIDLoader(loaderCollection)
 	resolver.RegisterUserLoader(loaderCollection)
 	resolver.RegisterServiceAccountLoader(loaderCollection)
 	resolver.RegisterConfigurationVersionLoader(loaderCollection)

@@ -28,6 +28,14 @@ func TestVCSWorkspaceLinkCaller_IsAdmin(t *testing.T) {
 	assert.False(t, caller.IsAdminModeActivated(t.Context()))
 }
 
+func TestVCSWorkspaceLinkCaller_GetNamespacePermissions(t *testing.T) {
+	caller := VCSWorkspaceLinkCaller{}
+	perms, err := caller.GetNamespacePermissions(context.Background(), "some/namespace")
+	assert.NoError(t, err)
+	// Not backed by namespace memberships, so it always reports an empty set.
+	assert.Empty(t, perms)
+}
+
 func TestVCSWorkspaceLinkCaller_GetRootNamespaceMemberships(t *testing.T) {
 	caller := VCSWorkspaceLinkCaller{}
 	namespaces, err := caller.GetRootNamespaceMemberships(WithCaller(context.Background(), &caller))
@@ -146,17 +154,5 @@ func TestVCSWorkspaceLinkCaller_RequireInheritedPermissions(t *testing.T) {
 		},
 	}
 	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.RunModelType, nil)
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireRole(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{
-		Provider: &models.VCSProvider{
-			Metadata: models.ResourceMetadata{
-				TRN: trn.TypeVCSProvider.Build("group-1/test-provider"),
-			},
-		},
-	}
-	err := caller.RequireRole(WithCaller(t.Context(), &caller), models.OwnerRoleID.String())
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 }

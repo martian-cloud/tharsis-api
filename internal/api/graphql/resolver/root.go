@@ -132,6 +132,18 @@ func (r RootResolver) MigrateWorkspace(ctx context.Context,
 	return response, nil
 }
 
+// SetWorkspaceRoleBinding creates, changes, or removes the role bound to a workspace
+func (r RootResolver) SetWorkspaceRoleBinding(ctx context.Context,
+	args *struct{ Input SetWorkspaceRoleBindingInput },
+) (*SetWorkspaceRoleBindingPayloadResolver, error) {
+	response, err := setWorkspaceRoleBindingMutation(ctx, &args.Input)
+	if err != nil {
+		return handleSetWorkspaceRoleBindingMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 // DestroyWorkspace creates a destroy run for an existing workspace
 func (r RootResolver) DestroyWorkspace(ctx context.Context,
 	args *struct{ Input DestroyWorkspaceInput },

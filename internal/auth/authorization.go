@@ -8,19 +8,17 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Authorizer is used to authorize access to namespaces
 type Authorizer interface {
 	GetRootNamespaces(ctx context.Context) ([]models.MembershipNamespace, error)
+	GetEffectivePermissions(ctx context.Context, namespacePath string) (map[string]models.Permission, error)
 	RequireAccess(ctx context.Context, perms []models.Permission, checks ...func(*constraints)) error
 	RequireAccessToInheritableResource(ctx context.Context, modelTypes []types.ModelType, checks ...func(*constraints)) error
-	RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error
 }
 
 type cacheKey struct {
@@ -103,6 +101,47 @@ func (a *authorizer) GetRootNamespaces(ctx context.Context) ([]models.Membership
 	return rootNamespaces, nil
 }
 
+// GetEffectivePermissions returns the union of every permission the caller holds at the given
+// namespace. A caller's effective permissions come from every membership that applies to the
+// namespace: direct memberships plus those inherited from each ancestor, held either directly or via
+// a team. This is the set form of the check RequireAccess performs for a single permission.
+//
+// It exists for callers that must answer "does this subject hold ALL of these permissions" — for
+// example, verifying that whoever binds a role to a workspace already holds everything in that role.
+// Looping RequireAccess would issue a memberships query per permission on cache misses; this issues
+// one and compares in memory.
+//
+// The returned set is keyed by Permission.String(), valued by the Permission itself. Note that it is
+// a literal union of the granted permissions and does not expand implied access, so a subset test
+// against it should use the same GTE semantics that requirePermission applies.
+func (a *authorizer) GetEffectivePermissions(ctx context.Context, namespacePath string) (map[string]models.Permission, error) {
+	sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
+	resp, err := a.getNamespaceMemberships(ctx, &db.GetNamespaceMembershipsInput{
+		Sort: &sortBy,
+		Filter: &db.NamespaceMembershipFilter{
+			NamespacePaths: expandNamespaceDescOrder(namespacePath),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	effective := map[string]models.Permission{}
+	for _, membership := range resp.NamespaceMemberships {
+		membershipCopy := membership
+		perms, err := a.getPermissionsFromMembership(ctx, &membershipCopy)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, p := range perms {
+			effective[p.String()] = p
+		}
+	}
+
+	return effective, nil
+}
+
 func (a *authorizer) RequireAccess(ctx context.Context, perms []models.Permission, checks ...func(*constraints)) error {
 	c := getConstraints(checks...)
 
@@ -155,45 +194,6 @@ func (a *authorizer) RequireAccessToInheritableResource(ctx context.Context, mod
 	}
 
 	return nil
-}
-
-func (a *authorizer) RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error {
-	c := getConstraints(checks...)
-
-	if len(c.namespacePaths) == 0 {
-		return errMissingConstraints
-	}
-
-	for _, namespacePath := range c.namespacePaths {
-		if err := a.requireRoleInNamespace(ctx, namespacePath, roleID); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (a *authorizer) requireRoleInNamespace(ctx context.Context, namespacePath string, roleID string) error {
-	sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
-	resp, err := a.getNamespaceMemberships(ctx, &db.GetNamespaceMembershipsInput{
-		Sort: &sortBy,
-		PaginationOptions: &pagination.Options{
-			First: ptr.Int32(0),
-		},
-		Filter: &db.NamespaceMembershipFilter{
-			NamespacePaths: expandNamespaceDescOrder(namespacePath),
-			RoleID:         &roleID,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	if resp.PageInfo.HasResults {
-		return nil
-	}
-
-	return a.authorizationError(ctx, false)
 }
 
 func (a *authorizer) requireAccessToGroup(ctx context.Context, groupID string, perm *models.Permission) error {

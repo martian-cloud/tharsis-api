@@ -26,7 +26,7 @@ const (
 )
 
 // DefaultOutputVisibility is the default output visibility for new root groups
-const DefaultOutputVisibility = OutputVisibilityDirectGroupOnly
+const DefaultOutputVisibility = OutputVisibilityRootGroup
 
 // ValidOutputVisibilities contains all valid output visibility values
 var ValidOutputVisibilities = []NamespaceOutputVisibilityLevel{

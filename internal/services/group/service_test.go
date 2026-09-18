@@ -1100,6 +1100,7 @@ func TestMigrateGroup(t *testing.T) {
 		isUserAdmin              bool
 		isGroupOwner             bool
 		isCallerDeployerOfParent bool
+		isCallerOwnerOfParent    bool
 	}{
 		{
 			name:             "successful move to root",
@@ -1121,6 +1122,7 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &newParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			isCallerOwnerOfParent:    true,
 			limit:                    5,
 			newParentChildren:        5,
 			injectChildDepth:         2, // new grandparent, new parent, nomad, two levels of descendants
@@ -1145,6 +1147,7 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &testGroupID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			isCallerOwnerOfParent:    true,
 			injectChildDepth:         -1,
 			expectErrorCode:          errors.EInvalid,
 		},
@@ -1154,6 +1157,7 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &loopParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			isCallerOwnerOfParent:    true,
 			injectChildDepth:         -1,
 			expectErrorCode:          errors.EInvalid,
 		},
@@ -1163,6 +1167,19 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &newParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: false,
+			injectChildDepth:         -1,
+			expectErrorCode:          errors.EForbidden,
+		},
+		{
+			// Migrating a subtree in introduces principals the destination's administrator never
+			// approved and changes path-derived output visibility, so it requires the permission that
+			// governs conferring access at the destination.
+			name:                     "caller cannot create namespace memberships in new parent group",
+			inputGroup:               testGroup,
+			newParentID:              &newParentID,
+			isGroupOwner:             true,
+			isCallerDeployerOfParent: true,
+			isCallerOwnerOfParent:    false,
 			injectChildDepth:         -1,
 			expectErrorCode:          errors.EForbidden,
 		},
@@ -1180,6 +1197,7 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &newParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			isCallerOwnerOfParent:    true,
 			limit:                    5,
 			newParentChildren:        6,
 			injectChildDepth:         1,
@@ -1197,6 +1215,7 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &newParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			isCallerOwnerOfParent:    true,
 			limit:                    5,
 			newParentChildren:        5,
 			injectChildDepth:         1, // the group and one child level
@@ -1214,6 +1233,7 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &newParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			isCallerOwnerOfParent:    true,
 			limit:                    5,
 			newParentChildren:        5,
 			injectChildDepth:         4, // just exceeds limit: 2 + 4
@@ -1231,12 +1251,15 @@ func TestMigrateGroup(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			var groupAccessError, parentAccessError error
+			var groupAccessError, parentAccessError, parentMembershipAccessError error
 			if !test.isGroupOwner {
 				groupAccessError = errors.New("test user is not owner of group being moved", errors.WithErrorCode(errors.EForbidden))
 			}
 			if !test.isCallerDeployerOfParent {
 				parentAccessError = errors.New("test user is not deployer of new parent", errors.WithErrorCode(errors.EForbidden))
+			}
+			if !test.isCallerOwnerOfParent {
+				parentMembershipAccessError = errors.New("test user cannot create namespace memberships in new parent", errors.WithErrorCode(errors.EForbidden))
 			}
 
 			mockAuthorizer := auth.MockAuthorizer{}
@@ -1251,6 +1274,9 @@ func TestMigrateGroup(t *testing.T) {
 
 			perms = []models.Permission{models.CreateGroupPermission}
 			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(parentAccessError)
+
+			perms = []models.Permission{models.CreateNamespaceMembershipPermission}
+			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(parentMembershipAccessError)
 
 			mockGroups := db.MockGroups{}
 			mockGroups.Test(t)

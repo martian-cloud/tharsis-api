@@ -178,6 +178,13 @@ type GetConfigurationVersionContentOutput struct {
 	ContentLength int64
 }
 
+// SetWorkspaceRoleBindingInput is the input for creating, changing, or removing a workspace's role
+// binding. Setting RoleID to nil removes the binding.
+type SetWorkspaceRoleBindingInput struct {
+	WorkspaceID string
+	RoleID      *string
+}
+
 // Service implements all workspace related functionality
 type Service interface {
 	SubscribeToWorkspaceEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error)
@@ -213,6 +220,12 @@ type Service interface {
 	GetStateVersionOutputs(ctx context.Context, stateVersionID string) ([]models.StateVersionOutput, error)
 	GetStateVersionInventory(ctx context.Context, stateVersion *models.StateVersion) (*StateVersionInventory, error)
 	MigrateWorkspace(ctx context.Context, workspaceID string, newGroupID string) (*models.Workspace, error)
+	GetWorkspaceRoleBindingByID(ctx context.Context, id string) (*models.WorkspaceRoleBinding, error)
+	GetWorkspaceRoleBindingByTRN(ctx context.Context, trn string) (*models.WorkspaceRoleBinding, error)
+	GetWorkspaceRoleBindingByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceRoleBinding, error)
+	GetWorkspaceRoleBindingsByWorkspaceIDs(ctx context.Context, idList []string) ([]models.WorkspaceRoleBinding, error)
+	GetWorkspaceRoleBindingsByIDs(ctx context.Context, idList []string) ([]models.WorkspaceRoleBinding, error)
+	SetWorkspaceRoleBinding(ctx context.Context, options *SetWorkspaceRoleBindingInput) (*models.WorkspaceRoleBinding, error)
 	GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*namespace.RunnerTagsSetting, error)
 	GetDriftDetectionEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.DriftDetectionEnabledSetting, error)
 	GetProviderMirrorEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.ProviderMirrorEnabledSetting, error)
@@ -269,14 +282,14 @@ func newService(
 	handleCaller handleCallerFunc,
 ) Service {
 	return &service{
-		logger,
-		dbClient,
-		limitChecker,
-		artifactStore,
-		eventManager,
-		terraformCLIVersionConstraint,
-		inheritedSettingsResolver,
-		handleCaller,
+		logger:                        logger,
+		dbClient:                      dbClient,
+		limitChecker:                  limitChecker,
+		artifactStore:                 artifactStore,
+		eventManager:                  eventManager,
+		terraformCLIVersionConstraint: terraformCLIVersionConstraint,
+		inheritedSettingsResolver:     inheritedSettingsResolver,
+		handleCaller:                  handleCaller,
 	}
 }
 
@@ -2158,6 +2171,20 @@ func (s *service) MigrateWorkspace(ctx context.Context, workspaceID string, newG
 		return nil, err
 	}
 
+	// The caller must also have CreateNamespaceMembershipPermission in the new parent. Moving a
+	// workspace in introduces principals the destination's administrator never approved, and it
+	// changes output visibility relationships, which are derived from namespace paths and group IDs.
+	// Both are access decisions that belong to whoever controls access at the destination, so this is
+	// checked in addition to (not instead of) CreateWorkspacePermission.
+	//
+	// Only the destination is checked. Moving a workspace out already requires
+	// DeleteWorkspacePermission on it, and a caller who can delete the workspace outright gains
+	// nothing by moving it.
+	err = caller.RequirePermission(ctx, models.CreateNamespaceMembershipPermission, auth.WithGroupID(newGroupID))
+	if err != nil {
+		return nil, err
+	}
+
 	// Caller must have DeleteWorkspacePermission in the workspace being moved.
 	err = caller.RequirePermission(ctx, models.DeleteWorkspacePermission, auth.WithWorkspaceID(workspaceID))
 	if err != nil {
@@ -2270,6 +2297,408 @@ func (s *service) MigrateWorkspace(ctx context.Context, workspaceID string, newG
 	return migratedWorkspace, nil
 }
 
+func (s *service) GetWorkspaceRoleBindingByID(ctx context.Context, id string) (*models.WorkspaceRoleBinding, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceRoleBindingByID")
+	defer span.End()
+
+	binding, err := s.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindingByID(ctx, id)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace role binding by ID", errors.WithSpan(span))
+	}
+
+	if binding == nil {
+		return nil, errors.New("workspace role binding with id %s not found", id, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = caller.RequirePermission(ctx, models.ViewWorkspaceRoleBindingPermission, auth.WithWorkspaceID(binding.WorkspaceID)); err != nil {
+		return nil, err
+	}
+
+	return binding, nil
+}
+
+func (s *service) GetWorkspaceRoleBindingByTRN(ctx context.Context, trn string) (*models.WorkspaceRoleBinding, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceRoleBindingByTRN")
+	defer span.End()
+
+	binding, err := s.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindingByTRN(ctx, trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace role binding by TRN", errors.WithSpan(span))
+	}
+
+	if binding == nil {
+		return nil, errors.New("workspace role binding with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = caller.RequirePermission(ctx, models.ViewWorkspaceRoleBindingPermission, auth.WithWorkspaceID(binding.WorkspaceID)); err != nil {
+		return nil, err
+	}
+
+	return binding, nil
+}
+
+func (s *service) GetWorkspaceRoleBindingByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceRoleBinding, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceRoleBindingByWorkspaceID")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = caller.RequirePermission(ctx, models.ViewWorkspaceRoleBindingPermission, auth.WithWorkspaceID(workspaceID)); err != nil {
+		return nil, err
+	}
+
+	binding, err := s.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindingByWorkspaceID(ctx, workspaceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace role binding by workspace ID", errors.WithSpan(span))
+	}
+
+	// A workspace legitimately has no binding; that is not an error.
+	return binding, nil
+}
+
+// GetWorkspaceRoleBindingsByWorkspaceIDs returns the role bindings for a batch of workspaces, used
+// by the WorkspaceRoleBinding dataloader. Workspaces with no binding are simply absent from the
+// result; that is not an error, and callers must not treat a missing entry as EnotFound.
+func (s *service) GetWorkspaceRoleBindingsByWorkspaceIDs(ctx context.Context, idList []string) ([]models.WorkspaceRoleBinding, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceRoleBindingsByWorkspaceIDs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindings(ctx, &db.GetWorkspaceRoleBindingsInput{
+		Filter: &db.WorkspaceRoleBindingFilter{
+			WorkspaceIDs: idList,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace role bindings by workspace IDs", errors.WithSpan(span))
+	}
+
+	if err = s.requireViewWorkspaceRoleBindingAccess(ctx, caller, result.WorkspaceRoleBindings); err != nil {
+		return nil, err
+	}
+
+	return result.WorkspaceRoleBindings, nil
+}
+
+// GetWorkspaceRoleBindingsByIDs returns the role bindings with the given IDs, used by the
+// WorkspaceRoleBinding-as-activity-event-target loader, which looks a binding up starting from its
+// own ID (the activity event's target ID) rather than from its workspace. Unlike
+// GetWorkspaceRoleBindingsByWorkspaceIDs, a missing entry here IS meaningful to the caller (the
+// binding no longer exists, e.g. it was later removed), so this returns exactly the bindings found
+// with no guarantee every requested ID is present — the caller (the activity event resolver) treats
+// an absent ID as "target no longer exists," the same as it does for every other target type.
+func (s *service) GetWorkspaceRoleBindingsByIDs(ctx context.Context, idList []string) ([]models.WorkspaceRoleBinding, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceRoleBindingsByIDs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindings(ctx, &db.GetWorkspaceRoleBindingsInput{
+		Filter: &db.WorkspaceRoleBindingFilter{
+			IDs: idList,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace role bindings by IDs", errors.WithSpan(span))
+	}
+
+	if err = s.requireViewWorkspaceRoleBindingAccess(ctx, caller, result.WorkspaceRoleBindings); err != nil {
+		return nil, err
+	}
+
+	return result.WorkspaceRoleBindings, nil
+}
+
+// SetWorkspaceRoleBinding creates, changes, or removes the role bound to a workspace. The bound
+// role's permissions become available to the workspace's job caller at the workspace's DIRECT
+// PARENT namespace (see models.WorkspaceRoleBinding for why the binding carries no namespace of its
+// own).
+//
+// Authorization is two-part and BOTH checks are against the workspace's PARENT namespace, never
+// against the workspace itself:
+//
+//  1. The caller must hold a WorkspaceRoleBinding permission (Create/Update/Delete as appropriate)
+//     at the parent namespace. This is the permission that governs conferring a binding, and by
+//     default only Owner holds it.
+//  2. The caller must hold every permission contained in the role being bound, at the parent
+//     namespace. This is what stops a caller from binding a role broader than their own access —
+//     the actual escalation-prevention check.
+//
+// Checking (1) with WithWorkspaceID instead of WithGroupID(workspace.GroupID) would be a critical
+// bug: it would let a caller whose membership is scoped to just the workspace confer authority over
+// the workspace's PARENT group, which is a namespace they may have no access to at all.
+//
+// A caller changing an existing binding to a different role must satisfy both checks again for the
+// new role. There is no in-place role swap that skips re-validation.
+func (s *service) SetWorkspaceRoleBinding(ctx context.Context, options *SetWorkspaceRoleBindingInput) (*models.WorkspaceRoleBinding, error) {
+	ctx, span := tracer.Start(ctx, "svc.SetWorkspaceRoleBinding")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	workspace, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, options.WorkspaceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace by ID", errors.WithSpan(span))
+	}
+
+	if workspace == nil {
+		return nil, errors.New("workspace with id %s not found", options.WorkspaceID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	existing, err := s.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindingByWorkspaceID(ctx, options.WorkspaceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get existing workspace role binding", errors.WithSpan(span))
+	}
+
+	if options.RoleID == nil {
+		return s.removeWorkspaceRoleBinding(ctx, caller, workspace, existing)
+	}
+
+	return s.createOrUpdateWorkspaceRoleBinding(ctx, caller, workspace, existing, *options.RoleID)
+}
+
+// createOrUpdateWorkspaceRoleBinding performs both halves of the escalation check against the
+// workspace's parent namespace, then creates or updates the binding row.
+func (s *service) createOrUpdateWorkspaceRoleBinding(
+	ctx context.Context,
+	caller auth.Caller,
+	workspace *models.Workspace,
+	existing *models.WorkspaceRoleBinding,
+	roleID string,
+) (*models.WorkspaceRoleBinding, error) {
+	bindingPerm := models.CreateWorkspaceRoleBindingPermission
+	action := models.ActionCreate
+	if existing != nil {
+		bindingPerm = models.UpdateWorkspaceRoleBindingPermission
+		action = models.ActionUpdate
+	}
+
+	// Part 1: the caller must hold the permission that governs conferring a binding, at the PARENT
+	// namespace. WithGroupID, never WithWorkspaceID.
+	if err := caller.RequirePermission(ctx, bindingPerm, auth.WithGroupID(workspace.GroupID)); err != nil {
+		return nil, err
+	}
+
+	role, err := s.dbClient.Roles.GetRoleByID(ctx, roleID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get role by ID")
+	}
+
+	if role == nil {
+		return nil, errors.New("role with id %s not found", roleID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	// Part 2: the caller must hold every permission the role would confer, at the PARENT namespace.
+	// This is the check that prevents a caller from binding a role broader than their own access.
+	if err := s.requireEffectivePermissionSuperset(ctx, caller, workspace.GroupID, role); err != nil {
+		return nil, err
+	}
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin DB transaction")
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer SetWorkspaceRoleBinding: %v", txErr)
+		}
+	}()
+
+	var result *models.WorkspaceRoleBinding
+	var previousRoleID string
+
+	if existing == nil {
+		created, cErr := s.dbClient.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(txContext, &models.WorkspaceRoleBinding{
+			WorkspaceID: workspace.Metadata.ID,
+			RoleID:      roleID,
+			CreatedBy:   caller.GetSubject(),
+		})
+		if cErr != nil {
+			return nil, errors.Wrap(cErr, "failed to create workspace role binding")
+		}
+		result = created
+	} else {
+		previousRoleID = existing.RoleID
+		toUpdate := *existing
+		toUpdate.RoleID = roleID
+
+		updated, uErr := s.dbClient.WorkspaceRoleBindings.UpdateWorkspaceRoleBinding(txContext, &toUpdate)
+		if uErr != nil {
+			return nil, errors.Wrap(uErr, "failed to update workspace role binding")
+		}
+		result = updated
+	}
+
+	groupPath := workspace.GetGroupPath()
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        action,
+			TargetType:    models.TargetWorkspaceRoleBinding,
+			TargetID:      result.Metadata.ID,
+			Payload: &models.ActivityEventSetWorkspaceRoleBindingPayload{
+				PreviousRoleID: previousRoleID,
+				NewRoleID:      roleID,
+			},
+		}); err != nil {
+		return nil, errors.Wrap(err, "failed to create an activity event")
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, errors.Wrap(err, "failed to commit a DB transaction")
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Set workspace role binding.",
+		"workspaceID", workspace.Metadata.ID,
+		"roleID", roleID,
+	)
+
+	return result, nil
+}
+
+// removeWorkspaceRoleBinding removes a workspace's binding. Removing a binding never grants
+// anything, so it is gated solely on DeleteWorkspaceRoleBindingPermission at the parent namespace —
+// there is no role to subset-check against.
+func (s *service) removeWorkspaceRoleBinding(
+	ctx context.Context,
+	caller auth.Caller,
+	workspace *models.Workspace,
+	existing *models.WorkspaceRoleBinding,
+) (*models.WorkspaceRoleBinding, error) {
+	if existing == nil {
+		return nil, errors.New("workspace with id %s has no role binding to remove", workspace.Metadata.ID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if err := caller.RequirePermission(ctx, models.DeleteWorkspaceRoleBindingPermission, auth.WithGroupID(workspace.GroupID)); err != nil {
+		return nil, err
+	}
+
+	role, err := s.dbClient.Roles.GetRoleByID(ctx, existing.RoleID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get role by ID")
+	}
+
+	roleName := existing.RoleID
+	if role != nil {
+		roleName = role.Name
+	}
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin DB transaction")
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer SetWorkspaceRoleBinding: %v", txErr)
+		}
+	}()
+
+	// Delete first, then record a DeleteChildResource event against the WORKSPACE the binding
+	// belonged to — not against the binding itself, which no longer exists once deleted.
+	if err = s.dbClient.WorkspaceRoleBindings.DeleteWorkspaceRoleBinding(txContext, existing); err != nil {
+		return nil, errors.Wrap(err, "failed to delete workspace role binding")
+	}
+
+	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
+		&activity.CreateActivityEventInput{
+			NamespacePath: &workspace.FullPath,
+			Action:        models.ActionDeleteChildResource,
+			TargetType:    models.TargetWorkspace,
+			TargetID:      workspace.Metadata.ID,
+			Payload: &models.ActivityEventDeleteChildResourcePayload{
+				Name: roleName,
+				ID:   existing.Metadata.ID,
+				Type: string(models.TargetWorkspaceRoleBinding),
+			},
+		}); err != nil {
+		return nil, errors.Wrap(err, "failed to create an activity event")
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, errors.Wrap(err, "failed to commit a DB transaction")
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Removed workspace role binding.",
+		"workspaceID", workspace.Metadata.ID,
+	)
+
+	return existing, nil
+}
+
+// requireEffectivePermissionSuperset returns an error unless the caller holds every permission in
+// role, at namespacePath. This is the subset check: it must be evaluated against the role's actual
+// permission set, not against a role ID comparison, so a custom role's permissions are checked the
+// same way a default role's are.
+func (s *service) requireEffectivePermissionSuperset(ctx context.Context, caller auth.Caller, groupID string, role *models.Role) error {
+	if caller.IsAdminModeActivated(ctx) {
+		return nil
+	}
+
+	group, err := s.dbClient.Groups.GetGroupByID(ctx, groupID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get group by ID")
+	}
+
+	if group == nil {
+		return errors.New("group with id %s not found", groupID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	effective, err := caller.GetNamespacePermissions(ctx, group.FullPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to get effective permissions")
+	}
+
+	missing := []string{}
+	for _, perm := range role.GetPermissions() {
+		required := perm
+		satisfied := false
+		for _, heldPerm := range effective {
+			if heldPerm.GTE(&required) {
+				satisfied = true
+				break
+			}
+		}
+		if !satisfied {
+			missing = append(missing, required.String())
+		}
+	}
+
+	if len(missing) > 0 {
+		return errors.New(
+			"cannot bind a role that grants permissions you do not hold at %s: missing %s",
+			group.FullPath, strings.Join(missing, ", "),
+			errors.WithErrorCode(errors.EForbidden),
+		)
+	}
+
+	return nil
+}
+
 func (s *service) getStateVersionByID(ctx context.Context, stateVersionID string) (*models.StateVersion, error) {
 	sv, err := s.dbClient.StateVersions.GetStateVersionByID(ctx, stateVersionID)
 	if err != nil {
@@ -2336,4 +2765,38 @@ func detectLabelChanges(oldLabels, newLabels map[string]string) *models.LabelCha
 	}
 
 	return changes
+}
+
+// requireViewWorkspaceRoleBindingAccess verifies the caller can view the given role bindings,
+// batching the workspace-ID-to-path resolution and permission check into a single RequirePermission
+// call (matching the pattern used by GetWorkspacesByIDs) instead of checking WithWorkspaceID for
+// each binding individually, which would otherwise issue one path-resolving DB lookup and one
+// permission check per binding for what is a single dataloader batch.
+func (s *service) requireViewWorkspaceRoleBindingAccess(ctx context.Context, caller auth.Caller, bindings []models.WorkspaceRoleBinding) error {
+	if len(bindings) == 0 {
+		return nil
+	}
+
+	workspaceIDs := make([]string, 0, len(bindings))
+	for _, binding := range bindings {
+		workspaceIDs = append(workspaceIDs, binding.WorkspaceID)
+	}
+
+	wsResult, err := s.dbClient.Workspaces.GetWorkspaces(ctx, &db.GetWorkspacesInput{
+		Filter: &db.WorkspaceFilter{WorkspaceIDs: workspaceIDs},
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to get workspaces for role bindings")
+	}
+
+	wsPaths := make([]string, 0, len(wsResult.Workspaces))
+	for _, ws := range wsResult.Workspaces {
+		wsPaths = append(wsPaths, ws.FullPath)
+	}
+
+	if len(wsPaths) == 0 {
+		return nil
+	}
+
+	return caller.RequirePermission(ctx, models.ViewWorkspaceRoleBindingPermission, auth.WithNamespacePaths(wsPaths))
 }

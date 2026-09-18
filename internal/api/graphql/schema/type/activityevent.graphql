@@ -56,6 +56,7 @@ enum ActivityEventTargetType {
   PACKAGE_VERSION
   POLICY
   RUN_GATE
+  WORKSPACE_ROLE_BINDING
 }
 
 type ActivityEventConnection {
@@ -95,6 +96,11 @@ type ActivityEventMigrateGroupPayload {
 
 type ActivityEventMigrateWorkspacePayload {
   previousGroupPath: String!
+}
+
+type ActivityEventSetWorkspaceRoleBindingPayload {
+  previousRoleId: String
+  newRoleId: String
 }
 
 type ActivityEventAddTeamMemberPayload {
@@ -170,6 +176,7 @@ union ActivityEventPayload =
   | ActivityEventUpdateTerraformModulePayload
   | ActivityEventUpdateRunPayload
   | ActivityEventUpdateRunGatePayload
+  | ActivityEventSetWorkspaceRoleBindingPayload
 
 type ActivityEvent implements Node {
   id: ID!

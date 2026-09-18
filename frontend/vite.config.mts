@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '');
 
     const host = env.VITE_HOST;
+    const port = Number(env.VITE_PORT) || 3000;
     const plugins = env.VITE_ENABLE_HTTPS === 'true' ? [mkcert({ hosts: host ? [host] : [] })] : [];
 
     return {
@@ -24,7 +25,7 @@ export default defineConfig(({ mode }) => {
         },
         server: {
             open: true,
-            port: 3000,
+            port: port,
             host: host
         },
         build: {

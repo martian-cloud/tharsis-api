@@ -67,6 +67,7 @@ var (
 	VCSProviderModelType                     = ModelType{trnType: trn.TypeVCSProvider, gidCode: "VP"}
 	WorkspaceAssessmentModelType             = ModelType{trnType: trn.TypeWorkspaceAssessment, gidCode: "WA"}
 	WorkspaceModelType                       = ModelType{trnType: trn.TypeWorkspace, gidCode: "W"}
+	WorkspaceRoleBindingModelType            = ModelType{trnType: trn.TypeWorkspaceRoleBinding, gidCode: "WRB"}
 	WorkspaceVCSProviderLinkModelType        = ModelType{trnType: trn.TypeWorkspaceVCSProviderLink, gidCode: "WPL"}
 )
 

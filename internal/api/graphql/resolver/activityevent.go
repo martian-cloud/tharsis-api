@@ -7,7 +7,9 @@ import (
 	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -255,6 +257,13 @@ func (r *ActivityEventPayloadResolver) ToActivityEventUpdateRunPayload() (*model
 // ToActivityEventUpdateRunGatePayload resolves the custom payload for a run gate update.
 func (r *ActivityEventPayloadResolver) ToActivityEventUpdateRunGatePayload() (*ActivityEventUpdateRunGatePayloadResolver, bool) {
 	res, ok := r.result.(*ActivityEventUpdateRunGatePayloadResolver)
+	return res, ok
+}
+
+// ToActivityEventSetWorkspaceRoleBindingPayload resolves the custom payload for creating, changing,
+// or removing a workspace's role binding.
+func (r *ActivityEventPayloadResolver) ToActivityEventSetWorkspaceRoleBindingPayload() (*ActivityEventSetWorkspaceRoleBindingPayloadResolver, bool) {
+	res, ok := r.result.(*ActivityEventSetWorkspaceRoleBindingPayloadResolver)
 	return res, ok
 }
 
@@ -560,6 +569,12 @@ func (r *ActivityEventResolver) loadTarget(ctx context.Context) (*NodeResolver, 
 			return nil, err
 		}
 		return &NodeResolver{result: &RunGateResolver{runGate: runGate}}, nil
+	case models.TargetWorkspaceRoleBinding:
+		binding, err := loadWorkspaceRoleBindingByID(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &WorkspaceRoleBindingResolver{workspaceRoleBinding: binding}}, nil
 	default:
 		return nil, errors.New("valid TargetType must be specified", errors.WithErrorCode(errors.EInvalid))
 	}
@@ -692,6 +707,17 @@ func (r *ActivityEventResolver) Payload() (*ActivityEventPayloadResolver, error)
 				return nil, err
 			}
 			return &ActivityEventPayloadResolver{result: &ActivityEventUpdateTerraformModulePayloadResolver{payload: &payload}}, nil
+		case r.activityEvent.TargetType == models.TargetWorkspaceRoleBinding:
+			// The same payload shape is recorded for both actions that still target the binding
+			// itself — create, and update (a role change). Removing a binding is recorded as a
+			// DeleteChildResource event against the WORKSPACE instead (see
+			// removeWorkspaceRoleBinding), handled by the ActionDeleteChildResource case above, so
+			// this case is never reached for a REMOVE.
+			var payload models.ActivityEventSetWorkspaceRoleBindingPayload
+			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return &ActivityEventPayloadResolver{result: &ActivityEventSetWorkspaceRoleBindingPayloadResolver{payload: &payload}}, nil
 		default:
 			return nil, fmt.Errorf("payload supplied without a supported target type and action")
 
@@ -780,6 +806,34 @@ func (r *ActivityEventMigrateGroupPayloadResolver) PreviousGroupPath() string {
 // PreviousGroupPath resolver (for workspace migration)
 func (r *ActivityEventMigrateWorkspacePayloadResolver) PreviousGroupPath() string {
 	return r.payload.PreviousGroupPath
+}
+
+// ActivityEventSetWorkspaceRoleBindingPayloadResolver resolves the payload recorded when a
+// workspace's role binding is created, changed, or removed.
+type ActivityEventSetWorkspaceRoleBindingPayloadResolver struct {
+	payload *models.ActivityEventSetWorkspaceRoleBindingPayload
+}
+
+// PreviousRoleID resolver. Empty (nil) when the binding is being created, since there is no
+// previous role in that case. The payload stores the role's local DB ID; this resolves it to the
+// role's global ID, the form every other ID-typed GraphQL field uses.
+func (r *ActivityEventSetWorkspaceRoleBindingPayloadResolver) PreviousRoleID() *string {
+	if r.payload.PreviousRoleID == "" {
+		return nil
+	}
+	globalID := gid.ToGlobalID(types.RoleModelType, r.payload.PreviousRoleID)
+	return &globalID
+}
+
+// NewRoleID resolver. Empty (nil) when the binding is being removed, since there is no new role in
+// that case. The payload stores the role's local DB ID; this resolves it to the role's global ID,
+// the form every other ID-typed GraphQL field uses.
+func (r *ActivityEventSetWorkspaceRoleBindingPayloadResolver) NewRoleID() *string {
+	if r.payload.NewRoleID == "" {
+		return nil
+	}
+	globalID := gid.ToGlobalID(types.RoleModelType, r.payload.NewRoleID)
+	return &globalID
 }
 
 // ActivityEventMoveManagedIdentityPayloadResolver resolves an activity event

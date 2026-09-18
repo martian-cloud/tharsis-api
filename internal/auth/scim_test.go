@@ -24,6 +24,14 @@ func TestSCIMCaller_IsAdmin(t *testing.T) {
 	assert.False(t, caller.IsAdminModeActivated(t.Context()))
 }
 
+func TestSCIMCaller_GetNamespacePermissions(t *testing.T) {
+	caller := SCIMCaller{}
+	perms, err := caller.GetNamespacePermissions(context.Background(), "some/namespace")
+	assert.NoError(t, err)
+	// Not backed by namespace memberships, so it always reports an empty set.
+	assert.Empty(t, perms)
+}
+
 func TestSCIMCaller_GetRootNamespaceMemberships(t *testing.T) {
 	caller := SCIMCaller{}
 	namespaces, err := caller.GetRootNamespaceMemberships(WithCaller(context.Background(), &caller))
@@ -153,11 +161,5 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 func TestSCIMCaller_RequireInheritedPermissions(t *testing.T) {
 	caller := SCIMCaller{}
 	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.RunnerModelType, nil)
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireRole(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireRole(WithCaller(t.Context(), &caller), models.OwnerRoleID.String())
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 }

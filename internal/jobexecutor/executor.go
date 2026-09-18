@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"time"
 
 	humanize "github.com/dustin/go-humanize"
@@ -106,7 +107,12 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 	} else if j.cancellableCtx.Err() != nil {
 		j.handleJobCanceled(ctx, jobLogger)
 	} else if err != nil {
-		j.handleJobFailureWithError(ctx, jobLogger, err)
+		// If this is an exec exit error than the error has already been logged by the command output
+		if _, ok := errors.AsType[*exec.ExitError](err); ok {
+			j.handleJobFailure(ctx, jobLogger)
+		} else {
+			j.handleJobFailureWithError(ctx, jobLogger, err)
+		}
 	} else {
 		jobLogger.Flush()
 		if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_finished, models.CurrentJobProtocolVersion); err != nil {

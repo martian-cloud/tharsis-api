@@ -20,15 +20,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Workspaces_GetWorkspaceByID_FullMethodName           = "/martiancloud.tharsis.api.workspace.Workspaces/GetWorkspaceByID"
-	Workspaces_GetWorkspaces_FullMethodName              = "/martiancloud.tharsis.api.workspace.Workspaces/GetWorkspaces"
-	Workspaces_CreateWorkspace_FullMethodName            = "/martiancloud.tharsis.api.workspace.Workspaces/CreateWorkspace"
-	Workspaces_UpdateWorkspace_FullMethodName            = "/martiancloud.tharsis.api.workspace.Workspaces/UpdateWorkspace"
-	Workspaces_DeleteWorkspace_FullMethodName            = "/martiancloud.tharsis.api.workspace.Workspaces/DeleteWorkspace"
-	Workspaces_LockWorkspace_FullMethodName              = "/martiancloud.tharsis.api.workspace.Workspaces/LockWorkspace"
-	Workspaces_UnlockWorkspace_FullMethodName            = "/martiancloud.tharsis.api.workspace.Workspaces/UnlockWorkspace"
-	Workspaces_MigrateWorkspace_FullMethodName           = "/martiancloud.tharsis.api.workspace.Workspaces/MigrateWorkspace"
-	Workspaces_SubscribeToWorkspaceEvents_FullMethodName = "/martiancloud.tharsis.api.workspace.Workspaces/SubscribeToWorkspaceEvents"
+	Workspaces_GetWorkspaceByID_FullMethodName                     = "/martiancloud.tharsis.api.workspace.Workspaces/GetWorkspaceByID"
+	Workspaces_GetWorkspaces_FullMethodName                        = "/martiancloud.tharsis.api.workspace.Workspaces/GetWorkspaces"
+	Workspaces_CreateWorkspace_FullMethodName                      = "/martiancloud.tharsis.api.workspace.Workspaces/CreateWorkspace"
+	Workspaces_UpdateWorkspace_FullMethodName                      = "/martiancloud.tharsis.api.workspace.Workspaces/UpdateWorkspace"
+	Workspaces_DeleteWorkspace_FullMethodName                      = "/martiancloud.tharsis.api.workspace.Workspaces/DeleteWorkspace"
+	Workspaces_LockWorkspace_FullMethodName                        = "/martiancloud.tharsis.api.workspace.Workspaces/LockWorkspace"
+	Workspaces_UnlockWorkspace_FullMethodName                      = "/martiancloud.tharsis.api.workspace.Workspaces/UnlockWorkspace"
+	Workspaces_MigrateWorkspace_FullMethodName                     = "/martiancloud.tharsis.api.workspace.Workspaces/MigrateWorkspace"
+	Workspaces_GetWorkspaceRoleBindingByWorkspaceID_FullMethodName = "/martiancloud.tharsis.api.workspace.Workspaces/GetWorkspaceRoleBindingByWorkspaceID"
+	Workspaces_SetWorkspaceRoleBinding_FullMethodName              = "/martiancloud.tharsis.api.workspace.Workspaces/SetWorkspaceRoleBinding"
+	Workspaces_SubscribeToWorkspaceEvents_FullMethodName           = "/martiancloud.tharsis.api.workspace.Workspaces/SubscribeToWorkspaceEvents"
 )
 
 // WorkspacesClient is the client API for Workspaces service.
@@ -53,6 +55,10 @@ type WorkspacesClient interface {
 	UnlockWorkspace(ctx context.Context, in *UnlockWorkspaceRequest, opts ...grpc.CallOption) (*Workspace, error)
 	// MigrateWorkspace moves a Workspace to a different group.
 	MigrateWorkspace(ctx context.Context, in *MigrateWorkspaceRequest, opts ...grpc.CallOption) (*Workspace, error)
+	// GetWorkspaceRoleBindingByWorkspaceID returns a workspace's role binding, if it has one.
+	GetWorkspaceRoleBindingByWorkspaceID(ctx context.Context, in *GetWorkspaceRoleBindingByWorkspaceIDRequest, opts ...grpc.CallOption) (*WorkspaceRoleBinding, error)
+	// SetWorkspaceRoleBinding creates, changes, or removes the role bound to a workspace.
+	SetWorkspaceRoleBinding(ctx context.Context, in *SetWorkspaceRoleBindingRequest, opts ...grpc.CallOption) (*WorkspaceRoleBinding, error)
 	// SubscribeToWorkspaceEvents subscribes to workspace events.
 	SubscribeToWorkspaceEvents(ctx context.Context, in *SubscribeToWorkspaceEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WorkspaceEvent], error)
 }
@@ -145,6 +151,26 @@ func (c *workspacesClient) MigrateWorkspace(ctx context.Context, in *MigrateWork
 	return out, nil
 }
 
+func (c *workspacesClient) GetWorkspaceRoleBindingByWorkspaceID(ctx context.Context, in *GetWorkspaceRoleBindingByWorkspaceIDRequest, opts ...grpc.CallOption) (*WorkspaceRoleBinding, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkspaceRoleBinding)
+	err := c.cc.Invoke(ctx, Workspaces_GetWorkspaceRoleBindingByWorkspaceID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workspacesClient) SetWorkspaceRoleBinding(ctx context.Context, in *SetWorkspaceRoleBindingRequest, opts ...grpc.CallOption) (*WorkspaceRoleBinding, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkspaceRoleBinding)
+	err := c.cc.Invoke(ctx, Workspaces_SetWorkspaceRoleBinding_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *workspacesClient) SubscribeToWorkspaceEvents(ctx context.Context, in *SubscribeToWorkspaceEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WorkspaceEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Workspaces_ServiceDesc.Streams[0], Workspaces_SubscribeToWorkspaceEvents_FullMethodName, cOpts...)
@@ -186,6 +212,10 @@ type WorkspacesServer interface {
 	UnlockWorkspace(context.Context, *UnlockWorkspaceRequest) (*Workspace, error)
 	// MigrateWorkspace moves a Workspace to a different group.
 	MigrateWorkspace(context.Context, *MigrateWorkspaceRequest) (*Workspace, error)
+	// GetWorkspaceRoleBindingByWorkspaceID returns a workspace's role binding, if it has one.
+	GetWorkspaceRoleBindingByWorkspaceID(context.Context, *GetWorkspaceRoleBindingByWorkspaceIDRequest) (*WorkspaceRoleBinding, error)
+	// SetWorkspaceRoleBinding creates, changes, or removes the role bound to a workspace.
+	SetWorkspaceRoleBinding(context.Context, *SetWorkspaceRoleBindingRequest) (*WorkspaceRoleBinding, error)
 	// SubscribeToWorkspaceEvents subscribes to workspace events.
 	SubscribeToWorkspaceEvents(*SubscribeToWorkspaceEventsRequest, grpc.ServerStreamingServer[WorkspaceEvent]) error
 	mustEmbedUnimplementedWorkspacesServer()
@@ -221,6 +251,12 @@ func (UnimplementedWorkspacesServer) UnlockWorkspace(context.Context, *UnlockWor
 }
 func (UnimplementedWorkspacesServer) MigrateWorkspace(context.Context, *MigrateWorkspaceRequest) (*Workspace, error) {
 	return nil, status.Error(codes.Unimplemented, "method MigrateWorkspace not implemented")
+}
+func (UnimplementedWorkspacesServer) GetWorkspaceRoleBindingByWorkspaceID(context.Context, *GetWorkspaceRoleBindingByWorkspaceIDRequest) (*WorkspaceRoleBinding, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWorkspaceRoleBindingByWorkspaceID not implemented")
+}
+func (UnimplementedWorkspacesServer) SetWorkspaceRoleBinding(context.Context, *SetWorkspaceRoleBindingRequest) (*WorkspaceRoleBinding, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetWorkspaceRoleBinding not implemented")
 }
 func (UnimplementedWorkspacesServer) SubscribeToWorkspaceEvents(*SubscribeToWorkspaceEventsRequest, grpc.ServerStreamingServer[WorkspaceEvent]) error {
 	return status.Error(codes.Unimplemented, "method SubscribeToWorkspaceEvents not implemented")
@@ -390,6 +426,42 @@ func _Workspaces_MigrateWorkspace_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Workspaces_GetWorkspaceRoleBindingByWorkspaceID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorkspaceRoleBindingByWorkspaceIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspacesServer).GetWorkspaceRoleBindingByWorkspaceID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Workspaces_GetWorkspaceRoleBindingByWorkspaceID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspacesServer).GetWorkspaceRoleBindingByWorkspaceID(ctx, req.(*GetWorkspaceRoleBindingByWorkspaceIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Workspaces_SetWorkspaceRoleBinding_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetWorkspaceRoleBindingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspacesServer).SetWorkspaceRoleBinding(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Workspaces_SetWorkspaceRoleBinding_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspacesServer).SetWorkspaceRoleBinding(ctx, req.(*SetWorkspaceRoleBindingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Workspaces_SubscribeToWorkspaceEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(SubscribeToWorkspaceEventsRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -439,6 +511,14 @@ var Workspaces_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "MigrateWorkspace",
 			Handler:    _Workspaces_MigrateWorkspace_Handler,
+		},
+		{
+			MethodName: "GetWorkspaceRoleBindingByWorkspaceID",
+			Handler:    _Workspaces_GetWorkspaceRoleBindingByWorkspaceID_Handler,
+		},
+		{
+			MethodName: "SetWorkspaceRoleBinding",
+			Handler:    _Workspaces_SetWorkspaceRoleBinding_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

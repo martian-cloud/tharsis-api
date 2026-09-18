@@ -533,6 +533,15 @@ func (c *Catalog) Init() {
 		},
 	)
 
+	c.addModelFetchers(types.WorkspaceRoleBindingModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.WorkspaceService.GetWorkspaceRoleBindingByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.WorkspaceService.GetWorkspaceRoleBindingByTRN(ctx, value)
+		},
+	)
+
 	c.addModelFetchers(types.WorkspaceAssessmentModelType,
 		func(ctx context.Context, value string) (models.Model, error) {
 			return c.WorkspaceService.GetWorkspaceAssessmentByID(ctx, value)
