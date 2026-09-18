@@ -8,11 +8,11 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 func TestGetRootNamespaces(t *testing.T) {
@@ -1153,6 +1153,128 @@ func TestRequireAccessToNamespace(t *testing.T) {
 	}
 }
 
+// TestGetEffectivePermissions covers the primitive used to answer "does this caller hold ALL of these
+// permissions at a namespace", which the workspace role binding gate needs. The result must be the
+// union across every applicable membership — direct, inherited from an ancestor, and via a team — so
+// that a caller cannot be denied a permission they legitimately hold through a second membership.
+func TestGetEffectivePermissions(t *testing.T) {
+	userID := "user1"
+	customRoleID := "custom-role-1"
+	secondCustomRoleID := "custom-role-2"
+
+	tests := []struct {
+		name                 string
+		requiredNamespace    string
+		namespaceMemberships []models.NamespaceMembership
+		customRolePerms      map[string][]models.Permission
+		expectPermissions    []models.Permission
+		notExpectPermissions []models.Permission
+	}{
+		{
+			name: "single direct membership returns that role's permissions",
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+			requiredNamespace: "ns1",
+			expectPermissions: []models.Permission{models.ViewGroupPermission, models.ViewWorkspacePermission},
+			// Viewer must not surface the mutating binding permission.
+			notExpectPermissions: []models.Permission{models.CreateWorkspaceRoleBindingPermission},
+		},
+		{
+			name: "permissions are unioned across two memberships at the same namespace",
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: customRoleID, Namespace: models.MembershipNamespace{Path: "ns1"}},
+				{RoleID: secondCustomRoleID, Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+			requiredNamespace: "ns1",
+			customRolePerms: map[string][]models.Permission{
+				customRoleID:       {models.CreateGroupPermission},
+				secondCustomRoleID: {models.CreateWorkspaceRoleBindingPermission},
+			},
+			expectPermissions: []models.Permission{
+				models.CreateGroupPermission,
+				models.CreateWorkspaceRoleBindingPermission,
+			},
+			notExpectPermissions: []models.Permission{models.DeleteGroupPermission},
+		},
+		{
+			name: "permissions inherited from an ancestor namespace are included",
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.OwnerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+			requiredNamespace: "ns1/ns2/ns3",
+			expectPermissions: []models.Permission{
+				models.CreateWorkspaceRoleBindingPermission,
+				models.CreateNamespaceMembershipPermission,
+			},
+		},
+		{
+			name: "a narrow membership does not shadow a broader one held higher up",
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.OwnerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
+				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1/ns2"}},
+			},
+			requiredNamespace: "ns1/ns2",
+			expectPermissions: []models.Permission{models.CreateWorkspaceRoleBindingPermission},
+		},
+		{
+			name:                 "no memberships yields an empty set",
+			namespaceMemberships: []models.NamespaceMembership{},
+			requiredNamespace:    "ns1",
+			notExpectPermissions: []models.Permission{models.ViewGroupPermission},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockNamespaceMemberships := db.NewMockNamespaceMemberships(t)
+			mockRoles := db.NewMockRoles(t)
+
+			for _, nm := range test.namespaceMemberships {
+				if perms, ok := test.customRolePerms[nm.RoleID]; ok {
+					role := &models.Role{}
+					role.SetPermissions(perms)
+					mockRoles.On("GetRoleByID", mock.Anything, nm.RoleID).Return(role, nil)
+				}
+			}
+
+			sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
+			mockNamespaceMemberships.On("GetNamespaceMemberships", mock.Anything,
+				&db.GetNamespaceMembershipsInput{
+					Sort: &sortBy,
+					Filter: &db.NamespaceMembershipFilter{
+						UserID:         &userID,
+						NamespacePaths: expandNamespaceDescOrder(test.requiredNamespace),
+					},
+				}).Return(&db.NamespaceMembershipResult{
+				NamespaceMemberships: test.namespaceMemberships,
+			}, nil)
+
+			dbClient := db.Client{
+				Roles:                mockRoles,
+				NamespaceMemberships: mockNamespaceMemberships,
+			}
+
+			authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, false)
+
+			effective, err := authorizer.GetEffectivePermissions(ctx, test.requiredNamespace)
+			require.NoError(t, err)
+
+			for _, want := range test.expectPermissions {
+				permCopy := want
+				assert.Contains(t, effective, permCopy.String())
+			}
+			for _, notWant := range test.notExpectPermissions {
+				permCopy := notWant
+				assert.NotContains(t, effective, permCopy.String())
+			}
+		})
+	}
+}
+
 func TestRequireAccessToNamespaces(t *testing.T) {
 	userID := "user1"
 	customRoleID := "custom-role-1"
@@ -1556,110 +1678,6 @@ func TestCheckCache(t *testing.T) {
 
 			cacheHit := authorizer.checkCache(&test.key, test.requiredPermissions)
 			assert.Equal(t, test.expectCacheHit, cacheHit)
-		})
-	}
-}
-
-func TestRequireRole(t *testing.T) {
-	userID := "user-1"
-
-	tests := []struct {
-		name                 string
-		expectErrorCode      errors.CodeType
-		roleID               string
-		namespaceMemberships []models.NamespaceMembership
-		constraints          []func(*constraints)
-	}{
-		{
-			name:        "caller has owner role in namespace",
-			roleID:      models.OwnerRoleID.String(),
-			constraints: []func(*constraints){WithNamespacePaths([]string{"ns1"})},
-			namespaceMemberships: []models.NamespaceMembership{
-				{RoleID: models.OwnerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
-			},
-		},
-		{
-			name:        "caller has owner role via parent namespace",
-			roleID:      models.OwnerRoleID.String(),
-			constraints: []func(*constraints){WithNamespacePaths([]string{"ns1/ns2"})},
-			namespaceMemberships: []models.NamespaceMembership{
-				{RoleID: models.OwnerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
-			},
-		},
-		{
-			name:        "caller has owner role in multiple namespaces",
-			roleID:      models.OwnerRoleID.String(),
-			constraints: []func(*constraints){WithNamespacePaths([]string{"ns1", "ns2"})},
-			namespaceMemberships: []models.NamespaceMembership{
-				{RoleID: models.OwnerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
-			},
-		},
-		{
-			name:            "caller does not have required role",
-			roleID:          models.OwnerRoleID.String(),
-			constraints:     []func(*constraints){WithNamespacePaths([]string{"ns1"})},
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:            "caller has no memberships in namespace",
-			roleID:          models.OwnerRoleID.String(),
-			constraints:     []func(*constraints){WithNamespacePaths([]string{"ns1"})},
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:            "missing constraints",
-			roleID:          models.OwnerRoleID.String(),
-			expectErrorCode: errors.EInternal,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := t.Context()
-
-			mockNamespaceMemberships := db.NewMockNamespaceMemberships(t)
-			mockCaller := NewMockCaller(t)
-
-			mockCaller.On("GetSubject").Return("testsubject").Maybe()
-			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
-				if hasViewerAccess {
-					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
-				}
-				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
-			}).Maybe()
-
-			c := getConstraints(test.constraints...)
-			sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
-
-			for _, namespacePath := range c.namespacePaths {
-				mockNamespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
-					Sort: &sortBy,
-					PaginationOptions: &pagination.Options{
-						First: ptr.Int32(0),
-					},
-					Filter: &db.NamespaceMembershipFilter{
-						UserID:         &userID,
-						NamespacePaths: expandNamespaceDescOrder(namespacePath),
-						RoleID:         &test.roleID,
-					},
-				}).Return(&db.NamespaceMembershipResult{
-					NamespaceMemberships: test.namespaceMemberships,
-					PageInfo:             &pagination.PageInfo{HasResults: len(test.namespaceMemberships) > 0, TotalCount: pagination.StaticCount(int32(len(test.namespaceMemberships)))},
-				}, nil)
-			}
-
-			dbClient := db.Client{
-				NamespaceMemberships: mockNamespaceMemberships,
-			}
-
-			authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, false)
-
-			err := authorizer.RequireRole(WithCaller(ctx, mockCaller), test.roleID, test.constraints...)
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-			} else {
-				assert.NoError(t, err)
-			}
 		})
 	}
 }

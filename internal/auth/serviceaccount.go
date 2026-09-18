@@ -41,6 +41,23 @@ func (s *ServiceAccountCaller) GetSubject() string {
 	return s.ServiceAccountPath
 }
 
+// GetNamespacePermissions returns the set of permissions this service account holds at
+// namespacePath, inherited from ancestor namespaces the same way RequirePermission is.
+func (s *ServiceAccountCaller) GetNamespacePermissions(ctx context.Context, namespacePath string) ([]*models.Permission, error) {
+	effective, err := s.authorizer.GetEffectivePermissions(ctx, namespacePath)
+	if err != nil {
+		return nil, err
+	}
+
+	perms := make([]*models.Permission, 0, len(effective))
+	for _, p := range effective {
+		permCopy := p
+		perms = append(perms, &permCopy)
+	}
+
+	return perms, nil
+}
+
 // IsAdminModeActivated returns true if the caller is an admin
 func (s *ServiceAccountCaller) IsAdminModeActivated(_ context.Context) bool {
 	return false
@@ -87,11 +104,6 @@ func (s *ServiceAccountCaller) RequirePermission(ctx context.Context, perm model
 	}
 
 	return s.authorizer.RequireAccess(ctx, []models.Permission{perm}, checks...)
-}
-
-// RequireRole will return an error if the caller doesn't have the specified role.
-func (s *ServiceAccountCaller) RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error {
-	return s.authorizer.RequireRole(ctx, roleID, checks...)
 }
 
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.

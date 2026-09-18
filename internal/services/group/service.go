@@ -577,6 +577,20 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 			return nil, err
 		}
 
+		// The caller must also have CreateNamespaceMembershipPermission in the new parent. Moving a
+		// subtree in introduces principals the destination's administrator never approved, and it
+		// changes output visibility relationships, which are derived from namespace paths and group
+		// IDs. Both are access decisions that belong to whoever controls access at the destination,
+		// so this is checked in addition to (not instead of) CreateGroupPermission.
+		//
+		// Only the destination is checked. Moving a subtree out already requires
+		// DeleteGroupPermission at the source, and a caller who can delete the group outright gains
+		// nothing by moving it.
+		err = caller.RequirePermission(ctx, models.CreateNamespaceMembershipPermission, auth.WithNamespacePath(newParent.FullPath))
+		if err != nil {
+			return nil, err
+		}
+
 		newParentPath = newParent.FullPath
 	} else {
 

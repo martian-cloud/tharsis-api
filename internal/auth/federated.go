@@ -148,6 +148,12 @@ func (f *FederatedRegistryCaller) UnauthorizedError(_ context.Context, hasViewer
 	)
 }
 
+// GetNamespacePermissions returns an empty set. A federated registry caller is not backed by
+// namespace memberships and has no permission set to report.
+func (f *FederatedRegistryCaller) GetNamespacePermissions(_ context.Context, _ string) ([]*models.Permission, error) {
+	return []*models.Permission{}, nil
+}
+
 // GetRootNamespaceMemberships returns a non-nil empty slice; a federated registry caller has no root
 // namespace memberships. It must be non-nil so the membership filter is applied and denies access —
 // a nil slice would be treated as "no filter".
@@ -159,11 +165,6 @@ func (f *FederatedRegistryCaller) GetRootNamespaceMemberships(_ context.Context)
 func (f *FederatedRegistryCaller) RequirePermission(ctx context.Context, _ models.Permission, _ ...func(*constraints),
 ) error {
 	// Federated caller only supports read-only permissions on inheritable resources (i.e. modules and providers)
-	return f.UnauthorizedError(ctx, false)
-}
-
-// RequireRole will return an error if the caller doesn't have the specified role.
-func (f *FederatedRegistryCaller) RequireRole(ctx context.Context, _ string, _ ...func(*constraints)) error {
 	return f.UnauthorizedError(ctx, false)
 }
 

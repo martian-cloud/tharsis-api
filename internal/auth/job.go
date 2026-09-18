@@ -49,7 +49,7 @@ func (j *JobCaller) UnauthorizedError(ctx context.Context, hasViewerAccess bool)
 	}
 
 	forbiddedMsg := fmt.Sprintf(
-		"job in workspace %s is not authorized to perform the requested operation: a job only has read access to resources in its group, a Tharsis Managed Identity must be assigned to the workspace to peform write operations.",
+		"job in workspace %s is not authorized to perform the requested operation: a job only has read access to resources in its group, a workspace role binding must be created to perform write operations.",
 		workspacePath,
 	)
 
@@ -68,54 +68,117 @@ func (j *JobCaller) UnauthorizedError(ctx context.Context, hasViewerAccess bool)
 	)
 }
 
+// GetNamespacePermissions returns the permissions granted by the job's workspace's role binding if it has one
+func (j *JobCaller) GetNamespacePermissions(ctx context.Context, namespacePath string) ([]*models.Permission, error) {
+	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if workspace == nil {
+		return []*models.Permission{}, nil
+	}
+
+	parentGroupPath := workspace.GetGroupPath()
+
+	if namespacePath != parentGroupPath && !utils.IsDescendantOfPath(namespacePath, parentGroupPath) {
+		return []*models.Permission{}, nil
+	}
+
+	binding, err := j.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindingByWorkspaceID(ctx, j.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if binding == nil {
+		return []*models.Permission{}, nil
+	}
+
+	role, err := j.dbClient.Roles.GetRoleByID(ctx, binding.RoleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if role == nil {
+		return []*models.Permission{}, nil
+	}
+
+	rolePerms := role.GetPermissions()
+	perms := make([]*models.Permission, 0, len(rolePerms))
+	for _, p := range rolePerms {
+		permCopy := p
+		perms = append(perms, &permCopy)
+	}
+
+	return perms, nil
+}
+
 // GetRootNamespaceMemberships returns a non-nil empty slice; a job caller has no root namespace
-// memberships (it is scoped to its workspace). It must be non-nil so the membership filter is
-// applied and denies access — a nil slice would be treated as "no filter" and expose all resources.
+// memberships
 func (j *JobCaller) GetRootNamespaceMemberships(_ context.Context) ([]models.MembershipNamespace, error) {
 	return []models.MembershipNamespace{}, nil
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions
 func (j *JobCaller) RequirePermission(ctx context.Context, perm models.Permission, checks ...func(*constraints)) error {
-	handlerFunc, ok := j.getPermissionHandler(perm)
-	if !ok {
-		// Handler not found so we need to check if the job has viewer access to determine which error to return
-		c := getConstraints(checks...)
-
-		// If no constraints are provided, we can't determine if the job has viewer access
-		if c.workspaceID == nil && c.groupID == nil && len(c.namespacePaths) == 0 {
-			return j.UnauthorizedError(ctx, false)
-		}
-
-		hasViewerAccess := true
-
-		if c.workspaceID != nil && j.WorkspaceID != *c.workspaceID {
-			// Job doesn't have access to the workspace
-			hasViewerAccess = false
-		}
-
-		if c.groupID != nil {
-			if err := j.requireAccessToInheritedGroupResource(ctx, *c.groupID); err != nil {
-				// Job doesn't have access to the group
-				hasViewerAccess = false
-			}
-		}
-		if len(c.namespacePaths) > 0 {
-			if err := j.requireAccessToInheritedNamespaceResource(ctx, c.namespacePaths); err != nil {
-				// Job doesn't have access to one of the namespaces
-				hasViewerAccess = false
-			}
-		}
-
-		return j.UnauthorizedError(ctx, hasViewerAccess)
+	// First check non-assignable permissions which take precedence
+	if handlerFunc, ok := j.getCoreJobPermissionHandler(perm); ok {
+		return handlerFunc(ctx, &perm, getConstraints(checks...))
 	}
 
-	return handlerFunc(ctx, &perm, getConstraints(checks...))
+	c := getConstraints(checks...)
+
+	if handlerFunc, ok := j.getSupersedableJobPermissionHandler(perm); ok {
+		if handlerErr := handlerFunc(ctx, &perm, c); handlerErr == nil {
+			return nil
+		}
+
+		if boundErr := j.requireBoundRoleAccess(ctx, &perm, c); boundErr == nil {
+			return nil
+		}
+
+		return j.viewerAccessDenial(ctx, c)
+	}
+
+	// No handler at all for this permission. Try the bound-role fallthrough before falling all the
+	// way through to a flat deny.
+	if boundErr := j.requireBoundRoleAccess(ctx, &perm, c); boundErr == nil {
+		return nil
+	}
+
+	return j.viewerAccessDenial(ctx, c)
 }
 
-// RequireRole will return an error if the caller doesn't have the specified role.
-func (j *JobCaller) RequireRole(ctx context.Context, _ string, _ ...func(*constraints)) error {
-	return j.UnauthorizedError(ctx, false)
+// viewerAccessDenial builds the final denial for a permission that neither a job-mechanics handler
+// nor a bound role satisfied, choosing EForbidden vs ENotFound based on whether the job has at least
+// viewer access to the constrained resource.
+func (j *JobCaller) viewerAccessDenial(ctx context.Context, c *constraints) error {
+	// If no constraints are provided, we can't determine if the job has viewer access
+	if c.workspaceID == nil && c.groupID == nil && len(c.namespacePaths) == 0 {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	hasViewerAccess := true
+
+	if c.workspaceID != nil && j.WorkspaceID != *c.workspaceID {
+		// Job doesn't have access to the workspace
+		hasViewerAccess = false
+	}
+
+	if c.groupID != nil {
+		if err := j.requireAccessToInheritedGroupResource(ctx, *c.groupID); err != nil {
+			// Job doesn't have access to the group
+			hasViewerAccess = false
+		}
+	}
+	if len(c.namespacePaths) > 0 {
+		if err := j.requireAccessToInheritedNamespaceResource(ctx, c.namespacePaths); err != nil {
+			// Job doesn't have access to one of the namespaces
+			hasViewerAccess = false
+		}
+	}
+
+	return j.UnauthorizedError(ctx, hasViewerAccess)
 }
 
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
@@ -509,16 +572,124 @@ func (j *JobCaller) requireProviderMirrorAccess(ctx context.Context, _ *models.P
 	return nil
 }
 
-// getPermissionHandler returns a permissionTypeHandler for a given permission.
-func (j *JobCaller) getPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
+// requireBoundRoleAccess checks whether the job's workspace has a WorkspaceRoleBinding whose role
+// covers perm at the target namespace named by checks. RequirePermission consults it in two cases:
+// as the sole check for a permission with no job-mechanics handler at all, and as a fallback after a
+// job-mechanics handler for an assignable permission denies (see
+// getSupersedableJobPermissionHandler) — a bound role's authority can supersede that narrower
+// check. It is never consulted for a permission handled by getCoreJobPermissionHandler; those
+// permissions are not assignable to a role and their handler's result is always final.
+func (j *JobCaller) requireBoundRoleAccess(ctx context.Context, perm *models.Permission, checks *constraints) error {
+	targetPath, err := j.resolveBoundRoleCheckTargetPath(ctx, checks)
+	if err != nil || targetPath == "" {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	binding, err := j.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindingByWorkspaceID(ctx, j.WorkspaceID)
+	if err != nil {
+		return err
+	}
+
+	if binding == nil {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+	if err != nil {
+		return err
+	}
+
+	if workspace == nil {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	parentGroupPath := workspace.GetGroupPath()
+
+	// The target must be the parent namespace itself or a descendant of it. This is the inheritance
+	// direction: authority flows down from the parent, never up to it from the workspace, and never
+	// sideways to an unrelated namespace.
+	if targetPath != parentGroupPath && !utils.IsDescendantOfPath(targetPath, parentGroupPath) {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	role, err := j.dbClient.Roles.GetRoleByID(ctx, binding.RoleID)
+	if err != nil {
+		return err
+	}
+
+	if role == nil {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	for _, p := range role.GetPermissions() {
+		if p.GTE(perm) {
+			return nil
+		}
+	}
+
+	return j.UnauthorizedError(ctx, false)
+}
+
+// resolveBoundRoleCheckTargetPath extracts the single namespace path the caller is asking about from
+// constraints. A bound-role check only makes sense against exactly one target namespace, unlike the
+// membership authorizer's RequireAccess which can be asked about several at once — job-mechanics
+// permissions only ever set one constraint kind at a time in practice, so this returns an empty path
+// rather than attempting to check several against a single role.
+func (j *JobCaller) resolveBoundRoleCheckTargetPath(ctx context.Context, checks *constraints) (string, error) {
+	switch {
+	case checks.workspaceID != nil:
+		ws, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, *checks.workspaceID)
+		if err != nil {
+			return "", err
+		}
+		if ws == nil {
+			return "", nil
+		}
+		return ws.FullPath, nil
+	case checks.groupID != nil:
+		group, err := j.dbClient.Groups.GetGroupByID(ctx, *checks.groupID)
+		if err != nil {
+			return "", err
+		}
+		if group == nil {
+			return "", nil
+		}
+		return group.FullPath, nil
+	case len(checks.namespacePaths) == 1:
+		return checks.namespacePaths[0], nil
+	default:
+		return "", nil
+	}
+}
+
+// getCoreJobPermissionHandler returns the handler for a core job-mechanics permission: one that is
+// NOT assignable to a role (see models.registerPermission's assignable flag) and therefore can never
+// be granted through a WorkspaceRoleBinding. These govern the job's own identity and the run nodes
+// it drives, and their result is always final — RequirePermission never falls through to
+// requireBoundRoleAccess for them.
+func (j *JobCaller) getCoreJobPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
 	handlerMap := map[models.Permission]permissionTypeHandler{
-		models.ViewWorkspacePermission:    j.requireWorkspaceOutputVisibility,
-		models.ViewStateVersionPermission: j.requireWorkspaceOutputVisibility,
-		// ViewVariablePermission now also governs non-sensitive variable value visibility,
-		// not just listing. Narrowed to job's own workspace only.
-		models.ViewVariablePermission: j.requireAccessToJobWorkspace,
-		// Narrowed for the same reason: no legitimate case for a job to read these
-		// outside its own workspace. Identity aliasing is unaffected (separate check).
+		models.UpdateJobPermission:                   j.requireJobAccess,
+		models.IssueFederatedRegistryTokenPermission: j.requireJobAccess,
+		models.UpdateRunPermission:                   j.requireRunWriteAccess,
+	}
+
+	handlerFunc, ok := handlerMap[perm]
+	return handlerFunc, ok
+}
+
+// getSupersedableJobPermissionHandler returns the handler for a permission that IS assignable to a
+// role and therefore could legitimately be granted through a WorkspaceRoleBinding, but also has
+// job-mechanics meaning of its own (self-access to the job's own workspace, output visibility, or
+// run access). The job-mechanics handler is tried first; if it denies, RequirePermission falls
+// through to requireBoundRoleAccess before the final flat deny, so a bound role's broader authority
+// can supersede the narrower job-mechanics check — see RequirePermission for the output-visibility
+// case this exists for.
+func (j *JobCaller) getSupersedableJobPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
+	handlerMap := map[models.Permission]permissionTypeHandler{
+		models.ViewWorkspacePermission:                 j.requireWorkspaceOutputVisibility,
+		models.ViewStateVersionPermission:              j.requireWorkspaceOutputVisibility,
+		models.ViewVariablePermission:                  j.requireAccessToJobWorkspace,
 		models.ViewManagedIdentityPermission:           j.requireAccessToJobWorkspace,
 		models.ViewConfigurationVersionPermission:      j.requireAccessToJobWorkspace,
 		models.ViewStateVersionDataPermission:          j.requireAccessToJobWorkspace,
@@ -526,9 +697,6 @@ func (j *JobCaller) getPermissionHandler(perm models.Permission) (permissionType
 		models.ViewSensitiveVariableValuePermission:    j.requireAccessToJobWorkspace,
 		models.ViewRunPermission:                       j.requireRunAccess, // View is automatically granted if action != View.
 		models.ViewJobPermission:                       j.requireJobAccess, // View is automatically granted if action != View.
-		models.UpdateJobPermission:                     j.requireJobAccess,
-		models.IssueFederatedRegistryTokenPermission:   j.requireJobAccess,
-		models.UpdateRunPermission:                     j.requireRunWriteAccess,
 		models.CreateTerraformProviderMirrorPermission: j.requireProviderMirrorAccess,
 	}
 

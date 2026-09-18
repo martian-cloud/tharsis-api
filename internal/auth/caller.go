@@ -204,12 +204,6 @@ func (s *SystemCaller) RequirePermission(_ context.Context, _ models.Permission,
 	return nil
 }
 
-// RequireRole will return an error if the caller doesn't have the specified role.
-func (s *SystemCaller) RequireRole(_ context.Context, _ string, _ ...func(*constraints)) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
 // RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type
 func (s *SystemCaller) RequireAccessToInheritableResource(_ context.Context, _ types.ModelType, _ ...func(*constraints)) error {
 	// Return nil because system caller is authorized to perform any action
@@ -224,6 +218,13 @@ func (s *SystemCaller) UnauthorizedError(_ context.Context, _ bool) error {
 	)
 }
 
+// GetNamespacePermissions returns an empty set. The system caller is always authorized via
+// RequirePermission/RequireAccessToInheritableResource directly (see above), so it
+// never needs to answer a subset-of-permissions question about itself.
+func (s *SystemCaller) GetNamespacePermissions(_ context.Context, _ string) ([]*models.Permission, error) {
+	return []*models.Permission{}, nil
+}
+
 // Caller represents a subject performing an API request
 type Caller interface {
 	GetSubject() string
@@ -234,9 +235,19 @@ type Caller interface {
 	// filtering.
 	GetRootNamespaceMemberships(ctx context.Context) ([]models.MembershipNamespace, error)
 	RequirePermission(ctx context.Context, perms models.Permission, checks ...func(*constraints)) error
-	RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error
 	RequireAccessToInheritableResource(ctx context.Context, modelType types.ModelType, checks ...func(*constraints)) error
 	UnauthorizedError(ctx context.Context, hasViewerAccess bool) error
+	// GetNamespacePermissions returns the set of permissions this caller holds at namespacePath,
+	// keyed by Permission.String() — for example, verifying that whoever binds a role to a
+	// workspace already holds everything in that role. Callers backed by namespace memberships
+	// (UserCaller, ServiceAccountCaller) return their actual effective permission set at the
+	// namespace, inherited from ancestors the same way RequirePermission is. JobCaller returns the
+	// permissions granted by its workspace's WorkspaceRoleBinding when namespacePath is that
+	// workspace's parent group or a descendant of it, and an empty slice otherwise. Other caller
+	// types (SCIMCaller, FederatedRegistryCaller, VCSWorkspaceLinkCaller) are not backed by
+	// namespace memberships or role bindings and always return an empty slice, failing closed on
+	// any subset check rather than being silently skipped.
+	GetNamespacePermissions(ctx context.Context, namespacePath string) ([]*models.Permission, error)
 }
 
 // WithCaller adds the caller to the context

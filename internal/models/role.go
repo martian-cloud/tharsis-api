@@ -1,6 +1,8 @@
 package models
 
 import (
+	"strconv"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -17,6 +19,8 @@ type Role struct {
 	CreatedBy   string
 	permissions []Permission
 	Metadata    ResourceMetadata
+	// SortOrder is a fixed display position used to order default roles ahead of custom roles
+	SortOrder int
 }
 
 // GetID returns the Metadata ID.
@@ -41,6 +45,9 @@ func (r *Role) ResolveMetadata(key string) (*string, error) {
 		switch key {
 		case "name":
 			return &r.Name, nil
+		case "sort_order":
+			resp := strconv.Itoa(r.SortOrder)
+			return &resp, nil
 		default:
 			return nil, err
 		}
@@ -102,10 +109,11 @@ type DefaultRoleID string
 
 // DefaultRoleID constants.
 const (
-	OwnerRoleID     DefaultRoleID = "623c83ea-23fe-4de6-874a-a99ccf6a76fc"
-	DeployerRoleID  DefaultRoleID = "8aa7adba-b769-471f-8ebb-3215f33991cb"
-	PublisherRoleID DefaultRoleID = "028fa46b-23ba-443f-a24f-61edcde148ff"
-	ViewerRoleID    DefaultRoleID = "52da70fd-37b0-4349-bb64-fb4659bcf5f5"
+	OwnerRoleID      DefaultRoleID = "623c83ea-23fe-4de6-874a-a99ccf6a76fc"
+	DeployerRoleID   DefaultRoleID = "8aa7adba-b769-471f-8ebb-3215f33991cb"
+	PublisherRoleID  DefaultRoleID = "028fa46b-23ba-443f-a24f-61edcde148ff"
+	ViewerRoleID     DefaultRoleID = "52da70fd-37b0-4349-bb64-fb4659bcf5f5"
+	MaintainerRoleID DefaultRoleID = "d1d61904-1255-4e4b-a5ee-4b9543e970b4"
 )
 
 // String returns the ID as a string.
@@ -116,7 +124,7 @@ func (d DefaultRoleID) String() string {
 // IsDefaultRole returns true if ID belongs to a default role.
 func (d DefaultRoleID) IsDefaultRole() bool {
 	switch d {
-	case OwnerRoleID, DeployerRoleID, PublisherRoleID, ViewerRoleID:
+	case OwnerRoleID, DeployerRoleID, PublisherRoleID, ViewerRoleID, MaintainerRoleID:
 		return true
 	}
 
@@ -144,10 +152,94 @@ var defaultRolePermissions = map[DefaultRoleID][]Permission{
 		CreateWorkspacePermission,
 		UpdateWorkspacePermission,
 		DeleteWorkspacePermission,
+		ViewWorkspaceRoleBindingPermission,
+		CreateWorkspaceRoleBindingPermission,
+		UpdateWorkspaceRoleBindingPermission,
+		DeleteWorkspaceRoleBindingPermission,
 		ViewNamespaceMembershipPermission,
 		CreateNamespaceMembershipPermission,
 		UpdateNamespaceMembershipPermission,
 		DeleteNamespaceMembershipPermission,
+		ViewRunPermission,
+		CreateRunPermission,
+		ViewJobPermission,
+		ViewRunnerPermission,
+		CreateRunnerPermission,
+		UpdateRunnerPermission,
+		DeleteRunnerPermission,
+		ViewVariablePermission,
+		CreateVariablePermission,
+		UpdateVariablePermission,
+		DeleteVariablePermission,
+		ViewSensitiveVariableValuePermission,
+		ViewTerraformProviderPermission,
+		CreateTerraformProviderPermission,
+		UpdateTerraformProviderPermission,
+		DeleteTerraformProviderPermission,
+		ViewTerraformModulePermission,
+		CreateTerraformModulePermission,
+		UpdateTerraformModulePermission,
+		DeleteTerraformModulePermission,
+		ViewStateVersionPermission,
+		ViewStateVersionDataPermission,
+		CreateStateVersionPermission,
+		ViewConfigurationVersionPermission,
+		CreateConfigurationVersionPermission,
+		UpdateConfigurationVersionPermission,
+		ViewServiceAccountPermission,
+		CreateServiceAccountPermission,
+		UpdateServiceAccountPermission,
+		DeleteServiceAccountPermission,
+		ViewManagedIdentityPermission,
+		CreateManagedIdentityPermission,
+		UpdateManagedIdentityPermission,
+		DeleteManagedIdentityPermission,
+		ViewVCSProviderPermission,
+		CreateVCSProviderPermission,
+		UpdateVCSProviderPermission,
+		DeleteVCSProviderPermission,
+		ViewTerraformProviderMirrorPermission,
+		CreateTerraformProviderMirrorPermission,
+		DeleteTerraformProviderMirrorPermission,
+		ViewFederatedRegistryPermission,
+		CreateFederatedRegistryPermission,
+		UpdateFederatedRegistryPermission,
+		DeleteFederatedRegistryPermission,
+		ViewPackagePermission,
+		CreatePackagePermission,
+		UpdatePackagePermission,
+		DeletePackagePermission,
+		ViewPolicyPermission,
+		CreatePolicyPermission,
+		UpdatePolicyPermission,
+		DeletePolicyPermission,
+		ViewCleanupPolicyPermission,
+		CreateCleanupPolicyPermission,
+		UpdateCleanupPolicyPermission,
+		DeleteCleanupPolicyPermission,
+	},
+	// Maintainer Role.
+	// Everything Owner has except the ability to add, change, or remove namespace memberships —
+	// the permission that governs conferring authority on other principals. This mirrors the
+	// escalation boundary Deployer already respects (it too lacks Create/Update/DeleteNamespaceMembershipPermission),
+	// extended to a role that otherwise carries Owner's full set.
+	MaintainerRoleID: {
+		ViewGPGKeyPermission,
+		CreateGPGKeyPermission,
+		DeleteGPGKeyPermission,
+		ViewGroupPermission,
+		CreateGroupPermission,
+		UpdateGroupPermission,
+		DeleteGroupPermission,
+		ViewWorkspacePermission,
+		CreateWorkspacePermission,
+		UpdateWorkspacePermission,
+		DeleteWorkspacePermission,
+		ViewWorkspaceRoleBindingPermission,
+		CreateWorkspaceRoleBindingPermission,
+		UpdateWorkspaceRoleBindingPermission,
+		DeleteWorkspaceRoleBindingPermission,
+		ViewNamespaceMembershipPermission,
 		ViewRunPermission,
 		CreateRunPermission,
 		ViewJobPermission,
@@ -219,6 +311,7 @@ var defaultRolePermissions = map[DefaultRoleID][]Permission{
 		CreateWorkspacePermission,
 		UpdateWorkspacePermission,
 		DeleteWorkspacePermission,
+		ViewWorkspaceRoleBindingPermission,
 		ViewNamespaceMembershipPermission,
 		ViewRunPermission,
 		CreateRunPermission,
@@ -272,6 +365,7 @@ var defaultRolePermissions = map[DefaultRoleID][]Permission{
 		ViewGPGKeyPermission,
 		ViewGroupPermission,
 		ViewWorkspacePermission,
+		ViewWorkspaceRoleBindingPermission,
 		ViewNamespaceMembershipPermission,
 		ViewRunPermission,
 		ViewJobPermission,
@@ -304,6 +398,7 @@ var defaultRolePermissions = map[DefaultRoleID][]Permission{
 		ViewGPGKeyPermission,
 		ViewGroupPermission,
 		ViewWorkspacePermission,
+		ViewWorkspaceRoleBindingPermission,
 		ViewNamespaceMembershipPermission,
 		ViewRunPermission,
 		ViewJobPermission,

@@ -49,6 +49,23 @@ func (u *UserCaller) GetSubject() string {
 	return u.User.Email
 }
 
+// GetNamespacePermissions returns the set of permissions this user holds at namespacePath,
+// inherited from ancestor namespaces the same way RequirePermission is.
+func (u *UserCaller) GetNamespacePermissions(ctx context.Context, namespacePath string) ([]*models.Permission, error) {
+	effective, err := u.authorizer.GetEffectivePermissions(ctx, namespacePath)
+	if err != nil {
+		return nil, err
+	}
+
+	perms := make([]*models.Permission, 0, len(effective))
+	for _, p := range effective {
+		permCopy := p
+		perms = append(perms, &permCopy)
+	}
+
+	return perms, nil
+}
+
 // IsAdminModeActivated returns true if the caller is an admin with admin mode currently active.
 func (u *UserCaller) IsAdminModeActivated(ctx context.Context) bool {
 	// If user is not an admin we can short circuit and return false
@@ -113,15 +130,6 @@ func (u *UserCaller) RequirePermission(ctx context.Context, perm models.Permissi
 
 	// Lastly, check the authorizer.
 	return u.authorizer.RequireAccess(ctx, []models.Permission{perm}, checks...)
-}
-
-// RequireRole will return an error if the caller doesn't have the specified role.
-func (u *UserCaller) RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error {
-	if u.User.IsAdminModeActive() {
-		return nil
-	}
-
-	return u.authorizer.RequireRole(ctx, roleID, checks...)
 }
 
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.

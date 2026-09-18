@@ -33,7 +33,11 @@ func TestSystemCaller_RequireInheritedPermissions(t *testing.T) {
 	assert.Nil(t, caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.RunModelType, nil))
 }
 
-func TestSystemCaller_RequireRole(t *testing.T) {
+func TestSystemCaller_GetNamespacePermissions(t *testing.T) {
 	caller := SystemCaller{}
-	assert.Nil(t, caller.RequireRole(t.Context(), models.OwnerRoleID.String()))
+	perms, err := caller.GetNamespacePermissions(context.Background(), "some/namespace")
+	assert.NoError(t, err)
+	// The system caller is always authorized directly via RequirePermission, so it never needs to
+	// answer a subset-of-permissions question about itself.
+	assert.Empty(t, perms)
 }

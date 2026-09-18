@@ -128,7 +128,7 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
     ) : (
         <ListItem divider={!last}>
             <ListItemIcon sx={{ minWidth: 80 }}>
-                <RunStageIcons fragmentRef={data} />
+                <RunStatusChip to={runPath} status={data.status} hasAdvisoryFailures={data.hasAdvisoryFailures} />
             </ListItemIcon>
             <ListItemText
                 primary={

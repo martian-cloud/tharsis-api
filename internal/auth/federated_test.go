@@ -6,7 +6,6 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/lestrrat-go/jwx/v2/jwt"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
@@ -624,8 +623,25 @@ func TestFederatedRegistryCaller_getRequestedNamespacePaths(t *testing.T) {
 	}
 }
 
-func TestFederatedRegistryCaller_RequireRole(t *testing.T) {
-	caller := FederatedRegistryCaller{subject: "federated-subject"}
-	err := caller.RequireRole(WithCaller(t.Context(), &caller), models.OwnerRoleID.String())
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+func TestFederatedRegistryCaller_GetNamespacePermissions(t *testing.T) {
+	// Test setup
+	mockDBClient := &db.Client{}
+	trustPolicies := []*config.FederatedRegistryTrustPolicy{
+		{
+			IssuerURL:         "https://issuer1.example.com",
+			Subject:           ptr.String("subject1"),
+			Audience:          ptr.String("audience1"),
+			GroupGlobPatterns: []string{"group1/*"},
+		},
+	}
+	subject := "test-subject"
+
+	caller := NewFederatedRegistryCaller(mockDBClient, trustPolicies, subject)
+
+	// Execute
+	result, err := caller.GetNamespacePermissions(t.Context(), "group1")
+
+	// Verify: not backed by namespace memberships, so it always reports an empty set.
+	require.NoError(t, err)
+	require.Empty(t, result)
 }

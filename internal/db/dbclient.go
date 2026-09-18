@@ -138,6 +138,7 @@ type Client struct {
 	WorkItemsQueue                   WorkItemsQueue
 	ObjectStoreRefs                  ObjectStoreRefs
 	CleanupPolicies                  CleanupPolicies
+	WorkspaceRoleBindings            WorkspaceRoleBindings
 	Namespaces                       Namespaces
 }
 
@@ -268,6 +269,7 @@ func NewClient(
 	dbClient.WorkItemsQueue = NewWorkItemsQueue(dbClient)
 	dbClient.ObjectStoreRefs = NewObjectStoreRefs(dbClient)
 	dbClient.CleanupPolicies = NewCleanupPolicies(dbClient)
+	dbClient.WorkspaceRoleBindings = NewWorkspaceRoleBindings(dbClient)
 	dbClient.Namespaces = NewNamespaces(dbClient)
 
 	return dbClient, nil

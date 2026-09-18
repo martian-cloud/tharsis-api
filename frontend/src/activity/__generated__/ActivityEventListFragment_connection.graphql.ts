@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7150f0c5e31e955896f5ef68d9127f31>>
+ * @generated SignedSource<<15ba62411ed37c838ef96668e4def124>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,7 @@ export type ActivityEventListFragment_connection$data = {
       readonly target: {
         readonly __typename: string;
       } | null | undefined;
-      readonly " $fragmentSpreads": FragmentRefs<"ActivityEventCleanupPolicyTargetFragment_event" | "ActivityEventFederatedRegistryTargetFragment_event" | "ActivityEventGPGKeyTargetFragment_event" | "ActivityEventGroupTargetFragment_event" | "ActivityEventManagedIdentityAccessRuleTargetFragment_event" | "ActivityEventManagedIdentityTargetFragment_event" | "ActivityEventNamespaceMembershipTargetFragment_event" | "ActivityEventPackageTargetFragment_event" | "ActivityEventPackageVersionTargetFragment_event" | "ActivityEventPolicyTargetFragment_event" | "ActivityEventRoleTargetFragment_event" | "ActivityEventRunGateTargetFragment_event" | "ActivityEventRunTargetFragment_event" | "ActivityEventRunnerTargetFragment_event" | "ActivityEventServiceAccountTargetFragment_event" | "ActivityEventStateVersionTargetFragment_event" | "ActivityEventTargetNotFoundFragment_event" | "ActivityEventTeamTargetFragment_event" | "ActivityEventTerraformModuleTargetFragment_event" | "ActivityEventTerraformModuleVersionTargetFragment_event" | "ActivityEventTerraformProviderTargetFragment_event" | "ActivityEventTerraformProviderVersionMirrorTargetFragment_event" | "ActivityEventTerraformProviderVersionTargetFragment_event" | "ActivityEventVCSProviderTargetFragment_event" | "ActivityEventVariableTargetFragment_event" | "ActivityEventWorkspaceTargetFragment_event">;
+      readonly " $fragmentSpreads": FragmentRefs<"ActivityEventCleanupPolicyTargetFragment_event" | "ActivityEventFederatedRegistryTargetFragment_event" | "ActivityEventGPGKeyTargetFragment_event" | "ActivityEventGroupTargetFragment_event" | "ActivityEventManagedIdentityAccessRuleTargetFragment_event" | "ActivityEventManagedIdentityTargetFragment_event" | "ActivityEventNamespaceMembershipTargetFragment_event" | "ActivityEventPackageTargetFragment_event" | "ActivityEventPackageVersionTargetFragment_event" | "ActivityEventPolicyTargetFragment_event" | "ActivityEventRoleTargetFragment_event" | "ActivityEventRunGateTargetFragment_event" | "ActivityEventRunTargetFragment_event" | "ActivityEventRunnerTargetFragment_event" | "ActivityEventServiceAccountTargetFragment_event" | "ActivityEventStateVersionTargetFragment_event" | "ActivityEventTargetNotFoundFragment_event" | "ActivityEventTeamTargetFragment_event" | "ActivityEventTerraformModuleTargetFragment_event" | "ActivityEventTerraformModuleVersionTargetFragment_event" | "ActivityEventTerraformProviderTargetFragment_event" | "ActivityEventTerraformProviderVersionMirrorTargetFragment_event" | "ActivityEventTerraformProviderVersionTargetFragment_event" | "ActivityEventVCSProviderTargetFragment_event" | "ActivityEventVariableTargetFragment_event" | "ActivityEventWorkspaceRoleBindingTargetFragment_event" | "ActivityEventWorkspaceTargetFragment_event">;
     } | null | undefined;
   } | null | undefined> | null | undefined;
   readonly " $fragmentType": "ActivityEventListFragment_connection";
@@ -202,6 +202,11 @@ const node: ReaderFragment = {
             {
               "args": null,
               "kind": "FragmentSpread",
+              "name": "ActivityEventWorkspaceRoleBindingTargetFragment_event"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
               "name": "ActivityEventTargetNotFoundFragment_event"
             }
           ],
@@ -215,6 +220,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "80b28d38ffb39e053aefdc06ba927479";
+(node as any).hash = "65afdfa85d385ed9105cc7d926302455";
 
 export default node;

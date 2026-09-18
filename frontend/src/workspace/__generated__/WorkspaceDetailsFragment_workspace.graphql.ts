@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d6b79ce29bad7890bb3636d42115d7ff>>
+ * @generated SignedSource<<7e3a74314e0bacf99d7bcaee28e54575>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,7 +15,7 @@ export type WorkspaceDetailsFragment_workspace$data = {
   readonly fullPath: string;
   readonly id: string;
   readonly name: string;
-  readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListFragment_assignedManagedIdentities" | "AssignedPolicyListFragment_workspace" | "CleanupPoliciesFragment_namespace" | "ConfigurationVersionDetailsFragment_workspace" | "NamespaceActivityFragment_activity" | "NamespaceMembershipsFragment_memberships" | "ProviderMirrorsFragment_namespace" | "RunsFragment_runs" | "StateVersionsFragment_stateVersions" | "VariablesFragment_variables" | "WorkspaceDetailsIndexFragment_workspace" | "WorkspaceSettingsFragment_workspace">;
+  readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListFragment_assignedManagedIdentities" | "AssignedPolicyListFragment_workspace" | "CleanupPoliciesFragment_namespace" | "ConfigurationVersionDetailsFragment_workspace" | "NamespaceActivityFragment_activity" | "NamespaceMembershipsFragment_memberships" | "ProviderMirrorsFragment_namespace" | "RunsFragment_runs" | "StateVersionsFragment_stateVersions" | "VariablesFragment_variables" | "WorkspaceDetailsIndexFragment_workspace" | "WorkspaceRoleBindingFragment_workspace" | "WorkspaceSettingsFragment_workspace">;
   readonly " $fragmentType": "WorkspaceDetailsFragment_workspace";
 };
 export type WorkspaceDetailsFragment_workspace$key = {
@@ -116,12 +116,17 @@ const node: ReaderFragment = {
       "args": null,
       "kind": "FragmentSpread",
       "name": "CleanupPoliciesFragment_namespace"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "WorkspaceRoleBindingFragment_workspace"
     }
   ],
   "type": "Workspace",
   "abstractKey": null
 };
 
-(node as any).hash = "145adacd99d5c6642dca7f33e8628731";
+(node as any).hash = "b0e2b0c16fcd8a5340676553680237b3";
 
 export default node;

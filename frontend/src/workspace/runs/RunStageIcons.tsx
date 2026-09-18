@@ -1,7 +1,7 @@
 import WarningIcon from '@mui/icons-material/Error';
-import { alpha, Box, Theme, Tooltip, Typography } from '@mui/material';
+import { Box, Theme, Tooltip, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { Link as RouterLink } from 'react-router-dom';
 import RunStageStatusTypes from './RunStageStatusTypes';
@@ -114,12 +114,7 @@ function RunStageIcons({ fragmentRef }: Props) {
                 {stages.map(stage => {
                     const info = RunStageStatusTypes[stage.status.toLowerCase()] ?? RunStageStatusTypes.created;
                     const isRunning = RUNNING_STATUSES.has(stage.status.toLowerCase());
-                    const opacity = IDLE_STATUSES.has(stage.status.toLowerCase()) ? 0.25
-                        // Skipped/canceled segments are dimmed to recede, but their colours are now
-                        // themselves recessive (warm inert / red), so they need more opacity than
-                        // before to stay visible against the paper background.
-                        : (stage.status.toLowerCase() === 'skipped' || stage.status.toLowerCase() === 'canceled') ? 0.55
-                            : 0.6;
+                    const opacity = IDLE_STATUSES.has(stage.status.toLowerCase()) ? 0.15 : 0.50;
                     return (
                         <Tooltip key={stage.name} title={`${stage.name}: ${info.label}`}>
                             <Box
@@ -130,10 +125,9 @@ function RunStageIcons({ fragmentRef }: Props) {
                                     return {
                                         flex: 1,
                                         display: 'block',
-                                        height: '8px',
+                                        height: '6px',
                                         borderRadius: '4px',
-                                        border: `1px solid ${c}`,
-                                        bgcolor: alpha(c, 0.25),
+                                        bgcolor: c,
                                         opacity,
                                         textDecoration: 'none',
                                         ...(isRunning && {

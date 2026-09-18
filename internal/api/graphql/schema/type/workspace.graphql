@@ -90,6 +90,29 @@ type MigrateWorkspacePayload {
   problems: [Problem!]!
 }
 
+# A WorkspaceRoleBinding confers a Role on a workspace: the role's permissions become available to
+# the workspace's job caller at the workspace's DIRECT PARENT namespace. See setWorkspaceRoleBinding.
+type WorkspaceRoleBinding implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  workspace: Workspace!
+  role: Role!
+  createdBy: String!
+}
+
+type SetWorkspaceRoleBindingPayload {
+  clientMutationId: String
+  workspace: Workspace
+  problems: [Problem!]!
+}
+
+input SetWorkspaceRoleBindingInput {
+  clientMutationId: String
+  workspaceId: String!
+  # The role to bind. Omit (or pass null) to remove the workspace's existing binding.
+  roleId: String
+}
+
 type Workspace implements Node, Namespace {
   id: ID!
   metadata: ResourceMetadata!
@@ -172,6 +195,7 @@ type Workspace implements Node, Namespace {
     search: String
   ): VCSProviderConnection!
   workspaceVcsProviderLink: WorkspaceVCSProviderLink
+  roleBinding: WorkspaceRoleBinding
   vcsEvents(
     after: String
     before: String

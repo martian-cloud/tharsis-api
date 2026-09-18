@@ -39,6 +39,11 @@ const (
 	RoleSortableFieldUpdatedAtDesc RoleSortableField = "UPDATED_AT_DESC"
 )
 
+// defaultRoleSortBy is used when the caller doesn't request an explicit sort. It orders roles by
+// their fixed sort_order (viewer, publisher, deployer, maintainer, owner, then any custom roles in
+// the order they were created), rather than leaving the result set in arbitrary primary-key order.
+var defaultRoleSortBy = &pagination.FieldDescriptor{Key: "sort_order", Table: "roles", Col: "sort_order"}
+
 func (r RoleSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch r {
 	case RoleSortableFieldNameAsc, RoleSortableFieldNameDesc:
@@ -83,7 +88,7 @@ type roles struct {
 	dbClient *Client
 }
 
-var rolesFieldList = append(metadataFieldList, "created_by", "name", "description", "permissions")
+var rolesFieldList = append(metadataFieldList, "created_by", "name", "description", "permissions", "sort_order")
 
 // NewRoles returns an instance of the Roles interface.
 func NewRoles(dbClient *Client) Roles {
@@ -140,7 +145,9 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 
 	sortDirection := pagination.AscSort
 
-	var sortBy *pagination.FieldDescriptor
+	// Default to the fixed display order (viewer, publisher, deployer, maintainer, owner, then
+	// custom roles) when the caller doesn't request an explicit sort field.
+	sortBy := defaultRoleSortBy
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
@@ -349,6 +356,7 @@ func scanRole(row scanner) (*models.Role, error) {
 		&r.Name,
 		&r.Description,
 		&perms,
+		&r.SortOrder,
 	}
 
 	if err := row.Scan(fields...); err != nil {

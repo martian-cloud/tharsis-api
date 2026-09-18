@@ -123,6 +123,7 @@ var activityEventFieldList = append(metadataFieldList,
 	"policy_target_id",
 	"run_gate_target_id",
 	"cleanup_policy_target_id",
+	"workspace_role_binding_target_id",
 )
 
 // NewActivityEvents returns an instance of the ActivityEvents interface
@@ -286,6 +287,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		policyTargetID                         *string
 		runGateTargetID                        *string
 		cleanupPolicyTargetID                  *string
+		workspaceRoleBindingTargetID           *string
 	)
 
 	switch input.TargetType {
@@ -339,6 +341,8 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		runGateTargetID = &input.TargetID
 	case models.TargetCleanupPolicy:
 		cleanupPolicyTargetID = &input.TargetID
+	case models.TargetWorkspaceRoleBinding:
+		workspaceRoleBindingTargetID = &input.TargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
 		return nil, errors.New("invalid target type: %s", input.TargetType, errors.WithSpan(span))
@@ -386,6 +390,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		"policy_target_id":                            policyTargetID,
 		"run_gate_target_id":                          runGateTargetID,
 		"cleanup_policy_target_id":                    cleanupPolicyTargetID,
+		"workspace_role_binding_target_id":            workspaceRoleBindingTargetID,
 	}
 
 	sql, args, err := toSQLWithTag("activity_event.CreateActivityEvent", dialect.Insert("activity_events").
@@ -455,8 +460,10 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 					return nil, errors.New("policy does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				case "fk_activity_events_run_gate_target_id":
 					return nil, errors.New("run gate does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
-				case "fk_activity_events_cleanup_policy_target_id":
+				case "activity_events_cleanup_policy_target_id_fkey":
 					return nil, errors.New("cleanup policy does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+				case "activity_events_workspace_role_binding_target_id_fkey":
+					return nil, errors.New("workspace role binding does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				}
 			}
 		}
@@ -513,6 +520,7 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		policyTargetID                         *string
 		runGateTargetID                        *string
 		cleanupPolicyTargetID                  *string
+		workspaceRoleBindingTargetID           *string
 	)
 
 	fields := []interface{}{
@@ -550,6 +558,7 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		&policyTargetID,
 		&runGateTargetID,
 		&cleanupPolicyTargetID,
+		&workspaceRoleBindingTargetID,
 	}
 
 	// Balance the number of selected fields and fields to scan out.
@@ -615,6 +624,8 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		activityEvent.TargetID = *runGateTargetID
 	case models.TargetCleanupPolicy:
 		activityEvent.TargetID = *cleanupPolicyTargetID
+	case models.TargetWorkspaceRoleBinding:
+		activityEvent.TargetID = *workspaceRoleBindingTargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
 		return nil, fmt.Errorf("invalid target type: %s", activityEvent.TargetType)

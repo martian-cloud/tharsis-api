@@ -27,6 +27,10 @@ service Workspaces {
   rpc UnlockWorkspace(UnlockWorkspaceRequest) returns (Workspace);
   // MigrateWorkspace moves a Workspace to a different group.
   rpc MigrateWorkspace(MigrateWorkspaceRequest) returns (Workspace);
+  // GetWorkspaceRoleBindingByWorkspaceID returns a workspace's role binding, if it has one.
+  rpc GetWorkspaceRoleBindingByWorkspaceID(GetWorkspaceRoleBindingByWorkspaceIDRequest) returns (WorkspaceRoleBinding);
+  // SetWorkspaceRoleBinding creates, changes, or removes the role bound to a workspace.
+  rpc SetWorkspaceRoleBinding(SetWorkspaceRoleBindingRequest) returns (WorkspaceRoleBinding);
   // SubscribeToWorkspaceEvents subscribes to workspace events.
   rpc SubscribeToWorkspaceEvents(SubscribeToWorkspaceEventsRequest) returns (stream WorkspaceEvent);
 }
@@ -104,6 +108,27 @@ message UnlockWorkspaceRequest {
 message MigrateWorkspaceRequest {
   string workspace_id = 1;
   string new_group_id = 2;
+}
+
+// GetWorkspaceRoleBindingByWorkspaceIDRequest is the input for retrieving a workspace's role binding.
+message GetWorkspaceRoleBindingByWorkspaceIDRequest {
+  string workspace_id = 1;
+}
+
+// SetWorkspaceRoleBindingRequest is the input for creating, changing, or removing a workspace's role
+// binding. Omit role_id to remove the workspace's existing binding.
+message SetWorkspaceRoleBindingRequest {
+  string          workspace_id = 1;
+  optional string role_id      = 2;
+}
+
+// WorkspaceRoleBinding confers a Role on a workspace: the role's permissions become available to the
+// workspace's job caller at the workspace's DIRECT PARENT namespace.
+message WorkspaceRoleBinding {
+  metadata.ResourceMetadata metadata     = 1;
+  string                    workspace_id = 2;
+  string                    role_id      = 3;
+  string                    created_by   = 4;
 }
 
 // SubscribeToWorkspaceEventsRequest is the input for subscribing to workspace events.

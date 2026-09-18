@@ -848,6 +848,156 @@ func (_m *MockService) GetWorkspaceByTRN(ctx context.Context, trn string) (*mode
 	return r0, r1
 }
 
+// GetWorkspaceRoleBindingByID provides a mock function with given fields: ctx, id
+func (_m *MockService) GetWorkspaceRoleBindingByID(ctx context.Context, id string) (*models.WorkspaceRoleBinding, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceRoleBindingByID")
+	}
+
+	var r0 *models.WorkspaceRoleBinding
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.WorkspaceRoleBinding, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.WorkspaceRoleBinding); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.WorkspaceRoleBinding)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspaceRoleBindingByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetWorkspaceRoleBindingByTRN(ctx context.Context, trn string) (*models.WorkspaceRoleBinding, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceRoleBindingByTRN")
+	}
+
+	var r0 *models.WorkspaceRoleBinding
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.WorkspaceRoleBinding, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.WorkspaceRoleBinding); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.WorkspaceRoleBinding)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspaceRoleBindingByWorkspaceID provides a mock function with given fields: ctx, workspaceID
+func (_m *MockService) GetWorkspaceRoleBindingByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceRoleBinding, error) {
+	ret := _m.Called(ctx, workspaceID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceRoleBindingByWorkspaceID")
+	}
+
+	var r0 *models.WorkspaceRoleBinding
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.WorkspaceRoleBinding, error)); ok {
+		return rf(ctx, workspaceID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.WorkspaceRoleBinding); ok {
+		r0 = rf(ctx, workspaceID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.WorkspaceRoleBinding)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, workspaceID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspaceRoleBindingsByIDs provides a mock function with given fields: ctx, idList
+func (_m *MockService) GetWorkspaceRoleBindingsByIDs(ctx context.Context, idList []string) ([]models.WorkspaceRoleBinding, error) {
+	ret := _m.Called(ctx, idList)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceRoleBindingsByIDs")
+	}
+
+	var r0 []models.WorkspaceRoleBinding
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]models.WorkspaceRoleBinding, error)); ok {
+		return rf(ctx, idList)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []models.WorkspaceRoleBinding); ok {
+		r0 = rf(ctx, idList)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.WorkspaceRoleBinding)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, idList)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspaceRoleBindingsByWorkspaceIDs provides a mock function with given fields: ctx, idList
+func (_m *MockService) GetWorkspaceRoleBindingsByWorkspaceIDs(ctx context.Context, idList []string) ([]models.WorkspaceRoleBinding, error) {
+	ret := _m.Called(ctx, idList)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceRoleBindingsByWorkspaceIDs")
+	}
+
+	var r0 []models.WorkspaceRoleBinding
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]models.WorkspaceRoleBinding, error)); ok {
+		return rf(ctx, idList)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []models.WorkspaceRoleBinding); ok {
+		r0 = rf(ctx, idList)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.WorkspaceRoleBinding)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, idList)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetWorkspaces provides a mock function with given fields: ctx, input
 func (_m *MockService) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) (*db.WorkspacesResult, error) {
 	ret := _m.Called(ctx, input)
@@ -961,6 +1111,36 @@ func (_m *MockService) MigrateWorkspace(ctx context.Context, workspaceID string,
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = rf(ctx, workspaceID, newGroupID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SetWorkspaceRoleBinding provides a mock function with given fields: ctx, options
+func (_m *MockService) SetWorkspaceRoleBinding(ctx context.Context, options *SetWorkspaceRoleBindingInput) (*models.WorkspaceRoleBinding, error) {
+	ret := _m.Called(ctx, options)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetWorkspaceRoleBinding")
+	}
+
+	var r0 *models.WorkspaceRoleBinding
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *SetWorkspaceRoleBindingInput) (*models.WorkspaceRoleBinding, error)); ok {
+		return rf(ctx, options)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *SetWorkspaceRoleBindingInput) *models.WorkspaceRoleBinding); ok {
+		r0 = rf(ctx, options)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.WorkspaceRoleBinding)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *SetWorkspaceRoleBindingInput) error); ok {
+		r1 = rf(ctx, options)
 	} else {
 		r1 = ret.Error(1)
 	}

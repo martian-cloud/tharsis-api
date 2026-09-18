@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, ListItemButton, ListItemText } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import { useMutation } from 'react-relay/hooks';
 import graphql from 'babel-plugin-relay/macro';
 import humanizeDuration from 'humanize-duration';
 import { useSnackbar } from 'notistack';
+import { useCallback, useEffect, useState } from 'react';
+import { useMutation } from 'react-relay/hooks';
 
 interface Props {
     expiresAt: string;
@@ -14,7 +13,6 @@ interface Props {
 function DeactivateAdminModeListItem({ expiresAt, onMenuClose }: Props) {
     const [display, setDisplay] = useState('');
     const [showConfirm, setShowConfirm] = useState(false);
-    const navigate = useNavigate();
     const { enqueueSnackbar } = useSnackbar();
 
     const [commitDeactivate] = useMutation(graphql`
@@ -41,11 +39,10 @@ function DeactivateAdminModeListItem({ expiresAt, onMenuClose }: Props) {
                 store.invalidateStore();
             },
             onCompleted: () => {
-                navigate('/');
                 enqueueSnackbar('Admin mode deactivated', { variant: 'success' });
             },
         });
-    }, [commitDeactivate, navigate, enqueueSnackbar]);
+    }, [commitDeactivate, enqueueSnackbar]);
 
     useEffect(() => {
         const update = () => {

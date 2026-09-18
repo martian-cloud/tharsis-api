@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<06d7fd54dcf8580809d8da0ed0344c17>>
+ * @generated SignedSource<<a53d89d03c7bac5da4852c452085f0cd>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -113,113 +113,114 @@ v9 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
+  "name": "fullPath",
+  "storageKey": null
+},
+v10 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
   "name": "description",
   "storageKey": null
 },
-v10 = [
+v11 = [
   (v8/*: any*/),
-  {
-    "alias": null,
-    "args": null,
-    "kind": "ScalarField",
-    "name": "fullPath",
-    "storageKey": null
-  },
-  (v9/*: any*/)
+  (v9/*: any*/),
+  (v10/*: any*/)
 ],
-v11 = {
+v12 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "resourcePath",
   "storageKey": null
 },
-v12 = [
+v13 = [
   (v8/*: any*/),
-  (v9/*: any*/),
-  (v11/*: any*/)
+  (v10/*: any*/),
+  (v12/*: any*/)
 ],
-v13 = {
+v14 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "username",
   "storageKey": null
 },
-v14 = {
+v15 = {
   "kind": "InlineFragment",
   "selections": [
-    (v13/*: any*/)
+    (v14/*: any*/)
   ],
   "type": "User",
   "abstractKey": null
 },
-v15 = [
+v16 = [
   (v8/*: any*/)
 ],
-v16 = {
+v17 = {
   "kind": "InlineFragment",
-  "selections": (v15/*: any*/),
+  "selections": (v16/*: any*/),
   "type": "Team",
   "abstractKey": null
 },
-v17 = {
+v18 = {
   "kind": "InlineFragment",
   "selections": [
-    (v11/*: any*/)
+    (v12/*: any*/)
   ],
   "type": "ServiceAccount",
   "abstractKey": null
 },
-v18 = [
+v19 = [
   (v6/*: any*/)
 ],
-v19 = {
+v20 = {
   "kind": "InlineFragment",
-  "selections": (v18/*: any*/),
+  "selections": (v19/*: any*/),
   "type": "Node",
   "abstractKey": "__isNode"
 },
-v20 = {
+v21 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "key",
   "storageKey": null
 },
-v21 = {
+v22 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "registryNamespace",
   "storageKey": null
 },
-v22 = {
+v23 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "version",
   "storageKey": null
 },
-v23 = {
+v24 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "system",
   "storageKey": null
 },
-v24 = {
+v25 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "groupPath",
   "storageKey": null
 },
-v25 = [
+v26 = [
   (v8/*: any*/),
-  (v24/*: any*/)
+  (v25/*: any*/)
 ],
-v26 = {
+v27 = {
   "alias": null,
   "args": null,
   "concreteType": null,
@@ -228,14 +229,14 @@ v26 = {
   "plural": false,
   "selections": [
     (v7/*: any*/),
-    (v14/*: any*/),
+    (v15/*: any*/),
+    (v18/*: any*/),
     (v17/*: any*/),
-    (v16/*: any*/),
-    (v19/*: any*/)
+    (v20/*: any*/)
   ],
   "storageKey": null
 },
-v27 = [
+v28 = [
   {
     "alias": null,
     "args": null,
@@ -244,8 +245,8 @@ v27 = [
     "storageKey": null
   }
 ],
-v28 = [
-  (v20/*: any*/),
+v29 = [
+  (v21/*: any*/),
   {
     "alias": null,
     "args": null,
@@ -254,7 +255,7 @@ v28 = [
     "storageKey": null
   }
 ],
-v29 = [
+v30 = [
   {
     "alias": null,
     "args": null,
@@ -270,7 +271,7 @@ v29 = [
         "kind": "LinkedField",
         "name": "added",
         "plural": true,
-        "selections": (v28/*: any*/),
+        "selections": (v29/*: any*/),
         "storageKey": null
       },
       {
@@ -280,7 +281,7 @@ v29 = [
         "kind": "LinkedField",
         "name": "updated",
         "plural": true,
-        "selections": (v28/*: any*/),
+        "selections": (v29/*: any*/),
         "storageKey": null
       },
       {
@@ -294,7 +295,7 @@ v29 = [
     "storageKey": null
   }
 ],
-v30 = {
+v31 = {
   "alias": null,
   "args": null,
   "concreteType": "User",
@@ -302,13 +303,13 @@ v30 = {
   "name": "user",
   "plural": false,
   "selections": [
-    (v13/*: any*/),
+    (v14/*: any*/),
     (v6/*: any*/)
   ],
   "storageKey": null
 },
-v31 = [
-  (v30/*: any*/),
+v32 = [
+  (v31/*: any*/),
   {
     "alias": null,
     "args": null,
@@ -389,19 +390,19 @@ return {
                       (v6/*: any*/),
                       {
                         "kind": "InlineFragment",
-                        "selections": (v10/*: any*/),
+                        "selections": (v11/*: any*/),
                         "type": "Workspace",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v10/*: any*/),
+                        "selections": (v11/*: any*/),
                         "type": "Group",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v12/*: any*/),
+                        "selections": (v13/*: any*/),
                         "type": "ManagedIdentity",
                         "abstractKey": null
                       },
@@ -417,10 +418,10 @@ return {
                             "plural": false,
                             "selections": [
                               (v7/*: any*/),
-                              (v14/*: any*/),
-                              (v16/*: any*/),
+                              (v15/*: any*/),
                               (v17/*: any*/),
-                              (v19/*: any*/)
+                              (v18/*: any*/),
+                              (v20/*: any*/)
                             ],
                             "storageKey": null
                           }
@@ -475,7 +476,7 @@ return {
                             "plural": false,
                             "selections": [
                               (v6/*: any*/),
-                              (v11/*: any*/)
+                              (v12/*: any*/)
                             ],
                             "storageKey": null
                           }
@@ -485,24 +486,24 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v12/*: any*/),
+                        "selections": (v13/*: any*/),
                         "type": "ServiceAccount",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v20/*: any*/)
+                          (v21/*: any*/)
                         ],
                         "type": "NamespaceVariable",
                         "abstractKey": null
                       },
-                      (v16/*: any*/),
+                      (v17/*: any*/),
                       {
                         "kind": "InlineFragment",
                         "selections": [
                           (v8/*: any*/),
-                          (v21/*: any*/)
+                          (v22/*: any*/)
                         ],
                         "type": "TerraformProvider",
                         "abstractKey": null
@@ -510,7 +511,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v22/*: any*/),
+                          (v23/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -520,7 +521,7 @@ return {
                             "plural": false,
                             "selections": [
                               (v8/*: any*/),
-                              (v21/*: any*/),
+                              (v22/*: any*/),
                               (v6/*: any*/)
                             ],
                             "storageKey": null
@@ -533,8 +534,8 @@ return {
                         "kind": "InlineFragment",
                         "selections": [
                           (v8/*: any*/),
-                          (v23/*: any*/),
-                          (v21/*: any*/)
+                          (v24/*: any*/),
+                          (v22/*: any*/)
                         ],
                         "type": "TerraformModule",
                         "abstractKey": null
@@ -542,7 +543,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v22/*: any*/),
+                          (v23/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -552,8 +553,8 @@ return {
                             "plural": false,
                             "selections": [
                               (v8/*: any*/),
-                              (v23/*: any*/),
-                              (v21/*: any*/),
+                              (v24/*: any*/),
+                              (v22/*: any*/),
                               (v6/*: any*/)
                             ],
                             "storageKey": null
@@ -564,19 +565,19 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v15/*: any*/),
+                        "selections": (v16/*: any*/),
                         "type": "VCSProvider",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v15/*: any*/),
+                        "selections": (v16/*: any*/),
                         "type": "Role",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v15/*: any*/),
+                        "selections": (v16/*: any*/),
                         "type": "Runner",
                         "abstractKey": null
                       },
@@ -597,7 +598,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v22/*: any*/),
+                          (v23/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -619,7 +620,7 @@ return {
                             "kind": "LinkedField",
                             "name": "run",
                             "plural": false,
-                            "selections": (v18/*: any*/),
+                            "selections": (v19/*: any*/),
                             "storageKey": null
                           }
                         ],
@@ -628,14 +629,14 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v25/*: any*/),
+                        "selections": (v26/*: any*/),
                         "type": "Package",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v22/*: any*/),
+                          (v23/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -646,7 +647,7 @@ return {
                             "selections": [
                               (v6/*: any*/),
                               (v8/*: any*/),
-                              (v24/*: any*/)
+                              (v25/*: any*/)
                             ],
                             "storageKey": null
                           }
@@ -656,8 +657,42 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v25/*: any*/),
+                        "selections": (v26/*: any*/),
                         "type": "Policy",
+                        "abstractKey": null
+                      },
+                      {
+                        "kind": "InlineFragment",
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "concreteType": "Workspace",
+                            "kind": "LinkedField",
+                            "name": "workspace",
+                            "plural": false,
+                            "selections": [
+                              (v8/*: any*/),
+                              (v9/*: any*/),
+                              (v6/*: any*/)
+                            ],
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "concreteType": "Role",
+                            "kind": "LinkedField",
+                            "name": "role",
+                            "plural": false,
+                            "selections": [
+                              (v8/*: any*/),
+                              (v6/*: any*/)
+                            ],
+                            "storageKey": null
+                          }
+                        ],
+                        "type": "WorkspaceRoleBinding",
                         "abstractKey": null
                       }
                     ],
@@ -697,7 +732,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v26/*: any*/),
+                          (v27/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -712,14 +747,14 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v26/*: any*/)
+                          (v27/*: any*/)
                         ],
                         "type": "ActivityEventRemoveNamespaceMembershipPayload",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v27/*: any*/),
+                        "selections": (v28/*: any*/),
                         "type": "ActivityEventMigrateWorkspacePayload",
                         "abstractKey": null
                       },
@@ -733,7 +768,7 @@ return {
                             "kind": "LinkedField",
                             "name": "labels",
                             "plural": true,
-                            "selections": (v28/*: any*/),
+                            "selections": (v29/*: any*/),
                             "storageKey": null
                           }
                         ],
@@ -742,19 +777,19 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v29/*: any*/),
+                        "selections": (v30/*: any*/),
                         "type": "ActivityEventUpdateWorkspacePayload",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v27/*: any*/),
+                        "selections": (v28/*: any*/),
                         "type": "ActivityEventMigrateGroupPayload",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v27/*: any*/),
+                        "selections": (v28/*: any*/),
                         "type": "ActivityEventMoveManagedIdentityPayload",
                         "abstractKey": null
                       },
@@ -802,21 +837,21 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v31/*: any*/),
+                        "selections": (v32/*: any*/),
                         "type": "ActivityEventUpdateTeamMemberPayload",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v30/*: any*/)
+                          (v31/*: any*/)
                         ],
                         "type": "ActivityEventRemoveTeamMemberPayload",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v31/*: any*/),
+                        "selections": (v32/*: any*/),
                         "type": "ActivityEventAddTeamMemberPayload",
                         "abstractKey": null
                       },
@@ -830,7 +865,7 @@ return {
                             "kind": "LinkedField",
                             "name": "labels",
                             "plural": true,
-                            "selections": (v28/*: any*/),
+                            "selections": (v29/*: any*/),
                             "storageKey": null
                           }
                         ],
@@ -839,7 +874,7 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v29/*: any*/),
+                        "selections": (v30/*: any*/),
                         "type": "ActivityEventUpdateTerraformModulePayload",
                         "abstractKey": null
                       },
@@ -897,7 +932,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v13/*: any*/),
+                          (v14/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -913,12 +948,12 @@ return {
                         "kind": "InlineFragment",
                         "selections": [
                           (v8/*: any*/),
-                          (v11/*: any*/)
+                          (v12/*: any*/)
                         ],
                         "type": "ServiceAccount",
                         "abstractKey": null
                       },
-                      (v19/*: any*/)
+                      (v20/*: any*/)
                     ],
                     "storageKey": null
                   },
@@ -1007,12 +1042,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "3bc4150ac5a4170dc46c1c200adfc7e0",
+    "cacheID": "9af626490ec67b0f820d6fd245fd415c",
     "id": null,
     "metadata": {},
     "name": "NamespaceActivityQuery",
     "operationKind": "query",
-    "text": "query NamespaceActivityQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $namespacePath: String\n) {\n  ...NamespaceActivityConnectionFragment_activity\n}\n\nfragment ActivityEventCleanupPolicyTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on CleanupPolicy {\n      kind\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventFederatedRegistryTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on FederatedRegistry {\n      id\n      hostname\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventGPGKeyTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on GPGKey {\n      id\n      gpgKeyId\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventGroupTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on Group {\n      name\n      fullPath\n      description\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventDeleteChildResourcePayload {\n      name\n      type\n    }\n    ... on ActivityEventCreateNamespaceMembershipPayload {\n      member {\n        __typename\n        ... on User {\n          username\n        }\n        ... on ServiceAccount {\n          resourcePath\n        }\n        ... on Team {\n          name\n        }\n        ... on Node {\n          __isNode: __typename\n          id\n        }\n      }\n      role\n    }\n    ... on ActivityEventRemoveNamespaceMembershipPayload {\n      member {\n        __typename\n        ... on User {\n          username\n        }\n        ... on ServiceAccount {\n          resourcePath\n        }\n        ... on Team {\n          name\n        }\n        ... on Node {\n          __isNode: __typename\n          id\n        }\n      }\n    }\n    ... on ActivityEventMigrateGroupPayload {\n      previousGroupPath\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventListFragment_connection on ActivityEventConnection {\n  edges {\n    node {\n      id\n      target {\n        __typename\n        id\n      }\n      ...ActivityEventWorkspaceTargetFragment_event\n      ...ActivityEventGroupTargetFragment_event\n      ...ActivityEventManagedIdentityTargetFragment_event\n      ...ActivityEventNamespaceMembershipTargetFragment_event\n      ...ActivityEventCleanupPolicyTargetFragment_event\n      ...ActivityEventGPGKeyTargetFragment_event\n      ...ActivityEventManagedIdentityAccessRuleTargetFragment_event\n      ...ActivityEventServiceAccountTargetFragment_event\n      ...ActivityEventVariableTargetFragment_event\n      ...ActivityEventRunTargetFragment_event\n      ...ActivityEventStateVersionTargetFragment_event\n      ...ActivityEventTeamTargetFragment_event\n      ...ActivityEventTerraformProviderTargetFragment_event\n      ...ActivityEventTerraformProviderVersionTargetFragment_event\n      ...ActivityEventTerraformModuleTargetFragment_event\n      ...ActivityEventTerraformModuleVersionTargetFragment_event\n      ...ActivityEventVCSProviderTargetFragment_event\n      ...ActivityEventRoleTargetFragment_event\n      ...ActivityEventRunnerTargetFragment_event\n      ...ActivityEventFederatedRegistryTargetFragment_event\n      ...ActivityEventTerraformProviderVersionMirrorTargetFragment_event\n      ...ActivityEventRunGateTargetFragment_event\n      ...ActivityEventPackageTargetFragment_event\n      ...ActivityEventPackageVersionTargetFragment_event\n      ...ActivityEventPolicyTargetFragment_event\n      ...ActivityEventTargetNotFoundFragment_event\n    }\n  }\n}\n\nfragment ActivityEventListItemFragment_event on ActivityEvent {\n  metadata {\n    createdAt\n  }\n  id\n  initiator {\n    __typename\n    ... on User {\n      username\n      email\n    }\n    ... on ServiceAccount {\n      name\n      resourcePath\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment ActivityEventManagedIdentityAccessRuleTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on ManagedIdentityAccessRule {\n      runStage\n      managedIdentity {\n        id\n        resourcePath\n      }\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventManagedIdentityTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on ManagedIdentity {\n      id\n      name\n      description\n      resourcePath\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventMoveManagedIdentityPayload {\n      previousGroupPath\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventNamespaceMembershipTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on NamespaceMembership {\n      member {\n        __typename\n        ... on User {\n          username\n        }\n        ... on Team {\n          name\n        }\n        ... on ServiceAccount {\n          resourcePath\n        }\n        ... on Node {\n          __isNode: __typename\n          id\n        }\n      }\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventUpdateNamespaceMembershipPayload {\n      prevRole\n      newRole\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventPackageTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on Package {\n      id\n      name\n      groupPath\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventPackageVersionTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on PackageVersion {\n      id\n      version\n      package {\n        id\n        name\n        groupPath\n      }\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventPolicyTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on Policy {\n      id\n      name\n      groupPath\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventRoleTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on Role {\n      name\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventRunGateTargetFragment_event on ActivityEvent {\n  namespacePath\n  target {\n    __typename\n    ... on RunGate {\n      id\n      run {\n        id\n      }\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventUpdateRunGatePayload {\n      gateUpdateType: type\n      comment\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventRunTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on Run {\n      id\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventUpdateRunPayload {\n      runUpdateType: type\n      nodePath\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventRunnerTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on Runner {\n      name\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventServiceAccountTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on ServiceAccount {\n      id\n      name\n      description\n      resourcePath\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventStateVersionTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on StateVersion {\n      id\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTargetNotFoundFragment_event on ActivityEvent {\n  targetType\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTeamTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on Team {\n      name\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventUpdateTeamMemberPayload {\n      user {\n        username\n        id\n      }\n      maintainer\n    }\n    ... on ActivityEventRemoveTeamMemberPayload {\n      user {\n        username\n        id\n      }\n    }\n    ... on ActivityEventAddTeamMemberPayload {\n      user {\n        username\n        id\n      }\n      maintainer\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTerraformModuleTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on TerraformModule {\n      name\n      system\n      registryNamespace\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventCreateTerraformModulePayload {\n      labels {\n        key\n        value\n      }\n    }\n    ... on ActivityEventUpdateTerraformModulePayload {\n      labelChanges {\n        added {\n          key\n          value\n        }\n        updated {\n          key\n          value\n        }\n        removed\n      }\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTerraformModuleVersionTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on TerraformModuleVersion {\n      version\n      module {\n        name\n        system\n        registryNamespace\n        id\n      }\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTerraformProviderTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on TerraformProvider {\n      name\n      registryNamespace\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTerraformProviderVersionMirrorTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on TerraformProviderVersionMirror {\n      id\n      version\n      providerAddress\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTerraformProviderVersionTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on TerraformProviderVersion {\n      version\n      provider {\n        name\n        registryNamespace\n        id\n      }\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventVCSProviderTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on VCSProvider {\n      name\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventVariableTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on NamespaceVariable {\n      key\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventWorkspaceTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on Workspace {\n      name\n      fullPath\n      description\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventDeleteChildResourcePayload {\n      name\n      type\n    }\n    ... on ActivityEventCreateNamespaceMembershipPayload {\n      member {\n        __typename\n        ... on User {\n          username\n        }\n        ... on ServiceAccount {\n          resourcePath\n        }\n        ... on Team {\n          name\n        }\n        ... on Node {\n          __isNode: __typename\n          id\n        }\n      }\n      role\n    }\n    ... on ActivityEventRemoveNamespaceMembershipPayload {\n      member {\n        __typename\n        ... on User {\n          username\n        }\n        ... on ServiceAccount {\n          resourcePath\n        }\n        ... on Team {\n          name\n        }\n        ... on Node {\n          __isNode: __typename\n          id\n        }\n      }\n    }\n    ... on ActivityEventMigrateWorkspacePayload {\n      previousGroupPath\n    }\n    ... on ActivityEventCreateWorkspacePayload {\n      labels {\n        key\n        value\n      }\n    }\n    ... on ActivityEventUpdateWorkspacePayload {\n      labelChanges {\n        added {\n          key\n          value\n        }\n        updated {\n          key\n          value\n        }\n        removed\n      }\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment NamespaceActivityConnectionFragment_activity on Query {\n  activityEvents(after: $after, before: $before, first: $first, last: $last, namespacePath: $namespacePath, includeNested: true, sort: CREATED_DESC) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...ActivityEventListFragment_connection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
+    "text": "query NamespaceActivityQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $namespacePath: String\n) {\n  ...NamespaceActivityConnectionFragment_activity\n}\n\nfragment ActivityEventCleanupPolicyTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on CleanupPolicy {\n      kind\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventFederatedRegistryTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on FederatedRegistry {\n      id\n      hostname\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventGPGKeyTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on GPGKey {\n      id\n      gpgKeyId\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventGroupTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on Group {\n      name\n      fullPath\n      description\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventDeleteChildResourcePayload {\n      name\n      type\n    }\n    ... on ActivityEventCreateNamespaceMembershipPayload {\n      member {\n        __typename\n        ... on User {\n          username\n        }\n        ... on ServiceAccount {\n          resourcePath\n        }\n        ... on Team {\n          name\n        }\n        ... on Node {\n          __isNode: __typename\n          id\n        }\n      }\n      role\n    }\n    ... on ActivityEventRemoveNamespaceMembershipPayload {\n      member {\n        __typename\n        ... on User {\n          username\n        }\n        ... on ServiceAccount {\n          resourcePath\n        }\n        ... on Team {\n          name\n        }\n        ... on Node {\n          __isNode: __typename\n          id\n        }\n      }\n    }\n    ... on ActivityEventMigrateGroupPayload {\n      previousGroupPath\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventListFragment_connection on ActivityEventConnection {\n  edges {\n    node {\n      id\n      target {\n        __typename\n        id\n      }\n      ...ActivityEventWorkspaceTargetFragment_event\n      ...ActivityEventGroupTargetFragment_event\n      ...ActivityEventManagedIdentityTargetFragment_event\n      ...ActivityEventNamespaceMembershipTargetFragment_event\n      ...ActivityEventCleanupPolicyTargetFragment_event\n      ...ActivityEventGPGKeyTargetFragment_event\n      ...ActivityEventManagedIdentityAccessRuleTargetFragment_event\n      ...ActivityEventServiceAccountTargetFragment_event\n      ...ActivityEventVariableTargetFragment_event\n      ...ActivityEventRunTargetFragment_event\n      ...ActivityEventStateVersionTargetFragment_event\n      ...ActivityEventTeamTargetFragment_event\n      ...ActivityEventTerraformProviderTargetFragment_event\n      ...ActivityEventTerraformProviderVersionTargetFragment_event\n      ...ActivityEventTerraformModuleTargetFragment_event\n      ...ActivityEventTerraformModuleVersionTargetFragment_event\n      ...ActivityEventVCSProviderTargetFragment_event\n      ...ActivityEventRoleTargetFragment_event\n      ...ActivityEventRunnerTargetFragment_event\n      ...ActivityEventFederatedRegistryTargetFragment_event\n      ...ActivityEventTerraformProviderVersionMirrorTargetFragment_event\n      ...ActivityEventRunGateTargetFragment_event\n      ...ActivityEventPackageTargetFragment_event\n      ...ActivityEventPackageVersionTargetFragment_event\n      ...ActivityEventPolicyTargetFragment_event\n      ...ActivityEventWorkspaceRoleBindingTargetFragment_event\n      ...ActivityEventTargetNotFoundFragment_event\n    }\n  }\n}\n\nfragment ActivityEventListItemFragment_event on ActivityEvent {\n  metadata {\n    createdAt\n  }\n  id\n  initiator {\n    __typename\n    ... on User {\n      username\n      email\n    }\n    ... on ServiceAccount {\n      name\n      resourcePath\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment ActivityEventManagedIdentityAccessRuleTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on ManagedIdentityAccessRule {\n      runStage\n      managedIdentity {\n        id\n        resourcePath\n      }\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventManagedIdentityTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on ManagedIdentity {\n      id\n      name\n      description\n      resourcePath\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventMoveManagedIdentityPayload {\n      previousGroupPath\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventNamespaceMembershipTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on NamespaceMembership {\n      member {\n        __typename\n        ... on User {\n          username\n        }\n        ... on Team {\n          name\n        }\n        ... on ServiceAccount {\n          resourcePath\n        }\n        ... on Node {\n          __isNode: __typename\n          id\n        }\n      }\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventUpdateNamespaceMembershipPayload {\n      prevRole\n      newRole\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventPackageTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on Package {\n      id\n      name\n      groupPath\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventPackageVersionTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on PackageVersion {\n      id\n      version\n      package {\n        id\n        name\n        groupPath\n      }\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventPolicyTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on Policy {\n      id\n      name\n      groupPath\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventRoleTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on Role {\n      name\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventRunGateTargetFragment_event on ActivityEvent {\n  namespacePath\n  target {\n    __typename\n    ... on RunGate {\n      id\n      run {\n        id\n      }\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventUpdateRunGatePayload {\n      gateUpdateType: type\n      comment\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventRunTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on Run {\n      id\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventUpdateRunPayload {\n      runUpdateType: type\n      nodePath\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventRunnerTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on Runner {\n      name\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventServiceAccountTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on ServiceAccount {\n      id\n      name\n      description\n      resourcePath\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventStateVersionTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on StateVersion {\n      id\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTargetNotFoundFragment_event on ActivityEvent {\n  targetType\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTeamTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on Team {\n      name\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventUpdateTeamMemberPayload {\n      user {\n        username\n        id\n      }\n      maintainer\n    }\n    ... on ActivityEventRemoveTeamMemberPayload {\n      user {\n        username\n        id\n      }\n    }\n    ... on ActivityEventAddTeamMemberPayload {\n      user {\n        username\n        id\n      }\n      maintainer\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTerraformModuleTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on TerraformModule {\n      name\n      system\n      registryNamespace\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventCreateTerraformModulePayload {\n      labels {\n        key\n        value\n      }\n    }\n    ... on ActivityEventUpdateTerraformModulePayload {\n      labelChanges {\n        added {\n          key\n          value\n        }\n        updated {\n          key\n          value\n        }\n        removed\n      }\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTerraformModuleVersionTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on TerraformModuleVersion {\n      version\n      module {\n        name\n        system\n        registryNamespace\n        id\n      }\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTerraformProviderTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on TerraformProvider {\n      name\n      registryNamespace\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTerraformProviderVersionMirrorTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on TerraformProviderVersionMirror {\n      id\n      version\n      providerAddress\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventTerraformProviderVersionTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on TerraformProviderVersion {\n      version\n      provider {\n        name\n        registryNamespace\n        id\n      }\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventVCSProviderTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on VCSProvider {\n      name\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventVariableTargetFragment_event on ActivityEvent {\n  action\n  namespacePath\n  target {\n    __typename\n    ... on NamespaceVariable {\n      key\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventWorkspaceRoleBindingTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on WorkspaceRoleBinding {\n      workspace {\n        name\n        fullPath\n        id\n      }\n      role {\n        name\n        id\n      }\n    }\n    id\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment ActivityEventWorkspaceTargetFragment_event on ActivityEvent {\n  action\n  target {\n    __typename\n    ... on Workspace {\n      name\n      fullPath\n      description\n    }\n    id\n  }\n  payload {\n    __typename\n    ... on ActivityEventDeleteChildResourcePayload {\n      name\n      type\n    }\n    ... on ActivityEventCreateNamespaceMembershipPayload {\n      member {\n        __typename\n        ... on User {\n          username\n        }\n        ... on ServiceAccount {\n          resourcePath\n        }\n        ... on Team {\n          name\n        }\n        ... on Node {\n          __isNode: __typename\n          id\n        }\n      }\n      role\n    }\n    ... on ActivityEventRemoveNamespaceMembershipPayload {\n      member {\n        __typename\n        ... on User {\n          username\n        }\n        ... on ServiceAccount {\n          resourcePath\n        }\n        ... on Team {\n          name\n        }\n        ... on Node {\n          __isNode: __typename\n          id\n        }\n      }\n    }\n    ... on ActivityEventMigrateWorkspacePayload {\n      previousGroupPath\n    }\n    ... on ActivityEventCreateWorkspacePayload {\n      labels {\n        key\n        value\n      }\n    }\n    ... on ActivityEventUpdateWorkspacePayload {\n      labelChanges {\n        added {\n          key\n          value\n        }\n        updated {\n          key\n          value\n        }\n        removed\n      }\n    }\n  }\n  ...ActivityEventListItemFragment_event\n}\n\nfragment NamespaceActivityConnectionFragment_activity on Query {\n  activityEvents(after: $after, before: $before, first: $first, last: $last, namespacePath: $namespacePath, includeNested: true, sort: CREATED_DESC) {\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...ActivityEventListFragment_connection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
   }
 };
 })();

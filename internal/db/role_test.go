@@ -64,6 +64,9 @@ func TestRoles_CreateRole(t *testing.T) {
 			assert.Equal(t, test.roleName, role.Name)
 			assert.Equal(t, test.description, role.Description)
 			assert.NotEmpty(t, role.Metadata.ID)
+			// A freshly created role always gets the column default, since CreateRole never sets
+			// sort_order — only the default-role seed migrations assign anything else.
+			assert.Equal(t, 100, role.SortOrder)
 		})
 	}
 }
@@ -368,6 +371,89 @@ func TestRoles_GetRolesWithPaginationAndSorting(t *testing.T) {
 
 		return result.PageInfo, resources, nil
 	})
+}
+
+func TestRoles_GetRolesDefaultSortOrder(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// The roles table is truncated per test, so seed rows with explicit sort_order values the same
+	// way the production migration does, to exercise the default (no explicit Sort) ordering.
+	seedRoles := []struct {
+		name      string
+		sortOrder int
+	}{
+		{name: "owner", sortOrder: 4},
+		{name: "maintainer", sortOrder: 3},
+		{name: "deployer", sortOrder: 2},
+		{name: "publisher", sortOrder: 1},
+		{name: "viewer", sortOrder: 0},
+	}
+
+	conn := testClient.client.getConnection(ctx)
+	for _, seed := range seedRoles {
+		_, err := conn.Exec(
+			ctx,
+			`INSERT INTO roles (id, version, created_at, updated_at, created_by, name, description, permissions, sort_order)
+			 VALUES (gen_random_uuid(), 1, now(), now(), 'db-integration-tests', $1, $2, '[]', $3)`,
+			seed.name, seed.name+" description", seed.sortOrder,
+		)
+		require.NoError(t, err)
+	}
+
+	// A custom role (left at the sort_order column default) should sort after every default role.
+	customRole, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name:        "custom-role-default-sort-test",
+		Description: "custom role",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// No explicit sort: expect the fixed default role display order (viewer, publisher, deployer,
+	// maintainer, owner), followed by the custom role.
+	result, err := testClient.client.Roles.GetRoles(ctx, &GetRolesInput{})
+	require.NoError(t, err)
+
+	names := make([]string, len(result.Roles))
+	sortOrders := make([]int, len(result.Roles))
+	for i, role := range result.Roles {
+		names[i] = role.Name
+		sortOrders[i] = role.SortOrder
+	}
+
+	expectedOrder := []string{"viewer", "publisher", "deployer", "maintainer", "owner", customRole.Name}
+	assert.Equal(t, expectedOrder, names)
+	// Confirm SortOrder is actually scanned onto the model, not just used internally to order the query.
+	assert.Equal(t, []int{0, 1, 2, 3, 4, 100}, sortOrders)
+
+	// Paginate through the same default-sorted result two at a time, following the cursor each
+	// page returns, to confirm the sort_order-based cursor (ResolveMetadata("sort_order")) actually
+	// round-trips through Postgres correctly rather than only being verified as a single-page order.
+	var (
+		pagedNames []string
+		after      *string
+		pageSize   = int32(2)
+	)
+	for {
+		page, pageErr := testClient.client.Roles.GetRoles(ctx, &GetRolesInput{
+			PaginationOptions: &pagination.Options{First: &pageSize, After: after},
+		})
+		require.NoError(t, pageErr)
+
+		for _, role := range page.Roles {
+			pagedNames = append(pagedNames, role.Name)
+		}
+
+		if !page.PageInfo.HasNextPage {
+			break
+		}
+		cursor, cursorErr := page.PageInfo.Cursor(&page.Roles[len(page.Roles)-1])
+		require.NoError(t, cursorErr)
+		after = cursor
+	}
+
+	assert.Equal(t, expectedOrder, pagedNames)
 }
 
 func TestRoles_GetRoleByTRN(t *testing.T) {

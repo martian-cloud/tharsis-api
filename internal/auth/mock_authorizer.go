@@ -15,6 +15,36 @@ type MockAuthorizer struct {
 	mock.Mock
 }
 
+// GetEffectivePermissions provides a mock function with given fields: ctx, namespacePath
+func (_m *MockAuthorizer) GetEffectivePermissions(ctx context.Context, namespacePath string) (map[string]models.Permission, error) {
+	ret := _m.Called(ctx, namespacePath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEffectivePermissions")
+	}
+
+	var r0 map[string]models.Permission
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (map[string]models.Permission, error)); ok {
+		return rf(ctx, namespacePath)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) map[string]models.Permission); ok {
+		r0 = rf(ctx, namespacePath)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]models.Permission)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, namespacePath)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRootNamespaces provides a mock function with given fields: ctx
 func (_m *MockAuthorizer) GetRootNamespaces(ctx context.Context) ([]models.MembershipNamespace, error) {
 	ret := _m.Called(ctx)
@@ -88,31 +118,6 @@ func (_m *MockAuthorizer) RequireAccessToInheritableResource(ctx context.Context
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, []types.ModelType, ...func(*constraints)) error); ok {
 		r0 = rf(ctx, modelTypes, checks...)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// RequireRole provides a mock function with given fields: ctx, roleID, checks
-func (_m *MockAuthorizer) RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error {
-	_va := make([]interface{}, len(checks))
-	for _i := range checks {
-		_va[_i] = checks[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, roleID)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RequireRole")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...func(*constraints)) error); ok {
-		r0 = rf(ctx, roleID, checks...)
 	} else {
 		r0 = ret.Error(0)
 	}

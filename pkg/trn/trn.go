@@ -91,6 +91,7 @@ const (
 	TypeVCSProvider                     Type = "vcs_provider"
 	TypeWorkspace                       Type = "workspace"
 	TypeWorkspaceAssessment             Type = "workspace_assessment"
+	TypeWorkspaceRoleBinding            Type = "workspace_role_binding"
 	TypeWorkspaceVCSProviderLink        Type = "workspace_vcs_provider_link"
 )
 

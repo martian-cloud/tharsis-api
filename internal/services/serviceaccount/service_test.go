@@ -585,6 +585,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
 				m.caller.On("IsAdminModeActivated", mock.Anything).Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
@@ -596,7 +597,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 					},
 					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)},
 				}, nil)
-				m.caller.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).Return(nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateNamespaceMembershipPermission, mock.Anything).Return(nil)
 
 				updated := *existingSA
 				updated.Description = updatedDescription
@@ -614,6 +615,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
 				m.caller.On("IsAdminModeActivated", mock.Anything).Return(true)
 
 				updated := *existingSA
@@ -632,6 +634,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
 				m.caller.On("IsAdminModeActivated", mock.Anything).Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
@@ -643,7 +646,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 					},
 					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)},
 				}, nil)
-				m.caller.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateNamespaceMembershipPermission, mock.Anything).
 					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
 			},
 			expectErrCode: terrs.EForbidden,
@@ -691,14 +694,6 @@ func TestUpdateServiceAccount(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
-				m.caller.On("IsAdminModeActivated", mock.Anything).Return(false)
-				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
-					Filter: &db.NamespaceMembershipFilter{
-						ServiceAccountID: &serviceAccountID,
-					},
-				}).Return(&db.NamespaceMembershipResult{
-					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
-				}, nil)
 				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).
 					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
 			},
@@ -1282,14 +1277,6 @@ func TestResetClientCredentials(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(saWithClientCreds, nil)
-				m.caller.On("IsAdminModeActivated", mock.Anything).Return(false)
-				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
-					Filter: &db.NamespaceMembershipFilter{
-						ServiceAccountID: &serviceAccountID,
-					},
-				}).Return(&db.NamespaceMembershipResult{
-					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(0)},
-				}, nil)
 				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).
 					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
 			},
@@ -1302,6 +1289,7 @@ func TestResetClientCredentials(t *testing.T) {
 			},
 			setupMocks: func(m *serviceAccountMocks) {
 				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(saWithClientCreds, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
 				m.caller.On("IsAdminModeActivated", mock.Anything).Return(false)
 				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
 					Filter: &db.NamespaceMembershipFilter{
@@ -1313,7 +1301,7 @@ func TestResetClientCredentials(t *testing.T) {
 					},
 					PageInfo: &pagination.PageInfo{TotalCount: pagination.StaticCount(1)},
 				}, nil)
-				m.caller.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateNamespaceMembershipPermission, mock.Anything).
 					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
 			},
 			expectErrCode: terrs.EForbidden,

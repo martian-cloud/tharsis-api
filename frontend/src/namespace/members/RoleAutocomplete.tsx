@@ -14,15 +14,17 @@ import { RoleAutocompleteQuery } from './__generated__/RoleAutocompleteQuery.gra
 export interface RoleOption {
     readonly id: string;
     readonly name: string;
+    readonly description?: string;
 }
 
 interface Props {
     onSelected: (value: RoleOption | null) => void
     size?: 'small' | 'medium'
+    hideDescription?: boolean;
 }
 
 function RoleAutocomplete(props: Props) {
-    const { onSelected, size } = props;
+    const { onSelected, size, hideDescription } = props;
 
     const [options, setOptions] = useState<ReadonlyArray<RoleOption> | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -46,6 +48,7 @@ function RoleAutocomplete(props: Props) {
                                   node {
                                       id
                                       name
+                                      description
                                   }
                               }
                             }
@@ -109,6 +112,7 @@ function RoleAutocomplete(props: Props) {
                                     </span>
                                 ))}
                             </Typography>
+                            {!hideDescription && <Typography variant="caption" color="textSecondary">{option.description}</Typography>}
                         </Box>
                     </Box>
                 );
