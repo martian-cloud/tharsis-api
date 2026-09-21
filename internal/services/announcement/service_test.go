@@ -1,6 +1,8 @@
 package announcement
 
 import (
+	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -19,13 +22,15 @@ import (
 func TestNewService(t *testing.T) {
 	logger, _ := logger.NewForTest()
 	dbClient := &db.Client{}
+	mockEnqueuer := email.NewMockEnqueuer(t)
 
 	expect := &service{
-		logger:   logger,
-		dbClient: dbClient,
+		logger:        logger,
+		dbClient:      dbClient,
+		emailEnqueuer: mockEnqueuer,
 	}
 
-	assert.Equal(t, expect, NewService(logger, dbClient))
+	assert.Equal(t, expect, NewService(logger, dbClient, mockEnqueuer))
 }
 
 func TestGetAnnouncementByID(t *testing.T) {
@@ -273,6 +278,7 @@ func TestCreateAnnouncement(t *testing.T) {
 		expectErrorCode    errors.CodeType
 		isAdmin            bool
 		authError          error
+		expectEmailSubject string
 	}
 
 	tests := []testCase{
@@ -321,6 +327,65 @@ func TestCreateAnnouncement(t *testing.T) {
 			isAdmin: true,
 		},
 		{
+			name: "admin creates announcement and broadcasts email with default subject",
+			input: &CreateAnnouncementInput{
+				Message:     "Test announcement",
+				StartTime:   &startTime,
+				EndTime:     &endTime,
+				Type:        models.AnnouncementTypeInfo,
+				Dismissible: true,
+				SendEmail:   true,
+			},
+			expectAnnouncement: &models.Announcement{
+				Metadata:    models.ResourceMetadata{ID: "created-id"},
+				Message:     "Test announcement",
+				StartTime:   startTime,
+				EndTime:     &endTime,
+				Type:        models.AnnouncementTypeInfo,
+				Dismissible: true,
+				CreatedBy:   testSubject,
+			},
+			isAdmin:            true,
+			expectEmailSubject: defaultAnnouncementEmailSubject,
+		},
+		{
+			name: "admin creates announcement and broadcasts email with custom subject",
+			input: &CreateAnnouncementInput{
+				Message:      "Test announcement",
+				StartTime:    &startTime,
+				EndTime:      &endTime,
+				Type:         models.AnnouncementTypeInfo,
+				Dismissible:  true,
+				SendEmail:    true,
+				EmailSubject: ptr.String("Custom Subject"),
+			},
+			expectAnnouncement: &models.Announcement{
+				Metadata:    models.ResourceMetadata{ID: "created-id"},
+				Message:     "Test announcement",
+				StartTime:   startTime,
+				EndTime:     &endTime,
+				Type:        models.AnnouncementTypeInfo,
+				Dismissible: true,
+				CreatedBy:   testSubject,
+			},
+			isAdmin:            true,
+			expectEmailSubject: "Custom Subject",
+		},
+		{
+			name: "email subject exceeding max length is rejected",
+			input: &CreateAnnouncementInput{
+				Message:      "Test announcement",
+				StartTime:    &startTime,
+				EndTime:      &endTime,
+				Type:         models.AnnouncementTypeInfo,
+				Dismissible:  true,
+				SendEmail:    true,
+				EmailSubject: ptr.String(strings.Repeat("a", models.MaxEmailSubjectLength+1)),
+			},
+			isAdmin:         true,
+			expectErrorCode: errors.EInvalid,
+		},
+		{
 			name: "non-admin caller cannot create announcement",
 			input: &CreateAnnouncementInput{
 				Message:     "Test announcement",
@@ -351,26 +416,43 @@ func TestCreateAnnouncement(t *testing.T) {
 
 			mockAnnouncements := db.NewMockAnnouncements(t)
 			mockCaller := auth.NewMockCaller(t)
+			mockUsers := db.NewMockUsers(t)
+			mockEnqueuer := email.NewMockEnqueuer(t)
+			mockTransactions := db.NewMockTransactions(t)
+
+			mockTransactions.On("BeginTx", mock.Anything).Return(func(ctx context.Context) context.Context { return ctx }, nil).Maybe()
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
 			if test.authError == nil {
 				ctx = auth.WithCaller(ctx, mockCaller)
 				mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin)
 
-				if test.isAdmin {
+				if test.isAdmin && test.expectErrorCode == "" {
 					mockCaller.On("GetSubject").Return(testSubject)
 					mockAnnouncements.On("CreateAnnouncement", mock.Anything, mock.AnythingOfType("*models.Announcement")).Return(test.expectAnnouncement, nil)
+				}
+
+				if test.input.SendEmail && test.isAdmin && test.expectErrorCode == "" {
+					mockEnqueuer.On("EnqueueEmail", mock.Anything, mock.MatchedBy(func(in *email.EnqueueEmailInput) bool {
+						// Announcement emails are retained (never ephemeral).
+						return in.Subject == test.expectEmailSubject && in.SendToAllUsers && in.Retain
+					})).Return(nil)
 				}
 			}
 
 			dbClient := &db.Client{
 				Announcements: mockAnnouncements,
+				Users:         mockUsers,
+				Transactions:  mockTransactions,
 			}
 
 			logger, _ := logger.NewForTest()
 
 			service := &service{
-				logger:   logger,
-				dbClient: dbClient,
+				logger:        logger,
+				dbClient:      dbClient,
+				emailEnqueuer: mockEnqueuer,
 			}
 
 			announcement, err := service.CreateAnnouncement(ctx, test.input)

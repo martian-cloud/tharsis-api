@@ -34,7 +34,7 @@ func handler(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	data := os.Getenv("EMAIL_DATA")
-	if err = emailBuilder.InitFromData([]byte(data)); err != nil {
+	if err = emailBuilder.InitFromJSON([]byte(data)); err != nil {
 		fmt.Fprintf(w, "failed to initialize email builder: %v", err)
 		return
 	}

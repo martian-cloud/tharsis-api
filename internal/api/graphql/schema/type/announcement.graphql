@@ -61,6 +61,8 @@ input CreateAnnouncementInput {
   endTime: Time
   type: AnnouncementType!
   dismissible: Boolean!
+  sendEmail: Boolean!
+  emailSubject: String
 }
 
 input UpdateAnnouncementInput {

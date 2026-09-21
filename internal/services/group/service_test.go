@@ -926,14 +926,13 @@ func TestGetGroups(t *testing.T) {
 				)
 
 			logger, _ := logger.NewForTest()
-			mockEmailClient := email.MockClient{}
-			mockEmailClient.Test(t)
+			mockEmailClient := email.NewMockEnqueuer(t)
 			mockNotifMgr := namespace.MockNotificationManager{}
 			mockNotifMgr.Test(t)
 			mockTaskManager := asynctask.MockManager{}
 			mockTaskManager.Test(t)
 			mockTaskManager.On("StartTask", mock.Anything).Maybe()
-			namespaceMembershipService := namespacemembership.NewService(logger, dbClient.Client, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
+			namespaceMembershipService := namespacemembership.NewService(logger, dbClient.Client, mockEmailClient, &mockNotifMgr)
 			service := NewService(logger, dbClient.Client, limiter, namespaceMembershipService, nil)
 
 			// Call the service function.

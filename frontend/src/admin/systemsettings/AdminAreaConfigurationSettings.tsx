@@ -66,6 +66,7 @@ const query = graphql`
             aiEnabled
             disableSensitiveVariableFeature
             emailFooter
+            emailEphemeralRetentionDays
             objectStorePluginType
             rateLimitStorePluginType
             jwsProviderPluginType

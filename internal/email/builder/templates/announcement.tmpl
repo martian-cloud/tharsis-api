@@ -1,0 +1,19 @@
+{{$alertClass := "alert-info"}}
+{{if eq .this.Severity "ERROR"}}{{$alertClass = "alert-error"}}
+{{else if eq .this.Severity "WARNING"}}{{$alertClass = "alert-warning"}}
+{{else if eq .this.Severity "SUCCESS"}}{{$alertClass = "alert-success"}}{{end}}
+<div class="{{$alertClass}}">
+    <div class="text markdown-body">
+        {{.this.Message}}
+    </div>
+</div>
+
+<a class="primary-button" style="margin-top: 24px;" href="{{.common.FrontendURL}}{{if .common.RecipientTokenPlaceholder}}?rid={{.common.RecipientTokenPlaceholder}}{{end}}" target="_blank">
+    <span class="primary-button-text">
+        Open Dashboard
+    </span>
+</a>
+
+<p class="text caption">
+    You're receiving this email because you're a Tharsis user.
+</p>

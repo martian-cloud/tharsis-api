@@ -56,6 +56,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/announcement"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cleanuppolicy"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
+	emailsvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
@@ -165,7 +166,28 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	maintenanceMonitor.Start(ctx)
 
 	taskManager := asynctask.NewManager(time.Duration(cfg.AsyncTaskTimeout) * time.Second)
-	emailClient := email.NewClient(pluginCatalog.EmailProvider, taskManager, dbClient, logger, cfg.TharsisUIURL, cfg.EmailFooter)
+
+	trackedObjectStore := objectstoregc.New(pluginCatalog.ObjectStore, dbClient.ObjectStoreRefs)
+
+	emailStore := email.NewStore(trackedObjectStore, dbClient.ObjectStoreRefs)
+	emailEnqueuer := email.NewEnqueuer(dbClient, emailStore, logger)
+
+	// Build and start the email delivery background workers: sender, delivery-feedback consumer, and cleaner.
+	emailWorkerSupervisor, err := email.NewWorkerSupervisor(&email.WorkerSupervisorInput{
+		DBClient:               dbClient,
+		Store:                  emailStore,
+		Provider:               pluginCatalog.EmailProvider,
+		Logger:                 logger,
+		MaintenanceMonitor:     maintenanceMonitor,
+		EventManager:           eventManager,
+		FrontendURL:            cfg.TharsisUIURL,
+		EmailFooter:            cfg.EmailFooter,
+		EphemeralRetentionDays: cfg.EmailEphemeralRetentionDays,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize email worker supervisor: %w", err)
+	}
+	emailWorkerSupervisor.Start(ctx)
 
 	signingKeyManager, err := auth.NewSigningKeyManager(
 		ctx,
@@ -174,7 +196,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		dbClient,
 		eventManager,
 		cfg,
-		emailClient,
+		emailEnqueuer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize identity provider: %w", err)
@@ -204,7 +226,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	respWriter := response.NewWriter(logger)
 
-	trackedObjectStore := objectstoregc.New(pluginCatalog.ObjectStore, dbClient.ObjectStoreRefs)
 	artifactStore := coreworkspace.NewArtifactStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 	providerRegistryStore := providerregistry.NewRegistryStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 	moduleRegistryStore := moduleregistry.NewRegistryStore(trackedObjectStore, dbClient.ObjectStoreRefs)
@@ -243,9 +264,9 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 			runeventhandlers.NewStalePlannedRunDiscarder(logger, dbClient),
 			runeventhandlers.NewRunGateManager(logger, dbClient),
 			runeventhandlers.NewPolicyCheckWorkItemEnqueuer(logger, dbClient),
+			runeventhandlers.NewFailedRunEmailHandler(logger, dbClient, emailEnqueuer, notificationManager),
 		},
 		[]runtypes.RunChangeHandler{
-			runeventhandlers.NewFailedRunEmailHandler(logger, dbClient, taskManager, emailClient, notificationManager),
 			runeventhandlers.NewRunMetricsHandler(logger, dbClient),
 		},
 	)
@@ -272,9 +293,9 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		activityService            = activityevent.NewService(dbClient, logger)
 		adminLogTailService        = adminlogtail.NewService(pluginCatalog.AdminLogTailStore)
 		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore, cfg.TerraformCLIVersionConstraint)
-		announcementService        = announcement.NewService(logger, dbClient)
+		announcementService        = announcement.NewService(logger, dbClient, emailEnqueuer)
 		userService                = user.NewService(logger, dbClient, inheritedSettingsResolver)
-		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, emailClient, notificationManager, taskManager)
+		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, emailEnqueuer, notificationManager)
 		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, inheritedSettingsResolver)
 		workspaceService           = workspacesvc.NewService(logger, dbClient, limits, artifactStore, eventManager, cfg.TerraformCLIVersionConstraint, inheritedSettingsResolver)
 		jobService                 = job.NewService(logger, dbClient, runCmdProcessor, runCmdFactory, signingKeyManager, logStreamManager, eventManager)
@@ -297,6 +318,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		resourceLimitService       = resourcelimit.NewService(logger, dbClient)
 		providerMirrorService      = providermirror.NewService(logger, dbClient, providerRegistryClient, limits, mirrorStore)
 		maintenanceModeService     = maint.NewService(logger, dbClient)
+		emailService               = emailsvc.NewService(logger, dbClient)
 	)
 
 	versionService, err := version.NewService(dbClient, apiVersion, buildTimestamp)
@@ -327,6 +349,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		AdminLogTailService:              adminLogTailService,
 		AnnouncementService:              announcementService,
 		CLIService:                       cliService,
+		EmailService:                     emailService,
 		FederatedRegistryService:         federatedRegistryService,
 		GPGKeyService:                    gpgKeyService,
 		GroupService:                     groupService,
@@ -378,7 +401,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	serviceaccount.NewSecretExpirationScheduler(
 		dbClient,
 		logger,
-		emailClient,
+		emailEnqueuer,
 		maintenanceMonitor,
 		notificationManager,
 	).Start(ctx)

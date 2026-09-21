@@ -26,6 +26,7 @@ type Config {
   disableSensitiveVariableFeature: Boolean!
   serviceAccountClientSecretMaxExpirationDays: Int!
   emailFooter: String
+  emailEphemeralRetentionDays: Int!
   objectStorePluginType: String!
   rateLimitStorePluginType: String!
   jwsProviderPluginType: String!

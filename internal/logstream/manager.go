@@ -674,7 +674,7 @@ func (s *stream) Subscribe(ctx context.Context, options *SubscriptionOptions) (<
 		for {
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
-				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
+				if errors.FilterContextError(err) != nil {
 					s.logger.WithContextFields(ctx).Errorf("error occurred while waiting for log events: %v", err)
 				}
 				return

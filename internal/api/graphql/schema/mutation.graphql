@@ -271,6 +271,12 @@ type Mutation {
   deleteAnnouncement(
     input: DeleteAnnouncementInput!
   ): DeleteAnnouncementPayload!
+  deleteEmailSuppression(
+    input: DeleteEmailSuppressionInput!
+  ): DeleteEmailSuppressionPayload!
+  markEmailRecipientClicked(
+    input: MarkEmailRecipientClickedInput!
+  ): MarkEmailRecipientClickedPayload!
   favoriteNamespace(
     input: NamespaceFavoriteInput!
   ): NamespaceFavoriteMutationPayload!

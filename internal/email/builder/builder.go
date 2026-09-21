@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"html/template"
 	"net/url"
+	"slices"
 
 	"github.com/vanng822/go-premailer/premailer"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/renderer/html"
 )
 
 const (
@@ -23,6 +26,11 @@ const (
 `
 )
 
+// RecipientTokenPlaceholder is the literal a rendered template embeds in a link back into the app;
+// the sender substitutes it with the actual recipient's global ID before sending, since a template
+// is rendered once and shared across all of an outbox's recipients.
+const RecipientTokenPlaceholder = "__RECIPIENT_TOKEN__"
+
 // EmailType is a constant representing the various types of emails
 type EmailType string
 
@@ -32,11 +40,17 @@ const (
 	ServiceAccountSecretExpirationEmailType EmailType = "service_account_secret_expiration"
 	SigningKeyDecommissionEmailType         EmailType = "signing_key_decommission"
 	MembershipChangeEmailType               EmailType = "membership_change"
+	AnnouncementEmailType                   EmailType = "announcement"
 )
 
 // EmailTypes returns a list of email types
 func EmailTypes() []EmailType {
-	return []EmailType{FailedRunEmailType, ServiceAccountSecretExpirationEmailType, SigningKeyDecommissionEmailType, MembershipChangeEmailType}
+	return []EmailType{FailedRunEmailType, ServiceAccountSecretExpirationEmailType, SigningKeyDecommissionEmailType, MembershipChangeEmailType, AnnouncementEmailType}
+}
+
+// Valid reports whether et is a known email type.
+func (et EmailType) Valid() bool {
+	return slices.Contains(EmailTypes(), et)
 }
 
 // TemplateFilename returns the template filename for this type
@@ -55,6 +69,8 @@ func (et EmailType) NewBuilder() (EmailBuilder, error) {
 		return &SigningKeyDecommissionEmail{}, nil
 	case MembershipChangeEmailType:
 		return &MembershipChangeEmail{}, nil
+	case AnnouncementEmailType:
+		return &AnnouncementEmail{}, nil
 	default:
 		return nil, fmt.Errorf("unknown email type: %s", et)
 	}
@@ -77,9 +93,16 @@ func registerTemplate(filename string, templates map[string]*template.Template) 
 
 // EmailBuilder is an interface for building emails
 type EmailBuilder interface {
+	// Type returns the email type, which is also the outbox email_type and template name.
 	Type() EmailType
+	// Build renders the email body HTML using the given template context.
 	Build(templateCtx *TemplateContext) (string, error)
-	InitFromData(data []byte) error
+	// InitFromMsgpack populates the builder from the outbox's stored payload, which the enqueuer
+	// serializes with msgpack. This is the path the sender uses.
+	InitFromMsgpack(data []byte) error
+	// InitFromJSON populates the builder from JSON. The email preview tool feeds it hand-authored
+	// JSON from an env var, so preview is the only caller.
+	InitFromJSON(data []byte) error
 }
 
 type baseTemplateData struct {
@@ -88,7 +111,8 @@ type baseTemplateData struct {
 }
 
 type commonFields struct {
-	FrontendURL string
+	FrontendURL               string
+	RecipientTokenPlaceholder string
 }
 
 // TemplateContext is the context for building templates
@@ -98,7 +122,7 @@ type TemplateContext struct {
 	templates map[string]*template.Template
 }
 
-// NewTemplateContext creates a new template context
+// NewTemplateContext creates a new template context.
 func NewTemplateContext(frontendURL string, footer string) *TemplateContext {
 	if footer == "" {
 		footer = defaultFooter
@@ -112,13 +136,13 @@ func NewTemplateContext(frontendURL string, footer string) *TemplateContext {
 	}
 
 	return &TemplateContext{
-		common:    commonFields{FrontendURL: frontendURL},
+		common:    commonFields{FrontendURL: frontendURL, RecipientTokenPlaceholder: RecipientTokenPlaceholder},
 		footer:    template.HTML(footer), // nosemgrep: gosec.G203-1
 		templates: templates,
 	}
 }
 
-// ExecuteTemplate executes the template and returns the html
+// ExecuteTemplate executes the template and returns the html; CSS is inlined once later by WrapInBaseTemplate.
 func (t *TemplateContext) ExecuteTemplate(filename string, data interface{}) (string, error) {
 	allData := map[string]interface{}{}
 	allData["common"] = t.common
@@ -127,10 +151,10 @@ func (t *TemplateContext) ExecuteTemplate(filename string, data interface{}) (st
 	var buf bytes.Buffer
 	err := t.templates[filename].Execute(&buf, allData)
 	if err != nil {
-		return "", fmt.Errorf("failed to execute email template: %v", err)
+		return "", fmt.Errorf("failed to execute email template: %w", err)
 	}
 
-	return t.inlineCSS(buf.String())
+	return buf.String(), nil
 }
 
 // WrapInBaseTemplate wraps the body in the base template html
@@ -138,11 +162,10 @@ func (t *TemplateContext) WrapInBaseTemplate(body string) (string, error) {
 	var buf bytes.Buffer
 	err := t.templates[baseTemplateFilename].Execute(&buf, &baseTemplateData{
 		Footer: template.HTML(t.footer), // nosemgrep: gosec.G203-1
-		// Passing html body here is safe since this is not user input
-		Body: template.HTML(body), // nosemgrep: gosec.G203-1
+		Body:   template.HTML(body),     // nosemgrep: gosec.G203-1
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to execute base email template: %v", err)
+		return "", fmt.Errorf("failed to execute base email template: %w", err)
 	}
 
 	return t.inlineCSS(buf.String())
@@ -151,7 +174,18 @@ func (t *TemplateContext) WrapInBaseTemplate(body string) (string, error) {
 func (t *TemplateContext) inlineCSS(html string) (string, error) {
 	prem, err := premailer.NewPremailerFromString(html, premailer.NewOptions())
 	if err != nil {
-		return "", fmt.Errorf("failed to inline email template css: %v", err)
+		return "", fmt.Errorf("failed to inline email template css: %w", err)
 	}
 	return prem.Transform()
+}
+
+// RenderMarkdownToHTML renders author-supplied markdown to HTML with raw HTML escaped (Unsafe off) and single newlines hard-wrapped to <br>; block spacing comes from the email CSS.
+func RenderMarkdownToHTML(source string) (template.HTML, error) {
+	var rendered bytes.Buffer
+	md := goldmark.New(goldmark.WithRendererOptions(html.WithHardWraps()))
+	if err := md.Convert([]byte(source), &rendered); err != nil {
+		return "", fmt.Errorf("failed to render markdown: %w", err)
+	}
+
+	return template.HTML(rendered.String()), nil // nosemgrep: gosec.G203-1
 }

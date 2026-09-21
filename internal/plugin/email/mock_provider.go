@@ -13,17 +13,17 @@ type MockProvider struct {
 	mock.Mock
 }
 
-// SendMail provides a mock function with given fields: ctx, to, subject, body
-func (_m *MockProvider) SendMail(ctx context.Context, to []string, subject string, body string) error {
-	ret := _m.Called(ctx, to, subject, body)
+// SendMail provides a mock function with given fields: ctx, to, subject, body, correlationID
+func (_m *MockProvider) SendMail(ctx context.Context, to string, subject string, body string, correlationID string) error {
+	ret := _m.Called(ctx, to, subject, body, correlationID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendMail")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []string, string, string) error); ok {
-		r0 = rf(ctx, to, subject, body)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) error); ok {
+		r0 = rf(ctx, to, subject, body, correlationID)
 	} else {
 		r0 = ret.Error(0)
 	}

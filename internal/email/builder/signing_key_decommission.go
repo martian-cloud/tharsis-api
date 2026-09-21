@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // SigningKeyDecommissionEmail is the email builder for signing key decommission alerts
@@ -30,7 +32,12 @@ func (e *SigningKeyDecommissionEmail) Build(templateCtx *TemplateContext) (strin
 	return templateCtx.WrapInBaseTemplate(html)
 }
 
-// InitFromData creates the builder from raw data
-func (e *SigningKeyDecommissionEmail) InitFromData(data []byte) error {
+// InitFromMsgpack populates the builder from the stored msgpack payload.
+func (e *SigningKeyDecommissionEmail) InitFromMsgpack(data []byte) error {
+	return msgpack.Unmarshal(data, e)
+}
+
+// InitFromJSON populates the builder from JSON for the email preview tool.
+func (e *SigningKeyDecommissionEmail) InitFromJSON(data []byte) error {
 	return json.Unmarshal(data, e)
 }

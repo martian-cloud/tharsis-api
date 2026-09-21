@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 func TestMembershipChangeEmail_Subject(t *testing.T) {
@@ -149,7 +150,15 @@ func TestMembershipChangeEmail_namespaceType(t *testing.T) {
 	}
 }
 
-func TestMembershipChangeEmail_InitFromData(t *testing.T) {
+func TestMembershipChangeEmail_InitFromMsgpack(t *testing.T) {
+	valid, err := msgpack.Marshal(&MembershipChangeEmail{
+		Action:        MembershipChangeActionCreated,
+		NamespacePath: "group/workspace",
+		RoleName:      "owner",
+		IsWorkspace:   true,
+	})
+	require.NoError(t, err)
+
 	tests := []struct {
 		name        string
 		data        []byte
@@ -157,7 +166,51 @@ func TestMembershipChangeEmail_InitFromData(t *testing.T) {
 		expected    MembershipChangeEmail
 	}{
 		{
-			name: "valid JSON",
+			name: "valid msgpack",
+			data: valid,
+			expected: MembershipChangeEmail{
+				Action:        MembershipChangeActionCreated,
+				NamespacePath: "group/workspace",
+				RoleName:      "owner",
+				IsWorkspace:   true,
+			},
+		},
+		{
+			name:     "empty data is a no-op",
+			data:     []byte{},
+			expected: MembershipChangeEmail{},
+		},
+		{
+			name:        "invalid data returns error",
+			data:        []byte{0xff, 0xff, 0xff},
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			email := &MembershipChangeEmail{}
+			err := email.InitFromMsgpack(test.data)
+			if test.expectError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, *email)
+		})
+	}
+}
+
+func TestMembershipChangeEmail_InitFromJSON(t *testing.T) {
+	tests := []struct {
+		name        string
+		data        []byte
+		expectError bool
+		expected    MembershipChangeEmail
+	}{
+		{
+			name: "valid json",
 			data: []byte(`{"Action":"created","NamespacePath":"group/workspace","RoleName":"owner","IsWorkspace":true}`),
 			expected: MembershipChangeEmail{
 				Action:        MembershipChangeActionCreated,
@@ -172,8 +225,8 @@ func TestMembershipChangeEmail_InitFromData(t *testing.T) {
 			expected: MembershipChangeEmail{},
 		},
 		{
-			name:        "invalid JSON returns error",
-			data:        []byte(`{not valid json`),
+			name:        "invalid data returns error",
+			data:        []byte("{not json"),
 			expectError: true,
 		},
 	}
@@ -181,7 +234,7 @@ func TestMembershipChangeEmail_InitFromData(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			email := &MembershipChangeEmail{}
-			err := email.InitFromData(test.data)
+			err := email.InitFromJSON(test.data)
 			if test.expectError {
 				require.Error(t, err)
 				return

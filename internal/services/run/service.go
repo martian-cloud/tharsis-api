@@ -388,7 +388,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 		for {
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
-				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
+				if errors.FilterContextError(err) != nil {
 					s.logger.WithContextFields(ctx).Errorf("Error occurred while waiting for run events: %v", err)
 				}
 				return

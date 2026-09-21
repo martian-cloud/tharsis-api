@@ -65,7 +65,7 @@ type signingKeyManager struct {
 	issuerURL                string
 	dbClient                 *db.Client
 	eventManager             *events.EventManager
-	emailClient              email.Client
+	emailEnqueuer            email.Enqueuer
 	keySet                   jwk.Set
 	keySetLock               sync.RWMutex
 	logger                   logger.Logger
@@ -82,9 +82,9 @@ func NewSigningKeyManager(
 	dbClient *db.Client,
 	eventManager *events.EventManager,
 	cfg *config.Config,
-	emailClient email.Client,
+	emailEnqueuer email.Enqueuer,
 ) (SigningKeyManager, error) {
-	return newSigningKeyManager(ctx, logger, jwsPlugin, dbClient, eventManager, cfg, emailClient, true)
+	return newSigningKeyManager(ctx, logger, jwsPlugin, dbClient, eventManager, cfg, emailEnqueuer, true)
 }
 
 func newSigningKeyManager(
@@ -94,7 +94,7 @@ func newSigningKeyManager(
 	dbClient *db.Client,
 	eventManager *events.EventManager,
 	cfg *config.Config,
-	emailClient email.Client,
+	emailEnqueuer email.Enqueuer,
 	startBackgroundTasks bool,
 ) (SigningKeyManager, error) {
 	if cfg.AsymmetricSigningKeyRotationPeriodDays > 0 && !jwsPlugin.SupportsKeyRotation() {
@@ -106,7 +106,7 @@ func newSigningKeyManager(
 		issuerURL:                cfg.JWTIssuerURL,
 		dbClient:                 dbClient,
 		eventManager:             eventManager,
-		emailClient:              emailClient,
+		emailEnqueuer:            emailEnqueuer,
 		keySet:                   jwk.NewSet(),
 		logger:                   logger,
 		keyRotationPeriod:        time.Duration(cfg.AsymmetricSigningKeyRotationPeriodDays) * 24 * time.Hour,
@@ -397,7 +397,7 @@ func (s *signingKeyManager) checkForExpiredKey(ctx context.Context) error {
 	return nil
 }
 
-func (s *signingKeyManager) sendKeyDecommissionAlert(ctx context.Context, decommissioningKey *models.AsymSigningKey) {
+func (s *signingKeyManager) sendKeyDecommissionAlert(ctx context.Context, decommissioningKey *models.AsymSigningKey) error {
 	// Calculate deletion time
 	deletionTime := decommissioningKey.Metadata.LastUpdatedTimestamp.Add(s.keyDecommissioningPeriod)
 
@@ -409,12 +409,11 @@ func (s *signingKeyManager) sendKeyDecommissionAlert(ctx context.Context, decomm
 		},
 	})
 	if err != nil {
-		s.logger.Errorf("failed to get admin users for key decommission alert: %v", err)
-		return
+		return errors.Wrap(err, "failed to get admin users for key decommission alert")
 	}
 
 	if len(adminUsers.Users) == 0 {
-		return
+		return nil
 	}
 
 	// Extract admin user IDs
@@ -423,17 +422,21 @@ func (s *signingKeyManager) sendKeyDecommissionAlert(ctx context.Context, decomm
 		adminUserIDs[i] = user.Metadata.ID
 	}
 
-	// Send email
-	s.emailClient.SendMail(ctx, &email.SendMailInput{
-		UsersIDs: adminUserIDs,
-		Subject:  "Signing Key Decommissioning",
+	if err := s.emailEnqueuer.EnqueueEmail(ctx, &email.EnqueueEmailInput{
+		UserIDs: adminUserIDs,
+		Subject: "Signing Key Decommissioning",
 		Builder: &builder.SigningKeyDecommissionEmail{
 			KeyID:                    decommissioningKey.GetGlobalID(),
 			DecommissioningStartedAt: *decommissioningKey.Metadata.LastUpdatedTimestamp,
 			DeletionTime:             deletionTime,
 		},
-	})
+	}); err != nil {
+		return errors.Wrap(err, "failed to enqueue signing key decommission email")
+	}
+
+	return nil
 }
+
 func (s *signingKeyManager) rotateKey(ctx context.Context, expiredKey *models.AsymSigningKey) error {
 	// Start db transaction
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -457,13 +460,13 @@ func (s *signingKeyManager) rotateKey(ctx context.Context, expiredKey *models.As
 		return fmt.Errorf("failed to create new signing key: %w", err)
 	}
 
-	// Commit transaction first
+	if err := s.sendKeyDecommissionAlert(txContext, updatedKey); err != nil {
+		return errors.Wrap(err, "failed to send signing key decommission alert")
+	}
+
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return fmt.Errorf("failed to commit transaction for key rotation: %w", err)
 	}
-
-	// Send email alert in background after successful commit
-	go s.sendKeyDecommissionAlert(ctx, updatedKey)
 
 	return nil
 }

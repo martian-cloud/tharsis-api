@@ -22,6 +22,9 @@ var (
 	AsymSigningKeyModelType                  = ModelType{trnType: trn.TypeAsymSigningKey, gidCode: "ASK"}
 	ConfigurationVersionModelType            = ModelType{trnType: trn.TypeConfigurationVersion, gidCode: "C"}
 	CleanupPolicyModelType                   = ModelType{trnType: trn.TypeCleanupPolicy, gidCode: "CP"}
+	EmailOutboxItemModelType                 = ModelType{trnType: trn.TypeEmailOutboxItem, gidCode: "EOI"}
+	EmailRecipientModelType                  = ModelType{trnType: trn.TypeEmailRecipient, gidCode: "ER"}
+	EmailSuppressionModelType                = ModelType{trnType: trn.TypeEmailSuppression, gidCode: "ES"}
 	FederatedRegistryModelType               = ModelType{trnType: trn.TypeFederatedRegistry, gidCode: "FR"}
 	GPGKeyModelType                          = ModelType{trnType: trn.TypeGPGKey, gidCode: "GPG"}
 	GroupModelType                           = ModelType{trnType: trn.TypeGroup, gidCode: "G"}

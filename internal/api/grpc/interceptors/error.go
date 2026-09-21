@@ -82,7 +82,7 @@ func handleError(ctx context.Context, err error, logger logger.Logger) error {
 	switch errors.ErrorCode(err) {
 	case errors.EInternal:
 		// Don't log context deadline expired and context cancelled errors.
-		if !errors.IsDeadlineExceededError(err) && !errors.IsContextCanceledError(err) {
+		if errors.FilterContextError(err) != nil {
 			logger.WithContextFields(ctx).Errorf("Unexpected gRPC error occurred: %s", err.Error())
 		}
 	}

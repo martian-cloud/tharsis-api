@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e8073cd7009a2e0798ad83e38eaa008f>>
+ * @generated SignedSource<<30b044f814c8a854e481e88154b28865>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,8 +14,10 @@ export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND"
 export type CreateAnnouncementInput = {
   clientMutationId?: string | null | undefined;
   dismissible: boolean;
+  emailSubject?: string | null | undefined;
   endTime?: any | null | undefined;
   message: string;
+  sendEmail: boolean;
   startTime?: any | null | undefined;
   type: AnnouncementType;
 };

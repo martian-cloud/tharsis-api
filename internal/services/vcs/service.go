@@ -31,6 +31,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/sanitize"
 )
 
 const (
@@ -1315,7 +1316,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 			}
 
 			// Update the status and error message on the event.
-			errorMessage := strings.ToValidUTF8(err.Error(), "�") // ErrorMessage must be a pointer.
+			errorMessage := sanitize.ToValidUTF8(err.Error()) // ErrorMessage must be a pointer.
 			createdEvent.Status = models.VCSEventErrored
 			createdEvent.ErrorMessage = &errorMessage
 		}
@@ -1468,7 +1469,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 			}
 
 			// Update the status and error message on the event.
-			errorMessage := strings.ToValidUTF8(err.Error(), "�") // ErrorMessage must be a pointer.
+			errorMessage := sanitize.ToValidUTF8(err.Error()) // ErrorMessage must be a pointer.
 			createdEvent.Status = models.VCSEventErrored
 			createdEvent.ErrorMessage = &errorMessage
 		}

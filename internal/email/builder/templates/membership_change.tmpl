@@ -73,7 +73,7 @@
 </p>
 
 {{if .this.ShowCTA}}
-<a class="primary-button" style="margin-top: 24px;" href="{{$nsURL}}" target="_blank">
+<a class="primary-button" style="margin-top: 24px;" href="{{$nsURL}}{{if .common.RecipientTokenPlaceholder}}?rid={{.common.RecipientTokenPlaceholder}}{{end}}" target="_blank">
     <span class="primary-button-text">
         View {{$nsType}}
     </span>

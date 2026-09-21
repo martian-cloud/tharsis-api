@@ -1,0 +1,60 @@
+enum EmailRecipientSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+enum EmailDeliveryStatus {
+  PENDING
+  ACCEPTED
+  COMPLETED
+  SOFT_BOUNCED
+  HARD_BOUNCED
+  FAILED
+  DELAYED
+  ABANDONED
+}
+
+type EmailRecipientStats {
+  total: Int!
+  delivered: Int!
+  opened: Int!
+  clicked: Int!
+  issues: Int!
+}
+
+type EmailRecipient implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  outboxItem: EmailOutboxItem!
+  address: String!
+  deliveryStatus: EmailDeliveryStatus!
+  attemptCount: Int!
+  availableAt: Time!
+  lastAttemptAt: Time
+  openedAt: Time
+  clickedAt: Time
+  complainedAt: Time
+  failureReason: String
+}
+
+type EmailRecipientConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [EmailRecipientEdge]
+}
+
+type EmailRecipientEdge {
+  cursor: String!
+  node: EmailRecipient
+}
+
+type MarkEmailRecipientClickedPayload {
+  clientMutationId: String
+  emailRecipient: EmailRecipient
+  problems: [Problem!]!
+}
+
+input MarkEmailRecipientClickedInput {
+  clientMutationId: String
+  recipientId: ID!
+}

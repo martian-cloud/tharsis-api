@@ -37,6 +37,7 @@ const (
 	RunnerSessionSubscription       SubscriptionType = "runner_sessions"
 	AgentSessionRunSubscription     SubscriptionType = "agent_session_runs"
 	WorkItemQueueSubscription       SubscriptionType = "work_items_queue"
+	EmailOutboxItemSubscription     SubscriptionType = "email_outbox_items"
 )
 
 // SubscriptionAction type represents the available actions that can be subscribed type

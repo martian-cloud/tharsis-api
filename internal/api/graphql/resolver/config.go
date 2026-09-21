@@ -215,6 +215,11 @@ func (r *ConfigResolver) EmailFooter() *string {
 	return &r.cfg.EmailFooter
 }
 
+// EmailEphemeralRetentionDays resolver
+func (r *ConfigResolver) EmailEphemeralRetentionDays() int32 {
+	return int32(r.cfg.EmailEphemeralRetentionDays)
+}
+
 // ObjectStorePluginType resolver
 func (r *ConfigResolver) ObjectStorePluginType() string {
 	return r.cfg.ObjectStorePluginType

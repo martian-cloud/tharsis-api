@@ -10,6 +10,7 @@ import AgentSessionChatSidebar from './ai/AgentSessionChatSidebar';
 import { ApiConfig, ApiConfigContext } from './ApiConfigContext';
 import { AppHeaderHeightProvider, useAppHeaderHeight } from './contexts/AppHeaderHeightProvider';
 import ErrorBoundary from './ErrorBoundary';
+import GlobalQueryParamActions from './GlobalQueryParamActions';
 import AppHeader from './nav/AppHeader';
 import AppRoutes from './routes/AppRoutes';
 import { User, UserContext } from './UserContext';
@@ -73,6 +74,7 @@ function RootContent({ fragmentRef }: { fragmentRef: RootQuery['response'] }) {
 
     return (
         <>
+            <GlobalQueryParamActions />
             <AppHeader fragmentRef={fragmentRef} />
             <Box sx={{ paddingTop: `${headerHeight}px`, marginRight: `${agentCopilotSidebarWidth}px`, transition: 'margin-right 0.2s ease' }}>
                 <ErrorBoundary resetKey={location.pathname}>

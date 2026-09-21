@@ -37,12 +37,30 @@ func (_m *MockEmailBuilder) Build(templateCtx *TemplateContext) (string, error) 
 	return r0, r1
 }
 
-// InitFromData provides a mock function with given fields: data
-func (_m *MockEmailBuilder) InitFromData(data []byte) error {
+// InitFromJSON provides a mock function with given fields: data
+func (_m *MockEmailBuilder) InitFromJSON(data []byte) error {
 	ret := _m.Called(data)
 
 	if len(ret) == 0 {
-		panic("no return value specified for InitFromData")
+		panic("no return value specified for InitFromJSON")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(data)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// InitFromMsgpack provides a mock function with given fields: data
+func (_m *MockEmailBuilder) InitFromMsgpack(data []byte) error {
+	ret := _m.Called(data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InitFromMsgpack")
 	}
 
 	var r0 error

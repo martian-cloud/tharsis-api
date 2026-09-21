@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"strings"
 	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/email"
@@ -50,11 +49,11 @@ func NewProvider(
 	}
 }
 
-func (s *smtpProvider) SendMail(_ context.Context, to []string, subject, body string) error {
+func (s *smtpProvider) SendMail(_ context.Context, to, subject, body, _ string) error {
 	m := gomail.NewMessage()
 
 	m.SetHeader("From", s.fromAddress)
-	m.SetHeader("To", strings.Join(to, ", "))
+	m.SetHeader("To", to)
 	m.SetHeader("Subject", subject)
 	m.SetBody("text/html", body)
 

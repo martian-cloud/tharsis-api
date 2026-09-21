@@ -266,6 +266,24 @@ type Query {
   ): AnnouncementConnection!
   version: Version!
   agentTrace(input: AgentTraceInput!): String
+  emailOutboxItems(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: EmailOutboxItemSort
+    ephemeral: Boolean
+    subjectSearch: String
+  ): EmailOutboxItemConnection!
+  emailSuppressions(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: EmailSuppressionSort
+    addresses: [String!]
+    search: String
+  ): EmailSuppressionConnection!
   adminLogTail(
     limit: Int
     levels: [AdminLogTailLevel!]

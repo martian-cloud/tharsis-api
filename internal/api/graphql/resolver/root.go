@@ -1710,6 +1710,16 @@ func (r RootResolver) Announcements(ctx context.Context, args *AnnouncementConne
 	return announcementsQuery(ctx, args)
 }
 
+// EmailOutboxItems returns a paginated list of email outbox items.
+func (r RootResolver) EmailOutboxItems(ctx context.Context, args *EmailOutboxItemConnectionQueryArgs) (*EmailOutboxItemConnectionResolver, error) {
+	return emailOutboxItemsQuery(ctx, args)
+}
+
+// EmailSuppressions returns a paginated list of email suppressions.
+func (r RootResolver) EmailSuppressions(ctx context.Context, args *EmailSuppressionConnectionQueryArgs) (*EmailSuppressionConnectionResolver, error) {
+	return emailSuppressionsQuery(ctx, args)
+}
+
 // CreateAnnouncement creates a new announcement
 func (r RootResolver) CreateAnnouncement(ctx context.Context,
 	args *struct{ Input CreateAnnouncementInput },
@@ -1740,6 +1750,32 @@ func (r RootResolver) DeleteAnnouncement(ctx context.Context,
 	if err != nil {
 		return handleAnnouncementMutationProblem(err, args.Input.ClientMutationID)
 	}
+	return response, nil
+}
+
+// DeleteEmailSuppression removes an address from the email suppression list.
+func (r RootResolver) DeleteEmailSuppression(ctx context.Context,
+	args *struct{ Input DeleteEmailSuppressionInput },
+) (*DeleteEmailSuppressionPayloadResolver, error) {
+	response, err := deleteEmailSuppressionMutation(ctx, &args.Input)
+	if err != nil {
+		return handleEmailSuppressionMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// MarkEmailRecipientClicked records that an email recipient clicked a link back into the app.
+func (r RootResolver) MarkEmailRecipientClicked(ctx context.Context,
+	args *struct {
+		Input MarkEmailRecipientClickedInput
+	},
+) (*MarkEmailRecipientClickedPayloadResolver, error) {
+	response, err := markEmailRecipientClickedMutation(ctx, &args.Input)
+	if err != nil {
+		return handleMarkEmailRecipientClickedProblem(err, args.Input.ClientMutationID)
+	}
+
 	return response, nil
 }
 

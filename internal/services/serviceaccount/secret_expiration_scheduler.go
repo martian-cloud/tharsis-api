@@ -32,7 +32,7 @@ const (
 type SecretExpirationScheduler struct {
 	dbClient            *db.Client
 	logger              logger.Logger
-	emailClient         email.Client
+	emailEnqueuer       email.Enqueuer
 	maintenanceMonitor  maintenance.Monitor
 	notificationManager namespace.NotificationManager
 }
@@ -41,14 +41,14 @@ type SecretExpirationScheduler struct {
 func NewSecretExpirationScheduler(
 	dbClient *db.Client,
 	logger logger.Logger,
-	emailClient email.Client,
+	emailEnqueuer email.Enqueuer,
 	maintenanceMonitor maintenance.Monitor,
 	notificationManager namespace.NotificationManager,
 ) *SecretExpirationScheduler {
 	return &SecretExpirationScheduler{
 		dbClient:            dbClient,
 		logger:              logger,
-		emailClient:         emailClient,
+		emailEnqueuer:       emailEnqueuer,
 		maintenanceMonitor:  maintenanceMonitor,
 		notificationManager: notificationManager,
 	}
@@ -164,16 +164,19 @@ func (s *SecretExpirationScheduler) sendExpirationWarning(ctx context.Context, s
 		return errors.Wrap(err, "failed to update service account")
 	}
 
-	s.emailClient.SendMail(txCtx, &email.SendMailInput{
-		UsersIDs: userIDs,
-		Subject:  "Service Account Client Secret Expiring Soon",
+	// Enqueue within the same transaction so the notified-at update and the email are persisted atomically.
+	if err := s.emailEnqueuer.EnqueueEmail(txCtx, &email.EnqueueEmailInput{
+		UserIDs: userIDs,
+		Subject: "Service Account Client Secret Expiring Soon",
 		Builder: &builder.ServiceAccountSecretExpirationEmail{
 			ServiceAccountName: sa.Name,
 			ServiceAccountID:   sa.GetGlobalID(),
 			GroupPath:          sa.GetGroupPath(),
 			ExpiresAt:          *sa.ClientSecretExpiresAt, // ClientSecretExpiresAt is guaranteed non-nil by the DB filter.
 		},
-	})
+	}); err != nil {
+		return errors.Wrap(err, "failed to enqueue secret expiration email")
+	}
 
 	if err := s.dbClient.Transactions.CommitTx(txCtx); err != nil {
 		return errors.Wrap(err, "failed to commit transaction")

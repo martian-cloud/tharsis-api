@@ -212,6 +212,42 @@ func (r *NodeResolver) ToUser() (*UserResolver, bool) {
 	}
 }
 
+// ToEmailOutboxItem resolver
+func (r *NodeResolver) ToEmailOutboxItem() (*EmailOutboxItemResolver, bool) {
+	switch res := r.result.(type) {
+	case *EmailOutboxItemResolver:
+		return res, true
+	case *models.EmailOutboxItem:
+		return &EmailOutboxItemResolver{outbox: res}, true
+	default:
+		return nil, false
+	}
+}
+
+// ToEmailRecipient resolver
+func (r *NodeResolver) ToEmailRecipient() (*EmailRecipientResolver, bool) {
+	switch res := r.result.(type) {
+	case *EmailRecipientResolver:
+		return res, true
+	case *models.EmailRecipient:
+		return &EmailRecipientResolver{recipient: res}, true
+	default:
+		return nil, false
+	}
+}
+
+// ToEmailSuppression resolver
+func (r *NodeResolver) ToEmailSuppression() (*EmailSuppressionResolver, bool) {
+	switch res := r.result.(type) {
+	case *EmailSuppressionResolver:
+		return res, true
+	case *models.EmailSuppression:
+		return &EmailSuppressionResolver{suppression: res}, true
+	default:
+		return nil, false
+	}
+}
+
 // ToUserSession resolver
 func (r *NodeResolver) ToUserSession() (*UserSessionResolver, bool) {
 	switch res := r.result.(type) {

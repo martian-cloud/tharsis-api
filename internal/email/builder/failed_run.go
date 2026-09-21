@@ -2,6 +2,8 @@ package builder
 
 import (
 	"encoding/json"
+
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // RunStage indicates which stage (plan or apply) errored.
@@ -48,7 +50,12 @@ func (fr *FailedRunEmail) Build(templateCtx *TemplateContext) (string, error) {
 	return templateCtx.WrapInBaseTemplate(html)
 }
 
-// InitFromData creates the builder from raw data
-func (fr *FailedRunEmail) InitFromData(data []byte) error {
+// InitFromMsgpack populates the builder from the stored msgpack payload.
+func (fr *FailedRunEmail) InitFromMsgpack(data []byte) error {
+	return msgpack.Unmarshal(data, fr)
+}
+
+// InitFromJSON populates the builder from JSON for the email preview tool.
+func (fr *FailedRunEmail) InitFromJSON(data []byte) error {
 	return json.Unmarshal(data, fr)
 }

@@ -20,7 +20,7 @@ import (
 
 func TestNewSecretExpirationScheduler(t *testing.T) {
 	testLogger, _ := logger.NewForTest()
-	mockEmailClient := email.NewMockClient(t)
+	mockEmailClient := email.NewMockEnqueuer(t)
 	mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
 	mockNotificationManager := namespace.NewMockNotificationManager(t)
 	dbClient := &db.Client{}
@@ -36,7 +36,7 @@ func TestNewSecretExpirationScheduler(t *testing.T) {
 	assert.NotNil(t, scheduler)
 	assert.Equal(t, dbClient, scheduler.dbClient)
 	assert.Equal(t, testLogger, scheduler.logger)
-	assert.Equal(t, mockEmailClient, scheduler.emailClient)
+	assert.Equal(t, mockEmailClient, scheduler.emailEnqueuer)
 	assert.Equal(t, mockMaintenanceMonitor, scheduler.maintenanceMonitor)
 	assert.Equal(t, mockNotificationManager, scheduler.notificationManager)
 }
@@ -88,7 +88,7 @@ func TestSecretExpirationScheduler_sendExpirationWarning(t *testing.T) {
 
 			mockServiceAccounts := db.NewMockServiceAccounts(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockEmailClient := email.NewMockClient(t)
+			mockEmailClient := email.NewMockEnqueuer(t)
 			mockNotificationManager := namespace.NewMockNotificationManager(t)
 
 			mockNotificationManager.On("GetNamespaceMembersWithRole", mock.Anything, "test-group", models.OwnerRoleID.String()).
@@ -101,7 +101,7 @@ func TestSecretExpirationScheduler_sendExpirationWarning(t *testing.T) {
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 				mockServiceAccounts.On("UpdateServiceAccount", mock.Anything, mock.Anything).Return(sa, nil)
-				mockEmailClient.On("SendMail", mock.Anything, mock.Anything).Return()
+				mockEmailClient.On("EnqueueEmail", mock.Anything, mock.Anything).Return(nil)
 			}
 
 			dbClient := &db.Client{
@@ -112,7 +112,7 @@ func TestSecretExpirationScheduler_sendExpirationWarning(t *testing.T) {
 			scheduler := &SecretExpirationScheduler{
 				dbClient:            dbClient,
 				logger:              testLogger,
-				emailClient:         mockEmailClient,
+				emailEnqueuer:       mockEmailClient,
 				notificationManager: mockNotificationManager,
 			}
 
@@ -176,7 +176,7 @@ func TestSecretExpirationScheduler_execute(t *testing.T) {
 
 			mockServiceAccounts := db.NewMockServiceAccounts(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockEmailClient := email.NewMockClient(t)
+			mockEmailClient := email.NewMockEnqueuer(t)
 			mockNotificationManager := namespace.NewMockNotificationManager(t)
 
 			if test.getAccountsError != nil {
@@ -210,7 +210,7 @@ func TestSecretExpirationScheduler_execute(t *testing.T) {
 			scheduler := &SecretExpirationScheduler{
 				dbClient:            dbClient,
 				logger:              testLogger,
-				emailClient:         mockEmailClient,
+				emailEnqueuer:       mockEmailClient,
 				notificationManager: mockNotificationManager,
 			}
 

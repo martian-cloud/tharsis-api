@@ -7,12 +7,17 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/builder"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"go.opentelemetry.io/otel/attribute"
 )
+
+// defaultAnnouncementEmailSubject is used when the caller does not supply an email subject.
+const defaultAnnouncementEmailSubject = "New Tharsis Announcement"
 
 // GetAnnouncementsInput is the input for getting announcements
 type GetAnnouncementsInput struct {
@@ -26,11 +31,13 @@ type GetAnnouncementsInput struct {
 
 // CreateAnnouncementInput is the input for creating an announcement
 type CreateAnnouncementInput struct {
-	Message     string
-	StartTime   *time.Time
-	EndTime     *time.Time
-	Type        models.AnnouncementType
-	Dismissible bool
+	Message      string
+	StartTime    *time.Time
+	EndTime      *time.Time
+	Type         models.AnnouncementType
+	Dismissible  bool
+	SendEmail    bool
+	EmailSubject *string
 }
 
 // UpdateAnnouncementInput is the input for updating an announcement
@@ -61,15 +68,17 @@ type Service interface {
 }
 
 type service struct {
-	logger   logger.Logger
-	dbClient *db.Client
+	logger        logger.Logger
+	dbClient      *db.Client
+	emailEnqueuer email.Enqueuer
 }
 
 // NewService creates a new announcement service
-func NewService(logger logger.Logger, dbClient *db.Client) Service {
+func NewService(logger logger.Logger, dbClient *db.Client, emailEnqueuer email.Enqueuer) Service {
 	return &service{
-		logger:   logger,
-		dbClient: dbClient,
+		logger:        logger,
+		dbClient:      dbClient,
+		emailEnqueuer: emailEnqueuer,
 	}
 }
 
@@ -155,6 +164,10 @@ func (s *service) CreateAnnouncement(ctx context.Context, input *CreateAnnouncem
 		return nil, errors.New("only admins with admin mode activated can create announcements", errors.WithErrorCode(errors.EForbidden))
 	}
 
+	if input.EmailSubject != nil && len(*input.EmailSubject) > models.MaxEmailSubjectLength {
+		return nil, errors.New("email subject cannot be greater than %d characters", models.MaxEmailSubjectLength, errors.WithErrorCode(errors.EInvalid))
+	}
+
 	// Default start time to current time if not provided
 	var startTime time.Time
 	if input.StartTime != nil {
@@ -176,13 +189,50 @@ func (s *service) CreateAnnouncement(ctx context.Context, input *CreateAnnouncem
 		return nil, errors.Wrap(err, "failed to validate announcement model", errors.WithSpan(span))
 	}
 
-	created, err := s.dbClient.Announcements.CreateAnnouncement(ctx, toCreate)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin transaction", errors.WithSpan(span))
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to roll back CreateAnnouncement transaction: %v", txErr)
+		}
+	}()
+
+	created, err := s.dbClient.Announcements.CreateAnnouncement(txContext, toCreate)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create announcement", errors.WithSpan(span))
 	}
 
-	s.logger.WithContextFields(ctx).Infow("Created announcement.",
+	if input.SendEmail {
+		emailSubject := defaultAnnouncementEmailSubject
+		if input.EmailSubject != nil && *input.EmailSubject != "" {
+			emailSubject = *input.EmailSubject
+		}
+
+		if err = s.emailEnqueuer.EnqueueEmail(txContext, &email.EnqueueEmailInput{
+			Builder: &builder.AnnouncementEmail{
+				Message:  created.Message,
+				Severity: string(created.Type),
+			},
+			Subject:        emailSubject,
+			SendToAllUsers: true,
+			Retain:         true, // Announcement emails are user-facing broadcasts kept for inspection
+			SendAt:         &created.StartTime,
+		}); err != nil {
+			return nil, errors.Wrap(err, "failed to enqueue announcement email", errors.WithSpan(span))
+		}
+	}
+
+	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, errors.Wrap(err, "failed to commit transaction", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("created announcement.",
 		"announcement_id", created.Metadata.ID,
+		"announcement_type", created.Type,
+		"sends_email", input.SendEmail,
 	)
 
 	return created, nil

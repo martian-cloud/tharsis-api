@@ -105,7 +105,7 @@ func (s *Scheduler) Start(ctx context.Context) {
 
 			select {
 			case <-time.After(sleep):
-				if err := s.sweep(ctx); isSweepError(err) {
+				if err := s.sweep(ctx); errors.FilterContextError(err) != nil {
 					s.logger.Error(err)
 				}
 			case <-ctx.Done():
@@ -155,7 +155,7 @@ func (s *Scheduler) sweep(ctx context.Context) error {
 				return nil
 			}
 
-			if err := s.sweepNamespaces(ctx, &policies[i]); isSweepError(err) {
+			if err := s.sweepNamespaces(ctx, &policies[i]); errors.FilterContextError(err) != nil {
 				s.logger.WithContextFields(ctx).Errorw("cleanup policy sweeper failed to sweep the namespaces of a policy",
 					"policyTRN", policies[i].Metadata.TRN,
 					"error", err,
@@ -270,7 +270,7 @@ func (s *Scheduler) sweepNamespaces(ctx context.Context, policy *models.CleanupP
 				}
 
 				sweeperDeletedCount.WithLabelValues(string(policy.Kind)).Add(float64(len(deletedTRNs)))
-			}); isSweepError(err) {
+			}); errors.FilterContextError(err) != nil {
 				s.logger.WithContextFields(ctx).Errorw("cleanup policy sweeper failed to prune a namespace",
 					"namespacePath", nsPath,
 					"policyTRN", policy.Metadata.TRN,
@@ -384,12 +384,6 @@ func (s *Scheduler) finishSweep(ctx context.Context, policy *models.CleanupPolic
 
 		return err
 	}, db.WithRetryOnOLEAttempts(finishSweepOLEAttempts))
-}
-
-// isSweepError reports whether err is a real failure worth logging, as opposed to nil or the pass
-// simply running out of time.
-func isSweepError(err error) bool {
-	return err != nil && !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err)
 }
 
 // overrideCache tracks the namespace paths that have their own policy of the kind being swept.

@@ -11,6 +11,9 @@ import AdminAreaUsers from "./users/AdminAreaUsers";
 import AdminAreaAnnouncementList from "./announcements/AdminAreaAnnouncementList";
 import AdminAreaNewAnnouncement from "./announcements/AdminAreaNewAnnouncement";
 import EditAdminAreaAnnouncement from "./announcements/EditAdminAreaAnnouncement";
+import AdminAreaEmailOutboxList from "./emails/AdminAreaEmailOutboxList";
+import AdminAreaEmailOutboxDetails from "./emails/AdminAreaEmailOutboxDetails";
+import AdminAreaEmailSuppressionList from "./emails/AdminAreaEmailSuppressionList";
 import AdminAreaSystemSettings from "./systemsettings/AdminAreaSystemSettings";
 import AdminAreaConfigurationPage from "./systemsettings/AdminAreaConfigurationPage";
 import AdminAreaResourceLimitsPage from "./systemsettings/AdminAreaResourceLimitsPage";
@@ -85,6 +88,9 @@ function AdminArea({ queryRef }: Props) {
                                 <Route path={`announcements`} element={<AdminAreaAnnouncementList />} />
                                 <Route path={`announcements/new`} element={<AdminAreaNewAnnouncement />} />
                                 <Route path={`announcements/:announcementId/edit`} element={<EditAdminAreaAnnouncement />} />
+                                <Route path={`email_outbox`} element={<AdminAreaEmailOutboxList />} />
+                                <Route path={`email_outbox/:outboxId`} element={<AdminAreaEmailOutboxDetails />} />
+                                <Route path={`email_suppressions`} element={<AdminAreaEmailSuppressionList />} />
                                 <Route path={`system_settings`} element={<AdminAreaSystemSettings />} />
                                 <Route path={`configuration`} element={<AdminAreaConfigurationPage />} />
                                 <Route path={`resource_limits`} element={<AdminAreaResourceLimitsPage />} />

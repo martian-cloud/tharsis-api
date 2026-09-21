@@ -35,6 +35,7 @@ const (
 	defaultHTTPRateLimit                               = 60 // in calls per second
 	defaultTerraformCLIVersions                        = ">= 1.0.0"
 	defaultWorkspaceAssessmentIntervalHours            = 24
+	defaultEmailEphemeralRetentionDays                 = 7
 	defaultWorkspaceAssessmentRunLimit                 = 20
 	defaultUserSessionAccessTokenExpirationMinutes     = 5
 	defaultUserSessionRefreshTokenExpirationMinutes    = 60 * 12 // 12 hours
@@ -101,6 +102,9 @@ type Config struct {
 	AIEnabled bool `yaml:"ai_enabled" env:"AI_ENABLED"`
 
 	EmailFooter string `yaml:"email_footer" env:"EMAIL_FOOTER"`
+
+	// EmailEphemeralRetentionDays is how many days a completed ephemeral email is kept before the cleanup worker reclaims it.
+	EmailEphemeralRetentionDays int `yaml:"email_ephemeral_retention_days" env:"EMAIL_EPHEMERAL_RETENTION_DAYS"`
 
 	MCPServerConfig MCPServerConfig `yaml:"mcp_server_config"`
 
@@ -266,6 +270,7 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		HTTPRateLimit:                               defaultHTTPRateLimit,
 		TerraformCLIVersionConstraint:               defaultTerraformCLIVersions,
 		WorkspaceAssessmentIntervalHours:            defaultWorkspaceAssessmentIntervalHours,
+		EmailEphemeralRetentionDays:                 defaultEmailEphemeralRetentionDays,
 		WorkspaceAssessmentRunLimit:                 defaultWorkspaceAssessmentRunLimit,
 		UserSessionAccessTokenExpirationMinutes:     defaultUserSessionAccessTokenExpirationMinutes,
 		UserSessionRefreshTokenExpirationMinutes:    defaultUserSessionRefreshTokenExpirationMinutes,
