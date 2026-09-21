@@ -58,7 +58,9 @@ function EditAdminAreaAnnouncement() {
         type: announcement.type,
         dismissible: announcement.dismissible,
         startTime: announcement.startTime ? moment(announcement.startTime) : null,
-        endTime: announcement.endTime ? moment(announcement.endTime) : null
+        endTime: announcement.endTime ? moment(announcement.endTime) : null,
+        sendEmail: false,
+        emailSubject: ''
     }), [announcement]);
 
     const [formData, setFormData] = useState<FormData>(originalFormData);

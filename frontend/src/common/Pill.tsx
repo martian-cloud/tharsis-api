@@ -92,6 +92,9 @@ const StyledChip = styled(Chip, {
         flexShrink: 0,
         '& .MuiChip-label': {
             padding: 0,
+            // lineHeight 1 clips descenders (the tail of a "p"/"g"); a looser label line-height
+            // reserves that space while flex-centering keeps the text inside the fixed-height box.
+            lineHeight: 1.4,
         },
         // Chip nudges its icon with a 5px/-6px margin pair to sit inside the label's padding; with
         // that padding gone the margins would double-count. The icon takes the pill's colour.

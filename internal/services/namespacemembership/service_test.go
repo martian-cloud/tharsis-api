@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
@@ -297,18 +296,16 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			mockNamespaceMemberships.On("GetNamespaceMemberships", mock.Anything, mock.Anything).
 				Return(&db.NamespaceMembershipResult{}, nil).Maybe()
 
-			mockEmailClient := email.MockClient{}
-			mockEmailClient.Test(t)
+			mockEmailClient := email.NewMockEnqueuer(t)
 
 			mockNotifMgr := namespace.MockNotificationManager{}
 			mockNotifMgr.Test(t)
-
-			mockTaskManager := asynctask.MockManager{}
-			mockTaskManager.Test(t)
-			mockTaskManager.On("StartTask", mock.Anything).Maybe()
+			// Membership emails now send synchronously; resolve to no users so no email is enqueued.
+			mockNotifMgr.On("GetNamespaceMembersWithRole", mock.Anything, mock.Anything, mock.Anything).Return([]string{}, nil).Maybe()
+			mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.Anything).Return([]string{}, nil).Maybe()
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
+			service := NewService(logger, &dbClient, mockEmailClient, &mockNotifMgr)
 
 			namespaceMembership, err := service.CreateNamespaceMembership(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrorCode != "" {
@@ -489,18 +486,16 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
-			mockEmailClient := email.MockClient{}
-			mockEmailClient.Test(t)
+			mockEmailClient := email.NewMockEnqueuer(t)
 
 			mockNotifMgr := namespace.MockNotificationManager{}
 			mockNotifMgr.Test(t)
-
-			mockTaskManager := asynctask.MockManager{}
-			mockTaskManager.Test(t)
-			mockTaskManager.On("StartTask", mock.Anything).Maybe()
+			// Membership emails now send synchronously; resolve to no users so no email is enqueued.
+			mockNotifMgr.On("GetNamespaceMembersWithRole", mock.Anything, mock.Anything, mock.Anything).Return([]string{}, nil).Maybe()
+			mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.Anything).Return([]string{}, nil).Maybe()
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
+			service := NewService(logger, &dbClient, mockEmailClient, &mockNotifMgr)
 
 			namespaceMembership, err := service.UpdateNamespaceMembership(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrorCode != "" {
@@ -538,7 +533,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 	type testCase struct {
 		name            string
 		membership      func() *models.NamespaceMembership
-		setupMocks      func(_ *testing.T, mockSAs *db.MockServiceAccounts, mockTeams *db.MockTeams, mockTeamMembers *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockClient)
+		setupMocks      func(_ *testing.T, mockSAs *db.MockServiceAccounts, mockTeams *db.MockTeams, mockTeamMembers *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockEnqueuer)
 		expectError     bool
 		expectEmailSent bool
 	}
@@ -551,11 +546,11 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.UserID = ptr.String(userID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockClient) {
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockEnqueuer) {
 				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.MatchedBy(func(in *namespace.GetUsersToNotifyInput) bool {
 					return in.NamespacePath == namespacePath && len(in.ParticipantUserIDs) == 1 && in.ParticipantUserIDs[0] == userID
 				})).Return([]string{userID}, nil)
-				mockEmail.On("SendMail", mock.Anything, mock.Anything).Return()
+				mockEmail.On("EnqueueEmail", mock.Anything, mock.Anything).Return(nil)
 			},
 			expectEmailSent: true,
 		},
@@ -566,7 +561,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.UserID = ptr.String(userID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockClient) {
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockEnqueuer) {
 				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.Anything).Return([]string{}, nil)
 			},
 		},
@@ -577,7 +572,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.UserID = ptr.String(userID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockClient) {
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockEnqueuer) {
 				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.Anything).Return(nil, errors.New("db error"))
 			},
 			expectError: true,
@@ -589,7 +584,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.TeamID = ptr.String(teamID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, mockTeams *db.MockTeams, mockTeamMembers *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockClient) {
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, mockTeams *db.MockTeams, mockTeamMembers *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockEnqueuer) {
 				mockTeams.On("GetTeamByID", mock.Anything, teamID).Return(&models.Team{Name: "my-team"}, nil)
 				mockTeamMembers.On("GetTeamMembers", mock.Anything, &db.GetTeamMembersInput{
 					Filter: &db.TeamMemberFilter{TeamIDs: []string{teamID}},
@@ -597,7 +592,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.MatchedBy(func(in *namespace.GetUsersToNotifyInput) bool {
 					return in.NamespacePath == namespacePath && len(in.ParticipantUserIDs) == 1 && in.ParticipantUserIDs[0] == userID
 				})).Return([]string{userID}, nil)
-				mockEmail.On("SendMail", mock.Anything, mock.Anything).Return()
+				mockEmail.On("EnqueueEmail", mock.Anything, mock.Anything).Return(nil)
 			},
 			expectEmailSent: true,
 		},
@@ -608,7 +603,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.TeamID = ptr.String(teamID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, mockTeams *db.MockTeams, _ *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockClient) {
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, mockTeams *db.MockTeams, _ *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockEnqueuer) {
 				mockTeams.On("GetTeamByID", mock.Anything, teamID).Return(nil, nil)
 			},
 			expectError: true,
@@ -620,7 +615,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.TeamID = ptr.String(teamID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, mockTeams *db.MockTeams, mockTeamMembers *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockClient) {
+			setupMocks: func(_ *testing.T, _ *db.MockServiceAccounts, mockTeams *db.MockTeams, mockTeamMembers *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockEnqueuer) {
 				mockTeams.On("GetTeamByID", mock.Anything, teamID).Return(&models.Team{Name: "my-team"}, nil)
 				mockTeamMembers.On("GetTeamMembers", mock.Anything, mock.Anything).Return(nil, errors.New("db error"))
 			},
@@ -633,7 +628,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.ServiceAccountID = ptr.String(saID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockClient) {
+			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, mockEmail *email.MockEnqueuer) {
 				mockSAs.On("GetServiceAccountByID", mock.Anything, saID).Return(&models.ServiceAccount{
 					Metadata: models.ResourceMetadata{TRN: trn.TypeServiceAccount.Build("parent/child/my-sa")},
 				}, nil)
@@ -641,7 +636,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.MatchedBy(func(in *namespace.GetUsersToNotifyInput) bool {
 					return in.NamespacePath == namespacePath && len(in.ParticipantUserIDs) == 1 && in.ParticipantUserIDs[0] == ownerUserID
 				})).Return([]string{ownerUserID}, nil)
-				mockEmail.On("SendMail", mock.Anything, mock.Anything).Return()
+				mockEmail.On("EnqueueEmail", mock.Anything, mock.Anything).Return(nil)
 			},
 			expectEmailSent: true,
 		},
@@ -652,7 +647,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.ServiceAccountID = ptr.String(saID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockClient) {
+			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockEnqueuer) {
 				mockSAs.On("GetServiceAccountByID", mock.Anything, saID).Return(&models.ServiceAccount{
 					Metadata: models.ResourceMetadata{TRN: trn.TypeServiceAccount.Build("parent/child/my-sa")},
 				}, nil)
@@ -667,7 +662,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.ServiceAccountID = ptr.String(saID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockClient) {
+			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockEnqueuer) {
 				mockSAs.On("GetServiceAccountByID", mock.Anything, saID).Return(nil, nil)
 			},
 			expectError: true,
@@ -679,7 +674,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.ServiceAccountID = ptr.String(saID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockClient) {
+			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, _ *namespace.MockNotificationManager, _ *email.MockEnqueuer) {
 				mockSAs.On("GetServiceAccountByID", mock.Anything, saID).Return(nil, errors.New("db error"))
 			},
 			expectError: true,
@@ -691,7 +686,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 				m.ServiceAccountID = ptr.String(saID)
 				return m
 			},
-			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockClient) {
+			setupMocks: func(_ *testing.T, mockSAs *db.MockServiceAccounts, _ *db.MockTeams, _ *db.MockTeamMembers, mockNotifMgr *namespace.MockNotificationManager, _ *email.MockEnqueuer) {
 				mockSAs.On("GetServiceAccountByID", mock.Anything, saID).Return(&models.ServiceAccount{
 					Metadata: models.ResourceMetadata{TRN: trn.TypeServiceAccount.Build("parent/child/my-sa")},
 				}, nil)
@@ -709,7 +704,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 			mockTeams := db.NewMockTeams(t)
 			mockTeamMembers := db.NewMockTeamMembers(t)
 			mockNotifMgr := namespace.NewMockNotificationManager(t)
-			mockEmail := email.NewMockClient(t)
+			mockEmail := email.NewMockEnqueuer(t)
 
 			test.setupMocks(t, mockSAs, mockTeams, mockTeamMembers, mockNotifMgr, mockEmail)
 
@@ -724,7 +719,7 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 					TeamMembers:     mockTeamMembers,
 				},
 				notificationManager: mockNotifMgr,
-				emailClient:         mockEmail,
+				emailEnqueuer:       mockEmail,
 				logger:              testLogger,
 			}
 
@@ -743,9 +738,9 @@ func TestSendMembershipChangeEmail(t *testing.T) {
 			require.NoError(t, err)
 
 			if test.expectEmailSent {
-				mockEmail.AssertCalled(t, "SendMail", mock.Anything, mock.Anything)
+				mockEmail.AssertCalled(t, "EnqueueEmail", mock.Anything, mock.Anything)
 			} else {
-				mockEmail.AssertNotCalled(t, "SendMail", mock.Anything, mock.Anything)
+				mockEmail.AssertNotCalled(t, "EnqueueEmail", mock.Anything, mock.Anything)
 			}
 		})
 	}
@@ -790,12 +785,9 @@ func TestCreateNamespaceMembership_SkipNotification(t *testing.T) {
 	mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, mock.Anything).
 		Return(&models.ServiceAccount{Metadata: models.ResourceMetadata{TRN: trn.TypeServiceAccount.Build("ns1/sa")}}, nil)
 
-	mockEmailClient := email.NewMockClient(t)
+	mockEmailClient := email.NewMockEnqueuer(t)
 	mockNotifMgr := namespace.MockNotificationManager{}
 	mockNotifMgr.Test(t)
-	// No StartTask expectation -- it must NOT be called.
-	mockTaskManager := asynctask.MockManager{}
-	mockTaskManager.Test(t)
 
 	testLogger, _ := logger.NewForTest()
 	svc := NewService(testLogger, &db.Client{
@@ -804,7 +796,7 @@ func TestCreateNamespaceMembership_SkipNotification(t *testing.T) {
 		Roles:                &mockRoles,
 		Users:                &mockUsers,
 		ServiceAccounts:      &mockServiceAccounts,
-	}, mockEmailClient, &mockNotifMgr, &mockTaskManager)
+	}, mockEmailClient, &mockNotifMgr)
 
 	_, err := svc.CreateNamespaceMembership(auth.WithCaller(ctx, &mockCaller), &CreateNamespaceMembershipInput{
 		NamespacePath:    "ns1",
@@ -813,7 +805,6 @@ func TestCreateNamespaceMembership_SkipNotification(t *testing.T) {
 		SkipNotification: true,
 	})
 	require.NoError(t, err)
-	mockTaskManager.AssertNotCalled(t, "StartTask")
 }
 
 func TestCreateNamespaceMembership_CallerIsSubject(t *testing.T) {
@@ -871,12 +862,9 @@ func TestCreateNamespaceMembership_CallerIsSubject(t *testing.T) {
 
 	mockTransactions.On("BeginTx", mock.Anything).Return(callerCtx, nil)
 
-	mockEmailClient := email.NewMockClient(t)
+	mockEmailClient := email.NewMockEnqueuer(t)
 	mockNotifMgr := namespace.MockNotificationManager{}
 	mockNotifMgr.Test(t)
-	// No StartTask expectation -- it must NOT be called.
-	mockTaskManager := asynctask.MockManager{}
-	mockTaskManager.Test(t)
 
 	testLogger, _ := logger.NewForTest()
 	svc := NewService(testLogger, &db.Client{
@@ -886,7 +874,7 @@ func TestCreateNamespaceMembership_CallerIsSubject(t *testing.T) {
 		Users:                &mockUsers,
 		ServiceAccounts:      &mockServiceAccounts,
 		ActivityEvents:       mockActivityEvents,
-	}, mockEmailClient, &mockNotifMgr, &mockTaskManager)
+	}, mockEmailClient, &mockNotifMgr)
 
 	_, err := svc.CreateNamespaceMembership(callerCtx, &CreateNamespaceMembershipInput{
 		NamespacePath: "ns1",
@@ -894,7 +882,6 @@ func TestCreateNamespaceMembership_CallerIsSubject(t *testing.T) {
 		User:          &models.User{Metadata: models.ResourceMetadata{ID: userID}},
 	})
 	require.NoError(t, err)
-	mockTaskManager.AssertNotCalled(t, "StartTask")
 }
 
 func TestDeleteNamespaceMembership(t *testing.T) {
@@ -1008,18 +995,16 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 				Transactions:         &mockTransactions,
 			}
 
-			mockEmailClient := email.MockClient{}
-			mockEmailClient.Test(t)
+			mockEmailClient := email.NewMockEnqueuer(t)
 
 			mockNotifMgr := namespace.MockNotificationManager{}
 			mockNotifMgr.Test(t)
-
-			mockTaskManager := asynctask.MockManager{}
-			mockTaskManager.Test(t)
-			mockTaskManager.On("StartTask", mock.Anything).Maybe()
+			// Membership emails now send synchronously; resolve to no users so no email is enqueued.
+			mockNotifMgr.On("GetNamespaceMembersWithRole", mock.Anything, mock.Anything, mock.Anything).Return([]string{}, nil).Maybe()
+			mockNotifMgr.On("GetUsersToNotify", mock.Anything, mock.Anything).Return([]string{}, nil).Maybe()
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockEmailClient, &mockNotifMgr, &mockTaskManager)
+			service := NewService(logger, &dbClient, mockEmailClient, &mockNotifMgr)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)

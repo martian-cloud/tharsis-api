@@ -3,6 +3,8 @@ package builder
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // ServiceAccountSecretExpirationEmail is the email builder for service account secret expiration warnings.
@@ -27,7 +29,12 @@ func (e *ServiceAccountSecretExpirationEmail) Build(templateCtx *TemplateContext
 	return templateCtx.WrapInBaseTemplate(html)
 }
 
-// InitFromData creates the builder from raw data
-func (e *ServiceAccountSecretExpirationEmail) InitFromData(data []byte) error {
+// InitFromMsgpack populates the builder from the stored msgpack payload.
+func (e *ServiceAccountSecretExpirationEmail) InitFromMsgpack(data []byte) error {
+	return msgpack.Unmarshal(data, e)
+}
+
+// InitFromJSON populates the builder from JSON for the email preview tool.
+func (e *ServiceAccountSecretExpirationEmail) InitFromJSON(data []byte) error {
 	return json.Unmarshal(data, e)
 }

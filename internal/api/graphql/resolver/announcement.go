@@ -226,6 +226,8 @@ type CreateAnnouncementInput struct {
 	EndTime          *graphql.Time
 	Type             models.AnnouncementType
 	Dismissible      bool
+	SendEmail        bool
+	EmailSubject     *string
 }
 
 // UpdateAnnouncementInput contains the input for updating an announcement
@@ -261,9 +263,11 @@ func createAnnouncementMutation(ctx context.Context, input *CreateAnnouncementIn
 	service := getServiceCatalog(ctx).AnnouncementService
 
 	createInput := &announcement.CreateAnnouncementInput{
-		Message:     input.Message,
-		Type:        input.Type,
-		Dismissible: input.Dismissible,
+		Message:      input.Message,
+		Type:         input.Type,
+		Dismissible:  input.Dismissible,
+		EmailSubject: input.EmailSubject,
+		SendEmail:    input.SendEmail,
 	}
 
 	if input.StartTime != nil {

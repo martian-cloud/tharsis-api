@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/announcement"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cleanuppolicy"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
+	emailsvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
@@ -53,6 +54,7 @@ type Catalog struct {
 	AdminLogTailService              adminlogtail.Service
 	AnnouncementService              announcement.Service
 	CLIService                       cli.Service
+	EmailService                     emailsvc.Service
 	FederatedRegistryService         federatedregistry.Service
 	GPGKeyService                    gpgkey.Service
 	GroupService                     group.Service
@@ -157,6 +159,32 @@ func (c *Catalog) Init() {
 		},
 		func(ctx context.Context, value string) (models.Model, error) {
 			return c.AnnouncementService.GetAnnouncementByTRN(ctx, value)
+		},
+	)
+
+	// Email Service
+	c.addModelFetchers(types.EmailOutboxItemModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.EmailService.GetOutboxItemByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.EmailService.GetOutboxItemByTRN(ctx, value)
+		},
+	)
+	c.addModelFetchers(types.EmailRecipientModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.EmailService.GetRecipientByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.EmailService.GetRecipientByTRN(ctx, value)
+		},
+	)
+	c.addModelFetchers(types.EmailSuppressionModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.EmailService.GetSuppressionByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.EmailService.GetSuppressionByTRN(ctx, value)
 		},
 	)
 

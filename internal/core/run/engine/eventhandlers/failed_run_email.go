@@ -9,7 +9,6 @@ import (
 	"golang.org/x/text/language"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/ansi"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/statemachine"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -17,6 +16,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/builder"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -28,50 +28,49 @@ var removeUnicodeCharacters = regexp.MustCompile("[╷│╵]")
 type FailedRunEmailHandler struct {
 	dbClient            *db.Client
 	logger              logger.Logger
-	emailClient         email.Client
+	emailEnqueuer       email.Enqueuer
 	notificationManager namespace.NotificationManager
-	taskManager         asynctask.Manager
 }
 
 // NewFailedRunEmailHandler creates a new FailedRunEmailHandler.
 func NewFailedRunEmailHandler(
 	logger logger.Logger,
 	dbClient *db.Client,
-	taskManager asynctask.Manager,
-	emailClient email.Client,
+	emailEnqueuer email.Enqueuer,
 	notificationManager namespace.NotificationManager,
 ) *FailedRunEmailHandler {
 	return &FailedRunEmailHandler{
 		dbClient:            dbClient,
 		logger:              logger,
-		emailClient:         emailClient,
+		emailEnqueuer:       emailEnqueuer,
 		notificationManager: notificationManager,
-		taskManager:         taskManager,
 	}
 }
 
 // HandleRunChanges handles run events.
-func (h *FailedRunEmailHandler) HandleRunChanges(_ context.Context, changes []types.RunChange) error {
+func (h *FailedRunEmailHandler) HandleRunChanges(ctx context.Context, changes []types.RunChange) error {
 	for _, failed := range getFailedRuns(changes) {
 		// Skip assessment runs.
 		if failed.run.IsAssessmentRun {
 			continue
 		}
 
-		run, stage := failed.run, failed.stage
-		h.taskManager.StartTask(func(ctx context.Context) {
-			h.sendFailureEmail(ctx, run, stage)
-		})
+		if err := h.sendFailureEmail(ctx, failed.run, failed.stage); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (h *FailedRunEmailHandler) sendFailureEmail(ctx context.Context, run *models.Run, stage builder.RunStage) {
+func (h *FailedRunEmailHandler) sendFailureEmail(ctx context.Context, run *models.Run, stage builder.RunStage) error {
 	ws, err := h.dbClient.Workspaces.GetWorkspaceByID(ctx, run.WorkspaceID)
-	if err != nil || ws == nil {
-		h.logger.WithContextFields(ctx).Errorf("failed to get workspace for run %s: %v", run.Metadata.ID, err)
-		return
+	if err != nil {
+		return errors.Wrap(err, "failed to get workspace for run %s", run.Metadata.ID)
+	}
+
+	if ws == nil {
+		return errors.New("workspace %s not found for run %s", run.WorkspaceID, run.Metadata.ID)
 	}
 
 	// If the run was created by a user, resolve the created-by email to a user ID so
@@ -97,12 +96,11 @@ func (h *FailedRunEmailHandler) sendFailureEmail(ctx context.Context, run *model
 		},
 	})
 	if err != nil {
-		h.logger.WithContextFields(ctx).Errorf("failed to get users to notify for run %s: %v", run.Metadata.ID, err)
-		return
+		return errors.Wrap(err, "failed to get users to notify for run %s", run.Metadata.ID)
 	}
 
 	if len(userIDs) == 0 {
-		return
+		return nil
 	}
 
 	var errorMessage string
@@ -123,9 +121,9 @@ func (h *FailedRunEmailHandler) sendFailureEmail(ctx context.Context, run *model
 
 	subject := failureSubject(run, stage)
 
-	h.emailClient.SendMail(ctx, &email.SendMailInput{
-		UsersIDs: userIDs,
-		Subject:  "Tharsis " + subject,
+	if err := h.emailEnqueuer.EnqueueEmail(ctx, &email.EnqueueEmailInput{
+		UserIDs: userIDs,
+		Subject: "Tharsis " + subject,
 		Builder: &builder.FailedRunEmail{
 			WorkspacePath: ws.FullPath,
 			Title:         cases.Title(language.English, cases.Compact).String(subject),
@@ -136,7 +134,11 @@ func (h *FailedRunEmailHandler) sendFailureEmail(ctx context.Context, run *model
 			RunID:         run.GetGlobalID(),
 			RunStage:      stage,
 		},
-	})
+	}); err != nil {
+		return errors.Wrap(err, "failed to enqueue failed-run email")
+	}
+
+	return nil
 }
 
 // failureSubject builds the run-failure subject text, distinguishing speculative,

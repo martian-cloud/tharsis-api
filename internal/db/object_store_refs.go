@@ -36,6 +36,7 @@ const (
 	ObjectStoreRefOwnerLogStreamChunk         ObjectStoreRefOwner = "log_stream_chunk_id"
 	ObjectStoreRefOwnerAgentSession           ObjectStoreRefOwner = "agent_session_id"
 	ObjectStoreRefOwnerPackageVersion         ObjectStoreRefOwner = "package_version_id"
+	ObjectStoreRefOwnerEmailOutboxItem        ObjectStoreRefOwner = "email_outbox_item_id"
 )
 
 // CreateObjectStoreRefInput is the input for creating an object store reference. AvailableAt is
@@ -161,6 +162,7 @@ func (r *objectStoreRefs) ClaimOrphanedRefs(ctx context.Context, limit uint) ([]
 		goqu.I("object_store_refs.provider_mirror_platform_id").IsNull(),
 		goqu.I("object_store_refs.agent_session_id").IsNull(),
 		goqu.I("object_store_refs.package_version_id").IsNull(),
+		goqu.I("object_store_refs.email_outbox_item_id").IsNull(),
 		goqu.I("object_store_refs.available_at").Lte(now),
 	)
 

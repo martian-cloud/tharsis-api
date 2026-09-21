@@ -806,7 +806,7 @@ func TestSigningKeyManager_rotateKey(t *testing.T) {
 				jwsPlugin:             mockJWSPlugin,
 				dbClient:              mockDBClient,
 				logger:                logger,
-				emailClient:           email.NewMockClient(t),
+				emailEnqueuer:         email.NewMockEnqueuer(t),
 				jwsProviderPluginType: "test-plugin",
 			}
 
@@ -990,7 +990,7 @@ func TestSigningKeyManager_checkForExpiredKey(t *testing.T) {
 				jwsPlugin:             mockJWSPlugin,
 				dbClient:              mockDBClient,
 				logger:                logger,
-				emailClient:           email.NewMockClient(t),
+				emailEnqueuer:         email.NewMockEnqueuer(t),
 				keyRotationPeriod:     6 * time.Hour,
 				jwsProviderPluginType: "test-plugin",
 			}
@@ -1031,6 +1031,7 @@ func TestSigningKeyManager_sendKeyDecommissionAlert(t *testing.T) {
 		emailClient    bool
 		setupMocks     func(*db.MockUsers)
 		expectSendMail bool
+		expectError    bool
 	}{
 		{
 			name:        "sends email to admin users",
@@ -1082,6 +1083,7 @@ func TestSigningKeyManager_sendKeyDecommissionAlert(t *testing.T) {
 				}).Return(nil, assert.AnError)
 			},
 			expectSendMail: false,
+			expectError:    true,
 		},
 	}
 
@@ -1095,16 +1097,16 @@ func TestSigningKeyManager_sendKeyDecommissionAlert(t *testing.T) {
 				Users: mockUsers,
 			}
 
-			var mockEmailClient email.Client
+			var mockEmailClient email.Enqueuer
 			if tc.emailClient {
-				mockEmail := email.NewMockClient(t)
+				mockEmail := email.NewMockEnqueuer(t)
 				if tc.expectSendMail {
-					mockEmail.On("SendMail", mock.Anything, mock.MatchedBy(func(input *email.SendMailInput) bool {
+					mockEmail.On("EnqueueEmail", mock.Anything, mock.MatchedBy(func(input *email.EnqueueEmailInput) bool {
 						return input.Subject == "Signing Key Decommissioning" &&
-							len(input.UsersIDs) == 2 &&
-							input.UsersIDs[0] == "admin-1" &&
-							input.UsersIDs[1] == "admin-2"
-					})).Return()
+							len(input.UserIDs) == 2 &&
+							input.UserIDs[0] == "admin-1" &&
+							input.UserIDs[1] == "admin-2"
+					})).Return(nil)
 				}
 				mockEmailClient = mockEmail
 			}
@@ -1113,12 +1115,17 @@ func TestSigningKeyManager_sendKeyDecommissionAlert(t *testing.T) {
 
 			manager := &signingKeyManager{
 				dbClient:                 mockDBClient,
-				emailClient:              mockEmailClient,
+				emailEnqueuer:            mockEmailClient,
 				logger:                   logger,
 				keyDecommissioningPeriod: 24 * time.Hour,
 			}
 
-			manager.sendKeyDecommissionAlert(ctx, decommissionedKey)
+			err := manager.sendKeyDecommissionAlert(ctx, decommissionedKey)
+			if tc.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }

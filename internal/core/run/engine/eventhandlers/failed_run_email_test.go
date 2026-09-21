@@ -2,9 +2,7 @@ package eventhandlers
 
 import (
 	"context"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -20,25 +18,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
-
-// fakeTaskManager is a tiny asynctask.Manager that records started tasks and runs
-// them synchronously, so tests can deterministically assert on the work performed
-// inside each task.
-type fakeTaskManager struct {
-	mu    sync.Mutex
-	count int
-}
-
-func (f *fakeTaskManager) StartTask(fn func(ctx context.Context)) {
-	f.mu.Lock()
-	f.count++
-	f.mu.Unlock()
-	fn(context.Background())
-}
-
-func (f *fakeTaskManager) Timeout() time.Duration { return time.Minute }
-
-func (f *fakeTaskManager) Shutdown() {}
 
 func TestGetFailedRuns(t *testing.T) {
 	runA := &models.Run{Metadata: models.ResourceMetadata{ID: "run-a"}}
@@ -184,15 +163,14 @@ func TestFailureSubject(t *testing.T) {
 
 func TestFailedRunEmailHandler_HandleRunChanges_SkipsAssessmentRuns(t *testing.T) {
 	logr, _ := logger.NewForTest()
-	taskMgr := &fakeTaskManager{}
 
 	// All mocks are constructed but should never be called for an assessment run.
 	mockWS := db.NewMockWorkspaces(t)
 	dbClient := &db.Client{Workspaces: mockWS}
-	emailClient := email.NewMockClient(t)
+	emailClient := email.NewMockEnqueuer(t)
 	notifMgr := namespace.NewMockNotificationManager(t)
 
-	handler := NewFailedRunEmailHandler(logr, dbClient, taskMgr, emailClient, notifMgr)
+	handler := NewFailedRunEmailHandler(logr, dbClient, emailClient, notifMgr)
 
 	changes := []types.RunChange{{
 		Run: &models.Run{
@@ -205,29 +183,28 @@ func TestFailedRunEmailHandler_HandleRunChanges_SkipsAssessmentRuns(t *testing.T
 	}}
 
 	require.NoError(t, handler.HandleRunChanges(context.Background(), changes))
-	assert.Equal(t, 0, taskMgr.count, "assessment runs must not schedule a task")
+	emailClient.AssertNotCalled(t, "EnqueueEmail", mock.Anything, mock.Anything)
 }
 
 func TestFailedRunEmailHandler_HandleRunChanges_SendsEmailPerFailedRun(t *testing.T) {
 	logr, _ := logger.NewForTest()
-	taskMgr := &fakeTaskManager{}
 
 	ws := &models.Workspace{FullPath: "group/ws"}
 
 	mockWS := db.NewMockWorkspaces(t)
 	mockWS.On("GetWorkspaceByID", mock.Anything, "ws-1").Return(ws, nil)
 
-	emailClient := email.NewMockClient(t)
-	emailClient.On("SendMail", mock.Anything, mock.MatchedBy(func(in *email.SendMailInput) bool {
-		return in.Subject == "Tharsis plan failed" && len(in.UsersIDs) == 1 && in.UsersIDs[0] == "user-1"
-	})).Return()
+	emailClient := email.NewMockEnqueuer(t)
+	emailClient.On("EnqueueEmail", mock.Anything, mock.MatchedBy(func(in *email.EnqueueEmailInput) bool {
+		return in.Subject == "Tharsis plan failed" && len(in.UserIDs) == 1 && in.UserIDs[0] == "user-1"
+	})).Return(nil)
 
 	notifMgr := namespace.NewMockNotificationManager(t)
 	notifMgr.On("GetUsersToNotify", mock.Anything, mock.Anything).Return([]string{"user-1"}, nil)
 
 	dbClient := &db.Client{Workspaces: mockWS}
 
-	handler := NewFailedRunEmailHandler(logr, dbClient, taskMgr, emailClient, notifMgr)
+	handler := NewFailedRunEmailHandler(logr, dbClient, emailClient, notifMgr)
 
 	changes := []types.RunChange{{
 		Run: &models.Run{
@@ -243,25 +220,24 @@ func TestFailedRunEmailHandler_HandleRunChanges_SendsEmailPerFailedRun(t *testin
 	}}
 
 	require.NoError(t, handler.HandleRunChanges(context.Background(), changes))
-	assert.Equal(t, 1, taskMgr.count, "one task should be scheduled per failed run")
+
 	emailClient.AssertExpectations(t)
 }
 
 func TestFailedRunEmailHandler_HandleRunChanges_NoUsersToNotifySkipsSend(t *testing.T) {
 	logr, _ := logger.NewForTest()
-	taskMgr := &fakeTaskManager{}
 
 	mockWS := db.NewMockWorkspaces(t)
 	mockWS.On("GetWorkspaceByID", mock.Anything, "ws-1").Return(&models.Workspace{FullPath: "group/ws"}, nil)
 
-	emailClient := email.NewMockClient(t) // SendMail must never be called.
+	emailClient := email.NewMockEnqueuer(t) // SendMail must never be called.
 
 	notifMgr := namespace.NewMockNotificationManager(t)
 	notifMgr.On("GetUsersToNotify", mock.Anything, mock.Anything).Return([]string{}, nil)
 
 	dbClient := &db.Client{Workspaces: mockWS}
 
-	handler := NewFailedRunEmailHandler(logr, dbClient, taskMgr, emailClient, notifMgr)
+	handler := NewFailedRunEmailHandler(logr, dbClient, emailClient, notifMgr)
 
 	changes := []types.RunChange{{
 		Run: &models.Run{
@@ -275,5 +251,5 @@ func TestFailedRunEmailHandler_HandleRunChanges_NoUsersToNotifySkipsSend(t *test
 	}}
 
 	require.NoError(t, handler.HandleRunChanges(context.Background(), changes))
-	assert.Equal(t, 1, taskMgr.count)
+
 }

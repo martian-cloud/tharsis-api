@@ -213,6 +213,21 @@ func IsDeadlineExceededError(err error) bool {
 	return errors.Is(err, context.DeadlineExceeded)
 }
 
+// FilterContextError returns nil if err is a context cancellation or deadline-exceeded error, which
+// background loops and subscriptions expect on shutdown; otherwise it returns err unchanged. This lets
+// callers write: if err := errors.FilterContextError(err); err != nil { ... }.
+func FilterContextError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if IsContextCanceledError(err) || IsDeadlineExceededError(err) {
+		return nil
+	}
+
+	return err
+}
+
 func interpretArgs(msg string, raw ...interface{}) (string, *config) {
 	// Build our args and options
 	var args []interface{}

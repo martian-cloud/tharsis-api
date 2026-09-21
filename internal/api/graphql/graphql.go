@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -55,6 +56,24 @@ func (c *contextGenerator) BuildContext(ctx context.Context, _ *http.Request) (c
 	ctx = c.loaders.Attach(ctx, options...)
 
 	return ctx, nil
+}
+
+// panicLogger logs recovered GraphQL panics at ERROR level with the stack trace as a structured field.
+type panicLogger struct {
+	logger logger.Logger
+}
+
+// LogPanic logs the recovered panic with the value and stack trace as separate structured fields.
+func (l *panicLogger) LogPanic(ctx context.Context, value any) {
+	l.logger.WithContextFields(ctx).Errorw("graphql panic recovered", "panic", value, "stack", string(debug.Stack()))
+}
+
+// panicHandler returns an internal error for a recovered GraphQL panic.
+type panicHandler struct{}
+
+// MakePanicError returns a QueryError whose EInternal error carries the panic value; the response loop sanitizes the client-facing message.
+func (*panicHandler) MakePanicError(_ context.Context, value any) *grapherrors.QueryError {
+	return &grapherrors.QueryError{Err: errors.New("panic occurred: %v", value)}
 }
 
 // The GraphQL handler handles GraphQL API requests over HTTP.
@@ -116,11 +135,15 @@ func NewGraphQL(
 	resolver.RegisterPackageLoader(loaderCollection)
 	resolver.RegisterPackageVersionLoader(loaderCollection)
 	resolver.RegisterCleanupPolicyLoader(loaderCollection)
+	resolver.RegisterEmailOutboxItemLoader(loaderCollection)
 
 	schema := graphql.MustParseSchema(schemaStr, resolver.NewRootResolver(), graphql.UseFieldResolvers(),
 		graphql.Tracer(&otel.Tracer{
 			Tracer: tracer,
 		}),
+		// panicLogger logs recovered panics with a stack field; panicHandler returns the sanitized error.
+		graphql.Logger(&panicLogger{logger: logger}),
+		graphql.PanicHandler(&panicHandler{}),
 		graphql.SubscribeResolverTimeout(time.Second*10),
 	)
 

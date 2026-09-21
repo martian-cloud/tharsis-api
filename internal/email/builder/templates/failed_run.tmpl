@@ -49,7 +49,7 @@
 {{end}}
 
 <a class="primary-button" style="margin-top: 24px;"
-    href="{{.common.FrontendURL}}/groups/{{.this.WorkspacePath}}/-/runs/{{.this.RunID}}/{{.this.RunStage}}"
+    href="{{.common.FrontendURL}}/groups/{{.this.WorkspacePath}}/-/runs/{{.this.RunID}}/{{.this.RunStage}}{{if .common.RecipientTokenPlaceholder}}?rid={{.common.RecipientTokenPlaceholder}}{{end}}"
     target="_blank">
     <span class="primary-button-text">
         View Run

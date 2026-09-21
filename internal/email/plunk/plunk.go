@@ -41,9 +41,9 @@ func NewProvider(logger logger.Logger, endpoint string, apiKey string) email.Pro
 	}
 }
 
-func (p *plunkProvider) SendMail(ctx context.Context, to []string, subject, body string) error {
+func (p *plunkProvider) SendMail(ctx context.Context, to, subject, body, _ string) error {
 	payload, err := json.Marshal(&sendEmailPayload{
-		To:      to,
+		To:      []string{to},
 		Subject: subject,
 		Body:    body,
 	})

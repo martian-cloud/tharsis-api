@@ -504,7 +504,7 @@ func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsI
 		for {
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
-				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
+				if errors.FilterContextError(err) != nil {
 					s.logger.WithContextFields(ctx).Errorf("error occurred while waiting for job events: %v", err)
 				}
 				return
@@ -528,7 +528,7 @@ func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsI
 
 			job, err := s.dbClient.Jobs.GetJobByID(ctx, event.ID)
 			if err != nil {
-				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
+				if errors.FilterContextError(err) != nil {
 					s.logger.WithContextFields(ctx).Errorf("error querying for job in subscription goroutine: %v", err)
 				}
 				continue
@@ -609,7 +609,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 		for {
 			event, err := subscriber.GetEvent(innerCtx)
 			if err != nil {
-				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
+				if errors.FilterContextError(err) != nil {
 					s.logger.WithContextFields(innerCtx).Errorf("%v", errors.Wrap(err, "Error occurred while waiting for job cancellation events", errors.WithSpan(innerSpan)))
 				}
 				return

@@ -1,0 +1,43 @@
+enum EmailOutboxItemSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+enum EmailOutboxItemStatus {
+  PREPARING
+  READY
+  COMPLETED
+  FAILED
+}
+
+type EmailOutboxItem implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  emailType: String!
+  subject: String!
+  ephemeral: Boolean!
+  status: EmailOutboxItemStatus!
+  recipientStats: EmailRecipientStats! @complexity(value: 5)
+  recipients(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: EmailRecipientSort
+    deliveryStatuses: [EmailDeliveryStatus!]
+    hasOpened: Boolean
+    hasIssues: Boolean
+    search: String
+  ): EmailRecipientConnection!
+}
+
+type EmailOutboxItemConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [EmailOutboxItemEdge]
+}
+
+type EmailOutboxItemEdge {
+  cursor: String!
+  node: EmailOutboxItem
+}

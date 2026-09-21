@@ -7,7 +7,6 @@ import (
 	"context"
 	"strings"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -70,25 +69,22 @@ type Service interface {
 type service struct {
 	logger              logger.Logger
 	dbClient            *db.Client
-	emailClient         email.Client
+	emailEnqueuer       email.Enqueuer
 	notificationManager namespace.NotificationManager
-	asyncTaskManager    asynctask.Manager
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	emailClient email.Client,
+	emailEnqueuer email.Enqueuer,
 	notificationManager namespace.NotificationManager,
-	asyncTaskManager asynctask.Manager,
 ) Service {
 	return &service{
 		logger:              logger,
 		dbClient:            dbClient,
-		emailClient:         emailClient,
+		emailEnqueuer:       emailEnqueuer,
 		notificationManager: notificationManager,
-		asyncTaskManager:    asyncTaskManager,
 	}
 }
 
@@ -373,15 +369,6 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
-	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
-	}
-
-	s.logger.WithContextFields(ctx).Infow("Created a namespace membership.",
-		"namespaceMembershipID", namespaceMembership.Metadata.ID,
-		"namespacePath", input.NamespacePath,
-	)
-
 	if !skipEmailNotification {
 		emailInput := &sendMembershipChangeEmailInput{
 			membership:   namespaceMembership,
@@ -390,12 +377,19 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 			isCustomRole: !models.DefaultRoleID(role.Metadata.ID).IsDefaultRole(),
 			caller:       caller,
 		}
-		s.asyncTaskManager.StartTask(func(ctx context.Context) {
-			if err := s.sendMembershipChangeEmail(ctx, emailInput); err != nil {
-				s.logger.Errorf("failed to send membership change email: %v", err)
-			}
-		})
+		if err := s.sendMembershipChangeEmail(txContext, emailInput); err != nil {
+			return nil, errors.Wrap(err, "failed to send membership change email", errors.WithSpan(span))
+		}
 	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Created a namespace membership.",
+		"namespaceMembershipID", namespaceMembership.Metadata.ID,
+		"namespacePath", input.NamespacePath,
+	)
 
 	return namespaceMembership, nil
 }
@@ -481,15 +475,6 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 		return nil, errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
-	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
-	}
-
-	s.logger.WithContextFields(ctx).Infow("Updated a namespace membership.",
-		"namespaceMembershipID", updatedNamespaceMembership.Metadata.ID,
-		"namespacePath", updatedNamespaceMembership.Namespace.Path,
-	)
-
 	// skip if caller is modifying their own membership
 	if !callerIsMembershipSubject(caller, updatedNamespaceMembership.UserID) {
 		input := &sendMembershipChangeEmailInput{
@@ -501,12 +486,19 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 			isPrevCustomRole: !models.DefaultRoleID(prevRole.Metadata.ID).IsDefaultRole(),
 			caller:           caller,
 		}
-		s.asyncTaskManager.StartTask(func(ctx context.Context) {
-			if err := s.sendMembershipChangeEmail(ctx, input); err != nil {
-				s.logger.Errorf("failed to send membership change email: %v", err)
-			}
-		})
+		if err := s.sendMembershipChangeEmail(txContext, input); err != nil {
+			return nil, errors.Wrap(err, "failed to send membership change email", errors.WithSpan(span))
+		}
 	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Updated a namespace membership.",
+		"namespaceMembershipID", updatedNamespaceMembership.Metadata.ID,
+		"namespacePath", updatedNamespaceMembership.Namespace.Path,
+	)
 
 	return updatedNamespaceMembership, nil
 }
@@ -565,6 +557,19 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
 
+	// skip if caller is modifying their own membership
+	if !callerIsMembershipSubject(caller, namespaceMembership.UserID) {
+		input := &sendMembershipChangeEmailInput{
+			membership: namespaceMembership,
+			action:     builder.MembershipChangeActionRemoved,
+			caller:     caller,
+		}
+
+		if err := s.sendMembershipChangeEmail(txContext, input); err != nil {
+			return errors.Wrap(err, "failed to send membership change email", errors.WithSpan(span))
+		}
+	}
+
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
@@ -573,20 +578,6 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 		"namespaceMembershipID", namespaceMembership.Metadata.ID,
 		"namespacePath", namespaceMembership.Namespace.Path,
 	)
-
-	// skip if caller is modifying their own membership
-	if !callerIsMembershipSubject(caller, namespaceMembership.UserID) {
-		input := &sendMembershipChangeEmailInput{
-			membership: namespaceMembership,
-			action:     builder.MembershipChangeActionRemoved,
-			caller:     caller,
-		}
-		s.asyncTaskManager.StartTask(func(ctx context.Context) {
-			if err := s.sendMembershipChangeEmail(ctx, input); err != nil {
-				s.logger.Errorf("failed to send membership change email: %v", err)
-			}
-		})
-	}
 
 	return nil
 }
@@ -715,11 +706,13 @@ func (s *service) sendMembershipChangeEmail(ctx context.Context, input *sendMemb
 		IsWorkspace:             membership.Namespace.WorkspaceID != nil,
 	}
 
-	s.emailClient.SendMail(ctx, &email.SendMailInput{
-		UsersIDs: usersToNotify,
-		Subject:  emailBuilder.Subject(),
-		Builder:  emailBuilder,
-	})
+	if err := s.emailEnqueuer.EnqueueEmail(ctx, &email.EnqueueEmailInput{
+		UserIDs: usersToNotify,
+		Subject: emailBuilder.Subject(),
+		Builder: emailBuilder,
+	}); err != nil {
+		return errors.Wrap(err, "failed to enqueue membership change email")
+	}
 
 	return nil
 }

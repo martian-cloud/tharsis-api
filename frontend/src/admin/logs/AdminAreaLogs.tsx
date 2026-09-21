@@ -3,18 +3,11 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import {
     Alert,
     Box,
-    Checkbox,
     Chip,
     CircularProgress,
     Collapse,
-    FormControl,
-    InputLabel,
     List,
-    ListItemText,
-    MenuItem,
     Paper,
-    Select,
-    SelectChangeEvent,
     Switch,
     Table,
     TableBody,
@@ -22,11 +15,13 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    ToggleButton,
+    ToggleButtonGroup,
     Typography,
     useMediaQuery,
     useTheme,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { Theme, alpha } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import throttle from 'lodash.throttle';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -106,6 +101,14 @@ function levelColor(level: string): 'default' | 'success' | 'info' | 'warning' |
         case 'error': case 'fatal': case 'dpanic': case 'panic': return 'error';
         default: return 'default';
     }
+}
+
+// levelPaletteColor resolves a level to a concrete palette color for the selected toggle fill.
+// DEBUG has no semantic severity; info.main is itself a near-white grey in this theme, so DEBUG
+// uses a solid mid-grey to stay clearly distinct from INFO.
+function levelPaletteColor(theme: Theme, level: string): string {
+    const c = levelColor(level);
+    return c === 'default' ? theme.palette.grey[600] : theme.palette[c].main;
 }
 
 // matchesFilter mirrors the server's Matches; guards the live stream during resubscribes.
@@ -419,13 +422,11 @@ function AdminAreaLogsContent() {
 
     useEffect(() => () => { refetch.cancel(); }, [refetch]);
 
-    const onLevelsChange = (event: SelectChangeEvent<AdminLogTailLevel[]>) => {
-        const value = event.target.value;
-        const newLevels = (typeof value === 'string' ? value.split(',') : value) as AdminLogTailLevel[];
+    // applyLevels sets the level filter and applies it immediately (no search throttle wait).
+    const applyLevels = (newLevels: AdminLogTailLevel[]) => {
         setLevels(newLevels);
         pendingLiveEntries.current = [];
         setLiveEntries([]);
-        // Apply level immediately rather than waiting out the search throttle.
         refetch(newLevels, search);
         refetch.flush();
     };
@@ -550,24 +551,36 @@ function AdminAreaLogsContent() {
                     flexDirection={mobile ? 'column' : 'row'}
                     alignItems={mobile ? 'stretch' : 'center'}
                 >
-                    <FormControl size="small" sx={{ minWidth: 160 }}>
-                        <InputLabel shrink>Levels</InputLabel>
-                        <Select
-                            multiple
-                            displayEmpty
+                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                        <Typography variant="body2" color="textSecondary" sx={{ mr: 0.5 }}>Levels</Typography>
+                        <ToggleButtonGroup
+                            size="small"
                             value={levels}
-                            label="Levels"
-                            onChange={onLevelsChange}
-                            renderValue={(selected) => (selected.length ? selected.join(', ') : 'All')}
+                            onChange={(_event, newLevels: AdminLogTailLevel[]) => applyLevels(newLevels)}
+                            aria-label="log level filter"
                         >
-                            {LOG_LEVELS.map(l => (
-                                <MenuItem key={l} value={l}>
-                                    <Checkbox checked={levels.includes(l)} size="small" />
-                                    <ListItemText primary={l} />
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
+                            {LOG_LEVELS.map(l => {
+                                const paletteColor = levelPaletteColor(theme, l);
+                                return (
+                                    <ToggleButton
+                                        key={l}
+                                        value={l}
+                                        aria-label={l}
+                                        sx={{
+                                            px: 1.5,
+                                            '&.Mui-selected': {
+                                                color: theme.palette.getContrastText(paletteColor),
+                                                backgroundColor: paletteColor,
+                                                '&:hover': { backgroundColor: paletteColor },
+                                            },
+                                        }}
+                                    >
+                                        {l}
+                                    </ToggleButton>
+                                );
+                            })}
+                        </ToggleButtonGroup>
+                    </Box>
 
                     <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', justifyContent: mobile ? 'flex-start' : 'center' }}>
                         <SearchInput

@@ -140,6 +140,9 @@ type Client struct {
 	CleanupPolicies                  CleanupPolicies
 	WorkspaceRoleBindings            WorkspaceRoleBindings
 	Namespaces                       Namespaces
+	EmailOutboxItems                 EmailOutboxItems
+	EmailRecipients                  EmailRecipients
+	EmailSuppressions                EmailSuppressions
 }
 
 // NewClient creates a new Client
@@ -271,6 +274,9 @@ func NewClient(
 	dbClient.CleanupPolicies = NewCleanupPolicies(dbClient)
 	dbClient.WorkspaceRoleBindings = NewWorkspaceRoleBindings(dbClient)
 	dbClient.Namespaces = NewNamespaces(dbClient)
+	dbClient.EmailOutboxItems = NewEmailOutboxItems(dbClient)
+	dbClient.EmailRecipients = NewEmailRecipients(dbClient)
+	dbClient.EmailSuppressions = NewEmailSuppressions(dbClient)
 
 	return dbClient, nil
 }

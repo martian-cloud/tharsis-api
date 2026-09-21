@@ -1,6 +1,10 @@
 package builder
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/vmihailenco/msgpack/v5"
+)
 
 // MembershipChangeAction represents the type of namespace membership change
 type MembershipChangeAction string
@@ -86,8 +90,17 @@ func (e *MembershipChangeEmail) Build(templateCtx *TemplateContext) (string, err
 	return templateCtx.WrapInBaseTemplate(html)
 }
 
-// InitFromData creates the builder from raw data
-func (e *MembershipChangeEmail) InitFromData(data []byte) error {
+// InitFromMsgpack populates the builder from the stored msgpack payload.
+func (e *MembershipChangeEmail) InitFromMsgpack(data []byte) error {
+	if len(data) == 0 {
+		return nil
+	}
+
+	return msgpack.Unmarshal(data, e)
+}
+
+// InitFromJSON populates the builder from JSON for the email preview tool.
+func (e *MembershipChangeEmail) InitFromJSON(data []byte) error {
 	if len(data) == 0 {
 		return nil
 	}

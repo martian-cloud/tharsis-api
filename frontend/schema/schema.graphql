@@ -592,6 +592,7 @@ type Config {
   disableSensitiveVariableFeature: Boolean!
   emailClientPluginData: [KeyValueEntry!]!
   emailClientPluginType: String!
+  emailEphemeralRetentionDays: Int!
   emailFooter: String
   federatedRegistryTrustPolicies: [FederatedRegistryTrustPolicy!]!
   httpRateLimit: Int!
@@ -679,8 +680,10 @@ type CreateAgentSessionPayload {
 input CreateAnnouncementInput {
   clientMutationId: String
   dismissible: Boolean!
+  emailSubject: String
   endTime: Time
   message: String!
+  sendEmail: Boolean!
   startTime: Time
   type: AnnouncementType!
 }
@@ -951,12 +954,6 @@ type CreateSCIMTokenPayload {
   tokenText: String
 }
 
-type SCIMToken implements Node {
-  createdBy: String!
-  id: ID!
-  metadata: ResourceMetadata!
-}
-
 input CreateServiceAccountInput {
   clientMutationId: String
   clientSecretExpiresAt: Time
@@ -1221,6 +1218,18 @@ input DeleteCleanupPolicyInput {
   clientMutationId: String
   id: ID!
   metadata: ResourceMetadataInput
+}
+
+input DeleteEmailSuppressionInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+}
+
+type DeleteEmailSuppressionPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  suppression: EmailSuppression
 }
 
 input DeleteFederatedRegistryInput {
@@ -1532,6 +1541,118 @@ input DiscardRunInput {
   runId: String!
 }
 
+enum EmailDeliveryStatus {
+  ABANDONED
+  ACCEPTED
+  COMPLETED
+  DELAYED
+  FAILED
+  HARD_BOUNCED
+  PENDING
+  SOFT_BOUNCED
+}
+
+type EmailOutboxItem implements Node {
+  emailType: String!
+  ephemeral: Boolean!
+  id: ID!
+  metadata: ResourceMetadata!
+  recipientStats: EmailRecipientStats!
+  recipients(after: String, before: String, deliveryStatuses: [EmailDeliveryStatus!], first: Int, hasIssues: Boolean, hasOpened: Boolean, last: Int, search: String, sort: EmailRecipientSort): EmailRecipientConnection!
+  status: EmailOutboxItemStatus!
+  subject: String!
+}
+
+type EmailOutboxItemConnection {
+  edges: [EmailOutboxItemEdge]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type EmailOutboxItemEdge {
+  cursor: String!
+  node: EmailOutboxItem
+}
+
+enum EmailOutboxItemSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+enum EmailOutboxItemStatus {
+  COMPLETED
+  FAILED
+  PREPARING
+  READY
+}
+
+type EmailRecipient implements Node {
+  address: String!
+  attemptCount: Int!
+  availableAt: Time!
+  clickedAt: Time
+  complainedAt: Time
+  deliveryStatus: EmailDeliveryStatus!
+  failureReason: String
+  id: ID!
+  lastAttemptAt: Time
+  metadata: ResourceMetadata!
+  openedAt: Time
+  outboxItem: EmailOutboxItem!
+}
+
+type EmailRecipientConnection {
+  edges: [EmailRecipientEdge]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type EmailRecipientEdge {
+  cursor: String!
+  node: EmailRecipient
+}
+
+enum EmailRecipientSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+type EmailRecipientStats {
+  clicked: Int!
+  delivered: Int!
+  issues: Int!
+  opened: Int!
+  total: Int!
+}
+
+type EmailSuppression implements Node {
+  address: String!
+  cause: EmailSuppressionCause!
+  id: ID!
+  metadata: ResourceMetadata!
+}
+
+enum EmailSuppressionCause {
+  COMPLAINT
+  HARD_BOUNCE
+}
+
+type EmailSuppressionConnection {
+  edges: [EmailSuppressionEdge]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type EmailSuppressionEdge {
+  cursor: String!
+  node: EmailSuppression
+}
+
+enum EmailSuppressionSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
 input EnableMaintenanceModeInput {
   clientMutationId: String
 }
@@ -1702,6 +1823,10 @@ type Job implements Node {
   logs(limit: Int!, startOffset: Int!): String!
   maxJobDuration: Int!
   metadata: ResourceMetadata!
+
+  """
+  OPA-specific data, or null for a plan/apply job, which has no owning policy check.
+  """
   opaData: JobOPAData
   outdatedJobProtocolVersion: Boolean!
   properties: [KeyValueEntry!]!
@@ -1758,6 +1883,9 @@ input JobLogStreamSubscriptionInput {
 }
 
 type JobOPAData {
+  """
+  The run stage this job's policy check evaluates at (e.g. PRE_PLAN, POST_PLAN).
+  """
   taskStageName: RunTaskStageName
 }
 
@@ -1920,6 +2048,17 @@ enum ManagedIdentitySort {
   UPDATED_AT_DESC
 }
 
+input MarkEmailRecipientClickedInput {
+  clientMutationId: String
+  recipientId: ID!
+}
+
+type MarkEmailRecipientClickedPayload {
+  clientMutationId: String
+  emailRecipient: EmailRecipient
+  problems: [Problem!]!
+}
+
 union MeResponse = ServiceAccount | User
 
 union Member = ServiceAccount | Team | User
@@ -1950,6 +2089,24 @@ type MigrateWorkspacePayload {
   clientMutationId: String
   problems: [Problem!]!
   workspace: Workspace
+}
+
+type ModuleAttestationPolicyData {
+  enforcementLevel: PolicyEnforcementLevel!
+  predicateType: String
+  publicKey: String!
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
+  stage: PolicyStage!
+  verifyStateLineage: Boolean!
+}
+
+input ModuleAttestationPolicyDataInput {
+  enforcementLevel: PolicyEnforcementLevel!
+  predicateType: String
+  publicKey: String!
+  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
+  stage: PolicyStage!
+  verifyStateLineage: Boolean!
 }
 
 input MoveManagedIdentityInput {
@@ -2020,6 +2177,7 @@ type Mutation {
   deactivateAdminMode(input: DeactivateAdminModeInput!): UpdateUserAdminStatusPayload!
   deleteAnnouncement(input: DeleteAnnouncementInput!): DeleteAnnouncementPayload!
   deleteCleanupPolicy(input: DeleteCleanupPolicyInput!): CleanupPolicyMutationPayload!
+  deleteEmailSuppression(input: DeleteEmailSuppressionInput!): DeleteEmailSuppressionPayload!
   deleteFederatedRegistry(input: DeleteFederatedRegistryInput!): FederatedRegistryMutationPayload!
   deleteGPGKey(input: DeleteGPGKeyInput!): DeleteGPGKeyPayload!
   deleteGroup(input: DeleteGroupInput!): DeleteGroupPayload!
@@ -2053,6 +2211,7 @@ type Mutation {
   enableMaintenanceMode(input: EnableMaintenanceModeInput!): EnableMaintenanceModePayload!
   favoriteNamespace(input: NamespaceFavoriteInput!): NamespaceFavoriteMutationPayload!
   lockWorkspace(input: LockWorkspaceInput!): LockWorkspacePayload!
+  markEmailRecipientClicked(input: MarkEmailRecipientClickedInput!): MarkEmailRecipientClickedPayload!
   migrateGroup(input: MigrateGroupInput!): MigrateGroupPayload!
   migrateWorkspace(input: MigrateWorkspaceInput!): MigrateWorkspacePayload!
   moveManagedIdentity(input: MoveManagedIdentityInput!): MoveManagedIdentityPayload!
@@ -2310,15 +2469,6 @@ input OIDCTrustPolicyInput {
   issuer: String!
 }
 
-type ModuleAttestationPolicyData {
-  enforcementLevel: PolicyEnforcementLevel!
-  predicateType: String
-  publicKey: String!
-  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
-  stage: PolicyStage!
-  verifyStateLineage: Boolean!
-}
-
 type OPAPolicyData {
   enforcementLevel: PolicyEnforcementLevel!
   packageDigest: String
@@ -2326,15 +2476,6 @@ type OPAPolicyData {
   packageVersionConstraint: String
   speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
   stage: PolicyStage!
-}
-
-input ModuleAttestationPolicyDataInput {
-  enforcementLevel: PolicyEnforcementLevel!
-  predicateType: String
-  publicKey: String!
-  speculativeRunEnforcementLevel: SpeculativeRunEnforcementLevel!
-  stage: PolicyStage!
-  verifyStateLineage: Boolean!
 }
 
 input OPAPolicyDataInput {
@@ -2716,6 +2857,8 @@ type Query {
   availableRolePermissions: [String!]!
   config: Config!
   configurationVersion(id: String!): ConfigurationVersion @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
+  emailOutboxItems(after: String, before: String, ephemeral: Boolean, first: Int, last: Int, sort: EmailOutboxItemSort, subjectSearch: String): EmailOutboxItemConnection!
+  emailSuppressions(addresses: [String!], after: String, before: String, first: Int, last: Int, search: String, sort: EmailSuppressionSort): EmailSuppressionConnection!
   group(fullPath: String!): Group @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
   groups(after: String, before: String, favorites: Boolean, first: Int, last: Int, parentId: String, parentPath: String, search: String, sort: GroupSort): GroupConnection!
   job(id: String!): Job @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
@@ -3019,8 +3162,8 @@ enum RunGateStatus {
 }
 
 enum RunGateType {
-  OPA_POLICY
   MODULE_ATTESTATION
+  OPA_POLICY
 }
 
 type RunMutationPayload {
@@ -3238,6 +3381,12 @@ enum RunnerSort {
 enum RunnerType {
   group
   shared
+}
+
+type SCIMToken implements Node {
+  createdBy: String!
+  id: ID!
+  metadata: ResourceMetadata!
 }
 
 input SaveJobLogsInput {

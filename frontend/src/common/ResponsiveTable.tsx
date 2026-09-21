@@ -61,7 +61,7 @@ export function ResponsiveTable({ columns, children, ariaLabel, minWidth, breakp
                     <TableHead>
                         <TableRow>
                             {columns.map((column, index) => (
-                                <TableCell key={index} align={column.align}>{column.label}</TableCell>
+                                <TableCell key={index} align={column.align} sx={{ whiteSpace: 'nowrap' }}>{column.label}</TableCell>
                             ))}
                         </TableRow>
                     </TableHead>
@@ -85,12 +85,19 @@ export interface ResponsiveCell {
 
 interface ResponsiveRowProps {
     cells: ResponsiveCell[];
+    // onClick makes the whole row/card interactive; when set, the row shows a pointer cursor and hover.
+    onClick?: () => void;
 }
 
 // ResponsiveRow renders a single record as a table row (desktop) or a card (mobile), based on the
 // surrounding ResponsiveTable.
-export function ResponsiveRow({ cells }: ResponsiveRowProps) {
+export function ResponsiveRow({ cells, onClick }: ResponsiveRowProps) {
     const card = useContext(CardModeContext);
+
+    // Empty (null/undefined) content in a data cell renders an em dash so a missing value reads as
+    // "no value" rather than a blank gap. Primary, action, and footer cells are left as-is.
+    const dataContent = (cell: ResponsiveCell): ReactNode =>
+        cell.content ?? <Typography variant="body2" color="textSecondary">—</Typography>;
 
     if (card) {
         // Primary content goes top-left, label-less cells (actions) top-right, labeled fields stack below.
@@ -100,7 +107,16 @@ export function ResponsiveRow({ cells }: ResponsiveRowProps) {
         const footerCells = cells.filter((cell) => cell.footer);
 
         return (
-            <Paper variant="outlined" sx={{ p: 2, overflowWrap: 'anywhere', backgroundColor: 'transparent' }}>
+            <Paper
+                variant="outlined"
+                onClick={onClick}
+                sx={{
+                    p: 2,
+                    overflowWrap: 'anywhere',
+                    backgroundColor: 'transparent',
+                    ...(onClick ? { cursor: 'pointer', '&:hover': { borderColor: 'primary.main' } } : {}),
+                }}
+            >
                 <Stack spacing={1}>
                     {(primaryCells.length > 0 || actionCells.length > 0) && (
                         <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={2}>
@@ -117,7 +133,7 @@ export function ResponsiveRow({ cells }: ResponsiveRowProps) {
                     {labeledCells.map((cell, index) => (
                         <Box key={index} display="flex" alignItems="center" gap={1} sx={{ minWidth: 0 }}>
                             <Typography variant="body2" color="textSecondary" sx={{ minWidth: 100, flexShrink: 0 }}>{cell.label}</Typography>
-                            <Box sx={{ minWidth: 0 }}>{cell.content}</Box>
+                            <Box sx={{ minWidth: 0 }}>{dataContent(cell)}</Box>
                         </Box>
                     ))}
                     {footerCells.length > 0 && (
@@ -131,9 +147,16 @@ export function ResponsiveRow({ cells }: ResponsiveRowProps) {
     }
 
     return (
-        <TableRow sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+        <TableRow
+            hover={!!onClick}
+            onClick={onClick}
+            sx={{
+                '&:last-child td, &:last-child th': { border: 0 },
+                ...(onClick ? { cursor: 'pointer' } : {}),
+            }}
+        >
             {cells.map((cell, index) => (
-                <TableCell key={index} align={cell.align}>{cell.content}</TableCell>
+                <TableCell key={index} align={cell.align}>{dataContent(cell)}</TableCell>
             ))}
         </TableRow>
     );

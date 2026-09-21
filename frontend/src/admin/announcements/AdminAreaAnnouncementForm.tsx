@@ -15,6 +15,8 @@ export interface FormData {
     dismissible: boolean;
     startTime: Moment | null;
     endTime: Moment | null;
+    sendEmail: boolean;
+    emailSubject: string;
 }
 
 interface Props {
@@ -31,7 +33,7 @@ const TYPE_OPTIONS: { value: AnnouncementType; label: string; description: strin
     { value: 'ERROR', label: 'Error', description: 'Critical issues or system problems' }
 ];
 
-function AdminAreaAnnouncementForm({ data, onChange, error }: Props) {
+function AdminAreaAnnouncementForm({ data, onChange, editMode, error }: Props) {
     const onStartTimeChange = (date: Moment | null) => {
         onChange({ ...data, startTime: date });
     };
@@ -208,6 +210,50 @@ function AdminAreaAnnouncementForm({ data, onChange, error }: Props) {
                         }
                     />
                 </Box>
+
+                {!editMode && (
+                    <Box sx={{ mt: 3 }}>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={data.sendEmail}
+                                    onChange={event => onChange({ ...data, sendEmail: event.target.checked })}
+                                    color="primary"
+                                />
+                            }
+                            label={
+                                <Box>
+                                    <Typography variant="body2">
+                                        Email all active users
+                                    </Typography>
+                                    <Typography variant="caption" color="textSecondary">
+                                        {!data.sendEmail
+                                            ? "This announcement will only appear in the app"
+                                            : data.startTime?.isValid() && data.startTime.isAfter(moment())
+                                                ? "Every active user will be emailed this announcement at its start time"
+                                                : "Every active user will be emailed this announcement immediately"
+                                        }
+                                    </Typography>
+                                </Box>
+                            }
+                        />
+                        {data.sendEmail && (
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="body2" gutterBottom>
+                                    Email Subject (Optional)
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    autoComplete="off"
+                                    size="small"
+                                    placeholder="New Tharsis Announcement"
+                                    value={data.emailSubject}
+                                    onChange={event => onChange({ ...data, emailSubject: event.target.value })}
+                                />
+                            </Box>
+                        )}
+                    </Box>
+                )}
             </Box>
         </Box>
     );

@@ -274,7 +274,7 @@ func newEmailProvider(ctx context.Context, logger logger.Logger, pluginType stri
 			return nil, errors.New("'region' is required when using the ses email client plugin")
 		}
 
-		sesClient, err := ses.NewProvider(ctx, logger, fromAddress, awsConfigSetName, region)
+		sesClient, err := ses.NewProvider(ctx, logger, fromAddress, awsConfigSetName, region, pluginData["sqs_queue_url"], pluginData["feedback_queue_filter"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to load ses email plugin: %v", err)
 		}

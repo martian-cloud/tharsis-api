@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<74d5296459818b256c4735008c050ebe>>
+ * @generated SignedSource<<2233cdfb6004e75aef776bf8b3388c99>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -37,6 +37,7 @@ export type AdminAreaConfigurationSettingsQuery$data = {
       readonly value: string;
     }>;
     readonly emailClientPluginType: string;
+    readonly emailEphemeralRetentionDays: number;
     readonly emailFooter: string | null | undefined;
     readonly federatedRegistryTrustPolicies: ReadonlyArray<{
       readonly audience: string | null | undefined;
@@ -382,6 +383,13 @@ v2 = [
         "alias": null,
         "args": null,
         "kind": "ScalarField",
+        "name": "emailEphemeralRetentionDays",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
         "name": "objectStorePluginType",
         "storageKey": null
       },
@@ -700,16 +708,16 @@ return {
     "selections": (v2/*: any*/)
   },
   "params": {
-    "cacheID": "bcef3153aa7829882e5f29c8612546f0",
+    "cacheID": "058b0a58483aa7591810c5cb907235b5",
     "id": null,
     "metadata": {},
     "name": "AdminAreaConfigurationSettingsQuery",
     "operationKind": "query",
-    "text": "query AdminAreaConfigurationSettingsQuery {\n  config {\n    serverPort\n    tharsisApiUrl\n    tharsisUiUrl\n    tharsisSupportUrl\n    serviceDiscoveryHost\n    corsAllowedOrigins\n    tlsEnabled\n    httpRateLimit\n    jwtIssuerUrl\n    oidcInternalIdentityProviderClientID\n    cliLoginOIDCClientID\n    cliLoginOIDCScopes\n    oauthProviders {\n      issuerUrl\n      clientId\n      usernameClaim\n      scope\n    }\n    userSessionAccessTokenExpirationMinutes\n    userSessionRefreshTokenExpirationMinutes\n    userSessionMaxSessionsPerUser\n    maxGraphQlComplexity\n    moduleRegistryMaxUploadSize\n    asyncTaskTimeout\n    vcsRepositorySizeLimit\n    serviceAccountClientSecretMaxExpirationDays\n    terraformCliVersionConstraint\n    workspaceAssessmentIntervalHours\n    workspaceAssessmentRunLimit\n    asymmetricSigningKeyRotationPeriodDays\n    asymmetricSigningKeyDecommissionPeriodDays\n    aiEnabled\n    disableSensitiveVariableFeature\n    emailFooter\n    objectStorePluginType\n    rateLimitStorePluginType\n    jwsProviderPluginType\n    secretManagerPluginType\n    emailClientPluginType\n    adminLogTailStorePluginType\n    objectStorePluginData {\n      key\n      value\n    }\n    rateLimitStorePluginData {\n      key\n      value\n    }\n    jwsProviderPluginData {\n      key\n      value\n    }\n    secretManagerPluginData {\n      key\n      value\n    }\n    emailClientPluginData {\n      key\n      value\n    }\n    adminLogTailStorePluginData {\n      key\n      value\n    }\n    dbHost\n    dbName\n    dbSslMode\n    dbPort\n    dbMaxConnections\n    dbAutoMigrateEnabled\n    tlsCertFile\n    tlsKeyFile\n    adminUserEmail\n    otelTraceEnabled\n    otelTraceType\n    otelTraceCollectorHost\n    otelTraceCollectorPort\n    federatedRegistryTrustPolicies {\n      issuerUrl\n      subject\n      audience\n      groupGlobPatterns\n    }\n    internalRunners {\n      name\n      jobDispatcherType\n      jobDispatcherData {\n        key\n        value\n      }\n    }\n    mcpServerConfig {\n      enabledToolsets\n      enabledTools\n      readOnly\n    }\n    sensitiveFields\n  }\n}\n"
+    "text": "query AdminAreaConfigurationSettingsQuery {\n  config {\n    serverPort\n    tharsisApiUrl\n    tharsisUiUrl\n    tharsisSupportUrl\n    serviceDiscoveryHost\n    corsAllowedOrigins\n    tlsEnabled\n    httpRateLimit\n    jwtIssuerUrl\n    oidcInternalIdentityProviderClientID\n    cliLoginOIDCClientID\n    cliLoginOIDCScopes\n    oauthProviders {\n      issuerUrl\n      clientId\n      usernameClaim\n      scope\n    }\n    userSessionAccessTokenExpirationMinutes\n    userSessionRefreshTokenExpirationMinutes\n    userSessionMaxSessionsPerUser\n    maxGraphQlComplexity\n    moduleRegistryMaxUploadSize\n    asyncTaskTimeout\n    vcsRepositorySizeLimit\n    serviceAccountClientSecretMaxExpirationDays\n    terraformCliVersionConstraint\n    workspaceAssessmentIntervalHours\n    workspaceAssessmentRunLimit\n    asymmetricSigningKeyRotationPeriodDays\n    asymmetricSigningKeyDecommissionPeriodDays\n    aiEnabled\n    disableSensitiveVariableFeature\n    emailFooter\n    emailEphemeralRetentionDays\n    objectStorePluginType\n    rateLimitStorePluginType\n    jwsProviderPluginType\n    secretManagerPluginType\n    emailClientPluginType\n    adminLogTailStorePluginType\n    objectStorePluginData {\n      key\n      value\n    }\n    rateLimitStorePluginData {\n      key\n      value\n    }\n    jwsProviderPluginData {\n      key\n      value\n    }\n    secretManagerPluginData {\n      key\n      value\n    }\n    emailClientPluginData {\n      key\n      value\n    }\n    adminLogTailStorePluginData {\n      key\n      value\n    }\n    dbHost\n    dbName\n    dbSslMode\n    dbPort\n    dbMaxConnections\n    dbAutoMigrateEnabled\n    tlsCertFile\n    tlsKeyFile\n    adminUserEmail\n    otelTraceEnabled\n    otelTraceType\n    otelTraceCollectorHost\n    otelTraceCollectorPort\n    federatedRegistryTrustPolicies {\n      issuerUrl\n      subject\n      audience\n      groupGlobPatterns\n    }\n    internalRunners {\n      name\n      jobDispatcherType\n      jobDispatcherData {\n        key\n        value\n      }\n    }\n    mcpServerConfig {\n      enabledToolsets\n      enabledTools\n      readOnly\n    }\n    sensitiveFields\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "f22a62d94df686bacd956647a0aa95b1";
+(node as any).hash = "31599e93ad40d7685222c49812253492";
 
 export default node;

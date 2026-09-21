@@ -17,7 +17,9 @@ function AdminAreaNewAnnouncement() {
         type: 'INFO',
         dismissible: true,
         startTime: null,
-        endTime: null
+        endTime: null,
+        sendEmail: false,
+        emailSubject: ''
     });
 
     const isFormValid = useMemo(() => {
@@ -54,7 +56,9 @@ function AdminAreaNewAnnouncement() {
                     type: formData.type,
                     dismissible: formData.dismissible,
                     startTime: formData.startTime?.toISOString() || null,
-                    endTime: formData.endTime?.toISOString() || null
+                    endTime: formData.endTime?.toISOString() || null,
+                    sendEmail: formData.sendEmail,
+                    emailSubject: formData.sendEmail && formData.emailSubject.trim() ? formData.emailSubject.trim() : null
                 }
             },
             onCompleted: data => {

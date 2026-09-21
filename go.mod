@@ -17,6 +17,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.31.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.99.1
 	github.com/aws/aws-sdk-go-v2/service/ses v1.29.7
+	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.24
 	github.com/aws/aws-sdk-go-v2/service/sts v1.42.0
 	github.com/aws/smithy-go v1.25.0
 	github.com/blevesearch/bleve/v2 v2.5.7
@@ -70,6 +71,8 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/vanng822/go-premailer v1.22.0
+	github.com/vmihailenco/msgpack/v5 v5.4.1
+	github.com/yuin/goldmark v1.8.6
 	github.com/zclconf/go-cty v1.16.4
 	gitlab.com/infor-cloud/martian-cloud/graphql-transport-ws v1.1.0
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20230411193226-3247984d5abc
@@ -263,6 +266,7 @@ require (
 	github.com/vanng822/css v1.0.1 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.34 // indirect
 	github.com/vektra/mockery/v2 v2.53.0 // indirect
+	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
