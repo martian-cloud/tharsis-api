@@ -255,7 +255,8 @@ type RunAnnotation {
 """
 RunAnnotationInput is a single annotation supplied when creating a run. The key must be a valid name
 (lowercase alphanumerics with - and _ in non-leading/trailing positions); key and value are required
-and non-empty. The link is optional. Exact length limits are enforced by the server on create.
+and non-empty. The link is optional. A run's annotations are limited by count and by their total
+serialized size, both enforced by the server on create.
 """
 input RunAnnotationInput {
   key: String!

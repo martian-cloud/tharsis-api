@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"time"
@@ -663,14 +664,17 @@ func (n *RunTaskStage) ShallowCompare(other RunNode) bool {
 	return n.ID == o.ID && n.StageName == o.StageName && n.Status == o.Status
 }
 
-// Annotation limits, matching Phobos pipeline annotations so the two behave identically.
+// Annotation limits. The count matches Phobos pipeline annotations; the size limit deliberately
+// differs — Phobos caps each field individually, whereas a run's annotations share one budget.
 const (
-	maxRunAnnotations           = 10
-	maxRunAnnotationValueLength = 256
-	// maxRunAnnotationLinkLength bounds the stored link purely as a storage/DoS guard (not a trust
-	// decision — link content safety is handled at render time by the client). Annotation links are
-	// structured CI-origin URLs (commit/MR/pipeline), so 256 is ample.
-	maxRunAnnotationLinkLength = 256
+	maxRunAnnotations = 10
+	// maxRunAnnotationsSize bounds the annotations as they are actually stored: the marshalled JSON
+	// written to the run's JSONB column. A single total is enforced rather than per-field caps so
+	// callers can spend the allowance as they need — a few long values, or many short ones.
+	//
+	// 1024 bytes keeps the whole run row comfortably under 2KB, which avoids Postgres moving
+	// oversized values out to a TOAST table and costing an extra lookup on every read.
+	maxRunAnnotationsSize = 1024
 )
 
 // RunAnnotation is an immutable key/value pair (with an optional link) attached to a run at creation
@@ -749,12 +753,15 @@ func (r *Run) Validate() error {
 	return r.validateAnnotations()
 }
 
-// validateAnnotations enforces the run annotation rules, which match Phobos pipeline annotations:
-// at most maxRunAnnotations entries; each key and value non-empty; each key a valid name; each value
-// no longer than maxRunAnnotationValueLength. Duplicate keys are allowed. The optional link's content is
-// not validated by design, matching Phobos — link safety is enforced at render time by the client (the UI
-// only makes http(s) links clickable), so any non-UI consumer must treat the link as untrusted — but its
-// length is bounded as a storage guard.
+// validateAnnotations enforces the run annotation rules: at most maxRunAnnotations entries; each key
+// and value non-empty; each key a valid name; and the annotations as a whole no larger than
+// maxRunAnnotationsSize once marshalled. Duplicate keys are allowed. The optional link's content is
+// not validated by design, matching Phobos — link safety is enforced at render time by the client
+// (the UI only makes http(s) links clickable), so any non-UI consumer must treat the link as
+// untrusted — but it counts towards the size budget.
+//
+// The size is checked against the marshalled form rather than individual fields so that the limit
+// reflects what is actually stored, and so callers can distribute the allowance as they need.
 func (r *Run) validateAnnotations() error {
 	if len(r.Annotations) > maxRunAnnotations {
 		return errors.New("maximum of %d annotations allowed", maxRunAnnotations, errors.WithErrorCode(errors.EInvalid))
@@ -770,11 +777,16 @@ func (r *Run) validateAnnotations() error {
 		if err := verifyValidName(annotation.Key); err != nil {
 			return errors.Wrap(err, "invalid annotation key")
 		}
-		if len(annotation.Value) > maxRunAnnotationValueLength {
-			return errors.New("annotation value cannot be longer than %d characters", maxRunAnnotationValueLength, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	if len(r.Annotations) > 0 {
+		marshalled, err := json.Marshal(r.Annotations)
+		if err != nil {
+			return errors.Wrap(err, "failed to measure annotations", errors.WithErrorCode(errors.EInvalid))
 		}
-		if annotation.Link != nil && len(*annotation.Link) > maxRunAnnotationLinkLength {
-			return errors.New("annotation link cannot be longer than %d characters", maxRunAnnotationLinkLength, errors.WithErrorCode(errors.EInvalid))
+		if len(marshalled) > maxRunAnnotationsSize {
+			return errors.New("annotations cannot be larger than %d bytes in total, got %d",
+				maxRunAnnotationsSize, len(marshalled), errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 

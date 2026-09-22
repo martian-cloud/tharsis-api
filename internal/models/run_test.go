@@ -2,6 +2,7 @@ package models
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -437,15 +438,12 @@ func strPtr(s string) *string { return &s }
 // TestRun_Validate_Annotations covers the run annotation validation rules, which match Phobos
 // pipeline annotations. It exercises the API acceptance scenarios for the feature.
 func TestRun_Validate_Annotations(t *testing.T) {
-	longValue := ""
-	for i := 0; i < 257; i++ {
-		longValue += "a"
-	}
+	// A value that would have breached the old 256-byte per-field cap but is fine within the total
+	// budget, and one large enough to breach the budget on its own.
+	valueOverOldPerFieldCap := strings.Repeat("a", 300)
+	valueOverTotalBudget := strings.Repeat("a", maxRunAnnotationsSize+1)
 
-	longLink := "https://example.com/"
-	for i := 0; i < 256; i++ {
-		longLink += "a"
-	}
+	longLink := "https://example.com/" + strings.Repeat("a", 256)
 
 	tests := []struct {
 		name        string
@@ -497,8 +495,13 @@ func TestRun_Validate_Annotations(t *testing.T) {
 			wantErr:     true,
 		},
 		{
-			name:        "value longer than 256 characters is rejected",
-			annotations: []*RunAnnotation{{Key: "commit", Value: longValue}},
+			name:        "a value longer than the old per-field cap is allowed within the total budget",
+			annotations: []*RunAnnotation{{Key: "commit", Value: valueOverOldPerFieldCap}},
+			wantErr:     false,
+		},
+		{
+			name:        "a single value larger than the total budget is rejected",
+			annotations: []*RunAnnotation{{Key: "commit", Value: valueOverTotalBudget}},
 			wantErr:     true,
 		},
 		{
@@ -515,9 +518,34 @@ func TestRun_Validate_Annotations(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:        "link longer than the max is rejected",
+			name:        "a long link is allowed while the total stays within budget",
 			annotations: []*RunAnnotation{{Key: "commit", Value: "v", Link: &longLink}},
-			wantErr:     true,
+			wantErr:     false,
+		},
+		{
+			name: "many annotations with links are rejected once they exceed the budget",
+			annotations: func() []*RunAnnotation {
+				out := make([]*RunAnnotation, 10)
+				for i := range out {
+					out[i] = &RunAnnotation{
+						Key:   "key" + strconv.Itoa(i),
+						Value: strings.Repeat("v", 50),
+						Link:  strPtr("https://example.com/" + strings.Repeat("p", 80)),
+					}
+				}
+				return out
+			}(),
+			wantErr: true,
+		},
+		{
+			name: "the annotations a CI pipeline typically sets are allowed",
+			annotations: []*RunAnnotation{
+				{Key: "commit", Value: "a1b2c3d4", Link: strPtr("https://gitlab.example.com/group/project/-/commit/a1b2c3d4e5f6a7b8c9d0")},
+				{Key: "ref", Value: "feature/run-annotations", Link: strPtr("https://gitlab.example.com/group/project/-/tree/feature/run-annotations")},
+				{Key: "mr", Value: "543", Link: strPtr("https://gitlab.example.com/group/project/-/merge_requests/543")},
+				{Key: "pipeline", Value: "1234567", Link: strPtr("https://gitlab.example.com/group/project/-/pipelines/1234567")},
+			},
+			wantErr: false,
 		},
 		{
 			name:        "a normal link is allowed",
