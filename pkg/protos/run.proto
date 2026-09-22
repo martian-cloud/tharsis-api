@@ -180,8 +180,8 @@ message CreateRunRequest {
   // false when unset.
   optional bool auto_apply = 13;
   // annotations are immutable key/value pairs (with an optional link) attached to the run at
-  // creation, letting it be traced back to what created it. Duplicate keys allowed; count and
-  // length limits are enforced by the server on create.
+  // creation, letting it be traced back to what created it. Duplicate keys allowed; the count and
+  // the annotations' total serialized size are limited by the server on create.
   repeated RunAnnotation annotations = 14;
 }
 
@@ -263,7 +263,8 @@ message Run {
 // RunAnnotation is an immutable key/value pair (with an optional link) attached to a run at
 // creation, letting the run be traced back to what created it. The key must be a valid name
 // (lowercase alphanumerics with - and _ in non-leading/trailing positions); key and value are
-// required and non-empty. Length limits are enforced by the server on create.
+// required and non-empty. A run's annotations are limited by count and by their total serialized
+// size, both enforced by the server on create.
 message RunAnnotation {
   string          key   = 1;
   string          value = 2;
