@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7e3a74314e0bacf99d7bcaee28e54575>>
+ * @generated SignedSource<<06663ba8fc0739b27b342cb76af9ff0c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,7 +15,7 @@ export type WorkspaceDetailsFragment_workspace$data = {
   readonly fullPath: string;
   readonly id: string;
   readonly name: string;
-  readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListFragment_assignedManagedIdentities" | "AssignedPolicyListFragment_workspace" | "CleanupPoliciesFragment_namespace" | "ConfigurationVersionDetailsFragment_workspace" | "NamespaceActivityFragment_activity" | "NamespaceMembershipsFragment_memberships" | "ProviderMirrorsFragment_namespace" | "RunsFragment_runs" | "StateVersionsFragment_stateVersions" | "VariablesFragment_variables" | "WorkspaceDetailsIndexFragment_workspace" | "WorkspaceRoleBindingFragment_workspace" | "WorkspaceSettingsFragment_workspace">;
+  readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListFragment_workspace" | "AssignedPolicyListFragment_workspace" | "CleanupPoliciesFragment_namespace" | "ConfigurationVersionDetailsFragment_workspace" | "NamespaceActivityFragment_activity" | "NamespaceMembershipsFragment_memberships" | "ProviderMirrorsFragment_namespace" | "RunsFragment_runs" | "StateVersionsFragment_stateVersions" | "VariablesFragment_variables" | "WorkspaceDetailsIndexFragment_workspace" | "WorkspaceRoleBindingFragment_workspace" | "WorkspaceSettingsFragment_workspace">;
   readonly " $fragmentType": "WorkspaceDetailsFragment_workspace";
 };
 export type WorkspaceDetailsFragment_workspace$key = {
@@ -70,7 +70,7 @@ const node: ReaderFragment = {
     {
       "args": null,
       "kind": "FragmentSpread",
-      "name": "AssignedManagedIdentityListFragment_assignedManagedIdentities"
+      "name": "AssignedManagedIdentityListFragment_workspace"
     },
     {
       "args": null,
@@ -127,6 +127,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "b0e2b0c16fcd8a5340676553680237b3";
+(node as any).hash = "d66fffc8378134dd4c3c20832bba604d";
 
 export default node;

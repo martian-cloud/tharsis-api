@@ -1,8 +1,8 @@
-import { Typography, useTheme } from '@mui/material';
+import { CircularProgress, Typography, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import { Button } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { Link as RouterLink, Route, Routes } from 'react-router-dom';
 import SearchInput from '../../common/SearchInput';
@@ -92,7 +92,13 @@ function NamespaceMembershipsIndex(props: NamespaceMembershipsIndexProps) {
                 sx={{ marginBottom: 2 }}
                 onChange={onSearchChange}
             />
-            <NamespaceMembershipList fragmentRef={data} search={search} />
+            <Suspense fallback={
+                <Box padding={4} display="flex" justifyContent="center" alignItems="center">
+                    <CircularProgress />
+                </Box>
+            }>
+                <NamespaceMembershipList fragmentRef={data} search={search} />
+            </Suspense>
         </Box>
     );
 }

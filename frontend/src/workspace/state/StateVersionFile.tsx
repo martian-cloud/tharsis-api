@@ -75,11 +75,36 @@ function StateJSON({ id }: { id: string }) {
 function StateContent({ json }: { json: string }) {
     return (
         <Box sx={{ fontSize: 14, overflowX: 'auto' }}>
-            <SyntaxHighlighter language="json" style={a11yDark} customStyle={{marginTop: 0}}>
+            <SyntaxHighlighter language="json" style={a11yDark} customStyle={{ marginTop: 0 }}>
                 {JSON.stringify(JSON.parse(json), null, 2)}
             </SyntaxHighlighter>
         </Box>
     );
+}
+
+// StateVersionRawState fetches Terraform's own state file (the base64-encoded raw blob). Isolating
+// the query in its own component keeps its suspense local to the panel body, so the format toggle
+// above it stays mounted while the raw state loads instead of suspending the whole panel.
+function StateVersionRawState({ id }: { id: string }) {
+    const queryData = useLazyLoadQuery<StateVersionFileQuery>(graphql`
+        query StateVersionFileQuery($id: String!) {
+            node(id: $id) {
+                ... on StateVersion {
+                    data
+                }
+            }
+        }
+    `, { id }, { fetchPolicy: 'store-and-network' });
+
+    const stateFileData = queryData.node?.data;
+
+    if (!stateFileData) {
+        // node was null — this shouldn't happen for a valid StateVersion ID,
+        // but guard here so we fail visibly rather than passing undefined downstream.
+        return null;
+    }
+
+    return <StateContent json={decodeBase64Utf8(stateFileData)} />;
 }
 
 function StateVersionFile(props: Props) {
@@ -93,18 +118,6 @@ function StateVersionFile(props: Props) {
         id
       }
     `, fragmentRef);
-
-    const queryData = useLazyLoadQuery<StateVersionFileQuery>(graphql`
-        query StateVersionFileQuery($id: String!) {
-            node(id: $id) {
-                ... on StateVersion {
-                    data
-                }
-            }
-        }
-    `, { id: data.id }, { fetchPolicy: 'store-and-network' });
-
-    const stateFileData = queryData.node?.data as string;
 
     const onFormatChange = (_event: React.MouseEvent<HTMLElement>, value: StateFormat | null) => {
         // ToggleButtonGroup reports null when the active button is clicked again; keep the current
@@ -139,7 +152,13 @@ function StateVersionFile(props: Props) {
                 <ToggleButton value="raw" size="small">Raw</ToggleButton>
                 <ToggleButton value="json" size="small">Enhanced</ToggleButton>
             </ToggleButtonGroup>
-            {format === 'raw' && <StateContent json={decodeBase64Utf8(stateFileData)} />}
+            {format === 'raw' && <Suspense fallback={
+                <Box sx={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CircularProgress />
+                </Box>
+            }>
+                <StateVersionRawState id={data.id} />
+            </Suspense>}
             {format === 'json' && <Suspense fallback={
                 <Box sx={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <CircularProgress />

@@ -14,6 +14,7 @@ import TRNButton from '../common/TRNButton';
 import { MutationError } from '../common/error';
 import NamespaceBreadcrumbs from '../namespace/NamespaceBreadcrumbs';
 import Link from '../routes/Link';
+import ModuleSourceLink from './ModuleSourceLink';
 import WorkspaceDetailsCurrentApplyRun from './WorkspaceDetailsCurrentApplyRun';
 import WorkspaceDetailsEmpty from './WorkspaceDetailsEmpty';
 import { WorkspaceDetailsIndexFragment_workspace$key } from './__generated__/WorkspaceDetailsIndexFragment_workspace.graphql';
@@ -91,6 +92,7 @@ function WorkspaceDetailsIndex(props: Props) {
             }
             run {
                 ...StateVersionInputVariablesFragment_variables
+                ...ModuleSourceLinkFragment_run
                 id
                 status
                 hasAdvisoryFailures
@@ -377,7 +379,7 @@ function WorkspaceDetailsIndex(props: Props) {
                             {!data.currentStateVersion.run && 'by manual update'}
                             {data.currentStateVersion.run && <React.Fragment>
                                 by run{' '}
-                                <Link to={`/groups/${data.fullPath}/-/runs/${data.currentStateVersion.run.id}`}>
+                                <Link color="secondary" to={`/groups/${data.fullPath}/-/runs/${data.currentStateVersion.run.id}`}>
                                     {data.currentStateVersion.run.id.substring(0, 8)}...
                                 </Link>
                             </React.Fragment>}
@@ -399,12 +401,7 @@ function WorkspaceDetailsIndex(props: Props) {
                         <ModuleIcon />
                         <Stack direction="row" spacing={1} alignItems="center">
                             <Typography color="textSecondary">Module:</Typography>
-                            <Typography sx={{ wordBreak: 'break-all' }}>
-                                {data.currentStateVersion.run.moduleSource}
-                            </Typography>
-                            <IconButton sx={{ padding: 0 }} onClick={() => navigator.clipboard.writeText(data.currentStateVersion?.run?.moduleSource ?? '')}>
-                                <CopyIcon sx={{ width: 16, height: 16 }} />
-                            </IconButton>
+                            <ModuleSourceLink fragmentRef={data.currentStateVersion.run} />
                         </Stack>
                         <Stack direction="row" spacing={1} alignItems="center">
                             <Typography color="textSecondary">Version:</Typography>
@@ -419,9 +416,17 @@ function WorkspaceDetailsIndex(props: Props) {
                         <ModuleIcon />
                         <Stack direction="row" spacing={1} alignItems="center">
                             <Typography color="textSecondary">Configuration Version:</Typography>
-                            <Typography sx={{ wordBreak: 'break-all' }}>
-                                {data.currentStateVersion.run.configurationVersion.id.substring(0, 8)}...
-                            </Typography>
+                            <Tooltip title="view files">
+                                <Typography sx={{ wordBreak: 'break-all' }}>
+                                    <Link
+                                        color="secondary"
+                                        underline="hover"
+                                        to={`/groups/${data.fullPath}/-/configuration_versions/${data.currentStateVersion.run.configurationVersion.id}`}
+                                    >
+                                        {data.currentStateVersion.run.configurationVersion.id.substring(0, 8)}...
+                                    </Link>
+                                </Typography>
+                            </Tooltip>
                             <IconButton sx={{ padding: 0 }} onClick={() => navigator.clipboard.writeText(data.currentStateVersion?.run?.configurationVersion?.id ?? '')}>
                                 <CopyIcon sx={{ width: 16, height: 16 }} />
                             </IconButton>

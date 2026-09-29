@@ -218,7 +218,7 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 		if input.Filter.NamespacePathPrefix != nil {
 			ex = ex.Append(goqu.Or(
 				goqu.I("namespaces.path").Eq(*input.Filter.NamespacePathPrefix),
-				goqu.I("namespaces.path").Like(*input.Filter.NamespacePathPrefix+"/%"),
+				goqu.I("namespaces.path").Like(escapeLikePattern(*input.Filter.NamespacePathPrefix)+"/%"),
 			))
 		}
 	}

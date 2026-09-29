@@ -72,7 +72,8 @@ type RunFilter struct {
 	TimeRangeStart *time.Time
 	UpdatedBefore  *time.Time
 	WorkspaceID    *string
-	GroupID        *string
+	// GroupPath is the full path of the group to filter runs by.
+	GroupPath *string
 	// RootNamespaceMemberships limits results to runs in workspaces at or under one of the
 	// caller's root member namespace paths. Non-nil empty = no memberships (matches nothing);
 	// nil = no membership filter.
@@ -615,13 +616,23 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 			ex = ex.Append(goqu.I("runs.status").In(statuses))
 		}
 
-		if input.Filter.GroupID != nil {
+		if input.Filter.GroupPath != nil {
 			includeNested := input.Filter.IncludeNestedRuns != nil && *input.Filter.IncludeNestedRuns
 			if includeNested {
-				ex = ex.Append(goqu.I("namespaces.path").Like(goqu.Any(
-					dialect.From("namespaces").Select(goqu.L("path || '/%'")).Where(goqu.Ex{"group_id": *input.Filter.GroupID}))))
+				// Literal prefix here (rather than a LIKE ANY(subquery) on group_id) lets Postgres
+				// use the namespaces(path varchar_pattern_ops) index for a range scan; a
+				// subquery-derived pattern is not known at plan time, so the planner can't use the
+				// index and instead evaluates the LIKE filter against every namespace row that has
+				// a workspace_id, which scales with total namespace count rather than the size of
+				// the target group's subtree.
+				ex = ex.Append(goqu.I("namespaces.path").Like(escapeLikePattern(*input.Filter.GroupPath) + "/%"))
 			} else {
-				ex = ex.Append(goqu.I("workspaces.group_id").Eq(*input.Filter.GroupID))
+				// Exact-match subquery on the unique path index resolves the group's id cheaply;
+				// unlike the nested case above, this is a literal equality (not a dynamic LIKE
+				// pattern), so it isn't subject to the same index limitation.
+				ex = ex.Append(goqu.I("workspaces.group_id").Eq(
+					dialect.From("namespaces").Select("group_id").Where(goqu.Ex{"path": *input.Filter.GroupPath}),
+				))
 			}
 		}
 

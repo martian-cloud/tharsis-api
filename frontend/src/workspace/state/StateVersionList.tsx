@@ -1,6 +1,7 @@
 import NoResults from '@/common/NoResults';
 import { Box } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
+import { Suspense } from 'react';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { useFragment, useLazyLoadQuery, usePaginationFragment } from 'react-relay';
 import { ResponsiveTable } from '../../common/ResponsiveTable';
@@ -36,7 +37,21 @@ function StateVersionList({ fragmentRef }: Props) {
         `, fragmentRef
     );
 
-    const queryData = useLazyLoadQuery<StateVersionListQuery>(query, { first: 100, workspaceId: workspace.id }, { fetchPolicy: 'store-and-network' });
+    return (
+        <Suspense fallback={<ListSkeleton rowCount={3} />}>
+            <StateVersionListContent workspaceId={workspace.id} workspacePath={workspace.fullPath} />
+        </Suspense>
+    );
+}
+
+interface StateVersionListContentProps {
+    workspaceId: string
+    workspacePath: string
+}
+
+function StateVersionListContent({ workspaceId, workspacePath }: StateVersionListContentProps) {
+
+    const queryData = useLazyLoadQuery<StateVersionListQuery>(query, { first: 100, workspaceId }, { fetchPolicy: 'store-and-network' });
 
     const { data, loadNext, hasNext } = usePaginationFragment<StateVersionListPaginationQuery, StateVersionListFragment_stateVersions$key>(
         graphql`
@@ -80,7 +95,7 @@ function StateVersionList({ fragmentRef }: Props) {
                     ]}
                 >
                     {edges.map((edge: any) => (
-                        <StateVersionListItem key={edge.node.id} stateVersionKey={edge.node} workspacePath={workspace.fullPath} />
+                        <StateVersionListItem key={edge.node.id} stateVersionKey={edge.node} workspacePath={workspacePath} />
                     ))}
                 </ResponsiveTable>
             </InfiniteScroll>}

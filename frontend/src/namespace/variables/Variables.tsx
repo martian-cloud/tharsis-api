@@ -11,7 +11,7 @@ import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import React, { useState } from 'react';
-import { useFragment, useMutation } from 'react-relay/hooks';
+import { useFragment, useLazyLoadQuery, useMutation } from 'react-relay/hooks';
 import { Route, Routes } from 'react-router-dom';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import NamespaceBreadcrumbs from '../NamespaceBreadcrumbs';
@@ -19,6 +19,7 @@ import EditVariableDialog from './EditVariableDialog';
 import VariableList from './VariableList';
 import { VariablesDeleteVariableMutation } from './__generated__/VariablesDeleteVariableMutation.graphql';
 import { VariablesFragment_variables$key } from './__generated__/VariablesFragment_variables.graphql';
+import { VariablesQuery } from './__generated__/VariablesQuery.graphql';
 import VariableHistoryDialog from './VariableHistoryDialog';
 
 interface Props {
@@ -30,23 +31,54 @@ const variableSearchFilter = (search: string) => (variable: any) => {
 }
 
 function Variables(props: Props) {
-    const theme = useTheme();
-    const { enqueueSnackbar } = useSnackbar();
-
-    const data = useFragment<VariablesFragment_variables$key>(
+    const namespace = useFragment<VariablesFragment_variables$key>(
         graphql`
         fragment VariablesFragment_variables on Namespace
         {
             id
             fullPath
-            variables {
-                id
-                key
-                category
-                ...VariableListItemFragment_variable
-            }
         }
       `, props.fragmentRef);
+
+    return (
+        <Box>
+            <Routes>
+                <Route index element={
+                    <VariablesIndex namespaceId={namespace.id} namespacePath={namespace.fullPath} />
+                } />
+            </Routes>
+        </Box>
+    );
+}
+
+interface VariablesIndexProps {
+    namespaceId: string
+    namespacePath: string
+}
+
+function VariablesIndex(props: VariablesIndexProps) {
+    const { namespaceId, namespacePath } = props;
+    const theme = useTheme();
+    const { enqueueSnackbar } = useSnackbar();
+
+    const queryData = useLazyLoadQuery<VariablesQuery>(graphql`
+        query VariablesQuery($id: String!) {
+            node(id: $id) {
+                ...on Namespace {
+                    id
+                    fullPath
+                    variables {
+                        id
+                        key
+                        category
+                        ...VariableListItemFragment_variable
+                    }
+                }
+            }
+        }
+    `, { id: namespaceId }, { fetchPolicy: 'store-and-network' });
+
+    const data = queryData.node;
 
     const [commitDeleteVariable, commitInFlight] = useMutation<VariablesDeleteVariableMutation>(graphql`
         mutation VariablesDeleteVariableMutation($input: DeleteNamespaceVariableInput!) {
@@ -119,103 +151,100 @@ function Variables(props: Props) {
         }
     };
 
-    const variables = data.variables.filter((v: any) => v.category === variableCategory);
+    const allVariables = data?.variables ?? [];
+    const variables = allVariables.filter((v: any) => v.category === variableCategory);
     const filteredVariables = search ? variables.filter(variableSearchFilter(search)) : variables;
 
     return (
         <Box>
-            <Routes>
-                <Route index element={<Box>
-                    <NamespaceBreadcrumbs
-                        namespacePath={data.fullPath}
-                        childRoutes={[
-                            { title: "variables", path: 'variables' }
-                        ]}
+            <NamespaceBreadcrumbs
+                namespacePath={namespacePath}
+                childRoutes={[
+                    { title: "variables", path: 'variables' }
+                ]}
+            />
+            <Box sx={{
+                marginBottom: 4,
+                display: 'flex',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                [theme.breakpoints.down('lg')]: {
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    '& > *:not(:last-child)': {
+                        marginBottom: 2
+                    },
+                }
+            }}>
+                <ToggleButtonGroup
+                    size="small"
+                    color="primary"
+                    value={variableCategory}
+                    exclusive
+                    onChange={onVariableCategoryChange}
+                    sx={{ height: '100%' }}
+                >
+                    <ToggleButton value="terraform" size="small">Terraform</ToggleButton>
+                    <ToggleButton value="environment" size="small">Environment</ToggleButton>
+                </ToggleButtonGroup>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ width: { xs: '100%', lg: 'auto' } }}>
+                    <TextField
+                        size="small"
+                        margin='none'
+                        placeholder="search for variables"
+                        InputProps={{
+                            sx: { background: darken(theme.palette.background.default, 0.5) }
+                        }}
+                        sx={{ width: { xs: '100%', sm: 300 } }}
+                        onChange={onSearchChange}
+                        autoComplete="off"
                     />
-                    <Box sx={{
-                        marginBottom: 4,
-                        display: 'flex',
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        [theme.breakpoints.down('lg')]: {
-                            flexDirection: 'column',
-                            alignItems: 'flex-start',
-                            '& > *:not(:last-child)': {
-                                marginBottom: 2
-                            },
-                        }
-                    }}>
-                        <ToggleButtonGroup
-                            size="small"
-                            color="primary"
-                            value={variableCategory}
-                            exclusive
-                            onChange={onVariableCategoryChange}
-                            sx={{ height: '100%' }}
-                        >
-                            <ToggleButton value="terraform" size="small">Terraform</ToggleButton>
-                            <ToggleButton value="environment" size="small">Environment</ToggleButton>
-                        </ToggleButtonGroup>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ width: { xs: '100%', lg: 'auto' } }}>
-                            <TextField
-                                size="small"
-                                margin='none'
-                                placeholder="search for variables"
-                                InputProps={{
-                                    sx: { background: darken(theme.palette.background.default, 0.5) }
-                                }}
-                                sx={{ width: { xs: '100%', sm: 300 } }}
-                                onChange={onSearchChange}
-                                autoComplete="off"
-                            />
-                            <Button
-                                size="small"
-                                color="info"
-                                sx={{ height: { sm: '100%' }, width: { xs: '100%', sm: 'auto' } }}
-                                onClick={() => setShowValues(!showValues)}
-                            >
-                                {showValues ? 'Hide Values' : 'Show Values'}
-                            </Button>
-                        </Stack>
-                    </Box>
-                    {(filteredVariables.length === 0 && search !== '') && <Typography sx={{ padding: 2 }} align="center" color="textSecondary">
-                        No variables matching search
+                    <Button
+                        size="small"
+                        color="info"
+                        sx={{ height: { sm: '100%' }, width: { xs: '100%', sm: 'auto' } }}
+                        onClick={() => setShowValues(!showValues)}
+                    >
+                        {showValues ? 'Hide Values' : 'Show Values'}
+                    </Button>
+                </Stack>
+            </Box>
+            {(filteredVariables.length === 0 && search !== '') && <Typography sx={{ padding: 2 }} align="center" color="textSecondary">
+                No variables matching search
+            </Typography>}
+            {search === '' && filteredVariables.length === 0 && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
+                    {variableCategory === 'terraform' && <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
+                        Add Terraform variables which will be provided as inputs to your Terraform modules
                     </Typography>}
-                    {search === '' && filteredVariables.length === 0 && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
-                        <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
-                            {variableCategory === 'terraform' && <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
-                                Add Terraform variables which will be provided as inputs to your Terraform modules
-                            </Typography>}
-                            {variableCategory === 'environment' && <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
-                                Add environment variables which will be automatically set when executing Terraform runs
-                            </Typography>}
-                            <Button variant="outlined" color="primary" onClick={onNewVariable}>New Variable</Button>
-                        </Box>
-                    </Paper>}
-                    {(filteredVariables.length > 0) && <Box marginBottom={6}>
-                        <Paper>
-                            <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
-                                <Typography variant="subtitle1">{filteredVariables.length} variable{filteredVariables.length === 1 ? '' : 's'}</Typography>
-                                <Button size="small" variant="outlined" color="secondary" onClick={onNewVariable}>New Variable</Button>
-                            </Box>
-                        </Paper>
-                        <VariableList
-                            namespacePath={data.fullPath}
-                            variables={filteredVariables}
-                            showValues={showValues}
-                            onEditVariable={onEditVariable}
-                            onDeleteVariable={(variable: any) => setVariableToDelete(variable)}
-                            onShowHistory={(variable: any) => setVariableToShowHistory(variable)}
-                        />
-                    </Box>}
-                </Box>} />
-            </Routes>
+                    {variableCategory === 'environment' && <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
+                        Add environment variables which will be automatically set when executing Terraform runs
+                    </Typography>}
+                    <Button variant="outlined" color="primary" onClick={onNewVariable}>New Variable</Button>
+                </Box>
+            </Paper>}
+            {(filteredVariables.length > 0) && <Box marginBottom={6}>
+                <Paper>
+                    <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                        <Typography variant="subtitle1">{filteredVariables.length} variable{filteredVariables.length === 1 ? '' : 's'}</Typography>
+                        <Button size="small" variant="outlined" color="secondary" onClick={onNewVariable}>New Variable</Button>
+                    </Box>
+                </Paper>
+                <VariableList
+                    namespacePath={namespacePath}
+                    variables={filteredVariables}
+                    showValues={showValues}
+                    onEditVariable={onEditVariable}
+                    onDeleteVariable={(variable: any) => setVariableToDelete(variable)}
+                    onShowHistory={(variable: any) => setVariableToShowHistory(variable)}
+                />
+            </Box>}
             {variableToShowHistory && <VariableHistoryDialog
                 variableId={variableToShowHistory.id}
                 sensitive={variableToShowHistory.sensitive}
                 onClose={() => setVariableToShowHistory(null)}
             />}
-            {variableToEdit && <EditVariableDialog variable={variableToEdit} namespacePath={data.fullPath} onClose={() => setVariableToEdit(null)} />}
+            {variableToEdit && <EditVariableDialog variable={variableToEdit} namespacePath={namespacePath} onClose={() => setVariableToEdit(null)} />}
             {variableToDelete && (
                 <ConfirmationDialog
                     title="Delete Variable"

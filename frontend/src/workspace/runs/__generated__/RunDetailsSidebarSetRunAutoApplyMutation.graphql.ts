@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d7033e826bebd25e37708016fcf1374d>>
+ * @generated SignedSource<<a93c1022e42ab4341b97ab593b42f1e7>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -403,12 +403,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "5517361f7e36fdbde3a888d0856e119a",
+    "cacheID": "eddad9592dcb1c6c6c21f955037cd002",
     "id": null,
     "metadata": {},
     "name": "RunDetailsSidebarSetRunAutoApplyMutation",
     "operationKind": "mutation",
-    "text": "mutation RunDetailsSidebarSetRunAutoApplyMutation(\n  $input: SetRunAutoApplyInput!\n) {\n  setRunAutoApply(input: $input) {\n    run {\n      ...RunDetailsSidebarFragment_details\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunDetailsSidebarFragment_details on Run {\n  id\n  status\n  createdBy\n  isDestroy\n  assessment\n  autoApply\n  hasAdvisoryFailures\n  moduleSource\n  moduleVersion\n  annotations {\n    key\n  }\n  ...RunAnnotationsFragment_run\n  workspace {\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    trn\n  }\n  configurationVersion {\n    id\n  }\n  plan {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n  taskStages {\n    stageName\n    status\n    policyChecks {\n      status\n      stageName\n    }\n  }\n  apply {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n}\n"
+    "text": "mutation RunDetailsSidebarSetRunAutoApplyMutation(\n  $input: SetRunAutoApplyInput!\n) {\n  setRunAutoApply(input: $input) {\n    run {\n      ...RunDetailsSidebarFragment_details\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment ModuleSourceLinkFragment_run on Run {\n  moduleSource\n  moduleVersion\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunDetailsSidebarFragment_details on Run {\n  id\n  status\n  createdBy\n  isDestroy\n  assessment\n  autoApply\n  hasAdvisoryFailures\n  moduleSource\n  moduleVersion\n  ...ModuleSourceLinkFragment_run\n  annotations {\n    key\n  }\n  ...RunAnnotationsFragment_run\n  workspace {\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    trn\n  }\n  configurationVersion {\n    id\n  }\n  plan {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n  taskStages {\n    stageName\n    status\n    policyChecks {\n      status\n      stageName\n    }\n  }\n  apply {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n}\n"
   }
 };
 })();

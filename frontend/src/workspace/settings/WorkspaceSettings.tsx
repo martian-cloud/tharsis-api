@@ -1,8 +1,11 @@
-import { Box, Divider, styled, Typography } from '@mui/material';
+import { Box, CircularProgress, Divider, styled, Typography } from '@mui/material';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import graphql from 'babel-plugin-relay/macro';
-import { useFragment } from 'react-relay/hooks';
+import { Suspense } from 'react';
+import { useFragment, useLazyLoadQuery } from 'react-relay/hooks';
 import { WorkspaceSettingsFragment_workspace$key } from './__generated__/WorkspaceSettingsFragment_workspace.graphql';
+import { WorkspaceSettingsQuery } from './__generated__/WorkspaceSettingsQuery.graphql';
+import { WorkspaceSettingsContentFragment_workspace$key } from './__generated__/WorkspaceSettingsContentFragment_workspace.graphql';
 import WorkspaceGeneralSettings from './WorkspaceGeneralSettings';
 import WorkspaceRunSettings from './WorkspaceRunSettings';
 import WorkspaceDriftDetectionSettings from './WorkspaceDriftDetectionSettings';
@@ -25,10 +28,51 @@ interface Props {
 }
 
 function WorkspaceSettings(props: Props) {
-
-    const data = useFragment(
+    const workspace = useFragment<WorkspaceSettingsFragment_workspace$key>(
         graphql`
         fragment WorkspaceSettingsFragment_workspace on Workspace
+        {
+            id
+            fullPath
+        }
+    `, props.fragmentRef
+    )
+
+    return (
+        <Box>
+            <NamespaceBreadcrumbs
+                namespacePath={workspace.fullPath}
+                childRoutes={[{ title: "settings", path: 'settings' }]} />
+            <Typography marginBottom={4} variant="h5" gutterBottom>Workspace Settings</Typography>
+            <Suspense fallback={
+                <Box padding={4} display="flex" justifyContent="center" alignItems="center">
+                    <CircularProgress />
+                </Box>
+            }>
+                <WorkspaceSettingsContent workspaceId={workspace.id} />
+            </Suspense>
+        </Box>
+    );
+}
+
+interface WorkspaceSettingsContentProps {
+    workspaceId: string
+}
+
+function WorkspaceSettingsContent({ workspaceId }: WorkspaceSettingsContentProps) {
+    const queryData = useLazyLoadQuery<WorkspaceSettingsQuery>(graphql`
+        query WorkspaceSettingsQuery($id: String!) {
+            node(id: $id) {
+                ...on Workspace {
+                    ...WorkspaceSettingsContentFragment_workspace
+                }
+            }
+        }
+    `, { id: workspaceId }, { fetchPolicy: 'store-and-network' });
+
+    const data = useFragment<WorkspaceSettingsContentFragment_workspace$key>(
+        graphql`
+        fragment WorkspaceSettingsContentFragment_workspace on Workspace
         {
             name
             description
@@ -44,16 +88,15 @@ function WorkspaceSettings(props: Props) {
             ...WorkspaceStateSettingsFragment_workspace
             ...WorkspaceLabelSettingsFragment_workspace
         }
-    `, props.fragmentRef
+    `, queryData.node
     )
+
+    if (!data) {
+        return null;
+    }
 
     return (
         <Box>
-            <NamespaceBreadcrumbs
-                namespacePath={data.fullPath}
-                childRoutes={[{ title: "settings", path: 'settings' }]} />
-            <Typography marginBottom={4} variant="h5" gutterBottom>Workspace Settings</Typography>
-            <StyledDivider />
             <WorkspaceGeneralSettings fragmentRef={data} />
             <StyledDivider />
             <WorkspaceLabelSettings fragmentRef={data} />

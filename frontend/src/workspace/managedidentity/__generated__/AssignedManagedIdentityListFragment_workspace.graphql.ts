@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<41a045cd8b0be2be1a7856f565daff9a>>
+ * @generated SignedSource<<368ccc71727b4c1143dc35ba3325429a>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,21 +10,21 @@
 
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type GroupSettingsFragment_group$data = {
+export type AssignedManagedIdentityListFragment_workspace$data = {
   readonly fullPath: string;
   readonly id: string;
-  readonly " $fragmentType": "GroupSettingsFragment_group";
+  readonly " $fragmentType": "AssignedManagedIdentityListFragment_workspace";
 };
-export type GroupSettingsFragment_group$key = {
-  readonly " $data"?: GroupSettingsFragment_group$data;
-  readonly " $fragmentSpreads": FragmentRefs<"GroupSettingsFragment_group">;
+export type AssignedManagedIdentityListFragment_workspace$key = {
+  readonly " $data"?: AssignedManagedIdentityListFragment_workspace$data;
+  readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListFragment_workspace">;
 };
 
 const node: ReaderFragment = {
   "argumentDefinitions": [],
   "kind": "Fragment",
   "metadata": null,
-  "name": "GroupSettingsFragment_group",
+  "name": "AssignedManagedIdentityListFragment_workspace",
   "selections": [
     {
       "alias": null,
@@ -41,10 +41,10 @@ const node: ReaderFragment = {
       "storageKey": null
     }
   ],
-  "type": "Group",
+  "type": "Workspace",
   "abstractKey": null
 };
 
-(node as any).hash = "0cf37a72a05958d13b1058b57932c2c2";
+(node as any).hash = "39f760366be35a664000017ad35e6c04";
 
 export default node;

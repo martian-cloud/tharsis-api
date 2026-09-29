@@ -340,6 +340,58 @@ func TestRuns_GetRuns(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// A subgroup with its own workspace, used to verify the IncludeNestedRuns filter finds runs
+	// in descendant namespaces via a literal path-prefix LIKE (not the target group's own runs).
+	subgroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "sub",
+		Description: "nested subgroup for runs list",
+		ParentID:    group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	subWorkspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "sub-workspace",
+		GroupID:        subgroup.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	subRun, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: subWorkspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// A namespace with a sibling path that shares the target group's path as a string prefix but
+	// is NOT actually nested under it (e.g. "test-group-runs-list-other" starts with
+	// "test-group-runs-list" but is a different group). A literal '/'-suffixed prefix match
+	// correctly excludes it; a naive prefix match without the separator would not.
+	siblingGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-runs-list-other",
+		Description: "sibling group with overlapping path prefix",
+		FullPath:    "test-group-runs-list-other",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	siblingWorkspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "sibling-workspace",
+		GroupID:        siblingGroup.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	_, err = testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: siblingWorkspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
 	runs := []models.Run{
 		{
 			WorkspaceID: workspace.Metadata.ID,
@@ -377,13 +429,41 @@ func TestRuns_GetRuns(t *testing.T) {
 		expectErrorCode errors.CodeType
 		input           *GetRunsInput
 		expectCount     int
+		expectRunIDs    []string
+		excludeRunIDs   []string
 	}
 
 	testCases := []testCase{
 		{
 			name:        "get all runs",
 			input:       &GetRunsInput{},
-			expectCount: len(createdRuns),
+			expectCount: len(createdRuns) + 2, // plus subRun and the sibling group's run
+		},
+		{
+			name: "filter by group without IncludeNestedRuns only returns the group's own runs",
+			input: &GetRunsInput{
+				Filter: &RunFilter{
+					GroupPath: &group.FullPath,
+				},
+			},
+			expectCount:   len(createdRuns),
+			excludeRunIDs: []string{subRun.Metadata.ID},
+		},
+		{
+			// This is the case that was previously slow / relied on a LIKE ANY(subquery) pattern
+			// that could not use the namespaces path-pattern index. With GroupPath supplied, the
+			// nested filter becomes a literal LIKE prefix and should find the subgroup's run in
+			// addition to the target group's own runs, while excluding the sibling group's run
+			// even though its path has "test-group-runs-list" as a raw string prefix.
+			name: "filter by group with IncludeNestedRuns finds nested subgroup runs and excludes path-prefix siblings",
+			input: &GetRunsInput{
+				Filter: &RunFilter{
+					GroupPath:         &group.FullPath,
+					IncludeNestedRuns: ptr.Bool(true),
+				},
+			},
+			expectCount:  len(createdRuns) + 1, // the group's own runs plus the subgroup's run
+			expectRunIDs: []string{subRun.Metadata.ID},
 		},
 	}
 
@@ -398,6 +478,17 @@ func TestRuns_GetRuns(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Len(t, result.Runs, test.expectCount)
+
+			resultIDs := make(map[string]bool, len(result.Runs))
+			for _, r := range result.Runs {
+				resultIDs[r.Metadata.ID] = true
+			}
+			for _, id := range test.expectRunIDs {
+				assert.True(t, resultIDs[id], "expected run %s to be present in results", id)
+			}
+			for _, id := range test.excludeRunIDs {
+				assert.False(t, resultIDs[id], "expected run %s to be excluded from results", id)
+			}
 		})
 	}
 }

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<32353b580713b977d02a33e988913d23>>
+ * @generated SignedSource<<c8500b840085091980aeee92c746a877>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -59,7 +59,7 @@ export type WorkspaceDetailsIndexFragment_workspace$data = {
         readonly status: PlanStatus;
       };
       readonly status: RunStatus;
-      readonly " $fragmentSpreads": FragmentRefs<"StateVersionInputVariablesFragment_variables">;
+      readonly " $fragmentSpreads": FragmentRefs<"ModuleSourceLinkFragment_run" | "StateVersionInputVariablesFragment_variables">;
     } | null | undefined;
     readonly " $fragmentSpreads": FragmentRefs<"StateVersionFileFragment_stateVersion" | "StateVersionOutputsFragment_outputs">;
   } | null | undefined;
@@ -315,6 +315,11 @@ return {
               "kind": "FragmentSpread",
               "name": "StateVersionInputVariablesFragment_variables"
             },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ModuleSourceLinkFragment_run"
+            },
             (v0/*: any*/),
             (v3/*: any*/),
             {
@@ -445,6 +450,6 @@ return {
 };
 })();
 
-(node as any).hash = "a8c1c5e5a7847ac259a4dffad5b776d0";
+(node as any).hash = "1a0724b39c90961654e206ef77173afb";
 
 export default node;

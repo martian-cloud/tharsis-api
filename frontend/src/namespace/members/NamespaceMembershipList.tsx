@@ -2,12 +2,13 @@ import { Box, Paper, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import { useState } from 'react';
-import { useFragment, useMutation } from "react-relay/hooks";
+import { useFragment, useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import { ResponsiveTable } from '../../common/ResponsiveTable';
 import NamespaceMembershipListItem from './NamespaceMembershipListItem';
 import { NamespaceMembershipListDeleteNamespaceMembershipMutation } from './__generated__/NamespaceMembershipListDeleteNamespaceMembershipMutation.graphql';
 import { NamespaceMembershipListFragment_memberships$key } from './__generated__/NamespaceMembershipListFragment_memberships.graphql';
+import { NamespaceMembershipListQuery } from './__generated__/NamespaceMembershipListQuery.graphql';
 
 const getMemberName = (membership: any) => {
   switch (membership.member.__typename) {
@@ -47,31 +48,43 @@ function NamespaceMembershipList(props: Props) {
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
 
-  const data = useFragment<NamespaceMembershipListFragment_memberships$key>(
+  const namespace = useFragment<NamespaceMembershipListFragment_memberships$key>(
     graphql`
     fragment NamespaceMembershipListFragment_memberships on Namespace
     {
+      id
       fullPath
-      memberships {
-          id
-          member {
-              __typename
-              ...on User {
-                  username
-                  email
-              }
-              ...on Team {
-                name
-            }
-              ...on ServiceAccount {
-                  resourcePath
-                  name
-              }
-          }
-          ...NamespaceMembershipListItemFragment_membership
-      }
     }
   `, fragmentRef);
+
+  const queryData = useLazyLoadQuery<NamespaceMembershipListQuery>(graphql`
+      query NamespaceMembershipListQuery($id: String!) {
+          node(id: $id) {
+              ...on Namespace {
+                  memberships {
+                      id
+                      member {
+                          __typename
+                          ...on User {
+                              username
+                              email
+                          }
+                          ...on Team {
+                            name
+                        }
+                          ...on ServiceAccount {
+                              resourcePath
+                              name
+                          }
+                      }
+                      ...NamespaceMembershipListItemFragment_membership
+                  }
+              }
+          }
+      }
+  `, { id: namespace.id }, { fetchPolicy: 'store-and-network' });
+
+  const data = queryData.node;
 
   const [commitDeleteNamespaceMembership, deleteInFlight] = useMutation<NamespaceMembershipListDeleteNamespaceMembershipMutation>(graphql`
         mutation NamespaceMembershipListDeleteNamespaceMembershipMutation($input: DeleteNamespaceMembershipInput!) {
@@ -120,7 +133,8 @@ function NamespaceMembershipList(props: Props) {
     }
   };
 
-  const filteredNamespaceMemberships = search ? data.memberships.filter(membershipSearchFilter(search)) : [...data.memberships];
+  const memberships = data?.memberships ?? [];
+  const filteredNamespaceMemberships = search ? memberships.filter(membershipSearchFilter(search)) : [...memberships];
   filteredNamespaceMemberships.sort((a: any, b: any) => {
     const n1 = getMemberName(a);
     const n2 = getMemberName(b);
@@ -150,7 +164,7 @@ function NamespaceMembershipList(props: Props) {
           {filteredNamespaceMemberships.map((membership: any) => <NamespaceMembershipListItem
             key={membership.id}
             fragmentRef={membership}
-            namespacePath={data.fullPath}
+            namespacePath={namespace.fullPath}
             onDelete={onShowDeleteConfirmationDialog}
           />)}
         </ResponsiveTable>}
