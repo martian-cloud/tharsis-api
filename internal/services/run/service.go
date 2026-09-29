@@ -919,7 +919,7 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 		if err != nil {
 			return nil, err
 		}
-		filter.GroupID = &input.Group.Metadata.ID
+		filter.GroupPath = &input.Group.FullPath
 	default:
 		// Otherwise, only return runs the user caller has access to.
 		userCaller, ok := caller.(*auth.UserCaller)
@@ -1454,6 +1454,13 @@ func (s *service) GetPlanCheckResults(ctx context.Context, planID string) ([]cor
 
 	results := []corerun.CheckResult{}
 	for _, check := range tfPlan.Checks {
+		// Skip "var" checks — Terraform emits these for undefined / type-mismatch
+		// variable diagnostics, but they duplicate errors already surfaced during
+		// plan validation. Including them here would double-report them to callers.
+		if check.Address.Kind == "var" {
+			continue
+		}
+
 		objects := []corerun.CheckResultObject{}
 		for _, instance := range check.Instances {
 			var failureMessages []string

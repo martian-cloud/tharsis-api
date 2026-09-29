@@ -1,13 +1,10 @@
-import CopyIcon from '@mui/icons-material/ContentCopy';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { Chip, Stack, Tooltip, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
-import IconButton from '@mui/material/IconButton';
 import graphql from 'babel-plugin-relay/macro';
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { Link as LinkRouter } from 'react-router-dom';
-import { ApiConfigContext } from '../../ApiConfigContext';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import Drawer from '../../common/Drawer';
 import { MutationError } from '../../common/error';
@@ -15,6 +12,7 @@ import Gravatar from '../../common/Gravatar';
 import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
 import Link from '../../routes/Link';
+import ModuleSourceLink from '../ModuleSourceLink';
 import { RunDetailsSidebarFragment_details$key } from './__generated__/RunDetailsSidebarFragment_details.graphql';
 import { RunDetailsSidebarSetRunAutoApplyMutation } from './__generated__/RunDetailsSidebarSetRunAutoApplyMutation.graphql';
 import RunAnnotations from './RunAnnotations';
@@ -35,7 +33,6 @@ export const SidebarWidth = 300;
 
 function RunDetailsSidebar(props: Props) {
     const { stage, open, temporary, onClose, onError } = props;
-    const apiConfig = useContext(ApiConfigContext);
 
     const data = useFragment<RunDetailsSidebarFragment_details$key>(
         graphql`
@@ -50,6 +47,7 @@ function RunDetailsSidebar(props: Props) {
         hasAdvisoryFailures
         moduleSource
         moduleVersion
+        ...ModuleSourceLinkFragment_run
         annotations {
           key
         }
@@ -150,14 +148,6 @@ function RunDetailsSidebar(props: Props) {
         });
     };
 
-    // If module source references a module in the tharsis registry than strip the host
-    const moduleSource = useMemo(
-        () => (data.moduleSource && data.moduleSource?.startsWith(apiConfig.serviceDiscoveryHost)) ? data.moduleSource.substring(apiConfig.serviceDiscoveryHost.length + 1) : data.moduleSource,
-        [data.moduleSource, apiConfig.serviceDiscoveryHost]
-    );
-
-    const isTharsisModule = useMemo(() => moduleSource && moduleSource.length != data.moduleSource?.length, [moduleSource, data.moduleSource]);
-
     // Stage-nav entries reflect the aggregate task stage status (the pre-plan stage runs before the
     // plan, the post-plan stage after it). Each stage is its own route, so `stage` alone says which
     // entry is active.
@@ -250,29 +240,9 @@ function RunDetailsSidebar(props: Props) {
                         </Tooltip>
                     </Stack>
                 </Box>}
-                {moduleSource && <Box marginBottom={3}>
+                {data.moduleSource && <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Module Source</Typography>
-                    {!isTharsisModule && <React.Fragment>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Tooltip title={data.moduleSource}>
-                                <Typography sx={{ wordBreak: 'break-all' }}>
-                                    {`${moduleSource.substring(0, 24)}...`}
-                                </Typography>
-                            </Tooltip>
-                            <IconButton sx={{ padding: '4px' }} onClick={() => navigator.clipboard.writeText(data.moduleSource ?? '')}>
-                                <CopyIcon sx={{ width: 16, height: 16 }} />
-                            </IconButton>
-                        </Stack>
-                    </React.Fragment>}
-                    {isTharsisModule && <React.Fragment>
-                        <Tooltip title={moduleSource}>
-                            <Typography color="secondary" component="p" noWrap>
-                                <Link color="inherit" noWrap underline="hover" to={`/module-registry/${moduleSource}/${data.moduleVersion}`}>
-                                    {moduleSource}
-                                </Link>
-                            </Typography>
-                        </Tooltip>
-                    </React.Fragment>}
+                    <ModuleSourceLink fragmentRef={data} truncateAt={24} />
                 </Box>}
                 {data.moduleVersion && <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Module Version</Typography>

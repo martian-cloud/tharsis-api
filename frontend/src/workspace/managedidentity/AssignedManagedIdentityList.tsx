@@ -1,31 +1,81 @@
 import NoResults from '@/common/NoResults';
-import { Alert, Box, Button, Paper, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Paper, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
-import { useState } from 'react';
-import { useFragment, useMutation } from "react-relay/hooks";
+import { Suspense, useState } from 'react';
+import { useFragment, useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import { MutationError } from '../../common/error';
 import { ResponsiveTable } from '../../common/ResponsiveTable';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import AssignedManagedIdentityListItem from './AssignedManagedIdentityListItem';
 import ManagedIdentityAutocomplete, { ManagedIdentityOption } from './ManagedIdentityAutocomplete';
-import { AssignedManagedIdentityListFragment_assignedManagedIdentities$key } from './__generated__/AssignedManagedIdentityListFragment_assignedManagedIdentities.graphql';
+import { AssignedManagedIdentityListFragment_workspace$key } from './__generated__/AssignedManagedIdentityListFragment_workspace.graphql';
+import { AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities$key } from './__generated__/AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities.graphql';
+import { AssignedManagedIdentityListQuery } from './__generated__/AssignedManagedIdentityListQuery.graphql';
 import { AssignedManagedIdentityListMutation } from './__generated__/AssignedManagedIdentityListMutation.graphql';
 import { AssignedManagedIdentityListUnassignMutation } from './__generated__/AssignedManagedIdentityListUnassignMutation.graphql';
 
 interface Props {
-    fragmentRef: AssignedManagedIdentityListFragment_assignedManagedIdentities$key
+    fragmentRef: AssignedManagedIdentityListFragment_workspace$key
 }
 
+const query = graphql`
+    query AssignedManagedIdentityListQuery($id: String!) {
+        node(id: $id) {
+            ...on Workspace {
+                ...AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities
+            }
+        }
+    }
+`;
+
 function AssignedManagedIdentityList(props: Props) {
+    const workspace = useFragment<AssignedManagedIdentityListFragment_workspace$key>(graphql`
+        fragment AssignedManagedIdentityListFragment_workspace on Workspace {
+            id
+            fullPath
+        }
+    `, props.fragmentRef)
+
+    return (
+        <Box>
+            <NamespaceBreadcrumbs
+                namespacePath={workspace.fullPath}
+                childRoutes={[
+                    { title: "managed identities", path: 'managed_identities' }
+                ]}
+            />
+            <Typography variant="h5" gutterBottom>Assigned Managed Identities</Typography>
+            <Suspense fallback={
+                <Box padding={4} display="flex" justifyContent="center" alignItems="center">
+                    <CircularProgress />
+                </Box>
+            }>
+                <AssignedManagedIdentityListContent workspaceId={workspace.id} workspacePath={workspace.fullPath} />
+            </Suspense>
+        </Box>
+    );
+}
+
+interface AssignedManagedIdentityListContentProps {
+    workspaceId: string
+    workspacePath: string
+}
+
+function AssignedManagedIdentityListContent(props: AssignedManagedIdentityListContentProps) {
+    const { workspaceId, workspacePath } = props;
     const [selected, setSelected] = useState<ManagedIdentityOption | null>(null);
     const [error, setError] = useState<MutationError | null>()
     const { enqueueSnackbar } = useSnackbar();
 
-    const data = useFragment<AssignedManagedIdentityListFragment_assignedManagedIdentities$key>(graphql`
-        fragment AssignedManagedIdentityListFragment_assignedManagedIdentities on Workspace {
-            id
-            fullPath
+    const queryData = useLazyLoadQuery<AssignedManagedIdentityListQuery>(
+        query,
+        { id: workspaceId },
+        { fetchPolicy: 'store-and-network' },
+    );
+
+    const data = useFragment<AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities$key>(graphql`
+        fragment AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities on Workspace {
             managedIdentities(includeInherited: true, first: 1) {
                 edges {
                     node {
@@ -38,13 +88,13 @@ function AssignedManagedIdentityList(props: Props) {
                 ...AssignedManagedIdentityListItemFragment_managedIdentity
             }
         }
-    `, props.fragmentRef)
+    `, queryData.node)
 
     const [commitAssign, assignCommitInFlight] = useMutation<AssignedManagedIdentityListMutation>(graphql`
         mutation AssignedManagedIdentityListMutation($input: AssignManagedIdentityInput!) {
             assignManagedIdentity(input: $input) {
                 workspace {
-                    ...AssignedManagedIdentityListFragment_assignedManagedIdentities
+                    ...AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities
                 }
                 problems {
                     message
@@ -59,7 +109,7 @@ function AssignedManagedIdentityList(props: Props) {
         mutation AssignedManagedIdentityListUnassignMutation($input: AssignManagedIdentityInput!) {
             unassignManagedIdentity(input: $input) {
                 workspace {
-                    ...AssignedManagedIdentityListFragment_assignedManagedIdentities
+                    ...AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities
                 }
                 problems {
                     message
@@ -81,7 +131,7 @@ function AssignedManagedIdentityList(props: Props) {
                 variables: {
                     input: {
                         managedIdentityId: selected?.id,
-                        workspacePath: data.fullPath
+                        workspacePath: workspacePath
                     },
                 },
                 onCompleted: data => {
@@ -109,7 +159,7 @@ function AssignedManagedIdentityList(props: Props) {
             variables: {
                 input: {
                     managedIdentityId: id,
-                    workspacePath: data.fullPath
+                    workspacePath: workspacePath
                 },
             },
             onCompleted: data => {
@@ -130,7 +180,9 @@ function AssignedManagedIdentityList(props: Props) {
         })
     };
 
-    const assignedManagedIdentityIds = data.assignedManagedIdentities.reduce((accumulator, item) => {
+    const assignedManagedIdentities = data?.assignedManagedIdentities ?? [];
+
+    const assignedManagedIdentityIds = assignedManagedIdentities.reduce((accumulator, item) => {
         accumulator.add(item.id);
         return accumulator;
     }, new Set());
@@ -139,13 +191,6 @@ function AssignedManagedIdentityList(props: Props) {
 
     return (
         <Box>
-            <NamespaceBreadcrumbs
-                namespacePath={data.fullPath}
-                childRoutes={[
-                    { title: "managed identities", path: 'managed_identities' }
-                ]}
-            />
-            <Typography variant="h5" gutterBottom>Assigned Managed Identities</Typography>
             {edges.length > 0 &&
                 <Paper variant="outlined" sx={{ marginTop: 4, marginBottom: 4 }}>
                     <Box padding={2}>
@@ -158,7 +203,7 @@ function AssignedManagedIdentityList(props: Props) {
                         <Box display="flex" marginTop={2}>
                             <ManagedIdentityAutocomplete
                                 value={selected}
-                                namespacePath={data.fullPath}
+                                namespacePath={workspacePath}
                                 assignedManagedIdentityIDs={assignedManagedIdentityIds}
                                 onSelected={onManagedIdentitySelected}
                             />
@@ -181,9 +226,9 @@ function AssignedManagedIdentityList(props: Props) {
                 No managed identities have been created in any parent group
             </NoResults>}
 
-            {data.assignedManagedIdentities.length > 0 && <Box marginTop={2}>
+            {assignedManagedIdentities.length > 0 && <Box marginTop={2}>
                 <Typography variant="h6" gutterBottom>
-                    {data.assignedManagedIdentities.length} Assigned Managed Identit{data.assignedManagedIdentities.length === 1 ? 'y' : 'ies'}
+                    {assignedManagedIdentities.length} Assigned Managed Identit{assignedManagedIdentities.length === 1 ? 'y' : 'ies'}
                 </Typography>
                 <ResponsiveTable
                     ariaLabel="assigned managed identities"
@@ -194,7 +239,7 @@ function AssignedManagedIdentityList(props: Props) {
                         { label: '', align: 'right' },
                     ]}
                 >
-                    {data.assignedManagedIdentities.map((identity: any) => <AssignedManagedIdentityListItem
+                    {assignedManagedIdentities.map((identity: any) => <AssignedManagedIdentityListItem
                         key={identity.id}
                         managedIdentityKey={identity}
                         onUnassign={onUnassign}

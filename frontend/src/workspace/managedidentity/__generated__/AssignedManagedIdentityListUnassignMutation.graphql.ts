@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d2ffdc38bcc6477302b8cbaba08c43d1>>
+ * @generated SignedSource<<023fa3acc3ec81a0056451327e10eb13>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -29,7 +29,7 @@ export type AssignedManagedIdentityListUnassignMutation$data = {
       readonly type: ProblemType;
     }>;
     readonly workspace: {
-      readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListFragment_assignedManagedIdentities">;
+      readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities">;
     } | null | undefined;
   };
 };
@@ -119,7 +119,7 @@ return {
               {
                 "args": null,
                 "kind": "FragmentSpread",
-                "name": "AssignedManagedIdentityListFragment_assignedManagedIdentities"
+                "name": "AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities"
               }
             ],
             "storageKey": null
@@ -154,14 +154,6 @@ return {
             "name": "workspace",
             "plural": false,
             "selections": [
-              (v4/*: any*/),
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "fullPath",
-                "storageKey": null
-              },
               {
                 "alias": null,
                 "args": [
@@ -258,7 +250,8 @@ return {
                   }
                 ],
                 "storageKey": null
-              }
+              },
+              (v4/*: any*/)
             ],
             "storageKey": null
           },
@@ -269,16 +262,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "895b1600c635ee4e9d77c8644590dde7",
+    "cacheID": "05b07d047f86750e2233dd3a1e7ccd1e",
     "id": null,
     "metadata": {},
     "name": "AssignedManagedIdentityListUnassignMutation",
     "operationKind": "mutation",
-    "text": "mutation AssignedManagedIdentityListUnassignMutation(\n  $input: AssignManagedIdentityInput!\n) {\n  unassignManagedIdentity(input: $input) {\n    workspace {\n      ...AssignedManagedIdentityListFragment_assignedManagedIdentities\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment AssignedManagedIdentityListFragment_assignedManagedIdentities on Workspace {\n  id\n  fullPath\n  managedIdentities(includeInherited: true, first: 1) {\n    edges {\n      node {\n        id\n      }\n    }\n  }\n  assignedManagedIdentities {\n    id\n    ...AssignedManagedIdentityListItemFragment_managedIdentity\n  }\n}\n\nfragment AssignedManagedIdentityListItemFragment_managedIdentity on ManagedIdentity {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  type\n  resourcePath\n}\n"
+    "text": "mutation AssignedManagedIdentityListUnassignMutation(\n  $input: AssignManagedIdentityInput!\n) {\n  unassignManagedIdentity(input: $input) {\n    workspace {\n      ...AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities on Workspace {\n  managedIdentities(includeInherited: true, first: 1) {\n    edges {\n      node {\n        id\n      }\n    }\n  }\n  assignedManagedIdentities {\n    id\n    ...AssignedManagedIdentityListItemFragment_managedIdentity\n  }\n}\n\nfragment AssignedManagedIdentityListItemFragment_managedIdentity on ManagedIdentity {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  type\n  resourcePath\n}\n"
   }
 };
 })();
 
-(node as any).hash = "331e0d1cd0a18d7fabc8ba461e5d2d1c";
+(node as any).hash = "f060f7a49b3106671601066fcb1d5dd2";
 
 export default node;

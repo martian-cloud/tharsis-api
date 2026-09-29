@@ -113,7 +113,11 @@ function ServiceAccountForm({ data, onChange, editMode, error }: Props) {
                             onChange={event => onChange({
                                 ...data,
                                 enableClientCredentials: event.target.checked,
-                                clientSecretExpiresAt: event.target.checked ? moment().add(maxExpirationDays, 'days') : null
+                                // Use 'hours' rather than 'days' so the default expiration is a fixed
+                                // elapsed duration, not local wall-clock arithmetic. moment().add(n, 'days')
+                                // preserves wall-clock time across a DST transition, which shifts the actual
+                                // elapsed time by an hour and can push the default past the server's max bound.
+                                clientSecretExpiresAt: event.target.checked ? moment().add(maxExpirationDays * 24, 'hours') : null
                             })}
                         />
                     }

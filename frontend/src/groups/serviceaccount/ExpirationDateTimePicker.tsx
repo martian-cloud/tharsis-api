@@ -18,8 +18,10 @@ interface Props {
 
 export function isExpirationInvalid(value: Moment | null | undefined, maxExpirationDays: number): boolean {
     if (!value?.isValid()) return false; // null is valid (uses default)
-    const min = moment().add(MIN_EXPIRATION_DAYS, 'days');
-    const max = moment().add(maxExpirationDays, 'days');
+    // Use 'hours' rather than 'days' so the bounds are a fixed elapsed duration, not local
+    // wall-clock arithmetic that can drift by an hour across a DST transition.
+    const min = moment().add(MIN_EXPIRATION_DAYS * 24, 'hours');
+    const max = moment().add(maxExpirationDays * 24, 'hours');
     return value.isBefore(min) || value.isAfter(max);
 }
 
@@ -34,8 +36,8 @@ function ExpirationDateTimePicker({ value, onChange, maxExpirationDays, disabled
                         textField: { size: 'small' },
                         actionBar: { actions: ['clear', 'accept'] },
                     }}
-                    minDateTime={moment().add(MIN_EXPIRATION_DAYS, 'days')}
-                    maxDateTime={moment().add(maxExpirationDays, 'days')}
+                    minDateTime={moment().add(MIN_EXPIRATION_DAYS * 24, 'hours')}
+                    maxDateTime={moment().add(maxExpirationDays * 24, 'hours')}
                     value={value}
                     onChange={onChange}
                     disabled={disabled}

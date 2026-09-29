@@ -756,6 +756,7 @@ func TestGetRuns(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: "group-1",
 		},
+		FullPath: "group-1-path",
 	}
 
 	userID := "userID"
@@ -822,7 +823,7 @@ func TestGetRuns(t *testing.T) {
 			case test.input.Workspace != nil:
 				filter.WorkspaceID = ptr.String(test.input.Workspace.Metadata.ID)
 			case test.input.Group != nil:
-				filter.GroupID = ptr.String(test.input.Group.Metadata.ID)
+				filter.GroupPath = ptr.String(test.input.Group.FullPath)
 			default:
 				if !test.isAdmin {
 					filter.RootNamespaceMemberships = []models.MembershipNamespace{

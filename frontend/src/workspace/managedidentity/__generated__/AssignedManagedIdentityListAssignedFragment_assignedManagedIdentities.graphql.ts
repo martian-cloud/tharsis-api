@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ba71d2e9bd3f2df8519aa723d5fc7ee8>>
+ * @generated SignedSource<<7f073ca672b6f8abc10470246be6c9d9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,13 +10,11 @@
 
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type AssignedManagedIdentityListFragment_assignedManagedIdentities$data = {
+export type AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities$data = {
   readonly assignedManagedIdentities: ReadonlyArray<{
     readonly id: string;
     readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListItemFragment_managedIdentity">;
   }>;
-  readonly fullPath: string;
-  readonly id: string;
   readonly managedIdentities: {
     readonly edges: ReadonlyArray<{
       readonly node: {
@@ -24,11 +22,11 @@ export type AssignedManagedIdentityListFragment_assignedManagedIdentities$data =
       } | null | undefined;
     } | null | undefined> | null | undefined;
   };
-  readonly " $fragmentType": "AssignedManagedIdentityListFragment_assignedManagedIdentities";
+  readonly " $fragmentType": "AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities";
 };
-export type AssignedManagedIdentityListFragment_assignedManagedIdentities$key = {
-  readonly " $data"?: AssignedManagedIdentityListFragment_assignedManagedIdentities$data;
-  readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListFragment_assignedManagedIdentities">;
+export type AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities$key = {
+  readonly " $data"?: AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities$data;
+  readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities">;
 };
 
 const node: ReaderFragment = (function(){
@@ -43,16 +41,8 @@ return {
   "argumentDefinitions": [],
   "kind": "Fragment",
   "metadata": null,
-  "name": "AssignedManagedIdentityListFragment_assignedManagedIdentities",
+  "name": "AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities",
   "selections": [
-    (v0/*: any*/),
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "fullPath",
-      "storageKey": null
-    },
     {
       "alias": null,
       "args": [
@@ -121,6 +111,6 @@ return {
 };
 })();
 
-(node as any).hash = "f2c2779cfb52c5583939cd2284ecde86";
+(node as any).hash = "02c022e133115a09ca2b7e24a1206c4d";
 
 export default node;

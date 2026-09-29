@@ -66,7 +66,7 @@ function WorkspaceDetails(props: Props) {
       fullPath
       ...WorkspaceDetailsIndexFragment_workspace
       ...AssignedPolicyListFragment_workspace
-      ...AssignedManagedIdentityListFragment_assignedManagedIdentities
+      ...AssignedManagedIdentityListFragment_workspace
       ...RunsFragment_runs
       ...ConfigurationVersionDetailsFragment_workspace
       ...StateVersionsFragment_stateVersions

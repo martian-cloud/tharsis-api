@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f6657a88ed53b6f2e5482d134b4f310a>>
+ * @generated SignedSource<<330e69d31084fdba79b729cb11ff5679>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,10 +11,8 @@
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type WorkspaceSettingsFragment_workspace$data = {
-  readonly description: string;
   readonly fullPath: string;
-  readonly name: string;
-  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceAdvancedSettingsFragment_workspace" | "WorkspaceDriftDetectionSettingsFragment_workspace" | "WorkspaceGeneralSettingsFragment_workspace" | "WorkspaceLabelSettingsFragment_workspace" | "WorkspaceOutputVisibilitySettingsFragment_workspace" | "WorkspaceProviderMirrorSettingsFragment_workspace" | "WorkspaceRunSettingsFragment_workspace" | "WorkspaceRunnerSettingsFragment_workspace" | "WorkspaceStateSettingsFragment_workspace" | "WorkspaceVCSProviderSettingsFragment_workspace">;
+  readonly id: string;
   readonly " $fragmentType": "WorkspaceSettingsFragment_workspace";
 };
 export type WorkspaceSettingsFragment_workspace$key = {
@@ -32,14 +30,7 @@ const node: ReaderFragment = {
       "alias": null,
       "args": null,
       "kind": "ScalarField",
-      "name": "name",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "description",
+      "name": "id",
       "storageKey": null
     },
     {
@@ -48,62 +39,12 @@ const node: ReaderFragment = {
       "kind": "ScalarField",
       "name": "fullPath",
       "storageKey": null
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceGeneralSettingsFragment_workspace"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceRunnerSettingsFragment_workspace"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceRunSettingsFragment_workspace"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceDriftDetectionSettingsFragment_workspace"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceProviderMirrorSettingsFragment_workspace"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceOutputVisibilitySettingsFragment_workspace"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceAdvancedSettingsFragment_workspace"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceVCSProviderSettingsFragment_workspace"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceStateSettingsFragment_workspace"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceLabelSettingsFragment_workspace"
     }
   ],
   "type": "Workspace",
   "abstractKey": null
 };
 
-(node as any).hash = "54033f6aec736175261641dd30baecc4";
+(node as any).hash = "e8636926ffda42f835d835ffbfc47b17";
 
 export default node;

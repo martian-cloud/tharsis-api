@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<776ad4bb6c851a4eee664a49b2b69272>>
+ * @generated SignedSource<<4d74598fac2f1fe3ad6ff8f2d0a93d96>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -67,7 +67,7 @@ export type RunDetailsSidebarFragment_details$data = {
   readonly workspace: {
     readonly fullPath: string;
   };
-  readonly " $fragmentSpreads": FragmentRefs<"RunAnnotationsFragment_run">;
+  readonly " $fragmentSpreads": FragmentRefs<"ModuleSourceLinkFragment_run" | "RunAnnotationsFragment_run">;
   readonly " $fragmentType": "RunDetailsSidebarFragment_details";
 };
 export type RunDetailsSidebarFragment_details$key = {
@@ -202,6 +202,11 @@ return {
       "storageKey": null
     },
     {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "ModuleSourceLinkFragment_run"
+    },
+    {
       "alias": null,
       "args": null,
       "concreteType": "RunAnnotation",
@@ -325,6 +330,6 @@ return {
 };
 })();
 
-(node as any).hash = "b40bca310f52d35006484557d96452ee";
+(node as any).hash = "21e863452be2ba49f02781eb1add01dd";
 
 export default node;

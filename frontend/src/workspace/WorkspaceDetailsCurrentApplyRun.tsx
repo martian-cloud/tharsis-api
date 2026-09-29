@@ -35,7 +35,7 @@ function WorkspaceDetailsCurrentApplyRun(props: Props) {
                     <RunIcon />
                     <Typography component="div">
                         Run{' '}
-                        <Link to={`/groups/${data.fullPath}/-/runs/${data.currentApplyRun.id}`}>
+                        <Link color="secondary" to={`/groups/${data.fullPath}/-/runs/${data.currentApplyRun.id}`}>
                             {data.currentApplyRun.id.substring(0, 8)}...
                         </Link>
                         {' '}is currently in progress

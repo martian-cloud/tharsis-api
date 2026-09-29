@@ -156,7 +156,7 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 				orex := goqu.Or()
 				// Add both plain path and with slash anything else.
 				orex = orex.Append(goqu.I("namespaces.path").Eq(input.Filter.NamespacePath),
-					goqu.I("namespaces.path").Like(*input.Filter.NamespacePath+"/%"))
+					goqu.I("namespaces.path").Like(escapeLikePattern(*input.Filter.NamespacePath)+"/%"))
 				ex = ex.Append(orex)
 			} else {
 				// Return only activity events connected directly to a specified namespace.

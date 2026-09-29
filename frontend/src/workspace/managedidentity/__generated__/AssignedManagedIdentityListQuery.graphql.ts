@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<af57e12942afe08a04e2ac59542ca46d>>
+ * @generated SignedSource<<a4f7ae22bc4eed5956ace5d29b5dd3cd>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,32 +10,17 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
-export type AssignManagedIdentityInput = {
-  clientMutationId?: string | null | undefined;
-  managedIdentityId?: string | null | undefined;
-  managedIdentityPath?: string | null | undefined;
-  workspaceId?: string | null | undefined;
-  workspacePath?: string | null | undefined;
+export type AssignedManagedIdentityListQuery$variables = {
+  id: string;
 };
-export type AssignedManagedIdentityListMutation$variables = {
-  input: AssignManagedIdentityInput;
+export type AssignedManagedIdentityListQuery$data = {
+  readonly node: {
+    readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities">;
+  } | null | undefined;
 };
-export type AssignedManagedIdentityListMutation$data = {
-  readonly assignManagedIdentity: {
-    readonly problems: ReadonlyArray<{
-      readonly field: ReadonlyArray<string> | null | undefined;
-      readonly message: string;
-      readonly type: ProblemType;
-    }>;
-    readonly workspace: {
-      readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities">;
-    } | null | undefined;
-  };
-};
-export type AssignedManagedIdentityListMutation = {
-  response: AssignedManagedIdentityListMutation$data;
-  variables: AssignedManagedIdentityListMutation$variables;
+export type AssignedManagedIdentityListQuery = {
+  response: AssignedManagedIdentityListQuery$data;
+  variables: AssignedManagedIdentityListQuery$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -43,50 +28,17 @@ var v0 = [
   {
     "defaultValue": null,
     "kind": "LocalArgument",
-    "name": "input"
+    "name": "id"
   }
 ],
 v1 = [
   {
     "kind": "Variable",
-    "name": "input",
-    "variableName": "input"
+    "name": "id",
+    "variableName": "id"
   }
 ],
 v2 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "type",
-  "storageKey": null
-},
-v3 = {
-  "alias": null,
-  "args": null,
-  "concreteType": "Problem",
-  "kind": "LinkedField",
-  "name": "problems",
-  "plural": true,
-  "selections": [
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "message",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "field",
-      "storageKey": null
-    },
-    (v2/*: any*/)
-  ],
-  "storageKey": null
-},
-v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -98,23 +50,18 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "AssignedManagedIdentityListMutation",
+    "name": "AssignedManagedIdentityListQuery",
     "selections": [
       {
         "alias": null,
         "args": (v1/*: any*/),
-        "concreteType": "AssignManagedIdentityPayload",
+        "concreteType": null,
         "kind": "LinkedField",
-        "name": "assignManagedIdentity",
+        "name": "node",
         "plural": false,
         "selections": [
           {
-            "alias": null,
-            "args": null,
-            "concreteType": "Workspace",
-            "kind": "LinkedField",
-            "name": "workspace",
-            "plural": false,
+            "kind": "InlineFragment",
             "selections": [
               {
                 "args": null,
@@ -122,37 +69,39 @@ return {
                 "name": "AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities"
               }
             ],
-            "storageKey": null
-          },
-          (v3/*: any*/)
+            "type": "Workspace",
+            "abstractKey": null
+          }
         ],
         "storageKey": null
       }
     ],
-    "type": "Mutation",
+    "type": "Query",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "AssignedManagedIdentityListMutation",
+    "name": "AssignedManagedIdentityListQuery",
     "selections": [
       {
         "alias": null,
         "args": (v1/*: any*/),
-        "concreteType": "AssignManagedIdentityPayload",
+        "concreteType": null,
         "kind": "LinkedField",
-        "name": "assignManagedIdentity",
+        "name": "node",
         "plural": false,
         "selections": [
           {
             "alias": null,
             "args": null,
-            "concreteType": "Workspace",
-            "kind": "LinkedField",
-            "name": "workspace",
-            "plural": false,
+            "kind": "ScalarField",
+            "name": "__typename",
+            "storageKey": null
+          },
+          {
+            "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
@@ -189,7 +138,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v4/*: any*/)
+                          (v2/*: any*/)
                         ],
                         "storageKey": null
                       }
@@ -207,7 +156,7 @@ return {
                 "name": "assignedManagedIdentities",
                 "plural": true,
                 "selections": [
-                  (v4/*: any*/),
+                  (v2/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -240,7 +189,13 @@ return {
                     "name": "description",
                     "storageKey": null
                   },
-                  (v2/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "type",
+                    "storageKey": null
+                  },
                   {
                     "alias": null,
                     "args": null,
@@ -250,28 +205,28 @@ return {
                   }
                 ],
                 "storageKey": null
-              },
-              (v4/*: any*/)
+              }
             ],
-            "storageKey": null
+            "type": "Workspace",
+            "abstractKey": null
           },
-          (v3/*: any*/)
+          (v2/*: any*/)
         ],
         "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "4bdecc7d0ae4cd6a1f6884f40ca76b87",
+    "cacheID": "708292ff28f84122be4c787766007a33",
     "id": null,
     "metadata": {},
-    "name": "AssignedManagedIdentityListMutation",
-    "operationKind": "mutation",
-    "text": "mutation AssignedManagedIdentityListMutation(\n  $input: AssignManagedIdentityInput!\n) {\n  assignManagedIdentity(input: $input) {\n    workspace {\n      ...AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities on Workspace {\n  managedIdentities(includeInherited: true, first: 1) {\n    edges {\n      node {\n        id\n      }\n    }\n  }\n  assignedManagedIdentities {\n    id\n    ...AssignedManagedIdentityListItemFragment_managedIdentity\n  }\n}\n\nfragment AssignedManagedIdentityListItemFragment_managedIdentity on ManagedIdentity {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  type\n  resourcePath\n}\n"
+    "name": "AssignedManagedIdentityListQuery",
+    "operationKind": "query",
+    "text": "query AssignedManagedIdentityListQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Workspace {\n      ...AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities\n    }\n    id\n  }\n}\n\nfragment AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities on Workspace {\n  managedIdentities(includeInherited: true, first: 1) {\n    edges {\n      node {\n        id\n      }\n    }\n  }\n  assignedManagedIdentities {\n    id\n    ...AssignedManagedIdentityListItemFragment_managedIdentity\n  }\n}\n\nfragment AssignedManagedIdentityListItemFragment_managedIdentity on ManagedIdentity {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  type\n  resourcePath\n}\n"
   }
 };
 })();
 
-(node as any).hash = "4a61b83e610b707635f46b8dec881d83";
+(node as any).hash = "32579b048b741923349d6863dd3a7cf7";
 
 export default node;
