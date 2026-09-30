@@ -4,10 +4,10 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/doug-martin/goqu/v9"
@@ -20,6 +20,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
+// jobCleanupClaimLeaseDuration is how long a claimed job is skipped by other runners' cleanup pollers,
+// so a stale claim from a crashed runner becomes reclaimable once the lease lapses.
+const jobCleanupClaimLeaseDuration = 10 * time.Minute
+
 // Jobs encapsulates the logic to access jobs from the database
 type Jobs interface {
 	GetJobByID(ctx context.Context, id string) (*models.Job, error)
@@ -29,6 +33,8 @@ type Jobs interface {
 	UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error)
 	CreateJob(ctx context.Context, job *models.Job) (*models.Job, error)
 	GetJobCountForRunner(ctx context.Context, runnerID string) (int, error)
+	ClaimJobsForCleanup(ctx context.Context, input *ClaimJobsForCleanupInput) ([]models.Job, error)
+	MarkJobsCleanedUp(ctx context.Context, runnerID string, jobIDs []string) error
 }
 
 // JobSortableField represents the fields that a job can be sorted by
@@ -95,13 +101,43 @@ type JobsResult struct {
 	Jobs     []models.Job
 }
 
+// ClaimJobsForCleanupInput is the input for leasing final, dispatched, not-yet-cleaned jobs to a
+// runner's cleanup poller with FOR UPDATE SKIP LOCKED.
+type ClaimJobsForCleanupInput struct {
+	// RunnerID scopes the claim to jobs dispatched by the given runner.
+	RunnerID string
+	// Limit bounds how many jobs are returned in one call.
+	Limit uint
+}
+
 type jobs struct {
 	dbClient *Client
 }
 
-var jobFieldList = append(metadataFieldList, "status", "type", "workspace_id", "run_id",
+var jobFieldList = append(metadataFieldList,
+	"status",
+	"type",
+	"workspace_id",
+	"run_id",
 	"cancel_requested_at",
-	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration", "force_canceled", "tags", "properties", "outdated_job_protocol_version", "job_data")
+	"runner_id",
+	"runner_path",
+	"queued_at",
+	"pending_at",
+	"running_at",
+	"finished_at",
+	"max_job_duration",
+	"force_canceled",
+	"tags",
+	"properties",
+	"outdated_job_protocol_version",
+	"job_data",
+	"resource_usage_metrics",
+	"resource_usage_limits",
+	"dispatcher_data",
+	"cleanup_claimed_at",
+	"cleanup_completed_at",
+)
 
 // NewJobs returns an instance of the Jobs interface
 func NewJobs(dbClient *Client) Jobs {
@@ -297,6 +333,27 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 
 	timestamp := currentTime()
 
+	// A nil value marshals to nil ([]byte), which the driver writes as SQL NULL.
+	resourceUsageMetricsJSON, err := marshalOptionalJSON(job.ResourceUsageMetrics)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceUsageLimitsJSON, err := marshalOptionalJSON(job.ResourceUsageLimits)
+	if err != nil {
+		return nil, err
+	}
+
+	// Marshal dispatcher data to JSON; nil becomes SQL NULL.
+	var dispatcherDataJSON []byte
+	if job.DispatcherData != nil {
+		var mErr error
+		dispatcherDataJSON, mErr = json.Marshal(job.DispatcherData)
+		if mErr != nil {
+			return nil, mErr
+		}
+	}
+
 	sql, args, err := toSQLWithTag("jobs.UpdateJob", dialect.From("jobs").
 		Prepared(true).
 		With("jobs",
@@ -320,6 +377,10 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 						"outdated_job_protocol_version": job.OutdatedJobProtocolVersion,
 						"tags":                          tags,
 						"job_data":                      jobData,
+						"resource_usage_metrics":        resourceUsageMetricsJSON,
+						"resource_usage_limits":         resourceUsageLimitsJSON,
+						"dispatcher_data":               dispatcherDataJSON,
+						"cleanup_completed_at":          job.CleanupCompletedAt,
 					},
 				).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).
 				Returning("*"),
@@ -434,6 +495,118 @@ func (j *jobs) GetJobCountForRunner(ctx context.Context, runnerID string) (int, 
 	return count, nil
 }
 
+// ClaimJobsForCleanup leases up to input.Limit final, dispatched jobs that haven't been cleaned up,
+// scoped to the given runner. It stamps cleanup_claimed_at and skips rows another runner's poller
+// already holds (FOR UPDATE SKIP LOCKED), so two runners never reap the same job and a stale claim
+// from a crashed runner is reclaimable once the lease lapses.
+func (j *jobs) ClaimJobsForCleanup(ctx context.Context, input *ClaimJobsForCleanupInput) ([]models.Job, error) {
+	ctx, span := tracer.Start(ctx, "db.ClaimJobsForCleanup")
+	defer span.End()
+
+	if input.Limit == 0 {
+		return nil, nil
+	}
+
+	now := currentTime()
+
+	finalStatuses := []models.JobStatus{
+		models.JobFinished,
+		models.JobFailed,
+		models.JobCanceled,
+	}
+
+	claimable := dialect.From(goqu.T("jobs")).
+		Select(goqu.I("jobs.id")).
+		Where(goqu.And(
+			goqu.I("jobs.runner_id").Eq(input.RunnerID),
+			goqu.I("jobs.dispatcher_data").IsNotNull(),
+			goqu.I("jobs.cleanup_completed_at").IsNull(),
+			goqu.I("jobs.status").In(finalStatuses),
+			goqu.Or(
+				goqu.I("jobs.cleanup_claimed_at").IsNull(),
+				goqu.I("jobs.cleanup_claimed_at").Lt(now.Add(-jobCleanupClaimLeaseDuration)),
+			),
+		)).
+		Order(goqu.I("jobs.created_at").Asc()).
+		Limit(input.Limit).
+		ForUpdate(goqu.SkipLocked)
+
+	sql, args, err := toSQLWithTag("jobs.ClaimJobsForCleanup", dialect.From("jobs").
+		Prepared(true).
+		With("claimable", claimable).
+		With("jobs",
+			dialect.Update("jobs").
+				Set(goqu.Record{
+					"version":            goqu.L("version + 1"),
+					"updated_at":         now,
+					"cleanup_claimed_at": now,
+				}).
+				From(goqu.T("claimable")).
+				Where(goqu.I("jobs.id").Eq(goqu.I("claimable.id"))).
+				Returning(goqu.T("jobs").All()),
+		).Select(j.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	rows, err := j.dbClient.getConnection(ctx).Query(ctx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+	defer rows.Close()
+
+	results := []models.Job{}
+	for rows.Next() {
+		item, sErr := scanJob(rows)
+		if sErr != nil {
+			return nil, errors.Wrap(sErr, "failed to scan row", errors.WithSpan(span))
+		}
+		results = append(results, *item)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to iterate rows", errors.WithSpan(span))
+	}
+
+	return results, nil
+}
+
+// MarkJobsCleanedUp stamps cleanup_completed_at on the given jobs, scoped to the runner that owns them
+// and skipping any already marked. The runner_id predicate ensures a runner can only complete its own jobs.
+func (j *jobs) MarkJobsCleanedUp(ctx context.Context, runnerID string, jobIDs []string) error {
+	ctx, span := tracer.Start(ctx, "db.MarkJobsCleanedUp")
+	defer span.End()
+
+	if len(jobIDs) == 0 {
+		return nil
+	}
+
+	now := currentTime()
+
+	sql, args, err := toSQLWithTag("jobs.MarkJobsCleanedUp", dialect.Update("jobs").
+		Prepared(true).
+		Set(goqu.Record{
+			"version":              goqu.L("version + 1"),
+			"updated_at":           now,
+			"cleanup_completed_at": now,
+		}).
+		Where(goqu.And(
+			goqu.I("jobs.id").In(jobIDs),
+			goqu.I("jobs.runner_id").Eq(runnerID),
+			goqu.I("jobs.cleanup_completed_at").IsNull(),
+		)))
+	if err != nil {
+		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	if _, err := j.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
+		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+
+	return nil
+}
+
 func (j *jobs) getJob(ctx context.Context, exp goqu.Ex) (*models.Job, error) {
 	ctx, span := tracer.Start(ctx, "db.getJob")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -480,18 +653,13 @@ func (j *jobs) getSelectFields() []interface{} {
 }
 
 func scanJob(row scanner) (*models.Job, error) {
-	var cancelRequestedAt sql.NullTime
-	var queuedAt sql.NullTime
-	var pendingAt sql.NullTime
-	var runningAt sql.NullTime
-	var finishedAt sql.NullTime
 	var workspacePath string
 	var status models.JobStatus
 	var rawJobData []byte
 
 	job := &models.Job{}
 
-	fields := []interface{}{
+	fields := []any{
 		&job.Metadata.ID,
 		&job.Metadata.CreationTimestamp,
 		&job.Metadata.LastUpdatedTimestamp,
@@ -500,19 +668,24 @@ func scanJob(row scanner) (*models.Job, error) {
 		&job.Type,
 		&job.WorkspaceID,
 		&job.RunID,
-		&cancelRequestedAt,
+		&job.CancelRequestedTimestamp,
 		&job.RunnerID,
 		&job.RunnerPath,
-		&queuedAt,
-		&pendingAt,
-		&runningAt,
-		&finishedAt,
+		&job.Timestamps.QueuedTimestamp,
+		&job.Timestamps.PendingTimestamp,
+		&job.Timestamps.RunningTimestamp,
+		&job.Timestamps.FinishedTimestamp,
 		&job.MaxJobDuration,
 		&job.ForceCanceled,
 		&job.Tags,
 		&job.Properties,
 		&job.OutdatedJobProtocolVersion,
 		&rawJobData,
+		&job.ResourceUsageMetrics,
+		&job.ResourceUsageLimits,
+		&job.DispatcherData,
+		&job.CleanupClaimedAt,
+		&job.CleanupCompletedAt,
 		&workspacePath,
 	}
 
@@ -535,26 +708,6 @@ func scanJob(row scanner) (*models.Job, error) {
 				return nil, err
 			}
 		}
-	}
-
-	if cancelRequestedAt.Valid {
-		job.CancelRequestedTimestamp = &cancelRequestedAt.Time
-	}
-
-	if queuedAt.Valid {
-		job.Timestamps.QueuedTimestamp = &queuedAt.Time
-	}
-
-	if pendingAt.Valid {
-		job.Timestamps.PendingTimestamp = &pendingAt.Time
-	}
-
-	if runningAt.Valid {
-		job.Timestamps.RunningTimestamp = &runningAt.Time
-	}
-
-	if finishedAt.Valid {
-		job.Timestamps.FinishedTimestamp = &finishedAt.Time
 	}
 
 	job.Metadata.TRN = trn.TypeJob.Build(workspacePath, job.GetGlobalID())

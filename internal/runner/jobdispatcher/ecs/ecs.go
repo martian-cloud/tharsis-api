@@ -6,16 +6,20 @@ package ecs
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/smithy-go/ptr"
 	dispatchertypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
+
+// taskArnKey is the dispatcher-data key under which the task ARN is stored.
+const taskArnKey = "taskArn"
 
 var pluginDataRequiredFields = []string{"endpoint", "region", "task_definition", "cluster", "subnets", "launch_type"}
 
@@ -32,6 +36,7 @@ type JobDispatcher struct {
 	launchType             types.LaunchType
 	apiEndpoint            string
 	discoveryProtocolHosts []string
+	limits                 *dispatchertypes.ResourceLimits
 	subnets                []string
 }
 
@@ -74,6 +79,11 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		}
 	}
 
+	limits, err := dispatchertypes.LoadResourceLimits(pluginData)
+	if err != nil {
+		return nil, err
+	}
+
 	client := ecs.NewFromConfig(awsCfg)
 
 	return &JobDispatcher{
@@ -84,12 +94,25 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		subnets:                strings.Split(pluginData["subnets"], ","),
 		apiEndpoint:            pluginData["endpoint"],
 		discoveryProtocolHosts: discoveryProtocolHosts,
+		limits:                 limits,
 		client:                 client,
 	}, nil
 }
 
 // DispatchJob will start an ECS task to execute the job
-func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token string) (string, error) {
+func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token string) (map[string]string, error) {
+	environment := []types.KeyValuePair{
+		{Name: new("JOB_ID"), Value: &jobID},
+		{Name: new("JOB_TOKEN"), Value: &token},
+		{Name: new("ENDPOINT"), Value: &j.apiEndpoint},
+		{Name: new("DISCOVERY_PROTOCOL_HOSTS"), Value: new(strings.Join(j.discoveryProtocolHosts, ","))},
+	}
+
+	limitEnv := j.limits.AsEnvVars()
+	for _, name := range slices.Sorted(maps.Keys(limitEnv)) {
+		environment = append(environment, types.KeyValuePair{Name: new(name), Value: new(limitEnv[name])})
+	}
+
 	input := ecs.RunTaskInput{
 		TaskDefinition: &j.taskDefinition,
 		LaunchType:     j.launchType,
@@ -103,20 +126,15 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 		Overrides: &types.TaskOverride{
 			ContainerOverrides: []types.ContainerOverride{
 				{
-					Name: ptr.String("main"),
-					Environment: []types.KeyValuePair{
-						{Name: ptr.String("JOB_ID"), Value: &jobID},
-						{Name: ptr.String("JOB_TOKEN"), Value: &token},
-						{Name: ptr.String("ENDPOINT"), Value: &j.apiEndpoint},
-						{Name: ptr.String("DISCOVERY_PROTOCOL_HOSTS"), Value: ptr.String(strings.Join(j.discoveryProtocolHosts, ","))},
-					},
+					Name:        new("main"),
+					Environment: environment,
 				},
 			},
 		},
 	}
 	output, err := j.client.RunTask(ctx, &input)
 	if err != nil {
-		return "", fmt.Errorf("ECS Job Dispatcher failed to run task for job %s: %v", jobID, err)
+		return nil, fmt.Errorf("ECS Job Dispatcher failed to run task for job %s: %v", jobID, err)
 	}
 
 	if len(output.Failures) > 0 {
@@ -127,12 +145,22 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 		if output.Failures[0].Detail != nil {
 			errors = append(errors, *output.Failures[0].Detail)
 		}
-		return "", fmt.Errorf("failed to run task: %s", strings.Join(errors, "; "))
+		return nil, fmt.Errorf("failed to run task: %s", strings.Join(errors, "; "))
 	}
 
 	if len(output.Tasks) == 0 {
-		return "", fmt.Errorf("no ECS tasks were created")
+		return nil, fmt.Errorf("no ECS tasks were created")
 	}
 
-	return *output.Tasks[0].TaskArn, nil
+	return map[string]string{taskArnKey: *output.Tasks[0].TaskArn}, nil
+}
+
+// CleanupJob is a no-op; ECS tasks stop and are reclaimed by ECS on their own.
+func (*JobDispatcher) CleanupJob(_ context.Context, _ string, _ map[string]string) error {
+	return nil
+}
+
+// Limits returns the resource limits jobs run under.
+func (j *JobDispatcher) Limits() *dispatchertypes.ResourceLimits {
+	return j.limits
 }

@@ -1,0 +1,3 @@
+# A 64-bit signed integer, serialized as a JSON number. Used for counters that can exceed
+# the 32-bit range of Int (e.g. byte and packet totals) without the precision loss of Float.
+scalar Int64

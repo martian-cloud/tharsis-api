@@ -1,11 +1,13 @@
 import AutoScrollIcon from '@mui/icons-material/ArrowCircleDown';
-import { Alert, Box, darken, LinearProgress, Paper, ToggleButton, Tooltip, Typography, useTheme } from '@mui/material';
+import KeyboardDoubleArrowDownIcon from '@mui/icons-material/KeyboardDoubleArrowDown';
+import { Alert, Box, darken, IconButton, LinearProgress, Paper, ToggleButton, Tooltip, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useMemo, useRef, useState } from 'react';
 import { useFragment, useLazyLoadQuery, useSubscription } from 'react-relay/hooks';
 import { GraphQLSubscriptionConfig, RecordSourceProxy } from 'relay-runtime';
-import Timestamp from '../../common/Timestamp';
-import LogViewer from './LogViewer';
+import Timestamp from '../../../common/Timestamp';
+import LogViewer, { LogViewerHandle } from '../LogViewer';
+import RunDetailsStageTabEmptyState from '../RunDetailsStageTabEmptyState';
 import { JobLogsFragment_logs$key } from './__generated__/JobLogsFragment_logs.graphql';
 import { JobLogsQuery } from './__generated__/JobLogsQuery.graphql';
 import { JobLogsSubscription, JobLogsSubscription$data } from './__generated__/JobLogsSubscription.graphql';
@@ -79,18 +81,20 @@ function JobLogsContent(props: { fragmentRef: JobLogsFragment_logs$key, scrollMo
         {
             id
             status
+            type
             completed
             logLastUpdatedAt
             logSize
             logs(startOffset: $startOffset, limit: $limit)
         }
-      `, props.fragmentRef)
+      `, props.fragmentRef);
 
     const [logs, setLogs] = useState(data.logs);
     const [currentLogSize, setCurrentLogSize] = useState(bytes(data.logs));
     const [actualLogSize, setActualLogSize] = useState(data.logSize);
     const [completed, setCompleted] = useState(data.completed);
     const [autoScroll, setAutoScroll] = useState(!FINAL_JOB_STATES.includes(data.status));
+    const logViewerRef = useRef<LogViewerHandle>(null);
     // Tracks the byte size already appended so we can dedupe events without re-measuring
     // the whole accumulated buffer on every event. Only valid for this job, which is why the
     // component is keyed on the job id by its caller.
@@ -120,6 +124,16 @@ function JobLogsContent(props: { fragmentRef: JobLogsFragment_logs$key, scrollMo
 
     const loadedPercent = useMemo(() => (currentLogSize / actualLogSize) * 100, [currentLogSize, actualLogSize]);
 
+    if (completed && !logs.trim()) {
+        const emptyMessage = data.type === 'plan' ? 'This plan produced no logs.'
+            : data.type === 'opa' ? 'This policy check produced no logs.'
+                : 'This apply produced no logs.';
+
+        return (
+            <RunDetailsStageTabEmptyState message={emptyMessage} />
+        );
+    }
+
     return (
         <Box>
             <Paper square>
@@ -135,20 +149,29 @@ function JobLogsContent(props: { fragmentRef: JobLogsFragment_logs$key, scrollMo
                     {data.logLastUpdatedAt && <Typography color="textSecondary">
                         last updated <Timestamp timestamp={data.logLastUpdatedAt as string} />
                     </Typography>}
-                    <Tooltip title={autoScroll ? 'Disable auto scroll' : 'Enable auto scroll'}>
-                        <ToggleButton
-                            size="small"
-                            value="check"
-                            selected={autoScroll}
-                            onChange={() => setAutoScroll(!autoScroll)}
-                        >
-                            <AutoScrollIcon />
-                        </ToggleButton>
-                    </Tooltip>
+                    {!FINAL_JOB_STATES.includes(data.status) ? (
+                        <Tooltip title={autoScroll ? 'Disable auto scroll' : 'Enable auto scroll'}>
+                            <ToggleButton
+                                size="small"
+                                value="check"
+                                selected={autoScroll}
+                                onChange={() => setAutoScroll(!autoScroll)}
+                            >
+                                <AutoScrollIcon />
+                            </ToggleButton>
+                        </Tooltip>
+                    ) : (
+                        <Tooltip title="Scroll to bottom">
+                            <IconButton size="small" onClick={() => logViewerRef.current?.scrollToBottom()}>
+                                <KeyboardDoubleArrowDownIcon />
+                            </IconButton>
+                        </Tooltip>
+                    )}
                 </Box>
             </Paper>
             {completed && loadedPercent < 100 && <LinearProgress variant="determinate" value={loadedPercent} />}
             <LogViewer
+                ref={logViewerRef}
                 logs={logs}
                 loading={!completed}
                 followOutput={autoScroll}

@@ -50,6 +50,36 @@ func (_m *MockService) ClaimJob(ctx context.Context, runnerID string) (*ClaimJob
 	return r0, r1
 }
 
+// ClaimJobsForCleanup provides a mock function with given fields: ctx, input
+func (_m *MockService) ClaimJobsForCleanup(ctx context.Context, input *ClaimJobsForCleanupInput) ([]models.Job, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClaimJobsForCleanup")
+	}
+
+	var r0 []models.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *ClaimJobsForCleanupInput) ([]models.Job, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *ClaimJobsForCleanupInput) []models.Job); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *ClaimJobsForCleanupInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetJobByID provides a mock function with given fields: ctx, jobID
 func (_m *MockService) GetJobByID(ctx context.Context, jobID string) (*models.Job, error) {
 	ret := _m.Called(ctx, jobID)
@@ -260,6 +290,42 @@ func (_m *MockService) GetRunnerAvailabilityForJob(ctx context.Context, jobID st
 	return r0, r1
 }
 
+// JobDispatched provides a mock function with given fields: ctx, jobID, dispatcherData, limits
+func (_m *MockService) JobDispatched(ctx context.Context, jobID string, dispatcherData map[string]string, limits *models.JobResourceUsageLimits) error {
+	ret := _m.Called(ctx, jobID, dispatcherData, limits)
+
+	if len(ret) == 0 {
+		panic("no return value specified for JobDispatched")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, map[string]string, *models.JobResourceUsageLimits) error); ok {
+		r0 = rf(ctx, jobID, dispatcherData, limits)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MarkJobsCleanedUp provides a mock function with given fields: ctx, input
+func (_m *MockService) MarkJobsCleanedUp(ctx context.Context, input *MarkJobsCleanedUpInput) error {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkJobsCleanedUp")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *MarkJobsCleanedUpInput) error); ok {
+		r0 = rf(ctx, input)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ReadLogs provides a mock function with given fields: ctx, jobID, startOffset, limit
 func (_m *MockService) ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) (io.ReadCloser, error) {
 	ret := _m.Called(ctx, jobID, startOffset, limit)
@@ -283,6 +349,36 @@ func (_m *MockService) ReadLogs(ctx context.Context, jobID string, startOffset i
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) error); ok {
 		r1 = rf(ctx, jobID, startOffset, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SaveJobResourceUsage provides a mock function with given fields: ctx, jobID, metrics
+func (_m *MockService) SaveJobResourceUsage(ctx context.Context, jobID string, metrics *models.JobResourceUsageMetrics) (*models.Job, error) {
+	ret := _m.Called(ctx, jobID, metrics)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SaveJobResourceUsage")
+	}
+
+	var r0 *models.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *models.JobResourceUsageMetrics) (*models.Job, error)); ok {
+		return rf(ctx, jobID, metrics)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *models.JobResourceUsageMetrics) *models.Job); ok {
+		r0 = rf(ctx, jobID, metrics)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *models.JobResourceUsageMetrics) error); ok {
+		r1 = rf(ctx, jobID, metrics)
 	} else {
 		r1 = ret.Error(1)
 	}

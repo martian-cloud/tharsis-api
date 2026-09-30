@@ -9,28 +9,37 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
 	dockerclient "github.com/docker/docker/client"
-	"github.com/dustin/go-humanize"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
+var _ jobdispatcher.JobDispatcher = (*JobDispatcher)(nil)
+
 var pluginDataRequiredFields = []string{"host", "image", "endpoint"}
+
+// containerIDKey is the dispatcher-data key under which the container ID is stored for cleanup.
+const containerIDKey = "containerID"
 
 type client interface {
 	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error)
 	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
+	ContainerRemove(ctx context.Context, containerID string, options container.RemoveOptions) error
 }
 
 // JobDispatcher uses the local docker api to dispatch jobs
@@ -44,8 +53,8 @@ type JobDispatcher struct {
 	apiEndpoint            string
 	discoveryProtocolHosts []string
 	extraHosts             []string
+	limits                 *types.ResourceLimits
 	localImage             bool
-	memoryLimit            int64 // in bytes, zero means unlimited
 }
 
 // New creates a JobDispatcher
@@ -74,16 +83,9 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 		extraHosts = append(extraHosts, strings.Split(pluginData["extra_hosts"], ",")...)
 	}
 
-	var memoryLimit int64
-	if mLimit, ok := pluginData["memory_limit"]; ok {
-		tmp, mErr := humanize.ParseBytes(mLimit)
-		memoryLimit = int64(tmp)
-		if mErr != nil {
-			return nil, fmt.Errorf("failed to parse job dispatcher 'memory_limit' config: %w", mErr)
-		}
-		if memoryLimit < 0 {
-			return nil, fmt.Errorf("invalid value for 'memory_limit' config: %s", mLimit)
-		}
+	limits, err := types.LoadResourceLimits(pluginData)
+	if err != nil {
+		return nil, err
 	}
 
 	discoveryProtocolHosts := []string{}
@@ -111,26 +113,26 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 		registryUsername:       pluginData["registry_username"],
 		registryPassword:       pluginData["registry_password"],
 		extraHosts:             extraHosts,
+		limits:                 limits,
 		localImage:             localImage,
 		client:                 client,
 		logger:                 logger,
-		memoryLimit:            memoryLimit,
 	}, nil
 }
 
 // DispatchJob will start a docker container to execute the job
-func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token string) (string, error) {
+func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token string) (map[string]string, error) {
 	if !j.localImage {
 		authStr, err := j.getRegistryAuth()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		out, err := j.client.ImagePull(ctx, j.image, image.PullOptions{
 			RegistryAuth: authStr,
 		})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		_, _ = io.Copy(os.Stdout, out)
 	}
@@ -145,30 +147,36 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 		hostConfig.Binds = []string{j.bindPath}
 	}
 
-	if j.memoryLimit != 0 {
-		hostConfig.Resources.Memory = j.memoryLimit
-		hostConfig.Resources.MemorySwap = j.memoryLimit
+	if j.limits != nil && j.limits.MemoryBytes != 0 {
+		hostConfig.Memory = int64(j.limits.MemoryBytes)
+		hostConfig.MemorySwap = int64(j.limits.MemoryBytes)
+	}
+
+	env := []string{
+		fmt.Sprintf("ENDPOINT=%s", j.apiEndpoint),
+		fmt.Sprintf("JOB_ID=%s", jobID),
+		fmt.Sprintf("JOB_TOKEN=%s", token),
+		fmt.Sprintf("DISCOVERY_PROTOCOL_HOSTS=%s", strings.Join(j.discoveryProtocolHosts, ",")),
+	}
+
+	limitEnv := j.limits.AsEnvVars()
+	for _, name := range slices.Sorted(maps.Keys(limitEnv)) {
+		env = append(env, fmt.Sprintf("%s=%s", name, limitEnv[name]))
 	}
 
 	resp, err := j.client.ContainerCreate(ctx, &container.Config{
 		Image: j.image,
-		Env: []string{
-			fmt.Sprintf("ENDPOINT=%s", j.apiEndpoint),
-			fmt.Sprintf("JOB_ID=%s", jobID),
-			fmt.Sprintf("JOB_TOKEN=%s", token),
-			fmt.Sprintf("DISCOVERY_PROTOCOL_HOSTS=%s", strings.Join(j.discoveryProtocolHosts, ",")),
-			fmt.Sprintf("MEMORY_LIMIT=%d", j.memoryLimit),
-		},
+		Env:   env,
 	}, hostConfig, nil, nil, "")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := j.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return resp.ID, nil
+	return map[string]string{containerIDKey: resp.ID}, nil
 }
 
 func (j *JobDispatcher) getRegistryAuth() (string, error) {
@@ -186,4 +194,30 @@ func (j *JobDispatcher) getRegistryAuth() (string, error) {
 		return base64.URLEncoding.EncodeToString(encodedAuth), nil
 	}
 	return "", nil
+}
+
+// CleanupJob removes the job's container, whose ID DispatchJob returned as the runtime resource name.
+func (j *JobDispatcher) CleanupJob(ctx context.Context, jobID string, dispatcherData map[string]string) error {
+	containerID := dispatcherData[containerIDKey]
+	if containerID == "" {
+		// Nothing to remove without a container ID; skip the API call rather than remove an empty ID.
+		j.logger.Warnf("docker job dispatcher skipping cleanup for job %s: dispatcher data has no container ID", jobID)
+		return nil
+	}
+
+	// Force removal so a container that is still running (e.g. a canceled job) is torn down too.
+	if err := j.client.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true}); err != nil {
+		if cerrdefs.IsNotFound(err) {
+			return nil
+		}
+
+		return fmt.Errorf("docker job dispatcher failed to remove container %s for job %s: %v", containerID, jobID, err)
+	}
+
+	return nil
+}
+
+// Limits returns the resource limits jobs run under.
+func (j *JobDispatcher) Limits() *types.ResourceLimits {
+	return j.limits
 }

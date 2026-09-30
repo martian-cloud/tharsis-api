@@ -5,7 +5,7 @@ import moment from 'moment';
 import { Suspense, useState } from 'react';
 import { useFragment, useLazyLoadQuery, usePaginationFragment } from 'react-relay/hooks';
 import Timestamp from '../../../common/Timestamp';
-import JobStatusChip from '../JobStatusChip';
+import JobStatusChip from '../jobs/JobStatusChip';
 import { RunTaskStagePolicyCheckPreviousJobsMenuFragment_jobs$key } from './__generated__/RunTaskStagePolicyCheckPreviousJobsMenuFragment_jobs.graphql';
 import { RunTaskStagePolicyCheckPreviousJobsMenuPaginationQuery } from './__generated__/RunTaskStagePolicyCheckPreviousJobsMenuPaginationQuery.graphql';
 import { RunTaskStagePolicyCheckPreviousJobsMenuQuery } from './__generated__/RunTaskStagePolicyCheckPreviousJobsMenuQuery.graphql';

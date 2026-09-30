@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -10,8 +9,10 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerimage "github.com/docker/docker/api/types/image"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -98,14 +99,12 @@ func TestDispatchJob(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			apiURL := "https://test"
 			discoveryProtocolHost := "test.com"
 			token := "token1"
 			image := "testimage"
-			memoryLimit := uint64(0)
 
 			client := mockClient{}
 			client.Test(t)
@@ -129,7 +128,6 @@ func TestDispatchJob(t *testing.T) {
 					fmt.Sprintf("JOB_ID=%s", test.jobID),
 					fmt.Sprintf("JOB_TOKEN=%s", token),
 					fmt.Sprintf("DISCOVERY_PROTOCOL_HOSTS=%s", discoveryProtocolHost),
-					fmt.Sprintf("MEMORY_LIMIT=%d", memoryLimit),
 				},
 			}, hostConfig, mock.Anything, mock.Anything, "").Return(test.retOutput, test.containerCreateRetErr)
 
@@ -147,14 +145,117 @@ func TestDispatchJob(t *testing.T) {
 				client:                 &client,
 			}
 
-			taskID, err := dispatcher.DispatchJob(ctx, test.jobID, token)
+			dispatcherData, err := dispatcher.DispatchJob(ctx, test.jobID, token)
 			if test.expectErrorMsg != "" {
 				assert.EqualError(t, err, test.expectErrorMsg)
 			} else {
 				assert.Nil(t, err, "Unexpected error occurred %v", err)
+				assert.Equal(t, test.expectTaskID, dispatcherData[containerIDKey])
+			}
+		})
+	}
+}
+
+func TestDispatchJob_memoryLimit(t *testing.T) {
+	ctx := t.Context()
+
+	apiURL := "https://test"
+	discoveryProtocolHost := "test.com"
+	token := "token1"
+	image := "testimage"
+
+	client := mockClient{}
+	client.Test(t)
+
+	client.On("ContainerCreate", ctx, mock.MatchedBy(func(cfg *dockercontainer.Config) bool {
+		for _, e := range cfg.Env {
+			if e == "MEMORY_LIMIT=268435456" {
+				return true
+			}
+		}
+
+		return false
+	}), mock.MatchedBy(func(hc *dockercontainer.HostConfig) bool {
+		return hc.Memory == 268435456 && hc.MemorySwap == 268435456
+	}), mock.Anything, mock.Anything, "").Return(dockercontainer.CreateResponse{ID: "123"}, nil)
+
+	client.On("ContainerStart", ctx, "123", dockercontainer.StartOptions{}).Return(nil)
+
+	limits, err := types.LoadResourceLimits(map[string]string{"memory_limit": "256Mi"})
+	assert.NoError(t, err)
+
+	dispatcher := JobDispatcher{
+		logger:                 logger.New(),
+		image:                  image,
+		localImage:             true,
+		apiEndpoint:            apiURL,
+		discoveryProtocolHosts: []string{discoveryProtocolHost},
+		limits:                 limits,
+		client:                 &client,
+	}
+
+	dispatcherData, err := dispatcher.DispatchJob(ctx, "job1", token)
+	assert.NoError(t, err)
+	assert.Equal(t, "123", dispatcherData[containerIDKey])
+}
+
+func TestJobDispatcher_CleanupJob(t *testing.T) {
+	const containerID = "container-123"
+
+	tests := []struct {
+		name       string
+		data       map[string]string
+		setupMocks func(*mockClient)
+		wantErr    bool
+	}{
+		{
+			name: "removes the container by resource name",
+			data: map[string]string{containerIDKey: containerID},
+			setupMocks: func(c *mockClient) {
+				c.On("ContainerRemove", mock.Anything, containerID, dockercontainer.RemoveOptions{Force: true}).Return(nil).Once()
+			},
+			wantErr: false,
+		},
+		{
+			name: "not found is treated as already cleaned up",
+			data: map[string]string{containerIDKey: containerID},
+			setupMocks: func(c *mockClient) {
+				c.On("ContainerRemove", mock.Anything, containerID, dockercontainer.RemoveOptions{Force: true}).
+					Return(fmt.Errorf("no such container: %w", cerrdefs.ErrNotFound)).Once()
+			},
+			wantErr: false,
+		},
+		{
+			name: "remove error is returned",
+			data: map[string]string{containerIDKey: containerID},
+			setupMocks: func(c *mockClient) {
+				c.On("ContainerRemove", mock.Anything, containerID, dockercontainer.RemoveOptions{Force: true}).Return(fmt.Errorf("boom")).Once()
+			},
+			wantErr: true,
+		},
+		{
+			name:       "missing container ID skips the remove call",
+			data:       map[string]string{},
+			setupMocks: func(*mockClient) {},
+			wantErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newMockClient(t)
+			tt.setupMocks(c)
+
+			j := &JobDispatcher{client: c, logger: logger.New()}
+
+			err := j.CleanupJob(t.Context(), "job-gid", tt.data)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
 			}
 
-			assert.Equal(t, test.expectTaskID, taskID)
+			assert.NoError(t, err)
 		})
 	}
 }

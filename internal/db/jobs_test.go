@@ -22,8 +22,8 @@ func jobWithStatus(j *models.Job, status models.JobStatus) *models.Job {
 }
 
 // getValue implements the sortableField interface for JobSortableField
-func (j JobSortableField) getValue() string {
-	return string(j)
+func (js JobSortableField) getValue() string {
+	return string(js)
 }
 
 func TestJobs_CreateJob(t *testing.T) {
@@ -183,6 +183,137 @@ func TestJobs_UpdateJob(t *testing.T) {
 			assert.Equal(t, createdJob.Metadata.Version+1, updatedJob.Metadata.Version)
 		})
 	}
+}
+
+func TestJobs_UpdateJob_ResourceUsageMetrics(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-job-metrics",
+		Description: "test group for job resource metrics",
+		FullPath:    "test-group-job-metrics",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-job-metrics",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	createdJob, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
+		WorkspaceID: workspace.Metadata.ID,
+		RunID:       run.Metadata.ID,
+		Type:        models.JobPlanType,
+	}, models.JobQueued))
+	require.Nil(t, err)
+
+	t.Run("nil resource metrics round-trips as nil", func(t *testing.T) {
+		jobToUpdate := *createdJob
+		_ = jobToUpdate.SetStatus(models.JobPending)
+		// ResourceMetrics is nil by default — verify it stays nil after update.
+		updatedJob, err := testClient.client.Jobs.UpdateJob(ctx, &jobToUpdate)
+		require.Nil(t, err)
+		assert.Nil(t, updatedJob.ResourceUsageMetrics)
+		createdJob = updatedJob
+	})
+
+	t.Run("resource metrics persist and round-trip correctly", func(t *testing.T) {
+		peakMem := int64(512_000_000)
+		cpuMS := float64(4_200)
+		netRecvBytes := int64(1_048_576)
+		netSentBytes := int64(524_288)
+		netRecvPkts := int64(1_024)
+		netSentPkts := int64(512)
+		diskR := int64(209_715_200)
+		diskW := int64(104_857_600)
+
+		jobToUpdate := *createdJob
+		_ = jobToUpdate.SetStatus(models.JobRunning)
+		jobToUpdate.ResourceUsageMetrics = &models.JobResourceUsageMetrics{
+			PeakMemoryBytes:             &peakMem,
+			TotalCPUTimeMS:              &cpuMS,
+			TotalNetworkReceivedBytes:   &netRecvBytes,
+			TotalNetworkSentBytes:       &netSentBytes,
+			TotalNetworkReceivedPackets: &netRecvPkts,
+			TotalNetworkSentPackets:     &netSentPkts,
+			TotalDiskReadBytes:          &diskR,
+			TotalDiskWriteBytes:         &diskW,
+		}
+
+		updatedJob, err := testClient.client.Jobs.UpdateJob(ctx, &jobToUpdate)
+		require.Nil(t, err)
+		require.NotNil(t, updatedJob.ResourceUsageMetrics)
+
+		assert.Equal(t, peakMem, *updatedJob.ResourceUsageMetrics.PeakMemoryBytes)
+		assert.Equal(t, cpuMS, *updatedJob.ResourceUsageMetrics.TotalCPUTimeMS)
+		assert.Equal(t, netRecvBytes, *updatedJob.ResourceUsageMetrics.TotalNetworkReceivedBytes)
+		assert.Equal(t, netSentBytes, *updatedJob.ResourceUsageMetrics.TotalNetworkSentBytes)
+		assert.Equal(t, netRecvPkts, *updatedJob.ResourceUsageMetrics.TotalNetworkReceivedPackets)
+		assert.Equal(t, netSentPkts, *updatedJob.ResourceUsageMetrics.TotalNetworkSentPackets)
+		assert.Equal(t, diskR, *updatedJob.ResourceUsageMetrics.TotalDiskReadBytes)
+		assert.Equal(t, diskW, *updatedJob.ResourceUsageMetrics.TotalDiskWriteBytes)
+		createdJob = updatedJob
+	})
+
+	t.Run("resource metrics can be cleared back to nil", func(t *testing.T) {
+		jobToUpdate := *createdJob
+		jobToUpdate.ResourceUsageMetrics = nil
+
+		updatedJob, err := testClient.client.Jobs.UpdateJob(ctx, &jobToUpdate)
+		require.Nil(t, err)
+		assert.Nil(t, updatedJob.ResourceUsageMetrics)
+		createdJob = updatedJob
+	})
+
+	t.Run("resource usage limits persist and round-trip correctly", func(t *testing.T) {
+		memLimit := int64(1_610_612_736)
+		netRecvLimit := int64(2_097_152)
+		netSentLimit := int64(1_048_576)
+		diskRLimit := int64(419_430_400)
+		diskWLimit := int64(209_715_200)
+
+		jobToUpdate := *createdJob
+		jobToUpdate.ResourceUsageLimits = &models.JobResourceUsageLimits{
+			MemoryBytes:          &memLimit,
+			NetworkReceivedBytes: &netRecvLimit,
+			NetworkSentBytes:     &netSentLimit,
+			DiskReadBytes:        &diskRLimit,
+			DiskWriteBytes:       &diskWLimit,
+		}
+
+		updatedJob, err := testClient.client.Jobs.UpdateJob(ctx, &jobToUpdate)
+		require.Nil(t, err)
+		require.NotNil(t, updatedJob.ResourceUsageLimits)
+
+		assert.Equal(t, memLimit, *updatedJob.ResourceUsageLimits.MemoryBytes)
+		assert.Equal(t, netRecvLimit, *updatedJob.ResourceUsageLimits.NetworkReceivedBytes)
+		assert.Equal(t, netSentLimit, *updatedJob.ResourceUsageLimits.NetworkSentBytes)
+		assert.Equal(t, diskRLimit, *updatedJob.ResourceUsageLimits.DiskReadBytes)
+		assert.Equal(t, diskWLimit, *updatedJob.ResourceUsageLimits.DiskWriteBytes)
+		createdJob = updatedJob
+	})
+
+	t.Run("resource usage limits can be cleared back to nil", func(t *testing.T) {
+		jobToUpdate := *createdJob
+		jobToUpdate.ResourceUsageLimits = nil
+
+		updatedJob, err := testClient.client.Jobs.UpdateJob(ctx, &jobToUpdate)
+		require.Nil(t, err)
+		assert.Nil(t, updatedJob.ResourceUsageLimits)
+	})
 }
 
 func TestJobs_GetJobByID(t *testing.T) {
@@ -756,4 +887,213 @@ func TestJobs_GetLatestJobByType(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestJobs_ClaimJobsForCleanup(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-job-cleanup",
+		FullPath:  "test-group-job-cleanup",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-job-cleanup",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	runner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+		Name: "test-runner-cleanup",
+		Type: models.SharedRunnerType,
+	})
+	require.NoError(t, err)
+
+	otherRunner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+		Name: "test-runner-cleanup-other",
+		Type: models.SharedRunnerType,
+	})
+	require.NoError(t, err)
+
+	// advanceToFinal walks a job through valid status transitions to reach a final status, since
+	// SetStatus rejects illegal jumps (e.g. queued -> finished).
+	advanceToFinal := func(job *models.Job, final models.JobStatus) {
+		path := []models.JobStatus{models.JobPending, models.JobRunning, final}
+		if final == models.JobCanceled {
+			path = []models.JobStatus{models.JobCanceled}
+		}
+		for _, s := range path {
+			require.NoError(t, job.SetStatus(s))
+		}
+	}
+
+	// createCleanableJob builds a job then advances it to a final status with dispatcher metadata set,
+	// which is the state the cleanup poller claims.
+	createCleanableJob := func(runnerID string, status models.JobStatus) *models.Job {
+		job, cErr := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
+			WorkspaceID: workspace.Metadata.ID,
+			RunID:       run.Metadata.ID,
+			Type:        models.JobPlanType,
+			RunnerID:    &runnerID,
+		}, models.JobQueued))
+		require.NoError(t, cErr)
+
+		advanceToFinal(job, status)
+		job.DispatcherData = map[string]string{"resourceName": "pod-" + job.Metadata.ID}
+		updated, uErr := testClient.client.Jobs.UpdateJob(ctx, job)
+		require.NoError(t, uErr)
+		return updated
+	}
+
+	// Eligible: final + dispatched + owned by runner.
+	eligible := createCleanableJob(runner.Metadata.ID, models.JobFinished)
+
+	// Ineligible variants that must never be claimed for this runner.
+	createCleanableJob(otherRunner.Metadata.ID, models.JobFinished) // different runner
+
+	nonFinal, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
+		WorkspaceID: workspace.Metadata.ID,
+		RunID:       run.Metadata.ID,
+		Type:        models.JobPlanType,
+		RunnerID:    &runner.Metadata.ID,
+	}, models.JobQueued))
+	require.NoError(t, err)
+	require.NoError(t, nonFinal.SetStatus(models.JobPending))
+	require.NoError(t, nonFinal.SetStatus(models.JobRunning))
+	nonFinal.DispatcherData = map[string]string{"resourceName": "pod-running"}
+	_, err = testClient.client.Jobs.UpdateJob(ctx, nonFinal)
+	require.NoError(t, err)
+
+	// Final but no dispatcher metadata (never dispatched to an external runtime).
+	noMetadata, err := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
+		WorkspaceID: workspace.Metadata.ID,
+		RunID:       run.Metadata.ID,
+		Type:        models.JobPlanType,
+		RunnerID:    &runner.Metadata.ID,
+	}, models.JobQueued))
+	require.NoError(t, err)
+	require.NoError(t, noMetadata.SetStatus(models.JobCanceled))
+	_, err = testClient.client.Jobs.UpdateJob(ctx, noMetadata)
+	require.NoError(t, err)
+
+	t.Run("claims only the eligible job for the runner and leases it", func(t *testing.T) {
+		claimed, cErr := testClient.client.Jobs.ClaimJobsForCleanup(ctx, &ClaimJobsForCleanupInput{
+			RunnerID: runner.Metadata.ID,
+			Limit:    10,
+		})
+		require.NoError(t, cErr)
+		require.Len(t, claimed, 1)
+		assert.Equal(t, eligible.Metadata.ID, claimed[0].Metadata.ID)
+		assert.Equal(t, map[string]string{"resourceName": "pod-" + eligible.Metadata.ID}, claimed[0].DispatcherData)
+	})
+
+	t.Run("a leased job is not re-claimed within the lease window", func(t *testing.T) {
+		claimed, cErr := testClient.client.Jobs.ClaimJobsForCleanup(ctx, &ClaimJobsForCleanupInput{
+			RunnerID: runner.Metadata.ID,
+			Limit:    10,
+		})
+		require.NoError(t, cErr)
+		assert.Empty(t, claimed)
+	})
+
+	t.Run("a limit of zero claims nothing", func(t *testing.T) {
+		claimed, cErr := testClient.client.Jobs.ClaimJobsForCleanup(ctx, &ClaimJobsForCleanupInput{
+			RunnerID: runner.Metadata.ID,
+			Limit:    0,
+		})
+		require.NoError(t, cErr)
+		assert.Empty(t, claimed)
+	})
+}
+
+func TestJobs_MarkJobsCleanedUp(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-job-mark-clean",
+		FullPath:  "test-group-job-mark-clean",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-job-mark-clean",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	runner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+		Name: "test-runner-mark-clean",
+		Type: models.SharedRunnerType,
+	})
+	require.NoError(t, err)
+
+	otherRunner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+		Name: "test-runner-mark-clean-other",
+		Type: models.SharedRunnerType,
+	})
+	require.NoError(t, err)
+
+	createFinalJob := func(runnerID string) *models.Job {
+		job, cErr := testClient.client.Jobs.CreateJob(ctx, jobWithStatus(&models.Job{
+			WorkspaceID: workspace.Metadata.ID,
+			RunID:       run.Metadata.ID,
+			Type:        models.JobPlanType,
+			RunnerID:    &runnerID,
+		}, models.JobQueued))
+		require.NoError(t, cErr)
+		require.NoError(t, job.SetStatus(models.JobPending))
+		require.NoError(t, job.SetStatus(models.JobRunning))
+		require.NoError(t, job.SetStatus(models.JobFinished))
+		job.DispatcherData = map[string]string{"resourceName": "pod-" + job.Metadata.ID}
+		updated, uErr := testClient.client.Jobs.UpdateJob(ctx, job)
+		require.NoError(t, uErr)
+		return updated
+	}
+
+	owned := createFinalJob(runner.Metadata.ID)
+	otherOwned := createFinalJob(otherRunner.Metadata.ID)
+
+	t.Run("marks the runner's jobs cleaned up and leaves other runners' jobs untouched", func(t *testing.T) {
+		err := testClient.client.Jobs.MarkJobsCleanedUp(ctx, runner.Metadata.ID, []string{owned.Metadata.ID, otherOwned.Metadata.ID})
+		require.NoError(t, err)
+
+		gotOwned, gErr := testClient.client.Jobs.GetJobByID(ctx, owned.Metadata.ID)
+		require.NoError(t, gErr)
+		assert.NotNil(t, gotOwned.CleanupCompletedAt)
+
+		// otherOwned belongs to a different runner, so the runner_id predicate must exclude it.
+		gotOther, gErr := testClient.client.Jobs.GetJobByID(ctx, otherOwned.Metadata.ID)
+		require.NoError(t, gErr)
+		assert.Nil(t, gotOther.CleanupCompletedAt)
+	})
+
+	t.Run("an empty job list is a no-op", func(t *testing.T) {
+		err := testClient.client.Jobs.MarkJobsCleanedUp(ctx, runner.Metadata.ID, nil)
+		require.NoError(t, err)
+	})
 }

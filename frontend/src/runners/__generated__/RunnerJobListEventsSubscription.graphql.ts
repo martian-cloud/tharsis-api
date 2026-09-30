@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<06f200c55982967ac17ab7f635110f65>>
+ * @generated SignedSource<<665225840d56fe084d4366ef91883b65>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -141,36 +141,6 @@ return {
               {
                 "alias": null,
                 "args": null,
-                "concreteType": "JobOPAData",
-                "kind": "LinkedField",
-                "name": "opaData",
-                "plural": false,
-                "selections": [
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "taskStageName",
-                    "storageKey": null
-                  }
-                ],
-                "storageKey": null
-              },
-              {
-                "alias": null,
-                "args": null,
-                "concreteType": "Run",
-                "kind": "LinkedField",
-                "name": "run",
-                "plural": false,
-                "selections": [
-                  (v3/*: any*/)
-                ],
-                "storageKey": null
-              },
-              {
-                "alias": null,
-                "args": null,
                 "concreteType": "JobTimestamps",
                 "kind": "LinkedField",
                 "name": "timestamps",
@@ -267,12 +237,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "37d3b1b3e5b09a928eda3093895575ec",
+    "cacheID": "661808273bd36078c634e7afa892ccfe",
     "id": null,
     "metadata": {},
     "name": "RunnerJobListEventsSubscription",
     "operationKind": "subscription",
-    "text": "subscription RunnerJobListEventsSubscription(\n  $input: JobSubscriptionInput!\n) {\n  jobEvents(input: $input) {\n    action\n    job {\n      id\n      ...RunnerJobListItemFragment\n    }\n  }\n}\n\nfragment RunnerJobListItemFragment on Job {\n  id\n  status\n  type\n  opaData {\n    taskStageName\n  }\n  run {\n    id\n  }\n  timestamps {\n    queuedAt\n    pendingAt\n    runningAt\n    finishedAt\n  }\n  workspace {\n    name\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    updatedAt\n  }\n}\n"
+    "text": "subscription RunnerJobListEventsSubscription(\n  $input: JobSubscriptionInput!\n) {\n  jobEvents(input: $input) {\n    action\n    job {\n      id\n      ...RunnerJobListItemFragment\n    }\n  }\n}\n\nfragment RunnerJobListItemFragment on Job {\n  id\n  status\n  type\n  timestamps {\n    queuedAt\n    pendingAt\n    runningAt\n    finishedAt\n  }\n  workspace {\n    name\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    updatedAt\n  }\n}\n"
   }
 };
 })();

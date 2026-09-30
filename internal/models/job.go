@@ -84,10 +84,37 @@ type JobTimestamps struct {
 	FinishedTimestamp *time.Time
 }
 
+// JobResourceUsageMetrics holds resource usage; a nil field means the metric was not collected (e.g. non-Linux host).
+type JobResourceUsageMetrics struct {
+	PeakMemoryBytes             *int64   `json:"peakMemoryBytes,omitempty"`
+	TotalCPUTimeMS              *float64 `json:"totalCpuTimeMs,omitempty"`
+	TotalNetworkReceivedBytes   *int64   `json:"totalNetworkReceivedBytes,omitempty"`
+	TotalNetworkSentBytes       *int64   `json:"totalNetworkSentBytes,omitempty"`
+	TotalNetworkReceivedPackets *int64   `json:"totalNetworkReceivedPackets,omitempty"`
+	TotalNetworkSentPackets     *int64   `json:"totalNetworkSentPackets,omitempty"`
+	TotalDiskReadBytes          *int64   `json:"totalDiskReadBytes,omitempty"`
+	TotalDiskWriteBytes         *int64   `json:"totalDiskWriteBytes,omitempty"`
+}
+
+// JobResourceUsageLimits holds the configured resource ceilings a job ran under; a nil field means that resource was unlimited.
+type JobResourceUsageLimits struct {
+	MemoryBytes          *int64 `json:"memoryBytes,omitempty"`
+	NetworkReceivedBytes *int64 `json:"networkReceivedBytes,omitempty"`
+	NetworkSentBytes     *int64 `json:"networkSentBytes,omitempty"`
+	DiskReadBytes        *int64 `json:"diskReadBytes,omitempty"`
+	DiskWriteBytes       *int64 `json:"diskWriteBytes,omitempty"`
+}
+
 // Job represents a unit of work that needs to be completed
 type Job struct {
-	Timestamps                 JobTimestamps
-	CancelRequestedTimestamp   *time.Time
+	Timestamps               JobTimestamps
+	ResourceUsageMetrics     *JobResourceUsageMetrics
+	ResourceUsageLimits      *JobResourceUsageLimits
+	CancelRequestedTimestamp *time.Time
+	// DispatcherData holds opaque dispatcher-specific runtime data (e.g. a Kubernetes pod name or Docker container ID) and is nil until the runner reports a successful dispatch.
+	DispatcherData             map[string]string
+	CleanupClaimedAt           *time.Time
+	CleanupCompletedAt         *time.Time
 	status                     JobStatus
 	Type                       JobType
 	WorkspaceID                string

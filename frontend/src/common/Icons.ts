@@ -18,6 +18,7 @@ import {
     KeyVariant as KeyIcon,
     Terraform as TerraformIcon,
     RobotOutline as RunnerIcon,
+    ConsoleLine as JobIcon,
     ServerNetwork as FederatedRegistryIcon,
     DeleteClockOutline as CleanupPolicyIcon,
 } from 'mdi-material-ui';
@@ -39,6 +40,7 @@ export {
     TerraformIcon,
     VCSProviderIcon,
     RunnerIcon,
+    JobIcon,
     UserIcon,
     FederatedRegistryIcon,
     AnnouncementIcon,

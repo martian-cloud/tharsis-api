@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<27fb74d322a221d88b3cfb82837335b7>>
+ * @generated SignedSource<<c99b2267e2bc498b6601cbb1c9cd1afb>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -132,6 +132,13 @@ return {
                 "alias": null,
                 "args": null,
                 "kind": "ScalarField",
+                "name": "type",
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
                 "name": "completed",
                 "storageKey": null
               },
@@ -177,12 +184,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "2d49c7105ba492cbfd30f1784c4a38dc",
+    "cacheID": "10ce6df325767ba1d34f38afcb93cc11",
     "id": null,
     "metadata": {},
     "name": "JobLogsQuery",
     "operationKind": "query",
-    "text": "query JobLogsQuery(\n  $id: String!\n  $startOffset: Int!\n  $limit: Int!\n) {\n  node(id: $id) {\n    __typename\n    ... on Job {\n      ...JobLogsFragment_logs\n    }\n    id\n  }\n}\n\nfragment JobLogsFragment_logs on Job {\n  id\n  status\n  completed\n  logLastUpdatedAt\n  logSize\n  logs(startOffset: $startOffset, limit: $limit)\n}\n"
+    "text": "query JobLogsQuery(\n  $id: String!\n  $startOffset: Int!\n  $limit: Int!\n) {\n  node(id: $id) {\n    __typename\n    ... on Job {\n      ...JobLogsFragment_logs\n    }\n    id\n  }\n}\n\nfragment JobLogsFragment_logs on Job {\n  id\n  status\n  type\n  completed\n  logLastUpdatedAt\n  logSize\n  logs(startOffset: $startOffset, limit: $limit)\n}\n"
   }
 };
 })();

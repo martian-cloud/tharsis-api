@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -310,6 +311,21 @@ func toSQLWithTag(tag string, query sqlGenerator) (string, []interface{}, error)
 		return "", nil, err
 	}
 	return sqltag.Inject(tag, sql), args, nil
+}
+
+// marshalOptionalJSON marshals a nilable pointer for a JSONB column, returning nil bytes (SQL NULL)
+// for a nil pointer rather than the JSON literal "null". It wraps marshal failures with context.
+func marshalOptionalJSON[T any](v *T) ([]byte, error) {
+	if v == nil {
+		return nil, nil
+	}
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, te.Wrap(err, "failed to marshal column to JSON")
+	}
+
+	return data, nil
 }
 
 // RetryOnOLE will retry the given function if an optimistic lock error occurs

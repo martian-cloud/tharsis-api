@@ -10,7 +10,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MutationError } from '../../common/error';
 import Link from '../../routes/Link';
 import ForceCancelRunAlert from './ForceCancelRunAlert';
-import JobLogs from './JobLogs';
+import JobLogs from './jobs/JobLogs';
+import JobResourceUsageMetrics from './jobs/JobResourceUsageMetrics';
 import NoRunnerAlert from './NoRunnerAlert';
 import OutdatedProtocolAlert from './OutdatedProtocolAlert';
 import RunDetailsErrorSummary from './RunDetailsErrorSummary';
@@ -71,6 +72,9 @@ function RunDetailsPlanStage(props: Props) {
             id
             status
             createdBy
+            workspace {
+                fullPath
+            }
             plan {
                 id
                 metadata {
@@ -95,6 +99,7 @@ function RunDetailsPlanStage(props: Props) {
                   }
                   ...NoRunnerAlertFragment_job
                   ...OutdatedProtocolAlertFragment_job
+                  ...JobResourceUsageMetricsFragment_job
                 }
                 jobs(first: 0) {
                   totalCount
@@ -407,9 +412,10 @@ function RunDetailsPlanStage(props: Props) {
                         <Tab label="Variables" value="variables" />
                         <Tab label="Changes" value="changes" />
                         <Tab label="Plan JSON" value="planjson" />
+                        <Tab label="Resource Usage" value="resources" />
                     </Tabs>
                 </Box>
-                {tab === 'logs' && <Box>
+                {tab === 'logs' && <Box marginTop={2}>
                     {viewingEarlierJob && <Alert severity="warning" sx={{ my: 2 }}>
                         Showing logs for an earlier job{' '}
                         <Link color="inherit" to={'?tab=logs'}>(view latest job)</Link>
@@ -467,14 +473,20 @@ function RunDetailsPlanStage(props: Props) {
                             'The plan file will be available once the plan has completed' : 'The plan file is not available'}
                     />}
                 </Box>}
+                {tab === 'resources' && <Box marginTop={2}>
+                    {data.plan.currentJob ? <JobResourceUsageMetrics
+                        fragmentRef={data.plan.currentJob}
+                        columns="single"
+                        emptyMessage={['pending', 'queued', 'running'].includes(data.plan.currentJob.status) ?
+                            'Resource usage will be available once the plan job has completed' :
+                            'No resource usage was collected for the plan job'}
+                    /> : <RunDetailsStageTabEmptyState message="Resource usage will be available once the plan job has started" />}
+                </Box>}
             </Box>
             {jobDialogOpen && <RunJobDialog
                 runId={data.id}
                 stage="plan"
-                onSelectJob={(id) => {
-                    navigate({ search: `?tab=logs&jobId=${id}` }, { replace: true });
-                    setJobDialogOpen(false);
-                }}
+                workspacePath={data.workspace.fullPath}
                 onClose={() => setJobDialogOpen(false)}
             />}
         </Box>

@@ -72,6 +72,7 @@ func newTestDownloaderWithURL(t *testing.T, testURL string) *cliDownloader {
 		httpClient: &http.Client{
 			Transport: &rewriteTransport{target: testURL},
 		},
+		jobLogger: noopJobLogger{},
 	}
 }
 
@@ -463,6 +464,7 @@ func downloaderServingKey(t *testing.T, armoredKey []byte, trusted map[string]st
 	return &cliDownloader{
 		httpClient:          &http.Client{Transport: &rewriteTransport{target: server.URL}},
 		trustedFingerprints: trusted,
+		jobLogger:           noopJobLogger{},
 	}
 }
 
@@ -546,5 +548,77 @@ func TestHashicorpTrustedGPGFingerprints_WellFormed(t *testing.T) {
 		if len(raw) != 20 {
 			t.Errorf("fingerprint %q decodes to %d bytes, want 20 (v4 fingerprint)", fp, len(raw))
 		}
+	}
+}
+
+// TestEmbeddedGPGKey_ParsesAndMatchesPinnedFingerprint verifies the embedded
+// HashiCorp signing key is a well-formed armored key whose primary-key fingerprint
+// is on the pinned allowlist, so the embedded-key path can actually be used.
+func TestEmbeddedGPGKey_ParsesAndMatchesPinnedFingerprint(t *testing.T) {
+	keyRing, err := openpgp.ReadArmoredKeyRing(strings.NewReader(hashicorpPublicGPGKey))
+	if err != nil {
+		t.Fatalf("embedded GPG key failed to parse: %v", err)
+	}
+	if len(keyRing) == 0 {
+		t.Fatal("embedded GPG key ring is empty")
+	}
+
+	found := false
+	for _, entity := range keyRing {
+		fp := strings.ToLower(hex.EncodeToString(entity.PrimaryKey.Fingerprint))
+		if _, ok := hashicorpTrustedGPGFingerprints[fp]; ok {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("embedded GPG key primary fingerprint is not on the pinned allowlist")
+	}
+}
+
+// TestVerifyChecksumsWithFallback verifies checksum-signature verification tries the
+// embedded key first and falls back to the well-known endpoint key.
+func TestVerifyChecksumsWithFallback(t *testing.T) {
+	checksums := []byte("abc123  terraform_1.12.0_linux_amd64.zip\n")
+
+	tests := []struct {
+		name    string
+		wantErr bool
+	}{
+		{
+			// Embedded HashiCorp key can't match the test signature, so it falls back to the served key.
+			name:    "falls back to the remote key when the embedded key does not match",
+			wantErr: false,
+		},
+		{
+			// Neither the embedded key nor the served (unrelated) key can verify the signature.
+			name:    "fails when no candidate key matches",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			signingKey := generateTestKey(t, "signer", time.Time{}, 0)
+			signature := signContent(t, signingKey, checksums)
+
+			// On the success case serve the signing key; on the failure case serve an unrelated key.
+			servedKey := signingKey
+			if tt.wantErr {
+				servedKey = generateTestKey(t, "other", time.Time{}, 0)
+			}
+			fp := strings.ToLower(hex.EncodeToString(servedKey.PrimaryKey.Fingerprint))
+			downloader := downloaderServingKey(t, armorEntities(t, servedKey), map[string]struct{}{fp: {}})
+
+			err := downloader.verifyChecksumsWithFallback(checksums, signature)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected verification to fail when no candidate key matches")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("expected fallback to the remote key to succeed, got: %v", err)
+			}
+		})
 	}
 }

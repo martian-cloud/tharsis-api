@@ -134,6 +134,35 @@ func (s *JobServer) SetJobStatus(ctx context.Context, req *pb.SetJobStatusInput)
 	return toPBJob(job), nil
 }
 
+// SaveJobResourceUsage saves resource usage collected during job execution.
+func (s *JobServer) SaveJobResourceUsage(ctx context.Context, req *pb.SaveJobResourceUsageInput) (*pb.Job, error) {
+	jobID, err := s.serviceCatalog.FetchModelID(ctx, req.JobId)
+	if err != nil {
+		return nil, err
+	}
+
+	var metrics *models.JobResourceUsageMetrics
+	if m := req.GetMetrics(); m != nil {
+		metrics = &models.JobResourceUsageMetrics{
+			PeakMemoryBytes:             m.PeakMemoryBytes,
+			TotalCPUTimeMS:              m.TotalCpuTimeMs,
+			TotalNetworkReceivedBytes:   m.TotalNetworkReceivedBytes,
+			TotalNetworkSentBytes:       m.TotalNetworkSentBytes,
+			TotalNetworkReceivedPackets: m.TotalNetworkReceivedPackets,
+			TotalNetworkSentPackets:     m.TotalNetworkSentPackets,
+			TotalDiskReadBytes:          m.TotalDiskReadBytes,
+			TotalDiskWriteBytes:         m.TotalDiskWriteBytes,
+		}
+	}
+
+	job, err := s.serviceCatalog.JobService.SaveJobResourceUsage(ctx, jobID, metrics)
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBJob(job), nil
+}
+
 // SaveJobLogs saves job logs.
 func (s *JobServer) SaveJobLogs(ctx context.Context, req *pb.SaveJobLogsRequest) (*emptypb.Empty, error) {
 	jobID, err := s.serviceCatalog.FetchModelID(ctx, req.JobId)
@@ -164,6 +193,78 @@ func (s *JobServer) ClaimJob(ctx context.Context, req *pb.ClaimJobRequest) (*pb.
 		Job:   toPBJob(resp.Job),
 		Token: resp.Token,
 	}, nil
+}
+
+// JobDispatched records that a runner dispatched a job, carrying opaque dispatcher data and limits.
+func (s *JobServer) JobDispatched(ctx context.Context, req *pb.JobDispatchedRequest) (*emptypb.Empty, error) {
+	jobID, err := s.serviceCatalog.FetchModelID(ctx, req.JobId)
+	if err != nil {
+		return nil, err
+	}
+
+	var limits *models.JobResourceUsageLimits
+	if l := req.GetLimits(); l != nil {
+		limits = &models.JobResourceUsageLimits{
+			MemoryBytes:          l.MemoryBytes,
+			NetworkReceivedBytes: l.NetworkReceivedBytes,
+			NetworkSentBytes:     l.NetworkSentBytes,
+			DiskReadBytes:        l.DiskReadBytes,
+			DiskWriteBytes:       l.DiskWriteBytes,
+		}
+	}
+
+	if err = s.serviceCatalog.JobService.JobDispatched(ctx, jobID, req.DispatcherData, limits); err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
+// ClaimJobsForCleanup leases final, dispatched jobs whose runtimes still need tearing down.
+func (s *JobServer) ClaimJobsForCleanup(ctx context.Context, req *pb.ClaimJobsForCleanupRequest) (*pb.ClaimJobsForCleanupResponse, error) {
+	runnerID, err := s.serviceCatalog.FetchModelID(ctx, req.RunnerId)
+	if err != nil {
+		return nil, err
+	}
+
+	jobs, err := s.serviceCatalog.JobService.ClaimJobsForCleanup(ctx, &job.ClaimJobsForCleanupInput{
+		RunnerID: runnerID,
+		Limit:    uint(req.Limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	pbJobs := make([]*pb.Job, len(jobs))
+	for i := range jobs {
+		pbJobs[i] = toPBJob(&jobs[i])
+	}
+
+	return &pb.ClaimJobsForCleanupResponse{Jobs: pbJobs}, nil
+}
+
+// MarkJobsCleanedUp records that a runner tore down the runtimes of a batch of jobs.
+func (s *JobServer) MarkJobsCleanedUp(ctx context.Context, req *pb.MarkJobsCleanedUpRequest) (*emptypb.Empty, error) {
+	runnerID, err := s.serviceCatalog.FetchModelID(ctx, req.RunnerId)
+	if err != nil {
+		return nil, err
+	}
+
+	jobIDs := make([]string, len(req.JobIds))
+	for i, id := range req.JobIds {
+		// We don't anticipate passing in TRN here so optimizing
+		// for just GID to avoid a DB call per ID.
+		jobIDs[i] = gid.FromGlobalID(id)
+	}
+
+	if err = s.serviceCatalog.JobService.MarkJobsCleanedUp(ctx, &job.MarkJobsCleanedUpInput{
+		RunnerID: runnerID,
+		JobIDs:   jobIDs,
+	}); err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
 }
 
 // SubscribeToJobLogStream subscribes to job log stream events.
@@ -294,6 +395,7 @@ func toPBJob(j *models.Job) *pb.Job {
 		CancelRequested:            j.GetStatus() == models.JobCanceling,
 		ForceCanceled:              j.ForceCanceled,
 		OutdatedJobProtocolVersion: j.OutdatedJobProtocolVersion,
+		DispatcherData:             j.DispatcherData,
 	}
 	if j.OPAData != nil {
 		pbJob.JobData = &pb.Job_OpaData{

@@ -85,6 +85,9 @@
     "schema": "schema/schema.graphql",
     "language": "typescript",
     "eagerEsModules": true,
+    "customScalarTypes": {
+      "Int64": "number"
+    },
     "exclude": [
       "**/node_modules/**",
       "**/__mocks__/**",

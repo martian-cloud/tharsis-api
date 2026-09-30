@@ -55,7 +55,7 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 }
 
 // DispatchJob will launch a local job executor that can be used to facilitate debugging
-func (l *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token string) (string, error) {
+func (l *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token string) (map[string]string, error) {
 	client, err := jobclient.NewClient(ctx, &jobclient.ClientConfig{
 		APIEndpoint:   l.apiURL,
 		Token:         token,
@@ -64,7 +64,7 @@ func (l *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 		Logger:        l.logger.Slog(),
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	go func() {
@@ -96,5 +96,15 @@ func (l *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 		}
 	}()
 
-	return "local", nil
+	return map[string]string{"mode": "local"}, nil
+}
+
+// CleanupJob is a no-op; the local dispatcher runs the job in-process with nothing to tear down.
+func (*JobDispatcher) CleanupJob(_ context.Context, _ string, _ map[string]string) error {
+	return nil
+}
+
+// Limits returns nil; the local dispatcher does not enforce resource limits.
+func (*JobDispatcher) Limits() *types.ResourceLimits {
+	return nil
 }

@@ -5,7 +5,7 @@ export type PageLayoutSize = 'normal' | 'wide' | 'fullscreen';
 
 const SIZE_MAP: Record<PageLayoutSize, number | undefined> = {
     normal: 1200,
-    wide: 1400,
+    wide: 1500,
     fullscreen: undefined,
 };
 

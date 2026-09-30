@@ -1,7 +1,7 @@
 import { alpha, Box, SxProps, Theme, useTheme } from '@mui/material';
 import { useVirtualizer, useWindowVirtualizer, Virtualizer } from '@tanstack/react-virtual';
 import Anser from 'anser';
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import LoadingDots from '../../common/LoadingDots';
 
@@ -13,6 +13,11 @@ interface Props {
     scrollMode?: 'window' | 'container'
     sx?: SxProps<Theme>
     disableDeepLink?: boolean
+}
+
+// LogViewerHandle exposes an imperative scroll-to-bottom for callers that render their own control.
+export interface LogViewerHandle {
+    scrollToBottom: () => void
 }
 
 const LINE_HEIGHT_ESTIMATE = 22;
@@ -221,7 +226,7 @@ const rootStyle = {
     mb: 0
 } as const;
 
-function WindowLogViewer({ sx, ...rest }: ViewerProps) {
+const WindowLogViewer = forwardRef<LogViewerHandle, ViewerProps>(function WindowLogViewer({ sx, ...rest }, ref) {
     const listRef = useRef<HTMLDivElement>(null);
     const [scrollMargin, setScrollMargin] = useState(0);
 
@@ -249,12 +254,20 @@ function WindowLogViewer({ sx, ...rest }: ViewerProps) {
         scrollMargin
     });
 
+    useImperativeHandle(ref, () => ({
+        scrollToBottom: () => {
+            if (rest.count > 0) {
+                virtualizer.scrollToIndex(rest.count - 1, { align: 'end' });
+            }
+        },
+    }), [virtualizer, rest.count]);
+
     return <Box ref={listRef} sx={{ ...rootStyle, ...sx }}>
         <LogList virtualizer={virtualizer} scrollMargin={scrollMargin} {...rest} />
     </Box>;
-}
+});
 
-function ContainerLogViewer({ sx, ...rest }: ViewerProps) {
+const ContainerLogViewer = forwardRef<LogViewerHandle, ViewerProps>(function ContainerLogViewer({ sx, ...rest }, ref) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const virtualizer = useVirtualizer({
@@ -264,12 +277,20 @@ function ContainerLogViewer({ sx, ...rest }: ViewerProps) {
         overscan: OVERSCAN
     });
 
+    useImperativeHandle(ref, () => ({
+        scrollToBottom: () => {
+            if (rest.count > 0) {
+                virtualizer.scrollToIndex(rest.count - 1, { align: 'end' });
+            }
+        },
+    }), [virtualizer, rest.count]);
+
     return <Box ref={scrollRef} sx={{ ...rootStyle, height: '100%', overflowY: 'auto', ...sx }}>
         <LogList virtualizer={virtualizer} scrollMargin={0} {...rest} />
     </Box>;
-}
+});
 
-function LogViewer({ logs, sx, hideLineNumbers, loading, followOutput, scrollMode, disableDeepLink }: Props) {
+const LogViewer = forwardRef<LogViewerHandle, Props>(function LogViewer({ logs, sx, hideLineNumbers, loading, followOutput, scrollMode, disableDeepLink }, ref) {
     const [searchParams, setSearchParams] = useSearchParams();
     const lastScrolledLineRef = useRef<number | undefined>(undefined);
 
@@ -298,7 +319,7 @@ function LogViewer({ logs, sx, hideLineNumbers, loading, followOutput, scrollMod
 
     const viewerProps: ViewerProps = { count, getLine, selectedLine, onSelect, lastScrolledLineRef, hideLineNumbers, loading, followOutput, sx };
 
-    return scrollMode === 'container' ? <ContainerLogViewer {...viewerProps} /> : <WindowLogViewer {...viewerProps} />;
-}
+    return scrollMode === 'container' ? <ContainerLogViewer ref={ref} {...viewerProps} /> : <WindowLogViewer ref={ref} {...viewerProps} />;
+});
 
 export default LogViewer;

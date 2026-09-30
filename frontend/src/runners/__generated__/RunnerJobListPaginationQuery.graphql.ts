@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<82381a06158c86f9ca647251feb7d7e9>>
+ * @generated SignedSource<<920605a23bf6d8b792495a2880f967c8>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -171,36 +171,6 @@ return {
                           {
                             "alias": null,
                             "args": null,
-                            "concreteType": "JobOPAData",
-                            "kind": "LinkedField",
-                            "name": "opaData",
-                            "plural": false,
-                            "selections": [
-                              {
-                                "alias": null,
-                                "args": null,
-                                "kind": "ScalarField",
-                                "name": "taskStageName",
-                                "storageKey": null
-                              }
-                            ],
-                            "storageKey": null
-                          },
-                          {
-                            "alias": null,
-                            "args": null,
-                            "concreteType": "Run",
-                            "kind": "LinkedField",
-                            "name": "run",
-                            "plural": false,
-                            "selections": [
-                              (v3/*: any*/)
-                            ],
-                            "storageKey": null
-                          },
-                          {
-                            "alias": null,
-                            "args": null,
                             "concreteType": "JobTimestamps",
                             "kind": "LinkedField",
                             "name": "timestamps",
@@ -351,12 +321,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "115866f32c1999a4997845e08304b280",
+    "cacheID": "0f88798a52f9af7bca55275380ff71c2",
     "id": null,
     "metadata": {},
     "name": "RunnerJobListPaginationQuery",
     "operationKind": "query",
-    "text": "query RunnerJobListPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...RunnerJobListFragment_jobs\n    id\n  }\n}\n\nfragment RunnerJobListFragment_jobs on Runner {\n  type\n  jobs(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...RunnerJobListItemFragment\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n\nfragment RunnerJobListItemFragment on Job {\n  id\n  status\n  type\n  opaData {\n    taskStageName\n  }\n  run {\n    id\n  }\n  timestamps {\n    queuedAt\n    pendingAt\n    runningAt\n    finishedAt\n  }\n  workspace {\n    name\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    updatedAt\n  }\n}\n"
+    "text": "query RunnerJobListPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...RunnerJobListFragment_jobs\n    id\n  }\n}\n\nfragment RunnerJobListFragment_jobs on Runner {\n  type\n  jobs(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...RunnerJobListItemFragment\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n\nfragment RunnerJobListItemFragment on Job {\n  id\n  status\n  type\n  timestamps {\n    queuedAt\n    pendingAt\n    runningAt\n    finishedAt\n  }\n  workspace {\n    name\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    updatedAt\n  }\n}\n"
   }
 };
 })();

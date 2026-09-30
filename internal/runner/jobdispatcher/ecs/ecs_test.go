@@ -152,14 +152,13 @@ func TestDispatchJob(t *testing.T) {
 				client:                 &client,
 			}
 
-			taskID, err := dispatcher.DispatchJob(ctx, test.jobID, token)
+			dispatcherData, err := dispatcher.DispatchJob(ctx, test.jobID, token)
 			if test.expectErrorMsg != "" {
 				assert.EqualError(t, err, test.expectErrorMsg)
 			} else {
 				assert.Nil(t, err, "Unexpected error occurred %v", err)
+				assert.Equal(t, test.expectTaskID, dispatcherData[taskArnKey])
 			}
-
-			assert.Equal(t, test.expectTaskID, taskID)
 		})
 	}
 }

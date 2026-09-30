@@ -8,9 +8,9 @@ import (
 	"os/exec"
 	"time"
 
-	humanize "github.com/dustin/go-humanize"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/resource"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/client"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -58,6 +58,7 @@ type JobExecutor struct {
 	logger         logger.Logger
 	cancellableCtx context.Context
 	cancelFunc     context.CancelFunc
+	resourceMon    resource.Monitor
 	version        string
 }
 
@@ -96,11 +97,14 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 	// Add a defer to handle any panics that may occur during job execution
 	defer func() {
 		if rErr := recover(); rErr != nil {
+			j.saveResourceUsage(ctx)
 			j.handleJobFailureWithError(ctx, jobLogger, fmt.Errorf("job panic: %v", rErr))
 		}
 	}()
 
 	err = j.execute(ctx, jobLogger)
+
+	j.saveResourceUsage(ctx)
 
 	if err == errJobAlreadyCanceled {
 		return nil
@@ -121,6 +125,26 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// saveResourceUsage stops the monitor and persists its metrics once; a failure is logged rather than failing the job.
+func (j *JobExecutor) saveResourceUsage(ctx context.Context) {
+	if j.resourceMon == nil {
+		return
+	}
+
+	// Nil the monitor first so the normal and panic-recover call sites can't stop it twice.
+	mon := j.resourceMon
+	j.resourceMon = nil
+
+	metrics := mon.Stop()
+	if metrics == nil {
+		return
+	}
+
+	if _, err := j.client.SaveJobResourceUsage(ctx, j.cfg.JobID, metrics); err != nil {
+		j.logger.Errorf("failed to save job resource usage: %v", err)
+	}
 }
 
 func (j *JobExecutor) handleJobFailureWithError(ctx context.Context, jobLogger joblogger.Logger, err error) {
@@ -172,26 +196,13 @@ func (j *JobExecutor) execute(ctx context.Context, jobLogger joblogger.Logger) e
 
 	j.startCancellationMonitor(ctx, jobLogger, job)
 
-	// Get the memory limit if one has been passed in.
-	memoryLimit := uint64(0)
-	sLimit := os.Getenv("MEMORY_LIMIT")
-	if sLimit != "" {
-		var pErr error
-		memoryLimit, pErr = humanize.ParseBytes(sLimit)
-		if pErr != nil {
-			return fmt.Errorf("invalid memory limit: MEMORY_LIMIT was %s: %w", sLimit, pErr)
-		}
+	limits := resource.LoadLimitsFromEnv(os.Getenv, jobLogger)
+	j.resourceMon, err = resource.NewMonitor(jobLogger, resource.WithLimits(limits))
+	if err != nil {
+		return fmt.Errorf("failed to create resource monitor: %w", err)
 	}
 
-	// If there is a defined memory limit, create a memory monitor and launch it.
-	if memoryLimit > 0 {
-		memoryMonitor, err := NewMemoryMonitor(jobLogger, memoryLimit)
-		if err != nil {
-			return err
-		}
-		memoryMonitor.Start(ctx)
-		defer memoryMonitor.Stop()
-	}
+	j.resourceMon.Start()
 
 	workspaceDir, err := os.MkdirTemp("", "tfworkspace")
 	if err != nil {
