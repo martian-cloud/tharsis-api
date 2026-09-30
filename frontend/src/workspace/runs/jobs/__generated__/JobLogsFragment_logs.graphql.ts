@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<0ba51f0b421788f350aae34dc30576a3>>
+ * @generated SignedSource<<dd86caeacf4b5f47b08305a93fd71906>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,6 +10,7 @@
 
 import { ReaderFragment } from 'relay-runtime';
 export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
+export type JobType = "apply" | "opa" | "plan" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type JobLogsFragment_logs$data = {
   readonly completed: boolean;
@@ -18,6 +19,7 @@ export type JobLogsFragment_logs$data = {
   readonly logSize: number;
   readonly logs: string;
   readonly status: JobStatus;
+  readonly type: JobType;
   readonly " $fragmentType": "JobLogsFragment_logs";
 };
 export type JobLogsFragment_logs$key = {
@@ -52,6 +54,13 @@ const node: ReaderFragment = {
       "args": null,
       "kind": "ScalarField",
       "name": "status",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "type",
       "storageKey": null
     },
     {
@@ -98,6 +107,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "756a5cfe3456820b806dceff6c6260f8";
+(node as any).hash = "6cdef7113b4366a0aa3de437d50a3d7a";
 
 export default node;

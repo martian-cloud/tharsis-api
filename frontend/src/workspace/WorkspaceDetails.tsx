@@ -17,6 +17,7 @@ import AssignedPolicyList from './AssignedPolicyList';
 import ConfigurationVersionDetails from './runs/ConfigurationVersionDetails';
 import { GetConnections } from './runs/WorkspaceRunList';
 import Runs from './runs/Runs';
+import JobDetails from './runs/jobs/JobDetails';
 import StateVersions from './state/StateVersions';
 import WorkspaceDetailsDrawer from './WorkspaceDetailsDrawer';
 import WorkspaceDetailsIndex from './WorkspaceDetailsIndex';
@@ -157,6 +158,7 @@ function WorkspaceDetails(props: Props) {
             <Routes>
               <Route path={`${workspacePath}/*`} element={<WorkspaceDetailsIndex fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/activity/*`} element={<NamespaceActivity fragmentRef={data} />} />
+              <Route path={`${workspacePath}/-/jobs/:jobId`} element={<JobDetails />} />
               <Route path={`${workspacePath}/-/runs/*`} element={<Runs fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/configuration_versions/:id/*`} element={<ConfigurationVersionDetails fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/state_versions/*`} element={<StateVersions fragmentRef={data} />} />

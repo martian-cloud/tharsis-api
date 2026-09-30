@@ -19,10 +19,19 @@ service Jobs {
   rpc GetLatestJobForApply(GetLatestJobForApplyRequest) returns (Job);
   // SetJobStatus sets the status of a job.
   rpc SetJobStatus(SetJobStatusInput) returns (Job);
+  // SaveJobResourceUsage saves resource usage metrics and limits collected during job execution.
+  rpc SaveJobResourceUsage(SaveJobResourceUsageInput) returns (Job);
   // SaveJobLogs saves job logs.
   rpc SaveJobLogs(SaveJobLogsRequest) returns (google.protobuf.Empty);
   // ClaimJob claims the next available job for a runner.
   rpc ClaimJob(ClaimJobRequest) returns (ClaimJobResponse);
+  // JobDispatched records that a runner dispatched a job, carrying opaque dispatcher data and the resource limits the
+  // job runs under.
+  rpc JobDispatched(JobDispatchedRequest) returns (google.protobuf.Empty);
+  // ClaimJobsForCleanup leases final, dispatched jobs whose runtimes still need tearing down.
+  rpc ClaimJobsForCleanup(ClaimJobsForCleanupRequest) returns (ClaimJobsForCleanupResponse);
+  // MarkJobsCleanedUp records that a runner tore down the runtimes of a batch of jobs.
+  rpc MarkJobsCleanedUp(MarkJobsCleanedUpRequest) returns (google.protobuf.Empty);
   // SubscribeToJobLogStream subscribes to job log stream events.
   rpc SubscribeToJobLogStream(SubscribeToJobLogStreamRequest) returns (stream JobLogStreamEvent);
   // SubscribeToJobEvents subscribes to job events.
@@ -78,6 +87,34 @@ message SetJobStatusInput {
   string    job_protocol_version = 3;
 }
 
+// JobResourceUsageMetrics holds resource usage; an absent field means the metric was not collected.
+message JobResourceUsageMetrics {
+  optional int64  peak_memory_bytes              = 1;
+  optional double total_cpu_time_ms              = 2;
+  optional int64  total_network_received_bytes   = 3;
+  optional int64  total_network_sent_bytes       = 4;
+  optional int64  total_network_received_packets = 5;
+  optional int64  total_network_sent_packets     = 6;
+  optional int64  total_disk_read_bytes          = 7;
+  optional int64  total_disk_write_bytes         = 8;
+}
+
+// JobResourceUsageLimits holds the configured resource ceilings a job ran under; an absent field
+// means that resource was unlimited. Reported with metrics so usage can be shown against its limit.
+message JobResourceUsageLimits {
+  optional int64 memory_bytes           = 1;
+  optional int64 network_received_bytes = 2;
+  optional int64 network_sent_bytes     = 3;
+  optional int64 disk_read_bytes        = 4;
+  optional int64 disk_write_bytes       = 5;
+}
+
+// SaveJobResourceUsageInput is the input for saving resource usage metrics for a job.
+message SaveJobResourceUsageInput {
+  string                  job_id  = 1;
+  JobResourceUsageMetrics metrics = 2;
+}
+
 // SubscribeToJobLogStreamRequest is the input for subscribing to job log stream events.
 message SubscribeToJobLogStreamRequest {
   string         job_id             = 1;
@@ -109,24 +146,25 @@ message SaveJobLogsRequest {
 
 // OPAJobData contains OPA-specific data associated with an OPA policy evaluation job.
 message OPAJobData {
-  string policy_check_id = 1; 
+  string policy_check_id = 1;
 }
 
 // Job represents a Terraform job.
 message Job {
-  metadata.ResourceMetadata metadata                       = 1;
-  string                    workspace_id                   = 2;
-  string                    run_id                         = 3;
-  string                    type                           = 4;
-  JobStatus                 status                         = 5;
-  int32                     max_job_duration               = 6;
-  map<string, string>       properties                     = 7;
-  bool                      cancel_requested               = 8;
-  bool                      force_canceled                 = 9;
-  bool                      outdated_job_protocol_version  = 10;
-  oneof job_data {
+  metadata.ResourceMetadata metadata                      = 1;
+  string                    workspace_id                  = 2;
+  string                    run_id                        = 3;
+  string                    type                          = 4;
+  JobStatus                 status                        = 5;
+  int32                     max_job_duration              = 6;
+  map<string, string>       properties                    = 7;
+  bool                      cancel_requested              = 8;
+  bool                      force_canceled                = 9;
+  bool                      outdated_job_protocol_version = 10;
+  oneof                     job_data {
     OPAJobData opa_data = 11;
   }
+  map<string, string> dispatcher_data = 12;
 }
 
 // JobLogStreamEventData contains the log data.
@@ -162,4 +200,28 @@ message GetJobLogsResponse {
 message ClaimJobResponse {
   Job    job   = 1;
   string token = 2;
+}
+
+// JobDispatchedRequest is the input for recording that a runner dispatched a job.
+message JobDispatchedRequest {
+  string                 job_id          = 1;
+  map<string, string>    dispatcher_data = 2;
+  JobResourceUsageLimits limits          = 3;
+}
+
+// ClaimJobsForCleanupRequest is the input for leasing final jobs that need runtime cleanup.
+message ClaimJobsForCleanupRequest {
+  string runner_id = 1;
+  uint32 limit     = 2;
+}
+
+// ClaimJobsForCleanupResponse is the response for claiming jobs for cleanup.
+message ClaimJobsForCleanupResponse {
+  repeated Job jobs = 1;
+}
+
+// MarkJobsCleanedUpRequest is the input for recording that a batch of jobs' runtimes were torn down.
+message MarkJobsCleanedUpRequest {
+  string          runner_id = 1;
+  repeated string job_ids   = 2;
 }

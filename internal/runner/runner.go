@@ -82,6 +82,9 @@ func (r *Runner) Start(ctx context.Context) {
 	// Send keep alive
 	go r.sendRunnerSessionHeartbeat(ctx, sessionID)
 
+	// Start the cleanup worker to reap the runtimes of this runner's finished jobs.
+	go newCleanupWorker(r.runnerID, sessionID, r.client, r.jobDispatcher, r.logger).start(ctx)
+
 	for {
 		r.logger.Info("Waiting for next available run")
 
@@ -105,9 +108,16 @@ func (r *Runner) Start(ctx context.Context) {
 		} else {
 			r.logger.Infof("Claimed job with ID %s", resp.JobID)
 
-			if err := r.launchJob(ctx, resp.JobID, resp.Token); err != nil {
+			dispatcherData, err := r.launchJob(ctx, resp.JobID, resp.Token)
+			if err != nil {
 				launchJobFails.Inc()
 				r.handleError(ctx, sessionID, fmt.Errorf("failed to launch job %v", err))
+			} else {
+				// Report the dispatch so limits are recorded and the cleanup loop can reap the runtime; a failure is tracked as a session error but doesn't fail the job.
+				input := &JobDispatchedInput{JobID: resp.JobID, DispatcherData: dispatcherData, Limits: r.jobDispatcher.Limits()}
+				if err := r.client.JobDispatched(ctx, input); err != nil {
+					r.handleError(ctx, sessionID, fmt.Errorf("failed to report job dispatched for job %s: %v", resp.JobID, err))
+				}
 			}
 
 			select {
@@ -125,20 +135,20 @@ func (r *Runner) handleError(ctx context.Context, sessionID string, err error) {
 	}
 }
 
-func (r *Runner) launchJob(ctx context.Context, jobID string, token string) error {
+func (r *Runner) launchJob(ctx context.Context, jobID string, token string) (map[string]string, error) {
 	// For measuring dispatch time in seconds.
 	start := time.Now()
-	executorID, err := r.jobDispatcher.DispatchJob(ctx, jobID, token)
+	dispatcherData, err := r.jobDispatcher.DispatchJob(ctx, jobID, token)
 	duration := time.Since(start)
 	jobDispatchTime.Observe(float64(duration.Seconds()))
 	jobDispatchCount.Inc()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	r.logger.Infof("Job %s running in executor %s", jobID, executorID)
+	r.logger.Infof("Job %s dispatched with dispatcher data %v", jobID, dispatcherData)
 
-	return nil
+	return dispatcherData, nil
 }
 
 func (r *Runner) sendRunnerSessionHeartbeat(ctx context.Context, sessionID string) {

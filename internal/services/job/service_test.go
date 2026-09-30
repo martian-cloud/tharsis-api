@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -1362,6 +1363,7 @@ func TestSetJobStatus(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockTransactions := db.NewMockTransactions(t)
 			mockLogStreams := db.NewMockLogStreams(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
 			mockCmdProcessor := engine.NewMockCmdProcessor(t)
 			testLogger, _ := logger.NewForTest()
 
@@ -1395,6 +1397,7 @@ func TestSetJobStatus(t *testing.T) {
 				Jobs:         mockJobs,
 				Transactions: mockTransactions,
 				LogStreams:   mockLogStreams,
+				Workspaces:   mockWorkspaces,
 			}
 
 			svc := &service{
@@ -1825,6 +1828,257 @@ func TestIsProtocolVersionOutdated(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			result := isProtocolVersionOutdated(test.executorVersion)
 			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestJobDispatched(t *testing.T) {
+	jobID := "job-1"
+	runnerID := "runner-1"
+	workspaceID := "workspace-1"
+
+	testCases := []struct {
+		existingJob     *models.Job
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name: "records dispatcher data and limits",
+			existingJob: &models.Job{
+				Metadata:    models.ResourceMetadata{ID: jobID},
+				WorkspaceID: workspaceID,
+				RunnerID:    &runnerID,
+			},
+		},
+		{
+			name:            "job not found",
+			existingJob:     nil,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "job has no runner",
+			existingJob: &models.Job{
+				Metadata:    models.ResourceMetadata{ID: jobID},
+				WorkspaceID: workspaceID,
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "caller lacks permission",
+			existingJob: &models.Job{
+				Metadata:    models.ResourceMetadata{ID: jobID},
+				WorkspaceID: workspaceID,
+				RunnerID:    &runnerID,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockJobs := db.NewMockJobs(t)
+			mockCaller := auth.NewMockCaller(t)
+
+			mockJobs.On("GetJobByID", mock.Anything, jobID).Return(test.existingJob, nil)
+
+			if test.existingJob != nil && test.existingJob.RunnerID != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ClaimJobPermission, mock.Anything).
+					Return(test.authError)
+
+				if test.authError == nil {
+					mockJobs.On("UpdateJob", mock.Anything, mock.MatchedBy(func(j *models.Job) bool {
+						return j.DispatcherData["resourceName"] == "pod-1"
+					})).Return(test.existingJob, nil)
+				}
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{dbClient: &db.Client{Jobs: mockJobs}, logger: logger}
+
+			err := service.JobDispatched(auth.WithCaller(ctx, mockCaller), jobID, map[string]string{"resourceName": "pod-1"}, nil)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+
+	t.Run("rejects dispatcher data over the size limit", func(t *testing.T) {
+		mockCaller := auth.NewMockCaller(t)
+		logger, _ := logger.NewForTest()
+		service := &service{logger: logger}
+
+		oversized := map[string]string{"blob": strings.Repeat("x", maxDispatcherDataBytes+1)}
+		err := service.JobDispatched(auth.WithCaller(context.Background(), mockCaller), jobID, oversized, nil)
+
+		assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+	})
+}
+
+func TestClaimJobsForCleanup(t *testing.T) {
+	runnerID := "runner-1"
+
+	testCases := []struct {
+		existingRunner  *models.Runner
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+		expectCount     int
+	}{
+		{
+			name: "claims jobs for cleanup",
+			existingRunner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: runnerID, TRN: trn.TypeRunner.Build("shared-runner")},
+				Type:     models.SharedRunnerType,
+			},
+			expectCount: 1,
+		},
+		{
+			name:            "runner not found",
+			existingRunner:  nil,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "caller lacks permission",
+			existingRunner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: runnerID, TRN: trn.TypeRunner.Build("shared-runner")},
+				Type:     models.SharedRunnerType,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockJobs := db.NewMockJobs(t)
+			mockRunners := db.NewMockRunners(t)
+			mockCaller := auth.NewMockCaller(t)
+
+			mockRunners.On("GetRunnerByID", mock.Anything, runnerID).Return(test.existingRunner, nil)
+
+			if test.existingRunner != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ClaimJobPermission, mock.Anything).
+					Return(test.authError)
+
+				if test.authError == nil {
+					mockJobs.On("ClaimJobsForCleanup", mock.Anything, mock.MatchedBy(func(input *db.ClaimJobsForCleanupInput) bool {
+						return input.RunnerID == runnerID
+					})).Return([]models.Job{{Metadata: models.ResourceMetadata{ID: "job-1"}}}, nil)
+				}
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{dbClient: &db.Client{Jobs: mockJobs, Runners: mockRunners}, logger: logger}
+
+			jobs, err := service.ClaimJobsForCleanup(auth.WithCaller(ctx, mockCaller), &ClaimJobsForCleanupInput{
+				RunnerID: runnerID,
+				Limit:    10,
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Len(t, jobs, test.expectCount)
+		})
+	}
+}
+
+func TestMarkJobsCleanedUp(t *testing.T) {
+	runnerID := "runner-1"
+
+	testCases := []struct {
+		existingRunner  *models.Runner
+		authError       error
+		name            string
+		jobIDs          []string
+		expectErrorCode errors.CodeType
+		expectDBCall    bool
+	}{
+		{
+			name: "marks jobs cleaned up",
+			existingRunner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: runnerID, TRN: trn.TypeRunner.Build("shared-runner")},
+				Type:     models.SharedRunnerType,
+			},
+			jobIDs:       []string{"job-1", "job-2"},
+			expectDBCall: true,
+		},
+		{
+			name: "no job IDs is a no-op",
+			existingRunner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: runnerID, TRN: trn.TypeRunner.Build("shared-runner")},
+				Type:     models.SharedRunnerType,
+			},
+			jobIDs:       nil,
+			expectDBCall: false,
+		},
+		{
+			name:            "runner not found",
+			existingRunner:  nil,
+			jobIDs:          []string{"job-1"},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "caller lacks permission",
+			existingRunner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: runnerID, TRN: trn.TypeRunner.Build("shared-runner")},
+				Type:     models.SharedRunnerType,
+			},
+			jobIDs:          []string{"job-1"},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockJobs := db.NewMockJobs(t)
+			mockRunners := db.NewMockRunners(t)
+			mockCaller := auth.NewMockCaller(t)
+
+			// The empty-input case returns before any runner lookup.
+			if len(test.jobIDs) > 0 {
+				mockRunners.On("GetRunnerByID", mock.Anything, runnerID).Return(test.existingRunner, nil)
+
+				if test.existingRunner != nil {
+					mockCaller.On("RequirePermission", mock.Anything, models.ClaimJobPermission, mock.Anything).
+						Return(test.authError)
+				}
+			}
+
+			if test.expectDBCall {
+				mockJobs.On("MarkJobsCleanedUp", mock.Anything, runnerID, test.jobIDs).Return(nil)
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{dbClient: &db.Client{Jobs: mockJobs, Runners: mockRunners}, logger: logger}
+
+			err := service.MarkJobsCleanedUp(auth.WithCaller(ctx, mockCaller), &MarkJobsCleanedUpInput{
+				RunnerID: runnerID,
+				JobIDs:   test.jobIDs,
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }

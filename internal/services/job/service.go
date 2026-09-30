@@ -28,6 +28,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -39,6 +40,8 @@ const (
 	// in case that event is missed. On each interval the surrounding loop re-queries the
 	// authoritative DB state instead of waiting indefinitely.
 	pollInterval = 5 * time.Minute
+	// maxDispatcherDataBytes caps the total size of a job's opaque dispatcher data (keys + values).
+	maxDispatcherDataBytes = 1024
 )
 
 // errRunnerJobLimitReached signals the runner is at its concurrent-job limit. It is
@@ -97,6 +100,22 @@ type ClaimJobResponse struct {
 	Token string
 }
 
+// ClaimJobsForCleanupInput is the input for claiming final jobs that need their runtime cleaned up.
+type ClaimJobsForCleanupInput struct {
+	// RunnerID is the runner whose dispatched jobs are being cleaned up.
+	RunnerID string
+	// Limit bounds how many jobs are returned in one call.
+	Limit uint
+}
+
+// MarkJobsCleanedUpInput is the input for marking a batch of jobs as cleaned up.
+type MarkJobsCleanedUpInput struct {
+	// RunnerID is the runner that cleaned up the jobs' runtimes.
+	RunnerID string
+	// JobIDs are the jobs whose runtimes were torn down.
+	JobIDs []string
+}
+
 // LogStreamEventSubscriptionOptions includes options for setting up a log event subscription
 type LogStreamEventSubscriptionOptions struct {
 	LastSeenLogSize *int
@@ -135,12 +154,16 @@ type Event struct {
 // Service implements all job related functionality
 type Service interface {
 	ClaimJob(ctx context.Context, runnerID string) (*ClaimJobResponse, error)
+	JobDispatched(ctx context.Context, jobID string, dispatcherData map[string]string, limits *models.JobResourceUsageLimits) error
+	ClaimJobsForCleanup(ctx context.Context, input *ClaimJobsForCleanupInput) ([]models.Job, error)
+	MarkJobsCleanedUp(ctx context.Context, input *MarkJobsCleanedUpInput) error
 	GetJobByID(ctx context.Context, jobID string) (*models.Job, error)
 	GetJobByTRN(ctx context.Context, trn string) (*models.Job, error)
 	GetJobsByIDs(ctx context.Context, idList []string) ([]models.Job, error)
 	GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsResult, error)
 	GetLatestJobForRun(ctx context.Context, run *models.Run) (*models.Job, error)
 	SetJobStatus(ctx context.Context, jobID string, status models.JobStatus, jobProtocolVersion string) (*models.Job, error)
+	SaveJobResourceUsage(ctx context.Context, jobID string, metrics *models.JobResourceUsageMetrics) (*models.Job, error)
 	SubscribeToCancellationEvent(ctx context.Context, options *CancellationSubscriptionsOptions) (<-chan *CancellationEvent, error)
 	WriteLogs(ctx context.Context, jobID string, startOffset int, logs []byte) (int, error)
 	ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) (io.ReadCloser, error)
@@ -393,7 +416,7 @@ func (s *service) SetJobStatus(ctx context.Context, jobID string, status models.
 			return errors.Wrap(err, "cannot set job status", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 		}
 
-		now := time.Now()
+		now := time.Now().UTC()
 		switch status {
 		case models.JobRunning:
 			current.Timestamps.RunningTimestamp = &now
@@ -451,6 +474,61 @@ func (s *service) SetJobStatus(ctx context.Context, jobID string, status models.
 		"newJobStatus", updatedJob.GetStatus(),
 		"jobID", updatedJob.Metadata.ID,
 	)
+
+	if status.IsFinal() {
+		if jobTRN, trnErr := trn.TypeJob.Parse(updatedJob.Metadata.TRN); trnErr == nil {
+			fields := []any{
+				"jobID", updatedJob.Metadata.ID,
+				"runID", updatedJob.RunID,
+				"workspacePath", jobTRN.ParentPath(),
+				"runnerPath", updatedJob.RunnerPath,
+				"status", string(status),
+			}
+
+			if updatedJob.ResourceUsageMetrics != nil {
+				fields = append(fields, "resourceUsageMetrics", updatedJob.ResourceUsageMetrics)
+			}
+
+			if updatedJob.ResourceUsageLimits != nil {
+				fields = append(fields, "resourceUsageLimits", updatedJob.ResourceUsageLimits)
+			}
+
+			s.logger.WithContextFields(ctx).Infow("job completed", fields...)
+		}
+	}
+
+	return updatedJob, nil
+}
+
+func (s *service) SaveJobResourceUsage(ctx context.Context, jobID string, metrics *models.JobResourceUsageMetrics) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "svc.SaveJobResourceUsage")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	job, err := s.dbClient.Jobs.GetJobByID(ctx, jobID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get job", errors.WithSpan(span))
+	}
+
+	if job == nil {
+		return nil, errors.New("job with ID %s not found", jobID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.UpdateJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
+		return nil, err
+	}
+
+	job.ResourceUsageMetrics = metrics
+
+	updatedJob, err := s.dbClient.Jobs.UpdateJob(ctx, job)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update job", errors.WithSpan(span))
+	}
 
 	return updatedJob, nil
 }
@@ -682,7 +760,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobRespo
 		}
 
 		// Attempt to claim job
-		now := time.Now()
+		now := time.Now().UTC()
 		job.Timestamps.PendingTimestamp = &now
 		if err := job.SetStatus(models.JobPending); err != nil {
 			return nil, errors.Wrap(err, "failed to set job status to pending", errors.WithSpan(span))
@@ -726,6 +804,132 @@ func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobRespo
 			return &ClaimJobResponse{Job: job, Token: string(token)}, nil
 		}
 	}
+}
+
+// JobDispatched records that a runner dispatched a job, storing the opaque dispatcher data and the
+// resource limits the job runs under. It is called under the runner's service account token, so it
+// authorizes via runner access to the job's owning runner rather than a workspace-scoped permission.
+func (s *service) JobDispatched(ctx context.Context, jobID string, dispatcherData map[string]string, limits *models.JobResourceUsageLimits) error {
+	ctx, span := tracer.Start(ctx, "svc.JobDispatched")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Reject oversized dispatcher data so a plugin can't bloat the job row.
+	var dispatcherDataBytes int
+	for k, v := range dispatcherData {
+		dispatcherDataBytes += len(k) + len(v)
+	}
+
+	if dispatcherDataBytes > maxDispatcherDataBytes {
+		return errors.New("dispatcher data exceeds the %d byte limit", maxDispatcherDataBytes, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	job, err := s.dbClient.Jobs.GetJobByID(ctx, jobID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get job", errors.WithSpan(span))
+	}
+
+	if job == nil {
+		return errors.New("job with ID %s not found", jobID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if job.RunnerID == nil {
+		return errors.New("job with ID %s has no assigned runner", jobID, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	// A runner may only report dispatch for a job dispatched by a runner its service account is
+	// assigned to; ClaimJobPermission routes to the runner-access check for a runner caller.
+	if err = caller.RequirePermission(ctx, models.ClaimJobPermission, auth.WithRunnerID(*job.RunnerID)); err != nil {
+		return err
+	}
+
+	job.DispatcherData = dispatcherData
+	job.ResourceUsageLimits = limits
+
+	if _, err = s.dbClient.Jobs.UpdateJob(ctx, job); err != nil {
+		return errors.Wrap(err, "failed to update job", errors.WithSpan(span))
+	}
+
+	return nil
+}
+
+// ClaimJobsForCleanup leases final, dispatched jobs whose runtimes still need tearing down, scoped to
+// the given runner. A runner may only claim cleanup for a runner its service account is assigned to.
+func (s *service) ClaimJobsForCleanup(ctx context.Context, input *ClaimJobsForCleanupInput) ([]models.Job, error) {
+	ctx, span := tracer.Start(ctx, "svc.ClaimJobsForCleanup")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, input.RunnerID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runner", errors.WithSpan(span))
+	}
+
+	if runner == nil {
+		return nil, errors.New("runner with id %s not found", input.RunnerID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// Reuse the claim permission: a runner caller passes only when its service account is assigned to
+	// the runner. The DB query is additionally scoped to runner_id so a caller can never reap another
+	// runner's jobs even if it holds the permission more broadly.
+	if err = caller.RequirePermission(ctx, models.ClaimJobPermission, auth.WithRunnerID(runner.Metadata.ID)); err != nil {
+		return nil, err
+	}
+
+	jobs, err := s.dbClient.Jobs.ClaimJobsForCleanup(ctx, &db.ClaimJobsForCleanupInput{
+		RunnerID: runner.Metadata.ID,
+		Limit:    input.Limit,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to claim jobs for cleanup", errors.WithSpan(span))
+	}
+
+	return jobs, nil
+}
+
+// MarkJobsCleanedUp records that a runner tore down the runtimes of a batch of jobs, so the cleanup
+// poller stops returning them. It authorizes via runner access, matching ClaimJobsForCleanup.
+func (s *service) MarkJobsCleanedUp(ctx context.Context, input *MarkJobsCleanedUpInput) error {
+	ctx, span := tracer.Start(ctx, "svc.MarkJobsCleanedUp")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(input.JobIDs) == 0 {
+		return nil
+	}
+
+	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, input.RunnerID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get runner", errors.WithSpan(span))
+	}
+
+	if runner == nil {
+		return errors.New("runner with id %s not found", input.RunnerID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// A runner may only mark jobs for a runner its service account is assigned to; the DB update is
+	// additionally scoped to the runner so a caller can't complete jobs it doesn't own.
+	if err = caller.RequirePermission(ctx, models.ClaimJobPermission, auth.WithRunnerID(runner.Metadata.ID)); err != nil {
+		return err
+	}
+
+	if err = s.dbClient.Jobs.MarkJobsCleanedUp(ctx, runner.Metadata.ID, input.JobIDs); err != nil {
+		return errors.Wrap(err, "failed to mark jobs cleaned up", errors.WithSpan(span))
+	}
+
+	return nil
 }
 
 func (s *service) SubscribeToLogStreamEvents(ctx context.Context, options *LogStreamEventSubscriptionOptions) (<-chan *logstream.LogEvent, error) {

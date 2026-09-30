@@ -12,6 +12,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	resource "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/resource"
+
 	tfjson "github.com/hashicorp/terraform-json"
 
 	time "time"
@@ -709,6 +711,36 @@ func (_m *MockClient) SaveJobLogs(ctx context.Context, jobID string, startOffset
 	}
 
 	return r0
+}
+
+// SaveJobResourceUsage provides a mock function with given fields: ctx, jobID, metrics
+func (_m *MockClient) SaveJobResourceUsage(ctx context.Context, jobID string, metrics *resource.Metrics) (*gen.Job, error) {
+	ret := _m.Called(ctx, jobID, metrics)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SaveJobResourceUsage")
+	}
+
+	var r0 *gen.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *resource.Metrics) (*gen.Job, error)); ok {
+		return rf(ctx, jobID, metrics)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *resource.Metrics) *gen.Job); ok {
+		r0 = rf(ctx, jobID, metrics)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*gen.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *resource.Metrics) error); ok {
+		r1 = rf(ctx, jobID, metrics)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // SetJobStatus provides a mock function with given fields: ctx, jobID, status, jobProtocolVersion

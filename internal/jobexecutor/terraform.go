@@ -137,6 +137,7 @@ func newTerraformWorkspace(
 		cliDownloader: *newCLIDownloader(
 			http.NewHTTPClient(),
 			client,
+			jobLogger,
 		),
 		credentialHelper: newCredentialHelper(),
 		capabilities:     capabilities,

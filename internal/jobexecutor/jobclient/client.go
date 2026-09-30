@@ -15,6 +15,7 @@ import (
 	"time"
 
 	tfjson "github.com/hashicorp/terraform-json"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/resource"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/client"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/client/token"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
@@ -66,6 +67,7 @@ type Client interface {
 	UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*pb.Plan, error)
 	ReportRunPolicyOutcomes(ctx context.Context, policyCheckID string, outcomes []RunPolicyOutcomeInput) error
 	SetJobStatus(ctx context.Context, jobID string, status pb.JobStatus, jobProtocolVersion string) (*pb.Job, error)
+	SaveJobResourceUsage(ctx context.Context, jobID string, metrics *resource.Metrics) (*pb.Job, error)
 	UploadPlanCache(ctx context.Context, planID string, body io.Reader) error
 	UploadPlanData(ctx context.Context, planID string, tfPlan *tfjson.Plan, tfProviderSchemas *tfjson.ProviderSchemas) error
 	UploadStateVersionJSON(ctx context.Context, stateVersionID string, tfState *tfjson.State) error
@@ -291,6 +293,25 @@ func (c *jobClient) SetJobStatus(ctx context.Context, jobID string, status pb.Jo
 		Status:             status,
 		JobProtocolVersion: jobProtocolVersion,
 	})
+}
+
+// SaveJobResourceUsage saves resource usage metrics collected during job execution.
+func (c *jobClient) SaveJobResourceUsage(ctx context.Context, jobID string, metrics *resource.Metrics) (*pb.Job, error) {
+	input := &pb.SaveJobResourceUsageInput{
+		JobId: jobID,
+		Metrics: &pb.JobResourceUsageMetrics{
+			PeakMemoryBytes:             metrics.PeakMemoryBytes,
+			TotalCpuTimeMs:              metrics.TotalCPUTimeMS,
+			TotalNetworkReceivedBytes:   metrics.TotalNetworkReceivedBytes,
+			TotalNetworkSentBytes:       metrics.TotalNetworkSentBytes,
+			TotalNetworkReceivedPackets: metrics.TotalNetworkReceivedPackets,
+			TotalNetworkSentPackets:     metrics.TotalNetworkSentPackets,
+			TotalDiskReadBytes:          metrics.TotalDiskReadBytes,
+			TotalDiskWriteBytes:         metrics.TotalDiskWriteBytes,
+		},
+	}
+
+	return c.grpcClient.JobsClient.SaveJobResourceUsage(ctx, input)
 }
 
 // CreateStateVersion creates a new state version and returns its contents

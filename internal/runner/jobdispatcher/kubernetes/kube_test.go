@@ -6,568 +6,259 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
-	v1 "k8s.io/api/batch/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_k8sRunner_CreateJob(t *testing.T) {
-	type args struct {
-		ctx context.Context
-		job *v1.Job
-	}
-	tests := []struct {
-		args    args
-		k       *k8sRunner
-		want    *v1.Job
-		name    string
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.k.CreateJob(tt.args.ctx, tt.args.job)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("k8sRunner.CreateJob() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("k8sRunner.CreateJob() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestJobDispatcher_DispatchJob(t *testing.T) {
-	type args struct {
-		ctx   context.Context
-		job   *models.Job
-		token string
-	}
+	jobID := testJobGID(t)
+	podName := "tharsis-job-" + testJobUUID
+
 	tests := []struct {
-		name    string
-		j       *JobDispatcher
-		args    args
-		want    string
-		wantErr bool
+		name       string
+		setupMocks func(*mockClient)
+		jobID      string
+		token      string
+		want       string
+		wantErr    bool
 	}{
 		{
-			name: "failed to create job",
-			j: &JobDispatcher{
-				logger:      nil,
-				image:       "hello-world",
-				apiEndpoint: "http://localhost",
-				client: func() client {
-					client := &mockClient{}
-
-					client.On("CreateJob", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("failed to launch job")).Once()
-					return client
-				}(),
+			name: "failed to create pod",
+			setupMocks: func(c *mockClient) {
+				c.On("CreatePod", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("failed to launch job")).Once()
 			},
-			args: args{
-				ctx: context.TODO(),
-				job: &models.Job{
-					Metadata: models.ResourceMetadata{
-						ID: "test-job-123",
-					},
-				},
-				token: "myToken",
-			},
+			jobID:   jobID,
+			token:   "myToken",
 			want:    "",
 			wantErr: true,
 		},
 		{
-			name: "create job succeeds",
-			j: &JobDispatcher{
-				logger:      nil,
-				image:       "hello-world",
-				apiEndpoint: "http://localhost",
-				client: func() client {
-					client := &mockClient{}
-
-					client.On("CreateJob", mock.Anything, mock.Anything).Return(&v1.Job{
-						ObjectMeta: metav1.ObjectMeta{
-							UID: "id",
-						},
-					}, nil).Once()
-					return client
-				}(),
-			},
-			args: args{
-				ctx: context.TODO(),
-				job: &models.Job{
-					Metadata: models.ResourceMetadata{
-						ID: "test-job-123",
-					},
-				},
-				token: "myToken",
-			},
-			want:    "id",
-			wantErr: false,
+			name:       "invalid job ID fails before create",
+			setupMocks: func(_ *mockClient) {},
+			jobID:      "not-a-global-id",
+			token:      "myToken",
+			want:       "",
+			wantErr:    true,
 		},
 		{
-			name: "create job with node selector succeeds",
-			j: &JobDispatcher{
-				logger:      nil,
-				image:       "hello-world",
-				apiEndpoint: "http://localhost",
-				nodeSelector: map[string]string{
-					"kubernetes.io/arch": "amd64",
-					"node-type":          "worker",
-				},
-				client: func() client {
-					client := &mockClient{}
-
-					// Verify that the job contains the node selector
-					client.On("CreateJob", mock.Anything, mock.MatchedBy(func(job *v1.Job) bool {
-						nodeSelector := job.Spec.Template.Spec.NodeSelector
-						return nodeSelector != nil &&
-							nodeSelector["kubernetes.io/arch"] == "amd64" &&
-							nodeSelector["node-type"] == "worker"
-					})).Return(&v1.Job{
-						ObjectMeta: metav1.ObjectMeta{
-							UID: "id-with-node-selector",
-						},
-					}, nil).Once()
-					return client
-				}(),
+			name: "create pod succeeds returns pod name",
+			setupMocks: func(c *mockClient) {
+				c.On("CreatePod", mock.Anything, mock.MatchedBy(func(pod *corev1.Pod) bool {
+					return pod.Labels[ownerLabelKey] == ownerLabelValue &&
+						pod.Labels[jobIDLabelKey] == jobID &&
+						pod.Name == podName &&
+						pod.Spec.RestartPolicy == corev1.RestartPolicyNever &&
+						pod.Spec.EnableServiceLinks != nil && !*pod.Spec.EnableServiceLinks
+				})).Return(&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: podName},
+				}, nil).Once()
 			},
-			args: args{
-				ctx: context.TODO(),
-				job: &models.Job{
-					Metadata: models.ResourceMetadata{
-						ID: "test-job-456",
-					},
-				},
-				token: "myToken",
-			},
-			want:    "id-with-node-selector",
+			jobID:   jobID,
+			token:   "myToken",
+			want:    podName,
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.j.DispatchJob(tt.args.ctx, tt.args.job.Metadata.ID, tt.args.token)
+			c := newMockClient(t)
+			tt.setupMocks(c)
+
+			j := &JobDispatcher{
+				config: &config{
+					image:       "hello-world",
+					apiEndpoint: "http://localhost",
+					limits:      &types.ResourceLimits{},
+				},
+				client: c,
+			}
+
+			got, err := j.DispatchJob(t.Context(), tt.jobID, tt.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("JobDispatcher.DispatchJob() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("JobDispatcher.DispatchJob() = %v, want %v", got, tt.want)
-			}
+
+			assert.Equal(t, tt.want, got[podNameKey])
 		})
 	}
 }
+
 func Test_New(t *testing.T) {
-	// Create a temporary kubeconfig file for testing
 	tempDir := t.TempDir()
 	kubeConfigPath := filepath.Join(tempDir, "kubeconfig")
-	err := os.WriteFile(kubeConfigPath, []byte("test kubeconfig content"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create test kubeconfig file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(kubeConfigPath, []byte("test kubeconfig content"), 0644))
 
-	// Create a mock token getter function
 	tokenGetter := func(_ context.Context) (string, error) {
 		return "test-token", nil
 	}
 
+	withData := func(extra map[string]string) map[string]string {
+		data := baseInClusterData()
+		for k, v := range extra {
+			data[k] = v
+		}
+
+		return data
+	}
+
 	tests := []struct {
-		name                string
 		pluginData          map[string]string
-		discoveryHost       string
-		tokenGetter         types.TokenGetterFunc
-		wantErr             bool
+		name                string
 		expectedErrContains string
+		wantErr             bool
 	}{
 		{
-			name: "Missing required field",
-			pluginData: map[string]string{
-				"endpoint": "https://api.example.com",
-				// Missing other required fields
-			},
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
-			wantErr:             true,
-			expectedErrContains: "kubernetes job dispatcher requires plugin data",
-		},
-		{
-			name: "Unsupported auth type",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      "unsupported_auth",
-				}
-				return data
-			}(),
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
+			name:                "unsupported auth type",
+			pluginData:          withData(map[string]string{"auth_type": "unsupported_auth"}),
 			wantErr:             true,
 			expectedErrContains: "kubernetes job dispatcher doesn't support auth_type",
 		},
 		{
-			name: "EKS IAM auth type missing required fields",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeEKSIAM,
-				}
-				return data
-			}(),
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
+			name:                "EKS IAM auth type missing required fields",
+			pluginData:          withData(map[string]string{"auth_type": AuthTypeEKSIAM}),
 			wantErr:             true,
 			expectedErrContains: "kubernetes job dispatcher requires plugin data",
 		},
 		{
 			name: "KubeConfig auth type with valid config",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":         "https://api.example.com",
-					"image":            "test-image:latest",
-					"memory_request":   "128Mi",
-					"memory_limit":     "256Mi",
-					"auth_type":        AuthTypeKubeConfig,
-					"kube_config_path": kubeConfigPath,
-				}
-				return data
-			}(),
-			discoveryHost: "discovery.example.com",
-			tokenGetter:   tokenGetter,
-			wantErr:       false,
+			pluginData: withData(map[string]string{
+				"auth_type":        AuthTypeKubeConfig,
+				"kube_config_path": kubeConfigPath,
+			}),
+			wantErr: false,
 		},
 		{
 			name: "KubeConfig auth type with invalid path",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":         "https://api.example.com",
-					"image":            "test-image:latest",
-					"memory_request":   "128Mi",
-					"memory_limit":     "256Mi",
-					"auth_type":        AuthTypeKubeConfig,
-					"kube_config_path": "/non/existent/path",
-				}
-				return data
-			}(),
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
-			wantErr:             true,
-			expectedErrContains: "failed to configure kube job dispatcher plugin",
-		},
-		{
-			name: "X509Cert auth type missing required fields",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeX509Cert,
-				}
-				return data
-			}(),
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
-			wantErr:             true,
-			expectedErrContains: "kubernetes job dispatcher requires plugin data",
-		},
-		{
-			name: "X509Cert auth type with invalid cert data",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeX509Cert,
-					"kube_server":    "https://kubernetes.default.svc",
-					"client_cert":    "invalid-base64",
-					"client_key":     "valid-key",
-				}
-				return data
-			}(),
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
+			pluginData: withData(map[string]string{
+				"auth_type":        AuthTypeKubeConfig,
+				"kube_config_path": "/non/existent/path",
+			}),
 			wantErr:             true,
 			expectedErrContains: "failed to configure kube job dispatcher plugin",
 		},
 		{
 			name: "X509Cert auth type with valid data",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeX509Cert,
-					"kube_server":    "https://kubernetes.default.svc",
-					"client_cert":    base64.StdEncoding.EncodeToString([]byte("test-cert")),
-					"client_key":     base64.StdEncoding.EncodeToString([]byte("test-key")),
-				}
-				return data
-			}(),
-			discoveryHost: "discovery.example.com",
-			tokenGetter:   tokenGetter,
-			wantErr:       false,
-		},
-		{
-			name: "RunnerIDToken auth type missing required fields",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeRunnerIDToken,
-				}
-				return data
-			}(),
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
-			wantErr:             true,
-			expectedErrContains: "kubernetes job dispatcher requires plugin data",
+			pluginData: withData(map[string]string{
+				"auth_type":   AuthTypeX509Cert,
+				"kube_server": "https://kubernetes.default.svc",
+				"client_cert": base64.StdEncoding.EncodeToString([]byte("test-cert")),
+				"client_key":  base64.StdEncoding.EncodeToString([]byte("test-key")),
+			}),
+			wantErr: false,
 		},
 		{
 			name: "RunnerIDToken auth type with valid data",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeRunnerIDToken,
-					"kube_server":    "https://kubernetes.default.svc",
-				}
-				return data
-			}(),
-			discoveryHost: "discovery.example.com",
-			tokenGetter:   tokenGetter,
-			wantErr:       false,
+			pluginData: withData(map[string]string{
+				"auth_type":   AuthTypeRunnerIDToken,
+				"kube_server": "https://kubernetes.default.svc",
+			}),
+			wantErr: false,
 		},
 		{
-			name: "InCluster auth type",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeInCluster,
-				}
-				return data
-			}(),
-			discoveryHost: "discovery.example.com",
-			tokenGetter:   tokenGetter,
-			wantErr:       false,
+			name:       "InCluster auth type",
+			pluginData: baseInClusterData(),
+			wantErr:    false,
 		},
 		{
-			name: "With security context settings",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":                         "https://api.example.com",
-					"image":                            "test-image:latest",
-					"memory_request":                   "128Mi",
-					"memory_limit":                     "256Mi",
-					"auth_type":                        AuthTypeInCluster,
-					"security_context_run_as_user":     "1000",
-					"security_context_run_as_group":    "1000",
-					"security_context_run_as_non_root": "true",
-				}
-				return data
-			}(),
-			discoveryHost: "discovery.example.com",
-			tokenGetter:   tokenGetter,
-			wantErr:       false,
-		},
-		{
-			name: "With invalid security context settings",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":                     "https://api.example.com",
-					"image":                        "test-image:latest",
-					"memory_request":               "128Mi",
-					"memory_limit":                 "256Mi",
-					"auth_type":                    AuthTypeInCluster,
-					"security_context_run_as_user": "not-a-number",
-				}
-				return data
-			}(),
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
+			name:                "empty memory_limit is rejected",
+			pluginData:          withData(map[string]string{"memory_limit": ""}),
 			wantErr:             true,
-			expectedErrContains: "failed to parse security_context_run_as_user",
-		},
-		{
-			name: "With extra discovery hosts",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":                      "https://api.example.com",
-					"image":                         "test-image:latest",
-					"memory_request":                "128Mi",
-					"memory_limit":                  "256Mi",
-					"auth_type":                     AuthTypeInCluster,
-					"extra_service_discovery_hosts": "host1.example.com, host2.example.com",
-				}
-				return data
-			}(),
-			discoveryHost: "discovery.example.com",
-			tokenGetter:   tokenGetter,
-			wantErr:       false,
-		},
-		{
-			name: "With valid node selector",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeInCluster,
-					"node_selector":  "kubernetes.io/arch=amd64,node-type=worker",
-				}
-				return data
-			}(),
-			discoveryHost: "discovery.example.com",
-			tokenGetter:   tokenGetter,
-			wantErr:       false,
-		},
-		{
-			name: "With empty node selector",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeInCluster,
-					"node_selector":  "",
-				}
-				return data
-			}(),
-			discoveryHost: "discovery.example.com",
-			tokenGetter:   tokenGetter,
-			wantErr:       false,
-		},
-		{
-			name: "With invalid node selector format - missing value",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeInCluster,
-					"node_selector":  "kubernetes.io/arch",
-				}
-				return data
-			}(),
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
-			wantErr:             true,
-			expectedErrContains: "invalid node selector format",
-		},
-		{
-			name: "With invalid node selector format - empty key",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeInCluster,
-					"node_selector":  "=amd64",
-				}
-				return data
-			}(),
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
-			wantErr:             true,
-			expectedErrContains: "invalid node selector format",
-		},
-		{
-			name: "With invalid node selector format - empty value",
-			pluginData: func() map[string]string {
-				data := map[string]string{
-					"endpoint":       "https://api.example.com",
-					"image":          "test-image:latest",
-					"memory_request": "128Mi",
-					"memory_limit":   "256Mi",
-					"auth_type":      AuthTypeInCluster,
-					"node_selector":  "kubernetes.io/arch=",
-				}
-				return data
-			}(),
-			discoveryHost:       "discovery.example.com",
-			tokenGetter:         tokenGetter,
-			wantErr:             true,
-			expectedErrContains: "invalid node selector format",
+			expectedErrContains: "memory_limit must be a non-zero value",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testLogger, _ := logger.NewForTest()
-			dispatcher, err := New(context.Background(), tt.pluginData, tt.discoveryHost, tt.tokenGetter, testLogger)
+			dispatcher, err := New(t.Context(), tt.pluginData, "discovery.example.com", types.TokenGetterFunc(tokenGetter), testLogger)
 
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.expectedErrContains != "" {
 					assert.Contains(t, err.Error(), tt.expectedErrContains)
 				}
+
 				assert.Nil(t, dispatcher)
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, dispatcher)
-
-				// Verify basic properties of the dispatcher
-				assert.Equal(t, tt.pluginData["endpoint"], dispatcher.apiEndpoint)
-				assert.Equal(t, tt.pluginData["image"], dispatcher.image)
-
-				// Check if discovery hosts are properly set
-				if tt.discoveryHost != "" {
-					assert.Contains(t, dispatcher.discoveryProtocolHosts, tt.discoveryHost)
-				}
-
-				// Check if extra discovery hosts are properly set
-				if extraHosts, ok := tt.pluginData["extra_service_discovery_hosts"]; ok {
-					for _, host := range []string{"host1.example.com", "host2.example.com"} {
-						if extraHosts != "" {
-							assert.Contains(t, dispatcher.discoveryProtocolHosts, host)
-						}
-					}
-				}
-
-				// Check if node selector is properly set
-				if nodeSelector, ok := tt.pluginData["node_selector"]; ok {
-					expectedNodeSelector := make(map[string]string)
-					for _, pair := range []string{"kubernetes.io/arch=amd64", "node-type=worker"} {
-						if strings.Contains(nodeSelector, pair) {
-							parts := strings.SplitN(pair, "=", 2)
-							if len(parts) == 2 {
-								expectedNodeSelector[parts[0]] = parts[1]
-							}
-						}
-					}
-					for key, value := range expectedNodeSelector {
-						assert.Equal(t, value, dispatcher.nodeSelector[key])
-					}
-				}
+				return
 			}
+
+			require.NoError(t, err)
+			require.NotNil(t, dispatcher)
+			assert.Equal(t, tt.pluginData["endpoint"], dispatcher.config.apiEndpoint)
+			assert.Equal(t, tt.pluginData["image"], dispatcher.config.image)
+			assert.Contains(t, dispatcher.config.discoveryProtocolHosts, "discovery.example.com")
+		})
+	}
+}
+
+func TestJobDispatcher_CleanupJob(t *testing.T) {
+	const podName = "tharsis-job-abc"
+
+	tests := []struct {
+		name       string
+		data       map[string]string
+		setupMocks func(*mockClient)
+		wantErr    bool
+	}{
+		{
+			name: "deletes the pod by resource name",
+			data: map[string]string{podNameKey: podName},
+			setupMocks: func(c *mockClient) {
+				c.On("DeletePod", mock.Anything, podName).Return(nil).Once()
+			},
+			wantErr: false,
+		},
+		{
+			name: "not found is treated as already cleaned up",
+			data: map[string]string{podNameKey: podName},
+			setupMocks: func(c *mockClient) {
+				c.On("DeletePod", mock.Anything, podName).Return(apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, podName)).Once()
+			},
+			wantErr: false,
+		},
+		{
+			name: "delete error is returned",
+			data: map[string]string{podNameKey: podName},
+			setupMocks: func(c *mockClient) {
+				c.On("DeletePod", mock.Anything, podName).Return(fmt.Errorf("boom")).Once()
+			},
+			wantErr: true,
+		},
+		{
+			name:       "missing pod name skips the delete call",
+			data:       map[string]string{},
+			setupMocks: func(*mockClient) {},
+			wantErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newMockClient(t)
+			tt.setupMocks(c)
+
+			j := &JobDispatcher{config: &config{}, client: c, logger: logger.New()}
+
+			err := j.CleanupJob(t.Context(), "job-gid", tt.data)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
 		})
 	}
 }

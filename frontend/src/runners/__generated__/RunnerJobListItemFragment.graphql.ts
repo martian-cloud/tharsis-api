@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<eff764fab2eaf84532ae5779d58447f2>>
+ * @generated SignedSource<<4d39fc146821055fe2fc4d0fb71d2a71>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,19 +11,12 @@
 import { ReaderFragment } from 'relay-runtime';
 export type JobStatus = "canceled" | "canceling" | "failed" | "finished" | "pending" | "queued" | "running" | "%future added value";
 export type JobType = "apply" | "opa" | "plan" | "%future added value";
-export type RunTaskStageName = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_PLAN" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunnerJobListItemFragment$data = {
   readonly id: string;
   readonly metadata: {
     readonly createdAt: any;
     readonly updatedAt: any;
-  };
-  readonly opaData: {
-    readonly taskStageName: RunTaskStageName | null | undefined;
-  } | null | undefined;
-  readonly run: {
-    readonly id: string;
   };
   readonly status: JobStatus;
   readonly timestamps: {
@@ -44,21 +37,19 @@ export type RunnerJobListItemFragment$key = {
   readonly " $fragmentSpreads": FragmentRefs<"RunnerJobListItemFragment">;
 };
 
-const node: ReaderFragment = (function(){
-var v0 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "id",
-  "storageKey": null
-};
-return {
+const node: ReaderFragment = {
   "argumentDefinitions": [],
   "kind": "Fragment",
   "metadata": null,
   "name": "RunnerJobListItemFragment",
   "selections": [
-    (v0/*: any*/),
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "id",
+      "storageKey": null
+    },
     {
       "alias": null,
       "args": null,
@@ -71,36 +62,6 @@ return {
       "args": null,
       "kind": "ScalarField",
       "name": "type",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "JobOPAData",
-      "kind": "LinkedField",
-      "name": "opaData",
-      "plural": false,
-      "selections": [
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "taskStageName",
-          "storageKey": null
-        }
-      ],
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "Run",
-      "kind": "LinkedField",
-      "name": "run",
-      "plural": false,
-      "selections": [
-        (v0/*: any*/)
-      ],
       "storageKey": null
     },
     {
@@ -196,8 +157,7 @@ return {
   "type": "Job",
   "abstractKey": null
 };
-})();
 
-(node as any).hash = "614a39152293ec5b3cb3f61e728e8e6f";
+(node as any).hash = "788e17fd9ee4989bda6ff63bde4f238a";
 
 export default node;

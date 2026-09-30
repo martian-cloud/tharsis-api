@@ -123,3 +123,56 @@ func (c *Client) claimJob(ctx context.Context, runnerID string) (*pb.ClaimJobRes
 		RunnerId: runnerID,
 	})
 }
+
+// JobDispatched records that a runner dispatched a job, carrying opaque dispatcher data and limits.
+func (c *Client) JobDispatched(ctx context.Context, input *runner.JobDispatchedInput) error {
+	var limits *pb.JobResourceUsageLimits
+	if input.Limits != nil {
+		limits = &pb.JobResourceUsageLimits{
+			MemoryBytes:          new(int64(input.Limits.MemoryBytes)),
+			NetworkReceivedBytes: new(int64(input.Limits.NetworkReceivedBytes)),
+			NetworkSentBytes:     new(int64(input.Limits.NetworkSentBytes)),
+			DiskReadBytes:        new(int64(input.Limits.DiskReadBytes)),
+			DiskWriteBytes:       new(int64(input.Limits.DiskWriteBytes)),
+		}
+	}
+
+	_, err := c.grpcClient.JobsClient.JobDispatched(ctx, &pb.JobDispatchedRequest{
+		JobId:          input.JobID,
+		DispatcherData: input.DispatcherData,
+		Limits:         limits,
+	})
+
+	return err
+}
+
+// ClaimJobsForCleanup claims final jobs whose runtimes still need to be torn down.
+func (c *Client) ClaimJobsForCleanup(ctx context.Context, input *runner.ClaimJobsForCleanupInput) ([]*runner.CleanupJobInfo, error) {
+	resp, err := c.grpcClient.JobsClient.ClaimJobsForCleanup(ctx, &pb.ClaimJobsForCleanupRequest{
+		RunnerId: input.RunnerID,
+		Limit:    uint32(input.Limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	infos := make([]*runner.CleanupJobInfo, 0, len(resp.Jobs))
+	for _, j := range resp.Jobs {
+		infos = append(infos, &runner.CleanupJobInfo{
+			JobID:          j.Metadata.Id,
+			DispatcherData: j.DispatcherData,
+		})
+	}
+
+	return infos, nil
+}
+
+// MarkJobsCleanedUp records that a runner tore down the runtimes of a batch of jobs.
+func (c *Client) MarkJobsCleanedUp(ctx context.Context, runnerID string, jobIDs []string) error {
+	_, err := c.grpcClient.JobsClient.MarkJobsCleanedUp(ctx, &pb.MarkJobsCleanedUpRequest{
+		RunnerId: runnerID,
+		JobIds:   jobIDs,
+	})
+
+	return err
+}

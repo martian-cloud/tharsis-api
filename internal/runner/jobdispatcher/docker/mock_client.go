@@ -51,6 +51,24 @@ func (_m *mockClient) ContainerCreate(ctx context.Context, config *container.Con
 	return r0, r1
 }
 
+// ContainerRemove provides a mock function with given fields: ctx, containerID, options
+func (_m *mockClient) ContainerRemove(ctx context.Context, containerID string, options container.RemoveOptions) error {
+	ret := _m.Called(ctx, containerID, options)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ContainerRemove")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, container.RemoveOptions) error); ok {
+		r0 = rf(ctx, containerID, options)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ContainerStart provides a mock function with given fields: ctx, containerID, options
 func (_m *mockClient) ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error {
 	ret := _m.Called(ctx, containerID, options)

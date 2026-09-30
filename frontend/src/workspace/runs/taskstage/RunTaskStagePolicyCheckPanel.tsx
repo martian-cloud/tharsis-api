@@ -15,7 +15,7 @@ import Pill, { resolvePaletteColor } from '../../../common/Pill';
 import Timestamp from '../../../common/Timestamp';
 import { MutationError } from '../../../common/error';
 import { checkTypeLabel } from '../../../namespace/policies/policyDisplay';
-import JobLogs from '../JobLogs';
+import JobLogs from '../jobs/JobLogs';
 import RunStageStatusTypes from '../RunStageStatusTypes';
 import RunTaskStageOverrideProgressBox from './RunTaskStageOverrideProgressBox';
 import RunTaskStageOverrideRunButton from './RunTaskStageOverrideRunButton';

@@ -1,401 +1,90 @@
 // Package kubernetes package
 package kubernetes
 
-//go:generate go tool mockery --name client --inpackage --case underscore
-
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
-	"time"
 
-	"github.com/aws/smithy-go/ptr"
-	v1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer/cert"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer/configfile"
-	ekscfg "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer/eks"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer/idtoken"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer/incluster"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
-// Auth Types
-const (
-	AuthTypeEKSIAM        = "eks_iam"
-	AuthTypeKubeConfig    = "kube_config"
-	AuthTypeX509Cert      = "x509_cert"
-	AuthTypeRunnerIDToken = "runner_id_token"
-	AuthTypeInCluster     = "in_cluster"
-)
+var _ jobdispatcher.JobDispatcher = (*JobDispatcher)(nil)
 
-var (
-	pluginDataRequiredFields              = []string{"endpoint", "auth_type", "image", "memory_request", "memory_limit"}
-	requireEKSIAMAuthFields               = []string{"region", "eks_cluster"}
-	requireKubeConfigAuthFields           = []string{"kube_config_path"}
-	requireX509CertAuthFields             = []string{"kube_server", "client_cert", "client_key"}
-	requireRunnerIDTokenAuthFields        = []string{"kube_server"}
-	_                              client = (*k8sRunner)(nil)
-)
+// podNameKey is the dispatcher-data key under which the pod name is stored for cleanup.
+const podNameKey = "podName"
 
-type client interface {
-	CreateJob(context.Context, *v1.Job) (*v1.Job, error)
-}
-
-type k8sRunner struct {
-	logger     logger.Logger
-	configurer configurer.Configurer
-	namespace  string
-}
-
-// CreateJob get a kubernetes config, sets up the client and creates the batch job.
-func (k *k8sRunner) CreateJob(ctx context.Context, job *v1.Job) (*v1.Job, error) {
-	config, err := k.configurer.GetConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	cs, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return cs.BatchV1().Jobs(k.namespace).Create(ctx, job, metav1.CreateOptions{})
-}
-
-// JobDispatcher uses a kubernetes client to dispatch jobs
+// JobDispatcher uses a kubernetes client to dispatch jobs.
 type JobDispatcher struct {
-	logger                 logger.Logger
-	client                 client
-	image                  string
-	apiEndpoint            string
-	discoveryProtocolHosts []string
-	memoryRequest          resource.Quantity
-	memoryLimit            resource.Quantity
-	cpuRequest             resource.Quantity
-	cpuLimit               resource.Quantity
-	securityContext        *corev1.SecurityContext
-	nodeSelector           map[string]string
-	hostAliases            []corev1.HostAlias
-	extraAnnotations       map[string]string
-	labels                 map[string]string
+	config *config
+	client client
+	logger logger.Logger
 }
 
-// New creates a JobDispatcher
+// New creates a JobDispatcher.
 func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHost string, tokenGetter types.TokenGetterFunc, logger logger.Logger) (*JobDispatcher, error) {
-	if err := types.MigrateDeprecatedPluginDataFields(pluginData, logger); err != nil {
+	cfg, err := parseConfig(pluginData, discoveryProtocolHost, logger)
+	if err != nil {
 		return nil, err
 	}
 
-	for _, field := range pluginDataRequiredFields {
-		if _, ok := pluginData[field]; !ok {
-			return nil, fmt.Errorf("kubernetes job dispatcher requires plugin data '%s' field", field)
-		}
-	}
-
-	var (
-		c   configurer.Configurer
-		err error
-	)
-	switch pluginData["auth_type"] {
-	case AuthTypeEKSIAM:
-		if err = checkRequiredFields(AuthTypeEKSIAM, pluginData, requireEKSIAMAuthFields); err != nil {
-			return nil, err
-		}
-
-		c, err = ekscfg.New(ctx, pluginData["region"], pluginData["eks_cluster"])
-		if err != nil {
-			return nil, fmt.Errorf("failed to configure kube job dispatcher plugin with auth type %q : %v", AuthTypeEKSIAM, err)
-		}
-	case AuthTypeKubeConfig:
-		if err = checkRequiredFields(AuthTypeKubeConfig, pluginData, requireKubeConfigAuthFields); err != nil {
-			return nil, err
-		}
-
-		kubeConfigPath := pluginData["kube_config_path"]
-		c, err = configfile.New(kubeConfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to configure kube job dispatcher plugin with auth type %q : %v", AuthTypeKubeConfig, err)
-		}
-	case AuthTypeX509Cert:
-		if err = checkRequiredFields(AuthTypeX509Cert, pluginData, requireX509CertAuthFields); err != nil {
-			return nil, err
-		}
-
-		kubeServer := pluginData["kube_server"]
-		clientCertData := pluginData["client_cert"]
-		clientKeyData := pluginData["client_key"]
-		caCertData := pluginData["ca_cert"]
-		c, err = cert.New(kubeServer, clientCertData, clientKeyData, caCertData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to configure kube job dispatcher plugin with auth type %q : %v", AuthTypeX509Cert, err)
-		}
-	case AuthTypeRunnerIDToken:
-		if err = checkRequiredFields(AuthTypeRunnerIDToken, pluginData, requireRunnerIDTokenAuthFields); err != nil {
-			return nil, err
-		}
-
-		kubeServer := pluginData["kube_server"]
-		caCertData := pluginData["ca_cert"]
-		c, err = idtoken.New(kubeServer, caCertData, tokenGetter)
-		if err != nil {
-			return nil, fmt.Errorf("failed to configure kube job dispatcher plugin with auth type %q : %v", AuthTypeRunnerIDToken, err)
-		}
-	case AuthTypeInCluster:
-		c = incluster.New()
-	default:
-		return nil, fmt.Errorf("kubernetes job dispatcher doesn't support auth_type '%s'", pluginData["auth_type"])
-	}
-
-	namespace := "default"
-	if ns, ok := pluginData["namespace"]; ok {
-		namespace = ns
-	}
-
-	var runAsUser *int64
-	if runAsUserStr, ok := pluginData["security_context_run_as_user"]; ok {
-		val, err := strconv.ParseInt(runAsUserStr, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse security_context_run_as_user for runner jobs: %v", err)
-		}
-		runAsUser = &val
-	}
-
-	var runAsGroup *int64
-	if runAsGroupStr, ok := pluginData["security_context_run_as_group"]; ok {
-		val, err := strconv.ParseInt(runAsGroupStr, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse security_context_run_as_group for runner jobs: %v", err)
-		}
-		runAsGroup = &val
-	}
-
-	var runAsNonRoot *bool
-	if runAsNonRootStr, ok := pluginData["security_context_run_as_non_root"]; ok {
-		val, err := strconv.ParseBool(runAsNonRootStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse security_context_run_as_non_root for runner jobs: %v", err)
-		}
-		runAsNonRoot = &val
-	}
-
-	memoryRequest, err := resource.ParseQuantity(pluginData["memory_request"])
+	configurer, err := parseConfigurer(ctx, pluginData, tokenGetter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse memory request for runner jobs: %v", err)
+		return nil, err
 	}
 
-	memoryLimit, err := resource.ParseQuantity(pluginData["memory_limit"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse memory limit for runner jobs: %v", err)
-	}
-
-	var cpuRequest resource.Quantity
-	if cpuRequestStr, ok := pluginData["cpu_request"]; ok {
-		cpuRequest, err = resource.ParseQuantity(cpuRequestStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse cpu request for runner jobs: %v", err)
-		}
-	}
-
-	var cpuLimit resource.Quantity
-	if cpuLimitStr, ok := pluginData["cpu_limit"]; ok {
-		cpuLimit, err = resource.ParseQuantity(cpuLimitStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse cpu limit for runner jobs: %v", err)
-		}
-	}
-
-	discoveryProtocolHosts := []string{}
-
-	if discoveryProtocolHost != "" {
-		discoveryProtocolHosts = append(discoveryProtocolHosts, discoveryProtocolHost)
-	}
-
-	if extraDiscoveryHostsStr, ok := pluginData["extra_service_discovery_hosts"]; ok {
-		for _, host := range strings.Split(extraDiscoveryHostsStr, ",") {
-			discoveryProtocolHosts = append(discoveryProtocolHosts, strings.TrimSpace(host))
-		}
-	}
-
-	var nodeSelector map[string]string
-	if nodeSelectorStr, ok := pluginData["node_selector"]; ok && nodeSelectorStr != "" {
-		nodeSelector = make(map[string]string)
-		for pair := range strings.SplitSeq(nodeSelectorStr, ",") {
-			parts := strings.SplitN(pair, "=", 2)
-			if len(parts) != 2 {
-				return nil, fmt.Errorf("invalid node selector format: %q, expected format: key1=value1,key2=value2", pair)
-			}
-
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-
-			if key == "" || value == "" {
-				return nil, fmt.Errorf("invalid node selector format: %q, key and value cannot be empty", pair)
-			}
-			nodeSelector[key] = value
-		}
-	}
-
-	var hostAliases []corev1.HostAlias
-	if hostAliasesStr, ok := pluginData["host_aliases"]; ok {
-		for _, hostEntry := range strings.Split(hostAliasesStr, ",") {
-			parts := strings.SplitN(strings.TrimSpace(hostEntry), ":", 2)
-			if len(parts) == 2 {
-				hostAliases = append(hostAliases, corev1.HostAlias{
-					IP:        strings.TrimSpace(parts[1]),
-					Hostnames: []string{strings.TrimSpace(parts[0])},
-				})
-			}
-		}
-	}
-
-	extraAnnotations := map[string]string{}
-	if extraAnnotationsStr, ok := pluginData["pod_annotations"]; ok && extraAnnotationsStr != "" {
-		if err := json.Unmarshal([]byte(extraAnnotationsStr), &extraAnnotations); err != nil {
-			return nil, fmt.Errorf("pod annotations options is invalid: %w", err)
-		}
-	}
-
-	labels := map[string]string{}
-	if labelsStr, ok := pluginData["pod_labels"]; ok && labelsStr != "" {
-		if err := json.Unmarshal([]byte(labelsStr), &labels); err != nil {
-			return nil, fmt.Errorf("pod labels options is invalid: %w", err)
-		}
-	}
+	logger.Infof("kubernetes job dispatcher will create job pods in namespace %q", cfg.namespace)
 
 	return &JobDispatcher{
-		logger:                 logger,
-		image:                  pluginData["image"],
-		apiEndpoint:            pluginData["endpoint"],
-		discoveryProtocolHosts: discoveryProtocolHosts,
-		memoryRequest:          memoryRequest,
-		memoryLimit:            memoryLimit,
-		cpuRequest:             cpuRequest,
-		cpuLimit:               cpuLimit,
-		nodeSelector:           nodeSelector,
-		extraAnnotations:       extraAnnotations,
-		labels:                 labels,
-		hostAliases:            hostAliases,
-		securityContext: &corev1.SecurityContext{
-			Privileged:               ptr.Bool(false),
-			AllowPrivilegeEscalation: ptr.Bool(false),
-			RunAsUser:                runAsUser,
-			RunAsGroup:               runAsGroup,
-			RunAsNonRoot:             runAsNonRoot,
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"NET_RAW"},
-			},
-		},
+		config: cfg,
 		client: &k8sRunner{
-			logger:     logger,
-			namespace:  namespace,
-			configurer: c,
+			namespace:  cfg.namespace,
+			configurer: configurer,
 		},
+		logger: logger,
 	}, nil
 }
 
-// DispatchJob will start a kubernetes batch job to execute the job
-func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token string) (string, error) {
-	// Disable retries
-	backoffLimit := int32(0)
-	// Remove once completed
-	ttlSecondsAfterFinished := int32(0)
-
-	annotations := map[string]string{
-		"job.phobos.io/id": jobID,
-	}
-
-	for k, v := range j.extraAnnotations {
-		annotations[k] = v
-	}
-
-	k8sJob := &v1.Job{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "batch/v1",
-			Kind:       "Job",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "tharsis-job-" + strings.ToLower(jobID[:8]),
-		},
-		Spec: v1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels:      j.labels,
-					Annotations: annotations,
-				},
-				Spec: corev1.PodSpec{
-					AutomountServiceAccountToken: ptr.Bool(false),
-					NodeSelector:                 j.nodeSelector,
-					HostAliases:                  j.hostAliases,
-					Containers: []corev1.Container{
-						{
-							Name:            "main",
-							Image:           j.image,
-							SecurityContext: j.securityContext,
-							Env: []corev1.EnvVar{
-								{
-									Name:  "JOB_ID",
-									Value: jobID,
-								},
-								{
-									Name:  "JOB_TOKEN",
-									Value: token,
-								},
-								{
-									Name:  "ENDPOINT",
-									Value: j.apiEndpoint,
-								},
-								{
-									Name:  "DISCOVERY_PROTOCOL_HOSTS",
-									Value: strings.Join(j.discoveryProtocolHosts, ","),
-								},
-								{
-									Name:  "MEMORY_LIMIT",
-									Value: j.memoryLimit.String(),
-								},
-							},
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceMemory: j.memoryRequest,
-									corev1.ResourceCPU:    j.cpuRequest,
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceMemory: j.memoryLimit,
-									corev1.ResourceCPU:    j.cpuLimit,
-								},
-							},
-						},
-					},
-					RestartPolicy:                 corev1.RestartPolicyNever,
-					TerminationGracePeriodSeconds: ptr.Int64(int64(time.Hour.Seconds())),
-				},
-			},
-			BackoffLimit:            &backoffLimit,
-			TTLSecondsAfterFinished: &ttlSecondsAfterFinished,
-		},
-	}
-
-	result, err := j.client.CreateJob(ctx, k8sJob)
+// DispatchJob starts a bare Kubernetes pod to execute the job.
+func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token string) (map[string]string, error) {
+	pod, err := j.config.buildPod(jobID, token)
 	if err != nil {
-		return "", fmt.Errorf("kubernetes job dispatcher failed to run for job %s: %v", jobID, err)
+		return nil, fmt.Errorf("kubernetes job dispatcher failed to build pod for job %s: %v", jobID, err)
 	}
 
-	return string(result.UID), nil
+	result, err := j.client.CreatePod(ctx, pod)
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes job dispatcher failed to run for job %s: %v", jobID, err)
+	}
+
+	return map[string]string{podNameKey: result.Name}, nil
 }
 
-func checkRequiredFields(authType string, pluginData map[string]string, requiredFields []string) error {
-	for _, field := range requiredFields {
-		if _, ok := pluginData[field]; !ok {
-			return fmt.Errorf("kubernetes job dispatcher requires plugin data %q field when using the %q auth type", field, authType)
-		}
+// CleanupJob deletes the job's pod, whose name DispatchJob stored in the dispatcher data.
+func (j *JobDispatcher) CleanupJob(ctx context.Context, jobID string, dispatcherData map[string]string) error {
+	podName := dispatcherData[podNameKey]
+	if podName == "" {
+		// Nothing to delete without a pod name; skip the API call rather than delete an empty name.
+		j.logger.Warnf("kubernetes job dispatcher skipping cleanup for job %s: dispatcher data has no pod name", jobID)
+		return nil
 	}
+
+	if err := j.client.DeletePod(ctx, podName); err != nil {
+		// The pod is already gone; nothing to clean up.
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return fmt.Errorf("kubernetes job dispatcher failed to delete pod %s for job %s: %v", podName, jobID, err)
+	}
+
 	return nil
+}
+
+// Limits returns the resource limits jobs run under.
+func (j *JobDispatcher) Limits() *types.ResourceLimits {
+	return j.config.limits
 }

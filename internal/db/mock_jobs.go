@@ -14,6 +14,36 @@ type MockJobs struct {
 	mock.Mock
 }
 
+// ClaimJobsForCleanup provides a mock function with given fields: ctx, input
+func (_m *MockJobs) ClaimJobsForCleanup(ctx context.Context, input *ClaimJobsForCleanupInput) ([]models.Job, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClaimJobsForCleanup")
+	}
+
+	var r0 []models.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *ClaimJobsForCleanupInput) ([]models.Job, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *ClaimJobsForCleanupInput) []models.Job); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *ClaimJobsForCleanupInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateJob provides a mock function with given fields: ctx, job
 func (_m *MockJobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, error) {
 	ret := _m.Called(ctx, job)
@@ -190,6 +220,24 @@ func (_m *MockJobs) GetLatestJobByType(ctx context.Context, runID string, jobTyp
 	}
 
 	return r0, r1
+}
+
+// MarkJobsCleanedUp provides a mock function with given fields: ctx, runnerID, jobIDs
+func (_m *MockJobs) MarkJobsCleanedUp(ctx context.Context, runnerID string, jobIDs []string) error {
+	ret := _m.Called(ctx, runnerID, jobIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkJobsCleanedUp")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string) error); ok {
+		r0 = rf(ctx, runnerID, jobIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // UpdateJob provides a mock function with given fields: ctx, job

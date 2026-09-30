@@ -46,6 +46,26 @@ type JobTimestamps {
   finishedAt: Time
 }
 
+type JobResourceUsageMetrics {
+  # Fractional (cgroup usage_usec / 1000), so it stays a Float; the counters below are whole-number Int64.
+  totalCpuTimeMs: Float
+  totalNetworkReceivedBytes: Int64
+  totalNetworkSentBytes: Int64
+  totalNetworkReceivedPackets: Int64
+  totalNetworkSentPackets: Int64
+  totalDiskReadBytes: Int64
+  totalDiskWriteBytes: Int64
+  peakMemoryBytes: Int64
+}
+
+type JobResourceUsageLimits {
+  memoryBytes: Int64
+  networkReceivedBytes: Int64
+  networkSentBytes: Int64
+  diskReadBytes: Int64
+  diskWriteBytes: Int64
+}
+
 type SaveJobLogsPayload {
   clientMutationId: String
   problems: [Problem!]!
@@ -87,6 +107,8 @@ type Job implements Node {
   properties: [KeyValueEntry!]!
   completed: Boolean!
   outdatedJobProtocolVersion: Boolean!
+  resourceUsageMetrics: JobResourceUsageMetrics
+  resourceUsageLimits: JobResourceUsageLimits
 }
 
 input JobLogStreamSubscriptionInput {

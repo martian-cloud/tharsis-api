@@ -1830,6 +1830,8 @@ type Job implements Node {
   opaData: JobOPAData
   outdatedJobProtocolVersion: Boolean!
   properties: [KeyValueEntry!]!
+  resourceUsageLimits: JobResourceUsageLimits
+  resourceUsageMetrics: JobResourceUsageMetrics
   run: Run!
   runner: Runner
   runnerAvailabilityStatus: RunnerAvailabilityStatus!
@@ -1887,6 +1889,25 @@ type JobOPAData {
   The run stage this job's policy check evaluates at (e.g. PRE_PLAN, POST_PLAN).
   """
   taskStageName: RunTaskStageName
+}
+
+type JobResourceUsageLimits {
+  diskReadBytes: Int64
+  diskWriteBytes: Int64
+  memoryBytes: Int64
+  networkReceivedBytes: Int64
+  networkSentBytes: Int64
+}
+
+type JobResourceUsageMetrics {
+  peakMemoryBytes: Int64
+  totalCpuTimeMs: Float
+  totalDiskReadBytes: Int64
+  totalDiskWriteBytes: Int64
+  totalNetworkReceivedBytes: Int64
+  totalNetworkReceivedPackets: Int64
+  totalNetworkSentBytes: Int64
+  totalNetworkSentPackets: Int64
 }
 
 enum JobSort {
@@ -3505,6 +3526,10 @@ type SetVariablesIncludedInTFConfigPayload {
 
 input SetWorkspaceRoleBindingInput {
   clientMutationId: String
+
+  """
+  The role to bind. Omit (or pass null) to remove the workspace's existing binding.
+  """
   roleId: String
   workspaceId: String!
 }
@@ -4017,6 +4042,12 @@ enum TerraformResourceMode {
   data
   managed
 }
+
+"""
+A 64-bit signed integer, serialized as a JSON number. Used for counters that can exceed
+the 32-bit range of Int (e.g. byte and packet totals) without the precision loss of Float.
+"""
+scalar Int64
 
 """Time represented in ISO 8601"""
 scalar Time
@@ -4633,6 +4664,10 @@ input WorkspaceLabelsFilter {
   labels: [WorkspaceLabelInput!]!
 }
 
+"""
+A WorkspaceRoleBinding confers a Role on a workspace: the role's permissions become available to
+the workspace's job caller at the workspace's DIRECT PARENT namespace. See setWorkspaceRoleBinding.
+"""
 type WorkspaceRoleBinding implements Node {
   createdBy: String!
   id: ID!

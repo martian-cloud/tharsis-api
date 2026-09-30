@@ -25,8 +25,12 @@ const (
 	Jobs_GetLatestJobForPlan_FullMethodName             = "/martiancloud.tharsis.api.job.Jobs/GetLatestJobForPlan"
 	Jobs_GetLatestJobForApply_FullMethodName            = "/martiancloud.tharsis.api.job.Jobs/GetLatestJobForApply"
 	Jobs_SetJobStatus_FullMethodName                    = "/martiancloud.tharsis.api.job.Jobs/SetJobStatus"
+	Jobs_SaveJobResourceUsage_FullMethodName            = "/martiancloud.tharsis.api.job.Jobs/SaveJobResourceUsage"
 	Jobs_SaveJobLogs_FullMethodName                     = "/martiancloud.tharsis.api.job.Jobs/SaveJobLogs"
 	Jobs_ClaimJob_FullMethodName                        = "/martiancloud.tharsis.api.job.Jobs/ClaimJob"
+	Jobs_JobDispatched_FullMethodName                   = "/martiancloud.tharsis.api.job.Jobs/JobDispatched"
+	Jobs_ClaimJobsForCleanup_FullMethodName             = "/martiancloud.tharsis.api.job.Jobs/ClaimJobsForCleanup"
+	Jobs_MarkJobsCleanedUp_FullMethodName               = "/martiancloud.tharsis.api.job.Jobs/MarkJobsCleanedUp"
 	Jobs_SubscribeToJobLogStream_FullMethodName         = "/martiancloud.tharsis.api.job.Jobs/SubscribeToJobLogStream"
 	Jobs_SubscribeToJobEvents_FullMethodName            = "/martiancloud.tharsis.api.job.Jobs/SubscribeToJobEvents"
 	Jobs_SubscribeToJobCancellationEvent_FullMethodName = "/martiancloud.tharsis.api.job.Jobs/SubscribeToJobCancellationEvent"
@@ -48,10 +52,18 @@ type JobsClient interface {
 	GetLatestJobForApply(ctx context.Context, in *GetLatestJobForApplyRequest, opts ...grpc.CallOption) (*Job, error)
 	// SetJobStatus sets the status of a job.
 	SetJobStatus(ctx context.Context, in *SetJobStatusInput, opts ...grpc.CallOption) (*Job, error)
+	// SaveJobResourceUsage saves resource usage metrics and limits collected during job execution.
+	SaveJobResourceUsage(ctx context.Context, in *SaveJobResourceUsageInput, opts ...grpc.CallOption) (*Job, error)
 	// SaveJobLogs saves job logs.
 	SaveJobLogs(ctx context.Context, in *SaveJobLogsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ClaimJob claims the next available job for a runner.
 	ClaimJob(ctx context.Context, in *ClaimJobRequest, opts ...grpc.CallOption) (*ClaimJobResponse, error)
+	// JobDispatched records that a runner dispatched a job, carrying opaque dispatcher data and the resource limits the job runs under.
+	JobDispatched(ctx context.Context, in *JobDispatchedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ClaimJobsForCleanup leases final, dispatched jobs whose runtimes still need tearing down.
+	ClaimJobsForCleanup(ctx context.Context, in *ClaimJobsForCleanupRequest, opts ...grpc.CallOption) (*ClaimJobsForCleanupResponse, error)
+	// MarkJobsCleanedUp records that a runner tore down the runtimes of a batch of jobs.
+	MarkJobsCleanedUp(ctx context.Context, in *MarkJobsCleanedUpRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// SubscribeToJobLogStream subscribes to job log stream events.
 	SubscribeToJobLogStream(ctx context.Context, in *SubscribeToJobLogStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[JobLogStreamEvent], error)
 	// SubscribeToJobEvents subscribes to job events.
@@ -118,6 +130,16 @@ func (c *jobsClient) SetJobStatus(ctx context.Context, in *SetJobStatusInput, op
 	return out, nil
 }
 
+func (c *jobsClient) SaveJobResourceUsage(ctx context.Context, in *SaveJobResourceUsageInput, opts ...grpc.CallOption) (*Job, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Job)
+	err := c.cc.Invoke(ctx, Jobs_SaveJobResourceUsage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *jobsClient) SaveJobLogs(ctx context.Context, in *SaveJobLogsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -132,6 +154,36 @@ func (c *jobsClient) ClaimJob(ctx context.Context, in *ClaimJobRequest, opts ...
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ClaimJobResponse)
 	err := c.cc.Invoke(ctx, Jobs_ClaimJob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobsClient) JobDispatched(ctx context.Context, in *JobDispatchedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Jobs_JobDispatched_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobsClient) ClaimJobsForCleanup(ctx context.Context, in *ClaimJobsForCleanupRequest, opts ...grpc.CallOption) (*ClaimJobsForCleanupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ClaimJobsForCleanupResponse)
+	err := c.cc.Invoke(ctx, Jobs_ClaimJobsForCleanup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobsClient) MarkJobsCleanedUp(ctx context.Context, in *MarkJobsCleanedUpRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Jobs_MarkJobsCleanedUp_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -211,10 +263,18 @@ type JobsServer interface {
 	GetLatestJobForApply(context.Context, *GetLatestJobForApplyRequest) (*Job, error)
 	// SetJobStatus sets the status of a job.
 	SetJobStatus(context.Context, *SetJobStatusInput) (*Job, error)
+	// SaveJobResourceUsage saves resource usage metrics and limits collected during job execution.
+	SaveJobResourceUsage(context.Context, *SaveJobResourceUsageInput) (*Job, error)
 	// SaveJobLogs saves job logs.
 	SaveJobLogs(context.Context, *SaveJobLogsRequest) (*emptypb.Empty, error)
 	// ClaimJob claims the next available job for a runner.
 	ClaimJob(context.Context, *ClaimJobRequest) (*ClaimJobResponse, error)
+	// JobDispatched records that a runner dispatched a job, carrying opaque dispatcher data and the resource limits the job runs under.
+	JobDispatched(context.Context, *JobDispatchedRequest) (*emptypb.Empty, error)
+	// ClaimJobsForCleanup leases final, dispatched jobs whose runtimes still need tearing down.
+	ClaimJobsForCleanup(context.Context, *ClaimJobsForCleanupRequest) (*ClaimJobsForCleanupResponse, error)
+	// MarkJobsCleanedUp records that a runner tore down the runtimes of a batch of jobs.
+	MarkJobsCleanedUp(context.Context, *MarkJobsCleanedUpRequest) (*emptypb.Empty, error)
 	// SubscribeToJobLogStream subscribes to job log stream events.
 	SubscribeToJobLogStream(*SubscribeToJobLogStreamRequest, grpc.ServerStreamingServer[JobLogStreamEvent]) error
 	// SubscribeToJobEvents subscribes to job events.
@@ -246,11 +306,23 @@ func (UnimplementedJobsServer) GetLatestJobForApply(context.Context, *GetLatestJ
 func (UnimplementedJobsServer) SetJobStatus(context.Context, *SetJobStatusInput) (*Job, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetJobStatus not implemented")
 }
+func (UnimplementedJobsServer) SaveJobResourceUsage(context.Context, *SaveJobResourceUsageInput) (*Job, error) {
+	return nil, status.Error(codes.Unimplemented, "method SaveJobResourceUsage not implemented")
+}
 func (UnimplementedJobsServer) SaveJobLogs(context.Context, *SaveJobLogsRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method SaveJobLogs not implemented")
 }
 func (UnimplementedJobsServer) ClaimJob(context.Context, *ClaimJobRequest) (*ClaimJobResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ClaimJob not implemented")
+}
+func (UnimplementedJobsServer) JobDispatched(context.Context, *JobDispatchedRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method JobDispatched not implemented")
+}
+func (UnimplementedJobsServer) ClaimJobsForCleanup(context.Context, *ClaimJobsForCleanupRequest) (*ClaimJobsForCleanupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ClaimJobsForCleanup not implemented")
+}
+func (UnimplementedJobsServer) MarkJobsCleanedUp(context.Context, *MarkJobsCleanedUpRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkJobsCleanedUp not implemented")
 }
 func (UnimplementedJobsServer) SubscribeToJobLogStream(*SubscribeToJobLogStreamRequest, grpc.ServerStreamingServer[JobLogStreamEvent]) error {
 	return status.Error(codes.Unimplemented, "method SubscribeToJobLogStream not implemented")
@@ -372,6 +444,24 @@ func _Jobs_SetJobStatus_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Jobs_SaveJobResourceUsage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveJobResourceUsageInput)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobsServer).SaveJobResourceUsage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Jobs_SaveJobResourceUsage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobsServer).SaveJobResourceUsage(ctx, req.(*SaveJobResourceUsageInput))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Jobs_SaveJobLogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SaveJobLogsRequest)
 	if err := dec(in); err != nil {
@@ -404,6 +494,60 @@ func _Jobs_ClaimJob_Handler(srv interface{}, ctx context.Context, dec func(inter
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(JobsServer).ClaimJob(ctx, req.(*ClaimJobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Jobs_JobDispatched_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JobDispatchedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobsServer).JobDispatched(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Jobs_JobDispatched_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobsServer).JobDispatched(ctx, req.(*JobDispatchedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Jobs_ClaimJobsForCleanup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClaimJobsForCleanupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobsServer).ClaimJobsForCleanup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Jobs_ClaimJobsForCleanup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobsServer).ClaimJobsForCleanup(ctx, req.(*ClaimJobsForCleanupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Jobs_MarkJobsCleanedUp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkJobsCleanedUpRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobsServer).MarkJobsCleanedUp(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Jobs_MarkJobsCleanedUp_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobsServer).MarkJobsCleanedUp(ctx, req.(*MarkJobsCleanedUpRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -469,12 +613,28 @@ var Jobs_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Jobs_SetJobStatus_Handler,
 		},
 		{
+			MethodName: "SaveJobResourceUsage",
+			Handler:    _Jobs_SaveJobResourceUsage_Handler,
+		},
+		{
 			MethodName: "SaveJobLogs",
 			Handler:    _Jobs_SaveJobLogs_Handler,
 		},
 		{
 			MethodName: "ClaimJob",
 			Handler:    _Jobs_ClaimJob_Handler,
+		},
+		{
+			MethodName: "JobDispatched",
+			Handler:    _Jobs_JobDispatched_Handler,
+		},
+		{
+			MethodName: "ClaimJobsForCleanup",
+			Handler:    _Jobs_ClaimJobsForCleanup_Handler,
+		},
+		{
+			MethodName: "MarkJobsCleanedUp",
+			Handler:    _Jobs_MarkJobsCleanedUp_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

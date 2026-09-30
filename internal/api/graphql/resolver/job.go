@@ -171,6 +171,92 @@ func (r *JobTimestampsResolver) FinishedAt() *graphql.Time {
 	return &graphql.Time{Time: *r.timestamps.FinishedTimestamp}
 }
 
+// JobResourceUsageMetricsResolver resolves a job's resource usage metrics
+type JobResourceUsageMetricsResolver struct {
+	metrics *models.JobResourceUsageMetrics
+}
+
+// TotalCPUTimeMs resolver
+func (r *JobResourceUsageMetricsResolver) TotalCPUTimeMs() *float64 {
+	return r.metrics.TotalCPUTimeMS
+}
+
+// TotalNetworkReceivedBytes resolver
+func (r *JobResourceUsageMetricsResolver) TotalNetworkReceivedBytes() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.metrics.TotalNetworkReceivedBytes)
+}
+
+// TotalNetworkSentBytes resolver
+func (r *JobResourceUsageMetricsResolver) TotalNetworkSentBytes() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.metrics.TotalNetworkSentBytes)
+}
+
+// TotalNetworkReceivedPackets resolver
+func (r *JobResourceUsageMetricsResolver) TotalNetworkReceivedPackets() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.metrics.TotalNetworkReceivedPackets)
+}
+
+// TotalNetworkSentPackets resolver
+func (r *JobResourceUsageMetricsResolver) TotalNetworkSentPackets() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.metrics.TotalNetworkSentPackets)
+}
+
+// TotalDiskReadBytes resolver
+func (r *JobResourceUsageMetricsResolver) TotalDiskReadBytes() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.metrics.TotalDiskReadBytes)
+}
+
+// TotalDiskWriteBytes resolver
+func (r *JobResourceUsageMetricsResolver) TotalDiskWriteBytes() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.metrics.TotalDiskWriteBytes)
+}
+
+// PeakMemoryBytes resolver
+func (r *JobResourceUsageMetricsResolver) PeakMemoryBytes() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.metrics.PeakMemoryBytes)
+}
+
+// JobResourceUsageLimitsResolver resolves a job's configured resource usage limits
+type JobResourceUsageLimitsResolver struct {
+	limits *models.JobResourceUsageLimits
+}
+
+// MemoryBytes resolver
+func (r *JobResourceUsageLimitsResolver) MemoryBytes() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.limits.MemoryBytes)
+}
+
+// NetworkReceivedBytes resolver
+func (r *JobResourceUsageLimitsResolver) NetworkReceivedBytes() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.limits.NetworkReceivedBytes)
+}
+
+// NetworkSentBytes resolver
+func (r *JobResourceUsageLimitsResolver) NetworkSentBytes() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.limits.NetworkSentBytes)
+}
+
+// DiskReadBytes resolver
+func (r *JobResourceUsageLimitsResolver) DiskReadBytes() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.limits.DiskReadBytes)
+}
+
+// DiskWriteBytes resolver
+func (r *JobResourceUsageLimitsResolver) DiskWriteBytes() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.limits.DiskWriteBytes)
+}
+
+// int64PtrToInt64ScalarPtr converts a nil-able int64 metric to the Int64 scalar the GraphQL schema exposes.
+func int64PtrToInt64ScalarPtr(v *int64) *Int64 {
+	if v == nil {
+		return nil
+	}
+
+	i := Int64(*v)
+
+	return &i
+}
+
 // JobResolver resolves a job resource
 type JobResolver struct {
 	job *models.Job
@@ -312,6 +398,24 @@ func (r *JobResolver) Metadata() *MetadataResolver {
 // Timestamps resolver
 func (r *JobResolver) Timestamps() *JobTimestampsResolver {
 	return &JobTimestampsResolver{timestamps: &r.job.Timestamps}
+}
+
+// ResourceUsageMetrics resolver
+func (r *JobResolver) ResourceUsageMetrics() *JobResourceUsageMetricsResolver {
+	if r.job.ResourceUsageMetrics == nil {
+		return nil
+	}
+
+	return &JobResourceUsageMetricsResolver{metrics: r.job.ResourceUsageMetrics}
+}
+
+// ResourceUsageLimits resolver
+func (r *JobResolver) ResourceUsageLimits() *JobResourceUsageLimitsResolver {
+	if r.job.ResourceUsageLimits == nil {
+		return nil
+	}
+
+	return &JobResourceUsageLimitsResolver{limits: r.job.ResourceUsageLimits}
 }
 
 // LogLastUpdatedAt resolver

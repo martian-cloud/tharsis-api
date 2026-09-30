@@ -7,7 +7,9 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	jobtypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 )
@@ -35,12 +37,34 @@ type ClaimJobResponse struct {
 	Token string
 }
 
+// CleanupJobInfo identifies a job whose runtime needs to be cleaned up.
+type CleanupJobInfo struct {
+	JobID          string
+	DispatcherData map[string]string
+}
+
+// ClaimJobsForCleanupInput is the input for claiming jobs that need runtime cleanup.
+type ClaimJobsForCleanupInput struct {
+	RunnerID string
+	Limit    uint
+}
+
+// JobDispatchedInput is the input for reporting that a runner dispatched a job.
+type JobDispatchedInput struct {
+	JobID          string
+	DispatcherData map[string]string
+	Limits         *jobtypes.ResourceLimits
+}
+
 // Client interface for claiming a job
 type Client interface {
 	CreateRunnerSession(ctx context.Context, input *CreateRunnerSessionInput) (string, error)
 	SendRunnerSessionHeartbeat(ctx context.Context, sessionID string) error
 	ClaimJob(ctx context.Context, input *ClaimJobInput) (*ClaimJobResponse, error)
 	CreateRunnerSessionError(ctx context.Context, sessionID string, err error) error
+	JobDispatched(ctx context.Context, input *JobDispatchedInput) error
+	ClaimJobsForCleanup(ctx context.Context, input *ClaimJobsForCleanupInput) ([]*CleanupJobInfo, error)
+	MarkJobsCleanedUp(ctx context.Context, runnerID string, jobIDs []string) error
 }
 
 // InternalTokenProvider is a token provider for internal runners
@@ -143,4 +167,51 @@ func (a *internalClient) ClaimJob(ctx context.Context, input *ClaimJobInput) (*C
 		JobID: resp.Job.GetGlobalID(),
 		Token: resp.Token,
 	}, nil
+}
+
+func (a *internalClient) JobDispatched(ctx context.Context, input *JobDispatchedInput) error {
+	var modelLimits *models.JobResourceUsageLimits
+	if input.Limits != nil {
+		modelLimits = &models.JobResourceUsageLimits{
+			MemoryBytes:          new(int64(input.Limits.MemoryBytes)),
+			NetworkReceivedBytes: new(int64(input.Limits.NetworkReceivedBytes)),
+			NetworkSentBytes:     new(int64(input.Limits.NetworkSentBytes)),
+			DiskReadBytes:        new(int64(input.Limits.DiskReadBytes)),
+			DiskWriteBytes:       new(int64(input.Limits.DiskWriteBytes)),
+		}
+	}
+
+	return a.jobService.JobDispatched(ctx, gid.FromGlobalID(input.JobID), input.DispatcherData, modelLimits)
+}
+
+func (a *internalClient) ClaimJobsForCleanup(ctx context.Context, input *ClaimJobsForCleanupInput) ([]*CleanupJobInfo, error) {
+	jobs, err := a.jobService.ClaimJobsForCleanup(ctx, &job.ClaimJobsForCleanupInput{
+		RunnerID: input.RunnerID,
+		Limit:    input.Limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	infos := make([]*CleanupJobInfo, 0, len(jobs))
+	for i := range jobs {
+		infos = append(infos, &CleanupJobInfo{
+			JobID:          jobs[i].GetGlobalID(),
+			DispatcherData: jobs[i].DispatcherData,
+		})
+	}
+
+	return infos, nil
+}
+
+func (a *internalClient) MarkJobsCleanedUp(ctx context.Context, runnerID string, jobIDs []string) error {
+	internalIDs := make([]string, len(jobIDs))
+	for i, id := range jobIDs {
+		internalIDs[i] = gid.FromGlobalID(id)
+	}
+
+	return a.jobService.MarkJobsCleanedUp(ctx, &job.MarkJobsCleanedUpInput{
+		RunnerID: runnerID,
+		JobIDs:   internalIDs,
+	})
 }

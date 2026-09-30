@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<cce99cfb0b07a548ad3eff2f03a3fc46>>
+ * @generated SignedSource<<6330b5e9f0e01dd65a5d6b4d05e8776b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -26,7 +26,7 @@ export type RunDetailsApplyStageFragment_apply$data = {
         readonly queuedAt: any | null | undefined;
         readonly runningAt: any | null | undefined;
       };
-      readonly " $fragmentSpreads": FragmentRefs<"NoRunnerAlertFragment_job" | "OutdatedProtocolAlertFragment_job">;
+      readonly " $fragmentSpreads": FragmentRefs<"JobResourceUsageMetricsFragment_job" | "NoRunnerAlertFragment_job" | "OutdatedProtocolAlertFragment_job">;
     } | null | undefined;
     readonly errorMessage: string | null | undefined;
     readonly jobs: {
@@ -52,6 +52,9 @@ export type RunDetailsApplyStageFragment_apply$data = {
     readonly " $fragmentSpreads": FragmentRefs<"StateVersionFileFragment_stateVersion">;
   } | null | undefined;
   readonly status: RunStatus;
+  readonly workspace: {
+    readonly fullPath: string;
+  };
   readonly " $fragmentSpreads": FragmentRefs<"ForceCancelRunAlertFragment_run" | "RunVariablesFragment_variables">;
   readonly " $fragmentType": "RunDetailsApplyStageFragment_apply";
 };
@@ -83,6 +86,24 @@ return {
   "selections": [
     (v0/*: any*/),
     (v1/*: any*/),
+    {
+      "alias": null,
+      "args": null,
+      "concreteType": "Workspace",
+      "kind": "LinkedField",
+      "name": "workspace",
+      "plural": false,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "fullPath",
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
+    },
     {
       "alias": null,
       "args": null,
@@ -206,6 +227,11 @@ return {
               "args": null,
               "kind": "FragmentSpread",
               "name": "OutdatedProtocolAlertFragment_job"
+            },
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "JobResourceUsageMetricsFragment_job"
             }
           ],
           "storageKey": null
@@ -296,6 +322,6 @@ return {
 };
 })();
 
-(node as any).hash = "b9c1bc23bbdd3710e8bd2c3809533e3c";
+(node as any).hash = "284ed700d24ce63ac1f580021d65afd6";
 
 export default node;

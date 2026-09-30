@@ -1,4 +1,4 @@
-import { Chip, SxProps, Theme } from '@mui/material';
+import { Chip, SxProps, Theme, Tooltip } from '@mui/material';
 import { alpha, styled } from '@mui/material/styles';
 import { ElementType, ReactElement, ReactNode } from 'react';
 
@@ -20,6 +20,8 @@ interface Props {
     size?: PillSize;
     // An element rather than a ReactNode, because it goes in Chip's icon slot.
     icon?: ReactElement;
+    // Optional hover text describing what kind of thing this pill represents (e.g. "Job status").
+    tooltip?: string;
     sx?: SxProps<Theme>;
 }
 
@@ -83,6 +85,9 @@ const StyledChip = styled(Chip, {
         // The label's own padding is dropped below, so the box padding lives here and `gap` is what
         // separates an icon from its text.
         padding: SIZES[pillSize].padding,
+        // Center the label vertically in the fixed-height box so text isn't top-heavy.
+        display: 'inline-flex',
+        alignItems: 'center',
         gap: '5px',
         borderRadius: '9999px',
         fontSize: theme.typography.caption.fontSize,
@@ -110,8 +115,8 @@ const StyledChip = styled(Chip, {
 // no click, no delete, no focus ring — so it stays legal inside a heading or a row that is itself a
 // link, and it takes a resolved color rather than a palette name because the statuses it labels come
 // from the app's own runStatus/checkResult palettes.
-function Pill({ children, color, variant = 'tint', size = 'medium', icon, sx }: Props) {
-    return (
+function Pill({ children, color, variant = 'tint', size = 'medium', icon, tooltip, sx }: Props) {
+    const chip = (
         <StyledChip
             // A span rather than Chip's div, so a pill can sit inline beside text.
             component="span"
@@ -123,6 +128,12 @@ function Pill({ children, color, variant = 'tint', size = 'medium', icon, sx }: 
             sx={sx}
         />
     );
+
+    if (tooltip) {
+        return <Tooltip title={tooltip}>{chip}</Tooltip>;
+    }
+
+    return chip;
 }
 
 export default Pill;

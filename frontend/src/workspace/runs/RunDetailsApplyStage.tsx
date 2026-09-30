@@ -10,7 +10,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MutationError } from '../../common/error';
 import Link from '../../routes/Link';
 import ForceCancelRunAlert from './ForceCancelRunAlert';
-import JobLogs from './JobLogs';
+import JobLogs from './jobs/JobLogs';
+import JobResourceUsageMetrics from './jobs/JobResourceUsageMetrics';
 import NoRunnerAlert from './NoRunnerAlert';
 import OutdatedProtocolAlert from './OutdatedProtocolAlert';
 import RunDetailsErrorSummary from './RunDetailsErrorSummary';
@@ -95,7 +96,7 @@ function RunDetailsApplyStage(props: Props) {
     // The tab lives in the URL like the plan stage's. Sanitize it: a stale value
     // carried over from the plan page (e.g. ?tab=changes) falls back to logs.
     const tabParam = searchParams.get('tab');
-    const tab = tabParam === 'variables' || tabParam === 'state' ? tabParam : 'logs';
+    const tab = tabParam === 'variables' || tabParam === 'state' || tabParam === 'resources' ? tabParam : 'logs';
 
     const data = useFragment<RunDetailsApplyStageFragment_apply$key>(
         graphql`
@@ -103,6 +104,9 @@ function RunDetailsApplyStage(props: Props) {
         {
             id
             status
+            workspace {
+                fullPath
+            }
             plan {
                 status
                 ...RunDetailsPlanSummaryFragment_plan
@@ -126,6 +130,7 @@ function RunDetailsApplyStage(props: Props) {
                   }
                   ...NoRunnerAlertFragment_job
                   ...OutdatedProtocolAlertFragment_job
+                  ...JobResourceUsageMetricsFragment_job
                 }
                 jobs(first: 0) {
                   totalCount
@@ -373,9 +378,10 @@ function RunDetailsApplyStage(props: Props) {
                         <Tab label="Logs" value="logs" />
                         <Tab label="Variables" value="variables" />
                         <Tab label="State" value="state" />
+                        <Tab label="Resource Usage" value="resources" />
                     </Tabs>
                 </Box>
-                {tab === 'logs' && <Box>
+                {tab === 'logs' && <Box marginTop={2}>
                     {viewingEarlierJob && <Alert severity="warning" sx={{ my: 2 }}>
                         Showing logs for an earlier job{' '}
                         <Link color="inherit" to={'?tab=logs'}>(view latest job)</Link>
@@ -397,14 +403,20 @@ function RunDetailsApplyStage(props: Props) {
                     <Box marginTop={2}>
                         <RunDetailsStageTabEmptyState message={stateEmptyMessage} />
                     </Box>)}
+                {tab === 'resources' && <Box marginTop={2}>
+                    {data.apply?.currentJob ? <JobResourceUsageMetrics
+                        fragmentRef={data.apply.currentJob}
+                        columns="single"
+                        emptyMessage={['pending', 'queued', 'running'].includes(data.apply.currentJob.status) ?
+                            'Resource usage will be available once the apply job has completed' :
+                            'No resource usage was collected for the apply job'}
+                    /> : <RunDetailsStageTabEmptyState message="Resource usage will be available once the apply job has started" />}
+                </Box>}
             </Box>
             {jobDialogOpen && <RunJobDialog
                 runId={data.id}
                 stage="apply"
-                onSelectJob={(id) => {
-                    navigate({ search: `?tab=logs&jobId=${id}` }, { replace: true });
-                    setJobDialogOpen(false);
-                }}
+                workspacePath={data.workspace.fullPath}
                 onClose={() => setJobDialogOpen(false)}
             />}
         </Box>
