@@ -22,7 +22,9 @@ import (
 // Constants used for sorting
 const (
 	gt   = "GT"
+	gte  = "GTE"
 	lt   = "LT"
+	lte  = "LTE"
 	ne   = "<>"
 	asc  = "ASC"
 	desc = "DESC"
@@ -180,12 +182,19 @@ func (c *cursorPaginatedRows) Finalize(resultsPtr any) error {
 	}
 
 	if c.limit != nil && c.count > *c.limit {
-		if c.before != nil && c.first != nil {
-			// Remove the first element
-			array.Set(array.Slice(1, array.Len()))
-		} else {
-			// Remove the last item
-			array.Set(array.Slice(0, int(*c.limit)))
+		// Remove the extra row fetched to detect another page; rows are fetched nearest the cursor first,
+		// so it is always the last one.
+		array.Set(array.Slice(0, int(*c.limit)))
+	}
+
+	// first+before (a forward traversal stepping back a page) and last+after (a reverse traversal stepping
+	// back a page) fetch rows walking away from the cursor. Reverse them into the order being traversed. This
+	// is done here rather than with an outer SQL query because re-sorting a subquery by column name fails
+	// when the query selects more than one column with the same name (e.g. two joined tables' id columns).
+	if (c.before != nil && c.first != nil) || (c.after != nil && c.last != nil) {
+		swap := reflect.Swapper(array.Interface())
+		for i, j := 0, array.Len()-1; i < j; i, j = i+1, j-1 {
+			swap(i, j)
 		}
 	}
 
@@ -205,14 +214,14 @@ func (c *cursorPaginatedRows) GetPageInfo() *PageInfo {
 		pageInfo.HasNextPage = c.count > *c.limit
 		pageInfo.HasPreviousPage = true
 	} else if c.after != nil && c.last != nil {
-		pageInfo.HasNextPage = false
+		pageInfo.HasNextPage = c.count > *c.limit
 		pageInfo.HasPreviousPage = true
 	} else if c.before != nil && c.first != nil {
 		pageInfo.HasNextPage = true
 		pageInfo.HasPreviousPage = c.count > *c.limit
 	} else if c.before != nil && c.last != nil {
 		pageInfo.HasNextPage = true
-		pageInfo.HasPreviousPage = false
+		pageInfo.HasPreviousPage = c.count > *c.limit
 	} else if c.first != nil {
 		pageInfo.HasNextPage = c.count > *c.limit
 		pageInfo.HasPreviousPage = false
@@ -362,11 +371,6 @@ func (p *PaginatedQueryBuilder) Execute(ctx context.Context, conn Connection, qu
 		query = query.Limit(uint(*p.limit) + 1)
 	}
 
-	if p.options.Before != nil && p.options.First != nil {
-		// When using a before with the first field, we need to reverse the query results
-		query = goqu.From(query).Order(p.buildOuterReverseOrderBy()...)
-	}
-
 	sql, args, err := query.Prepared(true).ToSQL()
 	if err != nil {
 		return nil, err
@@ -470,14 +474,48 @@ func (p *PaginatedQueryBuilder) buildWhereCondition() goqu.Expression {
 					},
 				)
 			}
-			return goqu.Or(
+			// When the sort is transformed (e.g. ordering by path depth rather than path), the keyset comparison
+			// must use the same transform as the ORDER BY or rows are skipped/repeated across pages. The cursor
+			// stores the raw sort column value, so apply the transform to it in SQL as well.
+			if p.sortTransformFunc != nil {
+				sortExpr := goqu.L(p.sortTransformFunc(p.sortBy.getFullColName()))
+				cursorExpr := goqu.L(p.sortTransformFunc("?"), *p.cur.secondary.value)
+
+				sortCompare := sortExpr.Gt(cursorExpr)
+				if op == lt {
+					sortCompare = sortExpr.Lt(cursorExpr)
+				}
+
+				return goqu.Or(
+					sortCompare,
+					goqu.And(
+						sortExpr.Eq(cursorExpr),
+						goqu.Ex{p.primaryKey.getFullColName(): goqu.Op{op: p.cur.primary.value}},
+					),
+				)
+			}
+
+			// The leading gte/lte range on the sort column is logically redundant, but unlike the OR below
+			// it references only the sort column, so the planner can use it as an index condition and start
+			// the scan at the cursor. Without it, an index on the sort column is scanned from the beginning
+			// and every row before the cursor is filtered out.
+			rangeOp := gte
+			if op == lt {
+				rangeOp = lte
+			}
+			return goqu.And(
 				goqu.Ex{
-					p.sortBy.getFullColName(): goqu.Op{op: p.cur.secondary.value},
+					p.sortBy.getFullColName(): goqu.Op{rangeOp: p.cur.secondary.value},
 				},
-				goqu.Ex{
-					p.sortBy.getFullColName():     p.cur.secondary.value,
-					p.primaryKey.getFullColName(): goqu.Op{op: p.cur.primary.value},
-				},
+				goqu.Or(
+					goqu.Ex{
+						p.sortBy.getFullColName(): goqu.Op{op: p.cur.secondary.value},
+					},
+					goqu.Ex{
+						p.sortBy.getFullColName():     p.cur.secondary.value,
+						p.primaryKey.getFullColName(): goqu.Op{op: p.cur.primary.value},
+					},
+				),
 			)
 		}
 		return goqu.Ex{p.primaryKey.getFullColName(): goqu.Op{op: p.cur.primary.value}}
@@ -496,8 +534,11 @@ func (p *PaginatedQueryBuilder) buildOrderBy() []exp.OrderedExpression {
 		backward = asc
 	}
 
+	// Rows are fetched walking away from the cursor so the limit keeps the rows nearest to it: backward for
+	// last (with or without before) and for first+before, forward for first (with or without after) and for
+	// last+after. The latter two are reversed into traversal order by Finalize.
 	direction := forward
-	if (p.options.Before == nil && p.options.Last != nil) || (p.options.Before != nil && p.options.First != nil) {
+	if (p.options.Last != nil && p.options.After == nil) || (p.options.Before != nil && p.options.First != nil) {
 		direction = backward
 	}
 
@@ -505,17 +546,6 @@ func (p *PaginatedQueryBuilder) buildOrderBy() []exp.OrderedExpression {
 		expressions = append(expressions, p.buildOrderByExpression(p.buildSortByExpr(p.sortBy.getFullColName()), direction))
 	}
 	expressions = append(expressions, p.buildOrderByExpression(goqu.I(p.primaryKey.getFullColName()), direction))
-
-	return expressions
-}
-
-func (p *PaginatedQueryBuilder) buildOuterReverseOrderBy() []exp.OrderedExpression {
-	expressions := []exp.OrderedExpression{}
-
-	if p.sortBy != nil {
-		expressions = append(expressions, p.buildOrderByExpression(p.buildSortByExpr(p.sortBy.Col), asc))
-	}
-	expressions = append(expressions, p.buildOrderByExpression(goqu.I(p.primaryKey.Col), asc))
 
 	return expressions
 }

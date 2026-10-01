@@ -112,14 +112,16 @@ func TestObjectStoreRefs_ClaimOrphanedRefs(t *testing.T) {
 		require.Len(t, first, 1)
 		assert.Equal(t, 1, first[0].ClaimCount)
 
-		// Manually reset available_at to now so it's immediately reclaimable.
+		// Manually backdate available_at so it's immediately reclaimable and, since claims are ordered by
+		// available_at, ahead of any unclaimed refs left over from earlier subtests.
 		_, execErr := testClient.client.getConnection(ctx).Exec(ctx,
-			"UPDATE object_store_refs SET available_at = NOW() WHERE id = $1", first[0].ID)
+			"UPDATE object_store_refs SET available_at = '2000-01-01' WHERE id = $1", first[0].ID)
 		require.NoError(t, execErr)
 
 		second, err := testClient.client.ObjectStoreRefs.ClaimOrphanedRefs(ctx, 1)
 		require.NoError(t, err)
 		require.Len(t, second, 1)
+		assert.Equal(t, first[0].ID, second[0].ID)
 		assert.Equal(t, 2, second[0].ClaimCount)
 	})
 

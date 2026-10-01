@@ -3,7 +3,6 @@
 package db
 
 import (
-	"context"
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
@@ -63,70 +62,70 @@ func TestGetNamespace(t *testing.T) {
 	})
 }
 
-type namespaceWarmupsInput struct {
-	groups     []models.Group
-	workspaces []models.Workspace
-}
-
-type namespaceWarmupsOutput struct {
-	groupID2Path     map[string]string
-	workspaceID2Path map[string]string
-	groups           []models.Group
-	workspaces       []models.Workspace
-}
-
 func TestGetNamespaceByGroupID(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupOutput, err := createWarmupNamespaces(ctx, testClient, &namespaceWarmupsInput{
-		groups: standardWarmupGroupsForNamespaces,
+	groupA, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-get-namespace-by-group-id-a",
+		CreatedBy: "db-integration-tests",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
+
+	groupB, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-get-namespace-by-group-id-b",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectErrorCode errors.CodeType
-		expectNamespace *namespaceRow
 		name            string
-		input           string
+		id              string
+		expectNamespace *namespaceRow
+		expectErrorCode errors.CodeType
 	}
 
-	testCases := []testCase{}
-
-	// Positive case, one warmup group at a time.
-	for _, toGet := range createdWarmupOutput.groups {
-		testCases = append(testCases, testCase{
-			name:  "positive-group--" + toGet.FullPath,
-			input: toGet.Metadata.ID,
+	testCases := []testCase{
+		{
+			name: "positive, group a",
+			id:   groupA.Metadata.ID,
 			expectNamespace: &namespaceRow{
-				path:    toGet.FullPath,
-				groupID: toGet.Metadata.ID,
+				path:    groupA.FullPath,
+				groupID: groupA.Metadata.ID,
 				version: initialResourceVersion,
 			},
-		})
-	}
-
-	testCases = append(testCases,
-		testCase{
-			name:  "negative: non-exist",
-			input: nonExistentID,
 		},
-		testCase{
-			name:            "negative: invalid",
-			input:           invalidID,
+		{
+			name: "positive, group b",
+			id:   groupB.Metadata.ID,
+			expectNamespace: &namespaceRow{
+				path:    groupB.FullPath,
+				groupID: groupB.Metadata.ID,
+				version: initialResourceVersion,
+			},
+		},
+		{
+			name: "negative, does not exist",
+			id:   nonExistentID,
+		},
+		{
+			name:            "negative, invalid",
+			id:              invalidID,
 			expectErrorCode: errors.EInternal,
 		},
-	)
+	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			gotNamespace, err := getNamespaceByGroupID(ctx, testClient.client.getConnection(ctx), test.input)
+			gotNamespace, err := getNamespaceByGroupID(ctx, testClient.client.getConnection(ctx), test.id)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
+
+			require.NoError(t, err)
 
 			if test.expectNamespace != nil {
 				require.NotNil(t, gotNamespace)
@@ -139,63 +138,62 @@ func TestGetNamespaceByGroupID(t *testing.T) {
 }
 
 func TestGetNamespaceByWorkspaceID(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupOutput, err := createWarmupNamespaces(ctx, testClient, &namespaceWarmupsInput{
-		groups:     standardWarmupGroupsForNamespaces,
-		workspaces: standardWarmupWorkspacesForNamespaces,
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-get-namespace-by-workspace-id",
+		CreatedBy: "db-integration-tests",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
 
-	// Creating the groups above is necessary in order to create the workspaces.
-	// However, to make sure the groups are not inadvertently used in the test
-	// execution, hide them from the rest of this test function.
-	createdWarmupOutput.groups = nil
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-get-namespace-by-workspace-id-ws",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectErrorCode errors.CodeType
-		expectNamespace *namespaceRow
 		name            string
-		input           string
+		id              string
+		expectNamespace *namespaceRow
+		expectErrorCode errors.CodeType
 	}
 
-	testCases := []testCase{}
-
-	// Positive case, one warmup workspace at a time.
-	for _, toGet := range createdWarmupOutput.workspaces {
-		testCases = append(testCases, testCase{
-			name:  "positive-workspace--" + toGet.FullPath,
-			input: toGet.Metadata.ID,
+	testCases := []testCase{
+		{
+			name: "positive, workspace",
+			id:   workspace.Metadata.ID,
 			expectNamespace: &namespaceRow{
-				path:        toGet.FullPath,
-				workspaceID: toGet.Metadata.ID,
+				path:        workspace.FullPath,
+				workspaceID: workspace.Metadata.ID,
 				version:     initialResourceVersion,
 			},
-		})
-	}
-
-	testCases = append(testCases,
-		testCase{
-			name:  "negative: non-exist",
-			input: nonExistentID,
 		},
-		testCase{
-			name:            "negative: invalid",
-			input:           invalidID,
+		{
+			name: "negative, does not exist",
+			id:   nonExistentID,
+		},
+		{
+			name:            "negative, invalid",
+			id:              invalidID,
 			expectErrorCode: errors.EInternal,
 		},
-	)
+	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			gotNamespace, err := getNamespaceByWorkspaceID(ctx, testClient.client.getConnection(ctx), test.input)
+			gotNamespace, err := getNamespaceByWorkspaceID(ctx, testClient.client.getConnection(ctx), test.id)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
+
+			require.NoError(t, err)
 
 			if test.expectNamespace != nil {
 				require.NotNil(t, gotNamespace)
@@ -208,74 +206,83 @@ func TestGetNamespaceByWorkspaceID(t *testing.T) {
 }
 
 func TestGetNamespaceByPath(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupOutput, err := createWarmupNamespaces(ctx, testClient, &namespaceWarmupsInput{
-		groups:     standardWarmupGroupsForNamespaces,
-		workspaces: standardWarmupWorkspacesForNamespaces,
+	parentGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-get-namespace-by-path-parent",
+		CreatedBy: "db-integration-tests",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
+
+	childGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-get-namespace-by-path-child",
+		ParentID:  parentGroup.Metadata.ID,
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-get-namespace-by-path-ws",
+		GroupID:        childGroup.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectErrorCode errors.CodeType
-		expectNamespace *namespaceRow
 		name            string
-		input           string
+		path            string
+		expectNamespace *namespaceRow
 	}
 
-	testCases := []testCase{}
-
-	// Positive cases, one warmup group at a time.
-	for _, group := range createdWarmupOutput.groups {
-		testCases = append(testCases, testCase{
-			name:  "positive-group-path--" + group.FullPath,
-			input: group.FullPath,
+	testCases := []testCase{
+		{
+			name: "positive, top-level group path",
+			path: parentGroup.FullPath,
 			expectNamespace: &namespaceRow{
-				path:    group.FullPath,
-				groupID: group.Metadata.ID,
+				path:    parentGroup.FullPath,
+				groupID: parentGroup.Metadata.ID,
 				version: initialResourceVersion,
 			},
-		})
-	}
-
-	// Positive cases, one warmup workspace at a time.
-	for _, workspace := range createdWarmupOutput.workspaces {
-		testCases = append(testCases, testCase{
-			name:  "positive-workspace-path--" + workspace.FullPath,
-			input: workspace.FullPath,
+		},
+		{
+			name: "positive, nested group path",
+			path: childGroup.FullPath,
+			expectNamespace: &namespaceRow{
+				path:    childGroup.FullPath,
+				groupID: childGroup.Metadata.ID,
+				version: initialResourceVersion,
+			},
+		},
+		{
+			name: "positive, workspace path",
+			path: workspace.FullPath,
 			expectNamespace: &namespaceRow{
 				path:        workspace.FullPath,
 				workspaceID: workspace.Metadata.ID,
 				version:     initialResourceVersion,
 			},
-		})
-	}
-
-	// Negative cases for paths that do not exist.
-	nonExistPaths := []string{
-		"non-exist-top-level",
-		"top-level-group-0-for-namespaces/non-exist-sub-path",
-		"top-level-group-1-for-namespaces/workspace-2/non-exist-below-workspace",
-	}
-	for _, nonExistPath := range nonExistPaths {
-		testCases = append(testCases,
-			testCase{
-				name:  "negative: non-exist--" + nonExistPath,
-				input: nonExistPath,
-			},
-		)
+		},
+		{
+			name: "negative, non-existent top-level path",
+			path: "non-exist-top-level",
+		},
+		{
+			name: "negative, non-existent path under an existing group",
+			path: parentGroup.FullPath + "/non-exist-sub-path",
+		},
+		{
+			name: "negative, non-existent path under an existing workspace",
+			path: workspace.FullPath + "/non-exist-below-workspace",
+		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			gotNamespace, err := getNamespaceByPath(ctx, testClient.client.getConnection(ctx), test.input)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
+			gotNamespace, err := getNamespaceByPath(ctx, testClient.client.getConnection(ctx), test.path)
+			require.NoError(t, err)
 
 			if test.expectNamespace != nil {
 				require.NotNil(t, gotNamespace)
@@ -288,204 +295,99 @@ func TestGetNamespaceByPath(t *testing.T) {
 }
 
 func TestCreateNamespace(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupOutput, err := createWarmupNamespaces(ctx, testClient, &namespaceWarmupsInput{
-		groups:     standardWarmupGroupsForNamespaces,
-		workspaces: standardWarmupWorkspacesForNamespaces,
+	// It is not feasible to make a direct positive test case here, because the group_id/workspace_id
+	// foreign keys must point to an existing group or workspace, and creating a group or workspace
+	// already creates its namespace row (see TestGetNamespace and friends for indirect coverage).
+	// These fixtures exist only to give the duplicate-conflict cases a real group/workspace ID to
+	// collide with.
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-create-namespace-group",
+		CreatedBy: "db-integration-tests",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-create-namespace-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
+		name            string
 		input           *namespaceRow
 		expectErrorCode errors.CodeType
-		expectNamespace *namespaceRow
-		name            string
 	}
 
-	testCases := []testCase{}
-
-	// It is not feasible to make a direct positive test case here, because the ID fields
-	// would have to match existing groups and workspaces.  The other test functions
-	// in this module serve as indirect tests of createNamespace.
-
-	testCases = append(testCases,
-
-		testCase{
-			name: "negative: duplicate group",
+	testCases := []testCase{
+		{
+			name: "negative, duplicate group",
 			input: &namespaceRow{
 				path:    "would/duplicate/a/group",
-				groupID: createdWarmupOutput.groups[0].Metadata.ID,
+				groupID: group.Metadata.ID,
 			},
 			expectErrorCode: errors.EConflict,
 		},
-
-		testCase{
-			name: "negative: duplicate workspace",
+		{
+			name: "negative, duplicate workspace",
 			input: &namespaceRow{
 				path:        "would/duplicate/a/workspace",
-				workspaceID: createdWarmupOutput.workspaces[0].Metadata.ID,
+				workspaceID: workspace.Metadata.ID,
 			},
 			expectErrorCode: errors.EConflict,
 		},
-
-		testCase{
-			name: "negative: non-exist group ID",
+		{
+			name: "negative, non-existent group id",
 			input: &namespaceRow{
-				path:    "group/ID/does/not/exist",
+				path:    "group/id/does/not/exist",
 				groupID: nonExistentID,
 			},
 			expectErrorCode: errors.EInternal,
 		},
-
-		testCase{
-			name: "negative: non-exist workspace ID",
+		{
+			name: "negative, non-existent workspace id",
 			input: &namespaceRow{
-				path:        "workspace/ID/does/not/exist",
+				path:        "workspace/id/does/not/exist",
 				workspaceID: nonExistentID,
 			},
 			expectErrorCode: errors.EInternal,
 		},
-		testCase{
-			name: "negative: invalid group ID",
+		{
+			name: "negative, invalid group id",
 			input: &namespaceRow{
-				path:    "group/ID/invalid",
+				path:    "group/id/invalid",
 				groupID: invalidID,
 			},
 			expectErrorCode: errors.EInternal,
 		},
-
-		testCase{
-			name: "negative: invalid workspace ID",
+		{
+			name: "negative, invalid workspace id",
 			input: &namespaceRow{
-				path:        "workspace/ID/invalid",
+				path:        "workspace/id/invalid",
 				workspaceID: invalidID,
 			},
 			expectErrorCode: errors.EInternal,
 		},
-	)
+	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			gotNamespace, err := createNamespace(ctx, testClient.client.getConnection(ctx), test.input)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
-
-			if test.expectNamespace != nil {
-				require.NotNil(t, gotNamespace)
-				compareNamespaceRows(t, test.expectNamespace, gotNamespace)
-			} else {
-				assert.Nil(t, gotNamespace)
-			}
+			assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			assert.Nil(t, gotNamespace)
 		})
 	}
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-// Common utility structures and functions:
-
-// Standard warmup groups for tests in this module:
-// The create function will derive the parent path and name from the full path.
-var standardWarmupGroupsForNamespaces = []models.Group{
-	{
-		Description: "top level group 0 for testing namespace functions",
-		FullPath:    "top-level-group-0-for-namespaces",
-		CreatedBy:   "someone-1",
-	},
-	{
-		Description: "top level group 1 for testing namespace functions",
-		FullPath:    "top-level-group-1-for-namespaces",
-		CreatedBy:   "someone-2",
-	},
-	{
-		Description: "top level group 2 for testing namespace functions",
-		FullPath:    "top-level-group-2-for-namespaces",
-		CreatedBy:   "someone-3",
-	},
-	{
-		Description: "top level group 3 for nothing",
-		FullPath:    "top-level-group-3-for-nothing",
-		CreatedBy:   "someone-4",
-	},
-}
-
-// Standard warmup workspaces for tests in this module:
-// Make sure the order in this slice is _NOT_ exactly full path or name order.
-// The create function will derive the group ID and name from the full path.
-var standardWarmupWorkspacesForNamespaces = []models.Workspace{
-	{
-		Description: "workspace 1 for testing namespace functions",
-		FullPath:    "top-level-group-0-for-namespaces/workspace-1",
-		CreatedBy:   "someone-1",
-	},
-	{
-		Description: "workspace 5 for testing namespace functions",
-		FullPath:    "top-level-group-1-for-namespaces/workspace-5",
-		CreatedBy:   "someone-6",
-	},
-	{
-		Description: "workspace 3 for testing namespace functions",
-		FullPath:    "top-level-group-2-for-namespaces/workspace-3",
-		CreatedBy:   "someone-5",
-	},
-	{
-		Description: "workspace 4 for testing namespace functions",
-		FullPath:    "top-level-group-0-for-namespaces/workspace-4",
-		CreatedBy:   "someone-3",
-	},
-	{
-		Description: "workspace 2 for testing namespace functions",
-		FullPath:    "top-level-group-1-for-namespaces/workspace-2",
-		CreatedBy:   "someone-2",
-	},
-}
-
-// createWarmupNamespaces creates some warmup groups and workspaces
-// and thus their associated namespaces for a test.
-// The warmup groups and workspaces to create can be standard or otherwise.
-//
-// NOTE: Due to the need to supply the parent ID for non-top-level groups,
-// the groups must be created in a top-down manner.
-func createWarmupNamespaces(ctx context.Context, testClient *testClient,
-	input *namespaceWarmupsInput,
-) (*namespaceWarmupsOutput, error) {
-	resultGroups, parentPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
-	if err != nil {
-		return nil, err
-	}
-
-	groupMap := make(map[string]string)
-	for _, group := range resultGroups {
-		groupMap[group.Metadata.ID] = group.FullPath
-	}
-
-	resultWorkspaces, err := createInitialWorkspaces(ctx, testClient, parentPath2ID, input.workspaces)
-	if err != nil {
-		return nil, err
-	}
-
-	workspaceMap := make(map[string]string)
-	for _, workspace := range resultWorkspaces {
-		workspaceMap[workspace.Metadata.ID] = workspace.FullPath
-	}
-
-	return &namespaceWarmupsOutput{
-		groups:           resultGroups,
-		workspaces:       resultWorkspaces,
-		groupID2Path:     groupMap,
-		workspaceID2Path: workspaceMap,
-	}, nil
 }
 
 // compareNamespaceRows compares two namespace row objects.
 // Because there's no way to find the expected ID, it cannot be checked.
 func compareNamespaceRows(t *testing.T, expected, actual *namespaceRow) {
+	t.Helper()
 	assert.Equal(t, expected.path, actual.path)
 	assert.Equal(t, expected.groupID, actual.groupID)
 	assert.Equal(t, expected.workspaceID, actual.workspaceID)

@@ -218,6 +218,8 @@ func (e *emailOutboxItems) ClaimOutboxItems(ctx context.Context, input *ClaimOut
 	}
 
 	if input.Ephemeral != nil {
+		// goqu renders this as IS TRUE / IS FALSE, which must match the predicate of
+		// index_email_outbox_items_on_ephemeral exactly or the planner won't use it.
 		conditions = append(conditions, goqu.I("email_outbox_items.ephemeral").Eq(*input.Ephemeral))
 	}
 

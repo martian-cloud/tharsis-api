@@ -81,7 +81,7 @@ func (r *objectStoreRefs) CreateRef(ctx context.Context, input *CreateObjectStor
 		availableAt = *input.AvailableAt
 	}
 
-	sql, args, err := dialect.Insert("object_store_refs").
+	sql, args, err := toSQLWithTag("object_store_refs.CreateRef", dialect.Insert("object_store_refs").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":           newResourceID(),
@@ -92,8 +92,7 @@ func (r *objectStoreRefs) CreateRef(ctx context.Context, input *CreateObjectStor
 		// OnConflict: intentional convention exception — re-uploads to the same key must not fail; refreshing available_at preserves the existing FK.
 		OnConflict(goqu.DoUpdate("object_key", goqu.Record{
 			"available_at": goqu.L("EXCLUDED.available_at"),
-		})).
-		ToSQL()
+		})))
 	if err != nil {
 		return errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
@@ -112,11 +111,10 @@ func (r *objectStoreRefs) LinkRef(ctx context.Context, objectKey string, owner O
 	ctx, span := tracer.Start(ctx, "db.LinkRef")
 	defer span.End()
 
-	sql, args, err := dialect.Update("object_store_refs").
+	sql, args, err := toSQLWithTag("object_store_refs.LinkRef", dialect.Update("object_store_refs").
 		Prepared(true).
 		Set(goqu.Record{string(owner): ownerID}).
-		Where(goqu.C("object_key").Eq(objectKey)).
-		ToSQL()
+		Where(goqu.C("object_key").Eq(objectKey)))
 	if err != nil {
 		return errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
@@ -166,14 +164,18 @@ func (r *objectStoreRefs) ClaimOrphanedRefs(ctx context.Context, limit uint) ([]
 		goqu.I("object_store_refs.available_at").Lte(now),
 	)
 
+	// Order by available_at, the orphan index's leading key column, so the planner can walk the index in
+	// order and stop at limit. Ordering by created_at forces it to read every entry with
+	// available_at <= now and sort them. This also sends refs whose delete failed (available_at pushed
+	// out by the lease) to the back of the queue.
 	claimable := dialect.From("object_store_refs").
 		Select(goqu.I("object_store_refs.id")).
 		Where(orphaned).
-		Order(goqu.I("object_store_refs.created_at").Asc()).
+		Order(goqu.I("object_store_refs.available_at").Asc()).
 		Limit(limit).
 		ForUpdate(goqu.SkipLocked)
 
-	sql, args, err := dialect.Update(goqu.T("object_store_refs")).
+	sql, args, err := toSQLWithTag("object_store_refs.ClaimOrphanedRefs", dialect.Update(goqu.T("object_store_refs")).
 		Prepared(true).
 		With("claimable", claimable).
 		Set(goqu.Record{
@@ -186,8 +188,7 @@ func (r *objectStoreRefs) ClaimOrphanedRefs(ctx context.Context, limit uint) ([]
 			goqu.I("object_store_refs.id"),
 			goqu.I("object_store_refs.object_key"),
 			goqu.I("object_store_refs.claim_count"),
-		).
-		ToSQL()
+		))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
@@ -219,10 +220,9 @@ func (r *objectStoreRefs) DeleteRefs(ctx context.Context, ids []string) error {
 	ctx, span := tracer.Start(ctx, "db.DeleteRefs")
 	defer span.End()
 
-	sql, args, err := dialect.Delete("object_store_refs").
+	sql, args, err := toSQLWithTag("object_store_refs.DeleteRefs", dialect.Delete("object_store_refs").
 		Prepared(true).
-		Where(goqu.C("id").In(ids)).
-		ToSQL()
+		Where(goqu.C("id").In(ids)))
 	if err != nil {
 		return errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}

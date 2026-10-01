@@ -202,10 +202,10 @@ func (l *logStreams) CreateLogStream(ctx context.Context, logStream *models.LogS
 		"object_store_key":      nullableString(logStream.ObjectStoreKey),
 	}
 
-	sql, args, err := dialect.Insert("log_streams").
+	sql, args, err := toSQLWithTag("log_stream.CreateLogStream", dialect.Insert("log_streams").
 		Prepared(true).
 		Rows(record).
-		Returning(logStreamFieldList...).ToSQL()
+		Returning(logStreamFieldList...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -288,6 +288,8 @@ func (l *logStreams) ClaimLogStreamsForCompaction(ctx context.Context, limit int
 
 	// Inner CTE: pick a batch of claimable streams and row-lock them with SKIP LOCKED so a concurrent
 	// scheduler on another instance skips these rows and selects a different batch rather than blocking.
+	// goqu renders the completed/compacted conditions as IS TRUE / IS FALSE, which must match the
+	// predicate of index_log_streams_claimable_for_compaction exactly or the planner won't use it.
 	claimable := dialect.From(goqu.T("log_streams")).
 		Select("id").
 		Where(
