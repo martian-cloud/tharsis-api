@@ -46,7 +46,8 @@ func (a *Announcement) ResolveMetadata(key string) (*string, error) {
 	if err != nil {
 		switch key {
 		case "start_time":
-			return ptr.String(a.StartTime.String()), nil
+			// Same format as the metadata timestamps; time.Time.String() isn't a valid Postgres timestamp.
+			return ptr.String(a.StartTime.Format(time.RFC3339Nano)), nil
 		default:
 			return nil, err
 		}

@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"slices"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -178,6 +176,92 @@ type sortableField interface {
 	getValue() string
 }
 
+// testCursorPageWalks checks cursor pagination against the unpaginated order for one sort. It walks every
+// page forward (First/After) and backward (Last/Before), and steps back one page from the middle
+// (First/Before and Last/After), expecting the rows immediately adjacent to the cursor each time. The page
+// size is smaller than the remaining rows so a query that returns rows from the wrong end of the list, or in
+// the wrong order, is detected. Resources are identified by their cursor, which is unique per row.
+func testCursorPageWalks(
+	ctx context.Context,
+	t *testing.T,
+	totalCount int,
+	sortByField sortableField,
+	getResourcesFunc func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error),
+) {
+	t.Helper()
+
+	const pageSize = 2
+	if totalCount < 2*pageSize+1 {
+		return
+	}
+
+	getPage := func(opts *pagination.Options) (*pagination.PageInfo, []string, []*string) {
+		t.Helper()
+		pageInfo, resources, err := getResourcesFunc(ctx, sortByField, opts)
+		require.Nil(t, err)
+
+		ids := []string{}
+		cursors := []*string{}
+		for _, resource := range resources {
+			c, err := pageInfo.Cursor(resource)
+			require.Nil(t, err)
+			ids = append(ids, *c)
+			cursors = append(cursors, c)
+		}
+		return pageInfo, ids, cursors
+	}
+
+	reversed := func(s []string) []string {
+		out := make([]string, 0, len(s))
+		for i := len(s) - 1; i >= 0; i-- {
+			out = append(out, s[i])
+		}
+		return out
+	}
+
+	_, expected, expectedCursors := getPage(&pagination.Options{})
+	require.Len(t, expected, totalCount)
+
+	// Forward walk.
+	walked := []string{}
+	var cursor *string
+	for range totalCount + 1 {
+		pageInfo, ids, cursors := getPage(&pagination.Options{First: ptr.Int32(pageSize), After: cursor})
+		walked = append(walked, ids...)
+		if len(ids) == 0 || !pageInfo.HasNextPage {
+			break
+		}
+		cursor = cursors[len(cursors)-1]
+	}
+	assert.Equal(t, expected, walked, "forward walk with sort by %s", sortByField.getValue())
+
+	// Backward walk. Last returns rows in reverse order, so the walk visits the list back to front.
+	walked = []string{}
+	cursor = nil
+	for range totalCount + 1 {
+		pageInfo, ids, cursors := getPage(&pagination.Options{Last: ptr.Int32(pageSize), Before: cursor})
+		walked = append(walked, ids...)
+		if len(ids) == 0 || !pageInfo.HasPreviousPage {
+			break
+		}
+		cursor = cursors[len(cursors)-1]
+	}
+	assert.Equal(t, expected, reversed(walked), "backward walk with sort by %s", sortByField.getValue())
+
+	// Step back one page from the middle in each direction.
+	middle := totalCount / 2
+
+	pageInfo, ids, _ := getPage(&pagination.Options{First: ptr.Int32(pageSize), Before: expectedCursors[middle]})
+	assert.Equal(t, expected[middle-pageSize:middle], ids, "first before with sort by %s", sortByField.getValue())
+	assert.True(t, pageInfo.HasNextPage, "first before with sort by %s", sortByField.getValue())
+	assert.Equal(t, middle-pageSize > 0, pageInfo.HasPreviousPage, "first before with sort by %s", sortByField.getValue())
+
+	pageInfo, ids, _ = getPage(&pagination.Options{Last: ptr.Int32(pageSize), After: expectedCursors[middle]})
+	assert.Equal(t, reversed(expected[middle+1:middle+1+pageSize]), ids, "last after with sort by %s", sortByField.getValue())
+	assert.True(t, pageInfo.HasPreviousPage, "last after with sort by %s", sortByField.getValue())
+	assert.Equal(t, middle+1+pageSize < totalCount, pageInfo.HasNextPage, "last after with sort by %s", sortByField.getValue())
+}
+
 func testResourcePaginationAndSorting(
 	ctx context.Context,
 	t *testing.T,
@@ -236,6 +320,11 @@ func testResourcePaginationAndSorting(
 	assert.Equal(t, remaining, len(resources))
 	assert.False(t, pageInfo.HasPreviousPage)
 	assert.True(t, pageInfo.HasNextPage)
+
+	/* Test walking every page in both directions, and stepping back a page, for each sort */
+	for _, sortByField := range sortableFields {
+		testCursorPageWalks(ctx, t, totalCount, sortByField, getResourcesFunc)
+	}
 
 	/* Test sorting */
 	for _, sortByField := range sortableFields {
@@ -305,246 +394,7 @@ func testResourcePaginationAndSorting(
 
 //////////////////////////////////////////////////////////////////////////////
 
-// Create initial objects to prepare to run tests.  These functions are called
-// by several test modules.
-
-// createInitialTeams creates some teams for a test.
-func createInitialTeams(ctx context.Context, testClient *testClient,
-	toCreate []models.Team) ([]models.Team, map[string]string, error) {
-	result := []models.Team{}
-	teamName2ID := make(map[string]string)
-
-	for _, team := range toCreate {
-
-		created, err := testClient.client.Teams.CreateTeam(ctx, &team)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		result = append(result, *created)
-		teamName2ID[created.Name] = created.Metadata.ID
-	}
-
-	return result, teamName2ID, nil
-}
-
-// createInitialUsers creates some users for a test.
-func createInitialUsers(ctx context.Context, testClient *testClient,
-	toCreate []models.User) ([]models.User, map[string]string, error) {
-	result := []models.User{}
-	username2ID := make(map[string]string)
-
-	for _, user := range toCreate {
-
-		created, err := testClient.client.Users.CreateUser(ctx, &user)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		result = append(result, *created)
-		username2ID[created.Username] = created.Metadata.ID
-	}
-
-	return result, username2ID, nil
-}
-
-// createInitialTeamMembers creates some team member relationships for a test.
-func createInitialTeamMembers(ctx context.Context, testClient *testClient,
-	teamMap, userMap map[string]string, toCreate []models.TeamMember) ([]models.TeamMember, error) {
-	result := []models.TeamMember{}
-
-	for _, input := range toCreate {
-
-		created, err := testClient.client.TeamMembers.AddUserToTeam(ctx, &models.TeamMember{
-			UserID: userMap[input.UserID],
-			TeamID: teamMap[input.TeamID],
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, *created)
-	}
-
-	return result, nil
-}
-
-// createInitialGroups creates some groups for a test.
-//
-// NOTE: Due to the need to supply the parent ID for non-top-level groups,
-// the groups must be created in a top-down manner.
-func createInitialGroups(ctx context.Context, testClient *testClient,
-	toCreate []models.Group) ([]models.Group, map[string]string, error) {
-	result := []models.Group{}
-	fullPath2ID := make(map[string]string)
-
-	for _, group := range toCreate {
-
-		// Derive the parent ID and name from the full path.
-		parentPath := fullPath2ParentPath(group.FullPath)
-		if parentPath != "" {
-			// Must check the parent path and set the Parent ID field.
-			parentID, ok := fullPath2ID[parentPath]
-			if !ok {
-				return nil, nil, fmt.Errorf("Failed to look up parent path in createInitialGroups: %s", parentPath)
-			}
-			if group.ParentID == "" {
-				group.ParentID = parentID
-			}
-		}
-		if group.Name == "" {
-			group.Name = fullPath2Name(group.FullPath)
-		}
-
-		created, err := testClient.client.Groups.CreateGroup(ctx, &group)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		result = append(result, *created)
-		fullPath2ID[created.FullPath] = created.Metadata.ID
-
-	}
-
-	return result, fullPath2ID, nil
-}
-
-// createInitialServiceAccounts creates some service accounts for a test.
-func createInitialServiceAccounts(ctx context.Context, testClient *testClient, groupMap map[string]string,
-	toCreate []models.ServiceAccount) ([]models.ServiceAccount, map[string]string, error) {
-	result := []models.ServiceAccount{}
-	serviceAccountName2ID := make(map[string]string)
-
-	for _, input := range toCreate {
-
-		created, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
-			Name:        input.Name,
-			Description: input.Description,
-			GroupID:     groupMap[input.GroupID],
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-
-		result = append(result, *created)
-		serviceAccountName2ID[created.Name] = created.Metadata.ID
-	}
-
-	return result, serviceAccountName2ID, nil
-}
-
-// createInitialWorkspaces creates some warmup workspaces for a test.
-func createInitialWorkspaces(ctx context.Context, testClient *testClient, groupPath2ID map[string]string,
-	newWorkspaces []models.Workspace) ([]models.Workspace, error) {
-
-	resultWorkspaces := []models.Workspace{}
-	for _, workspace := range newWorkspaces {
-
-		// Derive the group ID and name from the full path.
-		groupPath := fullPath2ParentPath(workspace.FullPath)
-		parentID, ok := groupPath2ID[groupPath]
-		if !ok {
-			return nil, fmt.Errorf("Failed to look up parent path in createInitialWorkspaces: %s", groupPath)
-		}
-		if workspace.GroupID == "" {
-			workspace.GroupID = parentID
-		}
-		if workspace.Name == "" {
-			workspace.Name = fullPath2Name(workspace.FullPath)
-		}
-
-		// Must set the MaxJobDuration field.
-		duration := int32(forTestMaxJobDuration.Minutes())
-		workspace.MaxJobDuration = &duration
-
-		created, err := testClient.client.Workspaces.CreateWorkspace(ctx, &workspace)
-		if err != nil {
-			return nil, err
-		}
-
-		resultWorkspaces = append(resultWorkspaces, *created)
-	}
-
-	return resultWorkspaces, nil
-}
-
-// createInitialNamespaceMemberships creates some warmup namespace memberships for a test.
-func createInitialNamespaceMemberships(ctx context.Context, testClient *testClient,
-	teamMap, userMap, groupMap, serviceAccountMap, rolesMap map[string]string,
-	toCreate []CreateNamespaceMembershipInput) ([]models.NamespaceMembership, error) {
-	result := []models.NamespaceMembership{}
-
-	for _, input := range toCreate {
-
-		translated := CreateNamespaceMembershipInput{
-			NamespacePath: input.NamespacePath,
-			RoleID:        rolesMap[input.RoleID],
-		}
-		if input.UserID != nil {
-			translated.UserID = ptr.String(userMap[*input.UserID])
-		}
-		if input.ServiceAccountID != nil {
-			translated.ServiceAccountID = ptr.String(serviceAccountMap[*input.ServiceAccountID])
-		}
-		if input.TeamID != nil {
-			translated.TeamID = ptr.String(teamMap[*input.TeamID])
-		}
-
-		created, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx,
-			&translated)
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, *created)
-	}
-
-	return result, nil
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
 // Other utility function(s):
-
-// fullPath2ParentPath returns the parent path of the specified full path.
-func fullPath2ParentPath(fullPath string) string {
-
-	if strings.Contains(fullPath, "/") {
-		// For a nested group, remove the last slash-separated segment.
-		segments := strings.Split(fullPath, "/")
-		return strings.Join(segments[:len(segments)-1], "/")
-	}
-
-	// For a top-level group, the parent path is the empty string.
-	return ""
-}
-
-// fullPath2Name returns the name of the specified full path.
-func fullPath2Name(fullPath string) string {
-
-	if strings.Contains(fullPath, "/") {
-		// For a nested group, remove the last slash-separated segment.
-		segments := strings.Split(fullPath, "/")
-		return segments[len(segments)-1]
-	}
-
-	// For a top-level group, the name is the full path.
-	return fullPath
-}
-
-// reverseStringSlice returns a new []string in the reverse order of the original.
-// The original is not modified.
-// This is not optimized for speed.
-// It is used by multiple test modules.
-func reverseStringSlice(input []string) []string {
-	result := []string{}
-
-	for i := len(input) - 1; i >= 0; i-- {
-		result = append(result, input[i])
-	}
-
-	return result
-}
 
 // Compare one actual time vs. an expect interval.
 // Use the negative sense, because we want >= and <=, while time gives us > and <.

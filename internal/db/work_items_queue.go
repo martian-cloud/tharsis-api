@@ -164,7 +164,7 @@ func (w *workItemsQueue) ClaimWorkItems(ctx context.Context, input *ClaimWorkIte
 		Limit(input.Limit).
 		ForUpdate(goqu.SkipLocked)
 
-	sql, args, err := dialect.Update(goqu.T("work_items_queue")).
+	sql, args, err := toSQLWithTag("work_items_queue.ClaimWorkItems", dialect.Update(goqu.T("work_items_queue")).
 		Prepared(true).
 		With("claimable_work_items", claimableWorkItems).
 		Set(goqu.Record{
@@ -173,8 +173,7 @@ func (w *workItemsQueue) ClaimWorkItems(ctx context.Context, input *ClaimWorkIte
 		}).
 		From(goqu.T("claimable_work_items")).
 		Where(goqu.I("work_items_queue.id").Eq(goqu.I("claimable_work_items.id"))).
-		Returning(w.getSelectFields()...).
-		ToSQL()
+		Returning(w.getSelectFields()...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build query", errors.WithSpan(span))
 	}
@@ -204,14 +203,13 @@ func (w *workItemsQueue) ClaimWorkItems(ctx context.Context, input *ClaimWorkIte
 // reapExhaustedWorkItems deletes work items of the given type that have reached the
 // maximum claim count, logging the dropped IDs so the dead-lettering is observable.
 func (w *workItemsQueue) reapExhaustedWorkItems(ctx context.Context, workItemType WorkItemType, maxClaimCount uint) error {
-	sql, args, err := dialect.Delete("work_items_queue").
+	sql, args, err := toSQLWithTag("work_items_queue.reapExhaustedWorkItems", dialect.Delete("work_items_queue").
 		Prepared(true).
 		Where(goqu.And(
 			goqu.C("type").Eq(workItemType),
 			goqu.C("claim_count").Gte(maxClaimCount),
 		)).
-		Returning("id").
-		ToSQL()
+		Returning("id"))
 	if err != nil {
 		return errors.Wrap(err, "failed to build query")
 	}
@@ -249,10 +247,9 @@ func (w *workItemsQueue) AcknowledgeWorkItem(ctx context.Context, workItemID str
 	ctx, span := tracer.Start(ctx, "db.AcknowledgeWorkItem")
 	defer span.End()
 
-	sql, args, err := dialect.Delete("work_items_queue").
+	sql, args, err := toSQLWithTag("work_items_queue.AcknowledgeWorkItem", dialect.Delete("work_items_queue").
 		Prepared(true).
-		Where(goqu.C("id").Eq(workItemID)).
-		ToSQL()
+		Where(goqu.C("id").Eq(workItemID)))
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
@@ -286,7 +283,7 @@ func (w *workItemsQueue) AddWorkItemToQueue(ctx context.Context, item *AddWorkIt
 		return nil, errors.Wrap(err, "failed to marshal payload", errors.WithSpan(span))
 	}
 
-	sql, args, err := dialect.Insert("work_items_queue").
+	sql, args, err := toSQLWithTag("work_items_queue.AddWorkItemToQueue", dialect.Insert("work_items_queue").
 		Prepared(true).
 		Rows(goqu.Record{
 			"id":           newResourceID(),
@@ -294,8 +291,7 @@ func (w *workItemsQueue) AddWorkItemToQueue(ctx context.Context, item *AddWorkIt
 			"available_at": availableAt,
 			"type":         item.Type,
 			"payload":      payloadBytes,
-		}).Returning(w.getSelectFields()...).
-		ToSQL()
+		}).Returning(w.getSelectFields()...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}

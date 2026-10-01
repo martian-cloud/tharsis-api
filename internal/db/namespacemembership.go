@@ -315,8 +315,14 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 				// This filters for direct namespace membership.
 				goqu.I("namespace_memberships.user_id").Eq(*input.Filter.UserID),
 
-				// This filters for indirect via the user being a team member.
-				goqu.I("namespace_memberships.team_id").In(
+				// This filters for indirect via the user being a team member. = ANY(ARRAY(subquery)) is used
+				// instead of IN (subquery) because an IN subquery inside an OR becomes a per-row hashed SubPlan
+				// that can't use an index and that the planner estimates as matching ~half the table. ARRAY()
+				// runs the subquery once as an InitPlan, letting the planner BitmapOr the user_id and team_id
+				// indexes and estimate a handful of rows, so it joins namespaces by primary key instead of
+				// hashing every namespace under the path prefix.
+				goqu.L("? = ANY(ARRAY(?))",
+					goqu.I("namespace_memberships.team_id"),
 					dialect.From("team_members").
 						Select("team_id").
 						Where(goqu.I("team_members.user_id").Eq(*input.Filter.UserID))),

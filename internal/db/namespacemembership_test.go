@@ -4,10 +4,8 @@ package db
 
 import (
 	"context"
-	"sort"
-	"strings"
+	"fmt"
 	"testing"
-	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -18,1214 +16,365 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
-// Some constants and pseudo-constants are declared/defined in dbclient_test.go.
-
-type holderIDs2Name struct {
-	userIDs2Name           map[string]string
-	serviceAccountIDs2Name map[string]string
-	teamIDs2Name           map[string]string
+// getValue implements the sortableField interface for NamespaceMembershipSortableField
+func (nm NamespaceMembershipSortableField) getValue() string {
+	return string(nm)
 }
 
-type namespaceMembershipWarmupsInput struct {
-	teams                []models.Team
-	users                []models.User
-	teamMembers          []models.TeamMember
-	groups               []models.Group
-	serviceAccounts      []models.ServiceAccount
-	workspaces           []models.Workspace
-	namespaceMemberships []CreateNamespaceMembershipInput
-	roles                []models.Role
-}
-
-type namespaceMembershipWarmupsOutput struct {
-	holderIDs2Name       holderIDs2Name
-	teams                []models.Team
-	teamMembers          []models.TeamMember
-	groups               []models.Group
-	serviceAccounts      []models.ServiceAccount
-	workspaces           []models.Workspace
-	namespaceMemberships []models.NamespaceMembership
-	users                []models.User
-	roles                []models.Role
-}
-
-// namespaceMembershipInfo aids convenience in accessing the information TestGetNamespaceMemberships
-// needs about the warmup namespace memberships.
-type namespaceMembershipInfo struct {
-	updateTime            time.Time
-	holder                string // user, service account, or team
-	role                  string
-	namespacePath         string
-	namespaceMembershipID string
-}
-
-// namespaceMembershipInfoPathSlice makes a slice of workspaceInfo sortable by namespace path
-type namespaceMembershipInfoPathSlice []namespaceMembershipInfo
-
-// workspaceInfoTimeSlice makes a slice of workspaceInfo sortable by last updated time
-type namespaceMembershipInfoTimeSlice []namespaceMembershipInfo
-
-func TestGetNamespaceMemberships(t *testing.T) {
+func TestCreateNamespaceMembership(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupOutput, err := createWarmupNamespaceMemberships(ctx, testClient, namespaceMembershipWarmupsInput{
-		teams:                standardWarmupTeamsForNamespaceMemberships,
-		users:                standardWarmupUsersForNamespaceMemberships,
-		teamMembers:          standardWarmupTeamMembersForNamespaceMemberships,
-		groups:               standardWarmupGroupsForNamespaceMemberships,
-		serviceAccounts:      standardWarmupServiceAccountsForNamespaceMemberships,
-		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
-		namespaceMemberships: standardWarmupNamespaceMemberships,
-		roles:                standardWarmupRolesForNamespaceMemberships,
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-create-membership",
+		CreatedBy: "db-integration-tests",
 	})
-
 	require.Nil(t, err)
-	allNamespaceMembershipInfos := namespaceMembershipInfoFromNamespaceMemberships(
-		createdWarmupOutput.holderIDs2Name, createdWarmupOutput.namespaceMemberships)
 
-	// Sort by namespace paths and more.
-	// A trail is more than a path.  A trail contains the path, the holder, and the role.
-	sort.Sort(namespaceMembershipInfoPathSlice(allNamespaceMembershipInfos))
-	allTrails := trailsFromNamespaceMembershipInfo(allNamespaceMembershipInfos, false)
-	reverseTrails := reverseStringSlice(allTrails)
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-create-membership",
+		Email:    "test-user-create-membership@example.com",
+	})
+	require.Nil(t, err)
 
-	// Sort by last update times.
-	sort.Sort(namespaceMembershipInfoTimeSlice(allNamespaceMembershipInfos))
-	allTrailsByTime := trailsFromNamespaceMembershipInfo(allNamespaceMembershipInfos, false)
-	reverseTrailsByTime := reverseStringSlice(allTrailsByTime)
+	serviceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Name:      "test-sa-create-membership",
+		GroupID:   group.Metadata.ID,
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
 
-	/*
-		These are the trails in allTrails:
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name: "test-team-create-membership",
+	})
+	require.Nil(t, err)
 
-		group-a--sa-1--deployer
-		group-a--team-a--viewer
-		group-a--user-2--owner
-		group-a/group-b--sa-2--owner
-		group-a/group-b--team-b--deployer
-		group-a/group-b--user-0--viewer
-		group-a/group-b/group-c--sa-0--viewer
-		group-a/group-b/group-c--team-c--owner
-		group-a/group-b/group-c--user-1--deployer
-		group-a/group-b/group-c/workspace-c3--sa-2--viewer
-		group-a/group-b/group-c/workspace-c3--team-b--deployer
-		group-a/group-b/group-c/workspace-c3--user-0--owner
-		group-a/group-b/workspace-b2--sa-1--deployer
-		group-a/group-b/workspace-b2--team-a--owner
-		group-a/group-b/workspace-b2--user-2--viewer
-		group-a/workspace-a1--sa-0--owner
-		group-a/workspace-a1--team-c--viewer
-		group-a/workspace-a1--user-1--deployer
-
-	*/
-
-	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name:      "test-role-create-membership",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
 
 	type testCase struct {
-		expectStartCursorError      error
-		expectEndCursorError        error
-		input                       *GetNamespaceMembershipsInput
-		expectErrorCode             errors.CodeType
-		name                        string
-		expectPageInfo              pagination.PageInfo
-		expectTrails                []string
-		getBeforeCursorFromPrevious bool
-		sortedDescending            bool
-		expectHasStartCursor        bool
-		getAfterCursorFromPrevious  bool
-		expectHasEndCursor          bool
+		name            string
+		input           *CreateNamespaceMembershipInput
+		expectErrorCode errors.CodeType
 	}
-
-	/*
-		template test case:
-
-		{
-			name: "",
-			input: &GetNamespaceMembershipsInput{
-			Sort:              nil,
-			PaginationOptions: nil,
-			Filter:            nil,
-			},
-			sortedDescending             bool
-			getBeforeCursorFromPrevious: false,
-			getAfterCursorFromPrevious:  false,
-			expectErrorCode:             "",
-			expectTrails:                []string{},
-			expectPageInfo: pagination.PageInfo{
-			Cursor:          nil,
-			TotalCount: pagination.StaticCount(0),
-			HasNextPage:     false,
-			HasPreviousPage: false,
-			},
-			expectStartCursorError: nil,
-			expectHasStartCursor:   false,
-			expectEndCursorError:   nil,
-			expectHasEndCursor:     false,
-		}
-	*/
 
 	testCases := []testCase{
-		// nil input causes a nil pointer dereference in GetNamespaceMemberships, so don't try it.
-
 		{
-			name: "non-nil but mostly empty input",
-			input: &GetNamespaceMembershipsInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
+			name: "create membership for a user",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath: group.FullPath,
+				UserID:        &user.Metadata.ID,
+				RoleID:        role.Metadata.ID,
 			},
-			expectTrails:         allTrails,
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allTrails))), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
 		},
-
 		{
-			name: "populated sort and pagination, nil filter",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: nil,
+			name: "create membership for a service account",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath:    group.FullPath,
+				ServiceAccountID: &serviceAccount.Metadata.ID,
+				RoleID:           role.Metadata.ID,
 			},
-			expectTrails:         allTrails,
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allTrails))), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
 		},
-
 		{
-			name: "sort in ascending order of namespace path",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
+			name: "create membership for a team",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath: group.FullPath,
+				TeamID:        &team.Metadata.ID,
+				RoleID:        role.Metadata.ID,
 			},
-			expectTrails:         allTrails,
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allTrails))), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
 		},
-
 		{
-			name: "sort in descending order of namespace path",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathDesc),
+			name: "duplicate membership for a user is rejected",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath: group.FullPath,
+				UserID:        &user.Metadata.ID,
+				RoleID:        role.Metadata.ID,
 			},
-			sortedDescending:     true,
-			expectTrails:         reverseTrails,
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allTrails))), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
+			expectErrorCode: errors.EConflict,
 		},
-
 		{
-			name: "sort in ascending order of time of last update",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldUpdatedAtAsc),
+			name: "duplicate membership for a service account is rejected",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath:    group.FullPath,
+				ServiceAccountID: &serviceAccount.Metadata.ID,
+				RoleID:           role.Metadata.ID,
 			},
-			expectTrails:         allTrailsByTime,
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allTrailsByTime))), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
+			expectErrorCode: errors.EConflict,
 		},
-
 		{
-			name: "sort in descending order of time of last update",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldUpdatedAtDesc),
+			name: "duplicate membership for a team is rejected",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath: group.FullPath,
+				TeamID:        &team.Metadata.ID,
+				RoleID:        role.Metadata.ID,
 			},
-			sortedDescending:     true,
-			expectTrails:         reverseTrailsByTime,
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allTrailsByTime))), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
+			expectErrorCode: errors.EConflict,
 		},
-
 		{
-			name: "pagination: everything at once",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
+			name: "namespace does not exist",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath: "bogus-namespace",
+				UserID:        &user.Metadata.ID,
+				RoleID:        role.Metadata.ID,
 			},
-			expectTrails:         allTrails,
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(int32(len(allTrails))), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
+			expectErrorCode: errors.ENotFound,
 		},
-
-		// Because of the interesting way we have to sort namespace memberships
-		// within a given namespace in order to compare results, pagination must
-		// keep each namespace path contained within the same page.  For these
-		// cases, there are 3 namespace memberships per namespace path.
 		{
-			name: "pagination: first six",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(6),
-				},
+			name: "user does not exist",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath: group.FullPath,
+				UserID:        ptr.String(nonExistentID),
+				RoleID:        role.Metadata.ID,
 			},
-			expectTrails: allTrails[:6],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      pagination.StaticCount(int32(len(allTrails))),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: false,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
+			expectErrorCode: errors.ENotFound,
 		},
-
 		{
-			name: "pagination: middle six",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(6),
-				},
+			name: "service account does not exist",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath:    group.FullPath,
+				ServiceAccountID: ptr.String(nonExistentID),
+				RoleID:           role.Metadata.ID,
 			},
-			getAfterCursorFromPrevious: true,
-			expectTrails:               allTrails[6:12],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      pagination.StaticCount(int32(len(allTrails))),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
+			expectErrorCode: errors.ENotFound,
 		},
-
 		{
-			name: "pagination: final three",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
+			name: "team does not exist",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath: group.FullPath,
+				TeamID:        ptr.String(nonExistentID),
+				RoleID:        role.Metadata.ID,
 			},
-			getAfterCursorFromPrevious: true,
-			expectTrails:               allTrails[12:],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      pagination.StaticCount(int32(len(allTrails))),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     false,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
+			expectErrorCode: errors.ENotFound,
 		},
-
-		// When Last is supplied, the sort order is intended to be reversed.
 		{
-			name: "pagination: last three",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &pagination.Options{
-					Last: ptr.Int32(3),
-				},
-			},
-			sortedDescending: true,
-			expectTrails:     reverseTrails[:3],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      pagination.StaticCount(int32(len(allTrails))),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     false,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		/*
-
-			The input.PaginationOptions.After field is tested earlier via getAfterCursorFromPrevious.
-
-			The input.PaginationOptions.Before field is not really supported and does not work.
-			If it did work, it could be tested by adapting the test cases corresponding to the
-			next few cases after a similar block of text from group_test.go
-
-		*/
-
-		{
-			name: "pagination, before and after, expect error",
-			input: &GetNamespaceMembershipsInput{
-				Sort:              ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &pagination.Options{},
-			},
-			getAfterCursorFromPrevious:  true,
-			getBeforeCursorFromPrevious: true,
-			expectErrorCode:             errors.EInternal,
-			expectTrails:                []string{},
-			expectPageInfo:              pagination.PageInfo{},
-		},
-
-		{
-			name: "pagination, first one and last two, expect error",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(1),
-					Last:  ptr.Int32(2),
-				},
+			name: "invalid user id",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath: group.FullPath,
+				UserID:        ptr.String(invalidID),
+				RoleID:        role.Metadata.ID,
 			},
 			expectErrorCode: errors.EInternal,
-			expectTrails:    allTrails[4:],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      pagination.StaticCount(int32(len(allTrails))),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: false,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
 		},
-
 		{
-			name: "fully-populated types, nothing allowed through filters",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: &NamespaceMembershipFilter{
-					UserID:              ptr.String(""),
-					ServiceAccountID:    ptr.String(""),
-					TeamID:              ptr.String(""),
-					GroupID:             ptr.String(""),
-					WorkspaceID:         ptr.String(""),
-					NamespacePathPrefix: ptr.String(""),
-					NamespacePaths:      []string{},
-				},
+			name: "invalid service account id",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath:    group.FullPath,
+				ServiceAccountID: ptr.String(invalidID),
+				RoleID:           role.Metadata.ID,
 			},
 			expectErrorCode: errors.EInternal,
-			expectTrails:    []string{},
-			expectPageInfo:  pagination.PageInfo{},
 		},
-
 		{
-			name: "filter, user member ID, positive 0",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					UserID: ptr.String(createdWarmupOutput.users[0].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.users[0].Username),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(2), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, user member ID, positive 1",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					UserID: ptr.String(createdWarmupOutput.users[1].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.users[1].Username),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(2), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, user member ID, exists, not a member of any namespace",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					UserID: ptr.String(findUserIDFromName(createdWarmupOutput.users, "user-99")),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, user member ID, non-existent",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					UserID: ptr.String(nonExistentID),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, user member ID, invalid",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					UserID: ptr.String(invalidID),
-				},
+			name: "invalid team id",
+			input: &CreateNamespaceMembershipInput{
+				NamespacePath: group.FullPath,
+				TeamID:        ptr.String(invalidID),
+				RoleID:        role.Metadata.ID,
 			},
 			expectErrorCode: errors.EInternal,
-			expectTrails:    []string{},
-			expectPageInfo:  pagination.PageInfo{},
-		},
-
-		{
-			name: "filter, service account member ID, positive 0",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					ServiceAccountID: ptr.String(createdWarmupOutput.serviceAccounts[0].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.serviceAccounts[0].Name),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(2), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, service account member ID, positive 1",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					ServiceAccountID: ptr.String(createdWarmupOutput.serviceAccounts[1].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.serviceAccounts[1].Name),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(2), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, service account member ID, exists, not a member of any namespace",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					ServiceAccountID: ptr.String(findServiceAccountIDFromName(createdWarmupOutput.serviceAccounts, "sa-99")),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, service account member ID, non-existent",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					ServiceAccountID: ptr.String(nonExistentID),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, service account member ID, invalid",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					ServiceAccountID: ptr.String(invalidID),
-				},
-			},
-			expectErrorCode: errors.EInternal,
-			expectTrails:    []string{},
-			expectPageInfo:  pagination.PageInfo{},
-		},
-
-		{
-			name: "filter, team ID, positive 0",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					TeamID: ptr.String(createdWarmupOutput.teams[0].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.teams[0].Name),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(2), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, team ID, positive 1",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					TeamID: ptr.String(createdWarmupOutput.teams[1].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.teams[1].Name),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(2), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, team ID, exists, not a member of any namespace",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					TeamID: ptr.String(findTeamIDFromName(createdWarmupOutput.teams, "team-99")),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, team ID, non-existent",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					TeamID: ptr.String(nonExistentID),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, team ID, invalid",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					TeamID: ptr.String(invalidID),
-				},
-			},
-			expectErrorCode: errors.EInternal,
-			expectTrails:    []string{},
-			expectPageInfo:  pagination.PageInfo{},
-		},
-
-		{
-			name: "filter, group ID, positive a",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					GroupID: ptr.String(createdWarmupOutput.groups[0].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.groups[0].Name+"--"),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, group ID, positive b",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					GroupID: ptr.String(createdWarmupOutput.groups[1].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.groups[1].Name+"--"),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, group ID, positive c",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					GroupID: ptr.String(createdWarmupOutput.groups[2].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.groups[2].Name+"--"),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, group ID, exists but no namespace memberships",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					GroupID: ptr.String(findGroupIDFromName(createdWarmupOutput.groups, "group-99")),
-				},
-			},
-			expectTrails:         []string{},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, group ID, non-existent",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					GroupID: ptr.String(nonExistentID),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, group ID, invalid",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					GroupID: ptr.String(invalidID),
-				},
-			},
-			expectErrorCode: errors.EInternal,
-			expectTrails:    []string{},
-			expectPageInfo:  pagination.PageInfo{},
-		},
-
-		{
-			name: "filter, workspace ID, positive 0",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					WorkspaceID: ptr.String(createdWarmupOutput.workspaces[0].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.workspaces[0].Name),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, workspace ID, positive 1",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					WorkspaceID: ptr.String(createdWarmupOutput.workspaces[1].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.workspaces[1].Name),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, workspace ID, positive 2",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					WorkspaceID: ptr.String(createdWarmupOutput.workspaces[2].Metadata.ID),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.workspaces[2].Name),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, workspace ID, exists, not a member of any namespace",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					WorkspaceID: ptr.String(findWorkspaceIDFromName(createdWarmupOutput.workspaces, "workspace-99")),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, workspace ID, non-existent",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					WorkspaceID: ptr.String(nonExistentID),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, workspace ID, invalid",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					WorkspaceID: ptr.String(invalidID),
-				},
-			},
-			expectErrorCode: errors.EInternal,
-			expectTrails:    []string{},
-			expectPageInfo:  pagination.PageInfo{},
-		},
-
-		{
-			name: "filter, namespace path prefix, positive 0",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePathPrefix: ptr.String("group-a"),
-				},
-			},
-			expectTrails:         allTrails,
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(18), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace path prefix, positive 1",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePathPrefix: ptr.String("group-a/group-b"),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, "group-a/group-b"),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(12), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace path prefix, positive 2",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePathPrefix: ptr.String("group-a/workspace-a1"),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, "group-a/workspace-a1"),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace path prefix, positive 3",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePathPrefix: ptr.String("group-a/group-b/group-c"),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, "group-a/group-b/group-c"),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(6), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace path prefix, positive 4",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePathPrefix: ptr.String("group-a/group-b/workspace-b2"),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, "group-a/group-b/workspace-b2"),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace path prefix, positive 5",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePathPrefix: ptr.String("group-a/group-b/group-c/workspace-c3"),
-				},
-			},
-			expectTrails:         findMatchingTrails(allTrails, "group-a/group-b/group-c/workspace-c3"),
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace path prefix, negative, end of path does not exist",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePathPrefix: ptr.String("group-a/group-b/group-c/bogus"),
-				},
-			},
-			expectTrails:         []string{},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace path prefix, exists, not a member of any namespace",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePathPrefix: ptr.String("group-99"),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, namespace path prefix, non-existent",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePathPrefix: ptr.String(nonExistentID),
-				},
-			},
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-		},
-
-		// The namespace path prefix is not required to be a UUID, so no check for UUID format can be done.
-
-		{
-			name: "filter, empty slice of namespace paths",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePaths: []string{},
-				},
-			},
-			expectTrails:         allTrails,
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(18), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace paths, a top-level group",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePaths: []string{"group-a"},
-				},
-			},
-			expectTrails:         allTrails[:3],
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace paths, a workspace in a top-level group",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePaths: []string{"group-a/workspace-a1"},
-				},
-			},
-			expectTrails:         allTrails[15:],
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace paths, a 2nd-level group",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePaths: []string{"group-a/group-b"},
-				},
-			},
-			expectTrails:         allTrails[3:6],
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace paths, a workspace in a 2nd-level group",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePaths: []string{"group-a/group-b/workspace-b2"},
-				},
-			},
-			expectTrails:         allTrails[12:15],
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace paths, a 3rd-level group",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePaths: []string{"group-a/group-b/group-c"},
-				},
-			},
-			expectTrails:         allTrails[6:9],
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace paths, a workspace in a 3rd-level group",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePaths: []string{"group-a/group-b/group-c/workspace-c3"},
-				},
-			},
-			expectTrails:         allTrails[9:12],
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(3), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		// Don't try to use append() to construct expectTrails.  Somehow, it corrupts allTrails.
-		// append(allTrails[:3], append(allTrails[6:9], allTrails[12:15]...)...)
-		{
-			name: "filter, namespace paths, multiple of the above",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePaths: []string{"group-a", "group-a/group-b/workspace-b2", "group-a/group-b/group-c"},
-				},
-			},
-			expectTrails: []string{
-				allTrails[0],
-				allTrails[1],
-				allTrails[2],
-				allTrails[6],
-				allTrails[7],
-				allTrails[8],
-				allTrails[12],
-				allTrails[13],
-				allTrails[14],
-			},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(9), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace paths, non-existent",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespacePaths: []string{"group-a/bogus"},
-				},
-			},
-			expectTrails:         []string{},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		// A namespace path is not required to be a UUID, so no check for UUID format can be done.
-
-		{
-			name: "filter, namespace membership IDs, positive",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespaceMembershipIDs: []string{createdWarmupOutput.namespaceMemberships[1].Metadata.ID},
-				},
-			},
-			expectTrails:         []string{allTrails[4]},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(1), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace membership IDs, non-existent",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespaceMembershipIDs: []string{nonExistentID},
-				},
-			},
-			expectTrails:         []string{},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, namespace membership IDs, invalid",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					NamespaceMembershipIDs: []string{invalidID},
-				},
-			},
-			expectErrorCode:      errors.EInternal,
-			expectTrails:         []string{},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		// Combining filter functions does a logical AND when deciding whether to include a result.
-		// Because there are so many filter fields, do a few combinations but not all possible.
-
-		{
-			name: "filter, combination UserID and GroupID",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					UserID:  ptr.String(createdWarmupOutput.users[2].Metadata.ID),
-					GroupID: ptr.String(createdWarmupOutput.groups[0].Metadata.ID),
-				},
-			},
-			expectTrails:         []string{allTrails[2]},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(1), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, combination ServiceAccountID and WorkspaceID",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					ServiceAccountID: ptr.String(createdWarmupOutput.serviceAccounts[1].Metadata.ID),
-					WorkspaceID:      ptr.String(createdWarmupOutput.workspaces[1].Metadata.ID),
-				},
-			},
-			expectTrails:         []string{allTrails[12]},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(1), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, combination TeamID and GroupID",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					TeamID:  ptr.String(createdWarmupOutput.teams[1].Metadata.ID),
-					GroupID: ptr.String(createdWarmupOutput.groups[1].Metadata.ID),
-				},
-			},
-			expectTrails:         []string{allTrails[4]},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(1), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, combination GroupID and WorkspaceID, contradictory",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					GroupID:     ptr.String(createdWarmupOutput.groups[0].Metadata.ID),
-					WorkspaceID: ptr.String(createdWarmupOutput.workspaces[0].Metadata.ID),
-				},
-			},
-			expectTrails:         []string{},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, combination TeamID and NamespacePathPrefix",
-			input: &GetNamespaceMembershipsInput{
-				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				Filter: &NamespaceMembershipFilter{
-					TeamID:              ptr.String(createdWarmupOutput.teams[2].Metadata.ID),
-					NamespacePathPrefix: ptr.String("group-a/group-b/group-c"),
-				},
-			},
-			expectTrails:         []string{allTrails[7]},
-			expectPageInfo:       pagination.PageInfo{TotalCount: pagination.StaticCount(1), Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
 		},
 	}
 
-	var (
-		previousEndCursorValue   *string
-		previousStartCursorValue *string
-	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			// For some pagination tests, a previous case's cursor value gets piped into the next case.
-			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
+			created, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, test.input)
 
-				// Make sure there's a place to put it.
-				require.NotNil(t, test.input.PaginationOptions)
-
-				if test.getAfterCursorFromPrevious {
-					// Make sure there's a previous value to use.
-					require.NotNil(t, previousEndCursorValue)
-					test.input.PaginationOptions.After = previousEndCursorValue
-				}
-
-				if test.getBeforeCursorFromPrevious {
-					// Make sure there's a previous value to use.
-					require.NotNil(t, previousStartCursorValue)
-					test.input.PaginationOptions.Before = previousStartCursorValue
-				}
-
-				// Clear the values so they won't be used twice.
-				previousEndCursorValue = nil
-				previousStartCursorValue = nil
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				assert.Nil(t, created)
+				return
 			}
 
-			// GetNamespaceMemberships(ctx context.Context, input *GetNamespaceMembershipsInput) (*NamespaceMembershipResult, error)
-			namespaceMembershipsResult, err := testClient.client.NamespaceMemberships.GetNamespaceMemberships(ctx, test.input)
+			require.Nil(t, err)
+			require.NotNil(t, created)
+
+			assert.Equal(t, initialResourceVersion, created.Metadata.Version)
+			assert.NotEmpty(t, created.Metadata.TRN)
+			assert.Equal(t, test.input.RoleID, created.RoleID)
+			assert.Equal(t, test.input.NamespacePath, created.Namespace.Path)
+			assert.Equal(t, test.input.UserID, created.UserID)
+			assert.Equal(t, test.input.ServiceAccountID, created.ServiceAccountID)
+			assert.Equal(t, test.input.TeamID, created.TeamID)
+		})
+	}
+}
+
+func TestUpdateNamespaceMembership(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-update-membership",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-update-membership",
+		Email:    "test-user-update-membership@example.com",
+	})
+	require.Nil(t, err)
+
+	roleA, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name:      "test-role-update-membership-a",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	roleB, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name:      "test-role-update-membership-b",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	createdMembership, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath: group.FullPath,
+		UserID:        &user.Metadata.ID,
+		RoleID:        roleA.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name            string
+		id              string
+		version         int
+		roleID          string
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:    "update role",
+			id:      createdMembership.Metadata.ID,
+			version: createdMembership.Metadata.Version,
+			roleID:  roleB.Metadata.ID,
+		},
+		{
+			name:            "update will fail because resource version doesn't match",
+			id:              createdMembership.Metadata.ID,
+			expectErrorCode: errors.EOptimisticLock,
+			version:         -1,
+			roleID:          roleA.Metadata.ID,
+		},
+		{
+			name:            "negative, invalid",
+			id:              invalidID,
+			expectErrorCode: errors.EInternal,
+			version:         1,
+			roleID:          roleA.Metadata.ID,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			updatedMembership, err := testClient.client.NamespaceMemberships.UpdateNamespaceMembership(ctx, &models.NamespaceMembership{
+				Metadata: models.ResourceMetadata{
+					ID:      test.id,
+					Version: test.version,
+				},
+				RoleID: test.roleID,
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				assert.Nil(t, updatedMembership)
+				return
+			}
+
+			require.Nil(t, err)
+			require.NotNil(t, updatedMembership)
+
+			assert.Equal(t, test.roleID, updatedMembership.RoleID)
+			assert.Equal(t, createdMembership.Metadata.Version+1, updatedMembership.Metadata.Version)
+		})
+	}
+}
+
+func TestDeleteNamespaceMembership(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-delete-membership",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-delete-membership",
+		Email:    "test-user-delete-membership@example.com",
+	})
+	require.Nil(t, err)
+
+	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name:      "test-role-delete-membership",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	createdMembership, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath: group.FullPath,
+		UserID:        &user.Metadata.ID,
+		RoleID:        role.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name            string
+		id              string
+		version         int
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:    "delete membership",
+			id:      createdMembership.Metadata.ID,
+			version: createdMembership.Metadata.Version,
+		},
+		{
+			name:            "delete will fail because resource version doesn't match",
+			id:              createdMembership.Metadata.ID,
+			expectErrorCode: errors.EOptimisticLock,
+			version:         -1,
+		},
+		{
+			name:            "negative, does not exist",
+			id:              nonExistentID,
+			expectErrorCode: errors.EOptimisticLock,
+		},
+		{
+			name:            "negative, invalid",
+			id:              invalidID,
+			expectErrorCode: errors.EInternal,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			err := testClient.client.NamespaceMemberships.DeleteNamespaceMembership(ctx, &models.NamespaceMembership{
+				Metadata: models.ResourceMetadata{
+					ID:      test.id,
+					Version: test.version,
+				},
+			})
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
-			// Never returns nil if error is nil.
-			require.NotNil(t, namespaceMembershipsResult.PageInfo)
-			assert.NotNil(t, namespaceMembershipsResult.NamespaceMemberships)
-			pageInfo := namespaceMembershipsResult.PageInfo
-			namespaceMemberships := namespaceMembershipsResult.NamespaceMemberships
+			require.Nil(t, err)
 
-			// Check the namespace memberships result by comparing a list of the trails.
-			infos := namespaceMembershipInfoFromNamespaceMemberships(createdWarmupOutput.holderIDs2Name,
-				namespaceMemberships)
-			resultTrails := trailsFromNamespaceMembershipInfo(infos, test.sortedDescending)
-
-			// If no sort direction was specified, sort the results here for repeatability.
-			if test.input.Sort == nil {
-				sort.Strings(resultTrails)
-			}
-
-			assert.Equal(t, len(test.expectTrails), len(resultTrails))
-			assert.Equal(t, test.expectTrails, resultTrails)
-
-			assert.Equal(t, test.expectPageInfo.HasNextPage, pageInfo.HasNextPage)
-			assert.Equal(t, test.expectPageInfo.HasPreviousPage, pageInfo.HasPreviousPage)
-			expectedTotalCount, _ := test.expectPageInfo.TotalCount(ctx)
-			actualTotalCount, err := pageInfo.TotalCount(ctx)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedTotalCount, actualTotalCount)
-			assert.Equal(t, test.expectPageInfo.Cursor != nil, pageInfo.Cursor != nil)
-
-			// Compare the cursor function results only if there is at least one namespace membership returned.
-			// If there are no namespace memberships returned, there is no argument to pass to the cursor function.
-			// Also, don't try to reverse engineer to compare the cursor string values.
-			if len(namespaceMemberships) > 0 {
-				resultStartCursor, resultStartCursorError := pageInfo.Cursor(&namespaceMemberships[0])
-				resultEndCursor, resultEndCursorError := pageInfo.Cursor(&namespaceMemberships[len(namespaceMemberships)-1])
-				assert.Equal(t, test.expectStartCursorError, resultStartCursorError)
-				assert.Equal(t, test.expectHasStartCursor, resultStartCursor != nil)
-				assert.Equal(t, test.expectEndCursorError, resultEndCursorError)
-				assert.Equal(t, test.expectHasEndCursor, resultEndCursor != nil)
-
-				// Capture the ending cursor values for the next case.
-				previousEndCursorValue = resultEndCursor
-				previousStartCursorValue = resultStartCursor
-			}
+			membership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, test.id)
+			assert.Nil(t, membership)
+			assert.Nil(t, err)
 		})
 	}
 }
@@ -1235,62 +384,69 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupOutput, err := createWarmupNamespaceMemberships(ctx, testClient, namespaceMembershipWarmupsInput{
-		teams:                standardWarmupTeamsForNamespaceMemberships,
-		users:                standardWarmupUsersForNamespaceMemberships,
-		teamMembers:          standardWarmupTeamMembersForNamespaceMemberships,
-		groups:               standardWarmupGroupsForNamespaceMemberships,
-		serviceAccounts:      standardWarmupServiceAccountsForNamespaceMemberships,
-		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
-		namespaceMemberships: standardWarmupNamespaceMemberships,
-		roles:                standardWarmupRolesForNamespaceMemberships,
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-get-by-id",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-get-by-id",
+		Email:    "test-user-get-by-id@example.com",
+	})
+	require.Nil(t, err)
+
+	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name:      "test-role-get-by-id",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	createdMembership, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath: group.FullPath,
+		UserID:        &user.Metadata.ID,
+		RoleID:        role.Metadata.ID,
 	})
 	require.Nil(t, err)
 
 	type testCase struct {
-		expectErrorCode           errors.CodeType
-		name                      string
-		searchID                  string
-		expectNamespaceMembership bool
+		expectErrorCode  errors.CodeType
+		name             string
+		searchID         string
+		expectMembership bool
 	}
 
-	testCases := []testCase{}
-	for _, positiveNamespaceMembership := range createdWarmupOutput.namespaceMemberships {
-		testCases = append(testCases, testCase{
-			name:                      positiveNamespaceMembership.Metadata.ID,
-			searchID:                  positiveNamespaceMembership.Metadata.ID,
-			expectNamespaceMembership: true,
-		})
-	}
-
-	testCases = append(testCases,
-		testCase{
-			name:     "negative, does not exist",
+	testCases := []testCase{
+		{
+			name:             "get resource by id",
+			searchID:         createdMembership.Metadata.ID,
+			expectMembership: true,
+		},
+		{
+			name:     "resource with id not found",
 			searchID: nonExistentID,
 		},
-		testCase{
-			name:            "negative, invalid",
+		{
+			name:            "get resource with invalid id will return an error",
 			searchID:        invalidID,
 			expectErrorCode: errors.EInvalid,
 		},
-	)
+	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			namespaceMembership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, test.searchID)
+			membership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, test.searchID)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
-			if test.expectNamespaceMembership {
-				// the positive case
-				require.NotNil(t, namespaceMembership)
-				assert.Equal(t, test.name, namespaceMembership.Metadata.ID)
+			if test.expectMembership {
+				require.NotNil(t, membership)
+				assert.Equal(t, test.searchID, membership.Metadata.ID)
 			} else {
-				// the negative and defective cases
-				assert.Nil(t, namespaceMembership)
+				assert.Nil(t, membership)
 			}
 		})
 	}
@@ -1304,17 +460,18 @@ func TestGetNamespaceMembershipByTRN(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name: "test-group",
 	})
-
 	require.NoError(t, err)
+
 	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name: "test-role",
 	})
-
 	require.NoError(t, err)
+
 	namespaceMembership, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
 		NamespacePath: group.FullPath,
 		RoleID:        role.Metadata.ID,
 	})
+	require.NoError(t, err)
 
 	type testCase struct {
 		name                      string
@@ -1364,1033 +521,375 @@ func TestGetNamespaceMembershipByTRN(t *testing.T) {
 	}
 }
 
-func TestCreateNamespaceMembership(t *testing.T) {
+func TestGetNamespaceMemberships(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupOutput, err := createWarmupNamespaceMemberships(ctx, testClient, namespaceMembershipWarmupsInput{
-		teams:                standardWarmupTeamsForNamespaceMemberships,
-		users:                standardWarmupUsersForNamespaceMemberships,
-		teamMembers:          standardWarmupTeamMembersForNamespaceMemberships,
-		groups:               standardWarmupGroupsForNamespaceMemberships,
-		serviceAccounts:      standardWarmupServiceAccountsForNamespaceMemberships,
-		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
-		namespaceMemberships: standardWarmupNamespaceMemberships,
-		roles:                standardWarmupRolesForNamespaceMemberships,
+	groupA, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-list-a",
+		CreatedBy: "db-integration-tests",
 	})
 	require.Nil(t, err)
 
+	groupB, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-list-b",
+		ParentID:  groupA.Metadata.ID,
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	workspaceA1, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-ws-list-a1",
+		GroupID:        groupA.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(int32(forTestMaxJobDuration.Minutes())),
+	})
+	require.Nil(t, err)
+
+	user0, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-list-0",
+		Email:    "test-user-list-0@example.com",
+	})
+	require.Nil(t, err)
+
+	user1, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-list-1",
+		Email:    "test-user-list-1@example.com",
+	})
+	require.Nil(t, err)
+
+	serviceAccount0, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Name:      "test-sa-list-0",
+		GroupID:   groupA.Metadata.ID,
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name: "test-team-list",
+	})
+	require.Nil(t, err)
+
+	_, err = testClient.client.TeamMembers.AddUserToTeam(ctx, &models.TeamMember{
+		UserID: user1.Metadata.ID,
+		TeamID: team.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name:      "test-role-list",
+		CreatedBy: "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	// groupA.FullPath is a prefix for groupB's and workspaceA1's paths, so this membership
+	// exercises the plain lookup as well as the "no children" behavior of the filters.
+	mUserGroupA, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath: groupA.FullPath,
+		UserID:        &user0.Metadata.ID,
+		RoleID:        role.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	mSAGroupB, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath:    groupB.FullPath,
+		ServiceAccountID: &serviceAccount0.Metadata.ID,
+		RoleID:           role.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	// This membership belongs to the team, so it is also the target for the indirect,
+	// team-based membership filter on user1.
+	mTeamWorkspaceA1, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath: workspaceA1.FullPath,
+		TeamID:        &team.Metadata.ID,
+		RoleID:        role.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	allIDs := []string{mUserGroupA.Metadata.ID, mSAGroupB.Metadata.ID, mTeamWorkspaceA1.Metadata.ID}
+
 	type testCase struct {
-		input           *CreateNamespaceMembershipInput
-		expectErrorCode errors.CodeType
-		expectCreated   *models.NamespaceMembership
 		name            string
+		input           *GetNamespaceMembershipsInput
+		expectErrorCode errors.CodeType
+		expectIDs       []string
 	}
 
-	// For the positive cases, must make GroupID and WorkspaceID point to empty string rather than nil.
-
-	now := currentTime()
 	testCases := []testCase{
 		{
-			name: "positive, user",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath: "group-99",
-				UserID:        &createdWarmupOutput.users[0].Metadata.ID,
-				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
-			},
-			expectCreated: &models.NamespaceMembership{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				RoleID: createdWarmupOutput.roles[0].Metadata.ID,
-				Namespace: models.MembershipNamespace{
-					Path:    "group-99",
-					GroupID: &createdWarmupOutput.groups[3].Metadata.ID,
-				},
-				UserID: &createdWarmupOutput.users[0].Metadata.ID,
-			},
+			name:      "no filter returns all",
+			input:     &GetNamespaceMembershipsInput{},
+			expectIDs: allIDs,
 		},
-
 		{
-			name: "positive, service account",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath:    "group-a/workspace-99",
-				ServiceAccountID: &createdWarmupOutput.serviceAccounts[0].Metadata.ID,
-				RoleID:           createdWarmupOutput.roles[1].Metadata.ID,
+			name: "filter, direct user membership",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{UserID: &user0.Metadata.ID},
 			},
-			expectCreated: &models.NamespaceMembership{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				RoleID: createdWarmupOutput.roles[1].Metadata.ID,
-				Namespace: models.MembershipNamespace{
-					Path:        "group-a/workspace-99",
-					WorkspaceID: &createdWarmupOutput.workspaces[3].Metadata.ID,
-				},
-				ServiceAccountID: &createdWarmupOutput.serviceAccounts[0].Metadata.ID,
-			},
+			expectIDs: []string{mUserGroupA.Metadata.ID},
 		},
-
 		{
-			name: "positive, team",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath: "group-99",
-				TeamID:        &createdWarmupOutput.teamMembers[0].TeamID,
-				RoleID:        createdWarmupOutput.roles[2].Metadata.ID,
+			name: "filter, indirect user membership via team",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{UserID: &user1.Metadata.ID},
 			},
-			expectCreated: &models.NamespaceMembership{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				RoleID: createdWarmupOutput.roles[2].Metadata.ID,
-				Namespace: models.MembershipNamespace{
-					Path:    "group-99",
-					GroupID: &createdWarmupOutput.groups[3].Metadata.ID,
-				},
-				TeamID: &createdWarmupOutput.teamMembers[0].TeamID,
-			},
+			expectIDs: []string{mTeamWorkspaceA1.Metadata.ID},
 		},
-
-		// For the negative duplicate cases, repeat the same entries from the positive cases.
-
 		{
-			name: "negative, duplicate, user",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath: "group-99",
-				UserID:        &createdWarmupOutput.users[0].Metadata.ID,
-				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
+			name: "filter, user id, non-existent",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{UserID: ptr.String(nonExistentID)},
 			},
-			expectErrorCode: errors.EConflict,
+			expectIDs: []string{},
 		},
-
 		{
-			name: "negative, duplicate, service account",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath:    "group-a/workspace-99",
-				ServiceAccountID: &createdWarmupOutput.serviceAccounts[0].Metadata.ID,
-				RoleID:           createdWarmupOutput.roles[0].Metadata.ID,
-			},
-			expectErrorCode: errors.EConflict,
-		},
-
-		{
-			name: "negative, duplicate, team",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath: "group-99",
-				TeamID:        &createdWarmupOutput.teamMembers[0].TeamID,
-				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
-			},
-			expectErrorCode: errors.EConflict,
-		},
-
-		{
-			name: "negative, non-existent namespace path",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath: "group-bogus",
-				UserID:        &createdWarmupOutput.users[1].Metadata.ID,
-				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
-			},
-			expectErrorCode: errors.ENotFound,
-		},
-
-		{
-			name: "negative, non-existent user",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath: "group-a",
-				UserID:        ptr.String(nonExistentID),
-				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
-			},
-			expectErrorCode: errors.ENotFound,
-		},
-
-		{
-			name: "negative, non-existent service account",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath:    "group-a",
-				ServiceAccountID: ptr.String(nonExistentID),
-				RoleID:           createdWarmupOutput.roles[0].Metadata.ID,
-			},
-			expectErrorCode: errors.ENotFound,
-		},
-
-		{
-			name: "negative, non-existent team",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath: "group-a",
-				TeamID:        ptr.String(nonExistentID),
-				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
-			},
-			expectErrorCode: errors.ENotFound,
-		},
-
-		{
-			name: "negative, invalid user",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath: "group-a",
-				UserID:        ptr.String(invalidID),
-				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
+			name: "filter, user id, invalid",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{UserID: ptr.String(invalidID)},
 			},
 			expectErrorCode: errors.EInternal,
 		},
-
 		{
-			name: "negative, invalid service account",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath:    "group-a",
-				ServiceAccountID: ptr.String(invalidID),
-				RoleID:           createdWarmupOutput.roles[0].Metadata.ID,
+			name: "filter, service account id",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{ServiceAccountID: &serviceAccount0.Metadata.ID},
+			},
+			expectIDs: []string{mSAGroupB.Metadata.ID},
+		},
+		{
+			name: "filter, service account id, non-existent",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{ServiceAccountID: ptr.String(nonExistentID)},
+			},
+			expectIDs: []string{},
+		},
+		{
+			name: "filter, service account id, invalid",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{ServiceAccountID: ptr.String(invalidID)},
 			},
 			expectErrorCode: errors.EInternal,
 		},
-
 		{
-			name: "negative, invalid team",
-			input: &CreateNamespaceMembershipInput{
-				NamespacePath: "group-a",
-				TeamID:        ptr.String(invalidID),
-				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
+			name: "filter, team id",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{TeamID: &team.Metadata.ID},
+			},
+			expectIDs: []string{mTeamWorkspaceA1.Metadata.ID},
+		},
+		{
+			name: "filter, team id, non-existent",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{TeamID: ptr.String(nonExistentID)},
+			},
+			expectIDs: []string{},
+		},
+		{
+			name: "filter, team id, invalid",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{TeamID: ptr.String(invalidID)},
 			},
 			expectErrorCode: errors.EInternal,
+		},
+		{
+			name: "filter, group id",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{GroupID: &groupA.Metadata.ID},
+			},
+			expectIDs: []string{mUserGroupA.Metadata.ID},
+		},
+		{
+			name: "filter, group id, invalid",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{GroupID: ptr.String(invalidID)},
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name: "filter, workspace id",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{WorkspaceID: &workspaceA1.Metadata.ID},
+			},
+			expectIDs: []string{mTeamWorkspaceA1.Metadata.ID},
+		},
+		{
+			name: "filter, workspace id, invalid",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{WorkspaceID: ptr.String(invalidID)},
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name: "filter, namespace path prefix, matches group and its descendants",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{NamespacePathPrefix: &groupA.FullPath},
+			},
+			expectIDs: allIDs,
+		},
+		{
+			name: "filter, namespace path prefix, matches a descendant group only",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{NamespacePathPrefix: &groupB.FullPath},
+			},
+			expectIDs: []string{mSAGroupB.Metadata.ID},
+		},
+		{
+			name: "filter, namespace path prefix, no match",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{NamespacePathPrefix: ptr.String("bogus-namespace")},
+			},
+			expectIDs: []string{},
+		},
+		{
+			name: "filter, empty slice of namespace paths matches everything",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{NamespacePaths: []string{}},
+			},
+			expectIDs: allIDs,
+		},
+		{
+			name: "filter, namespace paths, exact matches",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{NamespacePaths: []string{groupA.FullPath, workspaceA1.FullPath}},
+			},
+			expectIDs: []string{mUserGroupA.Metadata.ID, mTeamWorkspaceA1.Metadata.ID},
+		},
+		{
+			name: "filter, namespace paths, non-existent",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{NamespacePaths: []string{"bogus-namespace"}},
+			},
+			expectIDs: []string{},
+		},
+		{
+			name: "filter, namespace membership ids",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{NamespaceMembershipIDs: []string{mSAGroupB.Metadata.ID}},
+			},
+			expectIDs: []string{mSAGroupB.Metadata.ID},
+		},
+		{
+			name: "filter, namespace membership ids, non-existent",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{NamespaceMembershipIDs: []string{nonExistentID}},
+			},
+			expectIDs: []string{},
+		},
+		{
+			name: "filter, namespace membership ids, invalid",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{NamespaceMembershipIDs: []string{invalidID}},
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name: "filter, combination user id and group id, match",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{UserID: &user0.Metadata.ID, GroupID: &groupA.Metadata.ID},
+			},
+			expectIDs: []string{mUserGroupA.Metadata.ID},
+		},
+		{
+			name: "filter, combination group id and workspace id, contradictory",
+			input: &GetNamespaceMembershipsInput{
+				Filter: &NamespaceMembershipFilter{GroupID: &groupA.Metadata.ID, WorkspaceID: &workspaceA1.Metadata.ID},
+			},
+			expectIDs: []string{},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			// CreateNamespaceMembership(ctx context.Context, input *CreateNamespaceMembershipInput) (*models.NamespaceMembership, error)
-			actualCreated, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, test.input)
+			result, err := testClient.client.NamespaceMemberships.GetNamespaceMemberships(ctx, test.input)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
-			require.NoError(t, err)
+			require.Nil(t, err)
+			require.NotNil(t, result)
 
-			if test.expectCreated != nil {
-				// the positive case
-				require.NotNil(t, actualCreated)
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectCreated.Metadata.CreationTimestamp
-				now := currentTime()
-
-				compareNamespaceMemberships(t, test.expectCreated, actualCreated, false, timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				// the negative and defective cases
-				assert.Nil(t, actualCreated)
+			gotIDs := make([]string, len(result.NamespaceMemberships))
+			for i, m := range result.NamespaceMemberships {
+				gotIDs[i] = m.Metadata.ID
 			}
+
+			assert.ElementsMatch(t, test.expectIDs, gotIDs)
+
+			totalCount, err := result.PageInfo.TotalCount(ctx)
+			require.Nil(t, err)
+			assert.Equal(t, int32(len(test.expectIDs)), totalCount)
 		})
 	}
 }
 
-func TestUpdateNamespaceMembership(t *testing.T) {
+func TestGetNamespaceMembershipsWithPaginationAndSorting(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupOutput, err := createWarmupNamespaceMemberships(ctx, testClient, namespaceMembershipWarmupsInput{
-		teams:                standardWarmupTeamsForNamespaceMemberships,
-		users:                standardWarmupUsersForNamespaceMemberships,
-		teamMembers:          standardWarmupTeamMembersForNamespaceMemberships,
-		groups:               standardWarmupGroupsForNamespaceMemberships,
-		serviceAccounts:      standardWarmupServiceAccountsForNamespaceMemberships,
-		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
-		namespaceMemberships: standardWarmupNamespaceMemberships,
-		roles:                standardWarmupRolesForNamespaceMemberships,
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:      "test-group-membership-pagination",
+		CreatedBy: "db-integration-tests",
 	})
 	require.Nil(t, err)
-	allNamespaceMembershipInfos := namespaceMembershipInfoFromNamespaceMemberships(
-		createdWarmupOutput.holderIDs2Name, createdWarmupOutput.namespaceMemberships)
 
-	type testCase struct {
-		searchFor       *models.NamespaceMembership
-		expectErrorCode errors.CodeType
-		expectUpdated   *models.NamespaceMembership
-		name            string
-	}
-
-	// UpdateNamespaceMembership looks for ID and metadata version,
-	// updates metadata version, last updated timestamp, and role.
-	// The role is the only thing we control.
-
-	testCases := []testCase{}
-
-	for ix, preUpdate := range createdWarmupOutput.namespaceMemberships {
-		now := currentTime()
-		testCases = append(testCases, testCase{
-			name: "positive-" + buildTrail(allNamespaceMembershipInfos[ix]),
-			searchFor: &models.NamespaceMembership{
-				Metadata: models.ResourceMetadata{
-					ID:      preUpdate.Metadata.ID,
-					Version: preUpdate.Metadata.Version,
-				},
-				RoleID:    rotateRole(preUpdate.RoleID, createdWarmupOutput.roles),
-				Namespace: preUpdate.Namespace,
-			},
-			expectUpdated: &models.NamespaceMembership{
-				Metadata: models.ResourceMetadata{
-					ID:                   preUpdate.Metadata.ID,
-					Version:              preUpdate.Metadata.Version + 1,
-					CreationTimestamp:    preUpdate.Metadata.CreationTimestamp,
-					LastUpdatedTimestamp: &now,
-				},
-				RoleID: rotateRole(preUpdate.RoleID, createdWarmupOutput.roles),
-				Namespace: models.MembershipNamespace{
-					ID:          preUpdate.Namespace.ID,
-					Path:        preUpdate.Namespace.Path,
-					GroupID:     preUpdate.Namespace.GroupID,
-					WorkspaceID: preUpdate.Namespace.WorkspaceID,
-				},
-				UserID:           preUpdate.UserID,
-				ServiceAccountID: preUpdate.ServiceAccountID,
-				TeamID:           preUpdate.TeamID,
-			},
-		})
-	}
-
-	testCases = append(testCases, testCase{
-		name: "negative, non-exist",
-		searchFor: &models.NamespaceMembership{
-			Metadata: models.ResourceMetadata{
-				ID:      nonExistentID,
-				Version: 1,
-			},
-			RoleID: createdWarmupOutput.roles[0].Metadata.ID,
-		},
-		expectErrorCode: errors.EOptimisticLock,
-	},
-		testCase{
-			name: "negative, invalid",
-			searchFor: &models.NamespaceMembership{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: 1,
-				},
-				RoleID: createdWarmupOutput.roles[0].Metadata.ID,
-			},
-			expectErrorCode: errors.EInternal,
-		})
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			// UpdateNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) (*models.NamespaceMembership, error)
-			actualUpdated, err := testClient.client.NamespaceMemberships.UpdateNamespaceMembership(ctx, test.searchFor)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-
-				require.NoError(t, err)
-			}
-
-			if test.expectUpdated != nil {
-				// the positive case
-				require.NotNil(t, actualUpdated)
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectUpdated.Metadata.CreationTimestamp
-				now := currentTime()
-
-				compareNamespaceMemberships(t, test.expectUpdated, actualUpdated, false, timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				// the negative and defective cases
-				assert.Nil(t, actualUpdated)
-			}
-		})
-	}
-}
-
-func TestDeleteNamespaceMembership(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	createdWarmupOutput, err := createWarmupNamespaceMemberships(ctx, testClient, namespaceMembershipWarmupsInput{
-		teams:                standardWarmupTeamsForNamespaceMemberships,
-		users:                standardWarmupUsersForNamespaceMemberships,
-		teamMembers:          standardWarmupTeamMembersForNamespaceMemberships,
-		groups:               standardWarmupGroupsForNamespaceMemberships,
-		serviceAccounts:      standardWarmupServiceAccountsForNamespaceMemberships,
-		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
-		namespaceMemberships: standardWarmupNamespaceMemberships,
-		roles:                standardWarmupRolesForNamespaceMemberships,
+	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name:      "test-role-membership-pagination",
+		CreatedBy: "db-integration-tests",
 	})
 	require.Nil(t, err)
-	allNamespaceMembershipInfos := namespaceMembershipInfoFromNamespaceMemberships(
-		createdWarmupOutput.holderIDs2Name, createdWarmupOutput.namespaceMemberships)
 
-	type testCase struct {
-		searchFor                 *models.NamespaceMembership
-		expectErrorCode           errors.CodeType
-		name                      string
-		expectNamespaceMembership bool
-	}
-
-	testCases := []testCase{}
-	for ix, toDelete := range createdWarmupOutput.namespaceMemberships {
-		testCases = append(testCases, testCase{
-			name: "positive-" + buildTrail(allNamespaceMembershipInfos[ix]),
-			searchFor: &models.NamespaceMembership{
-				Metadata: models.ResourceMetadata{
-					ID:      toDelete.Metadata.ID,
-					Version: toDelete.Metadata.Version,
-				},
-			},
+	resourceCount := 10
+	for i := 0; i < resourceCount; i++ {
+		workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+			Name:           fmt.Sprintf("test-ws-membership-pagination-%d", i),
+			GroupID:        group.Metadata.ID,
+			CreatedBy:      "db-integration-tests",
+			MaxJobDuration: ptr.Int32(int32(forTestMaxJobDuration.Minutes())),
 		})
-	}
+		require.Nil(t, err)
 
-	testCases = append(testCases,
-		testCase{
-			name: "negative, non-exist",
-			searchFor: &models.NamespaceMembership{
-				Metadata: models.ResourceMetadata{
-					ID: nonExistentID,
-				},
-			},
-			expectErrorCode: errors.EOptimisticLock,
-		},
-		testCase{
-			name: "negative, defective-id",
-			searchFor: &models.NamespaceMembership{
-				Metadata: models.ResourceMetadata{
-					ID: invalidID,
-				},
-			},
-			expectErrorCode: errors.EInternal,
-		},
-	)
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			// DeleteNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) error
-			err := testClient.client.NamespaceMemberships.DeleteNamespaceMembership(ctx, test.searchFor)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-
-				return
-			}
-			require.NoError(t, err)
+		user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+			Username: fmt.Sprintf("test-user-membership-pagination-%d", i),
+			Email:    fmt.Sprintf("test-user-membership-pagination-%d@example.com", i),
 		})
+		require.Nil(t, err)
 
-	}
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-// Common utility structures and functions:
-
-// Standard warmup teams for tests in this module:
-var standardWarmupTeamsForNamespaceMemberships = []models.Team{
-	{
-		Name:        "team-a",
-		Description: "team a for namespace membership tests",
-	},
-	{
-		Name:        "team-b",
-		Description: "team b for namespace membership tests",
-	},
-	{
-		Name:        "team-c",
-		Description: "team c for namespace membership tests",
-	},
-	{
-		Name:        "team-99",
-		Description: "team 99 for namespace membership tests",
-	},
-}
-
-// Standard warmup users for tests in this module:
-// Please note: all users are _NON_-admin.
-var standardWarmupUsersForNamespaceMemberships = []models.User{
-	{
-		Username: "user-0",
-		Email:    "user-0@example.com",
-	},
-	{
-		Username: "user-1",
-		Email:    "user-1@example.com",
-	},
-	{
-		Username: "user-2",
-		Email:    "user-2@example.com",
-	},
-	{
-		Username: "user-team-a",
-		Email:    "user-3@example.com",
-	},
-	{
-		Username: "user-team-b",
-		Email:    "user-4@example.com",
-	},
-	{
-		Username: "user-team-c",
-		Email:    "user-5@example.com",
-	},
-	{
-		Username: "user-99",
-		Email:    "user-99@example.com",
-	},
-}
-
-// Standard warmup team member relationships for tests in this module:
-// Please note that the ID fields contain names, not IDs.
-var standardWarmupTeamMembersForNamespaceMemberships = []models.TeamMember{
-	{
-		UserID: "user-team-a",
-		TeamID: "team-a",
-	},
-	{
-		UserID: "user-team-b",
-		TeamID: "team-b",
-	},
-	{
-		UserID: "user-team-c",
-		TeamID: "team-c",
-	},
-}
-
-// Standard warmup groups for tests in this module:
-// These groups are in a linear chain of descent.
-// The create function will derive the parent path and name from the namespace path.
-var standardWarmupGroupsForNamespaceMemberships = []models.Group{
-	{
-		Description: "top level group for testing namespace membership functions",
-		FullPath:    "group-a",
-		CreatedBy:   "someone-1",
-	},
-	{
-		Description: "second level group for testing namespace membership functions",
-		FullPath:    "group-a/group-b",
-		CreatedBy:   "someone-2",
-	},
-	{
-		Description: "third level group for testing namespace membership functions",
-		FullPath:    "group-a/group-b/group-c",
-		CreatedBy:   "someone-3",
-	},
-	{
-		Description: "orphaned top-level group for testing namespace membership functions",
-		FullPath:    "group-99",
-		CreatedBy:   "someone-99",
-	},
-}
-
-// Standard warmup service accounts for tests in this module:
-// Please note: the GroupID field here contains the group _FULL_PATH_, not the _ID_.
-var standardWarmupServiceAccountsForNamespaceMemberships = []models.ServiceAccount{
-	{
-		Name:        "sa-0",
-		Description: "service account 0 for namespace membership tests",
-		GroupID:     "group-a",
-		CreatedBy:   "someone-0",
-	},
-	{
-		Name:        "sa-1",
-		Description: "service account 1 for namespace membership tests",
-		GroupID:     "group-a/group-b",
-		CreatedBy:   "someone-1",
-	},
-	{
-		Name:        "sa-2",
-		Description: "service account 2 for namespace membership tests",
-		GroupID:     "group-a/group-b/group-c",
-		CreatedBy:   "someone-2",
-	},
-	{
-		Name:        "sa-99",
-		Description: "service account 99 for namespace membership tests",
-		GroupID:     "group-99",
-		CreatedBy:   "nobody",
-	},
-}
-
-// Standard warmup workspaces for tests in this module:
-// The create function will derive the group ID and name from the namespace path.
-var standardWarmupWorkspacesForNamespaceMemberships = []models.Workspace{
-	{
-		Description: "workspace a1 for testing namespace membership functions",
-		FullPath:    "group-a/workspace-a1",
-		CreatedBy:   "someone-1",
-	},
-	{
-		Description: "workspace b2 for testing namespace membership functions",
-		FullPath:    "group-a/group-b/workspace-b2",
-		CreatedBy:   "someone-2",
-	},
-	{
-		Description: "workspace c3 for testing namespace membership functions",
-		FullPath:    "group-a/group-b/group-c/workspace-c3",
-		CreatedBy:   "someone-3",
-	},
-	{
-		Description: "workspace 99 for testing namespace membership functions",
-		FullPath:    "group-a/workspace-99",
-		CreatedBy:   "someone-99",
-	},
-}
-
-// Standard warmup namespace memberships for tests in this module:
-// In this variable, the ID field is the user, service account, and team _NAME_, NOT the ID.
-var standardWarmupNamespaceMemberships = []CreateNamespaceMembershipInput{
-	// Teams are given group memberships straight across: team X to group X; abc.
-	{
-		NamespacePath: "group-a",
-		TeamID:        ptr.String("team-a"),
-		RoleID:        "role-a",
-	},
-	{
-		NamespacePath: "group-a/group-b",
-		TeamID:        ptr.String("team-b"),
-		RoleID:        "role-b",
-	},
-	{
-		NamespacePath: "group-a/group-b/group-c",
-		TeamID:        ptr.String("team-c"),
-		RoleID:        "role-c",
-	},
-
-	// Users are given group memberships rotated by one slot; bca.
-	{
-		NamespacePath: "group-a/group-b",
-		UserID:        ptr.String("user-0"),
-		RoleID:        "role-b",
-	},
-	{
-		NamespacePath: "group-a/group-b/group-c",
-		UserID:        ptr.String("user-1"),
-		RoleID:        "role-c",
-	},
-	{
-		NamespacePath: "group-a",
-		UserID:        ptr.String("user-2"),
-		RoleID:        "role-a",
-	},
-
-	// Service accounts are given group memberships rotated by two slots (or back by one); cab.
-	{
-		NamespacePath:    "group-a/group-b/group-c",
-		ServiceAccountID: ptr.String("sa-0"),
-		RoleID:           "role-c",
-	},
-	{
-		NamespacePath:    "group-a",
-		ServiceAccountID: ptr.String("sa-1"),
-		RoleID:           "role-a",
-	},
-	{
-		NamespacePath:    "group-a/group-b",
-		ServiceAccountID: ptr.String("sa-2"),
-		RoleID:           "role-b",
-	},
-
-	// Teams are given workspace memberships rotated by one slot; bca.
-	{
-		NamespacePath: "group-a/group-b/workspace-b2",
-		TeamID:        ptr.String("team-a"),
-		RoleID:        "role-b",
-	},
-	{
-		NamespacePath: "group-a/group-b/group-c/workspace-c3",
-		TeamID:        ptr.String("team-b"),
-		RoleID:        "role-c",
-	},
-	{
-		NamespacePath: "group-a/workspace-a1",
-		TeamID:        ptr.String("team-c"),
-		RoleID:        "role-a",
-	},
-
-	// Users are given workspace memberships rotated by two slots (or back by one); cab.
-	{
-		NamespacePath: "group-a/group-b/group-c/workspace-c3",
-		UserID:        ptr.String("user-0"),
-		RoleID:        "role-c",
-	},
-	{
-		NamespacePath: "group-a/workspace-a1",
-		UserID:        ptr.String("user-1"),
-		RoleID:        "role-a",
-	},
-	{
-		NamespacePath: "group-a/group-b/workspace-b2",
-		UserID:        ptr.String("user-2"),
-		RoleID:        "role-b",
-	},
-
-	// Service accounts are given workspace memberships straight across; abc.
-	{
-		NamespacePath:    "group-a/workspace-a1",
-		ServiceAccountID: ptr.String("sa-0"),
-		RoleID:           "role-a",
-	},
-	{
-		NamespacePath:    "group-a/group-b/workspace-b2",
-		ServiceAccountID: ptr.String("sa-1"),
-		RoleID:           "role-b",
-	},
-	{
-		NamespacePath:    "group-a/group-b/group-c/workspace-c3",
-		ServiceAccountID: ptr.String("sa-2"),
-		RoleID:           "role-c",
-	},
-}
-
-// Standard warmup roles for tests in this module:
-var standardWarmupRolesForNamespaceMemberships = []models.Role{
-	{
-		Name:        "role-a",
-		Description: "role a for namespace membership tests",
-		CreatedBy:   "someone-a",
-	},
-	{
-		Name:        "role-b",
-		Description: "role b for namespace membership tests",
-		CreatedBy:   "someone-b",
-	},
-	{
-		Name:        "role-c",
-		Description: "role c for namespace membership tests",
-		CreatedBy:   "someone-c",
-	},
-}
-
-// createWarmupNamespaceMemberships creates some objects for a test
-// The objects to create can be standard or otherwise.
-//
-// NOTE: Due to the need to supply the parent ID for non-top-level groups,
-// any groups must be created in a top-down manner.
-func createWarmupNamespaceMemberships(ctx context.Context, testClient *testClient,
-	input namespaceMembershipWarmupsInput,
-) (*namespaceMembershipWarmupsOutput, error) {
-	resultTeams, teamName2ID, err := createInitialTeams(ctx, testClient, input.teams)
-	if err != nil {
-		return nil, err
-	}
-
-	resultUsers, username2ID, err := createInitialUsers(ctx, testClient, input.users)
-	if err != nil {
-		return nil, err
-	}
-
-	resultTeamMembers, err := createInitialTeamMembers(ctx, testClient, teamName2ID, username2ID, input.teamMembers)
-	if err != nil {
-		return nil, err
-	}
-
-	resultGroups, groupPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
-	if err != nil {
-		return nil, err
-	}
-
-	resultServiceAccounts, serviceAccountName2ID, err := createInitialServiceAccounts(ctx, testClient,
-		groupPath2ID, input.serviceAccounts)
-	if err != nil {
-		return nil, err
-	}
-
-	resultWorkspaces, err := createInitialWorkspaces(ctx, testClient, groupPath2ID, input.workspaces)
-	if err != nil {
-		return nil, err
-	}
-
-	resultRoles, roleName2ID, err := createInitialRoles(ctx, testClient, input.roles)
-	if err != nil {
-		return nil, err
-	}
-
-	resultNamespaceMemberships, err := createInitialNamespaceMemberships(ctx, testClient,
-		teamName2ID, username2ID, groupPath2ID, serviceAccountName2ID, roleName2ID, input.namespaceMemberships)
-	if err != nil {
-		return nil, err
-	}
-
-	return &namespaceMembershipWarmupsOutput{
-		teams:                resultTeams,
-		users:                resultUsers,
-		teamMembers:          resultTeamMembers,
-		groups:               resultGroups,
-		serviceAccounts:      resultServiceAccounts,
-		workspaces:           resultWorkspaces,
-		namespaceMemberships: resultNamespaceMemberships,
-		roles:                resultRoles,
-		holderIDs2Name: holderIDs2Name{
-			userIDs2Name:           reverseMap(username2ID),
-			serviceAccountIDs2Name: reverseMap(serviceAccountName2ID),
-			teamIDs2Name:           reverseMap(teamName2ID),
-		},
-	}, nil
-}
-
-// reverseMap returns a map that does the inverse mapping of the input.
-// Because names and IDs are unique within a given domain, collisions are not possible.
-func reverseMap(input map[string]string) map[string]string {
-	result := make(map[string]string)
-	for name, id := range input {
-		result[id] = name
-	}
-	return result
-}
-
-func ptrNamespaceMembershipSortableField(arg NamespaceMembershipSortableField) *NamespaceMembershipSortableField {
-	return &arg
-}
-
-func (nss namespaceMembershipInfoPathSlice) Len() int {
-	return len(nss)
-}
-
-func (nss namespaceMembershipInfoPathSlice) Swap(i, j int) {
-	nss[i], nss[j] = nss[j], nss[i]
-}
-
-func (nss namespaceMembershipInfoPathSlice) Less(i, j int) bool {
-	return nss[i].namespacePath < nss[j].namespacePath
-}
-
-func (nss namespaceMembershipInfoTimeSlice) Len() int {
-	return len(nss)
-}
-
-func (nss namespaceMembershipInfoTimeSlice) Swap(i, j int) {
-	nss[i], nss[j] = nss[j], nss[i]
-}
-
-func (nss namespaceMembershipInfoTimeSlice) Less(i, j int) bool {
-	return nss[i].updateTime.Before(nss[j].updateTime)
-}
-
-// namespaceMembershipInfoFromNamespaceMemberships returns a slice of namespaceMembershipInfo,
-// not necessarily sorted in any order.
-func namespaceMembershipInfoFromNamespaceMemberships(holderIDs2Name holderIDs2Name,
-	namespaceMemberships []models.NamespaceMembership,
-) []namespaceMembershipInfo {
-	result := []namespaceMembershipInfo{}
-
-	for _, namespaceMembership := range namespaceMemberships {
-
-		var holder string
-		switch {
-		case namespaceMembership.UserID != nil:
-			holder = holderIDs2Name.userIDs2Name[*namespaceMembership.UserID]
-		case namespaceMembership.ServiceAccountID != nil:
-			holder = holderIDs2Name.serviceAccountIDs2Name[*namespaceMembership.ServiceAccountID]
-		case namespaceMembership.TeamID != nil:
-			holder = holderIDs2Name.teamIDs2Name[*namespaceMembership.TeamID]
-		}
-
-		result = append(result, namespaceMembershipInfo{
-			namespacePath:         namespaceMembership.Namespace.Path,
-			namespaceMembershipID: namespaceMembership.Metadata.ID,
-			holder:                holder,
-			role:                  namespaceMembership.RoleID,
-			updateTime:            *namespaceMembership.Metadata.LastUpdatedTimestamp,
+		_, err = testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+			NamespacePath: workspace.FullPath,
+			UserID:        &user.Metadata.ID,
+			RoleID:        role.Metadata.ID,
 		})
+		require.Nil(t, err)
 	}
 
-	return result
-}
-
-/*
-trailsFromNamespaceMembershipInfo preserves order to a point but not beyond.
-
-Results from GetNamespaceMemberships are sorted by namespace path but _NOT_ by holder or role.
-In order to conveniently compare lists of namespace memberships, it is necessary to sort the
-namespace membership trails within the same namespace path.
-
-If sortedDescending is true, the trails within a given namespace path are sorted in descending order.
-*/
-func trailsFromNamespaceMembershipInfo(namespaceMembershipInfos []namespaceMembershipInfo,
-	sortedDescending bool,
-) []string {
-	result := []string{}
-
-	sameNamespace := []string{}
-	thisNamespacePath := ""
-	for _, namespaceMembershipInfo := range namespaceMembershipInfos {
-		thisTrail := buildTrail(namespaceMembershipInfo)
-
-		if (len(sameNamespace) > 0) && (namespaceMembershipInfo.namespacePath != thisNamespacePath) {
-			// A change of namespace: sort and flush the old sameNamespace.
-			sort.Strings(sameNamespace)
-			if sortedDescending {
-				sameNamespace = reverseStringSlice(sameNamespace)
-			}
-			result = append(result, sameNamespace...)
-			sameNamespace = []string{}
-		}
-
-		// Record the new entry, alone or in same namespace as those before it.
-		sameNamespace = append(sameNamespace, thisTrail)
-		thisNamespacePath = namespaceMembershipInfo.namespacePath
-
+	sortableFields := []sortableField{
+		NamespaceMembershipSortableFieldNamespacePathAsc,
+		NamespaceMembershipSortableFieldNamespacePathDesc,
+		NamespaceMembershipSortableFieldUpdatedAtAsc,
+		NamespaceMembershipSortableFieldUpdatedAtDesc,
 	}
 
-	// Flush the final contents of sameNamespace to result.
-	sort.Strings(sameNamespace)
-	if sortedDescending {
-		sameNamespace = reverseStringSlice(sameNamespace)
-	}
-	result = append(result, sameNamespace...)
+	testResourcePaginationAndSorting(ctx, t, resourceCount, sortableFields, func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error) {
+		sortBy := NamespaceMembershipSortableField(sortByField.getValue())
 
-	return result
-}
-
-// buildTrail constructs the trail for a namespaceMembership
-func buildTrail(input namespaceMembershipInfo) string {
-	return (input.namespacePath + "--" + input.holder + "--" + input.role)
-}
-
-// Compare two namespace membership objects, including bounds for creation and updated times.
-func compareNamespaceMemberships(t *testing.T, expected, actual *models.NamespaceMembership,
-	checkID bool, times timeBounds,
-) {
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
-	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-
-	// Compare timestamps.
-	compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-	compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-
-	assert.Equal(t, expected.RoleID, actual.RoleID)
-
-	assert.NotNil(t, expected.Namespace.ID, actual.Namespace.ID)
-	assert.Equal(t, expected.Namespace.Path, actual.Namespace.Path)
-	assert.NotEmpty(t, actual.Metadata.TRN)
-
-	assert.Equal(t, (expected.Namespace.GroupID == nil), (actual.Namespace.GroupID == nil))
-	if (expected.Namespace.GroupID != nil) && (actual.Namespace.GroupID != nil) {
-		assert.Equal(t, *expected.Namespace.GroupID, *actual.Namespace.GroupID)
-	}
-
-	assert.Equal(t, (expected.Namespace.WorkspaceID == nil), (actual.Namespace.WorkspaceID == nil))
-	if (expected.Namespace.WorkspaceID != nil) && (actual.Namespace.WorkspaceID != nil) {
-		assert.Equal(t, *expected.Namespace.WorkspaceID, *actual.Namespace.WorkspaceID)
-	}
-
-	assert.Equal(t, (expected.UserID == nil), (actual.UserID == nil))
-	if (expected.UserID != nil) && (actual.UserID != nil) {
-		assert.Equal(t, *expected.UserID, *actual.UserID)
-	}
-
-	assert.Equal(t, (expected.ServiceAccountID == nil), (actual.ServiceAccountID == nil))
-	if (expected.ServiceAccountID != nil) && (actual.ServiceAccountID != nil) {
-		assert.Equal(t, *expected.ServiceAccountID, *actual.ServiceAccountID)
-	}
-
-	assert.Equal(t, (expected.TeamID == nil), (actual.TeamID == nil))
-	if (expected.TeamID != nil) && (actual.TeamID != nil) {
-		assert.Equal(t, *expected.TeamID, *actual.TeamID)
-	}
-}
-
-// findMatchingTrails returns a slice of strings that contain the specified substring
-func findMatchingTrails(allTrails []string, s string) []string {
-	result := []string{}
-	for _, candidate := range allTrails {
-		if strings.Contains(candidate, s) {
-			result = append(result, candidate)
-		}
-	}
-
-	return result
-}
-
-// findUserIDFromName returns the matching user ID for the specified name.
-func findUserIDFromName(users []models.User, nm string) string {
-	for _, user := range users {
-		if user.Username == nm {
-			return user.Metadata.ID
-		}
-	}
-	return ""
-}
-
-// findServiceAccountIDFromName returns the matching service account ID for the specified name.
-func findServiceAccountIDFromName(serviceAccounts []models.ServiceAccount, nm string) string {
-	for _, serviceAccount := range serviceAccounts {
-		if serviceAccount.Name == nm {
-			return serviceAccount.Metadata.ID
-		}
-	}
-	return ""
-}
-
-// findTeamIDFromName returns the matching team ID for the specified name.
-func findTeamIDFromName(teams []models.Team, nm string) string {
-	for _, team := range teams {
-		if team.Name == nm {
-			return team.Metadata.ID
-		}
-	}
-	return ""
-}
-
-// findGroupIDFromName returns the matching group ID for the specified name.
-func findGroupIDFromName(groups []models.Group, nm string) string {
-	for _, group := range groups {
-		if group.Name == nm {
-			return group.Metadata.ID
-		}
-	}
-	return ""
-}
-
-// findWorkspaceIDFromName returns the matching workspace ID for the specified name.
-func findWorkspaceIDFromName(workspaces []models.Workspace, nm string) string {
-	for _, workspace := range workspaces {
-		if workspace.Name == nm {
-			return workspace.Metadata.ID
-		}
-	}
-	return ""
-}
-
-// rotateRole returns a different role from what was passed in.
-// If other modules need this function, move it to dbclient_test.
-func rotateRole(input string, roles []models.Role) string {
-	switch {
-	case input == roles[0].Metadata.ID:
-		return roles[1].Metadata.ID
-	case input == roles[1].Metadata.ID:
-		return roles[2].Metadata.ID
-	case input == roles[2].Metadata.ID:
-		return roles[0].Metadata.ID
-	}
-
-	// Keep the compiler happy, even if it cannot happen.
-	return roles[0].Metadata.ID
-}
-
-// createInitialRoles creates initial roles for testing
-func createInitialRoles(ctx context.Context, testClient *testClient, roles []models.Role) ([]models.Role, map[string]string, error) {
-	resultRoles := []models.Role{}
-	roleName2ID := make(map[string]string)
-
-	for _, role := range roles {
-		createdRole, err := testClient.client.Roles.CreateRole(ctx, &role)
+		result, err := testClient.client.NamespaceMemberships.GetNamespaceMemberships(ctx, &GetNamespaceMembershipsInput{
+			Sort:              &sortBy,
+			PaginationOptions: paginationOptions,
+		})
 		if err != nil {
 			return nil, nil, err
 		}
-		resultRoles = append(resultRoles, *createdRole)
-		roleName2ID[role.Name] = createdRole.Metadata.ID
-	}
 
-	return resultRoles, roleName2ID, nil
+		resources := []pagination.CursorPaginatable{}
+		for i := range result.NamespaceMemberships {
+			resources = append(resources, &result.NamespaceMemberships[i])
+		}
+
+		return result.PageInfo, resources, nil
+	})
 }
