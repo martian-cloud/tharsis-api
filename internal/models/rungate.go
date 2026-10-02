@@ -99,11 +99,20 @@ type RunGate struct {
 // decision rather than adding a second — but de-duplicating here too means a stray duplicate row can
 // never inflate a rule past its ceiling and clear a gate that should still be waiting.
 func (g *RunGate) Satisfied(approvals []RunGateApproval) bool {
-	for i := range g.ApprovalRules {
-		rule := g.ApprovalRules[i]
-		if rule.RequiredApprovals <= 0 {
-			continue
+	counts := g.ApprovalCounts(approvals)
+	for _, rule := range g.ApprovalRules {
+		if rule.RequiredApprovals > 0 && counts[rule.Name] < rule.RequiredApprovals {
+			return false
 		}
+	}
+	return true
+}
+
+// ApprovalCounts returns, per approval rule name, the number of distinct principals whose approve
+// decision covers that rule. Reject decisions never count. Every rule on the gate has an entry.
+func (g *RunGate) ApprovalCounts(approvals []RunGateApproval) map[string]int {
+	counts := make(map[string]int, len(g.ApprovalRules))
+	for _, rule := range g.ApprovalRules {
 		approvers := make(map[string]struct{})
 		for j := range approvals {
 			a := &approvals[j]
@@ -117,11 +126,9 @@ func (g *RunGate) Satisfied(approvals []RunGateApproval) bool {
 				}
 			}
 		}
-		if len(approvers) < rule.RequiredApprovals {
-			return false
-		}
+		counts[rule.Name] = len(approvers)
 	}
-	return true
+	return counts
 }
 
 // GetID returns the Metadata ID.

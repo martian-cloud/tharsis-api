@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Box, Collapse } from '@mui/material';
+import { Box } from '@mui/material';
 import LoadingButton from '@mui/lab/LoadingButton';
 import { MutationError } from '../../common/error';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { useSnackbar } from 'notistack';
-import SettingsToggleButton from '../../common/SettingsToggleButton';
+import SettingsSection from '../../common/SettingsSection';
 import graphql from 'babel-plugin-relay/macro';
 import { GroupProviderMirrorSettingsFragment_group$key } from './__generated__/GroupProviderMirrorSettingsFragment_group.graphql';
 import { GroupProviderMirrorSettingsMutation } from './__generated__/GroupProviderMirrorSettingsMutation.graphql';
@@ -16,7 +16,6 @@ interface Props {
 
 function GroupProviderMirrorSettings({ fragmentRef }: Props) {
     const { enqueueSnackbar } = useSnackbar();
-    const [showSettings, setShowSettings] = useState<boolean>(false);
     const [error, setError] = useState<MutationError>();
 
     const data = useFragment<GroupProviderMirrorSettingsFragment_group$key>(
@@ -96,16 +95,7 @@ function GroupProviderMirrorSettings({ fragmentRef }: Props) {
 
     return (
         <Box>
-            <SettingsToggleButton
-                title="Provider Mirror Settings"
-                showSettings={showSettings}
-                onToggle={() => setShowSettings(!showSettings)}
-            />
-            <Collapse
-                in={showSettings}
-                timeout="auto"
-                unmountOnExit
-            >
+            <SettingsSection section="provider-mirror" title="Provider Mirror Settings">
                 <ProviderMirrorSettingsForm
                     formData={formData}
                     onChange={(data) => setFormData(data)}
@@ -126,7 +116,7 @@ function GroupProviderMirrorSettings({ fragmentRef }: Props) {
                         Save changes
                     </LoadingButton>
                 </Box>
-            </Collapse>
+            </SettingsSection>
         </Box>
     );
 }

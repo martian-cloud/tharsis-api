@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
-import { Alert, Box, Button, Collapse } from '@mui/material'
+import { Alert, Box, Button } from '@mui/material'
 import { MutationError } from '../../common/error';
 import MaxJobDurationSetting from './MaxJobDurationSetting'
 import TerraformCLIVersionSetting from './TerraformCLIVersionSetting'
 import PreventDestroyRunSetting from './PreventDestroyRunSetting'
 import { useFragment, useMutation } from 'react-relay'
 import { useSnackbar } from 'notistack';
-import SettingsToggleButton from '../../common/SettingsToggleButton';
+import SettingsSection from '../../common/SettingsSection';
 import graphql from 'babel-plugin-relay/macro'
 import { WorkspaceRunSettingsFragment_workspace$key } from './__generated__/WorkspaceRunSettingsFragment_workspace.graphql'
 import { WorkspaceRunSettingsUpdateMutation } from './__generated__/WorkspaceRunSettingsUpdateMutation.graphql'
@@ -23,7 +23,6 @@ interface RunSettings {
 
 function WorkspaceRunSettings(props: Props) {
     const { enqueueSnackbar } = useSnackbar();
-    const [showSettings, setShowSettings] = useState<boolean>(false);
 
     const data = useFragment(
         graphql`
@@ -122,15 +121,7 @@ function WorkspaceRunSettings(props: Props) {
             {error && <Alert sx={{ mb: 2 }} severity={error.severity}>
                 {error.message}
             </Alert>}
-            <SettingsToggleButton
-                title="Run Settings"
-                showSettings={showSettings}
-                onToggle={() => setShowSettings(!showSettings)}
-            />
-            <Collapse
-                in={showSettings}
-                timeout="auto"
-            >
+            <SettingsSection section="runs" title="Run Settings" unmountOnExit={false}>
                 <Box>
                     <MaxJobDurationSetting
                         fragmentRef={data}
@@ -163,7 +154,7 @@ function WorkspaceRunSettings(props: Props) {
                         </Button>
                     </Box>
                 </Box>
-            </Collapse>
+            </SettingsSection>
         </Box>
     );
 }

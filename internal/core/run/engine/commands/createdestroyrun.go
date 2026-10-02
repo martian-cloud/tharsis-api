@@ -18,6 +18,7 @@ import (
 type CreateDestroyRunInput struct {
 	Subject     string
 	WorkspaceID string
+	AutoApply   bool
 }
 
 // CreateDestroyRun creates a destroy run from the workspace's current state,
@@ -77,6 +78,7 @@ func (c *CreateDestroyRun) Prepare(ctx context.Context) error {
 		ModuleRegistrySource:    resolvedModule.Source,
 		TerraformVersion:        source.TerraformVersion,
 		IsDestroy:               true,
+		AutoApply:               c.in.AutoApply,
 		Refresh:                 true,
 		VariablesObjectStoreKey: variablesObjectKey,
 	}

@@ -1096,6 +1096,11 @@ func (s *service) GetStateVersionInventory(ctx context.Context, stateVersion *mo
 	// Extract check results
 	checkResults := []*corerun.CheckResult{}
 	for _, cr := range state.CheckResults {
+		// Exclude variable check results
+		if cr.ObjectKind == "var" {
+			continue
+		}
+
 		objects := []corerun.CheckResultObject{}
 		for _, obj := range cr.Objects {
 			objects = append(objects, corerun.CheckResultObject{

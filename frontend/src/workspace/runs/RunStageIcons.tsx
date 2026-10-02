@@ -8,6 +8,7 @@ import RunStageStatusTypes from './RunStageStatusTypes';
 import { STATUS_MAP } from './RunStatusChip';
 import { RunStageIconsFragment_run$key } from './__generated__/RunStageIconsFragment_run.graphql';
 import { taskStagePath } from './runStageNavigation';
+import { buildRunStages, countCompletedStages } from './runStages';
 
 const ADVISORY_FAILURES_TOOLTIP = "One or more advisory policies failed.";
 
@@ -18,11 +19,6 @@ interface Props {
 const IDLE_STATUSES = new Set([
     'created', 'pending', 'queued', 'plan_queued', 'apply_queued',
     'plan_queuing', 'apply_queuing', 'pre_plan_queuing', 'pre_apply_queuing',
-]);
-
-const SUCCESS_STATUSES = new Set([
-    // 'completed' is the task stage aggregate success status; the rest are plan/apply statuses.
-    'finished', 'applied', 'planned_and_finished', 'completed',
 ]);
 
 const RUNNING_STATUSES = new Set([
@@ -58,23 +54,11 @@ function RunStageIcons({ fragmentRef }: Props) {
 
     const runPath = `/groups/${data.workspace.fullPath}/-/runs/${data.id}`;
     const runStatusLabel = STATUS_MAP[data.status]?.label?.toLowerCase() || 'unknown';
-    const stages = useMemo(() => {
-        const s = [];
-        // A pre-plan policy stage runs BEFORE the plan, so it leads the bar when present.
-        const prePlan = data.taskStages.find(t => t.stageName === 'PRE_PLAN');
-        if (prePlan) s.push({ name: 'Pre-Plan', status: prePlan.status, path: `${runPath}/${taskStagePath(prePlan.stageName)}` });
-        s.push({ name: 'Plan', status: data.plan.status, path: `${runPath}/plan` });
-        const postPlan = data.taskStages.find(t => t.stageName === 'POST_PLAN');
-        if (postPlan) s.push({ name: 'Post-Plan', status: postPlan.status, path: `${runPath}/${taskStagePath(postPlan.stageName)}` });
-        const preApply = data.taskStages.find(t => t.stageName === 'PRE_APPLY');
-        if (preApply) s.push({ name: 'Pre-Apply', status: preApply.status, path: `${runPath}/${taskStagePath(preApply.stageName)}` });
-        // A speculative run has no apply at all, which is what makes the segment conditional rather
-        // than the apply's status.
-        if (data.apply) s.push({ name: 'Apply', status: data.apply.status, path: `${runPath}/apply` });
-        const postApply = data.taskStages.find(t => t.stageName === 'POST_APPLY');
-        if (postApply) s.push({ name: 'Post-Apply', status: postApply.status, path: `${runPath}/${taskStagePath(postApply.stageName)}` });
-        return s;
-    }, [data, runPath]);
+    // Every stage has its own route, named after the stage key lowercased ('PRE_PLAN' -> 'pre_plan').
+    const stages = useMemo(() => buildRunStages(data).map(stage => ({
+        ...stage,
+        path: `${runPath}/${taskStagePath(stage.key)}`,
+    })), [data, runPath]);
 
     const activeIndex = useMemo(() => {
         let ai = 0;
@@ -84,7 +68,7 @@ function RunStageIcons({ fragmentRef }: Props) {
 
     const activeStage = stages[activeIndex];
     const activeInfo = RunStageStatusTypes[activeStage.status.toLowerCase()] ?? RunStageStatusTypes.created;
-    const successCount = stages.filter(s => SUCCESS_STATUSES.has(s.status.toLowerCase())).length;
+    const successCount = countCompletedStages(stages);
 
     // The dot, the status word, and the advisory glyph read as one unit, so they are grouped and
     // hovered as one — matching RunStatusChip, where the tooltip covers the whole chip rather than

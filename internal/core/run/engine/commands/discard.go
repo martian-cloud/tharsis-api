@@ -21,9 +21,9 @@ type DiscardRunInput struct {
 	SkipActivityEvent bool
 }
 
-// DiscardRun discards a planned run, moving it to the terminal discarded status (and,
-// unless suppressed, recording a discard activity event) in a single transaction. A run
-// can only be discarded while it is in the planned state (enforced by Execute).
+// DiscardRun discards a run, moving it to the terminal discarded status (and, unless
+// suppressed, recording a discard activity event) in a single transaction. A run can only
+// be discarded while it is planned or awaiting a policy override (enforced by Execute).
 type DiscardRun struct {
 	dbClient *db.Client
 	in       *DiscardRunInput
@@ -63,7 +63,7 @@ func (c *DiscardRun) Prepare(ctx context.Context) error {
 	return nil
 }
 
-// Execute discards the run, validating it is in the planned state, and records the
+// Execute discards the run, validating it is planned or awaiting a policy override, and records the
 // activity event. The state machine performs the transition to discarded (marking the
 // never-started apply node skipped).
 func (c *DiscardRun) Execute(ctx context.Context, input *types.ExecuteInput) error {
@@ -73,15 +73,16 @@ func (c *DiscardRun) Execute(ctx context.Context, input *types.ExecuteInput) err
 	}
 
 	// A run can be discarded when it is parked at planned, or when it is blocked awaiting a policy
-	// override at either the pre-plan or post-plan stage — all are states where the run is waiting on
-	// a human decision and discarding is the way to abandon it. Setting the run to discarded fires the
+	// override at the pre-plan, post-plan or pre-apply stage — all are states where the run is waiting
+	// on a human decision and discarding is the way to abandon it. Setting the run to discarded fires the
 	// state machine's handleRunTerminated listener, which skips every node that never started (the
 	// unstarted plan/apply and any not-yet-run stage) and cancels the gate the run was blocked at —
 	// its stage and the checks under it — so nothing is left reporting a decision the discard just
 	// abandoned. An undiscard revives the run by re-running that gate.
 	if run.Status != models.RunPlanned &&
 		run.Status != models.RunPrePlanAwaitingDecision &&
-		run.Status != models.RunPostPlanAwaitingDecision {
+		run.Status != models.RunPostPlanAwaitingDecision &&
+		run.Status != models.RunPreApplyAwaitingDecision {
 		return errors.New("run can only be discarded when it is in the planned state or awaiting a policy override", errors.WithErrorCode(errors.EConflict))
 	}
 

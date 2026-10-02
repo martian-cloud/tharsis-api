@@ -19,7 +19,7 @@ function RunDetailsStageStatusCard({ icon, title, durationMs, description, actio
     const theme = useTheme();
 
     return (
-        <Paper variant="outlined" sx={{ marginBottom: 2, p: 2 }}>
+        <Paper sx={{ marginBottom: 2, p: 2 }}>
             <Box sx={{
                 display: 'flex',
                 flexDirection: 'row',

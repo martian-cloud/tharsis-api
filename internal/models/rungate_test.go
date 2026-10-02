@@ -97,6 +97,67 @@ func TestRunGate_Satisfied(t *testing.T) {
 	}
 }
 
+func TestRunGate_ApprovalCounts(t *testing.T) {
+	sa := "sa1"
+	tests := []struct {
+		name      string
+		rules     []*RunGateApprovalRule
+		approvals []RunGateApproval
+		want      map[string]int
+	}{
+		{
+			name:  "no rules has no counts",
+			rules: nil,
+			want:  map[string]int{},
+		},
+		{
+			name: "every rule has an entry even without approvals",
+			rules: []*RunGateApprovalRule{
+				{Name: "p1", RequiredApprovals: 1},
+				{Name: "p2", RequiredApprovals: 2},
+			},
+			want: map[string]int{"p1": 0, "p2": 0},
+		},
+		{
+			name:  "duplicate approvals from the same principal count once",
+			rules: []*RunGateApprovalRule{{Name: "p1", RequiredApprovals: 2}},
+			approvals: []RunGateApproval{
+				approval("u1", RunGateDecisionApprove, "p1"),
+				approval("u1", RunGateDecisionApprove, "p1"),
+			},
+			want: map[string]int{"p1": 1},
+		},
+		{
+			name:  "reject decisions never count",
+			rules: []*RunGateApprovalRule{{Name: "p1", RequiredApprovals: 1}},
+			approvals: []RunGateApproval{
+				approval("u1", RunGateDecisionReject, "p1"),
+			},
+			want: map[string]int{"p1": 0},
+		},
+		{
+			name: "approvals are counted per covered rule",
+			rules: []*RunGateApprovalRule{
+				{Name: "p1", RequiredApprovals: 2},
+				{Name: "p2", RequiredApprovals: 2},
+			},
+			approvals: []RunGateApproval{
+				approval("u1", RunGateDecisionApprove, "p1", "p2"),
+				approval("u2", RunGateDecisionApprove, "p1"),
+				{ServiceAccountID: &sa, Decision: RunGateDecisionApprove, CoveredRules: []string{"p2"}},
+			},
+			want: map[string]int{"p1": 2, "p2": 2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gate := &RunGate{ApprovalRules: tt.rules}
+			assert.Equal(t, tt.want, gate.ApprovalCounts(tt.approvals))
+		})
+	}
+}
+
 func TestRunGate_Validate(t *testing.T) {
 	valid := func(mutate func(*RunGate)) *RunGate {
 		g := &RunGate{

@@ -189,6 +189,42 @@ func TestUndiscard_RerunsPrePlanGate(t *testing.T) {
 	assert.Equal(t, models.PlanPending, r.Plan.Status)
 }
 
+// TestUndiscard_RerunsPreApplyGate verifies that a run discarded while blocked at its pre-apply gate
+// cancels that gate, leaves the finished plan alone, and that undiscard re-runs the gate.
+func TestUndiscard_RerunsPreApplyGate(t *testing.T) {
+	r := &models.Run{
+		Metadata: models.ResourceMetadata{ID: "run-1"},
+		Status:   models.RunPreApplyAwaitingDecision,
+		Plan:     models.Plan{ID: "plan-1", Status: models.PlanFinished, HasChanges: true},
+		Apply:    &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+		TaskStages: []*models.RunTaskStage{
+			{ID: "stage-pre-apply", StageName: models.RunTaskStageNamePreApply, Status: models.RunTaskStageAwaitingOverride, PolicyChecks: []*models.PolicyCheck{
+				{ID: "check-1", StageName: models.RunTaskStageNamePreApply, CheckType: models.PolicyKindOPA, Status: models.PolicyCheckSoftFailed},
+			}},
+		},
+	}
+
+	// Discard from the pre-apply awaiting-decision state: the abandoned gate is canceled and the
+	// unstarted apply is skipped, while the finished plan is untouched.
+	_, err := SetRunStatus(r, models.RunDiscarded)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunDiscarded, r.Status)
+	assert.Equal(t, models.RunTaskStageCanceled, r.TaskStages[0].Status, "the abandoned pre-apply gate stage is canceled")
+	assert.Equal(t, models.PolicyCheckCanceled, r.AllPolicyChecks()[0].Status, "the gate's check is canceled with it")
+	assert.Equal(t, models.PlanFinished, r.Plan.Status)
+	assert.Equal(t, models.ApplySkipped, r.Apply.Status)
+
+	// Undiscard re-runs the pre-apply gate and restores the skipped apply. The stage is gated, so it
+	// waits at pending for the slot rather than evaluating immediately.
+	_, err = UndiscardRun(r)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunPreApplyQueuing, r.Status)
+	assert.Equal(t, models.RunTaskStagePending, r.TaskStages[0].Status)
+	assert.Equal(t, models.PolicyCheckPending, r.AllPolicyChecks()[0].Status, "the check waits for re-admission before re-evaluating")
+	assert.Equal(t, models.PlanFinished, r.Plan.Status)
+	assert.Equal(t, models.ApplyCreated, r.Apply.Status)
+}
+
 // TestUndiscard_ClearedPostPlanGate verifies that a run discarded from planned after its post-plan
 // gate had already cleared (stage completed) undiscards back to planned: the completed stage is
 // preserved through discard and undiscard derives planned from it, restoring the apply.

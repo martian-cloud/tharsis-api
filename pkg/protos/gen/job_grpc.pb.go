@@ -58,7 +58,8 @@ type JobsClient interface {
 	SaveJobLogs(ctx context.Context, in *SaveJobLogsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ClaimJob claims the next available job for a runner.
 	ClaimJob(ctx context.Context, in *ClaimJobRequest, opts ...grpc.CallOption) (*ClaimJobResponse, error)
-	// JobDispatched records that a runner dispatched a job, carrying opaque dispatcher data and the resource limits the job runs under.
+	// JobDispatched records that a runner dispatched a job, carrying opaque dispatcher data and the resource limits the
+	// job runs under.
 	JobDispatched(ctx context.Context, in *JobDispatchedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ClaimJobsForCleanup leases final, dispatched jobs whose runtimes still need tearing down.
 	ClaimJobsForCleanup(ctx context.Context, in *ClaimJobsForCleanupRequest, opts ...grpc.CallOption) (*ClaimJobsForCleanupResponse, error)
@@ -269,7 +270,8 @@ type JobsServer interface {
 	SaveJobLogs(context.Context, *SaveJobLogsRequest) (*emptypb.Empty, error)
 	// ClaimJob claims the next available job for a runner.
 	ClaimJob(context.Context, *ClaimJobRequest) (*ClaimJobResponse, error)
-	// JobDispatched records that a runner dispatched a job, carrying opaque dispatcher data and the resource limits the job runs under.
+	// JobDispatched records that a runner dispatched a job, carrying opaque dispatcher data and the resource limits the
+	// job runs under.
 	JobDispatched(context.Context, *JobDispatchedRequest) (*emptypb.Empty, error)
 	// ClaimJobsForCleanup leases final, dispatched jobs whose runtimes still need tearing down.
 	ClaimJobsForCleanup(context.Context, *ClaimJobsForCleanupRequest) (*ClaimJobsForCleanupResponse, error)

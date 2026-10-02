@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Alert, Box, Button, Collapse, Dialog, DialogActions, DialogTitle, DialogContent, IconButton, Typography } from '@mui/material'
+import { Alert, Box, Button, Dialog, DialogActions, DialogTitle, DialogContent, IconButton, Typography } from '@mui/material'
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import { useFragment } from 'react-relay';
 import graphql from 'babel-plugin-relay/macro';
 import { Link as RouterLink } from 'react-router-dom';
-import SettingsToggleButton from '../../../common/SettingsToggleButton';
+import SettingsSection from '../../../common/SettingsSection';
 import EditVCSProviderLink from './EditVCSProviderLink';
 import NewVCSProviderLink from './NewVCSProviderLink';
 import { WorkspaceVCSProviderSettingsFragment_workspace$key } from './__generated__/WorkspaceVCSProviderSettingsFragment_workspace.graphql';
@@ -77,7 +77,6 @@ function WebhooksDialog(props: WebhooksDialogProps){
 function WorkspaceVCSProviderSettings({ fragmentRef }: Props) {
     const [webhookObj, setWebhookObj] = useState<WebhooksData | null>(null);
     const [openDialog, setOpenDialog] = useState<boolean>(false);
-    const [showSettings, setShowSettings] = useState<boolean>(false);
 
     const data = useFragment<WorkspaceVCSProviderSettingsFragment_workspace$key>(
         graphql`
@@ -112,16 +111,7 @@ function WorkspaceVCSProviderSettings({ fragmentRef }: Props) {
 
     return (
         <Box>
-            <SettingsToggleButton
-                title="VCS Provider Link Settings"
-                showSettings={showSettings}
-                onToggle={() => setShowSettings(!showSettings)}
-            />
-            <Collapse
-                in={showSettings}
-                timeout="auto"
-                unmountOnExit
-            >
+            <SettingsSection section="vcs-provider" title="VCS Provider Link Settings">
                 <Box>
                     {data.workspaceVcsProviderLink && <EditVCSProviderLink fragmentRef={data} handleWebhookDialog={(confirm: boolean, data: WebhooksData) => handleWebhookDialog(confirm, data)} />}
                     {!data.workspaceVcsProviderLink && edges.length > 0 && <NewVCSProviderLink fragmentRef={data}
@@ -145,7 +135,7 @@ function WorkspaceVCSProviderSettings({ fragmentRef }: Props) {
                         </Box>
                     </Box>}
                 </Box>
-            </Collapse>
+            </SettingsSection>
             <WebhooksDialog
                 webhooksData={webhookObj}
                 open={openDialog}

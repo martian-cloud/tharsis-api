@@ -32,7 +32,7 @@ export function SummaryRowCol({ children, sx }: { children: React.ReactNode, sx?
                 minHeight: 41,
                 pt: 1,
                 pb: 1,
-                backgroundColor: darken(theme.palette.background.default, 0.3),
+                backgroundColor: darken(theme.palette.background.paper, 0.2),
                 display: 'flex',
                 alignItems: 'center',
                 width: '100%',

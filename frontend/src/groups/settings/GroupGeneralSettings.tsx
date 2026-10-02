@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Alert, Box, Button, Collapse, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, TextField, Typography } from '@mui/material'
 import { MutationError } from '../../common/error';
 import { useFragment, useMutation } from 'react-relay';
 import graphql from 'babel-plugin-relay/macro'
 import { useSnackbar } from 'notistack';
 import { GroupGeneralSettingsFragment_group$key } from './__generated__/GroupGeneralSettingsFragment_group.graphql'
 import { GroupGeneralSettingsUpdateMutation } from './__generated__/GroupGeneralSettingsUpdateMutation.graphql'
-import SettingsToggleButton from '../../common/SettingsToggleButton';
+import SettingsSection from '../../common/SettingsSection';
 
 interface Props {
     fragmentRef: GroupGeneralSettingsFragment_group$key
@@ -14,7 +14,6 @@ interface Props {
 
 function GroupGeneralSettings(props: Props) {
     const { enqueueSnackbar } = useSnackbar();
-    const [showSettings, setShowSettings] = useState<boolean>(false);
 
     const data = useFragment(
         graphql`
@@ -87,16 +86,7 @@ const onUpdate = () => {
             {error && <Alert sx={{ mb: 2 }} severity={error.severity}>
                 {error.message}
             </Alert>}
-            <SettingsToggleButton
-                title="General Settings"
-                showSettings={showSettings}
-                onToggle={() => setShowSettings(!showSettings)}
-            />
-            <Collapse
-                in={showSettings}
-                timeout="auto"
-                unmountOnExit
-            >
+            <SettingsSection section="general" title="General Settings">
                 <Box>
                     <Typography mt={2} mb={2} variant="subtitle1" gutterBottom>Details</Typography>
                     <TextField
@@ -129,7 +119,7 @@ const onUpdate = () => {
                         Save changes
                     </Button>
                 </Box>
-            </Collapse>
+            </SettingsSection>
         </Box>
     );
 }

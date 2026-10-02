@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Box, Button, Collapse } from '@mui/material';
+import { Box, Button } from '@mui/material';
 import { MutationError } from '../../common/error';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { useSnackbar } from 'notistack';
-import SettingsToggleButton from '../../common/SettingsToggleButton';
+import SettingsSection from '../../common/SettingsSection';
 import graphql from 'babel-plugin-relay/macro';
 import { GroupDriftDetectionSettingsFragment_group$key } from './__generated__/GroupDriftDetectionSettingsFragment_group.graphql';
 import { GroupDriftDetectionSettingsMutation } from './__generated__/GroupDriftDetectionSettingsMutation.graphql';
@@ -15,7 +15,6 @@ interface Props {
 
 function GroupDriftDetectionSettings({ fragmentRef }: Props) {
     const { enqueueSnackbar } = useSnackbar();
-    const [showSettings, setShowSettings] = useState<boolean>(false);
     const [error, setError] = useState<MutationError>();
 
     const data = useFragment<GroupDriftDetectionSettingsFragment_group$key>(
@@ -95,16 +94,7 @@ function GroupDriftDetectionSettings({ fragmentRef }: Props) {
 
     return (
         <Box>
-            <SettingsToggleButton
-                title="Drift Detection Settings"
-                showSettings={showSettings}
-                onToggle={() => setShowSettings(!showSettings)}
-            />
-            <Collapse
-                in={showSettings}
-                timeout="auto"
-                unmountOnExit
-            >
+            <SettingsSection section="drift-detection" title="Drift Detection Settings">
                 <DriftDetectionSettingsForm
                     formData={formData}
                     onChange={(data) => setFormData(data)}
@@ -125,7 +115,7 @@ function GroupDriftDetectionSettings({ fragmentRef }: Props) {
                         Save changes
                     </Button>
                 </Box>
-            </Collapse>
+            </SettingsSection>
         </Box>
     );
 }

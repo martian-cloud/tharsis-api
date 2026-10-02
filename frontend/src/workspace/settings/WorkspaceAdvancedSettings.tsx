@@ -4,7 +4,6 @@ import {
     AlertTitle,
     Box,
     Button,
-    Collapse,
     TextField,
     Typography
 } from '@mui/material'
@@ -16,7 +15,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import graphql from 'babel-plugin-relay/macro';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
-import SettingsToggleButton from '../../common/SettingsToggleButton';
+import SettingsSection from '../../common/SettingsSection';
 import MigrateWorkspaceDialog from './MigrateWorkspaceDialog';
 import { WorkspaceAdvancedSettingsFragment_workspace$key } from './__generated__/WorkspaceAdvancedSettingsFragment_workspace.graphql'
 import { WorkspaceAdvancedSettingsDeleteMutation } from './__generated__/WorkspaceAdvancedSettingsDeleteMutation.graphql'
@@ -28,7 +27,6 @@ interface Props {
 function WorkspaceAdvancedSettings({ fragmentRef }: Props) {
     const [showDeleteConfirmationDialog, setShowDeleteConfirmationDialog] = useState<boolean>(false);
     const [showMigrateWorkspaceDialog, setShowMigrateWorkspaceDialog] = useState<boolean>(false);
-    const [showSettings, setShowSettings] = useState<boolean>(false);
     const [confirmInput, setConfirmInput] = useState('');
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
@@ -91,16 +89,7 @@ function WorkspaceAdvancedSettings({ fragmentRef }: Props) {
 
     return (
         <Box>
-            <SettingsToggleButton
-                title="Advanced Settings"
-                showSettings={showSettings}
-                onToggle={() => setShowSettings(!showSettings)}
-            />
-            <Collapse
-                in={showSettings}
-                timeout="auto"
-                unmountOnExit
-            >
+            <SettingsSection section="advanced" title="Advanced Settings">
                 <Box>
                     <Box sx={{ mb: 4 }}>
                         <Typography variant="subtitle1" gutterBottom>Migrate Workspace</Typography>
@@ -118,7 +107,7 @@ function WorkspaceAdvancedSettings({ fragmentRef }: Props) {
                         <Button variant="outlined" color="error" onClick={() => setShowDeleteConfirmationDialog(true)}>Delete Workspace</Button>
                     </Box>
                 </Box>
-            </Collapse>
+            </SettingsSection>
             {showMigrateWorkspaceDialog && <MigrateWorkspaceDialog onClose={() => setShowMigrateWorkspaceDialog(false)} fragmentRef={data} />}
             {showDeleteConfirmationDialog && (
                 <ConfirmationDialog

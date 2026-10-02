@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Alert, Box, Button, Collapse } from '@mui/material';
+import { Alert, Box, Button } from '@mui/material';
 import { MutationError } from '../../common/error';
 import LockWorkspaceSetting from './LockWorkspaceSetting';
 import { useFragment, useMutation } from 'react-relay'
 import { useSnackbar } from 'notistack';
 import graphql from 'babel-plugin-relay/macro';
-import SettingsToggleButton from '../../common/SettingsToggleButton';
+import SettingsSection from '../../common/SettingsSection';
 import { WorkspaceStateSettingsFragment_workspace$key } from './__generated__/WorkspaceStateSettingsFragment_workspace.graphql';
 import { WorkspaceStateSettingsLockWorkspaceMutation } from './__generated__/WorkspaceStateSettingsLockWorkspaceMutation.graphql';
 import { WorkspaceStateSettingsUnlockWorkspaceMutation } from './__generated__/WorkspaceStateSettingsUnlockWorkspaceMutation.graphql';
@@ -36,7 +36,6 @@ function WorkspaceStateSettings(props: Props) {
     const [stateSettings, setStateSettings] = useState<StateSettings>({
         locked: data.locked,
     })
-    const [showSettings, setShowSettings] = useState<boolean>(false);
 
     const [lockWorkspaceCommit, lockWorkspaceIsInFlight] = useMutation<WorkspaceStateSettingsLockWorkspaceMutation>(
         graphql`
@@ -160,16 +159,7 @@ function WorkspaceStateSettings(props: Props) {
             {error && <Alert sx={{ mb: 2 }} severity={error.severity}>
                 {error.message}
             </Alert>}
-            <SettingsToggleButton
-                title="State Settings"
-                showSettings={showSettings}
-                onToggle={() => setShowSettings(!showSettings)}
-            />
-            <Collapse
-                in={showSettings}
-                timeout="auto"
-                unmountOnExit
-            >
+            <SettingsSection section="state" title="State Settings">
                 <Box>
                     <LockWorkspaceSetting
                         locked={stateSettings.locked}
@@ -190,7 +180,7 @@ function WorkspaceStateSettings(props: Props) {
                         </Button>
                     </Box>
                 </Box>
-            </Collapse>
+            </SettingsSection>
         </Box>
     );
 }

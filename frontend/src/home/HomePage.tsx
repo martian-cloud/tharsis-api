@@ -52,7 +52,7 @@ function HomePage() {
                             maxWidth: 400,
                         }
                     }}>
-                        {apiConfig.tharsisSupportUrl !== '' && <Paper sx={{ mb: 3 }} variant="outlined">
+                        {apiConfig.tharsisSupportUrl !== '' && <Paper sx={{ mb: 3 }}>
                             <ListItemButton component={Link} target='_blank' rel='noopener noreferrer' href={apiConfig.tharsisSupportUrl}>
                                 <HelpIcon sx={{ mr: 2 }} />
                                 <Box>
@@ -61,7 +61,7 @@ function HomePage() {
                                 </Box>
                             </ListItemButton>
                         </Paper>}
-                        <Paper sx={{ mb: 3 }} variant="outlined">
+                        <Paper sx={{ mb: 3 }}>
                             <ListItemButton component={Link} target='_blank' rel='noopener noreferrer' href={config.docsUrl}>
                                 <RocketLaunchIcon sx={{ mr: 2, width: 28, height: 28 }} />
                                 <Box>
@@ -70,12 +70,12 @@ function HomePage() {
                                 </Box>
                             </ListItemButton>
                         </Paper>
-                        <Paper sx={{ mb: 3 }} variant="outlined">
+                        <Paper sx={{ mb: 3 }}>
                             <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}><CircularProgress /></Box>}>
                                 <HomeApprovalsPanel />
                             </Suspense>
                         </Paper>
-                        <Paper sx={{ padding: 2 }} variant="outlined">
+                        <Paper sx={{ padding: 2 }}>
                             <HomeRunList />
                         </Paper>
                     </Box>}

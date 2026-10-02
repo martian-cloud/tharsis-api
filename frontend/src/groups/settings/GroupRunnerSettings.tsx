@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Box, Button, Collapse } from '@mui/material';
+import { Box, Button } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { MutationError } from '../../common/error';
 import { useSnackbar } from 'notistack';
 import RunnerSettingsForm, { FormData } from '../../runnertags/RunnerSettingsForm';
-import SettingsToggleButton from '../../common/SettingsToggleButton';
+import SettingsSection from '../../common/SettingsSection';
 import { GroupRunnerSettingsFragment_group$key } from './__generated__/GroupRunnerSettingsFragment_group.graphql';
 import { GroupRunnerSettingsMutation } from './__generated__/GroupRunnerSettingsMutation.graphql';
 
@@ -15,7 +15,6 @@ interface Props {
 
 function GroupRunnerSettings({ fragmentRef }: Props) {
     const { enqueueSnackbar } = useSnackbar();
-    const [showSettings, setShowSettings] = useState<boolean>(false);
 
     const data = useFragment<GroupRunnerSettingsFragment_group$key>(
         graphql`
@@ -115,16 +114,7 @@ function GroupRunnerSettings({ fragmentRef }: Props) {
 
     return formData ? (
         <Box>
-            <SettingsToggleButton
-                title="Runner Settings"
-                showSettings={showSettings}
-                onToggle={() => setShowSettings(!showSettings)}
-            />
-            <Collapse
-                in={showSettings}
-                timeout="auto"
-                unmountOnExit
-            >
+            <SettingsSection section="runners" title="Runner Settings">
                 {data.runnerTags &&
                     <RunnerSettingsForm
                         onChange={handleInputChange}
@@ -145,7 +135,7 @@ function GroupRunnerSettings({ fragmentRef }: Props) {
                         Save Changes
                     </Button>
                 </Box>
-            </Collapse>
+            </SettingsSection>
         </Box>
     ) : <Box>Not found</Box>;
 }

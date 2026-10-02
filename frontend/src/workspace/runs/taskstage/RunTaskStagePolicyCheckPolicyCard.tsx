@@ -1,8 +1,9 @@
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
-import { Box, Paper, Tooltip, Typography, useTheme } from '@mui/material';
+import { Box, Collapse, IconButton, Paper, Tooltip, Typography, useTheme } from '@mui/material';
 import { darken } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import { ReactNode } from 'react';
@@ -10,6 +11,7 @@ import { useFragment } from 'react-relay/hooks';
 import { Link as RouterLink } from 'react-router-dom';
 import RunTaskStagePolicyApproversBox from './RunTaskStagePolicyApproversBox';
 import Pill from '../../../common/Pill';
+import Link from '../../../routes/Link';
 import { ENFORCEMENT_LEVEL_LABELS } from '../../../namespace/policies/policyDisplay';
 import { RunTaskStagePolicyCheckPolicyCardFragment_gate$key } from './__generated__/RunTaskStagePolicyCheckPolicyCardFragment_gate.graphql';
 import { RunTaskStagePolicyCheckPolicyCardFragment_policy$key } from './__generated__/RunTaskStagePolicyCheckPolicyCardFragment_policy.graphql';
@@ -20,6 +22,9 @@ interface Props {
     // The gate governing the whole check, null when it has none. The approvers box below picks out the
     // rule for this card's policy, if there is one.
     gateRef: RunTaskStagePolicyCheckPolicyCardFragment_gate$key | null | undefined;
+    // expanded shows the card's details below its header; collapsed shows only the header.
+    expanded: boolean;
+    onExpandedChange: (expanded: boolean) => void;
 }
 
 // One labelled cell of the card's details grid. The micro-label is deliberately not RunTaskStageSectionLabel —
@@ -65,7 +70,7 @@ function publicKeyPreview(publicKey: string): string {
     return body.length > 24 ? `${body.slice(0, 24)}…` : body;
 }
 
-function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef }: Props) {
+function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef, expanded, onExpandedChange }: Props) {
     const theme = useTheme();
 
     const policy = useFragment<RunTaskStagePolicyCheckPolicyCardFragment_policy$key>(
@@ -129,13 +134,24 @@ function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef }: Props) {
             sx={{
                 background: darken(theme.palette.background.paper, 0.10),
                 padding: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 2,
             }}
         >
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, minWidth: 0 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                {/* The whole header toggles the card. The button has no handler of its own: its clicks (and
+                    Enter/Space when focused) bubble up to this one, so a click never toggles twice. */}
+                <Box
+                    onClick={() => onExpandedChange(!expanded)}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    <IconButton
+                        size="small"
+                        aria-label={expanded ? 'collapse policy' : 'expand policy'}
+                        aria-expanded={expanded}
+                        // Pulled into the card's padding so the title doesn't shift right by the button's width.
+                        sx={{ ml: -1, mr: -1 }}
+                    >
+                        {expanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
+                    </IconButton>
                     {/* The snapshot's name, falling back to the package for checks created before the
                         name was snapshotted. */}
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
@@ -159,151 +175,164 @@ function RunTaskStagePolicyCheckPolicyCard({ policyRef, gateRef }: Props) {
                         </Pill>
                     )}
                 </Box>
-                {policy.description && (
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                        {policy.description}
-                    </Typography>
-                )}
             </Box>
 
-            {/* What was actually evaluated. Collapses to a single column when the card is too narrow
-                to keep three readable. */}
-            <Box
-                sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fit, minmax(200px, 1fr))' },
-                    gap: '16px 24px',
-                }}
-            >
-                <DetailCell label="Policy type">
-                    <DetailValue>{policy.opaData ? 'OPA' : 'Module attestation'}</DetailValue>
-                </DetailCell>
-                {policy.opaData && <>
-                    <DetailCell label="Package source">
-                        <DetailValue>{policy.opaData.packageSource}</DetailValue>
-                    </DetailCell>
-                    <DetailCell label="Package version">
-                        {/* Says outright that this is a constraint: the check resolves it when it runs, so
-                            the version that was really evaluated is only in the job log. */}
-                        <Tooltip title="The version constraint this policy was pinned to. The concrete version evaluated is recorded in the policy check's job log.">
-                            <span>
-                                <DetailValue>{policy.opaData.packageVersionConstraint || 'latest'}</DetailValue>
-                            </span>
-                        </Tooltip>
-                    </DetailCell>
-                </>}
-                {policy.moduleAttestationData && <>
-                    <DetailCell label="Predicate type">
-                        <DetailValue>{policy.moduleAttestationData.predicateType || 'any'}</DetailValue>
-                    </DetailCell>
-                    <DetailCell label="Verify state lineage">
-                        <DetailValue>{policy.moduleAttestationData.verifyStateLineage ? 'yes' : 'no'}</DetailValue>
-                    </DetailCell>
-                    <DetailCell label="Public key">
-                        <Tooltip title={policy.moduleAttestationData.publicKey}>
-                            <Box sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                <DetailValue>{publicKeyPreview(policy.moduleAttestationData.publicKey)}</DetailValue>
-                            </Box>
-                        </Tooltip>
-                    </DetailCell>
-                </>}
-            </Box>
+            <Collapse in={expanded} timeout="auto">
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+                    {policy.description && (
+                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                            {policy.description}
+                        </Typography>
+                    )}
 
-            {gate && <RunTaskStagePolicyApproversBox gateRef={gate} policyId={policy.id} />}
-
-            {/* Kept quiet: the verdict pill above already says the policy failed, so the messages only
-                have to be readable, not alarming. The check's panel above collects the same messages
-                across every policy in a form that does draw the eye. */}
-            {failed && policy.messages.length > 0 && (
-                <Box
-                    sx={{
-                        borderTop: `1px solid ${theme.palette.divider}`,
-                        pt: 1.5,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 0.75,
-                    }}
-                >
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: theme.palette.text.secondary }}>
-                        {policy.messages.length} finding{policy.messages.length === 1 ? '' : 's'}
-                    </Typography>
-                    {policy.messages.map((message, i) => (
-                        <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                            <Box
-                                component="span"
-                                sx={{
-                                    width: 4,
-                                    height: 4,
-                                    mt: '7px',
-                                    flexShrink: 0,
-                                    borderRadius: '9999px',
-                                    background: theme.palette.text.disabled,
-                                }}
-                            />
-                            <Typography variant="body2" sx={{ color: theme.palette.text.secondary, whiteSpace: 'pre-wrap' }}>
-                                {message}
-                            </Typography>
-                        </Box>
-                    ))}
-                </Box>
-            )}
-
-            <Box
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1.5,
-                    flexWrap: 'wrap',
-                    mt: 2
-                }}
-            >
-                {/* Where the policy comes from. A policy is inherited by every namespace below the
-                    group that defines it, so the group is what says which one that is. With the
-                    policy deleted the snapshot no longer names its group, and the TRN stands in as
-                    the only remaining way to identify what was evaluated. */}
-                {policy.policy ? (
-                    <Tooltip title="Namespace this policy is defined in">
-                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, minWidth: 0, color: theme.palette.text.disabled }}>
-                            <FolderOutlinedIcon sx={{ width: 14, height: 14, flexShrink: 0 }} />
-                            <Typography variant="body2" sx={{ color: theme.palette.text.secondary, wordBreak: 'break-all' }}>
-                                {policy.policy.groupPath}
-                            </Typography>
-                        </Box>
-                    </Tooltip>
-                ) : (
-                    <Tooltip title="This policy is no longer available">
-                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, minWidth: 0, color: theme.palette.text.disabled }}>
-                            <Typography variant="code" sx={{ color: theme.palette.text.secondary, wordBreak: 'break-all' }}>
-                                {policy.provenance.policyTrn}
-                            </Typography>
-                            {/* Says outright why there is a TRN here instead of a namespace and a
-                                link, rather than leaving it to the tooltip. */}
-                            <Typography variant="body2" sx={{ flexShrink: 0 }}>(deleted)</Typography>
-                        </Box>
-                    </Tooltip>
-                )}
-                {policy.policy && (
-                    <Typography
-                        variant="body2"
-                        component={RouterLink}
-                        to={`/groups/${policy.policy.groupPath}/-/policies/${policy.policy.id}`}
+                    {/* What was actually evaluated. Collapses to a single column when the card is too narrow
+                        to keep three readable. */}
+                    <Box
                         sx={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            fontWeight: 600,
-                            color: theme.palette.secondary.main,
-                            textDecoration: 'none',
-                            flexShrink: 0,
-                            '&:hover': { textDecoration: 'underline' },
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fit, minmax(200px, 1fr))' },
+                            gap: '16px 24px',
                         }}
                     >
-                        View policy details
-                        <ChevronRightIcon sx={{ width: 14, height: 14 }} />
-                    </Typography>
-                )}
-            </Box>
+                        <DetailCell label="Policy type">
+                            <DetailValue>{policy.opaData ? 'OPA' : 'Module attestation'}</DetailValue>
+                        </DetailCell>
+                        {policy.opaData && <>
+                            <DetailCell label="Package source">
+                                {/* The source is the package's resource path; the registry page resolves its TRN. */}
+                                <Link
+                                    to={`/package-registry/${encodeURIComponent(`trn:package:${policy.opaData.packageSource}`)}`}
+                                    variant="code"
+                                    color="secondary"
+                                    sx={{ overflowWrap: 'anywhere' }}
+                                >
+                                    {policy.opaData.packageSource}
+                                </Link>
+                            </DetailCell>
+                            <DetailCell label="Package version">
+                                {/* Says outright that this is a constraint: the check resolves it when it runs, so
+                                    the version that was really evaluated is only in the job log. */}
+                                <Tooltip title="The version constraint this policy was pinned to. The concrete version evaluated is recorded in the policy check's job log.">
+                                    <span>
+                                        <DetailValue>{policy.opaData.packageVersionConstraint || 'latest'}</DetailValue>
+                                    </span>
+                                </Tooltip>
+                            </DetailCell>
+                        </>}
+                        {policy.moduleAttestationData && <>
+                            <DetailCell label="Predicate type">
+                                <DetailValue>{policy.moduleAttestationData.predicateType || 'any'}</DetailValue>
+                            </DetailCell>
+                            <DetailCell label="Verify state lineage">
+                                <DetailValue>{policy.moduleAttestationData.verifyStateLineage ? 'yes' : 'no'}</DetailValue>
+                            </DetailCell>
+                            <DetailCell label="Public key">
+                                <Tooltip title={policy.moduleAttestationData.publicKey}>
+                                    <Box sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <DetailValue>{publicKeyPreview(policy.moduleAttestationData.publicKey)}</DetailValue>
+                                    </Box>
+                                </Tooltip>
+                            </DetailCell>
+                        </>}
+                    </Box>
+
+                    {gate && <RunTaskStagePolicyApproversBox gateRef={gate} policyId={policy.id} />}
+
+                    {/* Kept quiet: the verdict pill above already says the policy failed, so the messages only
+                        have to be readable, not alarming. The check's panel above collects the same messages
+                        across every policy in a form that does draw the eye. */}
+                    {failed && policy.messages.length > 0 && (
+                        <Box
+                            sx={{
+                                borderTop: `1px solid ${theme.palette.divider}`,
+                                pt: 1.5,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 0.75,
+                            }}
+                        >
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: theme.palette.text.secondary }}>
+                                {policy.messages.length} finding{policy.messages.length === 1 ? '' : 's'}
+                            </Typography>
+                            {policy.messages.map((message, i) => (
+                                <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                                    <Box
+                                        component="span"
+                                        sx={{
+                                            width: 4,
+                                            height: 4,
+                                            mt: '7px',
+                                            flexShrink: 0,
+                                            borderRadius: '9999px',
+                                            background: theme.palette.text.disabled,
+                                        }}
+                                    />
+                                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, whiteSpace: 'pre-wrap' }}>
+                                        {message}
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Box>
+                    )}
+
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 1.5,
+                            flexWrap: 'wrap',
+                            mt: 2
+                        }}
+                    >
+                        {/* Where the policy comes from. A policy is inherited by every namespace below the
+                            group that defines it, so the group is what says which one that is. With the
+                            policy deleted the snapshot no longer names its group, and the TRN stands in as
+                            the only remaining way to identify what was evaluated. */}
+                        {policy.policy ? (
+                            <Tooltip title="Namespace this policy is defined in">
+                                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, minWidth: 0, color: theme.palette.text.disabled }}>
+                                    <FolderOutlinedIcon sx={{ width: 14, height: 14, flexShrink: 0 }} />
+                                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, wordBreak: 'break-all' }}>
+                                        {policy.policy.groupPath}
+                                    </Typography>
+                                </Box>
+                            </Tooltip>
+                        ) : (
+                            <Tooltip title="This policy is no longer available">
+                                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, minWidth: 0, color: theme.palette.text.disabled }}>
+                                    <Typography variant="code" sx={{ color: theme.palette.text.secondary, wordBreak: 'break-all' }}>
+                                        {policy.provenance.policyTrn}
+                                    </Typography>
+                                    {/* Says outright why there is a TRN here instead of a namespace and a
+                                        link, rather than leaving it to the tooltip. */}
+                                    <Typography variant="body2" sx={{ flexShrink: 0 }}>(deleted)</Typography>
+                                </Box>
+                            </Tooltip>
+                        )}
+                        {policy.policy && (
+                            <Typography
+                                variant="body2"
+                                component={RouterLink}
+                                to={`/groups/${policy.policy.groupPath}/-/policies/${policy.policy.id}`}
+                                sx={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    fontWeight: 600,
+                                    color: theme.palette.secondary.main,
+                                    textDecoration: 'none',
+                                    flexShrink: 0,
+                                    '&:hover': { textDecoration: 'underline' },
+                                }}
+                            >
+                                View policy details
+                                <ChevronRightIcon sx={{ width: 14, height: 14 }} />
+                            </Typography>
+                        )}
+                    </Box>
+                </Box>
+            </Collapse>
         </Paper>
     );
 }

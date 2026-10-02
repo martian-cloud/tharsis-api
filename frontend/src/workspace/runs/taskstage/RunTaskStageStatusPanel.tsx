@@ -83,7 +83,7 @@ function RunTaskStageStatusPanel({ runId, fragmentRef, onError }: Props) {
     const StatusIcon = statusType.icon;
 
     return (
-        <Paper variant="outlined" component="section" sx={{ padding: 2 }}>
+        <Paper component="section" sx={{ padding: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                     <Typography

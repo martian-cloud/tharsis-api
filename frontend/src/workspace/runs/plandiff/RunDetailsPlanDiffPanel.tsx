@@ -1,10 +1,11 @@
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { Alert, Chip, Collapse, IconButton, Paper, Typography, useTheme } from '@mui/material';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { Alert, Chip, Collapse, IconButton, Menu, MenuItem, Paper, Typography, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import 'prism-themes/themes/prism-holi-theme.css';
-import { useMemo } from 'react';
-import { ChangeData, Diff, DiffType, expandCollapsedBlockBy, getChangeKey, Hunk, HunkData, parseDiff, textLinesToHunk, useTokenizeWorker } from 'react-diff-view';
+import { useMemo, useState } from 'react';
+import { ChangeData, Decoration, Diff, DiffType, expandFromRawCode, getChangeKey, Hunk, HunkData, parseDiff, textLinesToHunk, useTokenizeWorker } from 'react-diff-view';
 import 'react-diff-view/style/index.css';
 import * as refractor from 'refractor';
 import hcl from 'refractor/lang/hcl';
@@ -71,8 +72,42 @@ const useWidgets = (hunks: HunkData[], warnings: readonly PlanChangeWarning[]) =
     }, [hunks, warnings]);
 };
 
-// useExpandedHunks is a hook which will expand all the collapsed hunks in the diff
-function useExpandedHunks(hunks: HunkData[], source: string): HunkData[] {
+// CollapsedRange is a run of unchanged source lines hidden between hunks, identified by the old line it starts at
+type CollapsedRange = { oldStart: number, newStart: number, lines: number };
+
+// getCollapsedRanges returns the collapsed range before each hunk, plus a final entry for the range after the
+// last hunk, so the result has hunks.length + 1 entries; null means no lines are hidden there. It is the single
+// place collapsed boundaries are computed, so the ranges that get expanded and the ranges that get rendered
+// (and that a click expands) always agree.
+function getCollapsedRanges(hunks: HunkData[], sourceLineCount: number): (CollapsedRange | null)[] {
+    const ranges = hunks.map((hunk, index) => {
+        const previousHunk = index > 0 ? hunks[index - 1] : null;
+        const oldStart = previousHunk ? previousHunk.oldStart + previousHunk.oldLines : 1;
+        const newStart = previousHunk ? previousHunk.newStart + previousHunk.newLines : 1;
+        return { oldStart, newStart, lines: hunk.oldStart - oldStart };
+    });
+
+    const lastHunk = hunks[hunks.length - 1];
+    if (lastHunk) {
+        const oldStart = lastHunk.oldStart + lastHunk.oldLines;
+        const newStart = lastHunk.newStart + lastHunk.newLines;
+        ranges.push({ oldStart, newStart, lines: sourceLineCount - oldStart + 1 });
+    }
+
+    return ranges.map(range => range.lines > 0 ? range : null);
+}
+
+// warningInRange reports whether any warning falls on a line within the given collapsed range
+function warningInRange(warnings: readonly PlanChangeWarning[], { lines, oldStart, newStart }: CollapsedRange): boolean {
+    return warnings.some(({ changeType, line }) => changeType === 'before'
+        ? line >= oldStart && line < oldStart + lines
+        : line >= newStart && line < newStart + lines);
+}
+
+// useExpandedHunks is a hook which expands the collapsed blocks between hunks. When showFullContent is
+// false, only the blocks the user has expanded, or that contain a warning, are expanded so the diff shows
+// just the changes and their surrounding context lines.
+function useExpandedHunks(hunks: HunkData[], source: string, warnings: readonly PlanChangeWarning[], showFullContent: boolean, expandedBlocks: Set<number>): HunkData[] {
     const renderingHunks = useMemo(
         () => {
             if (!source) {
@@ -86,15 +121,34 @@ function useExpandedHunks(hunks: HunkData[], source: string): HunkData[] {
                 processedHunks = hunk !== null ? [hunk] : [];
             }
 
-            return expandCollapsedBlockBy(processedHunks, source, () => true);
+            if (processedHunks.length === 0) {
+                return processedHunks;
+            }
+
+            const sourceLines = source.split('\n');
+            return getCollapsedRanges(processedHunks, sourceLines.length)
+                .filter((range): range is CollapsedRange => range !== null)
+                .filter(range => showFullContent || expandedBlocks.has(range.oldStart) || warningInRange(warnings, range))
+                .reduce((result, range) => expandFromRawCode(result, sourceLines, range.oldStart, range.oldStart + range.lines), processedHunks);
         },
-        [hunks, source]
+        [hunks, source, warnings, showFullContent, expandedBlocks]
     );
     return renderingHunks;
 }
 
-function DiffView({ diffType, hunks, oldSrc, warnings }: { diffType: DiffType, hunks: HunkData[], oldSrc: string, warnings: readonly PlanChangeWarning[] }) {
-    const processedHunks = useExpandedHunks(hunks, oldSrc);
+function CollapsedBlock({ lines, onExpand }: { lines: number, onExpand: () => void }) {
+    return (
+        <Decoration>
+            <Box component="button" type="button" className="diff-collapsed" onClick={onExpand}>
+                ⋯ {lines} unchanged {lines === 1 ? 'line' : 'lines'}
+            </Box>
+        </Decoration>
+    );
+}
+
+function DiffView({ diffType, hunks, oldSrc, warnings, showFullContent }: { diffType: DiffType, hunks: HunkData[], oldSrc: string, warnings: readonly PlanChangeWarning[], showFullContent: boolean }) {
+    const [expandedBlocks, setExpandedBlocks] = useState<Set<number>>(new Set());
+    const processedHunks = useExpandedHunks(hunks, oldSrc, warnings, showFullContent, expandedBlocks);
     const widgets = useWidgets(processedHunks, warnings);
 
     const workerOptions = useMemo(() => {
@@ -108,6 +162,27 @@ function DiffView({ diffType, hunks, oldSrc, warnings }: { diffType: DiffType, h
 
     const { tokens } = useTokenizeWorker(tokenizeWorker, workerOptions);
 
+    const sourceLineCount = useMemo(() => oldSrc ? oldSrc.split('\n').length : 0, [oldSrc]);
+
+    const expandBlock = (oldStart: number) => setExpandedBlocks(prev => new Set(prev).add(oldStart));
+
+    const renderHunks = (hunks: HunkData[]) => {
+        // Collapsed blocks only exist relative to the original source
+        if (!oldSrc) {
+            return hunks.map(hunk => <Hunk key={hunk.content} hunk={hunk} />);
+        }
+
+        const ranges = getCollapsedRanges(hunks, sourceLineCount);
+        const renderRange = (range: CollapsedRange | null) => range
+            ? [<CollapsedBlock key={`collapsed-${range.oldStart}`} lines={range.lines} onExpand={() => expandBlock(range.oldStart)} />]
+            : [];
+
+        return [
+            ...hunks.flatMap((hunk, index) => [...renderRange(ranges[index]), <Hunk key={hunk.content} hunk={hunk} />]),
+            ...renderRange(ranges[hunks.length])
+        ];
+    };
+
     return (
         <Diff
             viewType="unified"
@@ -117,7 +192,7 @@ function DiffView({ diffType, hunks, oldSrc, warnings }: { diffType: DiffType, h
             tokens={tokens}
             widgets={widgets}
         >
-            {hunks => hunks.flatMap(hunk => <Hunk key={hunk.content} hunk={hunk} />)}
+            {renderHunks}
         </Diff>
     );
 }
@@ -136,6 +211,17 @@ export type Props = {
 
 function RunDetailsPlanDiffPanel({ title, action, drift, imported, diff, oldSrc, warnings, collapsed, onCollapseChange }: Props) {
     const theme = useTheme();
+    const [showFullContent, setShowFullContent] = useState<boolean>(false);
+    const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
+
+    const toggleFullContent = () => {
+        setMenuAnchorEl(null);
+        setShowFullContent(!showFullContent);
+        // Showing the full contents of a collapsed panel opens it, so the change is visible.
+        if (collapsed) {
+            onCollapseChange(false);
+        }
+    };
     const file = useMemo(
         () => {
             const [file] = diff ? parseDiff(diff) : [];
@@ -155,11 +241,30 @@ function RunDetailsPlanDiffPanel({ title, action, drift, imported, diff, oldSrc,
                     <Typography variant="code" fontWeight={600}>{title}</Typography>
                     {drift && <Chip size="xs" label="drift" sx={{ color: colors.drift, ml: 1 }} />}
                 </Box>
-                <DiffActionChip action={action} importing={imported} />
+                <Box display="flex" alignItems="center">
+                    <DiffActionChip action={action} importing={imported} />
+                    {/* Unchanged lines can only be hidden relative to the original source. */}
+                    {oldSrc && <>
+                        <IconButton size="small" sx={{ ml: 0.5 }} aria-label="more options" onClick={e => setMenuAnchorEl(e.currentTarget)}>
+                            <MoreVertIcon fontSize="small" />
+                        </IconButton>
+                        <Menu
+                            anchorEl={menuAnchorEl}
+                            open={!!menuAnchorEl}
+                            onClose={() => setMenuAnchorEl(null)}
+                            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                        >
+                            <MenuItem onClick={toggleFullContent}>
+                                {showFullContent ? 'Show changes only' : 'Show full contents'}
+                            </MenuItem>
+                        </Menu>
+                    </>}
+                </Box>
             </Box>
             <Collapse in={!collapsed} timeout="auto" unmountOnExit>
                 <Box sx={{ backgroundColor: 'rgb(29, 31, 33)', fontSize: 14, fontFamily: theme.typography.code.fontFamily }}>
-                    <DiffView hunks={file ? file.hunks : []} diffType={file ? file.type : 'modify'} oldSrc={oldSrc} warnings={warnings} />
+                    <DiffView hunks={file ? file.hunks : []} diffType={file ? file.type : 'modify'} oldSrc={oldSrc} warnings={warnings} showFullContent={showFullContent} />
                 </Box>
             </Collapse>
         </Paper>

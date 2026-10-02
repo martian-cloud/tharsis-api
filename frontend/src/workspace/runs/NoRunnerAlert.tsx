@@ -50,7 +50,7 @@ function NoRunnerAlert ({ fragmentRef, sx }: Props) {
     );
 
     const workspaceSettingsPath = useMemo(
-        () => `/groups/${data.workspace.fullPath}/-/settings`,
+        () => `/groups/${data.workspace.fullPath}/-/settings?section=runners`,
         [data.workspace.fullPath]
     );
 
