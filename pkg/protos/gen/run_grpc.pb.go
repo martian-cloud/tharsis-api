@@ -34,6 +34,9 @@ const (
 	Runs_SetVariablesIncludedInTFConfig_FullMethodName = "/martiancloud.tharsis.api.run.Runs/SetVariablesIncludedInTFConfig"
 	Runs_SubscribeToRunEvents_FullMethodName           = "/martiancloud.tharsis.api.run.Runs/SubscribeToRunEvents"
 	Runs_CreateDestroyRunForWorkspace_FullMethodName   = "/martiancloud.tharsis.api.run.Runs/CreateDestroyRunForWorkspace"
+	Runs_DiscardRun_FullMethodName                     = "/martiancloud.tharsis.api.run.Runs/DiscardRun"
+	Runs_UndiscardRun_FullMethodName                   = "/martiancloud.tharsis.api.run.Runs/UndiscardRun"
+	Runs_GetPolicyCheckResults_FullMethodName          = "/martiancloud.tharsis.api.run.Runs/GetPolicyCheckResults"
 )
 
 // RunsClient is the client API for Runs service.
@@ -71,6 +74,14 @@ type RunsClient interface {
 	SubscribeToRunEvents(ctx context.Context, in *SubscribeToRunEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunEvent], error)
 	// CreateDestroyRunForWorkspace creates a destroy run using the workspace's current state.
 	CreateDestroyRunForWorkspace(ctx context.Context, in *CreateDestroyRunForWorkspaceRequest, opts ...grpc.CallOption) (*Run, error)
+	// DiscardRun discards a run that is waiting on a human decision: planned, or blocked at a policy
+	// gate (pre-plan, post-plan or pre-apply awaiting decision).
+	DiscardRun(ctx context.Context, in *DiscardRunRequest, opts ...grpc.CallOption) (*Run, error)
+	// UndiscardRun reverses a discard, moving a discarded run back to planned.
+	UndiscardRun(ctx context.Context, in *UndiscardRunRequest, opts ...grpc.CallOption) (*Run, error)
+	// GetPolicyCheckResults returns a policy check with one result per policy, carrying the violation
+	// messages it reported, and the run gate blocking the check, if any.
+	GetPolicyCheckResults(ctx context.Context, in *GetPolicyCheckResultsRequest, opts ...grpc.CallOption) (*PolicyCheckResults, error)
 }
 
 type runsClient struct {
@@ -230,6 +241,36 @@ func (c *runsClient) CreateDestroyRunForWorkspace(ctx context.Context, in *Creat
 	return out, nil
 }
 
+func (c *runsClient) DiscardRun(ctx context.Context, in *DiscardRunRequest, opts ...grpc.CallOption) (*Run, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Run)
+	err := c.cc.Invoke(ctx, Runs_DiscardRun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runsClient) UndiscardRun(ctx context.Context, in *UndiscardRunRequest, opts ...grpc.CallOption) (*Run, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Run)
+	err := c.cc.Invoke(ctx, Runs_UndiscardRun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runsClient) GetPolicyCheckResults(ctx context.Context, in *GetPolicyCheckResultsRequest, opts ...grpc.CallOption) (*PolicyCheckResults, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PolicyCheckResults)
+	err := c.cc.Invoke(ctx, Runs_GetPolicyCheckResults_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RunsServer is the server API for Runs service.
 // All implementations must embed UnimplementedRunsServer
 // for forward compatibility.
@@ -265,6 +306,14 @@ type RunsServer interface {
 	SubscribeToRunEvents(*SubscribeToRunEventsRequest, grpc.ServerStreamingServer[RunEvent]) error
 	// CreateDestroyRunForWorkspace creates a destroy run using the workspace's current state.
 	CreateDestroyRunForWorkspace(context.Context, *CreateDestroyRunForWorkspaceRequest) (*Run, error)
+	// DiscardRun discards a run that is waiting on a human decision: planned, or blocked at a policy
+	// gate (pre-plan, post-plan or pre-apply awaiting decision).
+	DiscardRun(context.Context, *DiscardRunRequest) (*Run, error)
+	// UndiscardRun reverses a discard, moving a discarded run back to planned.
+	UndiscardRun(context.Context, *UndiscardRunRequest) (*Run, error)
+	// GetPolicyCheckResults returns a policy check with one result per policy, carrying the violation
+	// messages it reported, and the run gate blocking the check, if any.
+	GetPolicyCheckResults(context.Context, *GetPolicyCheckResultsRequest) (*PolicyCheckResults, error)
 	mustEmbedUnimplementedRunsServer()
 }
 
@@ -316,6 +365,15 @@ func (UnimplementedRunsServer) SubscribeToRunEvents(*SubscribeToRunEventsRequest
 }
 func (UnimplementedRunsServer) CreateDestroyRunForWorkspace(context.Context, *CreateDestroyRunForWorkspaceRequest) (*Run, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateDestroyRunForWorkspace not implemented")
+}
+func (UnimplementedRunsServer) DiscardRun(context.Context, *DiscardRunRequest) (*Run, error) {
+	return nil, status.Error(codes.Unimplemented, "method DiscardRun not implemented")
+}
+func (UnimplementedRunsServer) UndiscardRun(context.Context, *UndiscardRunRequest) (*Run, error) {
+	return nil, status.Error(codes.Unimplemented, "method UndiscardRun not implemented")
+}
+func (UnimplementedRunsServer) GetPolicyCheckResults(context.Context, *GetPolicyCheckResultsRequest) (*PolicyCheckResults, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPolicyCheckResults not implemented")
 }
 func (UnimplementedRunsServer) mustEmbedUnimplementedRunsServer() {}
 func (UnimplementedRunsServer) testEmbeddedByValue()              {}
@@ -583,6 +641,60 @@ func _Runs_CreateDestroyRunForWorkspace_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Runs_DiscardRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DiscardRunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunsServer).DiscardRun(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Runs_DiscardRun_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunsServer).DiscardRun(ctx, req.(*DiscardRunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Runs_UndiscardRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UndiscardRunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunsServer).UndiscardRun(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Runs_UndiscardRun_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunsServer).UndiscardRun(ctx, req.(*UndiscardRunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Runs_GetPolicyCheckResults_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPolicyCheckResultsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunsServer).GetPolicyCheckResults(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Runs_GetPolicyCheckResults_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunsServer).GetPolicyCheckResults(ctx, req.(*GetPolicyCheckResultsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Runs_ServiceDesc is the grpc.ServiceDesc for Runs service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -641,6 +753,18 @@ var Runs_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateDestroyRunForWorkspace",
 			Handler:    _Runs_CreateDestroyRunForWorkspace_Handler,
+		},
+		{
+			MethodName: "DiscardRun",
+			Handler:    _Runs_DiscardRun_Handler,
+		},
+		{
+			MethodName: "UndiscardRun",
+			Handler:    _Runs_UndiscardRun_Handler,
+		},
+		{
+			MethodName: "GetPolicyCheckResults",
+			Handler:    _Runs_GetPolicyCheckResults_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

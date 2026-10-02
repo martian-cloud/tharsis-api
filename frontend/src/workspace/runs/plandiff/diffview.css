@@ -3,6 +3,23 @@
     --diff-code-insert-background-color: rgba(46, 160, 67, 0.15);
 }
 
+.diff-collapsed {
+    display: block;
+    width: 100%;
+    border: none;
+    font: inherit;
+    text-align: left;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: rgb(140, 149, 159);
+    background-color: rgba(56, 139, 253, 0.1);
+}
+
+.diff-collapsed:hover,
+.diff-collapsed:focus-visible {
+    color: rgb(201, 209, 217);
+}
+
 code[class*='language-'],
 pre[class*='language-'] {
 	background: inherit;

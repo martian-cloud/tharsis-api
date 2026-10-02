@@ -222,9 +222,15 @@ function PolicyCard({ fragmentRef, showGroupPath, showActions = true, onDelete }
                         <Typography variant="caption" component="div" sx={{ ...FIELD_LABEL_SX, color: theme.palette.text.secondary }}>
                             Package Source
                         </Typography>
-                        <Typography variant="code" sx={{ color: theme.palette.text.primary }}>
+                        {/* The source is the package's resource path; the registry page resolves its TRN. */}
+                        <Link
+                            to={`/package-registry/${encodeURIComponent(`trn:package:${opa.packageSource}`)}`}
+                            variant="code"
+                            color="secondary"
+                            sx={{ wordBreak: 'break-all' }}
+                        >
                             {opa.packageSource}
-                        </Typography>
+                        </Link>
                     </Box>
                     <Box sx={{ gridColumn: '1 / 3'}}>
                         <Typography variant="caption" component="div" sx={{ ...FIELD_LABEL_SX, color: theme.palette.text.secondary }}>

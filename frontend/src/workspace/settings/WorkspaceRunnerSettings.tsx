@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Box, Button, Collapse } from '@mui/material';
+import { Box, Button } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { MutationError } from '../../common/error';
 import { useSnackbar } from 'notistack';
 import RunnerSettingsForm from '../../runnertags/RunnerSettingsForm';
-import SettingsToggleButton from '../../common/SettingsToggleButton';
+import SettingsSection from '../../common/SettingsSection';
 import { FormData } from '../../runnertags/RunnerSettingsForm';
 import { WorkspaceRunnerSettingsFragment_workspace$key } from './__generated__/WorkspaceRunnerSettingsFragment_workspace.graphql';
 import { WorkspaceRunnerSettingsMutation } from './__generated__/WorkspaceRunnerSettingsMutation.graphql';
@@ -16,7 +16,6 @@ interface Props {
 
 function WorkspaceRunnerSettings({ fragmentRef }: Props) {
     const { enqueueSnackbar } = useSnackbar();
-    const [showSettings, setShowSettings] = useState<boolean>(false);
 
     const data = useFragment<WorkspaceRunnerSettingsFragment_workspace$key>(
         graphql`
@@ -112,16 +111,7 @@ function WorkspaceRunnerSettings({ fragmentRef }: Props) {
 
     return formData ? (
         <Box>
-            <SettingsToggleButton
-                title="Runner Settings"
-                showSettings={showSettings}
-                onToggle={() => setShowSettings(!showSettings)}
-            />
-            <Collapse
-                in={showSettings}
-                timeout="auto"
-                unmountOnExit
-            >
+            <SettingsSection section="runners" title="Runner Settings">
                 {data.runnerTags &&
                     <RunnerSettingsForm
                         onChange={handleInputChange}
@@ -141,7 +131,7 @@ function WorkspaceRunnerSettings({ fragmentRef }: Props) {
                         Save Changes
                     </Button>
                 </Box>
-            </Collapse>
+            </SettingsSection>
         </Box>
     ) : <Box>Not found</Box>;
 }

@@ -417,7 +417,8 @@ input RetryRunNodeInput {
 }
 
 """
-DiscardRunInput discards a run that is in the planned state, moving it to the
+DiscardRunInput discards a run that is waiting on a human decision (planned, or blocked
+awaiting a policy override at a pre-plan, post-plan or pre-apply gate), moving it to the
 terminal discarded status.
 """
 input DiscardRunInput {

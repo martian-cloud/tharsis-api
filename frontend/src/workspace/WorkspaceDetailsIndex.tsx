@@ -1,27 +1,20 @@
 import NoResults from '@/common/NoResults';
-import CopyIcon from '@mui/icons-material/ContentCopy';
-import StateIcon from '@mui/icons-material/InsertDriveFileOutlined';
-import { Alert, AlertTitle, Avatar, Box, Button, Chip, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography, useTheme } from '@mui/material';
+import { Alert, AlertTitle, Avatar, Box, Button, Chip, FormControlLabel, Paper, Stack, Switch, Tab, Tabs, Tooltip, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import { CubeOutline as ModuleIcon } from 'mdi-material-ui';
 import React, { useEffect, useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import ConfirmationDialog from '../common/ConfirmationDialog';
-import Timestamp from '../common/Timestamp';
 import TabContent from '../common/TabContent';
 import TRNButton from '../common/TRNButton';
 import { MutationError } from '../common/error';
 import NamespaceBreadcrumbs from '../namespace/NamespaceBreadcrumbs';
-import Link from '../routes/Link';
-import ModuleSourceLink from './ModuleSourceLink';
-import WorkspaceDetailsCurrentApplyRun from './WorkspaceDetailsCurrentApplyRun';
+import WorkspaceDetailsStatusPanel from './WorkspaceDetailsStatusPanel';
 import WorkspaceDetailsEmpty from './WorkspaceDetailsEmpty';
 import { WorkspaceDetailsIndexFragment_workspace$key } from './__generated__/WorkspaceDetailsIndexFragment_workspace.graphql';
 import { WorkspaceDetailsIndex_DestroyWorkspaceMutation } from './__generated__/WorkspaceDetailsIndex_DestroyWorkspaceMutation.graphql';
 import { WorkspaceDetailsIndex_ReconcileWorkspaceMutation } from './__generated__/WorkspaceDetailsIndex_ReconcileWorkspaceMutation.graphql';
 import LabelList from './labels/LabelList';
-import RunStatusChip from './runs/RunStatusChip';
 import StateVersionDependencies from './state/StateVersionDependencies';
 import StateVersionFile from './state/StateVersionFile';
 import StateVersionInputVariables from './state/StateVersionInputVariables';
@@ -45,6 +38,7 @@ function WorkspaceDetailsIndex(props: Props) {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [showDestroyRunConfirmationDialog, setShowDestroyRunConfirmationDialog] = useState<boolean>(false);
+    const [destroyAutoApply, setDestroyAutoApply] = useState<boolean>(false);
     const [showReconcileDialog, setShowReconcileDialog] = useState(false);
     const [error, setError] = useState<MutationError>();
     const { setState: setCopilotState } = useAgentCopilot();
@@ -73,7 +67,7 @@ function WorkspaceDetailsIndex(props: Props) {
             hasDrift
         }
         ...WorkspaceDetailsEmptyFragment_workspace
-        ...WorkspaceDetailsCurrentApplyRunFragment_workspace
+        ...WorkspaceDetailsStatusPanelFragment_workspace
         ...WorkspaceNotificationPreferenceFragment_workspace
         currentApplyRun {
             id
@@ -87,42 +81,9 @@ function WorkspaceDetailsIndex(props: Props) {
                 ...StateVersionCheckResultsFragment_checkResults
             }
             ...StateVersionFileFragment_stateVersion
-            metadata {
-                createdAt
-            }
             run {
-                ...StateVersionInputVariablesFragment_variables
-                ...ModuleSourceLinkFragment_run
                 id
-                status
-                hasAdvisoryFailures
-                createdBy
-                isDestroy
-                moduleSource
-                moduleVersion
-                metadata {
-                    createdAt
-                }
-                configurationVersion {
-                    id
-                    vcsEvent {
-                        status
-                    }
-                }
-                plan {
-                    status
-                    metadata {
-                        createdAt
-                    }
-                }
-                apply {
-                    status
-                    triggeredBy
-                    metadata {
-                        createdAt
-                        updatedAt
-                    }
-                }
+                ...StateVersionInputVariablesFragment_variables
             }
         }
         ...WorkspaceDetailsDriftDetectionFragment_workspace
@@ -150,6 +111,7 @@ function WorkspaceDetailsIndex(props: Props) {
             variables: {
                 input: {
                     workspacePath: data.fullPath,
+                    autoApply: destroyAutoApply,
                 }
             },
             onCompleted: data => {
@@ -181,6 +143,7 @@ function WorkspaceDetailsIndex(props: Props) {
             onDestroyRun();
         }
         setShowDestroyRunConfirmationDialog(false);
+        setDestroyAutoApply(false);
     };
 
     const [commitReconcile, isReconcileInFlight] = useMutation<WorkspaceDetailsIndex_ReconcileWorkspaceMutation>(graphql`
@@ -256,7 +219,7 @@ function WorkspaceDetailsIndex(props: Props) {
                 sx={{
                     display: "flex",
                     justifyContent: "space-between",
-                    mb: 2,
+                    mb: 4,
                     [theme.breakpoints.down('lg')]: {
                         flexDirection: 'column',
                         alignItems: 'flex-start',
@@ -291,7 +254,7 @@ function WorkspaceDetailsIndex(props: Props) {
                         <WorkspaceNotificationPreference fragmentRef={data} />
                         <TRNButton trn={data.metadata.trn} size="small" />
                     </Stack>
-                    {(data.currentStateVersion && data.currentStateVersion.run) && (
+                    {(!workspaceDestroyed && data.currentStateVersion && data.currentStateVersion.run) && (
                         <Tooltip
                             title={data.preventDestroyPlan ? "Prevent Destroy Run is enabled for this workspace." : "Create a destroy run, which destroys all resources in this workspace."}
                             placement="top"
@@ -326,7 +289,7 @@ function WorkspaceDetailsIndex(props: Props) {
                             color="warning"
                             size="small"
                             component={RouterLink}
-                            to={`/groups/${data.fullPath}/-/settings`}
+                            to={`/groups/${data.fullPath}/-/settings?section=state`}
                         >
                             Manage Workspace Lock
                         </Button>
@@ -359,8 +322,8 @@ function WorkspaceDetailsIndex(props: Props) {
                 </Alert>
             }
 
-            {data.currentApplyRun && <Box marginBottom={2}>
-                <WorkspaceDetailsCurrentApplyRun fragmentRef={data} />
+            {(data.currentApplyRun || data.currentStateVersion) && <Box marginBottom={2}>
+                <WorkspaceDetailsStatusPanel fragmentRef={data} />
             </Box>}
 
             {!data.currentStateVersion && <WorkspaceDetailsEmpty fragmentRef={data} />}
@@ -368,72 +331,6 @@ function WorkspaceDetailsIndex(props: Props) {
             {error && <Alert sx={{ marginTop: 2, mb: 2 }} severity={error.severity}>
                 {error.message}
             </Alert>}
-            {data.currentStateVersion && <Paper sx={{ marginBottom: 2, padding: 2 }} variant="outlined">
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Stack direction="row" spacing={2}>
-                        <StateIcon />
-                        <Typography component="div">
-                            State last updated{' '}
-                            <Timestamp component="span" timestamp={data.currentStateVersion.metadata.createdAt} />
-                            {' '}
-                            {!data.currentStateVersion.run && 'by manual update'}
-                            {data.currentStateVersion.run && <React.Fragment>
-                                by run{' '}
-                                <Link color="secondary" to={`/groups/${data.fullPath}/-/runs/${data.currentStateVersion.run.id}`}>
-                                    {data.currentStateVersion.run.id.substring(0, 8)}...
-                                </Link>
-                            </React.Fragment>}
-                        </Typography>
-                    </Stack>
-                    {data.currentStateVersion.run && <React.Fragment>
-                        <RunStatusChip
-                            to={`/groups/${data.fullPath}/-/runs/${data.currentStateVersion.run.id}`}
-                            status={data.currentStateVersion.run.status}
-                            hasAdvisoryFailures={data.currentStateVersion.run.hasAdvisoryFailures}
-                        />
-                    </React.Fragment>}
-                </Box>
-            </Paper>}
-
-            {data.currentStateVersion?.run?.moduleSource &&
-                <Paper sx={{ marginBottom: 2, padding: 2 }} variant="outlined">
-                    <Stack direction="row" spacing={2}>
-                        <ModuleIcon />
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography color="textSecondary">Module:</Typography>
-                            <ModuleSourceLink fragmentRef={data.currentStateVersion.run} />
-                        </Stack>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography color="textSecondary">Version:</Typography>
-                            <Chip size="small" label={data.currentStateVersion.run.moduleVersion} />
-                        </Stack>
-                    </Stack>
-                </Paper>}
-
-            {data.currentStateVersion?.run?.configurationVersion &&
-                <Paper sx={{ marginBottom: 2, padding: 2 }} variant="outlined">
-                    <Stack direction="row" spacing={2}>
-                        <ModuleIcon />
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography color="textSecondary">Configuration Version:</Typography>
-                            <Tooltip title="view files">
-                                <Typography sx={{ wordBreak: 'break-all' }}>
-                                    <Link
-                                        color="secondary"
-                                        underline="hover"
-                                        to={`/groups/${data.fullPath}/-/configuration_versions/${data.currentStateVersion.run.configurationVersion.id}`}
-                                    >
-                                        {data.currentStateVersion.run.configurationVersion.id.substring(0, 8)}...
-                                    </Link>
-                                </Typography>
-                            </Tooltip>
-                            <IconButton sx={{ padding: 0 }} onClick={() => navigator.clipboard.writeText(data.currentStateVersion?.run?.configurationVersion?.id ?? '')}>
-                                <CopyIcon sx={{ width: 16, height: 16 }} />
-                            </IconButton>
-                        </Stack>
-                    </Stack>
-                </Paper>}
-
             {data.currentStateVersion && <React.Fragment>
                 <Box sx={{ borderBottom: 1, borderColor: 'divider', marginBottom: 2 }}>
                     <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
@@ -465,7 +362,7 @@ function WorkspaceDetailsIndex(props: Props) {
                 <ConfirmationDialog
                     title="Destroy Workspace"
                     maxWidth="sm"
-                    confirmLabel="Destroy"
+                    confirmLabel={destroyAutoApply ? "Destroy" : "Create Destroy Plan"}
                     confirmInProgress={destroyWorkspaceIsInFlight ?? false}
                     onConfirm={() => onDestroyConfirmationDialogClosed(true)}
                     onClose={() => onDestroyConfirmationDialogClosed()}
@@ -474,8 +371,27 @@ function WorkspaceDetailsIndex(props: Props) {
                         <AlertTitle>Warning</AlertTitle>
                         Initiating a destroy workspace run will <strong><ins>permanently</ins></strong> destroy all resources managed by this workspace.
                         This operation will use the same module or configuration version that created the current workspace state. Any variables used in
-                        the most recent successful apply operation will automatically be included. The created plan will have to be applied manually.
+                        the most recent successful apply operation will automatically be included.
                     </Alert>
+                    <Paper variant="outlined" sx={{ mt: 2, p: 2 }}>
+                        <FormControlLabel
+                            sx={{ alignItems: 'flex-start', m: 0, gap: 1 }}
+                            control={
+                                <Switch
+                                    checked={destroyAutoApply}
+                                    onChange={e => setDestroyAutoApply(e.target.checked)}
+                                />
+                            }
+                            label={
+                                <Box sx={{ pt: 0.75 }}>
+                                    <Typography variant="subtitle1" fontWeight={500}>Auto apply</Typography>
+                                    <Typography variant="body2" color="textSecondary">
+                                        Automatically apply the destroy plan once it completes successfully, without waiting for manual approval.
+                                    </Typography>
+                                </Box>
+                            }
+                        />
+                    </Paper>
                 </ConfirmationDialog>
             )}
             {showReconcileDialog && (

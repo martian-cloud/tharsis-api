@@ -8,6 +8,7 @@ import "metadata.proto";
 import "pagination.proto";
 import "plan.proto";
 import "apply.proto";
+import "run_gate.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
@@ -42,6 +43,14 @@ service Runs {
   rpc SubscribeToRunEvents(SubscribeToRunEventsRequest) returns (stream RunEvent);
   // CreateDestroyRunForWorkspace creates a destroy run using the workspace's current state.
   rpc CreateDestroyRunForWorkspace(CreateDestroyRunForWorkspaceRequest) returns (Run);
+  // DiscardRun discards a run that is waiting on a human decision: planned, or blocked at a policy
+  // gate (pre-plan, post-plan or pre-apply awaiting decision).
+  rpc DiscardRun(DiscardRunRequest) returns (Run);
+  // UndiscardRun reverses a discard, moving a discarded run back to planned.
+  rpc UndiscardRun(UndiscardRunRequest) returns (Run);
+  // GetPolicyCheckResults returns a policy check with one result per policy, carrying the violation
+  // messages it reported, and the run gate blocking the check, if any.
+  rpc GetPolicyCheckResults(GetPolicyCheckResultsRequest) returns (PolicyCheckResults);
 }
 
 // RunSortableField defines enums that allow sorting a paginated list of Runs.
@@ -199,6 +208,23 @@ message CancelRunRequest {
 // CreateDestroyRunForWorkspaceRequest is the input for creating a destroy run for a workspace.
 message CreateDestroyRunForWorkspaceRequest {
   string workspace_id = 1;
+  bool   auto_apply   = 2;
+}
+
+// DiscardRunRequest is the input for discarding a Run.
+message DiscardRunRequest {
+  string run_id = 1;
+}
+
+// UndiscardRunRequest is the input for undiscarding a Run.
+message UndiscardRunRequest {
+  string run_id = 1;
+}
+
+// GetPolicyCheckResultsRequest is the input for retrieving a policy check's results.
+message GetPolicyCheckResultsRequest {
+  // policy_check_id is the policy check's RunNode GID (PolicyCheck.id).
+  string policy_check_id = 1;
 }
 
 // GetRunVariablesRequest is the input for getting run variables.
@@ -348,6 +374,24 @@ message RunPolicyOutcomeInput {
 message ReportRunPolicyOutcomesRequest {
   string                     policy_check_id = 1;
   repeated RunPolicyOutcomeInput outcomes        = 2;
+}
+
+// PolicyCheckPolicyResult is a single policy a check evaluated, with the violation messages it
+// reported in display order (empty when it reported none).
+message PolicyCheckPolicyResult {
+  PolicyCheckPolicy policy   = 1;
+  repeated string   messages = 2;
+}
+
+// PolicyCheckResults is a policy check with one result per policy it evaluates, and the gate
+// blocking it.
+message PolicyCheckResults {
+  // policy_check.policies is left empty; each policy is listed once, under policy_results.
+  PolicyCheck                      policy_check   = 1;
+  // policy_results has one entry per policy, in the check's policy order.
+  repeated PolicyCheckPolicyResult policy_results = 2;
+  // run_gate is unset when the check is not gated.
+  optional run_gate.RunGate        run_gate       = 3;
 }
 
 // RunVariable represents a variable used in a run.

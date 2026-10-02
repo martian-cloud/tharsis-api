@@ -55,13 +55,14 @@ func TestCreateDestroyRun_Prepare(t *testing.T) {
 			uploadedVars = variables
 			return nil, "vars-key", nil
 		},
-		in: &CreateDestroyRunInput{Subject: "u", WorkspaceID: "ws-1"},
+		in: &CreateDestroyRunInput{Subject: "u", WorkspaceID: "ws-1", AutoApply: true},
 	}
 
 	require.NoError(t, cmd.Prepare(ctx))
 	require.NotNil(t, cmd.createInput)
 	assert.True(t, cmd.createInput.IsDestroy)
 	assert.True(t, cmd.createInput.Refresh)
+	assert.True(t, cmd.createInput.AutoApply)
 	assert.Equal(t, "1.4.0", cmd.createInput.TerraformVersion)
 	assert.Equal(t, "vars-key", cmd.createInput.VariablesObjectStoreKey)
 	require.Len(t, uploadedVars, 1)

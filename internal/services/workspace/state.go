@@ -394,6 +394,7 @@ type stateV4 struct {
 }
 
 type checkResultV4 struct {
+	ObjectKind string                `json:"object_kind"`
 	ConfigAddr string                `json:"config_addr"`
 	Status     string                `json:"status"`
 	Objects    []checkResultObjectV4 `json:"objects"`

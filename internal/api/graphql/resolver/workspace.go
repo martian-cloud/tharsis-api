@@ -758,6 +758,7 @@ type DestroyWorkspaceInput struct {
 	ClientMutationID *string
 	WorkspacePath    *string // DEPRECATED: use WorkspaceID instead with a TRN
 	WorkspaceID      *string
+	AutoApply        *bool
 }
 
 // ReconcileWorkspaceInput contains the input for reconciling a workspace
@@ -1079,6 +1080,7 @@ func destroyWorkspaceMutation(ctx context.Context, input *DestroyWorkspaceInput)
 
 	run, err := getServiceCatalog(ctx).RunService.CreateDestroyRunForWorkspace(ctx, &run.CreateDestroyRunForWorkspaceInput{
 		WorkspaceID: workspaceID,
+		AutoApply:   input.AutoApply != nil && *input.AutoApply,
 	})
 	if err != nil {
 		return nil, err

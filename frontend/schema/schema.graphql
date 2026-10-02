@@ -1515,6 +1515,7 @@ type DeleteWorkspaceVCSProviderLinkPayload {
 }
 
 input DestroyWorkspaceInput {
+  autoApply: Boolean
   clientMutationId: String
   workspaceId: String
   workspacePath: String

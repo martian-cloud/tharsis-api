@@ -694,8 +694,8 @@ type CreateRunRequest struct {
 	// false when unset.
 	AutoApply *bool `protobuf:"varint,13,opt,name=auto_apply,json=autoApply,proto3,oneof" json:"auto_apply,omitempty"`
 	// annotations are immutable key/value pairs (with an optional link) attached to the run at
-	// creation, letting it be traced back to what created it. Duplicate keys allowed; count and
-	// length limits are enforced by the server on create.
+	// creation, letting it be traced back to what created it. Duplicate keys allowed; the count and
+	// the annotations' total serialized size are limited by the server on create.
 	Annotations   []*RunAnnotation `protobuf:"bytes,14,rep,name=annotations,proto3" json:"annotations,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -931,6 +931,7 @@ func (x *CancelRunRequest) GetForce() bool {
 type CreateDestroyRunForWorkspaceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	AutoApply     bool                   `protobuf:"varint,2,opt,name=auto_apply,json=autoApply,proto3" json:"auto_apply,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -972,6 +973,149 @@ func (x *CreateDestroyRunForWorkspaceRequest) GetWorkspaceId() string {
 	return ""
 }
 
+func (x *CreateDestroyRunForWorkspaceRequest) GetAutoApply() bool {
+	if x != nil {
+		return x.AutoApply
+	}
+	return false
+}
+
+// DiscardRunRequest is the input for discarding a Run.
+type DiscardRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscardRunRequest) Reset() {
+	*x = DiscardRunRequest{}
+	mi := &file_run_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscardRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscardRunRequest) ProtoMessage() {}
+
+func (x *DiscardRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscardRunRequest.ProtoReflect.Descriptor instead.
+func (*DiscardRunRequest) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *DiscardRunRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+// UndiscardRunRequest is the input for undiscarding a Run.
+type UndiscardRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UndiscardRunRequest) Reset() {
+	*x = UndiscardRunRequest{}
+	mi := &file_run_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UndiscardRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UndiscardRunRequest) ProtoMessage() {}
+
+func (x *UndiscardRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UndiscardRunRequest.ProtoReflect.Descriptor instead.
+func (*UndiscardRunRequest) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *UndiscardRunRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+// GetPolicyCheckResultsRequest is the input for retrieving a policy check's results.
+type GetPolicyCheckResultsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// policy_check_id is the policy check's RunNode GID (PolicyCheck.id).
+	PolicyCheckId string `protobuf:"bytes,1,opt,name=policy_check_id,json=policyCheckId,proto3" json:"policy_check_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPolicyCheckResultsRequest) Reset() {
+	*x = GetPolicyCheckResultsRequest{}
+	mi := &file_run_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPolicyCheckResultsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPolicyCheckResultsRequest) ProtoMessage() {}
+
+func (x *GetPolicyCheckResultsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPolicyCheckResultsRequest.ProtoReflect.Descriptor instead.
+func (*GetPolicyCheckResultsRequest) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetPolicyCheckResultsRequest) GetPolicyCheckId() string {
+	if x != nil {
+		return x.PolicyCheckId
+	}
+	return ""
+}
+
 // GetRunVariablesRequest is the input for getting run variables.
 type GetRunVariablesRequest struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
@@ -983,7 +1127,7 @@ type GetRunVariablesRequest struct {
 
 func (x *GetRunVariablesRequest) Reset() {
 	*x = GetRunVariablesRequest{}
-	mi := &file_run_proto_msgTypes[6]
+	mi := &file_run_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -995,7 +1139,7 @@ func (x *GetRunVariablesRequest) String() string {
 func (*GetRunVariablesRequest) ProtoMessage() {}
 
 func (x *GetRunVariablesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[6]
+	mi := &file_run_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1008,7 +1152,7 @@ func (x *GetRunVariablesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRunVariablesRequest.ProtoReflect.Descriptor instead.
 func (*GetRunVariablesRequest) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{6}
+	return file_run_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetRunVariablesRequest) GetId() string {
@@ -1037,7 +1181,7 @@ type SubscribeToRunEventsRequest struct {
 
 func (x *SubscribeToRunEventsRequest) Reset() {
 	*x = SubscribeToRunEventsRequest{}
-	mi := &file_run_proto_msgTypes[7]
+	mi := &file_run_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1049,7 +1193,7 @@ func (x *SubscribeToRunEventsRequest) String() string {
 func (*SubscribeToRunEventsRequest) ProtoMessage() {}
 
 func (x *SubscribeToRunEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[7]
+	mi := &file_run_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1062,7 +1206,7 @@ func (x *SubscribeToRunEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeToRunEventsRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeToRunEventsRequest) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{7}
+	return file_run_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SubscribeToRunEventsRequest) GetWorkspaceId() string {
@@ -1098,7 +1242,7 @@ type RunVariableInput struct {
 
 func (x *RunVariableInput) Reset() {
 	*x = RunVariableInput{}
-	mi := &file_run_proto_msgTypes[8]
+	mi := &file_run_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1110,7 +1254,7 @@ func (x *RunVariableInput) String() string {
 func (*RunVariableInput) ProtoMessage() {}
 
 func (x *RunVariableInput) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[8]
+	mi := &file_run_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1123,7 +1267,7 @@ func (x *RunVariableInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunVariableInput.ProtoReflect.Descriptor instead.
 func (*RunVariableInput) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{8}
+	return file_run_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RunVariableInput) GetCategory() string {
@@ -1158,7 +1302,7 @@ type SetVariablesIncludedInTFConfigRequest struct {
 
 func (x *SetVariablesIncludedInTFConfigRequest) Reset() {
 	*x = SetVariablesIncludedInTFConfigRequest{}
-	mi := &file_run_proto_msgTypes[9]
+	mi := &file_run_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1170,7 +1314,7 @@ func (x *SetVariablesIncludedInTFConfigRequest) String() string {
 func (*SetVariablesIncludedInTFConfigRequest) ProtoMessage() {}
 
 func (x *SetVariablesIncludedInTFConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[9]
+	mi := &file_run_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1183,7 +1327,7 @@ func (x *SetVariablesIncludedInTFConfigRequest) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use SetVariablesIncludedInTFConfigRequest.ProtoReflect.Descriptor instead.
 func (*SetVariablesIncludedInTFConfigRequest) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{9}
+	return file_run_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SetVariablesIncludedInTFConfigRequest) GetRunId() string {
@@ -1238,7 +1382,7 @@ type Run struct {
 
 func (x *Run) Reset() {
 	*x = Run{}
-	mi := &file_run_proto_msgTypes[10]
+	mi := &file_run_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1250,7 +1394,7 @@ func (x *Run) String() string {
 func (*Run) ProtoMessage() {}
 
 func (x *Run) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[10]
+	mi := &file_run_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1263,7 +1407,7 @@ func (x *Run) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Run.ProtoReflect.Descriptor instead.
 func (*Run) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{10}
+	return file_run_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Run) GetMetadata() *ResourceMetadata {
@@ -1459,7 +1603,8 @@ func (x *Run) GetAnnotations() []*RunAnnotation {
 // RunAnnotation is an immutable key/value pair (with an optional link) attached to a run at
 // creation, letting the run be traced back to what created it. The key must be a valid name
 // (lowercase alphanumerics with - and _ in non-leading/trailing positions); key and value are
-// required and non-empty. Length limits are enforced by the server on create.
+// required and non-empty. A run's annotations are limited by count and by their total serialized
+// size, both enforced by the server on create.
 type RunAnnotation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -1471,7 +1616,7 @@ type RunAnnotation struct {
 
 func (x *RunAnnotation) Reset() {
 	*x = RunAnnotation{}
-	mi := &file_run_proto_msgTypes[11]
+	mi := &file_run_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1483,7 +1628,7 @@ func (x *RunAnnotation) String() string {
 func (*RunAnnotation) ProtoMessage() {}
 
 func (x *RunAnnotation) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[11]
+	mi := &file_run_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1496,7 +1641,7 @@ func (x *RunAnnotation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunAnnotation.ProtoReflect.Descriptor instead.
 func (*RunAnnotation) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{11}
+	return file_run_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RunAnnotation) GetKey() string {
@@ -1535,7 +1680,7 @@ type RunTaskStage struct {
 
 func (x *RunTaskStage) Reset() {
 	*x = RunTaskStage{}
-	mi := &file_run_proto_msgTypes[12]
+	mi := &file_run_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1547,7 +1692,7 @@ func (x *RunTaskStage) String() string {
 func (*RunTaskStage) ProtoMessage() {}
 
 func (x *RunTaskStage) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[12]
+	mi := &file_run_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1560,7 +1705,7 @@ func (x *RunTaskStage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunTaskStage.ProtoReflect.Descriptor instead.
 func (*RunTaskStage) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{12}
+	return file_run_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RunTaskStage) GetId() string {
@@ -1607,7 +1752,7 @@ type PolicyCheck struct {
 
 func (x *PolicyCheck) Reset() {
 	*x = PolicyCheck{}
-	mi := &file_run_proto_msgTypes[13]
+	mi := &file_run_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1619,7 +1764,7 @@ func (x *PolicyCheck) String() string {
 func (*PolicyCheck) ProtoMessage() {}
 
 func (x *PolicyCheck) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[13]
+	mi := &file_run_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1632,7 +1777,7 @@ func (x *PolicyCheck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolicyCheck.ProtoReflect.Descriptor instead.
 func (*PolicyCheck) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{13}
+	return file_run_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PolicyCheck) GetId() string {
@@ -1692,7 +1837,7 @@ type OPAPolicyCheckData struct {
 
 func (x *OPAPolicyCheckData) Reset() {
 	*x = OPAPolicyCheckData{}
-	mi := &file_run_proto_msgTypes[14]
+	mi := &file_run_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1704,7 +1849,7 @@ func (x *OPAPolicyCheckData) String() string {
 func (*OPAPolicyCheckData) ProtoMessage() {}
 
 func (x *OPAPolicyCheckData) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[14]
+	mi := &file_run_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1717,7 +1862,7 @@ func (x *OPAPolicyCheckData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OPAPolicyCheckData.ProtoReflect.Descriptor instead.
 func (*OPAPolicyCheckData) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{14}
+	return file_run_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *OPAPolicyCheckData) GetPackageSource() string {
@@ -1754,7 +1899,7 @@ type ModuleAttestationPolicyCheckData struct {
 
 func (x *ModuleAttestationPolicyCheckData) Reset() {
 	*x = ModuleAttestationPolicyCheckData{}
-	mi := &file_run_proto_msgTypes[15]
+	mi := &file_run_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1766,7 +1911,7 @@ func (x *ModuleAttestationPolicyCheckData) String() string {
 func (*ModuleAttestationPolicyCheckData) ProtoMessage() {}
 
 func (x *ModuleAttestationPolicyCheckData) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[15]
+	mi := &file_run_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1779,7 +1924,7 @@ func (x *ModuleAttestationPolicyCheckData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModuleAttestationPolicyCheckData.ProtoReflect.Descriptor instead.
 func (*ModuleAttestationPolicyCheckData) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{15}
+	return file_run_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ModuleAttestationPolicyCheckData) GetPublicKey() string {
@@ -1825,7 +1970,7 @@ type PolicyCheckPolicy struct {
 
 func (x *PolicyCheckPolicy) Reset() {
 	*x = PolicyCheckPolicy{}
-	mi := &file_run_proto_msgTypes[16]
+	mi := &file_run_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1837,7 +1982,7 @@ func (x *PolicyCheckPolicy) String() string {
 func (*PolicyCheckPolicy) ProtoMessage() {}
 
 func (x *PolicyCheckPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[16]
+	mi := &file_run_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1850,7 +1995,7 @@ func (x *PolicyCheckPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolicyCheckPolicy.ProtoReflect.Descriptor instead.
 func (*PolicyCheckPolicy) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{16}
+	return file_run_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PolicyCheckPolicy) GetId() string {
@@ -1907,7 +2052,7 @@ type PolicyCheckPolicyProvenance struct {
 
 func (x *PolicyCheckPolicyProvenance) Reset() {
 	*x = PolicyCheckPolicyProvenance{}
-	mi := &file_run_proto_msgTypes[17]
+	mi := &file_run_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1919,7 +2064,7 @@ func (x *PolicyCheckPolicyProvenance) String() string {
 func (*PolicyCheckPolicyProvenance) ProtoMessage() {}
 
 func (x *PolicyCheckPolicyProvenance) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[17]
+	mi := &file_run_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1932,7 +2077,7 @@ func (x *PolicyCheckPolicyProvenance) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolicyCheckPolicyProvenance.ProtoReflect.Descriptor instead.
 func (*PolicyCheckPolicyProvenance) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{17}
+	return file_run_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *PolicyCheckPolicyProvenance) GetGroupId() string {
@@ -1964,7 +2109,7 @@ type RunPolicyOutcomeInput struct {
 
 func (x *RunPolicyOutcomeInput) Reset() {
 	*x = RunPolicyOutcomeInput{}
-	mi := &file_run_proto_msgTypes[18]
+	mi := &file_run_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1976,7 +2121,7 @@ func (x *RunPolicyOutcomeInput) String() string {
 func (*RunPolicyOutcomeInput) ProtoMessage() {}
 
 func (x *RunPolicyOutcomeInput) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[18]
+	mi := &file_run_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1989,7 +2134,7 @@ func (x *RunPolicyOutcomeInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunPolicyOutcomeInput.ProtoReflect.Descriptor instead.
 func (*RunPolicyOutcomeInput) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{18}
+	return file_run_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RunPolicyOutcomeInput) GetPolicyId() string {
@@ -2025,7 +2170,7 @@ type ReportRunPolicyOutcomesRequest struct {
 
 func (x *ReportRunPolicyOutcomesRequest) Reset() {
 	*x = ReportRunPolicyOutcomesRequest{}
-	mi := &file_run_proto_msgTypes[19]
+	mi := &file_run_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2037,7 +2182,7 @@ func (x *ReportRunPolicyOutcomesRequest) String() string {
 func (*ReportRunPolicyOutcomesRequest) ProtoMessage() {}
 
 func (x *ReportRunPolicyOutcomesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[19]
+	mi := &file_run_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2050,7 +2195,7 @@ func (x *ReportRunPolicyOutcomesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportRunPolicyOutcomesRequest.ProtoReflect.Descriptor instead.
 func (*ReportRunPolicyOutcomesRequest) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{19}
+	return file_run_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ReportRunPolicyOutcomesRequest) GetPolicyCheckId() string {
@@ -2063,6 +2208,125 @@ func (x *ReportRunPolicyOutcomesRequest) GetPolicyCheckId() string {
 func (x *ReportRunPolicyOutcomesRequest) GetOutcomes() []*RunPolicyOutcomeInput {
 	if x != nil {
 		return x.Outcomes
+	}
+	return nil
+}
+
+// PolicyCheckPolicyResult is a single policy a check evaluated, with the violation messages it
+// reported in display order (empty when it reported none).
+type PolicyCheckPolicyResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Policy        *PolicyCheckPolicy     `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"`
+	Messages      []string               `protobuf:"bytes,2,rep,name=messages,proto3" json:"messages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PolicyCheckPolicyResult) Reset() {
+	*x = PolicyCheckPolicyResult{}
+	mi := &file_run_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PolicyCheckPolicyResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PolicyCheckPolicyResult) ProtoMessage() {}
+
+func (x *PolicyCheckPolicyResult) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PolicyCheckPolicyResult.ProtoReflect.Descriptor instead.
+func (*PolicyCheckPolicyResult) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *PolicyCheckPolicyResult) GetPolicy() *PolicyCheckPolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+func (x *PolicyCheckPolicyResult) GetMessages() []string {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+// PolicyCheckResults is a policy check with one result per policy it evaluates, and the gate
+// blocking it.
+type PolicyCheckResults struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// policy_check.policies is left empty; each policy is listed once, under policy_results.
+	PolicyCheck *PolicyCheck `protobuf:"bytes,1,opt,name=policy_check,json=policyCheck,proto3" json:"policy_check,omitempty"`
+	// policy_results has one entry per policy, in the check's policy order.
+	PolicyResults []*PolicyCheckPolicyResult `protobuf:"bytes,2,rep,name=policy_results,json=policyResults,proto3" json:"policy_results,omitempty"`
+	// run_gate is unset when the check is not gated.
+	RunGate       *RunGate `protobuf:"bytes,3,opt,name=run_gate,json=runGate,proto3,oneof" json:"run_gate,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PolicyCheckResults) Reset() {
+	*x = PolicyCheckResults{}
+	mi := &file_run_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PolicyCheckResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PolicyCheckResults) ProtoMessage() {}
+
+func (x *PolicyCheckResults) ProtoReflect() protoreflect.Message {
+	mi := &file_run_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PolicyCheckResults.ProtoReflect.Descriptor instead.
+func (*PolicyCheckResults) Descriptor() ([]byte, []int) {
+	return file_run_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *PolicyCheckResults) GetPolicyCheck() *PolicyCheck {
+	if x != nil {
+		return x.PolicyCheck
+	}
+	return nil
+}
+
+func (x *PolicyCheckResults) GetPolicyResults() []*PolicyCheckPolicyResult {
+	if x != nil {
+		return x.PolicyResults
+	}
+	return nil
+}
+
+func (x *PolicyCheckResults) GetRunGate() *RunGate {
+	if x != nil {
+		return x.RunGate
 	}
 	return nil
 }
@@ -2083,7 +2347,7 @@ type RunVariable struct {
 
 func (x *RunVariable) Reset() {
 	*x = RunVariable{}
-	mi := &file_run_proto_msgTypes[20]
+	mi := &file_run_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2095,7 +2359,7 @@ func (x *RunVariable) String() string {
 func (*RunVariable) ProtoMessage() {}
 
 func (x *RunVariable) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[20]
+	mi := &file_run_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2108,7 +2372,7 @@ func (x *RunVariable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunVariable.ProtoReflect.Descriptor instead.
 func (*RunVariable) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{20}
+	return file_run_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *RunVariable) GetNamespacePath() string {
@@ -2171,7 +2435,7 @@ type RunEvent struct {
 
 func (x *RunEvent) Reset() {
 	*x = RunEvent{}
-	mi := &file_run_proto_msgTypes[21]
+	mi := &file_run_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2183,7 +2447,7 @@ func (x *RunEvent) String() string {
 func (*RunEvent) ProtoMessage() {}
 
 func (x *RunEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[21]
+	mi := &file_run_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2196,7 +2460,7 @@ func (x *RunEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunEvent.ProtoReflect.Descriptor instead.
 func (*RunEvent) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{21}
+	return file_run_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RunEvent) GetAction() string {
@@ -2224,7 +2488,7 @@ type GetRunsResponse struct {
 
 func (x *GetRunsResponse) Reset() {
 	*x = GetRunsResponse{}
-	mi := &file_run_proto_msgTypes[22]
+	mi := &file_run_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2236,7 +2500,7 @@ func (x *GetRunsResponse) String() string {
 func (*GetRunsResponse) ProtoMessage() {}
 
 func (x *GetRunsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[22]
+	mi := &file_run_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2249,7 +2513,7 @@ func (x *GetRunsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRunsResponse.ProtoReflect.Descriptor instead.
 func (*GetRunsResponse) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{22}
+	return file_run_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetRunsResponse) GetRuns() []*Run {
@@ -2276,7 +2540,7 @@ type GetRunVariablesResponse struct {
 
 func (x *GetRunVariablesResponse) Reset() {
 	*x = GetRunVariablesResponse{}
-	mi := &file_run_proto_msgTypes[23]
+	mi := &file_run_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2288,7 +2552,7 @@ func (x *GetRunVariablesResponse) String() string {
 func (*GetRunVariablesResponse) ProtoMessage() {}
 
 func (x *GetRunVariablesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_run_proto_msgTypes[23]
+	mi := &file_run_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2301,7 +2565,7 @@ func (x *GetRunVariablesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRunVariablesResponse.ProtoReflect.Descriptor instead.
 func (*GetRunVariablesResponse) Descriptor() ([]byte, []int) {
-	return file_run_proto_rawDescGZIP(), []int{23}
+	return file_run_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetRunVariablesResponse) GetVariables() []*RunVariable {
@@ -2316,7 +2580,7 @@ var File_run_proto protoreflect.FileDescriptor
 const file_run_proto_rawDesc = "" +
 	"\n" +
 	"\trun.proto\x12\x1cmartiancloud.tharsis.api.run\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\n" +
-	"plan.proto\x1a\vapply.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"#\n" +
+	"plan.proto\x1a\vapply.proto\x1a\x0erun_gate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"#\n" +
 	"\x11GetRunByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x98\x03\n" +
 	"\x0eGetRunsRequest\x12j\n" +
@@ -2362,9 +2626,17 @@ const file_run_proto_rawDesc = "" +
 	"\x10CancelRunRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\x05force\x18\x02 \x01(\bH\x00R\x05force\x88\x01\x01B\b\n" +
-	"\x06_force\"H\n" +
+	"\x06_force\"g\n" +
 	"#CreateDestroyRunForWorkspaceRequest\x12!\n" +
-	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"b\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1d\n" +
+	"\n" +
+	"auto_apply\x18\x02 \x01(\bR\tautoApply\"*\n" +
+	"\x11DiscardRunRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\",\n" +
+	"\x13UndiscardRunRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\"F\n" +
+	"\x1cGetPolicyCheckResultsRequest\x12&\n" +
+	"\x0fpolicy_check_id\x18\x01 \x01(\tR\rpolicyCheckId\"b\n" +
 	"\x16GetRunVariablesRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x128\n" +
 	"\x18include_sensitive_values\x18\x02 \x01(\bR\x16includeSensitiveValues\"\xc4\x01\n" +
@@ -2477,7 +2749,15 @@ const file_run_proto_rawDesc = "" +
 	"\bmessages\x18\x03 \x03(\tR\bmessages\"\x99\x01\n" +
 	"\x1eReportRunPolicyOutcomesRequest\x12&\n" +
 	"\x0fpolicy_check_id\x18\x01 \x01(\tR\rpolicyCheckId\x12O\n" +
-	"\boutcomes\x18\x02 \x03(\v23.martiancloud.tharsis.api.run.RunPolicyOutcomeInputR\boutcomes\"\xa3\x02\n" +
+	"\boutcomes\x18\x02 \x03(\v23.martiancloud.tharsis.api.run.RunPolicyOutcomeInputR\boutcomes\"~\n" +
+	"\x17PolicyCheckPolicyResult\x12G\n" +
+	"\x06policy\x18\x01 \x01(\v2/.martiancloud.tharsis.api.run.PolicyCheckPolicyR\x06policy\x12\x1a\n" +
+	"\bmessages\x18\x02 \x03(\tR\bmessages\"\x99\x02\n" +
+	"\x12PolicyCheckResults\x12L\n" +
+	"\fpolicy_check\x18\x01 \x01(\v2).martiancloud.tharsis.api.run.PolicyCheckR\vpolicyCheck\x12\\\n" +
+	"\x0epolicy_results\x18\x02 \x03(\v25.martiancloud.tharsis.api.run.PolicyCheckPolicyResultR\rpolicyResults\x12J\n" +
+	"\brun_gate\x18\x03 \x01(\v2*.martiancloud.tharsis.api.run_gate.RunGateH\x00R\arunGate\x88\x01\x01B\v\n" +
+	"\t_run_gate\"\xa3\x02\n" +
 	"\vRunVariable\x12*\n" +
 	"\x0enamespace_path\x18\x01 \x01(\tH\x00R\rnamespacePath\x88\x01\x01\x12\x1a\n" +
 	"\bcategory\x18\x02 \x01(\tR\bcategory\x12\x10\n" +
@@ -2572,7 +2852,7 @@ const file_run_proto_rawDesc = "" +
 	"$POLICY_ENFORCEMENT_LEVEL_UNSPECIFIED\x10\x00\x12%\n" +
 	"!POLICY_ENFORCEMENT_LEVEL_ADVISORY\x10\x01\x12+\n" +
 	"'POLICY_ENFORCEMENT_LEVEL_SOFT_MANDATORY\x10\x02\x12+\n" +
-	"'POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY\x10\x032\x84\f\n" +
+	"'POLICY_ENFORCEMENT_LEVEL_HARD_MANDATORY\x10\x032\xd4\x0e\n" +
 	"\x04Runs\x12`\n" +
 	"\n" +
 	"GetRunByID\x12/.martiancloud.tharsis.api.run.GetRunByIDRequest\x1a!.martiancloud.tharsis.api.run.Run\x12f\n" +
@@ -2589,7 +2869,11 @@ const file_run_proto_rawDesc = "" +
 	"\vUpdateApply\x122.martiancloud.tharsis.api.apply.UpdateApplyRequest\x1a%.martiancloud.tharsis.api.apply.Apply\x12}\n" +
 	"\x1eSetVariablesIncludedInTFConfig\x12C.martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest\x1a\x16.google.protobuf.Empty\x12{\n" +
 	"\x14SubscribeToRunEvents\x129.martiancloud.tharsis.api.run.SubscribeToRunEventsRequest\x1a&.martiancloud.tharsis.api.run.RunEvent0\x01\x12\x84\x01\n" +
-	"\x1cCreateDestroyRunForWorkspace\x12A.martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest\x1a!.martiancloud.tharsis.api.run.RunBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
+	"\x1cCreateDestroyRunForWorkspace\x12A.martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest\x1a!.martiancloud.tharsis.api.run.Run\x12`\n" +
+	"\n" +
+	"DiscardRun\x12/.martiancloud.tharsis.api.run.DiscardRunRequest\x1a!.martiancloud.tharsis.api.run.Run\x12d\n" +
+	"\fUndiscardRun\x121.martiancloud.tharsis.api.run.UndiscardRunRequest\x1a!.martiancloud.tharsis.api.run.Run\x12\x85\x01\n" +
+	"\x15GetPolicyCheckResults\x12:.martiancloud.tharsis.api.run.GetPolicyCheckResultsRequest\x1a0.martiancloud.tharsis.api.run.PolicyCheckResultsBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var (
 	file_run_proto_rawDescOnce sync.Once
@@ -2604,7 +2888,7 @@ func file_run_proto_rawDescGZIP() []byte {
 }
 
 var file_run_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
-var file_run_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_run_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_run_proto_goTypes = []any{
 	(RunSortableField)(0),                         // 0: martiancloud.tharsis.api.run.RunSortableField
 	(RunStatus)(0),                                // 1: martiancloud.tharsis.api.run.RunStatus
@@ -2620,98 +2904,114 @@ var file_run_proto_goTypes = []any{
 	(*ApplyRunRequest)(nil),                       // 11: martiancloud.tharsis.api.run.ApplyRunRequest
 	(*CancelRunRequest)(nil),                      // 12: martiancloud.tharsis.api.run.CancelRunRequest
 	(*CreateDestroyRunForWorkspaceRequest)(nil),   // 13: martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
-	(*GetRunVariablesRequest)(nil),                // 14: martiancloud.tharsis.api.run.GetRunVariablesRequest
-	(*SubscribeToRunEventsRequest)(nil),           // 15: martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
-	(*RunVariableInput)(nil),                      // 16: martiancloud.tharsis.api.run.RunVariableInput
-	(*SetVariablesIncludedInTFConfigRequest)(nil), // 17: martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
-	(*Run)(nil),                                   // 18: martiancloud.tharsis.api.run.Run
-	(*RunAnnotation)(nil),                         // 19: martiancloud.tharsis.api.run.RunAnnotation
-	(*RunTaskStage)(nil),                          // 20: martiancloud.tharsis.api.run.RunTaskStage
-	(*PolicyCheck)(nil),                           // 21: martiancloud.tharsis.api.run.PolicyCheck
-	(*OPAPolicyCheckData)(nil),                    // 22: martiancloud.tharsis.api.run.OPAPolicyCheckData
-	(*ModuleAttestationPolicyCheckData)(nil),      // 23: martiancloud.tharsis.api.run.ModuleAttestationPolicyCheckData
-	(*PolicyCheckPolicy)(nil),                     // 24: martiancloud.tharsis.api.run.PolicyCheckPolicy
-	(*PolicyCheckPolicyProvenance)(nil),           // 25: martiancloud.tharsis.api.run.PolicyCheckPolicyProvenance
-	(*RunPolicyOutcomeInput)(nil),                 // 26: martiancloud.tharsis.api.run.RunPolicyOutcomeInput
-	(*ReportRunPolicyOutcomesRequest)(nil),        // 27: martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest
-	(*RunVariable)(nil),                           // 28: martiancloud.tharsis.api.run.RunVariable
-	(*RunEvent)(nil),                              // 29: martiancloud.tharsis.api.run.RunEvent
-	(*GetRunsResponse)(nil),                       // 30: martiancloud.tharsis.api.run.GetRunsResponse
-	(*GetRunVariablesResponse)(nil),               // 31: martiancloud.tharsis.api.run.GetRunVariablesResponse
-	(*PaginationOptions)(nil),                     // 32: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),                      // 33: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*timestamppb.Timestamp)(nil),                 // 34: google.protobuf.Timestamp
-	(*Plan)(nil),                                  // 35: martiancloud.tharsis.api.plan.Plan
-	(*Apply)(nil),                                 // 36: martiancloud.tharsis.api.apply.Apply
-	(*PageInfo)(nil),                              // 37: martiancloud.tharsis.api.pagination.PageInfo
-	(*GetPlanByIDRequest)(nil),                    // 38: martiancloud.tharsis.api.plan.GetPlanByIDRequest
-	(*GetApplyByIDRequest)(nil),                   // 39: martiancloud.tharsis.api.apply.GetApplyByIDRequest
-	(*UpdatePlanRequest)(nil),                     // 40: martiancloud.tharsis.api.plan.UpdatePlanRequest
-	(*UpdateApplyRequest)(nil),                    // 41: martiancloud.tharsis.api.apply.UpdateApplyRequest
-	(*emptypb.Empty)(nil),                         // 42: google.protobuf.Empty
+	(*DiscardRunRequest)(nil),                     // 14: martiancloud.tharsis.api.run.DiscardRunRequest
+	(*UndiscardRunRequest)(nil),                   // 15: martiancloud.tharsis.api.run.UndiscardRunRequest
+	(*GetPolicyCheckResultsRequest)(nil),          // 16: martiancloud.tharsis.api.run.GetPolicyCheckResultsRequest
+	(*GetRunVariablesRequest)(nil),                // 17: martiancloud.tharsis.api.run.GetRunVariablesRequest
+	(*SubscribeToRunEventsRequest)(nil),           // 18: martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
+	(*RunVariableInput)(nil),                      // 19: martiancloud.tharsis.api.run.RunVariableInput
+	(*SetVariablesIncludedInTFConfigRequest)(nil), // 20: martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
+	(*Run)(nil),                                   // 21: martiancloud.tharsis.api.run.Run
+	(*RunAnnotation)(nil),                         // 22: martiancloud.tharsis.api.run.RunAnnotation
+	(*RunTaskStage)(nil),                          // 23: martiancloud.tharsis.api.run.RunTaskStage
+	(*PolicyCheck)(nil),                           // 24: martiancloud.tharsis.api.run.PolicyCheck
+	(*OPAPolicyCheckData)(nil),                    // 25: martiancloud.tharsis.api.run.OPAPolicyCheckData
+	(*ModuleAttestationPolicyCheckData)(nil),      // 26: martiancloud.tharsis.api.run.ModuleAttestationPolicyCheckData
+	(*PolicyCheckPolicy)(nil),                     // 27: martiancloud.tharsis.api.run.PolicyCheckPolicy
+	(*PolicyCheckPolicyProvenance)(nil),           // 28: martiancloud.tharsis.api.run.PolicyCheckPolicyProvenance
+	(*RunPolicyOutcomeInput)(nil),                 // 29: martiancloud.tharsis.api.run.RunPolicyOutcomeInput
+	(*ReportRunPolicyOutcomesRequest)(nil),        // 30: martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest
+	(*PolicyCheckPolicyResult)(nil),               // 31: martiancloud.tharsis.api.run.PolicyCheckPolicyResult
+	(*PolicyCheckResults)(nil),                    // 32: martiancloud.tharsis.api.run.PolicyCheckResults
+	(*RunVariable)(nil),                           // 33: martiancloud.tharsis.api.run.RunVariable
+	(*RunEvent)(nil),                              // 34: martiancloud.tharsis.api.run.RunEvent
+	(*GetRunsResponse)(nil),                       // 35: martiancloud.tharsis.api.run.GetRunsResponse
+	(*GetRunVariablesResponse)(nil),               // 36: martiancloud.tharsis.api.run.GetRunVariablesResponse
+	(*PaginationOptions)(nil),                     // 37: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),                      // 38: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*timestamppb.Timestamp)(nil),                 // 39: google.protobuf.Timestamp
+	(*Plan)(nil),                                  // 40: martiancloud.tharsis.api.plan.Plan
+	(*Apply)(nil),                                 // 41: martiancloud.tharsis.api.apply.Apply
+	(*RunGate)(nil),                               // 42: martiancloud.tharsis.api.run_gate.RunGate
+	(*PageInfo)(nil),                              // 43: martiancloud.tharsis.api.pagination.PageInfo
+	(*GetPlanByIDRequest)(nil),                    // 44: martiancloud.tharsis.api.plan.GetPlanByIDRequest
+	(*GetApplyByIDRequest)(nil),                   // 45: martiancloud.tharsis.api.apply.GetApplyByIDRequest
+	(*UpdatePlanRequest)(nil),                     // 46: martiancloud.tharsis.api.plan.UpdatePlanRequest
+	(*UpdateApplyRequest)(nil),                    // 47: martiancloud.tharsis.api.apply.UpdateApplyRequest
+	(*emptypb.Empty)(nil),                         // 48: google.protobuf.Empty
 }
 var file_run_proto_depIdxs = []int32{
-	32, // 0: martiancloud.tharsis.api.run.GetRunsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	37, // 0: martiancloud.tharsis.api.run.GetRunsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.run.GetRunsRequest.sort:type_name -> martiancloud.tharsis.api.run.RunSortableField
-	16, // 2: martiancloud.tharsis.api.run.CreateRunRequest.variables:type_name -> martiancloud.tharsis.api.run.RunVariableInput
-	19, // 3: martiancloud.tharsis.api.run.CreateRunRequest.annotations:type_name -> martiancloud.tharsis.api.run.RunAnnotation
-	33, // 4: martiancloud.tharsis.api.run.Run.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	34, // 5: martiancloud.tharsis.api.run.Run.force_cancel_available_at:type_name -> google.protobuf.Timestamp
-	35, // 6: martiancloud.tharsis.api.run.Run.plan:type_name -> martiancloud.tharsis.api.plan.Plan
-	36, // 7: martiancloud.tharsis.api.run.Run.apply:type_name -> martiancloud.tharsis.api.apply.Apply
+	19, // 2: martiancloud.tharsis.api.run.CreateRunRequest.variables:type_name -> martiancloud.tharsis.api.run.RunVariableInput
+	22, // 3: martiancloud.tharsis.api.run.CreateRunRequest.annotations:type_name -> martiancloud.tharsis.api.run.RunAnnotation
+	38, // 4: martiancloud.tharsis.api.run.Run.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	39, // 5: martiancloud.tharsis.api.run.Run.force_cancel_available_at:type_name -> google.protobuf.Timestamp
+	40, // 6: martiancloud.tharsis.api.run.Run.plan:type_name -> martiancloud.tharsis.api.plan.Plan
+	41, // 7: martiancloud.tharsis.api.run.Run.apply:type_name -> martiancloud.tharsis.api.apply.Apply
 	1,  // 8: martiancloud.tharsis.api.run.Run.status:type_name -> martiancloud.tharsis.api.run.RunStatus
-	20, // 9: martiancloud.tharsis.api.run.Run.task_stages:type_name -> martiancloud.tharsis.api.run.RunTaskStage
-	19, // 10: martiancloud.tharsis.api.run.Run.annotations:type_name -> martiancloud.tharsis.api.run.RunAnnotation
+	23, // 9: martiancloud.tharsis.api.run.Run.task_stages:type_name -> martiancloud.tharsis.api.run.RunTaskStage
+	22, // 10: martiancloud.tharsis.api.run.Run.annotations:type_name -> martiancloud.tharsis.api.run.RunAnnotation
 	3,  // 11: martiancloud.tharsis.api.run.RunTaskStage.stage_name:type_name -> martiancloud.tharsis.api.run.RunTaskStageName
 	4,  // 12: martiancloud.tharsis.api.run.RunTaskStage.status:type_name -> martiancloud.tharsis.api.run.RunTaskStageStatus
-	21, // 13: martiancloud.tharsis.api.run.RunTaskStage.policy_checks:type_name -> martiancloud.tharsis.api.run.PolicyCheck
+	24, // 13: martiancloud.tharsis.api.run.RunTaskStage.policy_checks:type_name -> martiancloud.tharsis.api.run.PolicyCheck
 	2,  // 14: martiancloud.tharsis.api.run.PolicyCheck.check_type:type_name -> martiancloud.tharsis.api.run.PolicyCheckType
 	5,  // 15: martiancloud.tharsis.api.run.PolicyCheck.status:type_name -> martiancloud.tharsis.api.run.PolicyCheckStatus
-	24, // 16: martiancloud.tharsis.api.run.PolicyCheck.policies:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicy
+	27, // 16: martiancloud.tharsis.api.run.PolicyCheck.policies:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicy
 	3,  // 17: martiancloud.tharsis.api.run.PolicyCheck.stage_name:type_name -> martiancloud.tharsis.api.run.RunTaskStageName
 	7,  // 18: martiancloud.tharsis.api.run.PolicyCheckPolicy.enforcement_level:type_name -> martiancloud.tharsis.api.run.PolicyEnforcementLevel
 	6,  // 19: martiancloud.tharsis.api.run.PolicyCheckPolicy.status:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyStatus
-	25, // 20: martiancloud.tharsis.api.run.PolicyCheckPolicy.provenance:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyProvenance
-	22, // 21: martiancloud.tharsis.api.run.PolicyCheckPolicy.opa_data:type_name -> martiancloud.tharsis.api.run.OPAPolicyCheckData
-	23, // 22: martiancloud.tharsis.api.run.PolicyCheckPolicy.module_attestation_data:type_name -> martiancloud.tharsis.api.run.ModuleAttestationPolicyCheckData
-	26, // 23: martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest.outcomes:type_name -> martiancloud.tharsis.api.run.RunPolicyOutcomeInput
-	18, // 24: martiancloud.tharsis.api.run.RunEvent.run:type_name -> martiancloud.tharsis.api.run.Run
-	18, // 25: martiancloud.tharsis.api.run.GetRunsResponse.runs:type_name -> martiancloud.tharsis.api.run.Run
-	37, // 26: martiancloud.tharsis.api.run.GetRunsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	28, // 27: martiancloud.tharsis.api.run.GetRunVariablesResponse.variables:type_name -> martiancloud.tharsis.api.run.RunVariable
-	8,  // 28: martiancloud.tharsis.api.run.Runs.GetRunByID:input_type -> martiancloud.tharsis.api.run.GetRunByIDRequest
-	9,  // 29: martiancloud.tharsis.api.run.Runs.GetRuns:input_type -> martiancloud.tharsis.api.run.GetRunsRequest
-	10, // 30: martiancloud.tharsis.api.run.Runs.CreateRun:input_type -> martiancloud.tharsis.api.run.CreateRunRequest
-	11, // 31: martiancloud.tharsis.api.run.Runs.ApplyRun:input_type -> martiancloud.tharsis.api.run.ApplyRunRequest
-	12, // 32: martiancloud.tharsis.api.run.Runs.CancelRun:input_type -> martiancloud.tharsis.api.run.CancelRunRequest
-	14, // 33: martiancloud.tharsis.api.run.Runs.GetRunVariables:input_type -> martiancloud.tharsis.api.run.GetRunVariablesRequest
-	38, // 34: martiancloud.tharsis.api.run.Runs.GetPlanByID:input_type -> martiancloud.tharsis.api.plan.GetPlanByIDRequest
-	39, // 35: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
-	40, // 36: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
-	27, // 37: martiancloud.tharsis.api.run.Runs.ReportRunPolicyOutcomes:input_type -> martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest
-	41, // 38: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
-	17, // 39: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:input_type -> martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
-	15, // 40: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
-	13, // 41: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:input_type -> martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
-	18, // 42: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
-	30, // 43: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
-	18, // 44: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
-	18, // 45: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
-	18, // 46: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
-	31, // 47: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
-	35, // 48: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
-	36, // 49: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
-	35, // 50: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
-	42, // 51: martiancloud.tharsis.api.run.Runs.ReportRunPolicyOutcomes:output_type -> google.protobuf.Empty
-	36, // 52: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
-	42, // 53: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:output_type -> google.protobuf.Empty
-	29, // 54: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
-	18, // 55: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:output_type -> martiancloud.tharsis.api.run.Run
-	42, // [42:56] is the sub-list for method output_type
-	28, // [28:42] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	28, // 20: martiancloud.tharsis.api.run.PolicyCheckPolicy.provenance:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyProvenance
+	25, // 21: martiancloud.tharsis.api.run.PolicyCheckPolicy.opa_data:type_name -> martiancloud.tharsis.api.run.OPAPolicyCheckData
+	26, // 22: martiancloud.tharsis.api.run.PolicyCheckPolicy.module_attestation_data:type_name -> martiancloud.tharsis.api.run.ModuleAttestationPolicyCheckData
+	29, // 23: martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest.outcomes:type_name -> martiancloud.tharsis.api.run.RunPolicyOutcomeInput
+	27, // 24: martiancloud.tharsis.api.run.PolicyCheckPolicyResult.policy:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicy
+	24, // 25: martiancloud.tharsis.api.run.PolicyCheckResults.policy_check:type_name -> martiancloud.tharsis.api.run.PolicyCheck
+	31, // 26: martiancloud.tharsis.api.run.PolicyCheckResults.policy_results:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyResult
+	42, // 27: martiancloud.tharsis.api.run.PolicyCheckResults.run_gate:type_name -> martiancloud.tharsis.api.run_gate.RunGate
+	21, // 28: martiancloud.tharsis.api.run.RunEvent.run:type_name -> martiancloud.tharsis.api.run.Run
+	21, // 29: martiancloud.tharsis.api.run.GetRunsResponse.runs:type_name -> martiancloud.tharsis.api.run.Run
+	43, // 30: martiancloud.tharsis.api.run.GetRunsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	33, // 31: martiancloud.tharsis.api.run.GetRunVariablesResponse.variables:type_name -> martiancloud.tharsis.api.run.RunVariable
+	8,  // 32: martiancloud.tharsis.api.run.Runs.GetRunByID:input_type -> martiancloud.tharsis.api.run.GetRunByIDRequest
+	9,  // 33: martiancloud.tharsis.api.run.Runs.GetRuns:input_type -> martiancloud.tharsis.api.run.GetRunsRequest
+	10, // 34: martiancloud.tharsis.api.run.Runs.CreateRun:input_type -> martiancloud.tharsis.api.run.CreateRunRequest
+	11, // 35: martiancloud.tharsis.api.run.Runs.ApplyRun:input_type -> martiancloud.tharsis.api.run.ApplyRunRequest
+	12, // 36: martiancloud.tharsis.api.run.Runs.CancelRun:input_type -> martiancloud.tharsis.api.run.CancelRunRequest
+	17, // 37: martiancloud.tharsis.api.run.Runs.GetRunVariables:input_type -> martiancloud.tharsis.api.run.GetRunVariablesRequest
+	44, // 38: martiancloud.tharsis.api.run.Runs.GetPlanByID:input_type -> martiancloud.tharsis.api.plan.GetPlanByIDRequest
+	45, // 39: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
+	46, // 40: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
+	30, // 41: martiancloud.tharsis.api.run.Runs.ReportRunPolicyOutcomes:input_type -> martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest
+	47, // 42: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
+	20, // 43: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:input_type -> martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
+	18, // 44: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
+	13, // 45: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:input_type -> martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
+	14, // 46: martiancloud.tharsis.api.run.Runs.DiscardRun:input_type -> martiancloud.tharsis.api.run.DiscardRunRequest
+	15, // 47: martiancloud.tharsis.api.run.Runs.UndiscardRun:input_type -> martiancloud.tharsis.api.run.UndiscardRunRequest
+	16, // 48: martiancloud.tharsis.api.run.Runs.GetPolicyCheckResults:input_type -> martiancloud.tharsis.api.run.GetPolicyCheckResultsRequest
+	21, // 49: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
+	35, // 50: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
+	21, // 51: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
+	21, // 52: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
+	21, // 53: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
+	36, // 54: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
+	40, // 55: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
+	41, // 56: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
+	40, // 57: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
+	48, // 58: martiancloud.tharsis.api.run.Runs.ReportRunPolicyOutcomes:output_type -> google.protobuf.Empty
+	41, // 59: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
+	48, // 60: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:output_type -> google.protobuf.Empty
+	34, // 61: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
+	21, // 62: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:output_type -> martiancloud.tharsis.api.run.Run
+	21, // 63: martiancloud.tharsis.api.run.Runs.DiscardRun:output_type -> martiancloud.tharsis.api.run.Run
+	21, // 64: martiancloud.tharsis.api.run.Runs.UndiscardRun:output_type -> martiancloud.tharsis.api.run.Run
+	32, // 65: martiancloud.tharsis.api.run.Runs.GetPolicyCheckResults:output_type -> martiancloud.tharsis.api.run.PolicyCheckResults
+	49, // [49:66] is the sub-list for method output_type
+	32, // [32:49] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_run_proto_init() }
@@ -2723,25 +3023,27 @@ func file_run_proto_init() {
 	file_pagination_proto_init()
 	file_plan_proto_init()
 	file_apply_proto_init()
+	file_run_gate_proto_init()
 	file_run_proto_msgTypes[1].OneofWrappers = []any{}
 	file_run_proto_msgTypes[2].OneofWrappers = []any{}
 	file_run_proto_msgTypes[4].OneofWrappers = []any{}
-	file_run_proto_msgTypes[7].OneofWrappers = []any{}
-	file_run_proto_msgTypes[8].OneofWrappers = []any{}
 	file_run_proto_msgTypes[10].OneofWrappers = []any{}
 	file_run_proto_msgTypes[11].OneofWrappers = []any{}
 	file_run_proto_msgTypes[13].OneofWrappers = []any{}
 	file_run_proto_msgTypes[14].OneofWrappers = []any{}
-	file_run_proto_msgTypes[15].OneofWrappers = []any{}
 	file_run_proto_msgTypes[16].OneofWrappers = []any{}
-	file_run_proto_msgTypes[20].OneofWrappers = []any{}
+	file_run_proto_msgTypes[17].OneofWrappers = []any{}
+	file_run_proto_msgTypes[18].OneofWrappers = []any{}
+	file_run_proto_msgTypes[19].OneofWrappers = []any{}
+	file_run_proto_msgTypes[24].OneofWrappers = []any{}
+	file_run_proto_msgTypes[25].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_run_proto_rawDesc), len(file_run_proto_rawDesc)),
 			NumEnums:      8,
-			NumMessages:   24,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

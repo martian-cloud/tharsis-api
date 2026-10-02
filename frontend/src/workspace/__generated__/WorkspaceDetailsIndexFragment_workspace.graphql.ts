@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c8500b840085091980aeee92c746a877>>
+ * @generated SignedSource<<f9c47a48a77d189a0738e1761f26522b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,9 +9,6 @@
 // @ts-nocheck
 
 import { ReaderFragment } from 'relay-runtime';
-export type ApplyStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
-export type PlanStatus = "canceled" | "created" | "errored" | "finished" | "pending" | "queued" | "running" | "skipped" | "%future added value";
-export type RunStatus = "applied" | "apply_queued" | "apply_queuing" | "applying" | "canceled" | "discarded" | "errored" | "pending" | "plan_queued" | "plan_queuing" | "planned" | "planned_and_finished" | "planning" | "post_apply_running" | "post_plan_awaiting_decision" | "post_plan_running" | "pre_apply_awaiting_decision" | "pre_apply_completed" | "pre_apply_queuing" | "pre_apply_running" | "pre_plan_awaiting_decision" | "pre_plan_completed" | "pre_plan_queuing" | "pre_plan_running" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type WorkspaceDetailsIndexFragment_workspace$data = {
   readonly assessment: {
@@ -25,41 +22,9 @@ export type WorkspaceDetailsIndexFragment_workspace$data = {
     readonly inventory: {
       readonly " $fragmentSpreads": FragmentRefs<"StateVersionCheckResultsFragment_checkResults" | "StateVersionDependenciesFragment_dependencies" | "StateVersionResourcesFragment_resources">;
     };
-    readonly metadata: {
-      readonly createdAt: any;
-    };
     readonly run: {
-      readonly apply: {
-        readonly metadata: {
-          readonly createdAt: any;
-          readonly updatedAt: any;
-        };
-        readonly status: ApplyStatus;
-        readonly triggeredBy: string | null | undefined;
-      } | null | undefined;
-      readonly configurationVersion: {
-        readonly id: string;
-        readonly vcsEvent: {
-          readonly status: string;
-        } | null | undefined;
-      } | null | undefined;
-      readonly createdBy: string;
-      readonly hasAdvisoryFailures: boolean;
       readonly id: string;
-      readonly isDestroy: boolean;
-      readonly metadata: {
-        readonly createdAt: any;
-      };
-      readonly moduleSource: string | null | undefined;
-      readonly moduleVersion: string | null | undefined;
-      readonly plan: {
-        readonly metadata: {
-          readonly createdAt: any;
-        };
-        readonly status: PlanStatus;
-      };
-      readonly status: RunStatus;
-      readonly " $fragmentSpreads": FragmentRefs<"ModuleSourceLinkFragment_run" | "StateVersionInputVariablesFragment_variables">;
+      readonly " $fragmentSpreads": FragmentRefs<"StateVersionInputVariablesFragment_variables">;
     } | null | undefined;
     readonly " $fragmentSpreads": FragmentRefs<"StateVersionFileFragment_stateVersion" | "StateVersionOutputsFragment_outputs">;
   } | null | undefined;
@@ -77,7 +42,7 @@ export type WorkspaceDetailsIndexFragment_workspace$data = {
   };
   readonly name: string;
   readonly preventDestroyPlan: boolean;
-  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceDetailsCurrentApplyRunFragment_workspace" | "WorkspaceDetailsDriftDetectionFragment_workspace" | "WorkspaceDetailsEmptyFragment_workspace" | "WorkspaceNotificationPreferenceFragment_workspace">;
+  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceDetailsDriftDetectionFragment_workspace" | "WorkspaceDetailsEmptyFragment_workspace" | "WorkspaceDetailsStatusPanelFragment_workspace" | "WorkspaceNotificationPreferenceFragment_workspace">;
   readonly " $fragmentType": "WorkspaceDetailsIndexFragment_workspace";
 };
 export type WorkspaceDetailsIndexFragment_workspace$key = {
@@ -91,32 +56,6 @@ var v0 = {
   "args": null,
   "kind": "ScalarField",
   "name": "id",
-  "storageKey": null
-},
-v1 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "createdAt",
-  "storageKey": null
-},
-v2 = {
-  "alias": null,
-  "args": null,
-  "concreteType": "ResourceMetadata",
-  "kind": "LinkedField",
-  "name": "metadata",
-  "plural": false,
-  "selections": [
-    (v1/*: any*/)
-  ],
-  "storageKey": null
-},
-v3 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "status",
   "storageKey": null
 };
 return {
@@ -237,7 +176,7 @@ return {
     {
       "args": null,
       "kind": "FragmentSpread",
-      "name": "WorkspaceDetailsCurrentApplyRunFragment_workspace"
+      "name": "WorkspaceDetailsStatusPanelFragment_workspace"
     },
     {
       "args": null,
@@ -301,7 +240,6 @@ return {
           "kind": "FragmentSpread",
           "name": "StateVersionFileFragment_stateVersion"
         },
-        (v2/*: any*/),
         {
           "alias": null,
           "args": null,
@@ -310,128 +248,11 @@ return {
           "name": "run",
           "plural": false,
           "selections": [
+            (v0/*: any*/),
             {
               "args": null,
               "kind": "FragmentSpread",
               "name": "StateVersionInputVariablesFragment_variables"
-            },
-            {
-              "args": null,
-              "kind": "FragmentSpread",
-              "name": "ModuleSourceLinkFragment_run"
-            },
-            (v0/*: any*/),
-            (v3/*: any*/),
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "hasAdvisoryFailures",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "createdBy",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "isDestroy",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "moduleSource",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "moduleVersion",
-              "storageKey": null
-            },
-            (v2/*: any*/),
-            {
-              "alias": null,
-              "args": null,
-              "concreteType": "ConfigurationVersion",
-              "kind": "LinkedField",
-              "name": "configurationVersion",
-              "plural": false,
-              "selections": [
-                (v0/*: any*/),
-                {
-                  "alias": null,
-                  "args": null,
-                  "concreteType": "VCSEvent",
-                  "kind": "LinkedField",
-                  "name": "vcsEvent",
-                  "plural": false,
-                  "selections": [
-                    (v3/*: any*/)
-                  ],
-                  "storageKey": null
-                }
-              ],
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "concreteType": "Plan",
-              "kind": "LinkedField",
-              "name": "plan",
-              "plural": false,
-              "selections": [
-                (v3/*: any*/),
-                (v2/*: any*/)
-              ],
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "concreteType": "Apply",
-              "kind": "LinkedField",
-              "name": "apply",
-              "plural": false,
-              "selections": [
-                (v3/*: any*/),
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "triggeredBy",
-                  "storageKey": null
-                },
-                {
-                  "alias": null,
-                  "args": null,
-                  "concreteType": "ResourceMetadata",
-                  "kind": "LinkedField",
-                  "name": "metadata",
-                  "plural": false,
-                  "selections": [
-                    (v1/*: any*/),
-                    {
-                      "alias": null,
-                      "args": null,
-                      "kind": "ScalarField",
-                      "name": "updatedAt",
-                      "storageKey": null
-                    }
-                  ],
-                  "storageKey": null
-                }
-              ],
-              "storageKey": null
             }
           ],
           "storageKey": null
@@ -450,6 +271,6 @@ return {
 };
 })();
 
-(node as any).hash = "1a0724b39c90961654e206ef77173afb";
+(node as any).hash = "5e9d634cdbbb73081aa413fbdb06a4d6";
 
 export default node;

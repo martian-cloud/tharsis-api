@@ -1,5 +1,6 @@
-import { Box, Typography } from '@mui/material';
+import { Box, ToggleButton, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
+import { useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { MutationError } from '../../../common/error';
 import ForceCancelRunAlert from '../ForceCancelRunAlert';
@@ -67,6 +68,9 @@ function RunDetailsRunTaskStage(props: Props) {
     const taskStage = data.taskStages.find(s => s.stageName === props.stageName);
     const checks = taskStage?.policyChecks ?? [];
 
+    // Declared before the early returns below so the hook order never changes between renders.
+    const [expandedPolicies, setExpandedPolicies] = useState<{ [policyId: string]: boolean }>({});
+
     if (!taskStage) {
         // Runs created before the policy feature (or with no attached policies) have no
         // policy stage; the sidebar never links here, so this only renders on direct URL
@@ -99,6 +103,11 @@ function RunDetailsRunTaskStage(props: Props) {
     // stage scoped by both an OPA and a module attestation policy has one gate per check.
     const allPolicies = checks.flatMap(check => check.policies.map(policy => ({ check, policy })));
 
+    // Policy cards start collapsed. "Expand All" reads as selected only while every card is open.
+    const allExpanded = allPolicies.length > 0 && allPolicies.every(({ policy }) => expandedPolicies[policy.id]);
+    const setAllExpanded = (expanded: boolean) =>
+        setExpandedPolicies(Object.fromEntries(allPolicies.map(({ policy }) => [policy.id, expanded])));
+
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {cancelRequested && taskStage.status !== 'CANCELED' && <ForceCancelRunAlert fragmentRef={data} />}
@@ -127,14 +136,34 @@ function RunDetailsRunTaskStage(props: Props) {
             ))}
 
             <Box component="section" sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 2 }}>
-                <Typography variant="h6" component="h2" sx={{ fontWeight: 400, m: 0 }}>Policies</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                    <Typography variant="h6" component="h2" sx={{ fontWeight: 400, m: 0 }}>Policies</Typography>
+                    {allPolicies.length > 0 && (
+                        <ToggleButton
+                            sx={{ whiteSpace: 'nowrap' }}
+                            onChange={() => setAllExpanded(!allExpanded)}
+                            color="secondary"
+                            selected={allExpanded}
+                            size="small"
+                            value="expand"
+                        >
+                            Expand All
+                        </ToggleButton>
+                    )}
+                </Box>
                 {allPolicies.length === 0 && (
                     <Typography variant="body2" color="textSecondary">
                         No policies were evaluated for this run
                     </Typography>
                 )}
                 {allPolicies.map(({ check, policy }) => (
-                    <RunTaskStagePolicyCheckPolicyCard key={policy.id} policyRef={policy} gateRef={check.runGate} />
+                    <RunTaskStagePolicyCheckPolicyCard
+                        key={policy.id}
+                        policyRef={policy}
+                        gateRef={check.runGate}
+                        expanded={!!expandedPolicies[policy.id]}
+                        onExpandedChange={expanded => setExpandedPolicies(prev => ({ ...prev, [policy.id]: expanded }))}
+                    />
                 ))}
             </Box>
         </Box>

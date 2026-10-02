@@ -47,6 +47,7 @@ const retryPolicy = `{
 			{"service": "martiancloud.tharsis.api.resource_limit.ResourceLimits"},
 			{"service": "martiancloud.tharsis.api.role.Roles"},
 			{"service": "martiancloud.tharsis.api.run.Runs"},
+			{"service": "martiancloud.tharsis.api.run_gate.RunGates"},
 			{"service": "martiancloud.tharsis.api.runner.Runners"},
 			{"service": "martiancloud.tharsis.api.service_account.ServiceAccounts"},
 			{"service": "martiancloud.tharsis.api.state_version.StateVersions"},
@@ -134,6 +135,7 @@ type GRPCClient struct {
 	ResourceLimitsClient           pb.ResourceLimitsClient
 	RolesClient                    pb.RolesClient
 	RunsClient                     pb.RunsClient
+	RunGatesClient                 pb.RunGatesClient
 	RunnersClient                  pb.RunnersClient
 	ServiceAccountsClient          pb.ServiceAccountsClient
 	StateVersionsClient            pb.StateVersionsClient
@@ -305,6 +307,7 @@ func NewGRPCClient(ctx context.Context, c *GRPCClientConfig) (*GRPCClient, error
 		ResourceLimitsClient:           pb.NewResourceLimitsClient(clientConn),
 		RolesClient:                    pb.NewRolesClient(clientConn),
 		RunsClient:                     pb.NewRunsClient(clientConn),
+		RunGatesClient:                 pb.NewRunGatesClient(clientConn),
 		RunnersClient:                  pb.NewRunnersClient(clientConn),
 		ServiceAccountsClient:          pb.NewServiceAccountsClient(clientConn),
 		StateVersionsClient:            pb.NewStateVersionsClient(clientConn),

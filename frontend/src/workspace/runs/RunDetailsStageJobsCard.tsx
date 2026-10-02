@@ -13,7 +13,7 @@ function RunDetailsStageJobsCard({ stage, totalCount, onOpenJobs }: Props) {
     const countText = `${totalCount} job${totalCount === 1 ? '' : 's'}`;
 
     return (
-        <Paper variant="outlined" sx={{ padding: 2, marginBottom: 2 }}>
+        <Paper sx={{ padding: 2, marginBottom: 2 }}>
             <Typography variant="body2" component="div">This {stage} has
                 {totalCount > 0 ? <MuiLink
                     component="button"

@@ -286,6 +286,7 @@ input UnlockWorkspaceInput {
 }
 
 input DestroyWorkspaceInput {
+  autoApply: Boolean
   clientMutationId: String
   workspaceId: String
   workspacePath: String

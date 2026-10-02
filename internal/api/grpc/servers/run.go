@@ -220,6 +220,93 @@ func (s *RunServer) CancelRun(ctx context.Context, req *pb.CancelRunRequest) (*p
 	return toPBRun(canceledRun), nil
 }
 
+// DiscardRun discards a Run that is waiting on a human decision.
+func (s *RunServer) DiscardRun(ctx context.Context, req *pb.DiscardRunRequest) (*pb.Run, error) {
+	runID, err := s.serviceCatalog.FetchModelID(ctx, req.RunId)
+	if err != nil {
+		return nil, err
+	}
+
+	discardedRun, err := s.serviceCatalog.RunService.DiscardRun(ctx, &run.DiscardRunInput{RunID: runID})
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBRun(discardedRun), nil
+}
+
+// UndiscardRun moves a discarded Run back to planned.
+func (s *RunServer) UndiscardRun(ctx context.Context, req *pb.UndiscardRunRequest) (*pb.Run, error) {
+	runID, err := s.serviceCatalog.FetchModelID(ctx, req.RunId)
+	if err != nil {
+		return nil, err
+	}
+
+	undiscardedRun, err := s.serviceCatalog.RunService.UndiscardRun(ctx, &run.UndiscardRunInput{RunID: runID})
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBRun(undiscardedRun), nil
+}
+
+// GetPolicyCheckResults returns a policy check with its policies' violation messages and its gate.
+func (s *RunServer) GetPolicyCheckResults(ctx context.Context, req *pb.GetPolicyCheckResultsRequest) (*pb.PolicyCheckResults, error) {
+	// The policy check is a run node addressed by its RunNode GID; decode it to the raw node ID.
+	parsedGID, err := gid.ParseGlobalID(req.PolicyCheckId)
+	if err != nil {
+		return nil, err
+	}
+	policyCheckID := parsedGID.ID
+
+	runModel, err := s.serviceCatalog.RunService.GetRunByNodeID(ctx, policyCheckID)
+	if err != nil {
+		return nil, err
+	}
+
+	check := runModel.PolicyCheckByID(policyCheckID)
+	if check == nil {
+		return nil, errors.New("policy check with id %s not found", req.PolicyCheckId, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	// Each policy is listed once, under PolicyResults, so the check is sent without its policies.
+	pbCheck := toPBPolicyCheck(check)
+	pbPolicies := pbCheck.Policies
+	pbCheck.Policies = nil
+
+	results := &pb.PolicyCheckResults{
+		PolicyCheck:   pbCheck,
+		PolicyResults: make([]*pb.PolicyCheckPolicyResult, 0, len(pbPolicies)),
+	}
+
+	for i, p := range check.Policies {
+		result := &pb.PolicyCheckPolicyResult{Policy: pbPolicies[i], Messages: []string{}}
+		// Only policies that reported messages have any stored; skip the object storage read otherwise.
+		if p.MessagesObjectStoreKey != nil {
+			messages, mErr := s.serviceCatalog.RunService.GetPolicyCheckPolicyMessages(ctx, policyCheckID, p.ID)
+			if mErr != nil {
+				return nil, mErr
+			}
+			result.Messages = messages
+		}
+		results.PolicyResults = append(results.PolicyResults, result)
+	}
+
+	gates, err := s.serviceCatalog.RunService.GetRunGatesByPolicyCheckIDs(ctx, []string{policyCheckID})
+	if err != nil {
+		return nil, err
+	}
+	if len(gates) > 0 {
+		pbGate, gErr := toPBRunGateWithApprovals(ctx, s.serviceCatalog, gates[0])
+		if gErr != nil {
+			return nil, gErr
+		}
+		results.RunGate = pbGate
+	}
+
+	return results, nil
+}
+
 // CreateDestroyRunForWorkspace creates a destroy run using the workspace's current state.
 func (s *RunServer) CreateDestroyRunForWorkspace(ctx context.Context, req *pb.CreateDestroyRunForWorkspaceRequest) (*pb.Run, error) {
 	workspaceID, err := s.serviceCatalog.FetchModelID(ctx, req.WorkspaceId)
@@ -229,6 +316,7 @@ func (s *RunServer) CreateDestroyRunForWorkspace(ctx context.Context, req *pb.Cr
 
 	createdRun, err := s.serviceCatalog.RunService.CreateDestroyRunForWorkspace(ctx, &run.CreateDestroyRunForWorkspaceInput{
 		WorkspaceID: workspaceID,
+		AutoApply:   req.AutoApply,
 	})
 	if err != nil {
 		return nil, err

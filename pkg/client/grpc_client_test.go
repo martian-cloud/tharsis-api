@@ -200,6 +200,7 @@ func TestNewGRPCClient(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	assert.NotNil(t, client.RunsClient)
+	assert.NotNil(t, client.RunGatesClient)
 	assert.NotNil(t, client.WorkspacesClient)
 	assert.NoError(t, client.Close())
 }

@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.run_gate;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+
+// RunGates defines the RPCs for deciding on run gates, the approval blocks on soft-failed policy checks.
+service RunGates {
+  // ApproveRunGate records the caller's approve or reject decision on a pending run gate. The gate
+  // clears once every approval rule has reached its required number of approvals; a reject is
+  // advisory and leaves the gate pending.
+  rpc ApproveRunGate(ApproveRunGateRequest) returns (RunGate);
+  // OverrideRunGate clears a pending run gate without collecting the approvals its rules require.
+  rpc OverrideRunGate(OverrideRunGateRequest) returns (RunGate);
+}
+
+// RunGateType identifies the kind of policy check a run gate governs.
+enum RunGateType {
+  RUN_GATE_TYPE_UNSPECIFIED        = 0;
+  RUN_GATE_TYPE_OPA_POLICY         = 1;
+  RUN_GATE_TYPE_MODULE_ATTESTATION = 2;
+}
+
+// RunGateStatus represents the status of a run gate.
+enum RunGateStatus {
+  RUN_GATE_STATUS_UNSPECIFIED = 0;
+  RUN_GATE_STATUS_PENDING     = 1;
+  RUN_GATE_STATUS_APPROVED    = 2;
+  RUN_GATE_STATUS_OVERRIDDEN  = 3;
+  RUN_GATE_STATUS_CANCELED    = 4;
+}
+
+// RunGateDecision is the decision recorded on a run gate approval.
+enum RunGateDecision {
+  RUN_GATE_DECISION_UNSPECIFIED = 0;
+  RUN_GATE_DECISION_APPROVE     = 1;
+  RUN_GATE_DECISION_REJECT      = 2;
+}
+
+// RunGateApprovalRule is the approval requirement for a single soft-failed policy on a run gate.
+message RunGateApprovalRule {
+  // name is the PolicyCheckPolicy id the rule covers.
+  string name               = 1;
+  int32  required_approvals = 2;
+  // approvals is the number of distinct principals that have approved this rule so far.
+  int32  approvals          = 3;
+}
+
+// RunGate is the approval gate blocking a policy check that soft-failed. It carries one approval
+// rule per soft-failed policy and clears once every rule has its required number of approvals.
+message RunGate {
+  metadata.ResourceMetadata    metadata         = 1;
+  string                       policy_check_id  = 2;
+  RunGateType                  type             = 3;
+  RunGateStatus                status           = 4;
+  repeated RunGateApprovalRule approval_rules   = 5;
+  string                       run_id           = 6;
+  // overridden_by is the subject that bypassed the gate; set only when status is OVERRIDDEN.
+  optional string              overridden_by    = 7;
+  // override_comment is the reason given for the override; empty when none was supplied.
+  string                       override_comment = 8;
+}
+
+// ApproveRunGateRequest is the input for recording a decision on a run gate.
+message ApproveRunGateRequest {
+  string          gate_id  = 1;
+  optional string comment  = 2;
+  RunGateDecision decision = 3;
+}
+
+// OverrideRunGateRequest is the input for overriding a run gate.
+message OverrideRunGateRequest {
+  string          gate_id = 1;
+  optional string comment = 2;
+}

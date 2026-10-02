@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Box, Button, Collapse } from '@mui/material';
+import { Box, Button } from '@mui/material';
 import { MutationError } from '../../common/error';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { useSnackbar } from 'notistack';
-import SettingsToggleButton from '../../common/SettingsToggleButton';
+import SettingsSection from '../../common/SettingsSection';
 import graphql from 'babel-plugin-relay/macro';
 import { WorkspaceOutputVisibilitySettingsFragment_workspace$key } from './__generated__/WorkspaceOutputVisibilitySettingsFragment_workspace.graphql';
 import { WorkspaceOutputVisibilitySettingsMutation } from './__generated__/WorkspaceOutputVisibilitySettingsMutation.graphql';
@@ -15,7 +15,6 @@ interface Props {
 
 function WorkspaceOutputVisibilitySettings({ fragmentRef }: Props) {
     const { enqueueSnackbar } = useSnackbar();
-    const [showSettings, setShowSettings] = useState<boolean>(false);
     const [error, setError] = useState<MutationError>();
 
     const data = useFragment<WorkspaceOutputVisibilitySettingsFragment_workspace$key>(
@@ -94,16 +93,7 @@ function WorkspaceOutputVisibilitySettings({ fragmentRef }: Props) {
 
     return (
         <Box>
-            <SettingsToggleButton
-                title="Output Visibility Settings"
-                showSettings={showSettings}
-                onToggle={() => setShowSettings(!showSettings)}
-            />
-            <Collapse
-                in={showSettings}
-                timeout="auto"
-                unmountOnExit
-            >
+            <SettingsSection section="output-visibility" title="Output Visibility Settings">
                 <OutputVisibilitySettingsForm
                     formData={formData}
                     onChange={(data) => setFormData(data)}
@@ -123,7 +113,7 @@ function WorkspaceOutputVisibilitySettings({ fragmentRef }: Props) {
                         Save changes
                     </Button>
                 </Box>
-            </Collapse>
+            </SettingsSection>
         </Box>
     );
 }

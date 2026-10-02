@@ -1,5 +1,6 @@
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import { Chip, Stack, Tooltip, Typography } from '@mui/material';
+import { Chip, Stack, Theme, Tooltip, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import graphql from 'babel-plugin-relay/macro';
 import React, { useState } from 'react';
@@ -120,6 +121,13 @@ function RunDetailsSidebar(props: Props) {
             'pre_plan_queuing', 'pre_plan_running', 'pre_plan_awaiting_decision', 'pre_plan_completed',
             'plan_queuing', 'plan_queued', 'planning', 'post_plan_running', 'post_plan_awaiting_decision',
         ].includes(data.status);
+    // Enabled gets a secondary (blue) tint (the same treatment as the tinted Pill); disabled stays neutral.
+    const autoApplyChipSx = data.autoApply ? (theme: Theme) => ({
+        color: theme.palette.secondary.main,
+        bgcolor: alpha(theme.palette.secondary.main, 0.12),
+        fontWeight: 500,
+        '&.MuiChip-clickable:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.2) },
+    }) : undefined;
 
     const confirmAutoApply = () => {
         commitSetAutoApply({
@@ -209,10 +217,11 @@ function RunDetailsSidebar(props: Props) {
                             <Chip
                                 size="small"
                                 label={data.autoApply ? 'Enabled' : 'Disabled'}
+                                sx={autoApplyChipSx}
                                 onClick={() => setEditingAutoApply(true)}
                             />
                         </Tooltip>
-                        : <Chip size="small" label={data.autoApply ? 'Enabled' : 'Disabled'} />}
+                        : <Chip size="small" label={data.autoApply ? 'Enabled' : 'Disabled'} sx={autoApplyChipSx} />}
                 </Box>}
                 <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Created</Typography>

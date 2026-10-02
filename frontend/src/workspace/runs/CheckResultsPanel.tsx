@@ -33,7 +33,7 @@ function CheckResultsPanel({ fragmentRefs }: Props) {
     }
 
     return (
-        <Paper variant="outlined" sx={{ marginBottom: 2, pt: 2, px: 2, pb: 0 }}>
+        <Paper sx={{ marginBottom: 2, pt: 2, px: 2, pb: 0 }}>
             <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 1 }}>Check Results</Typography>
             <Box mx={-2}>
                 {checkResults.map((check) => {

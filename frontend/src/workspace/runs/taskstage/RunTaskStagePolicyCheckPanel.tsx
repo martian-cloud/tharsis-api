@@ -205,7 +205,7 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
     const decisions = gate?.approvals ?? [];
 
     return (
-        <Paper variant="outlined" component="section" sx={{ padding: 2 }}>
+        <Paper component="section" sx={{ padding: 2 }}>
             {/* Header */}
             <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2.5, flexWrap: 'wrap' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>

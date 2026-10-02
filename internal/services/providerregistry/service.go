@@ -1458,9 +1458,12 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 			GPGKeyID:       gpgKeyID,
 			NamespacePaths: group.ExpandPath(),
 		}})
+	if err != nil {
+		return errors.Wrap(err, "failed to get gpg keys", errors.WithSpan(span))
+	}
 
 	if len(searchKeyResult.GPGKeys) == 0 {
-		return errors.Wrap(err, "a trusted gpg key for key id %d does not exist", gpgKeyID, errors.WithErrorCode(errors.EInvalid))
+		return errors.New("a trusted gpg key for key id %d does not exist", gpgKeyID, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	gpgKey := searchKeyResult.GPGKeys[0]

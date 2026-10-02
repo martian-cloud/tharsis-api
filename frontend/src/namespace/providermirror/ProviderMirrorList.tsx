@@ -98,7 +98,7 @@ function ProviderMirrorList(props: Props) {
     const hasResults = edges.length !== 0;
     const showList = hasResults || search;
     const mirrorDisabled = data?.namespace?.providerMirrorEnabled?.value === false;
-    const settingsLink = `/groups/${namespacePath}/-/settings`;
+    const settingsLink = `/groups/${namespacePath}/-/settings?section=provider-mirror`;
     const isRootGroup = !namespacePath.includes('/');
 
     return (

@@ -122,6 +122,7 @@ type CreateRunInput struct {
 // configuration version or module that is applied.
 type CreateDestroyRunForWorkspaceInput struct {
 	WorkspaceID string
+	AutoApply   bool
 }
 
 // CreateReconcileRunForWorkspaceInput is the input for creating a reconcile run using the current
@@ -538,6 +539,7 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 	cmd := s.cmdFactory.NewCreateDestroyRun(&commands.CreateDestroyRunInput{
 		Subject:     caller.GetSubject(),
 		WorkspaceID: options.WorkspaceID,
+		AutoApply:   options.AutoApply,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
 		return nil, errors.Wrap(err, "failed to create destroy run", errors.WithSpan(span))

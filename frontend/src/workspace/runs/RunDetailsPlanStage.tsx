@@ -61,7 +61,6 @@ function getPlanDescription(planStatus: string, jobStatus?: string): string | un
 function RunDetailsPlanStage(props: Props) {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const tab = searchParams.get('tab') ?? 'logs';
     const jobId = searchParams.get('jobId');
     const [jobDialogOpen, setJobDialogOpen] = useState(false);
 
@@ -336,6 +335,8 @@ function RunDetailsPlanStage(props: Props) {
     // log viewer is hidden before then. A job pinned via the jobs dialog is always
     // viewable (it has already run). While the job is pending (a runner claimed it
     // and is preparing to run) the logs area shows the launch animation instead.
+    // Default to the changes tab once the plan has completed, unless a specific job's logs were requested
+    const tab = searchParams.get('tab') ?? (data.plan.status === 'finished' && !jobId ? 'changes' : 'logs');
     const jobPending = data.plan.currentJob?.status === 'pending';
     const logsAvailable = !!jobId || ['running', 'finished', 'errored', 'canceled'].includes(data.plan.status);
 
@@ -409,8 +410,8 @@ function RunDetailsPlanStage(props: Props) {
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
                         <Tab label="Logs" value="logs" />
-                        <Tab label="Variables" value="variables" />
                         <Tab label="Changes" value="changes" />
+                        <Tab label="Variables" value="variables" />
                         <Tab label="Plan JSON" value="planjson" />
                         <Tab label="Resource Usage" value="resources" />
                     </Tabs>
