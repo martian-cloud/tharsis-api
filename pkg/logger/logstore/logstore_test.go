@@ -97,7 +97,10 @@ func TestFieldValue(t *testing.T) {
 		{name: "error", field: zap.Error(errors.New("boom")), want: "boom"},
 		{name: "stringer", field: zap.Stringer("k", namedStringer{name: "abc"}), want: "abc"},
 		{name: "skip", field: zap.Skip(), want: nil},
-		{name: "reflect falls through to %v", field: zap.Reflect("k", 42), want: "42"},
+		{name: "reflect scalar", field: zap.Reflect("k", 42), want: float64(42)},
+		{name: "reflect struct with pointer fields", field: zap.Reflect("k", &struct {
+			A *int64 `json:"a,omitempty"`
+		}{A: new(int64)}), want: map[string]any{"a": float64(0)}},
 	}
 
 	for _, tc := range testCases {

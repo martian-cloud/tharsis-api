@@ -328,6 +328,12 @@ func fieldValue(f zapcore.Field) any {
 			return err.Error()
 		}
 		return fmt.Sprintf("%v", f.Interface)
+	case zapcore.ReflectType:
+		var out any
+		if b, err := json.Marshal(f.Interface); err == nil && json.Unmarshal(b, &out) == nil {
+			return out
+		}
+		return fmt.Sprintf("%v", f.Interface)
 	case zapcore.SkipType:
 		return nil
 	default:
