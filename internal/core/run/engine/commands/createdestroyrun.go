@@ -19,6 +19,7 @@ type CreateDestroyRunInput struct {
 	Subject     string
 	WorkspaceID string
 	AutoApply   bool
+	Annotations []*models.RunAnnotation
 }
 
 // CreateDestroyRun creates a destroy run from the workspace's current state,
@@ -79,6 +80,7 @@ func (c *CreateDestroyRun) Prepare(ctx context.Context) error {
 		TerraformVersion:        source.TerraformVersion,
 		IsDestroy:               true,
 		AutoApply:               c.in.AutoApply,
+		Annotations:             c.in.Annotations,
 		Refresh:                 true,
 		VariablesObjectStoreKey: variablesObjectKey,
 	}

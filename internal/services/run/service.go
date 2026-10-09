@@ -123,6 +123,7 @@ type CreateRunInput struct {
 type CreateDestroyRunForWorkspaceInput struct {
 	WorkspaceID string
 	AutoApply   bool
+	Annotations []*models.RunAnnotation
 }
 
 // CreateReconcileRunForWorkspaceInput is the input for creating a reconcile run using the current
@@ -540,6 +541,7 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 		Subject:     caller.GetSubject(),
 		WorkspaceID: options.WorkspaceID,
 		AutoApply:   options.AutoApply,
+		Annotations: options.Annotations,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
 		return nil, errors.Wrap(err, "failed to create destroy run", errors.WithSpan(span))

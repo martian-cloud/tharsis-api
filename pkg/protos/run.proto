@@ -209,6 +209,10 @@ message CancelRunRequest {
 message CreateDestroyRunForWorkspaceRequest {
   string workspace_id = 1;
   bool   auto_apply   = 2;
+  // annotations are immutable key/value pairs (with an optional link) attached to the destroy run
+  // at creation, letting it be traced back to what created it. Duplicate keys allowed; the count
+  // and the annotations' total serialized size are limited by the server on create.
+  repeated RunAnnotation annotations = 3;
 }
 
 // DiscardRunRequest is the input for discarding a Run.

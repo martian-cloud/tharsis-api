@@ -317,6 +317,7 @@ func (s *RunServer) CreateDestroyRunForWorkspace(ctx context.Context, req *pb.Cr
 	createdRun, err := s.serviceCatalog.RunService.CreateDestroyRunForWorkspace(ctx, &run.CreateDestroyRunForWorkspaceInput{
 		WorkspaceID: workspaceID,
 		AutoApply:   req.AutoApply,
+		Annotations: fromPBRunAnnotations(req.Annotations),
 	})
 	if err != nil {
 		return nil, err

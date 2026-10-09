@@ -929,9 +929,13 @@ func (x *CancelRunRequest) GetForce() bool {
 
 // CreateDestroyRunForWorkspaceRequest is the input for creating a destroy run for a workspace.
 type CreateDestroyRunForWorkspaceRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	AutoApply     bool                   `protobuf:"varint,2,opt,name=auto_apply,json=autoApply,proto3" json:"auto_apply,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	AutoApply   bool                   `protobuf:"varint,2,opt,name=auto_apply,json=autoApply,proto3" json:"auto_apply,omitempty"`
+	// annotations are immutable key/value pairs (with an optional link) attached to the destroy run
+	// at creation, letting it be traced back to what created it. Duplicate keys allowed; the count
+	// and the annotations' total serialized size are limited by the server on create.
+	Annotations   []*RunAnnotation `protobuf:"bytes,3,rep,name=annotations,proto3" json:"annotations,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -978,6 +982,13 @@ func (x *CreateDestroyRunForWorkspaceRequest) GetAutoApply() bool {
 		return x.AutoApply
 	}
 	return false
+}
+
+func (x *CreateDestroyRunForWorkspaceRequest) GetAnnotations() []*RunAnnotation {
+	if x != nil {
+		return x.Annotations
+	}
+	return nil
 }
 
 // DiscardRunRequest is the input for discarding a Run.
@@ -2626,11 +2637,12 @@ const file_run_proto_rawDesc = "" +
 	"\x10CancelRunRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\x05force\x18\x02 \x01(\bH\x00R\x05force\x88\x01\x01B\b\n" +
-	"\x06_force\"g\n" +
+	"\x06_force\"\xb6\x01\n" +
 	"#CreateDestroyRunForWorkspaceRequest\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1d\n" +
 	"\n" +
-	"auto_apply\x18\x02 \x01(\bR\tautoApply\"*\n" +
+	"auto_apply\x18\x02 \x01(\bR\tautoApply\x12M\n" +
+	"\vannotations\x18\x03 \x03(\v2+.martiancloud.tharsis.api.run.RunAnnotationR\vannotations\"*\n" +
 	"\x11DiscardRunRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\",\n" +
 	"\x13UndiscardRunRequest\x12\x15\n" +
@@ -2945,73 +2957,74 @@ var file_run_proto_depIdxs = []int32{
 	0,  // 1: martiancloud.tharsis.api.run.GetRunsRequest.sort:type_name -> martiancloud.tharsis.api.run.RunSortableField
 	19, // 2: martiancloud.tharsis.api.run.CreateRunRequest.variables:type_name -> martiancloud.tharsis.api.run.RunVariableInput
 	22, // 3: martiancloud.tharsis.api.run.CreateRunRequest.annotations:type_name -> martiancloud.tharsis.api.run.RunAnnotation
-	38, // 4: martiancloud.tharsis.api.run.Run.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	39, // 5: martiancloud.tharsis.api.run.Run.force_cancel_available_at:type_name -> google.protobuf.Timestamp
-	40, // 6: martiancloud.tharsis.api.run.Run.plan:type_name -> martiancloud.tharsis.api.plan.Plan
-	41, // 7: martiancloud.tharsis.api.run.Run.apply:type_name -> martiancloud.tharsis.api.apply.Apply
-	1,  // 8: martiancloud.tharsis.api.run.Run.status:type_name -> martiancloud.tharsis.api.run.RunStatus
-	23, // 9: martiancloud.tharsis.api.run.Run.task_stages:type_name -> martiancloud.tharsis.api.run.RunTaskStage
-	22, // 10: martiancloud.tharsis.api.run.Run.annotations:type_name -> martiancloud.tharsis.api.run.RunAnnotation
-	3,  // 11: martiancloud.tharsis.api.run.RunTaskStage.stage_name:type_name -> martiancloud.tharsis.api.run.RunTaskStageName
-	4,  // 12: martiancloud.tharsis.api.run.RunTaskStage.status:type_name -> martiancloud.tharsis.api.run.RunTaskStageStatus
-	24, // 13: martiancloud.tharsis.api.run.RunTaskStage.policy_checks:type_name -> martiancloud.tharsis.api.run.PolicyCheck
-	2,  // 14: martiancloud.tharsis.api.run.PolicyCheck.check_type:type_name -> martiancloud.tharsis.api.run.PolicyCheckType
-	5,  // 15: martiancloud.tharsis.api.run.PolicyCheck.status:type_name -> martiancloud.tharsis.api.run.PolicyCheckStatus
-	27, // 16: martiancloud.tharsis.api.run.PolicyCheck.policies:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicy
-	3,  // 17: martiancloud.tharsis.api.run.PolicyCheck.stage_name:type_name -> martiancloud.tharsis.api.run.RunTaskStageName
-	7,  // 18: martiancloud.tharsis.api.run.PolicyCheckPolicy.enforcement_level:type_name -> martiancloud.tharsis.api.run.PolicyEnforcementLevel
-	6,  // 19: martiancloud.tharsis.api.run.PolicyCheckPolicy.status:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyStatus
-	28, // 20: martiancloud.tharsis.api.run.PolicyCheckPolicy.provenance:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyProvenance
-	25, // 21: martiancloud.tharsis.api.run.PolicyCheckPolicy.opa_data:type_name -> martiancloud.tharsis.api.run.OPAPolicyCheckData
-	26, // 22: martiancloud.tharsis.api.run.PolicyCheckPolicy.module_attestation_data:type_name -> martiancloud.tharsis.api.run.ModuleAttestationPolicyCheckData
-	29, // 23: martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest.outcomes:type_name -> martiancloud.tharsis.api.run.RunPolicyOutcomeInput
-	27, // 24: martiancloud.tharsis.api.run.PolicyCheckPolicyResult.policy:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicy
-	24, // 25: martiancloud.tharsis.api.run.PolicyCheckResults.policy_check:type_name -> martiancloud.tharsis.api.run.PolicyCheck
-	31, // 26: martiancloud.tharsis.api.run.PolicyCheckResults.policy_results:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyResult
-	42, // 27: martiancloud.tharsis.api.run.PolicyCheckResults.run_gate:type_name -> martiancloud.tharsis.api.run_gate.RunGate
-	21, // 28: martiancloud.tharsis.api.run.RunEvent.run:type_name -> martiancloud.tharsis.api.run.Run
-	21, // 29: martiancloud.tharsis.api.run.GetRunsResponse.runs:type_name -> martiancloud.tharsis.api.run.Run
-	43, // 30: martiancloud.tharsis.api.run.GetRunsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	33, // 31: martiancloud.tharsis.api.run.GetRunVariablesResponse.variables:type_name -> martiancloud.tharsis.api.run.RunVariable
-	8,  // 32: martiancloud.tharsis.api.run.Runs.GetRunByID:input_type -> martiancloud.tharsis.api.run.GetRunByIDRequest
-	9,  // 33: martiancloud.tharsis.api.run.Runs.GetRuns:input_type -> martiancloud.tharsis.api.run.GetRunsRequest
-	10, // 34: martiancloud.tharsis.api.run.Runs.CreateRun:input_type -> martiancloud.tharsis.api.run.CreateRunRequest
-	11, // 35: martiancloud.tharsis.api.run.Runs.ApplyRun:input_type -> martiancloud.tharsis.api.run.ApplyRunRequest
-	12, // 36: martiancloud.tharsis.api.run.Runs.CancelRun:input_type -> martiancloud.tharsis.api.run.CancelRunRequest
-	17, // 37: martiancloud.tharsis.api.run.Runs.GetRunVariables:input_type -> martiancloud.tharsis.api.run.GetRunVariablesRequest
-	44, // 38: martiancloud.tharsis.api.run.Runs.GetPlanByID:input_type -> martiancloud.tharsis.api.plan.GetPlanByIDRequest
-	45, // 39: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
-	46, // 40: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
-	30, // 41: martiancloud.tharsis.api.run.Runs.ReportRunPolicyOutcomes:input_type -> martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest
-	47, // 42: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
-	20, // 43: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:input_type -> martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
-	18, // 44: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
-	13, // 45: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:input_type -> martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
-	14, // 46: martiancloud.tharsis.api.run.Runs.DiscardRun:input_type -> martiancloud.tharsis.api.run.DiscardRunRequest
-	15, // 47: martiancloud.tharsis.api.run.Runs.UndiscardRun:input_type -> martiancloud.tharsis.api.run.UndiscardRunRequest
-	16, // 48: martiancloud.tharsis.api.run.Runs.GetPolicyCheckResults:input_type -> martiancloud.tharsis.api.run.GetPolicyCheckResultsRequest
-	21, // 49: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
-	35, // 50: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
-	21, // 51: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
-	21, // 52: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
-	21, // 53: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
-	36, // 54: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
-	40, // 55: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
-	41, // 56: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
-	40, // 57: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
-	48, // 58: martiancloud.tharsis.api.run.Runs.ReportRunPolicyOutcomes:output_type -> google.protobuf.Empty
-	41, // 59: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
-	48, // 60: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:output_type -> google.protobuf.Empty
-	34, // 61: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
-	21, // 62: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:output_type -> martiancloud.tharsis.api.run.Run
-	21, // 63: martiancloud.tharsis.api.run.Runs.DiscardRun:output_type -> martiancloud.tharsis.api.run.Run
-	21, // 64: martiancloud.tharsis.api.run.Runs.UndiscardRun:output_type -> martiancloud.tharsis.api.run.Run
-	32, // 65: martiancloud.tharsis.api.run.Runs.GetPolicyCheckResults:output_type -> martiancloud.tharsis.api.run.PolicyCheckResults
-	49, // [49:66] is the sub-list for method output_type
-	32, // [32:49] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	22, // 4: martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest.annotations:type_name -> martiancloud.tharsis.api.run.RunAnnotation
+	38, // 5: martiancloud.tharsis.api.run.Run.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	39, // 6: martiancloud.tharsis.api.run.Run.force_cancel_available_at:type_name -> google.protobuf.Timestamp
+	40, // 7: martiancloud.tharsis.api.run.Run.plan:type_name -> martiancloud.tharsis.api.plan.Plan
+	41, // 8: martiancloud.tharsis.api.run.Run.apply:type_name -> martiancloud.tharsis.api.apply.Apply
+	1,  // 9: martiancloud.tharsis.api.run.Run.status:type_name -> martiancloud.tharsis.api.run.RunStatus
+	23, // 10: martiancloud.tharsis.api.run.Run.task_stages:type_name -> martiancloud.tharsis.api.run.RunTaskStage
+	22, // 11: martiancloud.tharsis.api.run.Run.annotations:type_name -> martiancloud.tharsis.api.run.RunAnnotation
+	3,  // 12: martiancloud.tharsis.api.run.RunTaskStage.stage_name:type_name -> martiancloud.tharsis.api.run.RunTaskStageName
+	4,  // 13: martiancloud.tharsis.api.run.RunTaskStage.status:type_name -> martiancloud.tharsis.api.run.RunTaskStageStatus
+	24, // 14: martiancloud.tharsis.api.run.RunTaskStage.policy_checks:type_name -> martiancloud.tharsis.api.run.PolicyCheck
+	2,  // 15: martiancloud.tharsis.api.run.PolicyCheck.check_type:type_name -> martiancloud.tharsis.api.run.PolicyCheckType
+	5,  // 16: martiancloud.tharsis.api.run.PolicyCheck.status:type_name -> martiancloud.tharsis.api.run.PolicyCheckStatus
+	27, // 17: martiancloud.tharsis.api.run.PolicyCheck.policies:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicy
+	3,  // 18: martiancloud.tharsis.api.run.PolicyCheck.stage_name:type_name -> martiancloud.tharsis.api.run.RunTaskStageName
+	7,  // 19: martiancloud.tharsis.api.run.PolicyCheckPolicy.enforcement_level:type_name -> martiancloud.tharsis.api.run.PolicyEnforcementLevel
+	6,  // 20: martiancloud.tharsis.api.run.PolicyCheckPolicy.status:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyStatus
+	28, // 21: martiancloud.tharsis.api.run.PolicyCheckPolicy.provenance:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyProvenance
+	25, // 22: martiancloud.tharsis.api.run.PolicyCheckPolicy.opa_data:type_name -> martiancloud.tharsis.api.run.OPAPolicyCheckData
+	26, // 23: martiancloud.tharsis.api.run.PolicyCheckPolicy.module_attestation_data:type_name -> martiancloud.tharsis.api.run.ModuleAttestationPolicyCheckData
+	29, // 24: martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest.outcomes:type_name -> martiancloud.tharsis.api.run.RunPolicyOutcomeInput
+	27, // 25: martiancloud.tharsis.api.run.PolicyCheckPolicyResult.policy:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicy
+	24, // 26: martiancloud.tharsis.api.run.PolicyCheckResults.policy_check:type_name -> martiancloud.tharsis.api.run.PolicyCheck
+	31, // 27: martiancloud.tharsis.api.run.PolicyCheckResults.policy_results:type_name -> martiancloud.tharsis.api.run.PolicyCheckPolicyResult
+	42, // 28: martiancloud.tharsis.api.run.PolicyCheckResults.run_gate:type_name -> martiancloud.tharsis.api.run_gate.RunGate
+	21, // 29: martiancloud.tharsis.api.run.RunEvent.run:type_name -> martiancloud.tharsis.api.run.Run
+	21, // 30: martiancloud.tharsis.api.run.GetRunsResponse.runs:type_name -> martiancloud.tharsis.api.run.Run
+	43, // 31: martiancloud.tharsis.api.run.GetRunsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	33, // 32: martiancloud.tharsis.api.run.GetRunVariablesResponse.variables:type_name -> martiancloud.tharsis.api.run.RunVariable
+	8,  // 33: martiancloud.tharsis.api.run.Runs.GetRunByID:input_type -> martiancloud.tharsis.api.run.GetRunByIDRequest
+	9,  // 34: martiancloud.tharsis.api.run.Runs.GetRuns:input_type -> martiancloud.tharsis.api.run.GetRunsRequest
+	10, // 35: martiancloud.tharsis.api.run.Runs.CreateRun:input_type -> martiancloud.tharsis.api.run.CreateRunRequest
+	11, // 36: martiancloud.tharsis.api.run.Runs.ApplyRun:input_type -> martiancloud.tharsis.api.run.ApplyRunRequest
+	12, // 37: martiancloud.tharsis.api.run.Runs.CancelRun:input_type -> martiancloud.tharsis.api.run.CancelRunRequest
+	17, // 38: martiancloud.tharsis.api.run.Runs.GetRunVariables:input_type -> martiancloud.tharsis.api.run.GetRunVariablesRequest
+	44, // 39: martiancloud.tharsis.api.run.Runs.GetPlanByID:input_type -> martiancloud.tharsis.api.plan.GetPlanByIDRequest
+	45, // 40: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
+	46, // 41: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
+	30, // 42: martiancloud.tharsis.api.run.Runs.ReportRunPolicyOutcomes:input_type -> martiancloud.tharsis.api.run.ReportRunPolicyOutcomesRequest
+	47, // 43: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
+	20, // 44: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:input_type -> martiancloud.tharsis.api.run.SetVariablesIncludedInTFConfigRequest
+	18, // 45: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
+	13, // 46: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:input_type -> martiancloud.tharsis.api.run.CreateDestroyRunForWorkspaceRequest
+	14, // 47: martiancloud.tharsis.api.run.Runs.DiscardRun:input_type -> martiancloud.tharsis.api.run.DiscardRunRequest
+	15, // 48: martiancloud.tharsis.api.run.Runs.UndiscardRun:input_type -> martiancloud.tharsis.api.run.UndiscardRunRequest
+	16, // 49: martiancloud.tharsis.api.run.Runs.GetPolicyCheckResults:input_type -> martiancloud.tharsis.api.run.GetPolicyCheckResultsRequest
+	21, // 50: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
+	35, // 51: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
+	21, // 52: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
+	21, // 53: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
+	21, // 54: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
+	36, // 55: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
+	40, // 56: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
+	41, // 57: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
+	40, // 58: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
+	48, // 59: martiancloud.tharsis.api.run.Runs.ReportRunPolicyOutcomes:output_type -> google.protobuf.Empty
+	41, // 60: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
+	48, // 61: martiancloud.tharsis.api.run.Runs.SetVariablesIncludedInTFConfig:output_type -> google.protobuf.Empty
+	34, // 62: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
+	21, // 63: martiancloud.tharsis.api.run.Runs.CreateDestroyRunForWorkspace:output_type -> martiancloud.tharsis.api.run.Run
+	21, // 64: martiancloud.tharsis.api.run.Runs.DiscardRun:output_type -> martiancloud.tharsis.api.run.Run
+	21, // 65: martiancloud.tharsis.api.run.Runs.UndiscardRun:output_type -> martiancloud.tharsis.api.run.Run
+	32, // 66: martiancloud.tharsis.api.run.Runs.GetPolicyCheckResults:output_type -> martiancloud.tharsis.api.run.PolicyCheckResults
+	50, // [50:67] is the sub-list for method output_type
+	33, // [33:50] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_run_proto_init() }
