@@ -55,7 +55,12 @@ func TestCreateDestroyRun_Prepare(t *testing.T) {
 			uploadedVars = variables
 			return nil, "vars-key", nil
 		},
-		in: &CreateDestroyRunInput{Subject: "u", WorkspaceID: "ws-1", AutoApply: true},
+		in: &CreateDestroyRunInput{
+			Subject:     "u",
+			WorkspaceID: "ws-1",
+			AutoApply:   true,
+			Annotations: []*models.RunAnnotation{{Key: "team", Value: "platform"}},
+		},
 	}
 
 	require.NoError(t, cmd.Prepare(ctx))
@@ -65,6 +70,9 @@ func TestCreateDestroyRun_Prepare(t *testing.T) {
 	assert.True(t, cmd.createInput.AutoApply)
 	assert.Equal(t, "1.4.0", cmd.createInput.TerraformVersion)
 	assert.Equal(t, "vars-key", cmd.createInput.VariablesObjectStoreKey)
+	require.Len(t, cmd.createInput.Annotations, 1)
+	assert.Equal(t, "team", cmd.createInput.Annotations[0].Key)
+	assert.Equal(t, "platform", cmd.createInput.Annotations[0].Value)
 	require.Len(t, uploadedVars, 1)
 	assert.Nil(t, uploadedVars[0].NamespacePath, "inherited namespace path must be cleared")
 }
