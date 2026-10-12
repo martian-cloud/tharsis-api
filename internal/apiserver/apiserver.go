@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -118,7 +119,15 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	// captured by the store too. The redirect lives for the process lifetime, so the restore is ignored.
 	logger.RedirectStdLog()
 
-	openIDConfigFetcher := auth.NewOpenIDConfigFetcher(logger)
+	for _, warning := range insecureConfigWarnings(cfg) {
+		logger.Warnf("Insecure configuration: %s", warning)
+	}
+
+	// Requests whose destination comes from user input (registries, VCS providers, OIDC issuers) go
+	// through this policy, so they can't reach the API's own network or cloud metadata.
+	outboundPolicy := tharsishttp.NewOutboundPolicy(trustedOutboundURLs(cfg)...)
+
+	openIDConfigFetcher := auth.NewOpenIDConfigFetcher(logger, outboundPolicy.HTTPClient())
 
 	tlsConfig, err := loadTLSConfig(cfg, logger)
 	if err != nil {
@@ -157,7 +166,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		return nil, fmt.Errorf("failed to create DB client %v", err)
 	}
 
-	httpClient := tharsishttp.NewHTTPClient()
+	httpClient := outboundPolicy.HTTPClient()
 
 	eventManager := events.NewEventManager(dbClient, logger)
 	eventManager.Start(ctx)
@@ -202,7 +211,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		return nil, fmt.Errorf("failed to initialize identity provider: %w", err)
 	}
 
-	userAuth := auth.NewUserAuth(ctx, cfg.OauthProviders, logger, dbClient, maintenanceMonitor, openIDConfigFetcher)
+	userAuth := auth.NewUserAuth(ctx, cfg.OauthProviders, logger, dbClient, maintenanceMonitor, openIDConfigFetcher, cfg.AdminUserEmail)
 	federatedRegistryAuth := auth.NewFederatedRegistryAuth(ctx, cfg.FederatedRegistryTrustPolicies, logger, openIDConfigFetcher, dbClient)
 
 	inheritedSettingsResolver := namespace.NewInheritedSettingResolver(dbClient)
@@ -243,7 +252,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	limits := limits.NewLimitChecker(dbClient)
 	notificationManager := namespace.NewNotificationManager(dbClient, inheritedSettingsResolver)
-	federatedRegistryClient := registry.NewFederatedRegistryClient(logger, signingKeyManager, apiVersion)
+	federatedRegistryClient := registry.NewFederatedRegistryClient(logger, signingKeyManager, apiVersion, outboundPolicy)
 	moduleResolver := registry.NewModuleResolver(dbClient, httpClient, federatedRegistryClient, logger, cfg.TharsisAPIURL, signingKeyManager)
 	runVariablesBuilder := runvariables.NewBuilder(dbClient, pluginCatalog.SecretManager, artifactStore)
 	runAdmitter := admission.New(dbClient)
@@ -299,12 +308,12 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, inheritedSettingsResolver)
 		workspaceService           = workspacesvc.NewService(logger, dbClient, limits, artifactStore, eventManager, cfg.TerraformCLIVersionConstraint, inheritedSettingsResolver)
 		jobService                 = job.NewService(logger, dbClient, runCmdProcessor, runCmdFactory, signingKeyManager, logStreamManager, eventManager)
-		managedIdentityService     = managedidentity.NewService(logger, dbClient, limits, managedIdentityDelegates, workspaceService, jobService)
+		managedIdentityService     = managedidentity.NewService(logger, dbClient, limits, managedIdentityDelegates, workspaceService)
 		saService                  = serviceaccount.NewService(logger, dbClient, limits, signingKeyManager, openIDConfigFetcher, cfg.ServiceAccountClientSecretMaxExpirationDays)
 		variableService            = variable.NewService(logger, dbClient, limits, pluginCatalog.SecretManager, cfg.DisableSensitiveVariableFeature)
 		teamService                = team.NewService(logger, dbClient)
 		providerRegistryService    = providerregistry.NewService(logger, dbClient, limits, providerRegistryStore)
-		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, taskManager)
+		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, taskManager, cfg.ModuleRegistryMaxUploadSize)
 		packageRegistryService     = packageregistry.NewService(logger, dbClient, limits, packageStore)
 		policySetService           = policy.NewService(logger, dbClient, limits)
 		cleanupPolicyService       = cleanuppolicy.NewService(logger, dbClient)
@@ -436,12 +445,12 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	// Create the admin user if an email is provided.
 	if cfg.AdminUserEmail != "" {
-		if err = configureDefaultAdminUser(ctx, cfg.AdminUserEmail, cfg.AdminUserPassword, dbClient, logger); err != nil {
+		if err = configureDefaultAdminUser(ctx, cfg.AdminUserEmail, cfg.AdminUserPassword, cfg.OauthProviders, dbClient, logger); err != nil {
 			return nil, fmt.Errorf("failed to configure default admin user: %w", err)
 		}
 	}
 
-	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, universalSearchManager, userSessionManager, signingKeyManager, apiVersion)
+	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, universalSearchManager, userSessionManager, signingKeyManager, httpClient, apiVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -626,6 +635,21 @@ func (api *APIServer) Shutdown(ctx context.Context) {
 	})
 }
 
+// trustedOutboundURLs are the URLs from the API's own configuration whose hosts the API may always
+// connect to, even on a private network: its own URLs and the OIDC issuers an administrator
+// configured for login and federated registries. Only user-supplied destinations need the private
+// network allow list.
+func trustedOutboundURLs(cfg *config.Config) []string {
+	urls := []string{cfg.TharsisAPIURL, cfg.ServiceDiscoveryHost, cfg.JWTIssuerURL}
+	for _, provider := range cfg.OauthProviders {
+		urls = append(urls, provider.IssuerURL)
+	}
+	for _, policy := range cfg.FederatedRegistryTrustPolicies {
+		urls = append(urls, policy.IssuerURL)
+	}
+	return urls
+}
+
 func buildRootHandler(httpHandler http.Handler, grpcHandler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if grpc.IsGRPCRequest(r) {
@@ -636,7 +660,8 @@ func buildRootHandler(httpHandler http.Handler, grpcHandler http.Handler) http.H
 	})
 }
 
-func configureDefaultAdminUser(ctx context.Context, email string, password string, dbClient *db.Client, logger logger.Logger) error {
+func configureDefaultAdminUser(ctx context.Context, email string, password string, identityProviders []config.IdpConfig,
+	dbClient *db.Client, logger logger.Logger) error {
 	if email == "" {
 		return nil
 	}
@@ -647,16 +672,27 @@ func configureDefaultAdminUser(ctx context.Context, email string, password strin
 	}
 
 	if user == nil {
+		// Without a password the admin can only sign in through SSO, so the user is created as an admin on
+		// their first sign-in instead. Pre-creating it would leave an account that has to be linked by email.
+		if password == "" {
+			if !slices.ContainsFunc(identityProviders, func(idp config.IdpConfig) bool { return idp.AllowAdminBootstrap }) {
+				logger.Warnf("User with email %s won't be granted admin privileges: no admin user password is set and no "+
+					"identity provider has allow_admin_bootstrap enabled. Set one of them to create the admin user.", email)
+				return nil
+			}
+
+			logger.Infof("User with email %s will be granted admin privileges on first sign-in.", email)
+			return nil
+		}
+
 		user = &models.User{
 			Username: auth.ParseUsername(email),
 			Email:    email,
 			Admin:    true,
 			Active:   true,
 		}
-		if password != "" {
-			if err = user.SetPassword(password); err != nil {
-				return err
-			}
+		if err = user.SetPassword(password); err != nil {
+			return err
 		}
 
 		if _, err = dbClient.Users.CreateUser(ctx, user); err != nil {

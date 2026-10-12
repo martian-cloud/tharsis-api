@@ -157,6 +157,27 @@ type GRPCClientConfig struct {
 	TLSSkipVerify bool
 	Logger        LeveledLogger
 	UserAgent     string
+	// Dialer, when set, makes every connection: the discovery document fetch and the gRPC
+	// connection. Use it to restrict which addresses the client may connect to.
+	Dialer ContextDialer
+}
+
+// grpcTarget returns the gRPC target for host:port. With a caller-supplied dialer it uses the
+// passthrough resolver, so gRPC hands the dialer the hostname rather than an IP it resolved itself:
+// a dialer that restricts connections by hostname (such as an outbound policy that allows some hosts
+// to reach private addresses) can only work if it sees the name. The dialer then resolves the name.
+// Otherwise gRPC's default DNS resolver is used.
+func grpcTarget(host, port string, customDialer bool) string {
+	hostPort := net.JoinHostPort(host, port)
+	if customDialer {
+		return "passthrough:///" + hostPort
+	}
+	return hostPort
+}
+
+// ContextDialer makes network connections. *net.Dialer satisfies it.
+type ContextDialer interface {
+	DialContext(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
 // NewGRPCClient returns a new GRPCClient.
@@ -185,6 +206,14 @@ func NewGRPCClient(ctx context.Context, c *GRPCClientConfig) (*GRPCClient, error
 		dialOptions = append(dialOptions, grpc.WithUserAgent(c.UserAgent))
 	}
 
+	discoveryOptions := []GRPCDiscoveryOption{WithLogger(c.Logger), WithTLSSkipVerify(c.TLSSkipVerify)}
+	if c.Dialer != nil {
+		dialOptions = append(dialOptions, grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return c.Dialer.DialContext(ctx, "tcp", addr)
+		}))
+		discoveryOptions = append(discoveryOptions, WithDialer(c.Dialer))
+	}
+
 	if c.TokenResolver != nil {
 		// Add token based auth since we're using it.
 		dialOptions = append(
@@ -201,10 +230,10 @@ func NewGRPCClient(ctx context.Context, c *GRPCClientConfig) (*GRPCClient, error
 	}
 
 	// Fetch discovery document from API.
-	discoveryDocument, err := NewGRPCDiscoveryDocument(ctx, c.HTTPEndpoint, WithLogger(c.Logger), WithTLSSkipVerify(c.TLSSkipVerify))
+	discoveryDocument, err := NewGRPCDiscoveryDocument(ctx, c.HTTPEndpoint, discoveryOptions...)
 	if err != nil && errors.Is(err, context.DeadlineExceeded) {
 		// The context deadline was exceeded, try one more time before returning an error
-		discoveryDocument, err = NewGRPCDiscoveryDocument(ctx, c.HTTPEndpoint, WithLogger(c.Logger), WithTLSSkipVerify(c.TLSSkipVerify))
+		discoveryDocument, err = NewGRPCDiscoveryDocument(ctx, c.HTTPEndpoint, discoveryOptions...)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get discovery document: %w", err)
@@ -279,7 +308,7 @@ func NewGRPCClient(ctx context.Context, c *GRPCClientConfig) (*GRPCClient, error
 	//
 	// See: https://github.com/grpc/grpc-go/blob/master/Documentation/anti-patterns.md
 	clientConn, err := grpc.NewClient(
-		fmt.Sprintf("%s:%s", discoveryDocument.Host, discoveryDocument.Port),
+		grpcTarget(discoveryDocument.Host, discoveryDocument.Port, c.Dialer != nil),
 		dialOptions...,
 	)
 	if err != nil {
@@ -406,6 +435,7 @@ type GRPCDiscoveryDocument struct {
 type grpcDiscoveryOptions struct {
 	logger        LeveledLogger
 	tlsSkipVerify bool
+	dialer        ContextDialer
 }
 
 // GRPCDiscoveryOption is a function that sets options for the GRPC discovery document.
@@ -422,6 +452,15 @@ func WithLogger(logger LeveledLogger) GRPCDiscoveryOption {
 func WithTLSSkipVerify(skip bool) GRPCDiscoveryOption {
 	return func(o *grpcDiscoveryOptions) {
 		o.tlsSkipVerify = skip
+	}
+}
+
+// WithDialer makes the discovery document fetch connect through dialer instead of a default one.
+// Like a gRPC connection with a custom dialer, it then doesn't use a proxy from the environment:
+// the dialer makes the connection to the server itself.
+func WithDialer(dialer ContextDialer) GRPCDiscoveryOption {
+	return func(o *grpcDiscoveryOptions) {
+		o.dialer = dialer
 	}
 }
 
@@ -446,18 +485,24 @@ func NewGRPCDiscoveryDocument(ctx context.Context, endpoint string, options ...G
 		return nil, err
 	}
 
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout: 60 * time.Second,
+		}).DialContext,
+		DisableKeepAlives:   true,
+		TLSHandshakeTimeout: 30 * time.Second,
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: opts.tlsSkipVerify, MinVersion: tls.VersionTLS12}, // #nosec G402 -- Controlled by caller
+	}
+	if opts.dialer != nil {
+		transport.Proxy = nil
+		transport.DialContext = opts.dialer.DialContext
+	}
+
 	retryableClient := &retryablehttp.Client{
 		HTTPClient: &http.Client{
-			Timeout: 60 * time.Second,
-			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				DialContext: (&net.Dialer{
-					Timeout: 60 * time.Second,
-				}).DialContext,
-				DisableKeepAlives:   true,
-				TLSHandshakeTimeout: 30 * time.Second,
-				TLSClientConfig:     &tls.Config{InsecureSkipVerify: opts.tlsSkipVerify, MinVersion: tls.VersionTLS12}, // #nosec G402 -- Controlled by caller
-			},
+			Timeout:   60 * time.Second,
+			Transport: transport,
 		},
 		RetryWaitMin: 1 * time.Second,
 		RetryWaitMax: 30 * time.Second,

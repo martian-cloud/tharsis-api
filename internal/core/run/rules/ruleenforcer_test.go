@@ -859,9 +859,9 @@ func TestEnforceRules(t *testing.T) {
 			dbClient.StateVersions = mockStateVersions
 			dbClient.Runs = mockRuns
 
-			enforcer := NewRuleEnforcer(&dbClient)
+			enforcer := NewRuleEnforcer(&dbClient).(*ruleEnforcer)
 
-			err := enforcer.EnforceRules(ctx, &managedIdentity, test.buildRunDetails(t))
+			err := enforcer.enforceRulesForManagedIdentity(ctx, &managedIdentity, test.buildRunDetails(t))
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err), "unexpected error returned %v", err)
@@ -869,6 +869,70 @@ func TestEnforceRules(t *testing.T) {
 			}
 
 			require.Nil(t, err)
+		})
+	}
+}
+
+func TestEnforceRules_MultipleIdentities(t *testing.T) {
+	identities := []models.ManagedIdentity{
+		{Metadata: models.ResourceMetadata{ID: "mi-1"}},
+		{Metadata: models.ResourceMetadata{ID: "mi-2"}},
+		{Metadata: models.ResourceMetadata{ID: "mi-3"}},
+	}
+	input := &RunDetails{RunStage: models.JobApplyType}
+
+	testCases := []struct {
+		name            string
+		identities      []models.ManagedIdentity
+		failID          string
+		expectIDs       []string
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:      "no identities returns an empty, non-nil slice",
+			expectIDs: []string{},
+		},
+		{
+			name:       "every identity passes",
+			identities: identities,
+			expectIDs:  []string{"mi-1", "mi-2", "mi-3"},
+		},
+		{
+			name:            "stops at the first identity that fails",
+			identities:      identities,
+			failID:          "mi-2",
+			expectErrorCode: errors.EInternal,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockManagedIdentities := db.NewMockManagedIdentities(t)
+			for _, mi := range test.identities {
+				matchID := mock.MatchedBy(func(in *db.GetManagedIdentityAccessRulesInput) bool {
+					return *in.Filter.ManagedIdentityID == mi.Metadata.ID
+				})
+				if mi.Metadata.ID == test.failID {
+					// Later identities have no expectation, so the mock fails the test if they are checked.
+					mockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything, matchID).
+						Return(nil, errors.New("db failure")).Once()
+					break
+				}
+				mockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything, matchID).
+					Return(&db.ManagedIdentityAccessRulesResult{}, nil).Once()
+			}
+
+			enforcer := NewRuleEnforcer(&db.Client{ManagedIdentities: mockManagedIdentities})
+
+			ids, err := enforcer.EnforceRules(context.Background(), test.identities, input)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				assert.Nil(t, ids)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectIDs, ids)
 		})
 	}
 }

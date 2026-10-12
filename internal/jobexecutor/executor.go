@@ -16,14 +16,9 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 const (
-	// waitCancelError is the duration to sleep if cancel wait gets error
-	waitCancelError = 10 * time.Second
-
 	// waitForcedCancel is the duration to sleep between polls looking for forced cancel.
 	waitForcedCancel = 30 * time.Second
 
@@ -33,6 +28,29 @@ const (
 	// failureIcon is the icon used for failure messages
 	failureIcon = "\u274c"
 )
+
+// Delays for the graceful cancellation listener. Vars rather than consts only so tests can shrink
+// them; they are never reassigned at runtime.
+var (
+	// waitCancelError is the duration to sleep if cancel wait gets error
+	waitCancelError = 10 * time.Second
+
+	// waitCancelStreamEnded is the duration to wait before resubscribing when the cancellation stream
+	// ends without a cancellation.
+	waitCancelStreamEnded = 5 * time.Second
+)
+
+// sleepCtx waits for d, returning false early if ctx is done.
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
 
 var errJobAlreadyCanceled = errors.New("job already canceled")
 
@@ -60,6 +78,8 @@ type JobExecutor struct {
 	cancelFunc     context.CancelFunc
 	resourceMon    resource.Monitor
 	version        string
+	// exit terminates the process on a force cancel; replaced in tests.
+	exit func(code int)
 }
 
 // NewJobExecutor creates a new JobExecutor
@@ -80,6 +100,7 @@ func NewJobExecutor(
 		version:        version,
 		cancellableCtx: ctx,
 		cancelFunc:     cancel,
+		exit:           os.Exit,
 	}
 }
 
@@ -90,6 +111,8 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 		return fmt.Errorf("failed to create job logger %v", err)
 	}
 
+	// Each final status is set only after closing the logger, since logs for a finished job are
+	// rejected. Close is idempotent, so this only covers an early return.
 	defer jobLogger.Close()
 
 	jobLogger.Start()
@@ -118,7 +141,7 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 			j.handleJobFailureWithError(ctx, jobLogger, err)
 		}
 	} else {
-		jobLogger.Flush()
+		jobLogger.Close()
 		if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_finished, models.CurrentJobProtocolVersion); err != nil {
 			return fmt.Errorf("failed to set job status to succeeded: %v", err)
 		}
@@ -154,7 +177,7 @@ func (j *JobExecutor) handleJobFailureWithError(ctx context.Context, jobLogger j
 }
 
 func (j *JobExecutor) handleJobFailure(ctx context.Context, jobLogger joblogger.Logger) {
-	jobLogger.Flush()
+	jobLogger.Close()
 
 	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_failed, models.CurrentJobProtocolVersion); err != nil {
 		j.logger.Errorf("failed to set job status to failed: %v", err)
@@ -162,7 +185,7 @@ func (j *JobExecutor) handleJobFailure(ctx context.Context, jobLogger joblogger.
 }
 
 func (j *JobExecutor) handleJobCanceled(ctx context.Context, jobLogger joblogger.Logger) {
-	jobLogger.Flush()
+	jobLogger.Close()
 
 	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_canceled, models.CurrentJobProtocolVersion); err != nil {
 		j.logger.Errorf("failed to set job status to canceled: %v", err)
@@ -172,15 +195,12 @@ func (j *JobExecutor) handleJobCanceled(ctx context.Context, jobLogger joblogger
 func (j *JobExecutor) execute(ctx context.Context, jobLogger joblogger.Logger) error {
 	// Set job status to running
 	if _, err := j.client.SetJobStatus(ctx, j.cfg.JobID, pb.JobStatus_running, models.CurrentJobProtocolVersion); err != nil {
-		if status.Code(err) == codes.InvalidArgument {
-			// Check if job is already canceled
-			job, err := j.client.GetJob(ctx, j.cfg.JobID)
-			if err != nil {
-				return fmt.Errorf("failed to get job %v", err)
-			}
-			if job.Status == pb.JobStatus_canceled {
-				return errJobAlreadyCanceled
-			}
+		// The job may have been canceled before it started. That can surface as any error code: an
+		// illegal status transition, or the job token being refused updates once the job is final. A
+		// finished job's token can still read the job itself, so check for that here.
+		job, gErr := j.client.GetJob(ctx, j.cfg.JobID)
+		if gErr == nil && job.Status == pb.JobStatus_canceled {
+			return errJobAlreadyCanceled
 		}
 		return fmt.Errorf("failed to set job status to running: %v", err)
 	}
@@ -286,6 +306,7 @@ func (j *JobExecutor) startCancellationMonitor(
 	}()
 
 	// Listen for graceful cancel
+	errorWait, streamEndedWait := waitCancelError, waitCancelStreamEnded
 	go func() {
 		for {
 			if j.cancellableCtx.Err() != nil {
@@ -301,7 +322,9 @@ func (j *JobExecutor) startCancellationMonitor(
 				}
 
 				jobLogger.Errorf("Received error when listening for graceful job cancellation: %v", err)
-				time.Sleep(waitCancelError)
+				if !sleepCtx(ctx, errorWait) {
+					return
+				}
 				continue
 			}
 
@@ -311,6 +334,12 @@ func (j *JobExecutor) startCancellationMonitor(
 				// Cancel the context
 				j.cancelFunc()
 
+				return
+			}
+
+			// The stream ended cleanly without a cancellation (e.g. the server closed it). Wait before
+			// resubscribing so a server that keeps closing the stream doesn't cause a tight loop.
+			if !sleepCtx(ctx, streamEndedWait) {
 				return
 			}
 		}
@@ -343,7 +372,7 @@ func (j *JobExecutor) startCancellationMonitor(
 			// If the cancellation was forced, this should kill the main process and force the run to terminate.
 			if job.ForceCanceled {
 				jobLogger.Warningf("Received force cancel request for this job")
-				os.Exit(1)
+				j.exit(1)
 			}
 
 			time.Sleep(waitForcedCancel)

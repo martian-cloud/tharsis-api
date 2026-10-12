@@ -26,7 +26,12 @@ const (
 	// Flush retries a transient send error up to flushMaxAttempts times with exponential backoff
 	// (capped at flushMaxBackoff). Bounded so a persistently unreachable server can't hang the
 	// executor indefinitely.
-	flushMaxAttempts = 5
+	//
+	// The total backoff (0.5+1+2+4+5*5 = 32.5s, plus the time the attempts themselves take) must
+	// outlast the server's log chunk write lease (20s, see logstream's chunkLeaseDuration): if an API
+	// instance dies while holding the lease, writes to that chunk are rejected as Aborted until it
+	// expires, and giving up sooner would drop the job's final logs on the closing flush.
+	flushMaxAttempts = 10
 
 	// logSizeLimitReachedMarker is the substring the server embeds in the SaveJobLogs cap-rejection
 	// message (ETooLarge → gRPC InvalidArgument). handleTerminalSendError matches it to tell the cap

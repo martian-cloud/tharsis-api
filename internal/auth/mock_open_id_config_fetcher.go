@@ -4,6 +4,7 @@ package auth
 
 import (
 	context "context"
+	http "net/http"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -41,6 +42,26 @@ func (_m *MockOpenIDConfigFetcher) GetOpenIDConfig(ctx context.Context, issuer s
 	}
 
 	return r0, r1
+}
+
+// HTTPClient provides a mock function with no fields
+func (_m *MockOpenIDConfigFetcher) HTTPClient() *http.Client {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for HTTPClient")
+	}
+
+	var r0 *http.Client
+	if rf, ok := ret.Get(0).(func() *http.Client); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*http.Client)
+		}
+	}
+
+	return r0
 }
 
 // NewMockOpenIDConfigFetcher creates a new instance of MockOpenIDConfigFetcher. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

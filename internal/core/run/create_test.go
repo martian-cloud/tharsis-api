@@ -80,6 +80,13 @@ func callerCtx() context.Context {
 		auth.NewServiceAccountCaller("sa-1", "group/sa", nil, nil, nil))
 }
 
+// stubNoManagedIdentities assigns no managed identities to the workspace, so rule enforcement
+// has none to check.
+func (e *createTestEnv) stubNoManagedIdentities(ctx context.Context) {
+	e.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	e.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, mock.Anything).Return([]string{}, nil)
+}
+
 // stubCreatePersistence wires the persistence/limit/activity/upload calls that the
 // happy-path portion of Create makes after validation succeeds.
 func (e *createTestEnv) stubCreatePersistence(ctx context.Context) {
@@ -106,7 +113,7 @@ func TestCreate_HappyPath_NonSpeculative(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	env.stubCreatePersistence(ctx)
 
 	run, err := env.create(ctx, &CreateRunInput{
@@ -137,7 +144,7 @@ func TestCreate_AttachesPostPlanStageWhenPolicyApplies(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	// Ancestor group resolution: workspace path "group/ws" → ancestor path "group".
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
@@ -222,7 +229,7 @@ func TestCreate_AttachesAllFourStagesWhenPoliciesApply(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
@@ -290,7 +297,7 @@ func TestCreate_SpeculativeRunSkipsApplyPhaseStages(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
@@ -348,7 +355,7 @@ func TestCreate_OPAKindWithNilOPADataFailsRunCreation(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
@@ -385,7 +392,7 @@ func TestCreate_UnsupportedKindFailsRunCreation(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
@@ -421,7 +428,7 @@ func TestCreate_UnsupportedKindAtAnUnrelatedStageDoesNotFailRunCreation(t *testi
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
@@ -475,7 +482,7 @@ func TestCreate_ModuleAttestationKindWithNilDataFailsRunCreation(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
@@ -506,7 +513,7 @@ func TestCreate_StageWithBothKindsProducesTwoChecksWithDistinctPaths(t *testing.
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
@@ -583,7 +590,7 @@ func TestCreate_NoStageNodeWhenNoPolicies(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 
 	var capturedRun *models.Run
 	env.runs.On("CreateRun", ctx, mock.Anything).Return(func(_ context.Context, run *models.Run) *models.Run {
@@ -612,7 +619,7 @@ func TestCreate_SkipActivityEvent(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 
 	// Wire the persistence path without a CreateActivityEvent expectation;
 	// NewMockActivityEvents(t) fails the test if the suppressed event is created anyway.
@@ -643,7 +650,7 @@ func TestCreate_Speculative_HasNoApplyNode(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	env.stubCreatePersistence(ctx)
 
 	run, err := env.create(ctx, &CreateRunInput{
@@ -667,7 +674,7 @@ func TestCreate_SpeculativeUsesSpeculativeEnforcementLevel(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}, FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{
 		{Metadata: models.ResourceMetadata{ID: "g-ancestor"}, FullPath: "group"},
 	}}, nil)
@@ -765,9 +772,76 @@ func TestCreate_ManagedIdentityRuleDenied(t *testing.T) {
 	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").
 		Return([]models.ManagedIdentity{{Metadata: models.ResourceMetadata{ID: "mi-1"}}}, nil)
 	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, mock.Anything).
-		Return(errors.New("rule violation", errors.WithErrorCode(errors.EForbidden)))
+		Return(nil, errors.New("rule violation", errors.WithErrorCode(errors.EForbidden)))
 
 	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	require.Error(t, err)
+	assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
+	assert.Nil(t, run)
+}
+
+// matchRunStage matches rule enforcement for the given run stage.
+func matchRunStage(stage models.JobType) any {
+	return mock.MatchedBy(func(d *rules.RunDetails) bool { return d.RunStage == stage })
+}
+
+func TestCreate_ManualApplyRunSkipsApplyStageRules(t *testing.T) {
+	ctx := callerCtx()
+	env := newCreateTestEnv(t)
+
+	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
+		Return(&models.Workspace{FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
+	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").
+		Return([]models.ManagedIdentity{{Metadata: models.ResourceMetadata{ID: "mi-1"}}}, nil)
+	// Only the plan stage is expected: a manual apply's rules are checked by StartApply. The mock
+	// fails the test on an apply-stage call.
+	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, matchRunStage(models.JobPlanType)).Return([]string{"mi-1"}, nil).Once()
+	env.stubCreatePersistence(ctx)
+
+	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	require.NoError(t, err)
+	// The plan may use the identities that passed; the apply records its own when started.
+	assert.Equal(t, []string{"mi-1"}, run.Plan.ManagedIdentityIDs)
+	require.NotNil(t, run.Apply)
+	assert.Nil(t, run.Apply.ManagedIdentityIDs)
+}
+
+func TestCreate_AutoApplyRunEnforcesApplyStageRules(t *testing.T) {
+	ctx := callerCtx()
+	env := newCreateTestEnv(t)
+
+	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
+		Return(&models.Workspace{FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
+	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").
+		Return([]models.ManagedIdentity{{Metadata: models.ResourceMetadata{ID: "mi-1"}}}, nil)
+	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, matchRunStage(models.JobPlanType)).Return([]string{"mi-1"}, nil).Once()
+	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, matchRunStage(models.JobApplyType)).Return([]string{"mi-1"}, nil).Once()
+	env.stubCreatePersistence(ctx)
+
+	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1", AutoApply: true})
+	require.NoError(t, err)
+	assert.True(t, run.AutoApply)
+	// The apply is authorized now, so it records its identities at creation too.
+	assert.Equal(t, []string{"mi-1"}, run.Plan.ManagedIdentityIDs)
+	require.NotNil(t, run.Apply)
+	assert.Equal(t, []string{"mi-1"}, run.Apply.ManagedIdentityIDs)
+}
+
+func TestCreate_AutoApplyRunApplyStageRuleDenied(t *testing.T) {
+	ctx := callerCtx()
+	env := newCreateTestEnv(t)
+
+	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
+		Return(&models.Workspace{FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
+	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").
+		Return([]models.ManagedIdentity{{Metadata: models.ResourceMetadata{ID: "mi-1"}}}, nil)
+	// The caller passes the plan rules but not the apply rules, so an auto-apply run must not be
+	// created. CreateRun is not stubbed, so reaching it fails the test.
+	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, matchRunStage(models.JobPlanType)).Return([]string{"mi-1"}, nil).Once()
+	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, matchRunStage(models.JobApplyType)).
+		Return(nil, errors.New("rule violation", errors.WithErrorCode(errors.EForbidden))).Once()
+
+	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1", AutoApply: true})
 	require.Error(t, err)
 	assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
 	assert.Nil(t, run)
@@ -779,7 +853,7 @@ func TestCreate_RunLimitExceeded(t *testing.T) {
 
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").
 		Return(&models.Workspace{FullPath: "group/ws", TerraformVersion: "1.5.0"}, nil)
-	env.managedIDs.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return(nil, nil)
+	env.stubNoManagedIdentities(ctx)
 	// Policy resolution runs before the run is created (to gate the stage node), so it
 	// happens even on the limit-exceeded path.
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{}}, nil).Maybe()

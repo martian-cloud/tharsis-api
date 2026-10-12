@@ -1,6 +1,15 @@
 package module
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestBuildTokenEnvVar(t *testing.T) {
 	type args struct {
@@ -73,4 +82,44 @@ func TestBuildTokenEnvVar(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetModuleRegistryEndpointForHost(t *testing.T) {
+	var body string
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	serverURL, err := url.Parse(server.URL)
+	require.NoError(t, err)
+
+	t.Run("relative modules.v1 path resolves against the host", func(t *testing.T) {
+		body = `{"modules.v1":"/api/modules/v1"}`
+		got, err := GetModuleRegistryEndpointForHost(server.Client(), serverURL.Host)
+		require.NoError(t, err)
+		assert.Equal(t, "https://"+serverURL.Host+"/api/modules/v1/", got.String())
+	})
+
+	t.Run("an invalid document is not echoed in the error", func(t *testing.T) {
+		// The host is user-supplied, so echoing the body would let a caller read whatever it returned.
+		body = "<html>internal-secret</html>"
+		_, err := GetModuleRegistryEndpointForHost(server.Client(), serverURL.Host)
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "internal-secret")
+	})
+}
+
+func TestReadAllLimited(t *testing.T) {
+	t.Run("a body at the limit is read in full", func(t *testing.T) {
+		body, err := ReadAllLimited(strings.NewReader("12345"), 5)
+		require.NoError(t, err)
+		assert.Equal(t, "12345", string(body))
+	})
+
+	t.Run("a body over the limit is an error, not a truncated read", func(t *testing.T) {
+		_, err := ReadAllLimited(strings.NewReader("123456"), 5)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeds the maximum size of 5 bytes")
+	})
 }

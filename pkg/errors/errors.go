@@ -31,6 +31,7 @@ const (
 	EUnauthorized       CodeType = "unauthorized"
 	ETooLarge           CodeType = "request too large"
 	EServiceUnavailable CodeType = "service unavailable"
+	EDataLoss           CodeType = "data loss"
 )
 
 // serverFaultCodes are error codes representing a fault in the service itself, as opposed to an
@@ -41,6 +42,7 @@ var serverFaultCodes = map[CodeType]bool{
 	EInternal:           true,
 	ENotImplemented:     true,
 	EServiceUnavailable: true,
+	EDataLoss:           true,
 }
 
 // isClientError returns true if err represents an expected, caller-driven outcome (per its

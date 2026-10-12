@@ -46,7 +46,7 @@ func NewLogStore(objectStore objectstore.ObjectStore, objectStoreRefs db.ObjectS
 // so it is server-derived, not client-supplied. Object storage is written before the metadata commit,
 // so a committed chunk size is always backed by at least that many object bytes. If the existing
 // object is therefore missing or shorter than byteOffset, the object store has lost data relative to
-// the database — an internal inconsistency (EInternal), not a client gap.
+// the database (EDataLoss), not a client gap.
 func (ls *store) WriteChunk(ctx context.Context, key string, byteOffset int, buffer []byte) (db.RetainObjectRefFunc, error) {
 	if byteOffset < 0 {
 		return nil, errors.New("offset cannot be negative", errors.WithErrorCode(errors.EInvalid))
@@ -63,7 +63,7 @@ func (ls *store) WriteChunk(ctx context.Context, key string, byteOffset int, buf
 		if err != nil {
 			if errors.ErrorCode(err) == errors.ENotFound {
 				// The object is missing or shorter than its committed size: object store data loss.
-				return nil, errors.New("log chunk object %s is missing bytes before offset %d (object store data loss)", key, byteOffset, errors.WithErrorCode(errors.EInternal))
+				return nil, errors.New("log chunk object %s is missing bytes before offset %d (object store data loss)", key, byteOffset, errors.WithErrorCode(errors.EDataLoss))
 			}
 			return nil, errors.Wrap(err, "failed to read existing log chunk from object storage")
 		}
@@ -79,7 +79,7 @@ func (ls *store) WriteChunk(ctx context.Context, key string, byteOffset int, buf
 
 		// The object held fewer bytes than its committed size: object store data loss.
 		if len(prefix) != byteOffset {
-			return nil, errors.New("log chunk object %s is shorter (%d bytes) than its committed size %d (object store data loss)", key, len(prefix), byteOffset, errors.WithErrorCode(errors.EInternal))
+			return nil, errors.New("log chunk object %s is shorter (%d bytes) than its committed size %d (object store data loss)", key, len(prefix), byteOffset, errors.WithErrorCode(errors.EDataLoss))
 		}
 	}
 

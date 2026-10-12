@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/rules"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -23,19 +25,29 @@ type SetRunAutoApplyInput struct {
 // completes — while the run is still pending, in its pre-plan policy stage, or at
 // plan_queuing/plan_queued/planning, with its apply node not yet started. After that the setting no longer
 // has any effect.
+//
+// Enabling auto-apply verifies the managed-identity apply-stage rules against the caller, since the
+// apply will later be started by the system rather than a principal and StartApply never runs.
 type SetRunAutoApply struct {
-	dbClient *db.Client
-	in       *SetRunAutoApplyInput
+	dbClient       *db.Client
+	moduleResolver registry.ModuleResolver
+	ruleEnforcer   rules.RuleEnforcer
+	in             *SetRunAutoApplyInput
 
 	// Populated by Prepare.
 	namespacePath string
+	// managedIdentityIDs are the identities that passed the apply-stage rules when auto-apply is
+	// being enabled, recorded on the apply node so the apply job can only use those. Nil when
+	// Prepare did not check the rules.
+	managedIdentityIDs []string
 
 	// Updated is populated with the run once Execute succeeds.
 	Updated *models.Run
 }
 
-// Prepare resolves the workspace namespace path used for the activity event. It runs before
-// the transaction is opened.
+// Prepare resolves the workspace namespace path used for the activity event and, when auto-apply is
+// being enabled, verifies the apply-stage managed-identity rules. It performs registry/network I/O,
+// so it runs before the transaction is opened.
 func (c *SetRunAutoApply) Prepare(ctx context.Context) error {
 	run, err := c.dbClient.Runs.GetRunByID(ctx, c.in.RunID)
 	if err != nil {
@@ -54,6 +66,13 @@ func (c *SetRunAutoApply) Prepare(ctx context.Context) error {
 	}
 
 	c.namespacePath = ws.FullPath
+
+	if c.in.AutoApply && !run.AutoApply && run.Apply != nil {
+		if c.managedIdentityIDs, err = enforceApplyRules(ctx, c.dbClient, c.moduleResolver, c.ruleEnforcer, run); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -90,6 +109,18 @@ func (c *SetRunAutoApply) Execute(ctx context.Context, input *types.ExecuteInput
 		return nil
 	}
 
+	if c.in.AutoApply {
+		// Prepare skips the rule check when it read auto-apply as already enabled. If it was disabled
+		// since, no check has authorized this apply, so refuse rather than enable it unchecked.
+		if c.managedIdentityIDs == nil {
+			return errors.New("the run's auto-apply setting changed concurrently, retry the request", errors.WithErrorCode(errors.EConflict))
+		}
+		run.Apply.ManagedIdentityIDs = c.managedIdentityIDs
+	} else {
+		// The identities were authorized for the system-started apply. A manual apply is authorized
+		// again when it is started, so nothing is authorized until then.
+		run.Apply.ManagedIdentityIDs = nil
+	}
 	run.AutoApply = c.in.AutoApply
 
 	updateType := models.RunUpdateTypeEnableAutoApply

@@ -20,7 +20,7 @@ func TestNewFederatedRegistryAuth(t *testing.T) {
 	// Test setup
 	ctx := context.Background()
 	mockLogger, _ := logger.NewForTest()
-	mockOIDCConfigFetcher := NewMockOpenIDConfigFetcher(t)
+	mockOIDCConfigFetcher := newTestOIDCConfigFetcher(t)
 	mockDBClient := &db.Client{}
 
 	trustPolicies := []config.FederatedRegistryTrustPolicy{
@@ -53,7 +53,7 @@ func TestFederatedRegistryAuth_Use(t *testing.T) {
 	// Test setup
 	ctx := context.Background()
 	mockLogger, _ := logger.NewForTest()
-	mockOIDCConfigFetcher := NewMockOpenIDConfigFetcher(t)
+	mockOIDCConfigFetcher := newTestOIDCConfigFetcher(t)
 	mockDBClient := &db.Client{}
 
 	trustPolicies := []config.FederatedRegistryTrustPolicy{

@@ -33,8 +33,6 @@ import (
 )
 
 const (
-	// Number of concurrent jobs a given runner can execute.
-	runnerJobsLimit int = 100
 	// pollInterval is the fallback poll interval used while blocking on a
 	// wake-up event (a claimable job appearing, or one of the runner's jobs finishing),
 	// in case that event is missed. On each interval the surrounding loop re-queries the
@@ -678,9 +676,15 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 		if job.GetStatus() == models.JobCanceling || job.GetStatus() == models.JobCanceled {
 			select {
 			case <-innerCtx.Done():
+				return
 			case outgoing <- &CancellationEvent{Job: *job}:
 			}
-			return
+
+			// A canceled job is final, so no further cancellation event can follow. A canceling job can
+			// still be force canceled, so keep the stream open for subscribers that want to see it.
+			if job.GetStatus() == models.JobCanceled {
+				return
+			}
 		}
 
 		// Wait for cancellation event updates
@@ -722,6 +726,11 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 			case <-innerCtx.Done():
 				return
 			case outgoing <- &CancellationEvent{Job: *job}:
+			}
+
+			// A canceled job is final, so this was the last cancellation event.
+			if job.GetStatus() == models.JobCanceled {
+				return
 			}
 		}
 	}()
@@ -1293,8 +1302,9 @@ func (s *service) getNextAvailableQueuedJob(ctx context.Context, runner *models.
 }
 
 // waitForRunnerJobSlot blocks until the runner drops below its concurrent-job
-// limit. It is driven by update events for the runner's own finishing jobs, with a
-// polling safety net in case an event is missed.
+// limit. It is driven by update events for the runner's own finishing jobs and by
+// the runner's own events (since its job limit may change), with a polling safety
+// net in case an event is missed.
 func (s *service) waitForRunnerJobSlot(ctx context.Context, runnerID string) error {
 	subscriber := s.eventManager.Subscribe([]events.Subscription{
 		{
@@ -1302,15 +1312,29 @@ func (s *service) waitForRunnerJobSlot(ctx context.Context, runnerID string) err
 			Actions: []events.SubscriptionAction{events.UpdateAction},
 			Filter:  runnerJobFinishedFilter(runnerID),
 		},
+		{
+			Type: events.RunnerSubscription,
+			ID:   runnerID,
+		},
 	})
 	defer s.eventManager.Unsubscribe(subscriber)
 
 	for {
-		count, err := s.dbClient.Jobs.GetJobCountForRunner(ctx, runnerID)
+		// Re-read the runner each time since its job limit may have changed.
+		runner, err := s.dbClient.Runners.GetRunnerByID(ctx, runnerID)
 		if err != nil {
 			return err
 		}
-		if count < runnerJobsLimit {
+		if runner == nil {
+			// Let getNextAvailableJob report the deleted runner.
+			return nil
+		}
+
+		below, err := s.isRunnerBelowJobsLimit(ctx, runner)
+		if err != nil {
+			return err
+		}
+		if below {
 			return nil
 		}
 
@@ -1392,14 +1416,15 @@ func runnerJobFinishedFilter(runnerID string) func(data json.RawMessage) bool {
 	}
 }
 
-// isRunnerBelowJobsLimit determines if runner is full.
+// isRunnerBelowJobsLimit determines if runner is full. A job limit of 0 means the runner has no limit.
 func (s *service) isRunnerBelowJobsLimit(ctx context.Context, runner *models.Runner) (bool, error) {
+	// The job count is still queried for runners with no limit so the jobs gauge stays accurate.
 	runnerJobsCount, err := s.dbClient.Jobs.GetJobCountForRunner(ctx, runner.Metadata.ID)
 	if err != nil {
 		return false, err
 	}
 	runnerJobsGauge.WithLabelValues(runner.Metadata.TRN).Set(float64(runnerJobsCount))
-	return runnerJobsCount < runnerJobsLimit, nil
+	return runner.JobLimit == 0 || runnerJobsCount < runner.JobLimit, nil
 }
 
 // getNextAvailableJob returns the next queued job the runner can claim, or nil if

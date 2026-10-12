@@ -590,3 +590,26 @@ func TestRun_Copy_AnnotationsAreIndependent(t *testing.T) {
 	assert.Equal(t, "https://example.com/commit/a1b2c3d4", *orig.Annotations[0].Link)
 	assert.False(t, orig.ShallowCompare(cp), "a changed annotation should be detected")
 }
+
+// TestRunNodes_ManagedIdentityIDs_CopyAndCompare covers the authorized managed identities on the plan
+// and apply nodes: a copy must not share the slice with its original, and ShallowCompare must see a
+// change so the node row is written.
+func TestRunNodes_ManagedIdentityIDs_CopyAndCompare(t *testing.T) {
+	orig := &Run{
+		Metadata: ResourceMetadata{ID: "run-1"},
+		Plan:     Plan{ID: "plan-1", ManagedIdentityIDs: []string{"mi-1"}},
+		Apply:    &Apply{ID: "apply-1", ManagedIdentityIDs: []string{"mi-2"}},
+	}
+	cp := orig.Copy()
+
+	assert.True(t, orig.Plan.ShallowCompare(&cp.Plan))
+	assert.True(t, orig.Apply.ShallowCompare(cp.Apply))
+
+	cp.Plan.ManagedIdentityIDs[0] = "changed"
+	cp.Apply.ManagedIdentityIDs = append(cp.Apply.ManagedIdentityIDs, "mi-3")
+
+	assert.Equal(t, []string{"mi-1"}, orig.Plan.ManagedIdentityIDs)
+	assert.Equal(t, []string{"mi-2"}, orig.Apply.ManagedIdentityIDs)
+	assert.False(t, orig.Plan.ShallowCompare(&cp.Plan))
+	assert.False(t, orig.Apply.ShallowCompare(cp.Apply))
+}

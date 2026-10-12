@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/sqltag"
@@ -53,6 +54,10 @@ var (
 	metadataFieldList = []interface{}{"id", "created_at", "updated_at", "version"}
 	dialect           = goqu.Dialect("postgres")
 )
+
+// optimisticLockErrors counts the optimistic lock errors RetryOnOLE gets, including the last one when it runs
+// out of attempts.
+var optimisticLockErrors = metric.NewCounter("db_optimistic_lock_retry_errors_total", "Number of optimistic lock errors in RetryOnOLE.")
 
 // RetryOnOLEOption is used to configure the retry on optimistic lock error behavior
 type RetryOnOLEOption func(*retryOnOLEOptions)
@@ -341,7 +346,11 @@ func (db *Client) RetryOnOLE(ctx context.Context, fn func() error, options ...Re
 
 	return retry.Do(
 		func() error {
-			return fn()
+			err := fn()
+			if te.ErrorCode(err) == te.EOptimisticLock {
+				optimisticLockErrors.Inc()
+			}
+			return err
 		},
 		retry.Attempts(opts.attempts),
 		retry.DelayType(retry.FixedDelay),

@@ -49,12 +49,17 @@ const (
 	// options for creating a temporary TarFile
 	tarFlagWrite = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
 	tarMode      = 0o600
+
+	// repositoryExpansionRatio caps the total size of the files extracted from a repository archive
+	// at this multiple of the repository size limit (the compressed download cap). Source code
+	// compresses roughly 5-10x, so this leaves headroom for real repositories while stopping an
+	// archive built to expand far beyond that (100 MiB at the default 5 MiB limit).
+	repositoryExpansionRatio = 20
+	// maxRepositoryFiles caps the number of files extracted from a repository archive.
+	maxRepositoryFiles = 50000
 )
 
 var (
-	// Un-tarring of repository archive done with Hashicorp's go-getter library.
-	tgz = getter.TarGzipDecompressor{}
-
 	// refPrefixes is a slice of prefixes that _must_ be removed
 	// before matching branch, or tag filters.
 	refPrefixes = []string{
@@ -63,6 +68,9 @@ var (
 
 		// More can be added here as needed for other providers.
 	}
+
+	// commitIDRegex matches a full SHA-1 (40) or SHA-256 (64) git commit hash.
+	commitIDRegex = regexp.MustCompile(`^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`)
 )
 
 // GetVCSProvidersInput is the input for listing VCS providers.
@@ -1023,8 +1031,14 @@ func (s *service) UpdateWorkspaceVCSProviderLink(ctx context.Context, input *Upd
 		return nil, err
 	}
 
+	// Clean module directory path consistently with create, regardless of which API layer set it.
+	if input.Link.ModuleDirectory != nil && *input.Link.ModuleDirectory != "" {
+		moduleDirectory := filepath.Clean(*input.Link.ModuleDirectory)
+		input.Link.ModuleDirectory = &moduleDirectory
+	}
+
 	if err = input.Link.Validate(); err != nil {
-		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to validate workspace VCS provider link model", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Requested an update to a workspace vcs provider link.",
@@ -1405,17 +1419,6 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 		return nil
 	}
 
-	// If the after hash is zero and this is not a merge request event,
-	// then there are no changes to evaluate.
-	if !eventType.Equals(models.MergeRequestEventType) && plumbing.NewHash(input.After).IsZero() {
-		return nil
-	}
-
-	accessToken, err := s.refreshOAuthToken(ctx, provider, vcsCaller.Provider, false)
-	if err != nil {
-		return errors.Wrap(err, "failed to refresh access token", errors.WithSpan(span))
-	}
-
 	ref := input.Ref
 	commitID := input.After
 
@@ -1431,6 +1434,43 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to build repository URL", errors.WithSpan(span))
+	}
+
+	// An invalid event is recorded as an errored VCS event so it's visible on the workspace, but the
+	// request still succeeds: GitLab disables a hook after repeated 4xx responses, and resending the
+	// same event can't fix it.
+	if err = validateWebhookEventInput(input); err != nil {
+		s.logger.WithContextFields(ctx).Warnf("Rejecting invalid webhook event for link ID %s, workspace %s and repository %s: %v",
+			vcsCaller.Link.Metadata.ID,
+			workspace.FullPath,
+			vcsCaller.Link.RepositoryPath,
+			err,
+		)
+
+		errorMessage := sanitize.ToValidUTF8(errors.ErrorMessage(err))
+		if _, err = s.dbClient.VCSEvents.CreateEvent(ctx, &models.VCSEvent{
+			SourceReferenceName: &ref,
+			WorkspaceID:         workspace.Metadata.ID,
+			Type:                eventType,
+			Status:              models.VCSEventErrored,
+			ErrorMessage:        &errorMessage,
+			RepositoryURL:       repoURL,
+		}); err != nil {
+			return errors.Wrap(err, "failed to create a vcs event", errors.WithSpan(span))
+		}
+
+		return nil
+	}
+
+	// If the after hash is zero and this is not a merge request event,
+	// then there are no changes to evaluate.
+	if !eventType.Equals(models.MergeRequestEventType) && plumbing.NewHash(input.After).IsZero() {
+		return nil
+	}
+
+	accessToken, err := s.refreshOAuthToken(ctx, provider, vcsCaller.Provider, false)
+	if err != nil {
+		return errors.Wrap(err, "failed to refresh access token", errors.WithSpan(span))
 	}
 
 	// Create the VCS event with 'pending' status.
@@ -1932,7 +1972,12 @@ func (s *service) createUploadConfigurationVersion(ctx context.Context,
 
 	// Create a tar of the Terraform module, if moduleDirectory is not
 	// set then the root of the repo directory is used.
-	moduleTar, err := makeModuleTar(filepath.Join(input.repoDirectory, moduleDirectory))
+	modulePath, err := resolveModulePath(input.repoDirectory, moduleDirectory)
+	if err != nil {
+		return "", err
+	}
+
+	moduleTar, err := makeModuleTar(modulePath)
 	if err != nil {
 		return "", err
 	}
@@ -1970,6 +2015,19 @@ func (s *service) createUploadConfigurationVersion(ctx context.Context,
 	}
 
 	return cv.Metadata.ID, nil
+}
+
+// newRepositoryDecompressor returns the go-getter decompressor used to un-tar a repository archive.
+// The download is capped by the repository size limit, but that's the compressed size, so the
+// extracted size and file count are capped too: a small archive can otherwise expand to fill the API
+// server's disk. The extracted cap scales with the repository size limit so raising that limit for a
+// large repository raises both.
+func newRepositoryDecompressor(repositorySizeLimit int) *getter.TarGzipDecompressor {
+	// A zero FileSizeLimit means no limit to go-getter, so never let it reach zero.
+	return &getter.TarGzipDecompressor{
+		FileSizeLimit: max(int64(repositorySizeLimit), 1) * repositoryExpansionRatio,
+		FilesLimit:    maxRepositoryFiles,
+	}
 }
 
 // downloadRepositoryArchive downloads the repository archive
@@ -2011,6 +2069,7 @@ func downloadRepositoryArchive(ctx context.Context, input *downloadRepositoryArc
 	}
 
 	// Decompress the tar file.
+	tgz := newRepositoryDecompressor(input.repositorySizeLimit)
 	err = tgz.Decompress(tmpDownloadDir, destinationFile.Name(), true, 0o000)
 	if err != nil {
 		return tmpDownloadDir, "", err
@@ -2149,6 +2208,29 @@ func refMatches(
 	return eventType.Equals(models.BranchEventType) && ref == link.Branch
 }
 
+// resolveModulePath joins the module directory onto the repository checkout and verifies the result
+// is still inside it. The link's module directory is validated when it is saved, but links saved
+// before that validation existed are not, and a symlink committed to the repository could also point
+// the module directory outside the checkout — so containment is checked here, after resolving
+// symlinks, rather than trusted.
+func resolveModulePath(repoDirectory, moduleDirectory string) (string, error) {
+	root, err := filepath.EvalSymlinks(repoDirectory)
+	if err != nil {
+		return "", err
+	}
+
+	modulePath, err := filepath.EvalSymlinks(filepath.Join(root, moduleDirectory))
+	if err != nil {
+		return "", errors.Wrap(err, "module directory %q not found in repository", moduleDirectory, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	if rel, err := filepath.Rel(root, modulePath); err != nil || !filepath.IsLocal(rel) {
+		return "", errors.New("module directory %q is outside the repository", moduleDirectory, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	return modulePath, nil
+}
+
 // makeModuleTar creates a tar of the location specified by the module path.
 func makeModuleTar(modulePath string) (string, error) {
 	// Create the temporary tar.gz file.
@@ -2171,6 +2253,38 @@ func makeModuleTar(modulePath string) (string, error) {
 	}
 
 	return tarPath, err
+}
+
+// validateCommitID returns an EInvalid error if id is not a full hex git commit hash.
+func validateCommitID(field string, id string) error {
+	if !commitIDRegex.MatchString(id) {
+		return errors.New("%s must be a full hex git commit hash", field, errors.WithErrorCode(errors.EInvalid))
+	}
+	return nil
+}
+
+// validateWebhookEventInput verifies the commit hashes of a webhook event.
+func validateWebhookEventInput(input *ProcessWebhookEventInput) error {
+	// Commit hashes are optional, but must be full hex hashes when present. A zero hash
+	// (e.g. branch deletion) is valid hex and is handled by the caller.
+	commits := []struct {
+		field string
+		value string
+	}{
+		{"head commit ID", input.HeadCommitID},
+		{"before commit ID", input.Before},
+		{"after commit ID", input.After},
+	}
+	for _, c := range commits {
+		if c.value == "" {
+			continue
+		}
+		if err := validateCommitID(c.field, c.value); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // copyToDestination copies from source to destination in chunks.

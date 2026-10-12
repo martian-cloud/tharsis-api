@@ -108,7 +108,7 @@ type terraformRunners struct {
 
 var runnerFieldList = append(metadataFieldList,
 	"type", "name", "description", "group_id", "created_by", "disabled",
-	"tags", "run_untagged_jobs",
+	"tags", "run_untagged_jobs", "job_limit",
 )
 
 // NewRunners returns an instance of the Runners interface
@@ -286,6 +286,7 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 						"disabled":          runner.Disabled,
 						"tags":              tags,
 						"run_untagged_jobs": runner.RunUntaggedJobs,
+						"job_limit":         runner.JobLimit,
 					}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})))
@@ -334,6 +335,7 @@ func (t *terraformRunners) UpdateRunner(ctx context.Context, runner *models.Runn
 						"disabled":          runner.Disabled,
 						"tags":              tags,
 						"run_untagged_jobs": runner.RunUntaggedJobs,
+						"job_limit":         runner.JobLimit,
 					}).Where(goqu.Ex{"id": runner.Metadata.ID, "version": runner.Metadata.Version}).
 				Returning("*"),
 		).Select(t.getSelectFields()...).
@@ -445,6 +447,7 @@ func scanRunner(row scanner) (*models.Runner, error) {
 		&runner.Disabled,
 		&runner.Tags,
 		&runner.RunUntaggedJobs,
+		&runner.JobLimit,
 		&namespacePath,
 	}
 

@@ -275,17 +275,21 @@ func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMUsersInput) ([
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	// Any authenticated user can view basic user information.
-	caller, err := auth.AuthorizeCaller(ctx)
+	// Only the IDP's SCIM client may list SCIM users: the results include every provisioned user and
+	// their SCIM external ID.
+	scimCaller, err := requireSCIMCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	// A SCIM client only sees the users its own IDP manages.
+	issuer := scimCaller.GetIDPIssuerURL()
 
 	users := []models.User{}
 
 	// If SCIMExternalID is specified, use that instead.
 	if input.SCIMExternalID != nil && *input.SCIMExternalID != "" {
-		user, err := s.dbClient.Users.GetUserBySCIMExternalID(ctx, *input.SCIMExternalID)
+		user, err := s.dbClient.Users.GetUserBySCIMExternalID(ctx, issuer, *input.SCIMExternalID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get a SCIM user by scimExternalID", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 		}
@@ -301,28 +305,15 @@ func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMUsersInput) ([
 			return nil, errors.Wrap(err, "failed to get a SCIM user by username", errors.WithSpan(span))
 		}
 
-		if user == nil || user.SCIMExternalID == "" {
-			return users, nil
-		}
-
-		scimCaller, ok := caller.(*auth.SCIMCaller)
-		if !ok {
-			return nil, errors.New("caller is not a SCIM caller", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
-		}
-		linkedUser, err := s.dbClient.Users.GetUserByExternalID(ctx, scimCaller.GetIDPIssuerURL(), user.SCIMExternalID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to verify user external ID", errors.WithSpan(span))
-		}
-
-		// Only add user if linked to issuer
-		if linkedUser != nil {
+		// Only add the user if this IDP manages them.
+		if user != nil && scimCaller.Manages(user.SCIMIDPIssuerURL) {
 			users = append(users, *user)
 		}
 	} else {
-		// If no filter is specified, get all users that have a SCIMExternalID set.
+		// If no filter is specified, get all users this IDP manages.
 		input := &db.GetUsersInput{
 			Filter: &db.UserFilter{
-				SCIMExternalID: true,
+				SCIMIDPIssuerURL: &issuer,
 			},
 		}
 		result, err := s.dbClient.Users.GetUsers(ctx, input)
@@ -346,7 +337,7 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 		return nil, err
 	}
 
-	if err = caller.RequirePermission(ctx, models.CreateUserPermission); err != nil {
+	if err = caller.RequirePermission(ctx, models.ManageSCIMUserPermission); err != nil {
 		return nil, err
 	}
 
@@ -354,8 +345,13 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 	if !ok {
 		return nil, errors.New("only a scim caller may create scim users", errors.WithErrorCode(errors.EInternal))
 	}
+	issuer := scimCaller.GetIDPIssuerURL()
 
-	existingUser, err := s.dbClient.Users.GetUserBySCIMExternalID(ctx, input.SCIMExternalID)
+	if err = validateSCIMExternalID(input.SCIMExternalID); err != nil {
+		return nil, err
+	}
+
+	existingUser, err := s.dbClient.Users.GetUserBySCIMExternalID(ctx, issuer, input.SCIMExternalID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get user by scim external id", errors.WithSpan(span))
 	}
@@ -367,37 +363,25 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 			errors.WithErrorCode(errors.EConflict))
 	}
 
-	// Check if external identity already exists for this IDP and external ID
-	existingUser, err = s.dbClient.Users.GetUserByExternalID(ctx, scimCaller.GetIDPIssuerURL(), input.SCIMExternalID)
+	// Adopt the user who signs in through this IDP with the external ID, if there is one.
+	existingUser, err = s.dbClient.Users.GetUserByExternalID(ctx, issuer, input.SCIMExternalID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get user by external id", errors.WithSpan(span))
 	}
 
-	// If external identity exists but SCIMExternalID is not set, update it
-	if existingUser != nil {
-		if existingUser.SCIMExternalID != input.SCIMExternalID {
-			existingUser.SCIMExternalID = input.SCIMExternalID
-			existingUser.Active = input.Active
-			existingUser.Email = strings.ToLower(input.Email)
-
-			updatedUser, err := s.dbClient.Users.UpdateUser(ctx, existingUser)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to update user with SCIM external ID", errors.WithSpan(span))
-			}
-			return updatedUser, nil
+	// Otherwise adopt an existing user with the same email.
+	if existingUser == nil {
+		existingUser, err = s.dbClient.Users.GetUserByEmail(ctx, strings.ToLower(input.Email))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get user by email", errors.WithSpan(span))
 		}
-		// SCIMExternalID already set, return conflict
-		return nil, errors.New(
-			fmt.Sprintf("user with external id %s already exists", input.SCIMExternalID),
-			errors.WithErrorCode(errors.EConflict))
 	}
 
-	// If no user found by external ID, try to find by email to adopt existing user
-	existingUser, err = s.dbClient.Users.GetUserByEmail(ctx, strings.ToLower(input.Email))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get user by email", errors.WithSpan(span))
+	if existingUser != nil {
+		return s.adoptSCIMUser(ctx, existingUser, input, issuer)
 	}
 
+	// No such user, so create it.
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
@@ -409,49 +393,21 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 		}
 	}()
 
-	var createdUser *models.User
-
-	// User exists, so update it (it was created without SCIM).
-	if existingUser != nil {
-		existingUser.Active = input.Active
-		existingUser.SCIMExternalID = input.SCIMExternalID
-		existingUser.Email = strings.ToLower(input.Email)
-		// Don't update username - it should never change
-
-		createdUser, err = s.dbClient.Users.UpdateUser(txContext, existingUser)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to update user", errors.WithSpan(span))
-		}
-
-		// Create external identity record
-		err = s.dbClient.Users.LinkUserWithExternalID(txContext, scimCaller.GetIDPIssuerURL(), input.SCIMExternalID, createdUser.Metadata.ID)
-		if err != nil {
-			if errors.ErrorCode(err) == errors.EConflict {
-				return nil, errors.New("external identity already exists for this user", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
-			}
-			return nil, errors.Wrap(err, "failed to create external identity", errors.WithSpan(span))
-		}
+	createdUser, err := s.dbClient.Users.CreateUser(txContext, &models.User{
+		Username:         auth.ParseUsername(input.Email),
+		Email:            strings.ToLower(input.Email),
+		SCIMExternalID:   input.SCIMExternalID,
+		SCIMIDPIssuerURL: issuer,
+		Active:           input.Active,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create user", errors.WithSpan(span))
 	}
 
-	// No such user, so create it.
-	if existingUser == nil {
-		newUser := &models.User{
-			Username:       auth.ParseUsername(input.Email),
-			Email:          strings.ToLower(input.Email),
-			SCIMExternalID: input.SCIMExternalID,
-			Active:         input.Active,
-		}
-
-		createdUser, err = s.dbClient.Users.CreateUser(txContext, newUser)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create user", errors.WithSpan(span))
-		}
-
-		// Create external identity record for new user
-		err = s.dbClient.Users.LinkUserWithExternalID(txContext, scimCaller.GetIDPIssuerURL(), input.SCIMExternalID, createdUser.Metadata.ID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create external identity for new user", errors.WithSpan(span))
-		}
+	// Create external identity record for new user
+	err = s.dbClient.Users.LinkUserWithExternalID(txContext, issuer, input.SCIMExternalID, createdUser.Metadata.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create external identity for new user", errors.WithSpan(span))
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
@@ -465,6 +421,47 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 	return createdUser, nil
 }
 
+// adoptSCIMUser brings an existing user, created without SCIM, under the management of the IDP's SCIM client.
+// Adoption never links the SCIM external ID as a login identity: the SCIM caller chooses that value, so linking
+// it would let whoever holds the SCIM token sign in as the existing user.
+func (s *service) adoptSCIMUser(ctx context.Context, user *models.User, input *CreateSCIMUserInput, issuer string) (*models.User, error) {
+	// Never take a user from another SCIM external ID or another IDP's SCIM client.
+	if user.SCIMExternalID != "" || user.SCIMIDPIssuerURL != "" {
+		return nil, errors.New(
+			fmt.Sprintf("user with email %s is already managed by SCIM", user.Email),
+			errors.WithErrorCode(errors.EConflict))
+	}
+
+	// Only adopt users who already sign in through this identity provider.
+	linked, err := s.dbClient.Users.HasExternalIdentity(ctx, user.Metadata.ID, &issuer)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check user external identity")
+	}
+
+	if !linked {
+		return nil, errors.New(
+			fmt.Sprintf("user with email %s exists but has not signed in through this identity provider", user.Email),
+			errors.WithErrorCode(errors.EConflict))
+	}
+
+	user.Active = input.Active
+	user.SCIMExternalID = input.SCIMExternalID
+	user.SCIMIDPIssuerURL = issuer
+	user.Email = strings.ToLower(input.Email)
+	// Don't update username - it should never change
+
+	adoptedUser, err := s.dbClient.Users.UpdateUser(ctx, user)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update user")
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Adopted an existing user as a SCIM user.",
+		"userID", adoptedUser.Metadata.ID,
+	)
+
+	return adoptedUser, nil
+}
+
 func (s *service) UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput) (*models.User, error) {
 	ctx, span := tracer.Start(ctx, "svc.UpdateSCIMUser")
 	defer span.End()
@@ -474,7 +471,7 @@ func (s *service) UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdateUserPermission, auth.WithUserID(input.ID))
+	err = caller.RequirePermission(ctx, models.ManageSCIMUserPermission, auth.WithUserID(input.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -490,55 +487,23 @@ func (s *service) UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput
 		return nil, errors.Wrap(err, "failed to get user by ID", errors.WithSpan(span))
 	}
 
-	if user == nil {
+	// Only update users the caller's IDP manages, never manually managed users or another IDP's.
+	if user == nil || !scimCaller.Manages(user.SCIMIDPIssuerURL) {
 		return nil, errors.New(
 			"SCIM user not found",
 			errors.WithErrorCode(errors.ENotFound))
 	}
 
-	// Store original external ID for comparison
-	originalExternalID := user.SCIMExternalID
-
-	// Process the operations to update user fields
+	// Process the operations to update user fields. Login identities are never linked or unlinked here,
+	// since the SCIM caller chooses the externalId value.
 	updatedUser, err := s.processSCIMUserOperations(input.Operations, user)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to process SCIM user operations", errors.WithSpan(span))
 	}
 
-	// Start transaction for all DB operations
-	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to begin transaction", errors.WithSpan(span))
-	}
-	defer func() {
-		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback transaction for UpdateSCIMUser: %v", txErr)
-		}
-	}()
-
-	// Handle external ID linking/unlinking if changed
-	if originalExternalID != updatedUser.SCIMExternalID {
-		// Unlink old external ID if it exists
-		if originalExternalID != "" {
-			if err := s.dbClient.Users.UnlinkUserExternalID(txContext, scimCaller.GetIDPIssuerURL(), originalExternalID); err != nil {
-				return nil, errors.Wrap(err, "failed to unlink user external id", errors.WithSpan(span))
-			}
-		}
-
-		// Link new external ID
-		if err := s.dbClient.Users.LinkUserWithExternalID(txContext, scimCaller.GetIDPIssuerURL(), updatedUser.SCIMExternalID, updatedUser.Metadata.ID); err != nil {
-			return nil, errors.Wrap(err, "failed to link user with external id", errors.WithSpan(span))
-		}
-	}
-
-	// Update the user
-	updatedUser, err = s.dbClient.Users.UpdateUser(txContext, updatedUser)
+	updatedUser, err = s.dbClient.Users.UpdateUser(ctx, updatedUser)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to update user", errors.WithSpan(span))
-	}
-
-	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		return nil, errors.Wrap(err, "failed to commit transaction", errors.WithSpan(span))
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated a SCIM user.",
@@ -558,9 +523,14 @@ func (s *service) DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceI
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, models.DeleteUserPermission, auth.WithUserID(input.ID))
+	err = caller.RequirePermission(ctx, models.ManageSCIMUserPermission, auth.WithUserID(input.ID))
 	if err != nil {
 		return err
+	}
+
+	scimCaller, ok := caller.(*auth.SCIMCaller)
+	if !ok {
+		return errors.New("only a scim caller can delete a SCIM user", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	user, err := s.dbClient.Users.GetUserByID(ctx, input.ID)
@@ -568,7 +538,8 @@ func (s *service) DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceI
 		return errors.Wrap(err, "failed to get user by ID", errors.WithSpan(span))
 	}
 
-	if user == nil {
+	// Only delete users the caller's IDP manages, never manually managed users or another IDP's.
+	if user == nil || !scimCaller.Manages(user.SCIMIDPIssuerURL) {
 		return errors.New(
 			"SCIM user with ID %s does not exist", input.ID,
 			errors.WithErrorCode(errors.ENotFound))
@@ -590,16 +561,19 @@ func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMGroupsInput) 
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	// Any authenticated user can view basic scim group information.
-	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+	// Only the IDP's SCIM client may list SCIM groups, for the same reason as GetSCIMUsers, and it only
+	// sees the teams of its own IDP.
+	scimCaller, err := requireSCIMCaller(ctx)
+	if err != nil {
 		return nil, err
 	}
+	issuer := scimCaller.GetIDPIssuerURL()
 
 	var teams []models.Team
 
 	// If SCIMExternalID is specified, use that instead.
 	if input.SCIMExternalID != "" {
-		team, err := s.dbClient.Teams.GetTeamBySCIMExternalID(ctx, input.SCIMExternalID)
+		team, err := s.dbClient.Teams.GetTeamBySCIMExternalID(ctx, issuer, input.SCIMExternalID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get a SCIM group by scimExternalID", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 		}
@@ -610,10 +584,10 @@ func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMGroupsInput) 
 			teams = append(teams, *team)
 		}
 	} else {
-		// If no filter is specified, get all teams that have a SCIMExternalID set.
+		// If no filter is specified, get all teams this IDP manages.
 		input := &db.GetTeamsInput{
 			Filter: &db.TeamFilter{
-				SCIMExternalID: true,
+				SCIMIDPIssuerURL: &issuer,
 			},
 		}
 		result, err := s.dbClient.Teams.GetTeams(ctx, input)
@@ -637,7 +611,17 @@ func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInp
 		return nil, err
 	}
 
-	if err = caller.RequirePermission(ctx, models.CreateTeamPermission); err != nil {
+	if err = caller.RequirePermission(ctx, models.ManageSCIMTeamPermission); err != nil {
+		return nil, err
+	}
+
+	scimCaller, ok := caller.(*auth.SCIMCaller)
+	if !ok {
+		return nil, errors.New("caller is not a SCIM caller", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+	issuer := scimCaller.GetIDPIssuerURL()
+
+	if err = validateSCIMExternalID(input.SCIMExternalID); err != nil {
 		return nil, err
 	}
 
@@ -649,7 +633,15 @@ func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInp
 
 	var createdTeam *models.Team
 
-	// Team exists, so update it.
+	// Never adopt a team this IDP doesn't manage. A manually managed team may already hold namespace
+	// memberships that the SCIM caller would gain control of, and another IDP's team belongs to its SCIM client.
+	if existingTeam != nil && !scimCaller.Manages(existingTeam.SCIMIDPIssuerURL) {
+		return nil, errors.New(
+			fmt.Sprintf("team with name %s already exists and is not managed by this identity provider", input.Name),
+			errors.WithErrorCode(errors.EConflict))
+	}
+
+	// Team is already managed by this IDP's SCIM client, so update it.
 	if existingTeam != nil {
 		existingTeam.SCIMExternalID = input.SCIMExternalID
 		createdTeam, err = s.dbClient.Teams.UpdateTeam(ctx, existingTeam)
@@ -661,8 +653,9 @@ func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInp
 	// No such Team, so create it.
 	if existingTeam == nil {
 		newTeam := &models.Team{
-			Name:           input.Name,
-			SCIMExternalID: input.SCIMExternalID,
+			Name:             input.Name,
+			SCIMExternalID:   input.SCIMExternalID,
+			SCIMIDPIssuerURL: issuer,
 		}
 
 		createdTeam, err = s.dbClient.Teams.CreateTeam(ctx, newTeam)
@@ -688,12 +681,29 @@ func (s *service) UpdateSCIMGroup(ctx context.Context, input *UpdateResourceInpu
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdateTeamPermission, auth.WithTeamID(input.ID))
+	err = caller.RequirePermission(ctx, models.ManageSCIMTeamPermission, auth.WithTeamID(input.ID))
 	if err != nil {
 		return nil, err
 	}
 
-	updatedTeam, err := s.processSCIMGroupOperations(ctx, input.Operations, input.ID)
+	scimCaller, ok := caller.(*auth.SCIMCaller)
+	if !ok {
+		return nil, errors.New("only a scim caller can update a SCIM group", errors.WithErrorCode(errors.EForbidden))
+	}
+
+	team, err := s.dbClient.Teams.GetTeamByID(ctx, input.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get team by ID", errors.WithSpan(span))
+	}
+
+	// Only update teams the caller's IDP manages, never manually managed teams or another IDP's.
+	if team == nil || !scimCaller.Manages(team.SCIMIDPIssuerURL) {
+		return nil, errors.New(
+			"SCIM group with ID %s not found", input.ID,
+			errors.WithErrorCode(errors.ENotFound))
+	}
+
+	updatedTeam, err := s.processSCIMGroupOperations(ctx, input.Operations, team)
 	if err != nil {
 		return nil, errors.Wrap(err, "failes to process SCIM group operations", errors.WithSpan(span))
 	}
@@ -715,9 +725,14 @@ func (s *service) DeleteSCIMGroup(ctx context.Context, input *DeleteSCIMResource
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, models.DeleteTeamPermission, auth.WithTeamID(input.ID))
+	err = caller.RequirePermission(ctx, models.ManageSCIMTeamPermission, auth.WithTeamID(input.ID))
 	if err != nil {
 		return err
+	}
+
+	scimCaller, ok := caller.(*auth.SCIMCaller)
+	if !ok {
+		return errors.New("only a scim caller can delete a SCIM group", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	team, err := s.dbClient.Teams.GetTeamByID(ctx, input.ID)
@@ -725,7 +740,8 @@ func (s *service) DeleteSCIMGroup(ctx context.Context, input *DeleteSCIMResource
 		return errors.Wrap(err, "failed to get team by ID", errors.WithSpan(span))
 	}
 
-	if team == nil {
+	// Only delete teams the caller's IDP manages, never manually managed teams or another IDP's.
+	if team == nil || !scimCaller.Manages(team.SCIMIDPIssuerURL) {
 		return errors.New(
 			"SCIM group with ID %s not found", input.ID,
 			errors.WithErrorCode(errors.ENotFound))
@@ -768,6 +784,13 @@ func (s *service) processSCIMUserOperations(operations []Operation, user *models
 			if !ok {
 				return nil, fmt.Errorf("unexpected value for user externalId field: expected string, got %T", operation.Value)
 			}
+			if err = validateSCIMExternalID(externalID); err != nil {
+				return nil, err
+			}
+			// The SCIM external ID is the IDP's handle for the user, separate from their login identity:
+			// an IDP changes it when its SCIM attribute mapping changes, which needn't change the token
+			// claim the user signs in with. The login identity is never relinked here, since the SCIM
+			// caller chooses this value and could otherwise sign in as the user.
 			user.SCIMExternalID = externalID
 		case "active":
 			active, ok := operation.Value.(string)
@@ -795,19 +818,7 @@ func (s *service) processSCIMUserOperations(operations []Operation, user *models
 // processGroupOperations processes the SCIM PATCH operations,
 // and updates the team fields appropriately. Returns an error
 // if operation is not supported.
-func (s *service) processSCIMGroupOperations(ctx context.Context, ops []Operation, teamID string) (*models.Team, error) {
-	// Get the team, so it can be updated.
-	team, err := s.dbClient.Teams.GetTeamByID(ctx, teamID)
-	if err != nil {
-		return nil, err
-	}
-
-	if team == nil {
-		return nil, errors.New(
-			"Failed to get SCIM group for processing update operations",
-			errors.WithErrorCode(errors.EInternal))
-	}
-
+func (s *service) processSCIMGroupOperations(ctx context.Context, ops []Operation, team *models.Team) (*models.Team, error) {
 	// Determine if an update is required before beginning the transaction.
 	// Without this, if we start a transaction and no update is made then
 	// committing the transaction will fail and generate a false EInternal.
@@ -905,8 +916,15 @@ func (s *service) addRemoveSCIMGroupMember(ctx context.Context, operation *Opera
 			errors.WithErrorCode(errors.ENotFound))
 	}
 
-	// Add a new group (team) member.
+	// Add a new group (team) member. Only users managed by the team's IDP can be added: anyone else would
+	// gain the team's namespace memberships at the SCIM caller's discretion.
 	if operation.OP.Equal(addOPType) {
+		if user.SCIMIDPIssuerURL != team.SCIMIDPIssuerURL {
+			return errors.New(
+				"scim user with id %s is not managed by this identity provider", userID,
+				errors.WithErrorCode(errors.ENotFound))
+		}
+
 		_, err := s.dbClient.TeamMembers.AddUserToTeam(ctx, &models.TeamMember{
 			UserID: user.Metadata.ID,
 			TeamID: team.Metadata.ID,
@@ -1006,6 +1024,10 @@ func (s *service) isSCIMGroupUpdateRequired(ctx context.Context, operations []Op
 				return false, fmt.Errorf("unexpected type for team externalId: expected string, got %T", operation.Value)
 			}
 
+			if err = validateSCIMExternalID(externalID); err != nil {
+				return false, err
+			}
+
 			if team.SCIMExternalID != externalID {
 				return true, nil
 			}
@@ -1092,6 +1114,15 @@ func parseSCIMGroupMemberID(operation *Operation) (string, error) {
 	return gid.FromGlobalID(userID), nil
 }
 
+// validateSCIMExternalID returns an error if a SCIM external ID is empty. A user or team managed by SCIM
+// always has one, which keeps its external ID and IDP issuer set together.
+func validateSCIMExternalID(externalID string) error {
+	if externalID == "" {
+		return errors.New("SCIM externalId must not be empty", errors.WithErrorCode(errors.EInvalid))
+	}
+	return nil
+}
+
 // isSCIMUserOperationSupported returns an error if SCIM user
 // update operation is not supported.
 func isSCIMUserOperationSupported(operation OP) error {
@@ -1118,4 +1149,20 @@ func isSCIMGroupOperationSupported(operation OP) error {
 	return errors.New(
 		"Unsupported SCIM group operation: %s", operation,
 		errors.WithErrorCode(errors.EInvalid))
+}
+
+// requireSCIMCaller returns the caller if it authenticated with a SCIM token, and an EForbidden error
+// for any other authenticated caller.
+func requireSCIMCaller(ctx context.Context) (*auth.SCIMCaller, error) {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	scimCaller, ok := caller.(*auth.SCIMCaller)
+	if !ok {
+		return nil, errors.New("caller is not a SCIM caller", errors.WithErrorCode(errors.EForbidden))
+	}
+
+	return scimCaller, nil
 }

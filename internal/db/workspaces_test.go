@@ -5,10 +5,13 @@ package db
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -988,6 +991,328 @@ func TestWorkspaces_CreateWorkspaceWithLabels(t *testing.T) {
 			} else {
 				assert.Equal(t, test.expectedLabels, retrievedWorkspace.Labels)
 			}
+		})
+	}
+}
+
+// TestWorkspaces_MigrateWorkspace moves workspaces to a new group and checks the re-pathing and the
+// cleanup of the assignments the move puts out of scope: managed identities, service account
+// namespace memberships and VCS provider links. Each is kept only if the principal's group is an
+// ancestor of where the workspace landed.
+func TestWorkspaces_MigrateWorkspace(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// origin                      old grandparent
+	// `-- team                    old parent
+	//     |-- ws-a                migrated to dest/inner
+	//     |-- ws-b                migrated to dest/inner
+	//     |-- w_1                 migrated to dest/inner; '_' is a LIKE wildcard
+	//     |-- other-ws            does not move
+	//     `-- wx1                 what w_1 matches under an unescaped LIKE
+	//         `-- origin
+	//             `-- team
+	//                 `-- w_1-x   path contains "origin/team/w_1" after the start
+	// dest                        new grandparent
+	// `-- inner                   new parent
+	groups := map[string]*models.Group{}
+	for _, fullPath := range []string{
+		"origin",
+		"origin/team",
+		"origin/team/wx1",
+		"origin/team/wx1/origin",
+		"origin/team/wx1/origin/team",
+		"origin/team/wx1/origin/team/w_1-x",
+		"dest",
+		"dest/inner",
+	} {
+		name := fullPath
+		var parentID string
+		if i := strings.LastIndex(fullPath, "/"); i >= 0 {
+			parent, ok := groups[fullPath[:i]]
+			require.True(t, ok, "parent of %s must be created first", fullPath)
+			name = fullPath[i+1:]
+			parentID = parent.Metadata.ID
+		}
+
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Name:      name,
+			ParentID:  parentID,
+			FullPath:  fullPath,
+			CreatedBy: "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		groups[fullPath] = group
+	}
+
+	maxJobDuration := int32(forTestMaxJobDuration.Minutes())
+	workspaces := map[string]*models.Workspace{}
+	for _, fullPath := range []string{
+		"origin/team/ws-a",
+		"origin/team/ws-b",
+		"origin/team/w_1",
+		"origin/team/other-ws",
+	} {
+		i := strings.LastIndex(fullPath, "/")
+		workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+			Name:           fullPath[i+1:],
+			GroupID:        groups[fullPath[:i]].Metadata.ID,
+			FullPath:       fullPath,
+			MaxJobDuration: &maxJobDuration,
+			CreatedBy:      "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		workspaces[fullPath] = workspace
+	}
+
+	// assignmentCase describes one (workspace, principal) pair the cleanup has to judge. principalPath
+	// is the group the identity, service account or VCS provider lives in, which is all the cleanup
+	// knows about it.
+	type assignmentCase struct {
+		name          string
+		workspacePath string
+		principalPath string
+		expectKept    bool
+	}
+
+	managedIdentityCases := []assignmentCase{
+		{
+			name:          "managed identity in the new parent group stays assigned",
+			workspacePath: "origin/team/ws-a",
+			principalPath: "dest/inner",
+			expectKept:    true,
+		},
+		{
+			name:          "managed identity in the new grandparent group stays assigned",
+			workspacePath: "origin/team/ws-a",
+			principalPath: "dest",
+			expectKept:    true,
+		},
+		{
+			name:          "managed identity in the old parent group is unassigned",
+			workspacePath: "origin/team/ws-a",
+			principalPath: "origin/team",
+		},
+		{
+			name:          "managed identity in the old grandparent group is unassigned",
+			workspacePath: "origin/team/ws-a",
+			principalPath: "origin",
+		},
+		{
+			name:          "managed identity assigned to a workspace that doesn't move is untouched",
+			workspacePath: "origin/team/other-ws",
+			principalPath: "origin",
+			expectKept:    true,
+		},
+	}
+
+	managedIdentityIDs := make([]string, len(managedIdentityCases))
+	for i, test := range managedIdentityCases {
+		identity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+			Name:      fmt.Sprintf("test-identity-%d", i),
+			GroupID:   groups[test.principalPath].Metadata.ID,
+			Type:      models.ManagedIdentityAWSFederated,
+			Data:      []byte("test-identity-data"),
+			CreatedBy: "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx,
+			identity.Metadata.ID, workspaces[test.workspacePath].Metadata.ID))
+
+		managedIdentityIDs[i] = identity.Metadata.ID
+	}
+
+	membershipCases := []assignmentCase{
+		{
+			name:          "service account membership from the new grandparent group is kept",
+			workspacePath: "origin/team/ws-a",
+			principalPath: "dest",
+			expectKept:    true,
+		},
+		{
+			name:          "service account membership from the old parent group is removed",
+			workspacePath: "origin/team/ws-a",
+			principalPath: "origin/team",
+		},
+		{
+			name:          "service account membership of a workspace that doesn't move is untouched",
+			workspacePath: "origin/team/other-ws",
+			principalPath: "origin/team",
+			expectKept:    true,
+		},
+	}
+
+	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name:      "test-role",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	membershipIDs := make([]string, len(membershipCases))
+	for i, test := range membershipCases {
+		serviceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+			Name:      fmt.Sprintf("test-sa-%d", i),
+			GroupID:   groups[test.principalPath].Metadata.ID,
+			CreatedBy: "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		membership, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+			NamespacePath:    test.workspacePath,
+			ServiceAccountID: &serviceAccount.Metadata.ID,
+			RoleID:           role.Metadata.ID,
+		})
+		require.NoError(t, err)
+
+		membershipIDs[i] = membership.Metadata.ID
+	}
+
+	// A user membership has no group to be out of scope of, so the move must leave it alone.
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-migrate-workspace",
+		Email:    "test-user-migrate-workspace@test.com",
+	})
+	require.NoError(t, err)
+
+	userMembership, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath: "origin/team/ws-a",
+		UserID:        &user.Metadata.ID,
+		RoleID:        role.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	// A workspace holds at most one VCS provider link, so each case needs its own workspace.
+	linkCases := []assignmentCase{
+		{
+			name:          "VCS provider link from the new grandparent group is kept",
+			workspacePath: "origin/team/ws-a",
+			principalPath: "dest",
+			expectKept:    true,
+		},
+		{
+			name:          "VCS provider link from the old parent group is removed",
+			workspacePath: "origin/team/ws-b",
+			principalPath: "origin/team",
+		},
+		{
+			name:          "VCS provider link of a workspace that doesn't move is untouched",
+			workspacePath: "origin/team/other-ws",
+			principalPath: "origin/team",
+			expectKept:    true,
+		},
+	}
+
+	linkIDs := make([]string, len(linkCases))
+	for i, test := range linkCases {
+		provider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+			Name:      fmt.Sprintf("test-provider-%d", i),
+			GroupID:   groups[test.principalPath].Metadata.ID,
+			Type:      models.GitLabProviderType,
+			URL:       url.URL{Scheme: "https", Host: "gitlab.example.com"},
+			CreatedBy: "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+			WorkspaceID:    workspaces[test.workspacePath].Metadata.ID,
+			ProviderID:     provider.Metadata.ID,
+			TokenNonce:     uuid.New().String(),
+			RepositoryPath: "test-org/test-repo",
+			Branch:         "main",
+			CreatedBy:      "db-integration-tests",
+		})
+		require.NoError(t, err)
+
+		linkIDs[i] = link.Metadata.ID
+	}
+
+	t.Run("a stale version fails without moving the workspace", func(t *testing.T) {
+		stale := *workspaces["origin/team/ws-a"]
+		stale.Metadata.Version = -1
+
+		_, err := testClient.client.Workspaces.MigrateWorkspace(ctx, &stale, groups["dest/inner"])
+		assert.Equal(t, errors.EOptimisticLock, errors.ErrorCode(err))
+
+		// The namespace is re-pathed in the same transaction, so it must have been rolled back.
+		workspace, err := testClient.client.Workspaces.GetWorkspaceByID(ctx, stale.Metadata.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "origin/team/ws-a", workspace.FullPath)
+		assert.Equal(t, groups["origin/team"].Metadata.ID, workspace.GroupID)
+	})
+
+	for _, path := range []string{"origin/team/ws-a", "origin/team/ws-b", "origin/team/w_1"} {
+		original := workspaces[path]
+		migrated, err := testClient.client.Workspaces.MigrateWorkspace(ctx, original, groups["dest/inner"])
+		require.NoError(t, err)
+		require.NotNil(t, migrated)
+
+		assert.Equal(t, "dest/inner/"+original.Name, migrated.FullPath)
+		assert.Equal(t, groups["dest/inner"].Metadata.ID, migrated.GroupID)
+		assert.Equal(t, original.Metadata.Version+1, migrated.Metadata.Version)
+
+		// Re-query to confirm the new path was persisted, not just returned.
+		fetched, err := testClient.client.Workspaces.GetWorkspaceByID(ctx, original.Metadata.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "dest/inner/"+original.Name, fetched.FullPath)
+	}
+
+	t.Run("migrating w_1 leaves namespaces it matches only as a LIKE pattern untouched", func(t *testing.T) {
+		// An unescaped "origin/team/w_1/%" matches this group's path, and an unanchored regex replace
+		// of "origin/team/w_1" would then rewrite its later occurrence in it.
+		group, err := testClient.client.Groups.GetGroupByID(ctx, groups["origin/team/wx1/origin/team/w_1-x"].Metadata.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "origin/team/wx1/origin/team/w_1-x", group.FullPath)
+	})
+
+	t.Run("a workspace that doesn't move keeps its path", func(t *testing.T) {
+		workspace, err := testClient.client.Workspaces.GetWorkspaceByID(ctx, workspaces["origin/team/other-ws"].Metadata.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "origin/team/other-ws", workspace.FullPath)
+	})
+
+	for i, test := range managedIdentityCases {
+		t.Run(test.name, func(t *testing.T) {
+			identities, err := testClient.client.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx,
+				workspaces[test.workspacePath].Metadata.ID)
+			require.NoError(t, err)
+
+			assigned := false
+			for _, identity := range identities {
+				if identity.Metadata.ID == managedIdentityIDs[i] {
+					assigned = true
+				}
+			}
+
+			assert.Equal(t, test.expectKept, assigned)
+		})
+	}
+
+	for i, test := range membershipCases {
+		t.Run(test.name, func(t *testing.T) {
+			membership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, membershipIDs[i])
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectKept, membership != nil)
+		})
+	}
+
+	t.Run("user membership of the migrated workspace is untouched", func(t *testing.T) {
+		membership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, userMembership.Metadata.ID)
+		require.NoError(t, err)
+
+		assert.NotNil(t, membership)
+	})
+
+	for i, test := range linkCases {
+		t.Run(test.name, func(t *testing.T) {
+			link, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByID(ctx, linkIDs[i])
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectKept, link != nil)
 		})
 	}
 }

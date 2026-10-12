@@ -12,12 +12,16 @@ interface Props {
     // that is neither — a decision the dialog records rather than a change it destroys.
     confirmColor?: 'error' | 'primary' | 'success';
     confirmInProgress: boolean;
+    // When set, the confirm button is a link that opens this URL in a new tab (noopener, noreferrer).
+    // A native link click isn't subject to popup blocking the way window.open is, and window.open
+    // with noopener returns null whether or not it was blocked, so a blocked open can't be detected.
+    confirmHref?: string;
     onConfirm: () => void;
     onClose: () => void;
     maxWidth?: 'xs' | 'sm' | 'md';
 }
 
-function ConfirmationDialog({ title, children, confirmLabel, cancelLabel, confirmDisabled, confirmColor = 'error', confirmInProgress, onClose, onConfirm, maxWidth = 'xs', ...other }: Props) {
+function ConfirmationDialog({ title, children, confirmLabel, cancelLabel, confirmDisabled, confirmColor = 'error', confirmInProgress, confirmHref, onClose, onConfirm, maxWidth = 'xs', ...other }: Props) {
     return (
         <Dialog
             maxWidth={maxWidth}
@@ -38,6 +42,7 @@ function ConfirmationDialog({ title, children, confirmLabel, cancelLabel, confir
                     color={confirmColor}
                     loading={confirmInProgress}
                     disabled={confirmDisabled}
+                    {...(confirmHref && { href: confirmHref, target: '_blank', rel: 'noopener noreferrer' })}
                     onClick={onConfirm}
                 >
                     {confirmLabel}

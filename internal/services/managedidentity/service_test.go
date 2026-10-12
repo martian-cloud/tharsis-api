@@ -14,7 +14,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -169,7 +168,7 @@ func TestGetManagedIdentities(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil)
 
 			result, err := service.GetManagedIdentities(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -283,7 +282,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, nil, nil)
+			service := NewService(logger, dbClient, nil, nil, nil)
 
 			err := service.DeleteManagedIdentity(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -351,7 +350,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil)
 
 			result, err := service.GetManagedIdentitiesForWorkspace(auth.WithCaller(ctx, mockCaller), test.workspaceID)
 
@@ -556,7 +555,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, mockWorkspaces, nil)
+			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, mockWorkspaces)
 
 			err := service.AddManagedIdentityToWorkspace(auth.WithCaller(ctx, mockCaller), test.managedIdentityID, test.workspaceID)
 
@@ -652,7 +651,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, mockWorkspaces, nil)
+			service := NewService(logger, dbClient, nil, nil, mockWorkspaces)
 
 			err := service.RemoveManagedIdentityFromWorkspace(auth.WithCaller(ctx, mockCaller), test.managedIdentityID, test.workspaceID)
 
@@ -723,7 +722,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil)
 
 			identity, err := service.GetManagedIdentityByID(auth.WithCaller(ctx, mockCaller), test.searchID)
 
@@ -1162,7 +1161,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, nil)
+			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, nil)
 
 			alias, err := service.CreateManagedIdentityAlias(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1294,7 +1293,7 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, nil, nil)
+			service := NewService(logger, dbClient, nil, nil, nil)
 
 			err := service.DeleteManagedIdentityAlias(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1610,7 +1609,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), delegateMap, nil, nil)
+			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), delegateMap, nil)
 
 			identity, err := service.CreateManagedIdentity(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1696,7 +1695,7 @@ func TestGetManagedIdentitiesByIDs(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil)
 
 			result, err := service.GetManagedIdentitiesByIDs(auth.WithCaller(ctx, mockCaller), test.inputIDList)
 
@@ -1861,7 +1860,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, delegateMap, nil, nil)
+			service := NewService(logger, dbClient, nil, delegateMap, nil)
 
 			identity, err := service.UpdateManagedIdentity(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1963,7 +1962,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil)
 
 			rules, err := service.GetManagedIdentityAccessRules(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2076,7 +2075,7 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil)
 
 			rules, err := service.GetManagedIdentityAccessRulesByIDs(auth.WithCaller(ctx, mockCaller), test.inputIDList)
 
@@ -2158,7 +2157,7 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
+			service := NewService(nil, dbClient, nil, nil, nil)
 
 			rule, err := service.GetManagedIdentityAccessRuleByID(auth.WithCaller(ctx, mockCaller), test.searchID)
 
@@ -2423,7 +2422,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, nil)
+			service := NewService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, nil)
 
 			accessRule, err := service.CreateManagedIdentityAccessRule(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2556,7 +2555,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, nil, nil)
+			service := NewService(logger, dbClient, nil, nil, nil)
 
 			accessRule, err := service.UpdateManagedIdentityAccessRule(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2661,7 +2660,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, nil, nil)
+			service := NewService(logger, dbClient, nil, nil, nil)
 
 			err := service.DeleteManagedIdentityAccessRule(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2687,16 +2686,25 @@ func TestCreateCredentials(t *testing.T) {
 		Type:    models.ManagedIdentityAWSFederated,
 	}
 
-	sampleJob := &models.Job{
-		Metadata: models.ResourceMetadata{
-			ID: "some-job-id",
-		},
-		WorkspaceID: "some-workspace-id",
+	// runWith returns a run whose plan and apply nodes were authorized for the given identities.
+	runWith := func(planIDs, applyIDs []string) *models.Run {
+		return &models.Run{
+			Metadata: models.ResourceMetadata{ID: "some-run-id"},
+			Plan:     models.Plan{ManagedIdentityIDs: planIDs},
+			Apply:    &models.Apply{ManagedIdentityIDs: applyIDs},
+		}
 	}
+	authorized := []string{sampleManagedIdentity.Metadata.ID}
+	// Recorded, but the identity was not among those that passed the rules.
+	noneAuthorized := []string{}
+
 	type testCase struct {
 		caller                    auth.Caller
 		input                     *models.ManagedIdentity
 		existingManagedIdentities []models.ManagedIdentity
+		jobType                   models.JobType
+		jobStatus                 models.JobStatus
+		run                       *models.Run
 		name                      string
 		expectErrorCode           errors.CodeType
 		expectCredentials         []byte
@@ -2704,24 +2712,79 @@ func TestCreateCredentials(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			name: "positive: successfully create managed identity credentials",
-			caller: &auth.JobCaller{
-				JobID:       sampleJob.Metadata.ID,
-				WorkspaceID: sampleJob.WorkspaceID,
-			},
+			name:                      "positive: plan job creates credentials for an identity authorized on the plan",
+			jobType:                   models.JobPlanType,
+			run:                       runWith(authorized, nil),
 			input:                     sampleManagedIdentity,
 			existingManagedIdentities: []models.ManagedIdentity{*sampleManagedIdentity},
 			expectCredentials:         []byte("some-credentials"),
 		},
 		{
-			name: "negative: managed identities don't belong to respective workspace",
-			caller: &auth.JobCaller{
-				JobID:       sampleJob.Metadata.ID,
-				WorkspaceID: sampleJob.WorkspaceID,
-			},
+			name:                      "positive: apply job creates credentials for an identity authorized on the apply",
+			jobType:                   models.JobApplyType,
+			run:                       runWith(nil, authorized),
+			input:                     sampleManagedIdentity,
+			existingManagedIdentities: []models.ManagedIdentity{*sampleManagedIdentity},
+			expectCredentials:         []byte("some-credentials"),
+		},
+		{
+			// Assigned to the workspace after the run passed its rules.
+			name:                      "negative: identity assigned but not authorized on the plan",
+			jobType:                   models.JobPlanType,
+			run:                       runWith(noneAuthorized, authorized),
+			input:                     sampleManagedIdentity,
+			existingManagedIdentities: []models.ManagedIdentity{*sampleManagedIdentity},
+			expectErrorCode:           errors.EForbidden,
+		},
+		{
+			// Authorized for the plan only: the apply's own authorization is what counts.
+			name:                      "negative: identity assigned but not authorized on the apply",
+			jobType:                   models.JobApplyType,
+			run:                       runWith(authorized, noneAuthorized),
+			input:                     sampleManagedIdentity,
+			existingManagedIdentities: []models.ManagedIdentity{*sampleManagedIdentity},
+			expectErrorCode:           errors.EForbidden,
+		},
+		{
+			// Never recorded: treated as none authorized, even though the identity is assigned.
+			name:                      "negative: plan with no recorded identities",
+			jobType:                   models.JobPlanType,
+			run:                       runWith(nil, nil),
+			input:                     sampleManagedIdentity,
+			existingManagedIdentities: []models.ManagedIdentity{*sampleManagedIdentity},
+			expectErrorCode:           errors.EForbidden,
+		},
+		{
+			name:                      "negative: apply with no recorded identities",
+			jobType:                   models.JobApplyType,
+			run:                       runWith(nil, nil),
+			input:                     sampleManagedIdentity,
+			existingManagedIdentities: []models.ManagedIdentity{*sampleManagedIdentity},
+			expectErrorCode:           errors.EForbidden,
+		},
+
+		{
+			// Removed from the workspace mid-run: the authorization no longer applies.
+			name:                      "negative: identity authorized but no longer assigned to the workspace",
+			jobType:                   models.JobPlanType,
 			input:                     sampleManagedIdentity,
 			existingManagedIdentities: []models.ManagedIdentity{},
 			expectErrorCode:           errors.EUnauthorized,
+		},
+		{
+			// The token outlives the job, but a finished job has no use for credentials.
+			name:            "negative: finished job",
+			jobType:         models.JobApplyType,
+			jobStatus:       models.JobFinished,
+			input:           sampleManagedIdentity,
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			// An OPA job evaluates policies and never runs Terraform, so it never needs cloud credentials.
+			name:            "negative: OPA job",
+			jobType:         models.JobOPAType,
+			input:           sampleManagedIdentity,
+			expectErrorCode: errors.EForbidden,
 		},
 		{
 			name:            "negative: not a job caller",
@@ -2738,15 +2801,38 @@ func TestCreateCredentials(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := auth.WithCaller(context.Background(), test.caller)
+			sampleJob := &models.Job{
+				Metadata:    models.ResourceMetadata{ID: "some-job-id"},
+				Type:        test.jobType,
+				RunID:       "some-run-id",
+				WorkspaceID: "some-workspace-id",
+			}
+			jobStatus := test.jobStatus
+			if jobStatus == "" {
+				jobStatus = models.JobRunning
+			}
+			require.NoError(t, sampleJob.SetStatus(jobStatus))
+
+			caller := test.caller
+			if test.jobType != "" {
+				caller = &auth.JobCaller{
+					Job:         sampleJob,
+					RunID:       sampleJob.RunID,
+					WorkspaceID: sampleJob.WorkspaceID,
+				}
+			}
+			ctx := auth.WithCaller(context.Background(), caller)
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
-			mockJobService := job.NewMockService(t)
+			mockRuns := db.NewMockRuns(t)
 			mockDelegate := NewMockDelegate(t)
 
 			if test.existingManagedIdentities != nil {
 				mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, sampleJob.WorkspaceID).Return(test.existingManagedIdentities, nil)
-				mockJobService.On("GetJobByID", mock.Anything, sampleJob.Metadata.ID).Return(sampleJob, nil)
+			}
+
+			if test.run != nil {
+				mockRuns.On("GetRunByID", mock.Anything, sampleJob.RunID).Return(test.run, nil)
 			}
 
 			if test.expectCredentials != nil {
@@ -2755,6 +2841,7 @@ func TestCreateCredentials(t *testing.T) {
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
+				Runs:              mockRuns,
 			}
 
 			delegateMap := map[models.ManagedIdentityType]Delegate{
@@ -2764,7 +2851,7 @@ func TestCreateCredentials(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, delegateMap, nil, mockJobService)
+			service := NewService(logger, dbClient, nil, delegateMap, nil)
 
 			credentials, err := service.CreateCredentials(ctx, test.input)
 
@@ -3095,7 +3182,7 @@ func TestMoveManagedIdentity(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, mockLimitChecker, nil, nil, nil)
+			service := NewService(logger, dbClient, mockLimitChecker, nil, nil)
 
 			_, err := service.MoveManagedIdentity(auth.WithCaller(ctx, mockCaller), &MoveManagedIdentityInput{
 				ManagedIdentityID: test.mover.Metadata.ID,

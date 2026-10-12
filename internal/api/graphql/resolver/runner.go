@@ -266,6 +266,11 @@ func (r *RunnerResolver) RunUntaggedJobs() bool {
 	return r.runner.RunUntaggedJobs
 }
 
+// JobLimit resolver
+func (r *RunnerResolver) JobLimit() int32 {
+	return int32(r.runner.JobLimit)
+}
+
 // Tags resolver
 func (r *RunnerResolver) Tags() []string {
 	return r.runner.Tags
@@ -312,6 +317,7 @@ type CreateRunnerInput struct {
 	Name             string
 	Description      string
 	RunUntaggedJobs  bool
+	JobLimit         *int32
 	Tags             []string
 }
 
@@ -323,6 +329,7 @@ type UpdateRunnerInput struct {
 	Disabled         *bool
 	Description      string
 	RunUntaggedJobs  *bool
+	JobLimit         *int32
 	Tags             *[]string
 }
 
@@ -367,6 +374,10 @@ func createRunnerMutation(ctx context.Context, input *CreateRunnerInput) (*Runne
 		Tags:            input.Tags,
 	}
 
+	if input.JobLimit != nil {
+		toCreate.JobLimit = int(*input.JobLimit)
+	}
+
 	createdRunner, err := getServiceCatalog(ctx).RunnerService.CreateRunner(ctx, toCreate)
 	if err != nil {
 		return nil, err
@@ -407,6 +418,10 @@ func updateRunnerMutation(ctx context.Context, input *UpdateRunnerInput) (*Runne
 
 	if input.RunUntaggedJobs != nil {
 		runner.RunUntaggedJobs = *input.RunUntaggedJobs
+	}
+
+	if input.JobLimit != nil {
+		runner.JobLimit = int(*input.JobLimit)
 	}
 
 	if input.Tags != nil {

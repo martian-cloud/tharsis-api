@@ -152,9 +152,9 @@ func (_m *MockUsers) GetUserByID(ctx context.Context, id string) (*models.User, 
 	return r0, r1
 }
 
-// GetUserBySCIMExternalID provides a mock function with given fields: ctx, scimExternalID
-func (_m *MockUsers) GetUserBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.User, error) {
-	ret := _m.Called(ctx, scimExternalID)
+// GetUserBySCIMExternalID provides a mock function with given fields: ctx, scimIDPIssuerURL, scimExternalID
+func (_m *MockUsers) GetUserBySCIMExternalID(ctx context.Context, scimIDPIssuerURL string, scimExternalID string) (*models.User, error) {
+	ret := _m.Called(ctx, scimIDPIssuerURL, scimExternalID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserBySCIMExternalID")
@@ -162,19 +162,19 @@ func (_m *MockUsers) GetUserBySCIMExternalID(ctx context.Context, scimExternalID
 
 	var r0 *models.User
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.User, error)); ok {
-		return rf(ctx, scimExternalID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*models.User, error)); ok {
+		return rf(ctx, scimIDPIssuerURL, scimExternalID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.User); ok {
-		r0 = rf(ctx, scimExternalID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *models.User); ok {
+		r0 = rf(ctx, scimIDPIssuerURL, scimExternalID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.User)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, scimExternalID)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, scimIDPIssuerURL, scimExternalID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -242,6 +242,34 @@ func (_m *MockUsers) GetUsers(ctx context.Context, input *GetUsersInput) (*Users
 	return r0, r1
 }
 
+// HasExternalIdentity provides a mock function with given fields: ctx, userID, issuer
+func (_m *MockUsers) HasExternalIdentity(ctx context.Context, userID string, issuer *string) (bool, error) {
+	ret := _m.Called(ctx, userID, issuer)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasExternalIdentity")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *string) (bool, error)); ok {
+		return rf(ctx, userID, issuer)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *string) bool); ok {
+		r0 = rf(ctx, userID, issuer)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *string) error); ok {
+		r1 = rf(ctx, userID, issuer)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // LinkUserWithExternalID provides a mock function with given fields: ctx, issuer, externalID, userID
 func (_m *MockUsers) LinkUserWithExternalID(ctx context.Context, issuer string, externalID string, userID string) error {
 	ret := _m.Called(ctx, issuer, externalID, userID)
@@ -253,24 +281,6 @@ func (_m *MockUsers) LinkUserWithExternalID(ctx context.Context, issuer string, 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
 		r0 = rf(ctx, issuer, externalID, userID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// UnlinkUserExternalID provides a mock function with given fields: ctx, issuer, externalID
-func (_m *MockUsers) UnlinkUserExternalID(ctx context.Context, issuer string, externalID string) error {
-	ret := _m.Called(ctx, issuer, externalID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UnlinkUserExternalID")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, issuer, externalID)
 	} else {
 		r0 = ret.Error(0)
 	}

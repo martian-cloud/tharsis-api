@@ -1123,6 +1123,16 @@ func (s *service) GetStateVersionInventory(ctx context.Context, stateVersion *mo
 	}, nil
 }
 
+// requireStateVersionWritePermission authorizes writing a state version. The run ID is included when
+// the state version belongs to a run, so a job caller can be held to writing state only for its own
+// apply.
+func requireStateVersionWritePermission(ctx context.Context, caller auth.Caller, sv *models.StateVersion) error {
+	if sv.RunID != nil {
+		return caller.RequirePermission(ctx, models.CreateStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID), auth.WithRunID(*sv.RunID))
+	}
+	return caller.RequirePermission(ctx, models.CreateStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
+}
+
 func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string, jsonData *string) (*models.StateVersion, error) {
 	ctx, span := tracer.Start(ctx, "svc.CreateStateVersion")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -1133,7 +1143,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.CreateStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
+	err = requireStateVersionWritePermission(ctx, caller, stateVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -1524,7 +1534,7 @@ func (s *service) UploadStateVersionJSON(ctx context.Context, stateVersionID str
 
 	// Writing the rendering is part of recording state, so it takes the same permission as creating the
 	// state version rather than a weaker view permission.
-	if err = caller.RequirePermission(ctx, models.CreateStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID)); err != nil {
+	if err = requireStateVersionWritePermission(ctx, caller, sv); err != nil {
 		return err
 	}
 

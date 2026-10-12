@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -187,6 +188,27 @@ func TestNewGRPCDiscoveryDocument(t *testing.T) {
 		_, err := NewGRPCDiscoveryDocument(t.Context(), srv.URL)
 		assert.Error(t, err)
 	})
+
+	t.Run("connects through the caller's dialer", func(t *testing.T) {
+		// Callers restrict which addresses the client may reach by supplying the dialer.
+		srv := discoveryServer(t, http.StatusOK, `{"grpc":{"host":"grpc.example.com","transport_security":"tls","port":"443"}}`)
+
+		dialer := &recordingDialer{}
+		_, err := NewGRPCDiscoveryDocument(t.Context(), srv.URL, WithDialer(dialer))
+		require.NoError(t, err)
+		assert.NotEmpty(t, dialer.dialed)
+	})
+}
+
+// recordingDialer records the addresses it connects to.
+type recordingDialer struct {
+	net.Dialer
+	dialed []string
+}
+
+func (d *recordingDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	d.dialed = append(d.dialed, addr)
+	return d.Dialer.DialContext(ctx, network, addr)
 }
 
 func TestNewGRPCClient(t *testing.T) {
@@ -226,4 +248,81 @@ func TestContextCredentials(t *testing.T) {
 		_, err := creds.GetRequestMetadata(t.Context())
 		assert.ErrorIs(t, err, assert.AnError)
 	})
+}
+
+func TestGRPCTarget(t *testing.T) {
+	assert.Equal(t, "grpc.example.com:443", grpcTarget("grpc.example.com", "443", false))
+	assert.Equal(t, "passthrough:///grpc.example.com:443", grpcTarget("grpc.example.com", "443", true))
+	assert.Equal(t, "passthrough:///[2001:db8::1]:443", grpcTarget("2001:db8::1", "443", true))
+}
+
+// hostRecordingDialer records the addresses gRPC asks it to dial and connects every one of them to
+// target, so a test can use a hostname that doesn't resolve.
+type hostRecordingDialer struct {
+	target string
+	dialed chan string
+}
+
+func (d *hostRecordingDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	select {
+	case d.dialed <- addr:
+	default:
+	}
+	var dialer net.Dialer
+	return dialer.DialContext(ctx, network, d.target)
+}
+
+func TestNewGRPCClient_DialerReceivesHostname(t *testing.T) {
+	// The gRPC "server" just accepts connections; the test only cares what address was dialed.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		for {
+			conn, aErr := listener.Accept()
+			if aErr != nil {
+				return
+			}
+			_ = conn.Close()
+		}
+	}()
+
+	srv := discoveryServer(t, http.StatusOK, `{"grpc":{"host":"grpc.test.invalid","transport_security":"plaintext","port":"50051"}}`)
+
+	dialer := &hostRecordingDialer{target: listener.Addr().String(), dialed: make(chan string, 10)}
+	// The discovery fetch also goes through the dialer, so let it reach the discovery server.
+	discoveryAddr := srv.Listener.Addr().String()
+
+	client, err := NewGRPCClient(t.Context(), &GRPCClientConfig{
+		HTTPEndpoint: srv.URL,
+		Dialer: dialerFunc(func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if addr == discoveryAddr {
+				var d net.Dialer
+				return d.DialContext(ctx, network, addr)
+			}
+			return dialer.DialContext(ctx, network, addr)
+		}),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = client.Close() })
+
+	// Trigger a connection attempt; the RPC itself fails since the listener isn't a gRPC server.
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	_, _ = client.VersionClient.GetVersion(ctx, nil, grpc.WaitForReady(false))
+
+	select {
+	case addr := <-dialer.dialed:
+		// With gRPC's DNS resolver the name would have failed to resolve (or been replaced by an IP)
+		// before reaching the dialer.
+		assert.Equal(t, "grpc.test.invalid:50051", addr)
+	case <-time.After(2 * time.Second):
+		t.Fatal("the dialer was never called")
+	}
+}
+
+type dialerFunc func(ctx context.Context, network, addr string) (net.Conn, error)
+
+func (f dialerFunc) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	return f(ctx, network, addr)
 }

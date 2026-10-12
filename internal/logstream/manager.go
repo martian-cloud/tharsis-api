@@ -7,7 +7,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"hash"
+	"hash/crc32"
 	"io"
+	"time"
 
 	"github.com/google/uuid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -42,6 +45,19 @@ const (
 	// other InvalidArgument rejections. The runner keeps its own copy of this string; keep them in
 	// sync (see jobLogger.handleLogLimitReached).
 	LogSizeLimitReachedMsg = "log size limit reached"
+
+	// chunkLeaseDuration is how long a writer holds an active chunk's write lease. It bounds how long
+	// writes to a chunk stay blocked if the holder dies without releasing it, so it must stay well
+	// within the runner's log-send retry budget (joblogger's flush retries Aborted for ~32s) or the
+	// runner gives up and drops logs. Keep the two in sync.
+	chunkLeaseDuration = 20 * time.Second
+
+	// chunkWriteTimeout bounds the object store IO for one write. It must be comfortably shorter than
+	// chunkLeaseDuration so an upload can never complete after the lease has expired.
+	chunkWriteTimeout = 10 * time.Second
+
+	// leaseReleaseTimeout bounds the best-effort lease release after a failed write.
+	leaseReleaseTimeout = 5 * time.Second
 )
 
 // SubscriptionOptions includes options for setting up a log event subscription
@@ -62,6 +78,9 @@ type LogEvent struct {
 	Completed bool
 	Truncated bool
 	Data      *LogEventData
+	// Err is set only on the final event of a subscription that ended because of a failure rather
+	// than because the stream completed or the subscriber's context ended.
+	Err error
 }
 
 // Manager interface encapsulates the logic for saving and retrieving logs
@@ -81,7 +100,7 @@ type Manager interface {
 	CompactStream(ctx context.Context, logStream *models.LogStream) error
 }
 
-type stream struct {
+type manager struct {
 	store           Store
 	dbClient        *db.Client
 	eventManager    *events.EventManager
@@ -94,7 +113,7 @@ type stream struct {
 // New writes are split into chunks of DefaultMaxChunkSize; that fill size is not stored per stream,
 // so changing it just affects the chunks active streams write from then on.
 func New(store Store, dbClient *db.Client, eventManager *events.EventManager, logger logger.Logger, maxLogSizeBytes int) Manager {
-	return &stream{
+	return &manager{
 		store:           store,
 		dbClient:        dbClient,
 		eventManager:    eventManager,
@@ -108,6 +127,7 @@ type objectWrite struct {
 	key        string
 	byteOffset int
 	data       []byte
+	newChunk   bool // the write is to a chunk being created, whose object ref must be linked
 }
 
 // openChunk tracks the chunk currently being filled while planning a write.
@@ -116,6 +136,7 @@ type openChunk struct {
 	index       int
 	startOffset int
 	size        int
+	checksum    *uint32                // CRC-32 of [0, size); nil when unknown. Never written through.
 	existing    *models.LogStreamChunk // non-nil when filling an already-persisted chunk row
 }
 
@@ -125,7 +146,15 @@ type openChunk struct {
 // safe because writes are append-only and idempotent on resend, and reads only expose bytes up to
 // LogStream.Size: any object bytes written beyond the committed size are invisible until a later DB
 // update references them, and a retry re-writes the same (overwrite-safe) chunk object.
-func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, startOffset int, buffer []byte) (*models.LogStream, error) {
+//
+// Appending to the active chunk rewrites its whole object (object stores have no append), so two
+// concurrent writers could otherwise both read the same committed state and the slower upload would
+// replace the faster one's object with a shorter or different one, losing committed bytes. To prevent
+// that, the writer claims the chunk's write lease before touching the object: the claim fails unless
+// the chunk is unchanged since it was read and no other writer holds an unexpired lease. Object writes
+// run under a deadline well inside the lease, and the lease is released when the write commits (or,
+// best effort, when it fails). New chunks are written to fresh unique keys, so they need no lease.
+func (m *manager) WriteLogs(ctx context.Context, logStream *models.LogStream, startOffset int, buffer []byte) (*models.LogStream, error) {
 	if logStream == nil {
 		return nil, errors.New("log stream cannot be nil", errors.WithErrorCode(errors.EInvalid))
 	}
@@ -157,9 +186,8 @@ func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, sta
 	// than silently dropping ever-higher offsets. This must run BEFORE the offset/gap validation
 	// below so late or in-flight patches arriving after the cap get the clear cap error instead of a
 	// confusing "offset past end of stream" gap rejection.
-	if s.maxLogSizeBytes > 0 && logStream.Size >= s.maxLogSizeBytes {
-		return logStream, errors.New("%s (%d bytes)", LogSizeLimitReachedMsg, s.maxLogSizeBytes,
-			errors.WithErrorCode(errors.ETooLarge))
+	if m.maxLogSizeBytes > 0 && logStream.Size >= m.maxLogSizeBytes {
+		return logStream, m.logSizeLimitError()
 	}
 
 	// Validate the incoming offset against the current stream size (append-only semantics).
@@ -177,7 +205,7 @@ func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, sta
 		if skip < len(buffer) {
 			overlap = buffer[:skip]
 		}
-		if err := s.verifyOverlap(ctx, logStream, startOffset, overlap); err != nil {
+		if err := m.verifyOverlap(ctx, logStream, startOffset, overlap); err != nil {
 			return nil, err
 		}
 	}
@@ -192,28 +220,100 @@ func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, sta
 	// that fits and mark the stream truncated, then return ETooLarge after the commit so the runner
 	// keeps the final bytes up to the cap yet is still told to stop streaming.
 	reachedCap := false
-	if s.maxLogSizeBytes > 0 && logStream.Size+len(effectiveBuffer) > s.maxLogSizeBytes {
-		effectiveBuffer = effectiveBuffer[:s.maxLogSizeBytes-logStream.Size]
+	if m.maxLogSizeBytes > 0 && logStream.Size+len(effectiveBuffer) > m.maxLogSizeBytes {
+		effectiveBuffer = effectiveBuffer[:m.maxLogSizeBytes-logStream.Size]
 		reachedCap = true
 	}
 
-	// The fill size is a fixed default, not stored per stream: it bounds only how new data is split
-	// into chunks.
-	maxChunkSize := DefaultMaxChunkSize
-
-	activeChunk, err := s.dbClient.LogStreamChunks.GetActiveChunk(ctx, logStreamID)
+	activeChunk, err := m.dbClient.LogStreamChunks.GetActiveChunk(ctx, logStreamID)
 	if err != nil {
 		return nil, err
 	}
 
-	var (
-		objectWrites []objectWrite
-		chunkCreates []*models.LogStreamChunk
-		chunkUpdates []*models.LogStreamChunk
-	)
+	// The chunks always cover exactly [0, LogStream.Size), so if the tail chunk doesn't end where the
+	// caller's stream view does, another write has committed since that view was loaded. Reject it
+	// early as a conflict; the client retries with fresh state (where the resend is usually a no-op).
+	if activeChunk != nil && activeChunk.StartOffset+activeChunk.Size != logStream.Size {
+		return nil, errors.New("log stream %s was updated by a concurrent write", logStreamID,
+			errors.WithErrorCode(errors.EOptimisticLock))
+	}
+
+	// committed is set once the DB transaction commits; until then a claimed lease is released on return.
+	committed := false
+
+	if activeChunk != nil && !activeChunk.Sealed {
+		// This write rewrites the active chunk's object, so claim its write lease first.
+		claimedChunk, cErr := m.dbClient.LogStreamChunks.ClaimLogStreamChunkLease(ctx, activeChunk, chunkLeaseDuration)
+		if cErr != nil {
+			if errors.ErrorCode(cErr) == errors.EOptimisticLock {
+				return nil, errors.New("log stream %s chunk %d is being written by another request", logStreamID, activeChunk.ChunkIndex,
+					errors.WithErrorCode(errors.EOptimisticLock))
+			}
+			return nil, cErr
+		}
+		activeChunk = claimedChunk
+
+		defer func() {
+			if !committed {
+				m.releaseChunkLease(ctx, claimedChunk)
+			}
+		}()
+	}
+
+	plan := planChunkWrites(logStreamID, activeChunk, logStream.Size, effectiveBuffer, DefaultMaxChunkSize)
+
+	// Write objects BEFORE touching the database. A failure here leaves the DB untouched.
+	retainFns, err := m.writeChunkObjects(ctx, plan.objectWrites)
+	if err != nil {
+		return nil, err
+	}
+
+	// The caller's stream is left unchanged until the commit succeeds.
+	updated := *logStream
+	updated.Size += len(effectiveBuffer)
+	if reachedCap {
+		updated.Truncated = true
+	}
+
+	updatedStream, err := m.commitChunkWrites(ctx, plan, retainFns, &updated)
+	if err != nil {
+		return nil, err
+	}
+	committed = true
+
+	if reachedCap {
+		// The prefix that fits is now committed and the stream is flagged truncated; signal the cap so
+		// the caller (runner) stops streaming further logs.
+		return updatedStream, m.logSizeLimitError()
+	}
+
+	return updatedStream, nil
+}
+
+// logSizeLimitError is the ETooLarge rejection for a write past the maximum log size.
+func (m *manager) logSizeLimitError() error {
+	return errors.New("%s (%d bytes)", LogSizeLimitReachedMsg, m.maxLogSizeBytes, errors.WithErrorCode(errors.ETooLarge))
+}
+
+// chunkWritePlan is the object writes and chunk row changes that append data to a log stream.
+type chunkWritePlan struct {
+	objectWrites []objectWrite
+	creates      []*models.LogStreamChunk
+	updates      []*models.LogStreamChunk
+}
+
+// planChunkWrites plans appending data to a stream of streamSize bytes whose tail chunk is
+// activeChunk (nil when the stream has no chunk rows). Data fills the active chunk, if it is unsealed,
+// then new chunks of up to maxChunkSize bytes, each sealed once full. activeChunk is not modified.
+func planChunkWrites(logStreamID string, activeChunk *models.LogStreamChunk, streamSize int, data []byte, maxChunkSize int) *chunkWritePlan {
+	plan := &chunkWritePlan{}
+
+	newChunk := func(index, startOffset int) *openChunk {
+		return &openChunk{key: chunkObjectKey(logStreamID), index: index, startOffset: startOffset, checksum: new(uint32)}
+	}
 
 	// Determine the chunk we begin appending into. The first byte always lands at absolute offset
-	// logStream.Size.
+	// streamSize.
 	var cur *openChunk
 	switch {
 	case activeChunk != nil && !activeChunk.Sealed:
@@ -222,162 +322,178 @@ func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, sta
 			index:       activeChunk.ChunkIndex,
 			startOffset: activeChunk.StartOffset,
 			size:        activeChunk.Size,
+			checksum:    activeChunk.Checksum,
 			existing:    activeChunk,
 		}
 	case activeChunk != nil:
 		// The tail chunk is sealed; start the next chunk after it.
-		cur = &openChunk{
-			key:         chunkObjectKey(logStreamID),
-			index:       activeChunk.ChunkIndex + 1,
-			startOffset: activeChunk.StartOffset + activeChunk.Size,
-		}
+		cur = newChunk(activeChunk.ChunkIndex+1, activeChunk.StartOffset+activeChunk.Size)
+	case streamSize > 0:
+		// A stream with bytes but no chunks is a pre-chunking (legacy) stream whose data lives in
+		// the single consolidated object. It is reopened here: adopt that object as a sealed chunk 0
+		// and write new data into chunk 1.
+		//
+		// Chunk 0 spans the whole legacy object, so its Size can exceed the fill size (maxChunkSize).
+		// That is expected: the fill size bounds only how new writes are split into chunks; it is not
+		// a per-chunk invariant. The legacy single-file writer always truncated the object to exactly
+		// LogStream.Size on every write, so the object's byte length equals streamSize here, and
+		// reads of chunk 0 never run past the object's end.
+		// The adopted chunk 0 has no known checksum, so it is left nil (and is never verified).
+		plan.creates = append(plan.creates, &models.LogStreamChunk{
+			LogStreamID:    logStreamID,
+			ChunkIndex:     0,
+			StartOffset:    0,
+			Size:           streamSize,
+			ObjectStoreKey: consolidatedObjectKey(logStreamID),
+			Sealed:         true,
+		})
+		cur = newChunk(1, streamSize)
 	default:
 		// No chunk rows yet.
-		if logStream.Size > 0 {
-			// A stream with bytes but no chunks is a pre-chunking (legacy) stream whose data lives in
-			// the single consolidated object. It is reopened here: adopt that object as a sealed chunk 0
-			// and write new data into chunk 1.
-			//
-			// Chunk 0 spans the whole legacy object, so its Size can exceed the fill size (maxChunkSize).
-			// That is expected: the fill size bounds only how new writes are split into chunks; it is not
-			// a per-chunk invariant. The legacy single-file writer always truncated the object to exactly
-			// LogStream.Size on every write, so the object's byte length equals logStream.Size here, and
-			// reads of chunk 0 never run past the object's end.
-			chunkCreates = append(chunkCreates, &models.LogStreamChunk{
-				LogStreamID:    logStreamID,
-				ChunkIndex:     0,
-				StartOffset:    0,
-				Size:           logStream.Size,
-				ObjectStoreKey: consolidatedObjectKey(logStreamID),
-				Sealed:         true,
-			})
-			cur = &openChunk{
-				key:         chunkObjectKey(logStreamID),
-				index:       1,
-				startOffset: logStream.Size,
-			}
-		} else {
-			cur = &openChunk{
-				key:   chunkObjectKey(logStreamID),
-				index: 0,
-			}
-		}
+		cur = newChunk(0, 0)
 	}
 
 	finalize := func(c *openChunk, sealed bool) {
 		if c.existing != nil {
-			c.existing.Size = c.size
-			c.existing.Sealed = sealed
-			chunkUpdates = append(chunkUpdates, c.existing)
+			updated := *c.existing
+			updated.Size = c.size
+			updated.Sealed = sealed
+			updated.Checksum = c.checksum
+			// Committing this update releases the write lease claimed on the chunk.
+			updated.LeaseExpiresAt = nil
+			plan.updates = append(plan.updates, &updated)
 			return
 		}
-		chunkCreates = append(chunkCreates, &models.LogStreamChunk{
+		plan.creates = append(plan.creates, &models.LogStreamChunk{
 			LogStreamID:    logStreamID,
 			ChunkIndex:     c.index,
 			StartOffset:    c.startOffset,
 			Size:           c.size,
 			ObjectStoreKey: c.key,
 			Sealed:         sealed,
+			Checksum:       c.checksum,
 		})
 	}
 
 	// Fill the open chunk, sealing and rolling over to a new chunk whenever it reaches the max size.
-	data := effectiveBuffer
 	for len(data) > 0 {
-		capacity := maxChunkSize - cur.size
-		if capacity <= 0 {
+		if cur.size >= maxChunkSize {
 			finalize(cur, true)
-			cur = &openChunk{
-				key:         chunkObjectKey(logStreamID),
-				index:       cur.index + 1,
-				startOffset: cur.startOffset + cur.size,
-			}
-			capacity = maxChunkSize
+			cur = newChunk(cur.index+1, cur.startOffset+cur.size)
 		}
 
-		n := capacity
-		if n > len(data) {
-			n = len(data)
-		}
-
-		objectWrites = append(objectWrites, objectWrite{key: cur.key, byteOffset: cur.size, data: data[:n]})
+		n := min(maxChunkSize-cur.size, len(data))
+		plan.objectWrites = append(plan.objectWrites, objectWrite{
+			key:        cur.key,
+			byteOffset: cur.size,
+			data:       data[:n],
+			newChunk:   cur.existing == nil,
+		})
 		cur.size += n
+		cur.checksum = extendChecksum(cur.checksum, data[:n])
 		data = data[n:]
 	}
 	finalize(cur, cur.size >= maxChunkSize)
 
-	// Track which keys belong to new chunks so we call their retainFns in the TX.
-	newChunkKeys := make(map[string]struct{}, len(chunkCreates))
-	for _, c := range chunkCreates {
-		newChunkKeys[c.ObjectStoreKey] = struct{}{}
+	return plan
+}
+
+// extendChecksum returns the CRC-32 of a chunk's bytes followed by data, given the checksum of the
+// chunk's bytes; it returns nil when that checksum is unknown. CRC-32 extends incrementally, so the
+// prefix isn't rehashed. checksum is not modified.
+func extendChecksum(checksum *uint32, data []byte) *uint32 {
+	if checksum == nil {
+		return nil
 	}
+	c := crc32.Update(*checksum, crc32.IEEETable, data)
+	return &c
+}
 
-	// Write objects BEFORE touching the database. A failure here leaves the DB untouched.
-	// The store registers a pending ref and returns a linkFunc; we invoke it for new chunks only.
-	retainFns := make(map[string]db.RetainObjectRefFunc, len(newChunkKeys))
-	for i := range objectWrites {
-		w := &objectWrites[i]
-		linkFunc, wErr := s.store.WriteChunk(ctx, w.key, w.byteOffset, w.data)
-		if wErr != nil {
-			return nil, wErr
+// writeChunkObjects performs the planned object writes and returns, by object key, the callbacks
+// that link new chunks' objects to their chunk rows. The writes run under a deadline well inside the
+// chunk lease, so an upload can't still be in flight (and overwrite the object) after the lease has
+// expired and another writer has taken it.
+func (m *manager) writeChunkObjects(ctx context.Context, writes []objectWrite) (map[string]db.RetainObjectRefFunc, error) {
+	writeCtx, cancel := context.WithTimeout(ctx, chunkWriteTimeout)
+	defer cancel()
+
+	retainFns := map[string]db.RetainObjectRefFunc{}
+	for _, w := range writes {
+		linkFunc, err := m.store.WriteChunk(writeCtx, w.key, w.byteOffset, w.data)
+		if err != nil {
+			return nil, err
 		}
-
-		if _, isNew := newChunkKeys[w.key]; isNew {
+		if w.newChunk {
 			retainFns[w.key] = linkFunc
 		}
 	}
 
-	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	return retainFns, nil
+}
+
+// commitChunkWrites saves the planned chunk rows, links the new chunks' objects and saves
+// logStream, in one transaction.
+func (m *manager) commitChunkWrites(ctx context.Context, plan *chunkWritePlan, retainFns map[string]db.RetainObjectRefFunc,
+	logStream *models.LogStream) (*models.LogStream, error) {
+	txContext, err := m.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	defer func() {
-		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
+		if txErr := m.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			m.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
 		}
 	}()
 
-	for _, c := range chunkCreates {
-		createdChunk, crErr := s.dbClient.LogStreamChunks.CreateLogStreamChunk(txContext, c)
-		if crErr != nil {
-			return nil, crErr
+	for _, c := range plan.creates {
+		createdChunk, err := m.dbClient.LogStreamChunks.CreateLogStreamChunk(txContext, c)
+		if err != nil {
+			if errors.ErrorCode(err) == errors.EConflict {
+				// A concurrent write created this chunk index first. That is a write race, not a client
+				// error, so report it as retryable rather than as a terminal conflict.
+				return nil, errors.Wrap(err, "log stream %s chunk was created by a concurrent write", logStream.Metadata.ID,
+					errors.WithErrorCode(errors.EOptimisticLock))
+			}
+			return nil, err
 		}
 
-		if lf := retainFns[c.ObjectStoreKey]; lf != nil {
-			if crErr = lf(txContext, createdChunk.Metadata.ID); crErr != nil {
-				return nil, crErr
+		// The adopted legacy chunk 0 has no entry: its object was written, and linked, before chunking.
+		if retainFn := retainFns[c.ObjectStoreKey]; retainFn != nil {
+			if err = retainFn(txContext, createdChunk.Metadata.ID); err != nil {
+				return nil, err
 			}
 		}
 	}
-	for _, c := range chunkUpdates {
-		if _, err = s.dbClient.LogStreamChunks.UpdateLogStreamChunk(txContext, c); err != nil {
+	for _, c := range plan.updates {
+		if _, err = m.dbClient.LogStreamChunks.UpdateLogStreamChunk(txContext, c); err != nil {
 			return nil, err
 		}
 	}
 
-	logStream.Size += len(effectiveBuffer)
-	if reachedCap {
-		logStream.Truncated = true
-	}
-
-	updatedStream, err := s.dbClient.LogStreams.UpdateLogStream(txContext, logStream)
+	updatedStream, err := m.dbClient.LogStreams.UpdateLogStream(txContext, logStream)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
+	if err = m.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return nil, err
 	}
 
-	if reachedCap {
-		// The prefix that fits is now committed and the stream is flagged truncated; signal the cap so
-		// the caller (runner) stops streaming further logs.
-		return updatedStream, errors.New("%s (%d bytes)", LogSizeLimitReachedMsg, s.maxLogSizeBytes,
-			errors.WithErrorCode(errors.ETooLarge))
-	}
-
 	return updatedStream, nil
+}
+
+// releaseChunkLease releases a chunk write lease after a failed write so the next writer doesn't have
+// to wait for it to expire. It is best effort: if it fails the lease simply expires.
+func (m *manager) releaseChunkLease(ctx context.Context, chunk *models.LogStreamChunk) {
+	// Release even if the request context has ended (a canceled request is a common way to get here).
+	releaseCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), leaseReleaseTimeout)
+	defer cancel()
+
+	if err := m.dbClient.LogStreamChunks.ReleaseLogStreamChunkLease(releaseCtx, chunk); err != nil {
+		m.logger.WithContextFields(ctx).Errorf("failed to release write lease on log stream %s chunk %d: %v",
+			chunk.LogStreamID, chunk.ChunkIndex, err)
+	}
 }
 
 // CompactStream consolidates a completed stream's chunk data into the single static-key object and
@@ -389,7 +505,7 @@ func (s *stream) WriteLogs(ctx context.Context, logStream *models.LogStream, sta
 // LogStreams.ClaimLogStreamsForCompaction, which row-locks it with SELECT ... FOR UPDATE SKIP LOCKED
 // so concurrent instances never process the same stream. CompactStream therefore assumes the passed
 // stream is already claimed and does not re-claim it.
-func (s *stream) CompactStream(ctx context.Context, logStream *models.LogStream) error {
+func (m *manager) CompactStream(ctx context.Context, logStream *models.LogStream) error {
 	if logStream == nil {
 		return errors.New("log stream cannot be nil", errors.WithErrorCode(errors.EInvalid))
 	}
@@ -397,40 +513,49 @@ func (s *stream) CompactStream(ctx context.Context, logStream *models.LogStream)
 		return nil
 	}
 
+	// The caller's stream is left unchanged; only the saved copy is marked compacted.
+	compacted := *logStream
+
 	// Only write an object if there is log data. A completed stream that logged nothing has no
 	// chunks; reads of it return empty via readConsolidated, so just set the flag.
 	var consolidatedRetainFn db.RetainObjectRefFunc
 	if logStream.Size > 0 {
-		// logStream.Compacted is false here, so readLogs streams from the chunk objects.
-		reader, err := s.readLogs(ctx, logStream, 0, logStream.Size)
+		// logStream.Compacted is false here, so this streams from the chunk objects. Each chunk is
+		// checked as it streams: its object must hold all its committed bytes and, when the chunk's
+		// checksum is known, match it. A damaged chunk's data is already lost, so it is logged rather
+		// than failing compaction (which would leave the stream uncompacted and retried forever).
+		reader, err := m.openLogsReader(ctx, logStream, 0, logStream.Size, func(d *damagedChunk) {
+			m.logger.WithContextFields(ctx).Errorf("log stream %s chunk %d (object %s) is damaged, compacting the bytes it holds: %s",
+				logStream.Metadata.ID, d.chunk.ChunkIndex, d.chunk.ObjectStoreKey, d)
+		})
 		if err != nil {
 			return err
 		}
 		defer reader.Close()
 
 		consolidatedKey := consolidatedObjectKey(logStream.Metadata.ID)
-		consolidatedRetainFn, err = s.store.WriteConsolidated(ctx, consolidatedKey, reader)
+		consolidatedRetainFn, err = m.store.WriteConsolidated(ctx, consolidatedKey, reader)
 		if err != nil {
 			return err
 		}
 
-		logStream.ObjectStoreKey = consolidatedKey
+		compacted.ObjectStoreKey = consolidatedKey
 	}
 
-	logStream.Compacted = true
+	compacted.Compacted = true
 
-	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	txContext, err := m.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to begin transaction for CompactStream")
 	}
 
 	defer func() {
-		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CompactStream: %v", txErr)
+		if txErr := m.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			m.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CompactStream: %v", txErr)
 		}
 	}()
 
-	if _, err := s.dbClient.LogStreams.UpdateLogStream(txContext, logStream); err != nil {
+	if _, err := m.dbClient.LogStreams.UpdateLogStream(txContext, &compacted); err != nil {
 		if errors.ErrorCode(err) == errors.EOptimisticLock {
 			// A concurrent update raced with this mark. Completed streams reject further WriteLogs and
 			// the SKIP LOCKED claim keeps other instances off this stream, so the consolidated object we
@@ -448,7 +573,7 @@ func (s *stream) CompactStream(ctx context.Context, logStream *models.LogStream)
 		}
 	}
 
-	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+	if err := m.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return errors.Wrap(err, "failed to commit transaction for CompactStream")
 	}
 
@@ -458,8 +583,8 @@ func (s *stream) CompactStream(ctx context.Context, logStream *models.LogStream)
 // verifyOverlap reads the already-stored bytes at [startOffset, startOffset+len(expected)) and
 // returns an EConflict error if they differ from expected. This makes idempotent resends safe: the
 // overlapping portion of a re-sent write must match what was already persisted.
-func (s *stream) verifyOverlap(ctx context.Context, logStream *models.LogStream, startOffset int, expected []byte) error {
-	reader, err := s.readLogs(ctx, logStream, startOffset, len(expected))
+func (m *manager) verifyOverlap(ctx context.Context, logStream *models.LogStream, startOffset int, expected []byte) error {
+	reader, err := m.readLogs(ctx, logStream, startOffset, len(expected))
 	if err != nil {
 		return err
 	}
@@ -479,7 +604,7 @@ func (s *stream) verifyOverlap(ctx context.Context, logStream *models.LogStream,
 }
 
 // ReadLogs returns a reader that streams a range of logs from the stream.
-func (s *stream) ReadLogs(ctx context.Context, logStream *models.LogStream, startOffset int, limit int) (io.ReadCloser, error) {
+func (m *manager) ReadLogs(ctx context.Context, logStream *models.LogStream, startOffset int, limit int) (io.ReadCloser, error) {
 	if logStream == nil {
 		return nil, errors.New("log stream cannot be nil", errors.WithErrorCode(errors.EInvalid))
 	}
@@ -489,13 +614,23 @@ func (s *stream) ReadLogs(ctx context.Context, logStream *models.LogStream, star
 			limit, MaxLogPatchSizeBytes, errors.WithErrorCode(errors.EInvalid))
 	}
 
-	return s.readLogs(ctx, logStream, startOffset, limit)
+	return m.readLogs(ctx, logStream, startOffset, limit)
 }
 
 // readLogs returns a reader over [startOffset, startOffset+limit) that streams the overlapping
 // chunk objects one at a time, so the full range is never buffered in memory. Streams with no chunk
 // rows fall back to the legacy single-object layout.
-func (s *stream) readLogs(ctx context.Context, logStream *models.LogStream, startOffset int, limit int) (io.ReadCloser, error) {
+func (m *manager) readLogs(ctx context.Context, logStream *models.LogStream, startOffset int, limit int) (io.ReadCloser, error) {
+	return m.openLogsReader(ctx, logStream, startOffset, limit, nil)
+}
+
+// openLogsReader is readLogs with an optional damaged-chunk callback. A chunk object that holds fewer
+// bytes than were committed fails the read with ENotFound, since returning the rest of the range
+// would put later bytes at the wrong offsets. When onDamagedChunk is non-nil it is called instead, for
+// that and for every chunk that is read in full and doesn't match its known checksum, and the read
+// continues.
+func (m *manager) openLogsReader(ctx context.Context, logStream *models.LogStream, startOffset int, limit int,
+	onDamagedChunk func(damaged *damagedChunk)) (io.ReadCloser, error) {
 	if startOffset < 0 || limit < 0 {
 		return nil, errors.New("limit and offset cannot be negative", errors.WithErrorCode(errors.EInvalid))
 	}
@@ -506,19 +641,19 @@ func (s *stream) readLogs(ctx context.Context, logStream *models.LogStream, star
 	// A compacted stream's data lives in the single static-key object; read it directly and ignore
 	// any (orphaned, not-yet-reclaimed) chunk rows.
 	if logStream.Compacted {
-		return s.readConsolidated(ctx, logStream, startOffset, limit)
+		return m.readConsolidated(ctx, logStream, startOffset, limit)
 	}
 
 	end := startOffset + limit
 
-	chunks, err := s.dbClient.LogStreamChunks.GetOverlappingChunks(ctx, logStream.Metadata.ID, startOffset, end)
+	chunks, err := m.dbClient.LogStreamChunks.GetOverlappingChunks(ctx, logStream.Metadata.ID, startOffset, end)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(chunks) == 0 {
 		// No chunk rows: this is either a pre-chunking (legacy) stream or one that has not been written.
-		return s.readConsolidated(ctx, logStream, startOffset, limit)
+		return m.readConsolidated(ctx, logStream, startOffset, limit)
 	}
 
 	slices := make([]chunkSlice, 0, len(chunks))
@@ -531,16 +666,16 @@ func (s *stream) readLogs(ctx context.Context, logStream *models.LogStream, star
 			continue
 		}
 
-		slices = append(slices, chunkSlice{key: c.ObjectStoreKey, offset: sliceStart, length: sliceEnd - sliceStart})
+		slices = append(slices, chunkSlice{chunk: c, offset: sliceStart, length: sliceEnd - sliceStart})
 	}
 
-	return &chunkReader{ctx: ctx, store: s.store, slices: slices}, nil
+	return &chunkReader{ctx: ctx, store: m.store, slices: slices, onDamagedChunk: onDamagedChunk}, nil
 }
 
 // readConsolidated reads the single whole-stream object: the logstreams/{id}.txt key
 // first, then the older per-job workspaces/... key, mirroring the historical fallback behavior.
-func (s *stream) readConsolidated(ctx context.Context, logStream *models.LogStream, startOffset int, limit int) (io.ReadCloser, error) {
-	logs, err := s.store.ReadRange(ctx, consolidatedObjectKey(logStream.Metadata.ID), startOffset, limit)
+func (m *manager) readConsolidated(ctx context.Context, logStream *models.LogStream, startOffset int, limit int) (io.ReadCloser, error) {
+	logs, err := m.store.ReadRange(ctx, consolidatedObjectKey(logStream.Metadata.ID), startOffset, limit)
 	if err != nil {
 		if errors.ErrorCode(err) != errors.ENotFound {
 			return nil, errors.Wrap(err, "failed to read log file from object store")
@@ -551,7 +686,7 @@ func (s *stream) readConsolidated(ctx context.Context, logStream *models.LogStre
 			return io.NopCloser(bytes.NewReader(nil)), nil
 		}
 
-		job, jErr := s.dbClient.Jobs.GetJobByID(ctx, *logStream.JobID)
+		job, jErr := m.dbClient.Jobs.GetJobByID(ctx, *logStream.JobID)
 		if jErr != nil {
 			return nil, jErr
 		}
@@ -559,7 +694,7 @@ func (s *stream) readConsolidated(ctx context.Context, logStream *models.LogStre
 			return nil, errors.New("job with ID %s not found", *logStream.JobID, errors.WithErrorCode(errors.ENotFound))
 		}
 
-		legacyLogs, lErr := s.store.ReadRange(ctx, legacyJobObjectKey(job), startOffset, limit)
+		legacyLogs, lErr := m.store.ReadRange(ctx, legacyJobObjectKey(job), startOffset, limit)
 		if lErr != nil {
 			if errors.ErrorCode(lErr) == errors.ENotFound {
 				return io.NopCloser(bytes.NewReader(nil)), nil
@@ -574,9 +709,29 @@ func (s *stream) readConsolidated(ctx context.Context, logStream *models.LogStre
 
 // chunkSlice identifies a byte range within a single chunk object.
 type chunkSlice struct {
-	key    string
+	chunk  *models.LogStreamChunk
 	offset int
 	length int
+}
+
+// verifiable reports whether the slice covers the whole chunk and the chunk's checksum is known.
+func (sl *chunkSlice) verifiable() bool {
+	return sl.chunk.Checksum != nil && sl.offset == 0 && sl.length == sl.chunk.Size
+}
+
+// damagedChunk describes a chunk whose object doesn't hold the chunk's committed bytes.
+type damagedChunk struct {
+	chunk     *models.LogStreamChunk
+	bytesRead int
+	// checksum is the CRC-32 of the bytes read; nil when the chunk wasn't verified.
+	checksum *uint32
+}
+
+func (d *damagedChunk) String() string {
+	if d.bytesRead < d.chunk.Size {
+		return fmt.Sprintf("its object holds %d of %d committed bytes", d.bytesRead, d.chunk.Size)
+	}
+	return fmt.Sprintf("expected crc32 %08x, got %08x", *d.chunk.Checksum, *d.checksum)
 }
 
 // chunkReader streams a sequence of chunk slices, opening each chunk object lazily and reading it to
@@ -588,6 +743,12 @@ type chunkReader struct {
 	slices []chunkSlice
 	idx    int
 	cur    io.ReadCloser
+
+	// onDamagedChunk is the damaged-chunk callback; see openLogsReader.
+	onDamagedChunk func(damaged *damagedChunk)
+	// hasher computes the current slice's checksum; nil when the slice isn't verified.
+	hasher       hash.Hash32
+	curBytesRead int
 }
 
 func (r *chunkReader) Read(p []byte) (int, error) {
@@ -596,29 +757,80 @@ func (r *chunkReader) Read(p []byte) (int, error) {
 			if r.idx >= len(r.slices) {
 				return 0, io.EOF
 			}
-			sl := r.slices[r.idx]
-			rc, err := r.store.ReadRange(r.ctx, sl.key, sl.offset, sl.length)
+			sl := &r.slices[r.idx]
+			rc, err := r.store.ReadRange(r.ctx, sl.chunk.ObjectStoreKey, sl.offset, sl.length)
 			if err != nil {
+				if errors.ErrorCode(err) == errors.ENotFound {
+					// The range is within the chunk's committed size and objects are written before the
+					// size is committed, so the bytes are missing from the object store. The message is
+					// our own, so it carries no object store error details.
+					return 0, errors.New("log stream %s chunk %d object %s is missing the %d bytes at offset %d",
+						sl.chunk.LogStreamID, sl.chunk.ChunkIndex, sl.chunk.ObjectStoreKey, sl.length, sl.offset,
+						errors.WithErrorCode(errors.EDataLoss))
+				}
 				return 0, err
 			}
 			r.cur = rc
+			r.curBytesRead = 0
+			r.hasher = nil
+			if r.onDamagedChunk != nil && sl.verifiable() {
+				r.hasher = crc32.NewIEEE()
+			}
 		}
 
 		n, err := r.cur.Read(p)
+		if n > 0 {
+			r.curBytesRead += n
+			if r.hasher != nil {
+				_, _ = r.hasher.Write(p[:n])
+			}
+		}
 		if err == io.EOF {
 			closeErr := r.cur.Close()
 			r.cur = nil
+			sliceErr := r.finishSlice()
 			r.idx++
+			if sliceErr == nil {
+				sliceErr = closeErr
+			}
+			if sliceErr != nil {
+				return n, sliceErr
+			}
 			if n > 0 {
 				return n, nil
-			}
-			if closeErr != nil {
-				return 0, closeErr
 			}
 			continue
 		}
 		return n, err
 	}
+}
+
+// finishSlice checks the slice that was just read to completion. An object holding fewer bytes than
+// the slice covers is an EDataLoss error (the same as a range that starts past an object's end),
+// unless onDamagedChunk is set; then it and a checksum mismatch are reported to onDamagedChunk.
+func (r *chunkReader) finishSlice() error {
+	sl := &r.slices[r.idx]
+	short := r.curBytesRead < sl.length
+
+	if r.onDamagedChunk == nil {
+		if short {
+			return errors.New("log stream %s chunk %d object %s holds %d of the %d bytes at offset %d",
+				sl.chunk.LogStreamID, sl.chunk.ChunkIndex, sl.chunk.ObjectStoreKey, r.curBytesRead, sl.length, sl.offset,
+				errors.WithErrorCode(errors.EDataLoss))
+		}
+		return nil
+	}
+
+	var checksum *uint32
+	if r.hasher != nil {
+		c := r.hasher.Sum32()
+		checksum = &c
+		r.hasher = nil
+	}
+	if short || (checksum != nil && *checksum != *sl.chunk.Checksum) {
+		r.onDamagedChunk(&damagedChunk{chunk: sl.chunk, bytesRead: r.curBytesRead, checksum: checksum})
+	}
+	return nil
 }
 
 func (r *chunkReader) Close() error {
@@ -630,14 +842,20 @@ func (r *chunkReader) Close() error {
 	return nil
 }
 
-func (s *stream) Subscribe(ctx context.Context, options *SubscriptionOptions) (<-chan *LogEvent, error) {
-	logStream, err := s.dbClient.LogStreams.GetLogStreamByID(ctx, options.LogStreamID)
+func (m *manager) Subscribe(ctx context.Context, options *SubscriptionOptions) (<-chan *LogEvent, error) {
+	// Reject a bad offset up front: failing it mid-stream would be indistinguishable from a transient
+	// read failure to a client that reconnects with the same request.
+	if options.LastSeenLogSize != nil && *options.LastSeenLogSize < 0 {
+		return nil, errors.New("last seen log size cannot be negative", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	logStream, err := m.dbClient.LogStreams.GetLogStreamByID(ctx, options.LogStreamID)
 	if err != nil {
 		return nil, err
 	}
 
 	if logStream == nil {
-		return nil, fmt.Errorf("log stream not found with ID: %s", options.LogStreamID)
+		return nil, errors.New("log stream not found with ID: %s", options.LogStreamID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	subscription := events.Subscription{
@@ -648,47 +866,41 @@ func (s *stream) Subscribe(ctx context.Context, options *SubscriptionOptions) (<
 			events.UpdateAction,
 		},
 	}
-	subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
+	subscriber := m.eventManager.Subscribe([]events.Subscription{subscription})
 
 	outgoing := make(chan *LogEvent)
-	var completed bool
 
 	go func() {
-		var currentSize int
-
 		// Defer close of outgoing channel
 		defer close(outgoing)
-		defer s.eventManager.Unsubscribe(subscriber)
+		defer m.eventManager.Unsubscribe(subscriber)
 
-		if options.LastSeenLogSize != nil {
-			// Send all logs that were missed since last seen size
-			currentSize, completed = s.sendLogstreamEvent(ctx, logStream, *options.LastSeenLogSize, logStream.Size, logStream.Completed, logStream.Truncated, outgoing)
-			if completed {
+		if err := m.streamLogEvents(ctx, logStream, options.LastSeenLogSize, subscriber, outgoing); err != nil {
+			// Only the subscriber's own context ending (client disconnect, server drain) is a normal end:
+			// just close the channel. A context error from anything else (e.g. an object store request
+			// timing out) is a failure, and closing silently would read as completion to the client.
+			if ctx.Err() != nil {
 				return
 			}
-		} else {
-			currentSize = logStream.Size
-		}
-
-		// Wait for log stream updates
-		for {
-			event, err := subscriber.GetEvent(ctx)
-			if err != nil {
-				if errors.FilterContextError(err) != nil {
-					s.logger.WithContextFields(ctx).Errorf("error occurred while waiting for log events: %v", err)
-				}
-				return
+			if errors.FilterContextError(err) == nil {
+				err = errors.Wrap(err, "log stream subscription interrupted", errors.WithErrorCode(errors.EServiceUnavailable))
 			}
 
-			logStreamEventData, err := event.ToLogStreamEventData()
-			if err != nil {
-				s.logger.WithContextFields(ctx).Errorf("failed to get log stream event data in log stream subscription, log event %s: %v", event.ID, err)
-				return
+			m.logger.WithContextFields(ctx).Errorf("log stream subscription for log stream %s failed: %v", logStream.Metadata.ID, err)
+
+			// A server fault can wrap database or object store errors whose details the client must not
+			// see, so the client gets a new error with only the code; the full error is logged above.
+			switch errors.ErrorCode(err) {
+			case errors.EServiceUnavailable, errors.EInternal, errors.ENotImplemented, errors.EDataLoss:
+				err = errors.New("log stream subscription for log stream %s failed", logStream.Metadata.ID,
+					errors.WithErrorCode(errors.ErrorCode(err)))
 			}
 
-			currentSize, completed = s.sendLogstreamEvent(ctx, logStream, currentSize, logStreamEventData.Size, logStreamEventData.Completed, logStreamEventData.Truncated, outgoing)
-			if completed {
-				return
+			// Deliver the failure as a terminal event so the consumer returns an error to its client
+			// instead of closing the stream cleanly, which a client can't tell apart from completion.
+			select {
+			case <-ctx.Done():
+			case outgoing <- &LogEvent{Err: err}:
 			}
 		}
 	}()
@@ -696,22 +908,66 @@ func (s *stream) Subscribe(ctx context.Context, options *SubscriptionOptions) (<
 	return outgoing, nil
 }
 
-func (s *stream) sendLogstreamEvent(ctx context.Context, logStream *models.LogStream, lastSeenLogSize int, actualLogSize int, completed bool, truncated bool, outgoing chan *LogEvent) (int, bool) {
+// streamLogEvents sends any logs missed since lastSeenLogSize, then forwards live log stream updates
+// until the stream completes (returns nil) or the subscription fails (returns the error).
+func (m *manager) streamLogEvents(ctx context.Context, logStream *models.LogStream, lastSeenLogSize *int,
+	subscriber *events.Subscriber, outgoing chan *LogEvent) error {
+	currentSize := logStream.Size
+
+	if lastSeenLogSize != nil {
+		// Send all logs that were missed since last seen size
+		size, completed, err := m.sendLogstreamEvent(ctx, logStream, *lastSeenLogSize, logStream.Size, logStream.Completed, logStream.Truncated, outgoing)
+		if err != nil || completed {
+			return err
+		}
+		currentSize = size
+	}
+
+	// Wait for log stream updates
+	for {
+		event, err := subscriber.GetEvent(ctx)
+		if err != nil {
+			if errors.FilterContextError(err) == nil {
+				return err
+			}
+			// The event listener failed or this subscriber was dropped. Nothing is lost on the
+			// stream itself, so the client can reconnect and resume from its last seen size.
+			return errors.Wrap(err, "failed waiting for log stream events", errors.WithErrorCode(errors.EServiceUnavailable))
+		}
+
+		logStreamEventData, err := event.ToLogStreamEventData()
+		if err != nil {
+			// A malformed event payload is a bug, and every later event would fail the same way, so a
+			// reconnect can't recover from it.
+			return errors.Wrap(err, "failed to get log stream event data for event %s", event.ID, errors.WithErrorCode(errors.EInternal))
+		}
+
+		size, completed, err := m.sendLogstreamEvent(ctx, logStream, currentSize, logStreamEventData.Size, logStreamEventData.Completed, logStreamEventData.Truncated, outgoing)
+		if err != nil || completed {
+			return err
+		}
+		currentSize = size
+	}
+}
+
+// sendLogstreamEvent sends the logs in [lastSeenLogSize, actualLogSize) followed, if the stream is
+// completed, by the terminal completed event. It returns the new last seen size and whether the
+// subscription is done (completed, or the context ended). A non-nil error means the logs could not be
+// read and the subscription must fail rather than be reported as completed.
+func (m *manager) sendLogstreamEvent(ctx context.Context, logStream *models.LogStream, lastSeenLogSize int, actualLogSize int, completed bool, truncated bool, outgoing chan *LogEvent) (int, bool, error) {
 	for lastSeenLogSize < actualLogSize {
 		offset := lastSeenLogSize
 		// Read logs in bounded windows. The window is small (logEventChunkSizeBytes), so reading it
 		// fully into memory here is safe.
-		reader, err := s.readLogs(ctx, logStream, lastSeenLogSize, logEventChunkSizeBytes)
+		reader, err := m.readLogs(ctx, logStream, lastSeenLogSize, logEventChunkSizeBytes)
 		if err != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to read logs for log stream %s: %v", logStream.Metadata.ID, err)
-			return 0, true
+			return 0, true, readLogsError(logStream, offset, err)
 		}
 
 		logs, err := io.ReadAll(reader)
 		_ = reader.Close()
 		if err != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to read logs for log stream %s: %v", logStream.Metadata.ID, err)
-			return 0, true
+			return 0, true, readLogsError(logStream, offset, err)
 		}
 
 		if len(logs) == 0 {
@@ -723,7 +979,7 @@ func (s *stream) sendLogstreamEvent(ctx context.Context, logStream *models.LogSt
 
 		select {
 		case <-ctx.Done():
-			return 0, true
+			return 0, true, ctx.Err()
 		case outgoing <- &LogEvent{Size: lastSeenLogSize, Truncated: truncated, Data: &LogEventData{Offset: offset, Logs: string(logs)}}:
 		}
 	}
@@ -732,12 +988,33 @@ func (s *stream) sendLogstreamEvent(ctx context.Context, logStream *models.LogSt
 	if completed {
 		select {
 		case <-ctx.Done():
-			return 0, true
+			return 0, true, ctx.Err()
 		case outgoing <- &LogEvent{Size: lastSeenLogSize, Completed: completed, Truncated: truncated}:
 		}
 	}
 
-	return lastSeenLogSize, completed
+	return lastSeenLogSize, completed, nil
+}
+
+// readLogsError classifies a failure to read committed log bytes so the client knows whether to
+// reconnect:
+//   - Committed bytes that are missing (the chunk reader reports EDataLoss; a bare ENotFound from the
+//     object store means the same) are permanent: reconnecting would fail the same way forever, so
+//     the failure is EDataLoss.
+//   - Errors caused by the request itself (e.g. an invalid offset or a denied permission) keep their
+//     code, since a reconnect with the same request would fail the same way.
+//   - Anything else, such as an object store outage or timeout, is transient: EServiceUnavailable, so
+//     the client reconnects and resumes.
+func readLogsError(logStream *models.LogStream, offset int, err error) error {
+	code := errors.EServiceUnavailable
+	switch errors.ErrorCode(err) {
+	case errors.ENotFound, errors.EDataLoss:
+		code = errors.EDataLoss
+	case errors.EInvalid, errors.EForbidden, errors.EUnauthorized, errors.ETooLarge, errors.ENotImplemented:
+		code = errors.ErrorCode(err)
+	}
+
+	return errors.Wrap(err, "failed to read logs for log stream %s at offset %d", logStream.Metadata.ID, offset, errors.WithErrorCode(code))
 }
 
 // chunkObjectKey returns a fresh, unique object key for a new log stream chunk.

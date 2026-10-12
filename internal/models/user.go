@@ -14,10 +14,13 @@ var _ Model = (*User)(nil)
 
 // User represents a human user account
 type User struct {
-	Username            string
-	Email               string
-	PasswordHash        []byte
-	SCIMExternalID      string
+	Username       string
+	Email          string
+	PasswordHash   []byte
+	SCIMExternalID string
+	// SCIMIDPIssuerURL is the issuer URL of the IDP whose SCIM client manages the user; empty if the user
+	// is not managed by SCIM.
+	SCIMIDPIssuerURL    string
 	Metadata            ResourceMetadata
 	Admin               bool
 	Active              bool

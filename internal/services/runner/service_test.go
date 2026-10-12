@@ -472,6 +472,7 @@ func TestCreateRunner(t *testing.T) {
 				GroupID:         groupID,
 				Tags:            []string{"some-tag"},
 				RunUntaggedJobs: false,
+				JobLimit:        10,
 			},
 			expectCreatedRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{
@@ -484,9 +485,20 @@ func TestCreateRunner(t *testing.T) {
 				CreatedBy:       "mockSubject",
 				Tags:            []string{"some-tag"},
 				RunUntaggedJobs: false,
+				JobLimit:        10,
 			},
 			limit:                 5,
 			injectRunnersPerGroup: 5,
+		},
+		{
+			name: "job limit cannot be negative",
+			input: CreateRunnerInput{
+				Name:     "test-runner",
+				GroupID:  groupID,
+				Tags:     []string{"some-tag"},
+				JobLimit: -1,
+			},
+			expectErrCode: errors.EInvalid,
 		},
 		{
 			name: "subject does not have owner role",
@@ -547,8 +559,9 @@ func TestCreateRunner(t *testing.T) {
 			}
 
 			if test.expectCreatedRunner != nil {
-				mockRunners.On("CreateRunner", mock.Anything, mock.Anything).
-					Return(test.expectCreatedRunner, nil)
+				mockRunners.On("CreateRunner", mock.Anything, mock.MatchedBy(func(r *models.Runner) bool {
+					return r.JobLimit == test.expectCreatedRunner.JobLimit
+				})).Return(test.expectCreatedRunner, nil)
 			}
 
 			dbClient := db.Client{
@@ -623,7 +636,23 @@ func TestUpdateRunner(t *testing.T) {
 				Disabled:        false,
 				Tags:            []string{"some-tag"},
 				RunUntaggedJobs: true,
+				JobLimit:        5,
 			},
+		},
+		{
+			name: "job limit cannot be negative",
+			input: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: trn.TypeRun.Build("group123/test-runner"),
+				},
+				Type:            models.GroupRunnerType,
+				Name:            "test-runner",
+				GroupID:         &groupID,
+				RunUntaggedJobs: true,
+				JobLimit:        -1,
+			},
+			expectErrCode: errors.EInvalid,
 		},
 		{
 			name: "subject does not have owner role",
@@ -658,7 +687,7 @@ func TestUpdateRunner(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockRunners := db.NewMockRunners(t)
 
-			if test.authError == nil {
+			if test.authError == nil && test.expectErrCode == "" {
 				mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
@@ -1655,8 +1684,8 @@ func TestCreateRunnerSessionError(t *testing.T) {
 		},
 		{
 			// The log stream manager enforces the max log stream size and returns ETooLarge once the
-			// cap is reached; CreateRunnerSessionError just propagates it.
-			name:          "fail to create error because log stream reached its size limit",
+			// cap is reached; CreateRunnerSessionError propagates it, after the count is saved.
+			name:          "error count is saved even when the log stream reached its size limit",
 			logStreamSize: 100,
 			writeLogsErr:  errors.New("log size limit reached", errors.WithErrorCode(errors.ETooLarge)),
 			expectErrCode: errors.ETooLarge,
@@ -1670,15 +1699,12 @@ func TestCreateRunnerSessionError(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockRunnerSessions := db.NewMockRunnerSessions(t)
 			mockLogStreams := db.NewMockLogStreams(t)
-			mockTransactions := db.NewMockTransactions(t)
+			mockTransactions := db.NewMockTransactions(t) // no transaction may be used
 			mockLimitChecker := limits.NewMockLimitChecker(t)
 			mockLogStreamManager := logstream.NewMockManager(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunnerSessionPermission, mock.Anything).
 				Return(test.authError)
-
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 
 			mockLogStreams.On("GetLogStreamByRunnerSessionID", mock.Anything, runnerSessionID).Return(&models.LogStream{
 				Metadata: models.ResourceMetadata{ID: logStreamID},
@@ -1709,10 +1735,6 @@ func TestCreateRunnerSessionError(t *testing.T) {
 				}),
 			).Return(nil, test.writeLogsErr).Maybe()
 
-			if test.authError == nil && test.expectErrCode == "" {
-				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-			}
-
 			dbClient := &db.Client{
 				Transactions:   mockTransactions,
 				RunnerSessions: mockRunnerSessions,
@@ -1729,6 +1751,13 @@ func TestCreateRunnerSessionError(t *testing.T) {
 			}
 
 			err := service.CreateRunnerSessionError(auth.WithCaller(ctx, mockCaller), runnerSessionID, message)
+
+			if test.authError != nil {
+				mockRunnerSessions.AssertNotCalled(t, "UpdateRunnerSession", mock.Anything, mock.Anything)
+				mockLogStreamManager.AssertNotCalled(t, "WriteLogs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			} else {
+				mockRunnerSessions.AssertCalled(t, "UpdateRunnerSession", mock.Anything, mock.Anything)
+			}
 
 			if test.expectErrCode != "" {
 				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))

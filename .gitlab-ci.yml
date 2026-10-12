@@ -481,6 +481,18 @@ lint:
     - <<: *ui-cache-template
       policy: pull
 
+ui-tests:
+  extends: .node
+  stage: test
+  script:
+    - cd frontend
+    # "vitest run" runs once; the package.json "test" script starts watch mode
+    - npx vitest run
+  # populate_npm_cache only runs when the lockfile or CI config changes
+  needs:
+    - job: populate_npm_cache
+      optional: true
+
 build_aio_container_image:
   stage: trigger
   rules:

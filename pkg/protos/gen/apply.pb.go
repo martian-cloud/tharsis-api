@@ -205,8 +205,12 @@ type Apply struct {
 	ErrorMessage     *string     `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
 	LatestJobId      *string     `protobuf:"bytes,5,opt,name=latest_job_id,json=latestJobId,proto3,oneof" json:"latest_job_id,omitempty"`
 	Status           ApplyStatus `protobuf:"varint,6,opt,name=status,proto3,enum=martiancloud.tharsis.api.apply.ApplyStatus" json:"status,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Global IDs of the managed identities the apply job may create credentials for. Set when
+	// auto-apply is enabled (including at run creation) or when the apply is approved; empty
+	// otherwise.
+	ManagedIdentityIds []string `protobuf:"bytes,7,rep,name=managed_identity_ids,json=managedIdentityIds,proto3" json:"managed_identity_ids,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Apply) Reset() {
@@ -282,6 +286,13 @@ func (x *Apply) GetStatus() ApplyStatus {
 	return ApplyStatus_UNSPECIFIED
 }
 
+func (x *Apply) GetManagedIdentityIds() []string {
+	if x != nil {
+		return x.ManagedIdentityIds
+	}
+	return nil
+}
+
 var File_apply_proto protoreflect.FileDescriptor
 
 const file_apply_proto_rawDesc = "" +
@@ -295,14 +306,15 @@ const file_apply_proto_rawDesc = "" +
 	"\rerror_message\x18\x04 \x01(\tH\x01R\ferrorMessage\x88\x01\x01B\n" +
 	"\n" +
 	"\b_versionB\x10\n" +
-	"\x0e_error_messageJ\x04\b\x03\x10\x04\"\xe8\x02\n" +
+	"\x0e_error_messageJ\x04\b\x03\x10\x04\"\x9a\x03\n" +
 	"\x05Apply\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12/\n" +
 	"\x11deprecated_status\x18\x02 \x01(\tB\x02\x18\x01R\x10deprecatedStatus\x12!\n" +
 	"\ftriggered_by\x18\x03 \x01(\tR\vtriggeredBy\x12(\n" +
 	"\rerror_message\x18\x04 \x01(\tH\x00R\ferrorMessage\x88\x01\x01\x12'\n" +
 	"\rlatest_job_id\x18\x05 \x01(\tH\x01R\vlatestJobId\x88\x01\x01\x12C\n" +
-	"\x06status\x18\x06 \x01(\x0e2+.martiancloud.tharsis.api.apply.ApplyStatusR\x06statusB\x10\n" +
+	"\x06status\x18\x06 \x01(\x0e2+.martiancloud.tharsis.api.apply.ApplyStatusR\x06status\x120\n" +
+	"\x14managed_identity_ids\x18\a \x03(\tR\x12managedIdentityIdsB\x10\n" +
 	"\x0e_error_messageB\x10\n" +
 	"\x0e_latest_job_id*\x87\x01\n" +
 	"\vApplyStatus\x12\x0f\n" +

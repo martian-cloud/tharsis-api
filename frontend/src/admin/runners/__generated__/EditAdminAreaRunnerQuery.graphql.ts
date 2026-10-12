@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<bc1d085d8c2981bf50ee0d8c15126fdc>>
+ * @generated SignedSource<<bc4cf9596fef82ccea8bec2568552f34>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,6 +17,7 @@ export type EditAdminAreaRunnerQuery$data = {
     readonly description?: string;
     readonly disabled?: boolean;
     readonly id?: string;
+    readonly jobLimit?: number;
     readonly name?: string;
     readonly runUntaggedJobs?: boolean;
     readonly tags?: ReadonlyArray<string>;
@@ -83,6 +84,13 @@ v7 = {
   "kind": "ScalarField",
   "name": "runUntaggedJobs",
   "storageKey": null
+},
+v8 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "jobLimit",
+  "storageKey": null
 };
 return {
   "fragment": {
@@ -107,7 +115,8 @@ return {
               (v4/*: any*/),
               (v5/*: any*/),
               (v6/*: any*/),
-              (v7/*: any*/)
+              (v7/*: any*/),
+              (v8/*: any*/)
             ],
             "type": "Runner",
             "abstractKey": null
@@ -148,7 +157,8 @@ return {
               (v4/*: any*/),
               (v5/*: any*/),
               (v6/*: any*/),
-              (v7/*: any*/)
+              (v7/*: any*/),
+              (v8/*: any*/)
             ],
             "type": "Runner",
             "abstractKey": null
@@ -159,16 +169,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "09639579411a05eb3a193c0ee26c0cbd",
+    "cacheID": "b04fd7545d418a32836fc9705ce05eb9",
     "id": null,
     "metadata": {},
     "name": "EditAdminAreaRunnerQuery",
     "operationKind": "query",
-    "text": "query EditAdminAreaRunnerQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Runner {\n      id\n      name\n      description\n      disabled\n      tags\n      runUntaggedJobs\n    }\n    id\n  }\n}\n"
+    "text": "query EditAdminAreaRunnerQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Runner {\n      id\n      name\n      description\n      disabled\n      tags\n      runUntaggedJobs\n      jobLimit\n    }\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "0ac8313b659a7e6e32225c09ea2eb5e7";
+(node as any).hash = "9bc58d9b3496df716732766cb8cc1fe2";
 
 export default node;

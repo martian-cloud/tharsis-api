@@ -58,6 +58,7 @@ type CreateRunnerInput struct {
 	Name            string
 	Description     string
 	RunUntaggedJobs bool
+	JobLimit        int
 	Tags            []string
 }
 
@@ -648,6 +649,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 		CreatedBy:       caller.GetSubject(),
 		Tags:            input.Tags,
 		RunUntaggedJobs: input.RunUntaggedJobs,
+		JobLimit:        input.JobLimit,
 	}
 
 	if input.Disabled != nil {
@@ -906,7 +908,10 @@ func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID 
 		return err
 	}
 
-	return s.dbClient.RetryOnOLE(ctx, func() error {
+	// The count and the log are saved separately, each with its own OLE retry, so a retry of one
+	// can't repeat the other. The count is saved first so it is recorded even once the error log has
+	// reached its size limit.
+	if err = s.dbClient.RetryOnOLE(ctx, func() error {
 		session, err := s.getRunnerSessionByID(ctx, span, runnerSessionID)
 		if err != nil {
 			return err
@@ -917,6 +922,17 @@ func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID 
 			return err
 		}
 
+		session.ErrorCount++
+		_, err = s.dbClient.RunnerSessions.UpdateRunnerSession(ctx, session)
+		return err
+	}); err != nil {
+		return err
+	}
+
+	timestamp := runnerLogsTimestampColor.Sprintf("%s:", time.Now().UTC().Format(time.RFC3339Nano))
+	buf := []byte(fmt.Sprintf("%s %s\n", timestamp, message))
+
+	if err = s.dbClient.RetryOnOLE(ctx, func() error {
 		// Find log stream associated with runner session
 		stream, err := s.dbClient.LogStreams.GetLogStreamByRunnerSessionID(ctx, runnerSessionID)
 		if err != nil {
@@ -926,48 +942,21 @@ func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID 
 			return errors.New("log stream not found for runner session: %s", runnerSessionID)
 		}
 
-		timestamp := runnerLogsTimestampColor.Sprintf("%s:", time.Now().UTC().Format(time.RFC3339Nano))
-
-		buf := []byte(fmt.Sprintf("%s %s\n", timestamp, message))
-
 		// The log stream manager enforces the server-authoritative maximum log stream size
 		// (MaxLogStreamSizeBytes) and returns ETooLarge once the cap is reached, so no separate
-		// runner-error-log limit is needed here.
+		// runner-error-log limit is needed here. It writes objects outside any transaction, so it
+		// must not be called inside one.
+		_, err = s.logStreamManager.WriteLogs(ctx, stream, stream.Size, buf)
+		return err
+	}); err != nil {
+		return err
+	}
 
-		txContext, err := s.dbClient.Transactions.BeginTx(ctx)
-		if err != nil {
-			return err
-		}
+	s.logger.WithContextFields(ctx).Infow("Recorded a runner session error.",
+		"runnerSessionID", runnerSessionID,
+	)
 
-		defer func() {
-			if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-				s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
-			}
-		}()
-
-		// Update session error count
-		session.ErrorCount++
-		_, err = s.dbClient.RunnerSessions.UpdateRunnerSession(txContext, session)
-		if err != nil {
-			return err
-		}
-
-		// Write logs to store
-		_, err = s.logStreamManager.WriteLogs(txContext, stream, stream.Size, buf)
-		if err != nil {
-			return err
-		}
-
-		if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-			return err
-		}
-
-		s.logger.WithContextFields(ctx).Infow("Recorded a runner session error.",
-			"runnerSessionID", runnerSessionID,
-		)
-
-		return nil
-	})
+	return nil
 }
 
 func (s *service) ReadRunnerSessionErrorLog(ctx context.Context, runnerSessionID string, startOffset int, limit int) (io.ReadCloser, error) {

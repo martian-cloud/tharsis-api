@@ -72,6 +72,14 @@ func (wpl *WorkspaceVCSProviderLink) ResolveMetadata(key string) (*string, error
 
 // Validate verifies a VCS Provider link struct.
 func (wpl *WorkspaceVCSProviderLink) Validate() error {
+	if wpl.ModuleDirectory != nil && *wpl.ModuleDirectory != "" {
+		// The module directory is joined onto the repository checkout, so it must stay inside it:
+		// no absolute paths and no ".." segments that climb out.
+		if !filepath.IsLocal(filepath.FromSlash(*wpl.ModuleDirectory)) {
+			return errors.New("module directory must be a relative path within the repository", errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+
 	// Verify glob patterns.
 	for _, pattern := range wpl.GlobPatterns {
 		if len(pattern) > maxPatternLength {

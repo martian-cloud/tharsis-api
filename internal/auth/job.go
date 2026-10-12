@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -15,14 +16,34 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
+// jobStageScopedPermissions restricts job-mechanics permissions to the job types that need
+// them. A permission absent from the map is available to every job type. The job token is readable
+// by the code the job runs, so each job only gets what its own type does: an OPA job evaluates
+// policies and never runs Terraform, and only an apply records state.
+var jobStageScopedPermissions = map[models.Permission][]models.JobType{
+	models.IssueFederatedRegistryTokenPermission:   {models.JobPlanType, models.JobApplyType},
+	models.ViewConfigurationVersionPermission:      {models.JobPlanType, models.JobApplyType},
+	models.ViewManagedIdentityPermission:           {models.JobPlanType, models.JobApplyType},
+	models.CreateTerraformProviderMirrorPermission: {models.JobPlanType, models.JobApplyType},
+	// Policy evaluation only reads non-sensitive variable values; sensitive ones are passed to Terraform.
+	models.ViewSensitiveVariableValuePermission: {models.JobPlanType, models.JobApplyType},
+	models.CreateStateVersionPermission:         {models.JobApplyType},
+}
+
+// errJobFinished is returned for anything but reading the job itself once the job has reached a final
+// status: the token outlives the job, but a finished job has nothing left to do.
+var errJobFinished = terrors.New("job token is no longer valid: the job has finished", terrors.WithErrorCode(terrors.EUnauthorized))
+
 // JobCaller represents a job subject
 type JobCaller struct {
 	dbClient                 *db.Client
 	inheritedSettingResolver namespace.InheritedSettingResolver
-	JobID                    string
-	JobTRN                   string
-	WorkspaceID              string
-	RunID                    string
+	// Job is the job the token was issued to, loaded when the caller is authenticated. Authentication
+	// has already checked that it belongs to RunID and WorkspaceID.
+	Job         *models.Job
+	JobTRN      string
+	WorkspaceID string
+	RunID       string
 }
 
 // GetSubject returns the subject identifier for this caller
@@ -70,6 +91,10 @@ func (j *JobCaller) UnauthorizedError(ctx context.Context, hasViewerAccess bool)
 
 // GetNamespacePermissions returns the permissions granted by the job's workspace's role binding if it has one
 func (j *JobCaller) GetNamespacePermissions(ctx context.Context, namespacePath string) ([]*models.Permission, error) {
+	if j.isJobFinished() {
+		return []*models.Permission{}, nil
+	}
+
 	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
 	if err != nil {
 		return nil, err
@@ -106,6 +131,9 @@ func (j *JobCaller) GetNamespacePermissions(ctx context.Context, namespacePath s
 	rolePerms := role.GetPermissions()
 	perms := make([]*models.Permission, 0, len(rolePerms))
 	for _, p := range rolePerms {
+		if !j.jobTypeAllowsBoundRolePermission(p) {
+			continue
+		}
 		permCopy := p
 		perms = append(perms, &permCopy)
 	}
@@ -119,8 +147,50 @@ func (j *JobCaller) GetRootNamespaceMemberships(_ context.Context) ([]models.Mem
 	return []models.MembershipNamespace{}, nil
 }
 
+// isJobFinished reports whether the job has reached a final status.
+func (j *JobCaller) isJobFinished() bool {
+	return j.Job.GetStatus().IsFinal()
+}
+
+// jobTypeAllowsStageScopedPermission reports whether the caller's job type may use perm at all
+// (see jobStageScopedPermissions). It is checked before any handler or bound role.
+func (j *JobCaller) jobTypeAllowsStageScopedPermission(perm models.Permission) bool {
+	jobTypes, ok := jobStageScopedPermissions[perm]
+	return !ok || slices.Contains(jobTypes, j.Job.Type)
+}
+
+// jobTypeAllowsBoundRolePermission reports whether the caller's job type may use perm through the
+// workspace's role binding. Only an apply makes changes, so a plan job gets the bound role's view
+// permissions only, and an OPA job none: otherwise a plan, including a speculative plan for a merge
+// request, could use the bound role to make changes nobody approved.
+func (j *JobCaller) jobTypeAllowsBoundRolePermission(perm models.Permission) bool {
+	switch j.Job.Type {
+	case models.JobApplyType:
+		return true
+	case models.JobPlanType:
+		return perm.Action == models.ViewAction
+	default:
+		return false
+	}
+}
+
 // RequirePermission will return an error if the caller doesn't have the specified permissions
 func (j *JobCaller) RequirePermission(ctx context.Context, perm models.Permission, checks ...func(*constraints)) error {
+	// A finished job may still read itself, which is how the executor learns that its job was force
+	// canceled (it polls the job after a graceful cancel) or was canceled before it started. A bound
+	// role can't widen this.
+	if j.isJobFinished() {
+		if perm == models.ViewJobPermission {
+			return j.requireJobAccess(ctx, &perm, getConstraints(checks...))
+		}
+		return errJobFinished
+	}
+
+	if !j.jobTypeAllowsStageScopedPermission(perm) {
+		// A role binding can't grant this, so don't suggest one.
+		return terrors.New("%s jobs are not allowed the %s permission", j.Job.Type, perm.String(), terrors.WithErrorCode(terrors.EForbidden))
+	}
+
 	// First check non-assignable permissions which take precedence
 	if handlerFunc, ok := j.getCoreJobPermissionHandler(perm); ok {
 		return handlerFunc(ctx, &perm, getConstraints(checks...))
@@ -183,6 +253,10 @@ func (j *JobCaller) viewerAccessDenial(ctx context.Context, c *constraints) erro
 
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
 func (j *JobCaller) RequireAccessToInheritableResource(ctx context.Context, _ types.ModelType, checks ...func(*constraints)) error {
+	if j.isJobFinished() {
+		return errJobFinished
+	}
+
 	c := getConstraints(checks...)
 	if c.groupID != nil {
 		return j.requireAccessToInheritedGroupResource(ctx, *c.groupID)
@@ -343,6 +417,17 @@ func (j *JobCaller) requireAccessToJobWorkspace(ctx context.Context, _ *models.P
 	return errMissingConstraints
 }
 
+// requireStateVersionDataAccess authorizes a job to read state data in its own workspace. When the
+// data belongs to a specific run (a plan, which embeds that run's variable values, sensitive ones
+// included, and its prior state), the run must be the job's own: other runs in the workspace may
+// have been created with different variables.
+func (j *JobCaller) requireStateVersionDataAccess(ctx context.Context, perm *models.Permission, checks *constraints) error {
+	if checks.runID != nil && *checks.runID != j.RunID {
+		return j.UnauthorizedError(ctx, false)
+	}
+	return j.requireAccessToJobWorkspace(ctx, perm, checks)
+}
+
 // requireRunAccess will return an error if the caller doesn't have permission to the run
 func (j *JobCaller) requireRunAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.runID == nil && checks.workspaceID == nil {
@@ -407,7 +492,37 @@ func (j *JobCaller) requireRunWriteAccess(ctx context.Context, _ *models.Permiss
 		return errMissingConstraints
 	}
 
-	if latestJobID == nil || *latestJobID != j.JobID {
+	if latestJobID == nil || *latestJobID != j.Job.Metadata.ID {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	return nil
+}
+
+// requireStateVersionWriteAccess authorizes a job to record its workspace's state. Only an apply
+// writes state, so the caller must be the latest apply job of a non-speculative run, and the state
+// version must belong to that run. The job's type and active status are checked before this runs, in
+// RequirePermission (jobStageScopedPermissions, and rejecting jobs in a final status); a canceling apply
+// must still be able to save the state Terraform wrote before it was interrupted. Checking the
+// workspace alone is not enough: the job
+// token is readable by the Terraform code the job runs, so a plan — including a speculative plan
+// for a merge request — could otherwise replace the workspace's current state.
+func (j *JobCaller) requireStateVersionWriteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
+	if checks.runID == nil {
+		return errMissingConstraints
+	}
+
+	if *checks.runID != j.RunID || (checks.workspaceID != nil && *checks.workspaceID != j.WorkspaceID) {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	run, err := j.dbClient.Runs.GetRunByID(ctx, j.RunID)
+	if err != nil {
+		return err
+	}
+
+	if run == nil || run.WorkspaceID != j.WorkspaceID || run.Speculative() ||
+		run.Apply == nil || run.Apply.LatestJobID == nil || *run.Apply.LatestJobID != j.Job.Metadata.ID {
 		return j.UnauthorizedError(ctx, false)
 	}
 
@@ -420,7 +535,7 @@ func (j *JobCaller) requireJobAccess(ctx context.Context, _ *models.Permission, 
 		return errMissingConstraints
 	}
 
-	if j.JobID == *checks.jobID {
+	if j.Job.Metadata.ID == *checks.jobID {
 		return nil
 	}
 
@@ -509,17 +624,8 @@ func (j *JobCaller) requireProviderMirrorAccess(ctx context.Context, _ *models.P
 		return errMissingConstraints
 	}
 
-	job, err := j.dbClient.Jobs.GetJobByID(ctx, j.JobID)
-	if err != nil {
-		return err
-	}
-
-	if job == nil {
-		return j.UnauthorizedError(ctx, false)
-	}
-
 	// Check if provider mirror is enabled from job properties
-	propValue, ok := job.Properties[models.JobPropertyProviderMirrorEnabled]
+	propValue, ok := j.Job.Properties[models.JobPropertyProviderMirrorEnabled]
 	if !ok {
 		return j.UnauthorizedError(ctx, true)
 	}
@@ -580,6 +686,10 @@ func (j *JobCaller) requireProviderMirrorAccess(ctx context.Context, _ *models.P
 // check. It is never consulted for a permission handled by getCoreJobPermissionHandler; those
 // permissions are not assignable to a role and their handler's result is always final.
 func (j *JobCaller) requireBoundRoleAccess(ctx context.Context, perm *models.Permission, checks *constraints) error {
+	if !j.jobTypeAllowsBoundRolePermission(*perm) {
+		return j.UnauthorizedError(ctx, false)
+	}
+
 	targetPath, err := j.resolveBoundRoleCheckTargetPath(ctx, checks)
 	if err != nil || targetPath == "" {
 		return j.UnauthorizedError(ctx, false)
@@ -692,8 +802,8 @@ func (j *JobCaller) getSupersedableJobPermissionHandler(perm models.Permission) 
 		models.ViewVariablePermission:                  j.requireAccessToJobWorkspace,
 		models.ViewManagedIdentityPermission:           j.requireAccessToJobWorkspace,
 		models.ViewConfigurationVersionPermission:      j.requireAccessToJobWorkspace,
-		models.ViewStateVersionDataPermission:          j.requireAccessToJobWorkspace,
-		models.CreateStateVersionPermission:            j.requireAccessToJobWorkspace,
+		models.ViewStateVersionDataPermission:          j.requireStateVersionDataAccess,
+		models.CreateStateVersionPermission:            j.requireStateVersionWriteAccess,
 		models.ViewSensitiveVariableValuePermission:    j.requireAccessToJobWorkspace,
 		models.ViewRunPermission:                       j.requireRunAccess, // View is automatically granted if action != View.
 		models.ViewJobPermission:                       j.requireJobAccess, // View is automatically granted if action != View.

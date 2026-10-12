@@ -89,7 +89,7 @@ const AssistantMessage: FC<{ showToolCalls?: boolean }> = ({ showToolCalls = tru
                     components={{
                         Text: ({ text }) => text ? (
                             <Box sx={{ my: 0.5, overflowWrap: 'anywhere', '& code': { whiteSpace: 'pre-wrap' } }}>
-                                <Markdown>{text}</Markdown>
+                                <Markdown restrictExternalContent>{text}</Markdown>
                                 <MessagePartPrimitive.InProgress>
                                     <LoadingDots />
                                 </MessagePartPrimitive.InProgress>

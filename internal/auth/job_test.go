@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,7 @@ import (
 )
 
 func TestJobCaller_GetSubject(t *testing.T) {
-	caller := JobCaller{JobTRN: "trn:job:group/workspace/job-id"}
+	caller := JobCaller{Job: &models.Job{Type: models.JobApplyType}, JobTRN: "trn:job:group/workspace/job-id"}
 	assert.Equal(t, "trn:job:group/workspace/job-id", caller.GetSubject())
 }
 
@@ -97,7 +98,7 @@ func TestJobCaller_GetNamespacePermissions(t *testing.T) {
 			mockRoles := db.NewMockRoles(t)
 			mockBindings := db.NewMockWorkspaceRoleBindings(t)
 
-			caller := &JobCaller{WorkspaceID: jobWorkspace.Metadata.ID}
+			caller := &JobCaller{Job: &models.Job{Type: models.JobApplyType}, WorkspaceID: jobWorkspace.Metadata.ID}
 
 			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, jobWorkspace.Metadata.ID).Return(jobWorkspace, nil).Maybe()
 			mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, jobWorkspace.Metadata.ID).
@@ -131,9 +132,51 @@ func TestJobCaller_GetNamespacePermissions(t *testing.T) {
 	}
 }
 
+// TestJobCaller_FinishedJob covers a token whose job has reached a final status: it may still read
+// the job itself, which is how the executor learns of a force cancel (by polling the job), but nothing else.
+func TestJobCaller_FinishedJob(t *testing.T) {
+	job := &models.Job{Metadata: models.ResourceMetadata{ID: "job-1"}, Type: models.JobApplyType}
+	require.NoError(t, job.SetStatus(models.JobCanceled))
+
+	mockWorkspaces := db.NewMockWorkspaces(t)
+	mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "ws-1").Return(&models.Workspace{FullPath: "group/ws"}, nil).Maybe()
+
+	caller := &JobCaller{Job: job, WorkspaceID: "ws-1", RunID: "run-1", dbClient: &db.Client{Workspaces: mockWorkspaces}}
+	ctx := WithCaller(t.Context(), caller)
+
+	t.Run("the job itself can be viewed", func(t *testing.T) {
+		assert.NoError(t, caller.RequirePermission(ctx, models.ViewJobPermission, WithJobID("job-1"), WithWorkspaceID("ws-1")))
+	})
+
+	t.Run("another job cannot be viewed", func(t *testing.T) {
+		// The job caller has no viewer access to other jobs, so the denial doesn't reveal they exist.
+		err := caller.RequirePermission(ctx, models.ViewJobPermission, WithJobID("job-2"), WithWorkspaceID("ws-1"))
+		require.Error(t, err)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+	})
+
+	t.Run("other permissions are denied", func(t *testing.T) {
+		for _, perm := range []models.Permission{models.ViewVariablePermission, models.ViewStateVersionDataPermission, models.UpdateJobPermission} {
+			err := caller.RequirePermission(ctx, perm, WithJobID("job-1"), WithWorkspaceID("ws-1"))
+			assert.Equal(t, errors.EUnauthorized, errors.ErrorCode(err), perm.String())
+		}
+	})
+
+	t.Run("inherited resources are denied", func(t *testing.T) {
+		err := caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, WithNamespacePath("group"))
+		assert.Equal(t, errors.EUnauthorized, errors.ErrorCode(err))
+	})
+
+	t.Run("no namespace permissions are reported", func(t *testing.T) {
+		perms, err := caller.GetNamespacePermissions(ctx, "group")
+		require.NoError(t, err)
+		assert.Empty(t, perms)
+	})
+}
+
 func TestJobCaller_GetRootNamespaceMemberships(t *testing.T) {
 	t.Run("returns a non-nil empty slice regardless of whether the workspace has a binding", func(t *testing.T) {
-		caller := JobCaller{WorkspaceID: "ws1"}
+		caller := JobCaller{Job: &models.Job{Type: models.JobApplyType}, WorkspaceID: "ws1"}
 
 		namespaces, err := caller.GetRootNamespaceMemberships(context.Background())
 		require.NoError(t, err)
@@ -163,10 +206,11 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 	}
 
 	caller := JobCaller{
-		JobID:       "job1",
+		Job:         &models.Job{Metadata: models.ResourceMetadata{ID: "job1"}, Type: models.JobApplyType},
 		WorkspaceID: jobWorkspace.Metadata.ID,
 		RunID:       "run1",
 	}
+	defaultJob := caller.Job
 
 	mockResolver := namespace.NewMockInheritedSettingResolver(t)
 	mockResolver.On("GetOutputVisibility", mock.Anything, mock.Anything).Return(&namespace.OutputVisibilitySetting{
@@ -196,19 +240,6 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			workspace:   &models.Workspace{FullPath: "a/ws-2"},
 			perms:       models.ViewWorkspacePermission,
 			constraints: []func(*constraints){WithWorkspaceID("ws2")},
-		},
-		{
-			name:        "job can view state data because it's for the workspace that contains the job",
-			workspace:   &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}},
-			perms:       models.CreateStateVersionPermission,
-			constraints: []func(*constraints){WithWorkspaceID("ws1")},
-		},
-		{
-			name:            "access denied because job cannot view state data for another workspace",
-			workspace:       &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws2"}, FullPath: "a/ws-2"},
-			perms:           models.CreateStateVersionPermission,
-			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
-			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because workspace is not under same root namespace",
@@ -321,7 +352,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 		{
 			name:        "job is requesting access to itself",
 			perms:       models.UpdateJobPermission,
-			constraints: []func(*constraints){WithJobID(caller.JobID)},
+			constraints: []func(*constraints){WithJobID(caller.Job.Metadata.ID)},
 		},
 		{
 			name:            "access denied because job is requesting access to another job",
@@ -331,13 +362,13 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 		},
 		{
 			name:        "job has permission to write to plan",
-			run:         &models.Run{Plan: models.Plan{ID: "plan1", LatestJobID: &caller.JobID}},
+			run:         &models.Run{Plan: models.Plan{ID: "plan1", LatestJobID: &caller.Job.Metadata.ID}},
 			perms:       models.UpdateRunPermission,
 			constraints: []func(*constraints){WithRunID(caller.RunID), WithPlanID("plan1")},
 		},
 		{
 			name:            "access denied because requested plan ID does not match run plan ID",
-			run:             &models.Run{Plan: models.Plan{ID: "plan1", LatestJobID: &caller.JobID}},
+			run:             &models.Run{Plan: models.Plan{ID: "plan1", LatestJobID: &caller.Job.Metadata.ID}},
 			perms:           models.UpdateRunPermission,
 			constraints:     []func(*constraints){WithRunID(caller.RunID), WithPlanID(invalid)},
 			expectErrorCode: errors.ENotFound,
@@ -372,7 +403,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			name: "job has permission to write to apply",
 			run: &models.Run{
 				Plan:  models.Plan{ID: "plan1"},
-				Apply: &models.Apply{ID: "apply1", LatestJobID: &caller.JobID},
+				Apply: &models.Apply{ID: "apply1", LatestJobID: &caller.Job.Metadata.ID},
 			},
 			perms:       models.UpdateRunPermission,
 			constraints: []func(*constraints){WithRunID(caller.RunID), WithApplyID("apply1")},
@@ -381,7 +412,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			name: "access denied because requested apply ID does not match run apply ID",
 			run: &models.Run{
 				Plan:  models.Plan{ID: "plan1"},
-				Apply: &models.Apply{ID: "apply1", LatestJobID: &caller.JobID},
+				Apply: &models.Apply{ID: "apply1", LatestJobID: &caller.Job.Metadata.ID},
 			},
 			perms:           models.UpdateRunPermission,
 			constraints:     []func(*constraints){WithRunID(caller.RunID), WithApplyID(invalid)},
@@ -417,7 +448,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			name: "job has permission to write to policy check",
 			run: &models.Run{
 				Plan:       models.Plan{ID: "plan1"},
-				TaskStages: []*models.RunTaskStage{{StageName: models.RunTaskStageNamePostPlan, PolicyChecks: []*models.PolicyCheck{{ID: "pc1", LatestJobID: &caller.JobID}}}},
+				TaskStages: []*models.RunTaskStage{{StageName: models.RunTaskStageNamePostPlan, PolicyChecks: []*models.PolicyCheck{{ID: "pc1", LatestJobID: &caller.Job.Metadata.ID}}}},
 			},
 			perms:       models.UpdateRunPermission,
 			constraints: []func(*constraints){WithRunID(caller.RunID), WithPolicyCheckID("pc1")},
@@ -426,7 +457,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			name: "access denied because requested policy check ID is not on the run",
 			run: &models.Run{
 				Plan:       models.Plan{ID: "plan1"},
-				TaskStages: []*models.RunTaskStage{{StageName: models.RunTaskStageNamePostPlan, PolicyChecks: []*models.PolicyCheck{{ID: "pc1", LatestJobID: &caller.JobID}}}},
+				TaskStages: []*models.RunTaskStage{{StageName: models.RunTaskStageNamePostPlan, PolicyChecks: []*models.PolicyCheck{{ID: "pc1", LatestJobID: &caller.Job.Metadata.ID}}}},
 			},
 			perms:           models.UpdateRunPermission,
 			constraints:     []func(*constraints){WithRunID(caller.RunID), WithPolicyCheckID(invalid)},
@@ -500,7 +531,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			perms:       models.CreateTerraformProviderMirrorPermission,
 			constraints: []func(*constraints){WithNamespacePath("a")},
 			job: &models.Job{
-				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Metadata:   models.ResourceMetadata{ID: caller.Job.Metadata.ID},
 				Properties: map[string]string{"providerMirrorEnabled": "true"},
 			},
 		},
@@ -509,7 +540,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			perms:       models.CreateTerraformProviderMirrorPermission,
 			constraints: []func(*constraints){WithGroupID("group-ID")},
 			job: &models.Job{
-				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Metadata:   models.ResourceMetadata{ID: caller.Job.Metadata.ID},
 				Properties: map[string]string{"providerMirrorEnabled": "true"},
 			},
 		},
@@ -518,7 +549,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			perms:       models.CreateTerraformProviderMirrorPermission,
 			constraints: []func(*constraints){WithNamespacePath("a")},
 			job: &models.Job{
-				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Metadata:   models.ResourceMetadata{ID: caller.Job.Metadata.ID},
 				Properties: map[string]string{"providerMirrorEnabled": "false"},
 			},
 			expectErrorCode: errors.EForbidden,
@@ -528,7 +559,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			perms:       models.CreateTerraformProviderMirrorPermission,
 			constraints: []func(*constraints){WithNamespacePath("a")},
 			job: &models.Job{
-				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Metadata:   models.ResourceMetadata{ID: caller.Job.Metadata.ID},
 				Properties: map[string]string{},
 			},
 			expectErrorCode: errors.EForbidden,
@@ -538,7 +569,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			perms:       models.CreateTerraformProviderMirrorPermission,
 			constraints: []func(*constraints){WithNamespacePath("b")},
 			job: &models.Job{
-				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Metadata:   models.ResourceMetadata{ID: caller.Job.Metadata.ID},
 				Properties: map[string]string{"providerMirrorEnabled": "true"},
 			},
 			expectErrorCode: errors.ENotFound,
@@ -548,7 +579,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			perms:       models.CreateTerraformProviderMirrorPermission,
 			constraints: []func(*constraints){WithGroupID("other-group-ID")},
 			job: &models.Job{
-				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Metadata:   models.ResourceMetadata{ID: caller.Job.Metadata.ID},
 				Properties: map[string]string{"providerMirrorEnabled": "true"},
 			},
 			expectErrorCode: errors.ENotFound,
@@ -558,7 +589,6 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			mockRuns := db.NewMockRuns(t)
-			mockJobs := db.NewMockJobs(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
 			mockGroups := db.NewMockGroups(t)
 
@@ -566,7 +596,14 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 
 			mockRuns.On("GetRunByID", mock.Anything, caller.RunID).Return(test.run, nil).Maybe()
 
-			mockJobs.On("GetJobByID", mock.Anything, caller.JobID).Return(test.job, nil).Maybe()
+			// The caller carries the job loaded at authentication; a test that needs particular job
+			// properties supplies its own.
+			caller.Job = defaultJob
+			if test.job != nil {
+				job := *test.job
+				job.Type = defaultJob.Type
+				caller.Job = &job
+			}
 
 			if constraints.workspaceID != nil {
 				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, *constraints.workspaceID).Return(test.workspace, nil).Maybe()
@@ -584,7 +621,6 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 
 			caller.dbClient = &db.Client{
 				Runs:                  mockRuns,
-				Jobs:                  mockJobs,
 				Workspaces:            mockWorkspaces,
 				Groups:                mockGroups,
 				WorkspaceRoleBindings: mockBindings,
@@ -604,7 +640,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 func TestJobCaller_RequireInheritedPermissions(t *testing.T) {
 	invalid := "invalid"
 
-	caller := JobCaller{WorkspaceID: "ws1"}
+	caller := JobCaller{Job: &models.Job{Type: models.JobApplyType}, WorkspaceID: "ws1"}
 	ctx := WithCaller(context.Background(), &caller)
 
 	testCases := []struct {
@@ -702,6 +738,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		mockResolver := namespace.NewMockInheritedSettingResolver(t)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -729,6 +766,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -757,6 +795,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -784,6 +823,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -812,6 +852,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -846,6 +887,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -880,6 +922,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -908,6 +951,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -935,6 +979,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -962,6 +1007,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -986,6 +1032,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		mockResolver := namespace.NewMockInheritedSettingResolver(t)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -1011,6 +1058,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		mockResolver := namespace.NewMockInheritedSettingResolver(t)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -1043,6 +1091,7 @@ func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -1079,6 +1128,7 @@ func TestJobCaller_OutputVisibilityAccess_NamespacePaths(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -1106,6 +1156,7 @@ func TestJobCaller_OutputVisibilityAccess_NamespacePaths(t *testing.T) {
 		}, nil)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -1127,6 +1178,7 @@ func TestJobCaller_OutputVisibilityAccess_NamespacePaths(t *testing.T) {
 		mockResolver := namespace.NewMockInheritedSettingResolver(t)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -1152,6 +1204,7 @@ func TestJobCaller_OutputVisibilityAccess_NamespacePaths(t *testing.T) {
 		mockResolver := namespace.NewMockInheritedSettingResolver(t)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -1170,6 +1223,7 @@ func TestJobCaller_OutputVisibilityAccess_NamespacePaths(t *testing.T) {
 		mockResolver := namespace.NewMockInheritedSettingResolver(t)
 
 		caller := &JobCaller{
+			Job:                      &models.Job{Type: models.JobApplyType},
 			WorkspaceID:              "requesting-ws",
 			dbClient:                 &db.Client{Workspaces: mockWorkspaces},
 			inheritedSettingResolver: mockResolver,
@@ -1281,7 +1335,7 @@ func TestJobCaller_RequirePermission_BoundRoleFallthrough(t *testing.T) {
 			mockRoles := db.NewMockRoles(t)
 			mockBindings := db.NewMockWorkspaceRoleBindings(t)
 
-			caller := &JobCaller{WorkspaceID: jobWorkspace.Metadata.ID}
+			caller := &JobCaller{Job: &models.Job{Type: models.JobApplyType}, WorkspaceID: jobWorkspace.Metadata.ID}
 			ctx := WithCaller(context.Background(), caller)
 
 			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, jobWorkspace.Metadata.ID).Return(jobWorkspace, nil).Maybe()
@@ -1397,6 +1451,7 @@ func TestJobCaller_RequirePermission_BoundRoleSupersedesOutputVisibility(t *test
 			mockResolver := namespace.NewMockInheritedSettingResolver(t)
 
 			caller := &JobCaller{
+				Job:                      &models.Job{Type: models.JobApplyType},
 				WorkspaceID:              requestingWorkspace.Metadata.ID,
 				inheritedSettingResolver: mockResolver,
 			}
@@ -1445,7 +1500,7 @@ func TestJobCaller_RequirePermission_CoreJobPermissionsNeverFallThrough(t *testi
 	deployerPerms, ok := models.DeployerRoleID.Permissions()
 	require.True(t, ok)
 
-	caller := &JobCaller{JobID: "job-1", WorkspaceID: "ws1"}
+	caller := &JobCaller{Job: &models.Job{Metadata: models.ResourceMetadata{ID: "job-1"}, Type: models.JobApplyType}, WorkspaceID: "ws1"}
 	ctx := WithCaller(context.Background(), caller)
 
 	mockWorkspaces := db.NewMockWorkspaces(t)
@@ -1569,6 +1624,7 @@ func TestJobCaller_ResolveBoundRoleCheckTargetPath(t *testing.T) {
 			test.setupMocks(mockWorkspaces, mockGroups)
 
 			caller := &JobCaller{
+				Job:      &models.Job{Type: models.JobApplyType},
 				dbClient: &db.Client{Workspaces: mockWorkspaces, Groups: mockGroups},
 			}
 
@@ -1646,6 +1702,7 @@ func TestJobCaller_RequireBoundRoleAccess_DBErrors(t *testing.T) {
 			test.setupMocks(mockWorkspaces, mockGroups, mockBindings, mockRoles)
 
 			caller := &JobCaller{
+				Job:         &models.Job{Type: models.JobApplyType},
 				WorkspaceID: ws.Metadata.ID,
 				dbClient: &db.Client{
 					Workspaces:            mockWorkspaces,
@@ -1820,6 +1877,7 @@ func TestJobCaller_ViewerAccessDenial(t *testing.T) {
 			test.setupMocks(mockWorkspaces, mockGroups)
 
 			caller := &JobCaller{
+				Job:         &models.Job{Type: models.JobApplyType},
 				WorkspaceID: jobWorkspace.Metadata.ID,
 				dbClient:    &db.Client{Workspaces: mockWorkspaces, Groups: mockGroups},
 			}
@@ -1833,3 +1891,349 @@ func TestJobCaller_ViewerAccessDenial(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+func TestJobCaller_RequireStateVersionWriteAccess(t *testing.T) {
+	caller := JobCaller{
+		Job:         &models.Job{Metadata: models.ResourceMetadata{ID: "job1"}, Type: models.JobApplyType},
+		WorkspaceID: "ws1",
+		RunID:       "run1",
+	}
+
+	applyRun := func(latestApplyJobID string) *models.Run {
+		return &models.Run{
+			Metadata:    models.ResourceMetadata{ID: caller.RunID},
+			WorkspaceID: caller.WorkspaceID,
+			Apply:       &models.Apply{LatestJobID: ptr.String(latestApplyJobID)},
+		}
+	}
+
+	testCases := []struct {
+		name            string
+		constraints     []func(*constraints)
+		run             *models.Run
+		expectErrorCode errors.CodeType
+		expectMissing   bool
+	}{
+		{
+			name:        "running apply job writes state for its own run",
+			constraints: []func(*constraints){WithWorkspaceID("ws1"), WithRunID("run1")},
+			run:         applyRun("job1"),
+		},
+		{
+			// A state version with no run (a manual upload) is never a job's to write.
+			name:          "no run constraint",
+			constraints:   []func(*constraints){WithWorkspaceID("ws1")},
+			expectMissing: true,
+		},
+		{
+			name:            "state version for another run",
+			constraints:     []func(*constraints){WithWorkspaceID("ws1"), WithRunID("run2")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "state version for another workspace",
+			constraints:     []func(*constraints){WithWorkspaceID("ws2"), WithRunID("run1")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			// A speculative run has no apply: its plan job must not be able to replace state.
+			name:            "speculative run",
+			constraints:     []func(*constraints){WithWorkspaceID("ws1"), WithRunID("run1")},
+			run:             &models.Run{Metadata: models.ResourceMetadata{ID: "run1"}, WorkspaceID: "ws1"},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			// The run's plan job holds a token for the same run, but it is not the apply's job.
+			name:            "plan job of an apply run",
+			constraints:     []func(*constraints){WithWorkspaceID("ws1"), WithRunID("run1")},
+			run:             applyRun("apply-job"),
+			expectErrorCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockRuns := db.NewMockRuns(t)
+			mockRuns.On("GetRunByID", mock.Anything, caller.RunID).Return(test.run, nil).Maybe()
+
+			// Denials look up the job's workspace to name it in the error.
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, caller.WorkspaceID).
+				Return(&models.Workspace{FullPath: "a/ws1"}, nil).Maybe()
+
+			c := caller
+			c.dbClient = &db.Client{Runs: mockRuns, Workspaces: mockWorkspaces}
+
+			err := c.requireStateVersionWriteAccess(context.Background(), nil, getConstraints(test.constraints...))
+			switch {
+			case test.expectMissing:
+				assert.ErrorIs(t, err, errMissingConstraints)
+			case test.expectErrorCode != "":
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			default:
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestJobCaller_StateVersionDataAccess covers ViewStateVersionData for a job through RequirePermission.
+// A plan download passes the run ID, which limits every job type, OPA included, to its own run's
+// plan; a state download passes only the workspace.
+func TestJobCaller_StateVersionDataAccess(t *testing.T) {
+	testCases := []struct {
+		name            string
+		jobType         models.JobType
+		constraints     []func(*constraints)
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:        "OPA job reads its own run's plan",
+			jobType:     models.JobOPAType,
+			constraints: []func(*constraints){WithWorkspaceID("ws1"), WithRunID("run1")},
+		},
+		{
+			name:        "plan job reads its own run's plan",
+			jobType:     models.JobPlanType,
+			constraints: []func(*constraints){WithWorkspaceID("ws1"), WithRunID("run1")},
+		},
+		{
+			name:        "apply job reads its own run's plan",
+			jobType:     models.JobApplyType,
+			constraints: []func(*constraints){WithWorkspaceID("ws1"), WithRunID("run1")},
+		},
+		{
+			name:            "OPA job reads another run's plan in the same workspace",
+			jobType:         models.JobOPAType,
+			constraints:     []func(*constraints){WithWorkspaceID("ws1"), WithRunID("run2")},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "plan job reads another run's plan in the same workspace",
+			jobType:         models.JobPlanType,
+			constraints:     []func(*constraints){WithWorkspaceID("ws1"), WithRunID("run2")},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "apply job reads another run's plan in the same workspace",
+			jobType:         models.JobApplyType,
+			constraints:     []func(*constraints){WithWorkspaceID("ws1"), WithRunID("run2")},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "job reads a plan in another workspace",
+			jobType:         models.JobOPAType,
+			constraints:     []func(*constraints){WithWorkspaceID("ws2"), WithRunID("run2")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			// State downloads carry no run ID and stay workspace-scoped.
+			name:        "job reads its own workspace's state",
+			jobType:     models.JobOPAType,
+			constraints: []func(*constraints){WithWorkspaceID("ws1")},
+		},
+		{
+			name:            "job reads another workspace's state",
+			jobType:         models.JobApplyType,
+			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
+			expectErrorCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "ws1").
+				Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}, FullPath: "root/ws1"}, nil).Maybe()
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "ws2").
+				Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws2"}, FullPath: "root/ws2"}, nil).Maybe()
+
+			// No role is bound to the workspace, so a denial is final.
+			mockBindings := db.NewMockWorkspaceRoleBindings(t)
+			mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, "ws1").Return(nil, nil).Maybe()
+
+			caller := &JobCaller{
+				Job:         &models.Job{Metadata: models.ResourceMetadata{ID: "job1"}, Type: test.jobType},
+				WorkspaceID: "ws1",
+				RunID:       "run1",
+				dbClient:    &db.Client{Workspaces: mockWorkspaces, WorkspaceRoleBindings: mockBindings},
+			}
+
+			err := caller.RequirePermission(context.Background(), models.ViewStateVersionDataPermission, test.constraints...)
+			if test.expectErrorCode != "" {
+				require.Error(t, err)
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestJobCaller_JobTypeAllowsStageScopedPermission(t *testing.T) {
+	// Permissions only jobs that run Terraform need, and the one only an apply needs.
+	terraformOnly := []models.Permission{
+		models.IssueFederatedRegistryTokenPermission,
+		models.ViewConfigurationVersionPermission,
+		models.ViewManagedIdentityPermission,
+		models.CreateTerraformProviderMirrorPermission,
+		models.ViewSensitiveVariableValuePermission,
+	}
+	// Permissions every job type needs, e.g. an OPA job reads the run's plan JSON and state.
+	allTypes := []models.Permission{
+		models.UpdateJobPermission,
+		models.ViewJobPermission,
+		models.UpdateRunPermission,
+		models.ViewRunPermission,
+		models.ViewVariablePermission,
+		models.ViewStateVersionPermission,
+		models.ViewStateVersionDataPermission,
+	}
+
+	for _, jobType := range []models.JobType{models.JobPlanType, models.JobApplyType, models.JobOPAType, ""} {
+		caller := &JobCaller{Job: &models.Job{Type: jobType}}
+		runsTerraform := jobType == models.JobPlanType || jobType == models.JobApplyType
+
+		t.Run(string(jobType), func(t *testing.T) {
+			for _, perm := range terraformOnly {
+				assert.Equal(t, runsTerraform, caller.jobTypeAllowsStageScopedPermission(perm), perm.String())
+			}
+			for _, perm := range allTypes {
+				assert.True(t, caller.jobTypeAllowsStageScopedPermission(perm), perm.String())
+			}
+			assert.Equal(t, jobType == models.JobApplyType,
+				caller.jobTypeAllowsStageScopedPermission(models.CreateStateVersionPermission))
+		})
+	}
+}
+
+func TestJobCaller_JobTypeAllowsBoundRolePermission(t *testing.T) {
+	tests := []struct {
+		jobType     models.JobType
+		allowView   bool
+		allowChange bool
+	}{
+		{jobType: models.JobApplyType, allowView: true, allowChange: true},
+		{jobType: models.JobPlanType, allowView: true, allowChange: false},
+		{jobType: models.JobOPAType, allowView: false, allowChange: false},
+		{jobType: "", allowView: false, allowChange: false},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.jobType), func(t *testing.T) {
+			caller := &JobCaller{Job: &models.Job{Type: test.jobType}}
+			assert.Equal(t, test.allowView, caller.jobTypeAllowsBoundRolePermission(models.ViewWorkspacePermission))
+			assert.Equal(t, test.allowChange, caller.jobTypeAllowsBoundRolePermission(models.UpdateWorkspacePermission))
+			assert.Equal(t, test.allowChange, caller.jobTypeAllowsBoundRolePermission(models.CreateStateVersionPermission))
+		})
+	}
+}
+
+func TestJobCaller_RequirePermission_JobTypeGating(t *testing.T) {
+	jobWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{ID: "ws1"},
+		FullPath: "root/parent/ws1",
+	}
+
+	newCaller := func(t *testing.T, jobType models.JobType) *JobCaller {
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, jobWorkspace.Metadata.ID).Return(jobWorkspace, nil).Maybe()
+
+		// A Deployer binding would grant every permission below, so each denial proves the job type,
+		// not the role, decided.
+		deployerPerms, ok := models.DeployerRoleID.Permissions()
+		require.True(t, ok)
+		role := &models.Role{}
+		role.SetPermissions(deployerPerms)
+		mockBindings := db.NewMockWorkspaceRoleBindings(t)
+		mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, jobWorkspace.Metadata.ID).
+			Return(&models.WorkspaceRoleBinding{RoleID: "role-1"}, nil).Maybe()
+		mockRoles := db.NewMockRoles(t)
+		mockRoles.On("GetRoleByID", mock.Anything, "role-1").Return(role, nil).Maybe()
+
+		return &JobCaller{
+			Job:         &models.Job{Metadata: models.ResourceMetadata{ID: "job1"}, Type: jobType},
+			RunID:       "run1",
+			WorkspaceID: jobWorkspace.Metadata.ID,
+			dbClient: &db.Client{
+				Workspaces:            mockWorkspaces,
+				WorkspaceRoleBindings: mockBindings,
+				Roles:                 mockRoles,
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		jobType     models.JobType
+		perm        models.Permission
+		expectAllow bool
+	}{
+		{name: "OPA job cannot view managed identities", jobType: models.JobOPAType, perm: models.ViewManagedIdentityPermission},
+		{name: "plan job can view managed identities", jobType: models.JobPlanType, perm: models.ViewManagedIdentityPermission, expectAllow: true},
+		{name: "OPA job cannot view sensitive variable values", jobType: models.JobOPAType, perm: models.ViewSensitiveVariableValuePermission},
+		{name: "OPA job can view variables", jobType: models.JobOPAType, perm: models.ViewVariablePermission, expectAllow: true},
+		{name: "plan job can view sensitive variable values", jobType: models.JobPlanType, perm: models.ViewSensitiveVariableValuePermission, expectAllow: true},
+		{name: "plan job cannot create a state version even with a bound role", jobType: models.JobPlanType, perm: models.CreateStateVersionPermission},
+		{name: "plan job cannot use a bound role to make changes", jobType: models.JobPlanType, perm: models.UpdateWorkspacePermission},
+		{name: "apply job can use a bound role to make changes", jobType: models.JobApplyType, perm: models.UpdateWorkspacePermission, expectAllow: true},
+		{name: "OPA job cannot use a bound role at all", jobType: models.JobOPAType, perm: models.ViewGroupPermission},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			caller := newCaller(t, test.jobType)
+			err := caller.RequirePermission(context.Background(), test.perm, WithWorkspaceID(jobWorkspace.Metadata.ID))
+			if test.expectAllow {
+				assert.NoError(t, err)
+				return
+			}
+			assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
+			if _, scoped := jobStageScopedPermissions[test.perm]; scoped {
+				// A role binding can't grant a permission the job type is denied, so it isn't suggested.
+				assert.NotContains(t, err.Error(), "role binding")
+			}
+		})
+	}
+}
+
+func TestJobCaller_GetNamespacePermissions_FiltersBoundRoleByJobType(t *testing.T) {
+	jobWorkspace := &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}, FullPath: "root/parent/ws1"}
+	rolePerms := []models.Permission{models.ViewWorkspacePermission, models.UpdateWorkspacePermission}
+
+	tests := []struct {
+		jobType     models.JobType
+		expectPerms []models.Permission
+	}{
+		{jobType: models.JobApplyType, expectPerms: rolePerms},
+		{jobType: models.JobPlanType, expectPerms: []models.Permission{models.ViewWorkspacePermission}},
+		{jobType: models.JobOPAType, expectPerms: nil},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.jobType), func(t *testing.T) {
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "ws1").Return(jobWorkspace, nil)
+			mockBindings := db.NewMockWorkspaceRoleBindings(t)
+			mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, "ws1").
+				Return(&models.WorkspaceRoleBinding{RoleID: "role-1"}, nil)
+			role := &models.Role{}
+			role.SetPermissions(rolePerms)
+			mockRoles := db.NewMockRoles(t)
+			mockRoles.On("GetRoleByID", mock.Anything, "role-1").Return(role, nil)
+
+			caller := &JobCaller{
+				Job:         &models.Job{Type: test.jobType},
+				WorkspaceID: "ws1",
+				dbClient:    &db.Client{Workspaces: mockWorkspaces, WorkspaceRoleBindings: mockBindings, Roles: mockRoles},
+			}
+
+			perms, err := caller.GetNamespacePermissions(context.Background(), "root/parent")
+			require.NoError(t, err)
+			require.Len(t, perms, len(test.expectPerms))
+			for i, p := range test.expectPerms {
+				assert.Equal(t, p, *perms[i])
+			}
+		})
+	}
+}

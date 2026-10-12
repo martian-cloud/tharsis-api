@@ -593,6 +593,49 @@ func TestGroups_GetGroupByTRN(t *testing.T) {
 	}
 }
 
+// TestGroups_MigrateGroup_LiteralPrefix checks that migrating a group re-paths only its own subtree.
+// '_' is valid in a group name but is a LIKE wildcard, so an unescaped "a_b/%" also matches paths
+// under "axb"; and an unanchored regex replace of "a_b" would then rewrite a later "a_b" in such a
+// path, corrupting another group's namespace.
+func TestGroups_MigrateGroup_LiteralPrefix(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	groups := map[string]*models.Group{}
+	for _, fullPath := range []string{"a_b", "a_b/x", "axb", "axb/a_b-x", "dest"} {
+		name := fullPath
+		var parentID string
+		if i := strings.LastIndex(fullPath, "/"); i >= 0 {
+			name = fullPath[i+1:]
+			parentID = groups[fullPath[:i]].Metadata.ID
+		}
+
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Name:      name,
+			ParentID:  parentID,
+			FullPath:  fullPath,
+			CreatedBy: "db-integration-tests",
+		})
+		require.NoError(t, err)
+		groups[fullPath] = group
+	}
+
+	migrated, err := testClient.client.Groups.MigrateGroup(ctx, groups["a_b"], groups["dest"])
+	require.NoError(t, err)
+	assert.Equal(t, "dest/a_b", migrated.FullPath)
+
+	child, err := testClient.client.Groups.GetGroupByID(ctx, groups["a_b/x"].Metadata.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "dest/a_b/x", child.FullPath)
+
+	// Matched by the unescaped LIKE, but not under the migrated group: it must be left untouched.
+	unrelated, err := testClient.client.Groups.GetGroupByID(ctx, groups["axb/a_b-x"].Metadata.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "axb/a_b-x", unrelated.FullPath)
+	assert.Equal(t, groups["axb/a_b-x"].Metadata.Version, unrelated.Metadata.Version)
+}
+
 // TestGroups_MigrateGroup re-parents a group and checks the cleanup of the assignments the move puts
 // out of scope: policy approvers, managed identities, runner service accounts, service account
 // namespace memberships and workspace VCS provider links. The fixture is built and migrated once,

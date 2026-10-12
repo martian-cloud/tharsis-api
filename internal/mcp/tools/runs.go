@@ -46,6 +46,7 @@ type plan struct {
 	Summary      planSummary       `json:"summary" jsonschema:"Counts of the resource and output changes the plan computed"`
 	DiffSize     int               `json:"diff_size,omitempty" jsonschema:"Size in bytes of the stored plan diff"`
 	HasChanges   bool              `json:"has_changes" jsonschema:"True if the plan detected any resource or output changes"`
+	LatestJobID  *string           `json:"latest_job_id,omitempty" jsonschema:"ID of the most recent plan job; pass it to get_job or get_job_logs (null if no job has been created yet)"`
 }
 
 // planSummary breaks down the resource and output changes a plan computed.
@@ -67,6 +68,7 @@ type apply struct {
 	TriggeredBy  string             `json:"triggered_by,omitempty" jsonschema:"Email of the user or service account that triggered the apply"`
 	Comment      string             `json:"comment,omitempty" jsonschema:"Optional comment provided when the apply was triggered"`
 	ErrorMessage *string            `json:"error_message,omitempty" jsonschema:"Error message if the apply failed (null otherwise)"`
+	LatestJobID  *string            `json:"latest_job_id,omitempty" jsonschema:"ID of the most recent apply job; pass it to get_job or get_job_logs (null if no job has been created yet)"`
 }
 
 // getRunInput defines the parameters for retrieving a run.
@@ -142,8 +144,9 @@ func GetRun(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getRunInput, getRunOu
 				OutputChanges:        r.Plan.Summary.OutputChanges,
 				OutputDestructions:   r.Plan.Summary.OutputDestructions,
 			},
-			DiffSize:   r.Plan.DiffSize,
-			HasChanges: r.Plan.HasChanges,
+			DiffSize:    r.Plan.DiffSize,
+			HasChanges:  r.Plan.HasChanges,
+			LatestJobID: jobGlobalID(r.Plan.LatestJobID),
 		}
 
 		if applyNode := r.Apply; applyNode != nil {
@@ -153,6 +156,7 @@ func GetRun(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getRunInput, getRunOu
 				TriggeredBy:  applyNode.TriggeredBy,
 				Comment:      applyNode.Comment,
 				ErrorMessage: applyNode.ErrorMessage,
+				LatestJobID:  jobGlobalID(applyNode.LatestJobID),
 			}
 		}
 
@@ -160,4 +164,13 @@ func GetRun(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getRunInput, getRunOu
 	}
 
 	return tool, handler
+}
+
+// jobGlobalID returns the global ID of a job, or nil if jobID is nil.
+func jobGlobalID(jobID *string) *string {
+	if jobID == nil {
+		return nil
+	}
+	jobGID := gid.ToGlobalID(types.JobModelType, *jobID)
+	return &jobGID
 }

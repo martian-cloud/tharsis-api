@@ -80,7 +80,7 @@ func TestGetOpenIDConfig(t *testing.T) {
 			issuer = s.URL
 
 			logger, _ := logger.NewForTest()
-			resp, err := NewOpenIDConfigFetcher(logger).GetOpenIDConfig(ctx, issuer)
+			resp, err := NewOpenIDConfigFetcher(logger, &http.Client{}).GetOpenIDConfig(ctx, issuer)
 			if err != nil {
 				assert.True(t, test.expectErr)
 				return
@@ -289,6 +289,8 @@ func TestOIDCTokenVerifier_VerifyToken(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			mockFetcher := NewMockOpenIDConfigFetcher(t)
+			// The keys are served by a local test server, so the policy-restricted client is not used here.
+			mockFetcher.On("HTTPClient").Return(&http.Client{}).Maybe()
 
 			if test.setupMocks != nil {
 				test.setupMocks(mockFetcher)
@@ -364,6 +366,8 @@ func TestOIDCTokenVerifier_loadOIDCConfig(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			mockFetcher := NewMockOpenIDConfigFetcher(t)
+			// The keys are served by a local test server, so the policy-restricted client is not used here.
+			mockFetcher.On("HTTPClient").Return(&http.Client{}).Maybe()
 
 			if test.setupMocks != nil {
 				test.setupMocks(mockFetcher)
@@ -433,6 +437,8 @@ func TestOIDCTokenVerifier_getOIDCConfigFromCache(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			mockFetcher := NewMockOpenIDConfigFetcher(t)
+			// The keys are served by a local test server, so the policy-restricted client is not used here.
+			mockFetcher.On("HTTPClient").Return(&http.Client{}).Maybe()
 
 			// Create the token verifier
 			verifier := NewOIDCTokenVerifier(ctx, []string{test.issuer}, mockFetcher, false)
@@ -518,6 +524,8 @@ func TestOIDCTokenVerifier_getKeySet(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			mockFetcher := NewMockOpenIDConfigFetcher(t)
+			// The keys are served by a local test server, so the policy-restricted client is not used here.
+			mockFetcher.On("HTTPClient").Return(&http.Client{}).Maybe()
 
 			var jwksServer *httptest.Server
 			if test.setupMocks != nil {
@@ -542,4 +550,12 @@ func TestOIDCTokenVerifier_getKeySet(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newTestOIDCConfigFetcher returns a mock fetcher that only stubs HTTPClient, which the token
+// verifier reads at construction. Use it where a test builds a verifier but never fetches config.
+func newTestOIDCConfigFetcher(t *testing.T) *MockOpenIDConfigFetcher {
+	fetcher := NewMockOpenIDConfigFetcher(t)
+	fetcher.On("HTTPClient").Return(&http.Client{}).Maybe()
+	return fetcher
 }

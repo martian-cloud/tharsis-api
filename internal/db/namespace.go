@@ -173,11 +173,16 @@ func migrateNamespaces(ctx context.Context, conn connection, oldPath, newPath st
 			goqu.Record{
 				"version":    goqu.L("? + ?", goqu.C("version"), 1),
 				"updated_at": timestamp,
-				"path":       goqu.L("REGEXP_REPLACE(?, ?, ?)", goqu.C("path"), oldPath, newPath),
+				// Swap the old prefix for the new one literally. A regex replace would treat oldPath
+				// as a pattern ('.' and similar match any character) and match it anywhere in the
+				// path, not just at the start.
+				"path": goqu.L("?::text || SUBSTRING(? FROM CHAR_LENGTH(?::text) + 1)", newPath, goqu.C("path"), oldPath),
 			},
 		).Where(goqu.Or(
 		goqu.I("path").Eq(oldPath),
-		goqu.I("path").Like(oldPath+"/%"),
+		// Escaped because '_' and '%' are LIKE wildcards and '_' is valid in a namespace name, so an
+		// unescaped "a_b/%" would also match paths under "axb".
+		goqu.I("path").Like(escapeLikePattern(oldPath)+"/%"),
 	)).Returning(namespaceFieldList...))
 
 	if err != nil {

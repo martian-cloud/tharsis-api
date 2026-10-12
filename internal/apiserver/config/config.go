@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -54,6 +55,17 @@ type IdpConfig struct {
 	ClientID      string `yaml:"client_id"`
 	UsernameClaim string `yaml:"username_claim"`
 	Scope         string `yaml:"scope"`
+	// ExternalIDClaim is the token claim that identifies a user, and must match the externalId the IDP sends
+	// over SCIM. Defaults to "sub". Use "oid" for Microsoft Entra, whose "sub" is pairwise per application.
+	ExternalIDClaim string `yaml:"external_id_claim"`
+	// EmailLinking allows a first sign-in to be linked to an existing user with the same email, provided that
+	// user has no external identity yet (e.g. a user created before SSO was enabled). The email is only asserted
+	// by the IDP, so this is off by default.
+	EmailLinking bool `yaml:"email_linking"`
+	// AllowAdminBootstrap lets this IDP create the bootstrap admin: a user created on first sign-in through it
+	// whose email matches THARSIS_ADMIN_USER_EMAIL is made an admin. The email is only asserted by the IDP, so
+	// this is off by default and should be enabled only for an IDP that controls the emails it asserts.
+	AllowAdminBootstrap bool `yaml:"allow_admin_bootstrap"`
 }
 
 // RunnerConfig contains the config fields for a system runner
@@ -469,10 +481,32 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 			clientIDKey := envOidcProviderConfigPrefix + index + "_CLIENT_ID"
 			usernameClaimKey := envOidcProviderConfigPrefix + index + "_USERNAME_CLAIM"
 			scopeKey := envOidcProviderConfigPrefix + index + "_SCOPE"
+			externalIDClaimKey := envOidcProviderConfigPrefix + index + "_EXTERNAL_ID_CLAIM"
+			emailLinkingKey := envOidcProviderConfigPrefix + index + "_EMAIL_LINKING"
+			allowAdminBootstrapKey := envOidcProviderConfigPrefix + index + "_ALLOW_ADMIN_BOOTSTRAP"
 
 			clientID := os.Getenv(clientIDKey)
 			usernameClaim := os.Getenv(usernameClaimKey)
 			scope := os.Getenv(scopeKey)
+			externalIDClaim := os.Getenv(externalIDClaimKey)
+
+			emailLinking := false
+			if v := os.Getenv(emailLinkingKey); v != "" {
+				parsed, err := strconv.ParseBool(v)
+				if err != nil {
+					return nil, fmt.Errorf("invalid value for %s: %w", emailLinkingKey, err)
+				}
+				emailLinking = parsed
+			}
+
+			allowAdminBootstrap := false
+			if v := os.Getenv(allowAdminBootstrapKey); v != "" {
+				parsed, err := strconv.ParseBool(v)
+				if err != nil {
+					return nil, fmt.Errorf("invalid value for %s: %w", allowAdminBootstrapKey, err)
+				}
+				allowAdminBootstrap = parsed
+			}
 
 			if clientID == "" {
 				return nil, errors.New(clientIDKey + " environment variable is required")
@@ -483,10 +517,13 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 			}
 
 			idpConfigs = append(idpConfigs, IdpConfig{
-				IssuerURL:     issuerURL,
-				ClientID:      clientID,
-				UsernameClaim: usernameClaim,
-				Scope:         scope,
+				IssuerURL:           issuerURL,
+				ClientID:            clientID,
+				UsernameClaim:       usernameClaim,
+				Scope:               scope,
+				ExternalIDClaim:     externalIDClaim,
+				EmailLinking:        emailLinking,
+				AllowAdminBootstrap: allowAdminBootstrap,
 			})
 		}
 	}

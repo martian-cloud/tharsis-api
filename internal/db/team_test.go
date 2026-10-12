@@ -183,16 +183,35 @@ func TestTeams_GetTeamBySCIMExternalID(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
+	issuer := "https://idp.example.com"
 	externalID := uuid.New().String()
 	_, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
-		Name:           "test-team",
-		SCIMExternalID: externalID,
+		Name:             "test-team",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: issuer,
 	})
 	require.NoError(t, err)
+
+	// The same external ID is allowed for a team of another IDP.
+	_, err = testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:             "other-idp-team",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: "https://other-idp.example.com",
+	})
+	require.NoError(t, err)
+
+	// But not twice for the same IDP.
+	_, err = testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:             "duplicate-team",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: issuer,
+	})
+	assert.Equal(t, errors.EConflict, errors.ErrorCode(err))
 
 	type testCase struct {
 		expectErrorCode errors.CodeType
 		name            string
+		issuer          string
 		searchID        string
 		expectTeam      bool
 	}
@@ -200,15 +219,23 @@ func TestTeams_GetTeamBySCIMExternalID(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:       "get team by SCIM external ID",
+			issuer:     issuer,
 			searchID:   externalID,
 			expectTeam: true,
 		},
 		{
+			name:     "team managed by another IDP is not found",
+			issuer:   "https://unknown-idp.example.com",
+			searchID: externalID,
+		},
+		{
 			name:     "resource with ID not found",
+			issuer:   issuer,
 			searchID: nonExistentID,
 		},
 		{
 			name:            "get resource with invalid ID will return an error",
+			issuer:          issuer,
 			searchID:        invalidID,
 			expectErrorCode: errors.EInvalid,
 		},
@@ -216,7 +243,7 @@ func TestTeams_GetTeamBySCIMExternalID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualTeam, err := testClient.client.Teams.GetTeamBySCIMExternalID(ctx, test.searchID)
+			actualTeam, err := testClient.client.Teams.GetTeamBySCIMExternalID(ctx, test.issuer, test.searchID)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -449,4 +476,64 @@ func TestTeams_GetTeamsWithPaginationAndSorting(t *testing.T) {
 
 		return result.PageInfo, resources, nil
 	})
+}
+
+// TestTeams_SCIMIDPIssuerURL checks that a team's SCIM IDP issuer URL is stored, kept across updates and
+// usable as a filter, which is how a SCIM client is limited to its own IDP's teams.
+func TestTeams_SCIMIDPIssuerURL(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	const (
+		issuerA = "https://idp-a.example.com"
+		issuerB = "https://idp-b.example.com"
+	)
+
+	teams := map[string]*models.Team{}
+	for _, team := range []*models.Team{
+		{Name: "team-a", SCIMExternalID: "11111111-1111-1111-1111-111111111111", SCIMIDPIssuerURL: issuerA},
+		{Name: "team-b", SCIMExternalID: "22222222-2222-2222-2222-222222222222", SCIMIDPIssuerURL: issuerB},
+		{Name: "team-manual"},
+	} {
+		created, err := testClient.client.Teams.CreateTeam(ctx, team)
+		require.NoError(t, err)
+		assert.Equal(t, team.SCIMIDPIssuerURL, created.SCIMIDPIssuerURL)
+		teams[team.Name] = created
+	}
+
+	t.Run("kept across an update", func(t *testing.T) {
+		team := teams["team-a"]
+		team.Description = "updated"
+		updated, err := testClient.client.Teams.UpdateTeam(ctx, team)
+		require.NoError(t, err)
+		assert.Equal(t, issuerA, updated.SCIMIDPIssuerURL)
+
+		fetched, err := testClient.client.Teams.GetTeamByID(ctx, team.Metadata.ID)
+		require.NoError(t, err)
+		assert.Equal(t, issuerA, fetched.SCIMIDPIssuerURL)
+	})
+
+	for _, test := range []struct {
+		issuer        string
+		expectedTeams []string
+	}{
+		{issuer: issuerA, expectedTeams: []string{"team-a"}},
+		{issuer: issuerB, expectedTeams: []string{"team-b"}},
+		{issuer: "https://unknown.example.com", expectedTeams: []string{}},
+	} {
+		t.Run("filter by "+test.issuer, func(t *testing.T) {
+			issuer := test.issuer
+			result, err := testClient.client.Teams.GetTeams(ctx, &GetTeamsInput{
+				Filter: &TeamFilter{SCIMExternalID: true, SCIMIDPIssuerURL: &issuer},
+			})
+			require.NoError(t, err)
+
+			got := []string{}
+			for _, team := range result.Teams {
+				got = append(got, team.Name)
+			}
+			assert.ElementsMatch(t, test.expectedTeams, got)
+		})
+	}
 }

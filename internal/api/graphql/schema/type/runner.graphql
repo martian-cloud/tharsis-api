@@ -79,6 +79,8 @@ type Runner implements Node {
     last: Int
   ): ServiceAccountConnection!
   runUntaggedJobs: Boolean!
+  "Max concurrent jobs; 0 means no limit."
+  jobLimit: Int!
   tags: [String!]!
 }
 
@@ -107,6 +109,8 @@ input CreateRunnerInput {
     )
   disabled: Boolean
   runUntaggedJobs: Boolean!
+  "Max concurrent jobs; 0 (default when omitted) means no limit."
+  jobLimit: Int
   tags: [String!]!
 }
 
@@ -117,6 +121,8 @@ input UpdateRunnerInput {
   description: String!
   disabled: Boolean
   runUntaggedJobs: Boolean
+  "Max concurrent jobs; 0 means no limit. Omit to leave the current limit unchanged."
+  jobLimit: Int
   tags: [String!]
 }
 

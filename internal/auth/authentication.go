@@ -173,11 +173,26 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 			t.maintenanceMonitor,
 		), nil
 	case JobTokenType:
+		jobID := gid.FromGlobalID(output.PrivateClaims["job_id"])
+		runID := gid.FromGlobalID(output.PrivateClaims["run_id"])
+		workspaceID := gid.FromGlobalID(output.PrivateClaims["workspace_id"])
+
+		// A job token outlives its job by up to an hour, so the job is loaded on every request: once
+		// the job reaches a final status the caller is limited to reading the job itself (see
+		// JobCaller). A retried run node gets a new job, so a token for an earlier attempt is rejected.
+		job, err := t.dbClient.Jobs.GetJobByID(ctx, jobID)
+		if err != nil {
+			return nil, err
+		}
+		if job == nil || job.RunID != runID || job.WorkspaceID != workspaceID {
+			return nil, errors.New("job token is no longer valid", errors.WithErrorCode(errors.EUnauthorized))
+		}
+
 		return &JobCaller{
-			JobID:                    gid.FromGlobalID(output.PrivateClaims["job_id"]),
+			Job:                      job,
 			JobTRN:                   output.PrivateClaims["job_trn"],
-			RunID:                    gid.FromGlobalID(output.PrivateClaims["run_id"]),
-			WorkspaceID:              gid.FromGlobalID(output.PrivateClaims["workspace_id"]),
+			RunID:                    runID,
+			WorkspaceID:              workspaceID,
 			dbClient:                 t.dbClient,
 			inheritedSettingResolver: t.inheritedSettingResolver,
 		}, nil
@@ -185,7 +200,12 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 		if sErr := t.verifySCIMTokenClaim(ctx, output.Token); sErr != nil {
 			return nil, sErr
 		}
-		return NewSCIMCaller(t.dbClient, t.maintenanceMonitor, output.PrivateClaims[IDPIssuerURLClaimName]), nil
+		// The issuer scopes everything a SCIM caller can manage, so a token without one is never accepted.
+		idpIssuerURL := output.PrivateClaims[IDPIssuerURLClaimName]
+		if idpIssuerURL == "" {
+			return nil, errors.New("scim token is missing the %s claim", IDPIssuerURLClaimName, errors.WithErrorCode(errors.EUnauthorized))
+		}
+		return NewSCIMCaller(t.maintenanceMonitor, idpIssuerURL), nil
 	case VCSWorkspaceLinkTokenType:
 		vcsCaller, sErr := t.verifyVCSToken(ctx, output)
 		if sErr != nil {

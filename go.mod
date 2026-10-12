@@ -3,6 +3,7 @@ module gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api
 go 1.26.2
 
 require (
+	code.dny.dev/ssrf v0.3.0
 	github.com/ProtonMail/go-crypto v1.3.0
 	github.com/apparentlymart/go-versions v1.0.2
 	github.com/avast/retry-go v3.0.0+incompatible

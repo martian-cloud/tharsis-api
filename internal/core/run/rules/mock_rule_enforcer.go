@@ -14,22 +14,34 @@ type MockRuleEnforcer struct {
 	mock.Mock
 }
 
-// EnforceRules provides a mock function with given fields: ctx, managedIdentity, input
-func (_m *MockRuleEnforcer) EnforceRules(ctx context.Context, managedIdentity *models.ManagedIdentity, input *RunDetails) error {
-	ret := _m.Called(ctx, managedIdentity, input)
+// EnforceRules provides a mock function with given fields: ctx, managedIdentities, input
+func (_m *MockRuleEnforcer) EnforceRules(ctx context.Context, managedIdentities []models.ManagedIdentity, input *RunDetails) ([]string, error) {
+	ret := _m.Called(ctx, managedIdentities, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for EnforceRules")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.ManagedIdentity, *RunDetails) error); ok {
-		r0 = rf(ctx, managedIdentity, input)
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []models.ManagedIdentity, *RunDetails) ([]string, error)); ok {
+		return rf(ctx, managedIdentities, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []models.ManagedIdentity, *RunDetails) []string); ok {
+		r0 = rf(ctx, managedIdentities, input)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, []models.ManagedIdentity, *RunDetails) error); ok {
+		r1 = rf(ctx, managedIdentities, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewMockRuleEnforcer creates a new instance of MockRuleEnforcer. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

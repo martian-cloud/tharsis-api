@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
@@ -9,7 +11,13 @@ var _ Model = (*LogStreamChunk)(nil)
 
 // LogStreamChunk represents a contiguous chunk of a log stream stored as a single object-store file.
 type LogStreamChunk struct {
-	Metadata       ResourceMetadata
+	Metadata ResourceMetadata
+	// LeaseExpiresAt is set while a writer holds the chunk's write lease (see
+	// LogStreamChunks.ClaimLogStreamChunkLease). Nil when the chunk is not leased.
+	LeaseExpiresAt *time.Time
+	// Checksum is the CRC-32 (IEEE) of the chunk's committed bytes [0, Size). Nil when unknown (a chunk
+	// written before checksums were tracked), in which case it is not verified.
+	Checksum       *uint32
 	LogStreamID    string
 	ObjectStoreKey string
 	ChunkIndex     int

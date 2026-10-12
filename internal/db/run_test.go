@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -190,6 +191,10 @@ func TestRuns_UpdateRun(t *testing.T) {
 		upd.Plan.Summary.ResourceAdditions = 9
 		upd.Apply.Status = models.ApplyQueued
 		upd.Apply.Comment = "updated comment"
+		planIdentityIDs := []string{uuid.NewString(), uuid.NewString()}
+		applyIdentityIDs := []string{uuid.NewString()}
+		upd.Plan.ManagedIdentityIDs = planIdentityIDs
+		upd.Apply.ManagedIdentityIDs = applyIdentityIDs
 
 		updatedRun, err := testClient.client.Runs.UpdateRun(ctx, upd)
 		require.Nil(t, err)
@@ -213,6 +218,8 @@ func TestRuns_UpdateRun(t *testing.T) {
 		require.NotNil(t, fetched.Apply)
 		assert.Equal(t, models.ApplyQueued, fetched.Apply.Status)
 		assert.Equal(t, "updated comment", fetched.Apply.Comment)
+		assert.Equal(t, planIdentityIDs, fetched.Plan.ManagedIdentityIDs)
+		assert.Equal(t, applyIdentityIDs, fetched.Apply.ManagedIdentityIDs)
 	})
 
 	t.Run("selective update only touches the named node", func(t *testing.T) {

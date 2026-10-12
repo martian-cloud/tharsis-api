@@ -8,6 +8,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -206,13 +207,14 @@ func TestCreateSCIMToken(t *testing.T) {
 
 func TestGetSCIMUsers(t *testing.T) {
 	issuerURL := "https://test-idp.example.com"
-	scimCaller := auth.NewSCIMCaller(nil, nil, issuerURL)
+	scimCaller := auth.NewSCIMCaller(nil, issuerURL)
 	ctx := auth.WithCaller(context.Background(), scimCaller)
 
 	expectedUser := models.User{
-		Username:       "expected-user-name",
-		Email:          "expected-user-email",
-		SCIMExternalID: externalID,
+		Username:         "expected-user-name",
+		Email:            "expected-user-email",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: issuerURL,
 		Metadata: models.ResourceMetadata{
 			ID: resourceUUID,
 		},
@@ -221,6 +223,10 @@ func TestGetSCIMUsers(t *testing.T) {
 	}
 
 	expectedUsersList := []models.User{expectedUser}
+
+	// The same user, but managed by another IDP's SCIM client.
+	otherIDPUser := expectedUser
+	otherIDPUser.SCIMIDPIssuerURL = "https://other-idp.example.com"
 
 	userWithoutSCIMID := models.User{
 		Username:       "user-no-scim",
@@ -239,7 +245,6 @@ func TestGetSCIMUsers(t *testing.T) {
 		expectedError string
 		expectedUsers []models.User
 		mockUser      *models.User
-		mockLinked    *models.User
 	}{
 		{
 			name: "positive: SCIMExternalID is valid; expect a slice of users.",
@@ -248,6 +253,14 @@ func TestGetSCIMUsers(t *testing.T) {
 			},
 			expectedUsers: expectedUsersList,
 			// expect nil errors
+		},
+		{
+			// The external ID only exists for another IDP; the lookup is scoped to the caller's IDP.
+			name: "negative: SCIMExternalID of a user managed by another IDP; expect empty slice",
+			input: &GetSCIMUsersInput{
+				SCIMExternalID: ptr.String(externalID),
+			},
+			expectedUsers: []models.User{}, // not nil
 		},
 		{
 			name:          "positive: input is empty; expect a slice of all users.",
@@ -267,7 +280,6 @@ func TestGetSCIMUsers(t *testing.T) {
 				Username: ptr.String("expected-user-name"),
 			},
 			mockUser:      &expectedUser,
-			mockLinked:    &expectedUser,
 			expectedUsers: []models.User{expectedUser},
 		},
 		{
@@ -287,12 +299,11 @@ func TestGetSCIMUsers(t *testing.T) {
 			expectedUsers: []models.User{}, // not nil
 		},
 		{
-			name: "negative: user not linked to issuer; expect empty slice",
+			name: "negative: user managed by another IDP; expect empty slice",
 			input: &GetSCIMUsersInput{
 				Username: ptr.String("expected-user-name"),
 			},
-			mockUser:      &expectedUser,
-			mockLinked:    nil,
+			mockUser:      &otherIDPUser,
 			expectedUsers: []models.User{}, // not nil
 		},
 	}
@@ -302,22 +313,20 @@ func TestGetSCIMUsers(t *testing.T) {
 			mockUsers := db.MockUsers{}
 			mockUsers.Test(t)
 
+			// The list is scoped to the caller's IDP.
 			getUsersInput := &db.GetUsersInput{
 				Filter: &db.UserFilter{
-					SCIMExternalID: true,
+					SCIMIDPIssuerURL: &issuerURL,
 				}}
 
 			if test.input.SCIMExternalID != nil && *test.input.SCIMExternalID != "" {
-				externalIDUser := &expectedUser
-				if len(test.expectedUsers) == 0 {
-					externalIDUser = nil
+				externalIDUser := test.mockUser
+				if externalIDUser == nil && len(test.expectedUsers) > 0 {
+					externalIDUser = &expectedUser
 				}
-				mockUsers.On("GetUserBySCIMExternalID", mock.Anything, *test.input.SCIMExternalID).Return(externalIDUser, nil)
+				mockUsers.On("GetUserBySCIMExternalID", mock.Anything, issuerURL, *test.input.SCIMExternalID).Return(externalIDUser, nil)
 			} else if test.input.Username != nil && *test.input.Username != "" {
 				mockUsers.On("GetUserByTRN", mock.Anything, trn.TypeUser.Build(*test.input.Username)).Return(test.mockUser, nil)
-				if test.mockUser != nil && test.mockUser.SCIMExternalID != "" {
-					mockUsers.On("GetUserByExternalID", mock.Anything, issuerURL, test.mockUser.SCIMExternalID).Return(test.mockLinked, nil)
-				}
 			} else {
 				mockUsers.On("GetUsers", mock.Anything, getUsersInput).Return(&db.UsersResult{Users: expectedUsersList}, nil)
 			}
@@ -343,60 +352,124 @@ func TestGetSCIMUsers(t *testing.T) {
 }
 
 func TestCreateSCIMUser(t *testing.T) {
+	issuer := "https://example.com/scim"
+
 	sampleUser := &models.User{
-		Username:       "input-user",
+		Username:         "input-user",
+		Email:            "input-user@example.com",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: issuer,
+		Admin:            false,
+		Active:           true,
+	}
+
+	input := &CreateSCIMUserInput{
 		Email:          "input-user@example.com",
 		SCIMExternalID: externalID,
-		Admin:          false,
 		Active:         true,
 	}
 
-	// testCases should never return an error since CreateSCIMUser is idempotent.
 	testCases := []struct {
 		input                  *CreateSCIMUserInput
-		existingSCIMUser       *models.User
+		existingEmailUser      *models.User
 		existingExternalIDUser *models.User
 		returnedSCIMUser       *models.User
 		name                   string
+		userLinked             bool
+		expectLink             bool
+		expectedErrorCode      errors.CodeType
 	}{
 		{
-			name: "positive: user already exists in the system without a scimExternalID; expect updated user.",
-			input: &CreateSCIMUserInput{
-				Email:          "input-user@example.com",
-				SCIMExternalID: externalID,
-				Active:         true,
-			},
-			existingSCIMUser: &models.User{
+			name:  "positive: user signed in through this IDP exists without a scimExternalID; expect adopted user without a new login link.",
+			input: input,
+			existingEmailUser: &models.User{
+				Metadata: models.ResourceMetadata{ID: resourceUUID},
 				Username: "input-user",
 				Email:    "input-user@example.com",
 				Admin:    false,
 				Active:   true,
 			},
+			userLinked:       true,
 			returnedSCIMUser: sampleUser,
 		},
 		{
-			name: "positive: user exists with external ID but no SCIMExternalID; expect updated user.",
-			input: &CreateSCIMUserInput{
+			name:  "negative: user exists but has not signed in through this IDP; expect EConflict.",
+			input: input,
+			existingEmailUser: &models.User{
+				Metadata: models.ResourceMetadata{ID: resourceUUID},
+				Username: "input-user",
+				Email:    "input-user@example.com",
+				Active:   true,
+			},
+			expectedErrorCode: errors.EConflict,
+		},
+		{
+			name:  "negative: user is already managed by SCIM under a different external id; expect EConflict.",
+			input: input,
+			existingEmailUser: &models.User{
+				Metadata:       models.ResourceMetadata{ID: resourceUUID},
+				Username:       "input-user",
 				Email:          "input-user@example.com",
-				SCIMExternalID: externalID,
+				SCIMExternalID: "other-external-id",
 				Active:         true,
 			},
+			userLinked:        true,
+			expectedErrorCode: errors.EConflict,
+		},
+		{
+			name:  "positive: user exists with external ID but no SCIMExternalID; expect updated user.",
+			input: input,
 			existingExternalIDUser: &models.User{
+				Metadata: models.ResourceMetadata{ID: resourceUUID},
 				Username: "input-user",
 				Email:    "input-user@example.com",
 				Admin:    false,
 				Active:   true,
 			},
+			userLinked:       true,
 			returnedSCIMUser: sampleUser,
 		},
 		{
-			name: "positive: user does not already exist in the system; expect user to be created.",
-			input: &CreateSCIMUserInput{
-				Email:          "input-user@example.com",
-				SCIMExternalID: externalID,
-				Active:         true,
+			name:  "negative: user linked by external ID is managed by another IDP's SCIM client; expect EConflict.",
+			input: input,
+			existingExternalIDUser: &models.User{
+				Metadata:         models.ResourceMetadata{ID: resourceUUID},
+				Username:         "input-user",
+				Email:            "input-user@example.com",
+				SCIMExternalID:   "other-external-id",
+				SCIMIDPIssuerURL: "https://other-idp.example.com",
+				Active:           true,
 			},
+			userLinked:        true,
+			expectedErrorCode: errors.EConflict,
+		},
+		{
+			name:  "negative: user linked by external ID is managed by this IDP under another external id; expect EConflict.",
+			input: input,
+			existingExternalIDUser: &models.User{
+				Metadata:         models.ResourceMetadata{ID: resourceUUID},
+				Username:         "input-user",
+				Email:            "input-user@example.com",
+				SCIMExternalID:   "other-external-id",
+				SCIMIDPIssuerURL: issuer,
+				Active:           true,
+			},
+			userLinked:        true,
+			expectedErrorCode: errors.EConflict,
+		},
+		{
+			name: "negative: empty external id; expect EInvalid.",
+			input: &CreateSCIMUserInput{
+				Email:  "input-user@example.com",
+				Active: true,
+			},
+			expectedErrorCode: errors.EInvalid,
+		},
+		{
+			name:             "positive: user does not already exist in the system; expect user to be created and linked.",
+			input:            input,
 			returnedSCIMUser: sampleUser,
+			expectLink:       true,
 		},
 	}
 
@@ -414,32 +487,50 @@ func TestCreateSCIMUser(t *testing.T) {
 			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
 			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
 
-			mockUsers.On("GetUserBySCIMExternalID", mock.Anything, externalID).Return(nil, nil)
-			mockUsers.On("GetUserByExternalID", mock.Anything, "https://example.com/scim", externalID).Return(test.existingExternalIDUser, nil)
-			mockUsers.On("GetUserByEmail", mock.Anything, test.input.Email).Return(test.existingSCIMUser, nil)
-			mockUsers.On("UpdateUser", mock.Anything, mock.Anything).Return(test.returnedSCIMUser, nil)
-			mockUsers.On("CreateUser", mock.Anything, sampleUser).Return(test.returnedSCIMUser, nil)
-			mockUsers.On("LinkUserWithExternalID", mock.Anything, "https://example.com/scim", externalID, mock.AnythingOfType("string")).Return(nil)
+			mockUsers.On("GetUserBySCIMExternalID", mock.Anything, issuer, externalID).Return(nil, nil).Maybe()
+			mockUsers.On("GetUserByExternalID", mock.Anything, issuer, externalID).Return(test.existingExternalIDUser, nil).Maybe()
+			mockUsers.On("GetUserByEmail", mock.Anything, test.input.Email).Return(test.existingEmailUser, nil).Maybe()
+			mockUsers.On("HasExternalIdentity", mock.Anything, resourceUUID, &issuer).Return(test.userLinked, nil).Maybe()
+			mockUsers.On("UpdateUser", mock.Anything, mock.Anything).Return(test.returnedSCIMUser, nil).Maybe()
+			mockUsers.On("CreateUser", mock.Anything, sampleUser).Return(test.returnedSCIMUser, nil).Maybe()
+			mockUsers.On("LinkUserWithExternalID", mock.Anything, issuer, externalID, mock.AnythingOfType("string")).Return(nil).Maybe()
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
 			dbClient := &db.Client{
 				Users:        &mockUsers,
 				Transactions: &mockTransactions,
 			}
 
-			scimCaller := auth.NewSCIMCaller(dbClient, mockMaintenanceMonitor, "https://example.com/scim")
+			scimCaller := auth.NewSCIMCaller(mockMaintenanceMonitor, issuer)
 
 			logger, _ := logger.NewForTest()
 			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
 			user, err := service.CreateSCIMUser(auth.WithCaller(ctx, scimCaller), test.input)
-			if err != nil {
-				t.Fatal(err)
+
+			if test.expectLink {
+				mockUsers.AssertCalled(t, "LinkUserWithExternalID", mock.Anything, issuer, externalID, mock.AnythingOfType("string"))
 			} else {
-				assert.Equal(t, test.returnedSCIMUser, user)
+				mockUsers.AssertNotCalled(t, "LinkUserWithExternalID", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			}
+
+			if test.expectedErrorCode != "" {
+				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
+				mockUsers.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything)
+				return
+			}
+
+			require.Nil(t, err)
+			assert.Equal(t, test.returnedSCIMUser, user)
+
+			// Whichever path the user took (linked, adopted or created), it is now managed by this IDP.
+			if test.existingEmailUser != nil || test.existingExternalIDUser != nil {
+				mockUsers.AssertCalled(t, "UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
+					return u.SCIMIDPIssuerURL == issuer && u.SCIMExternalID == externalID
+				}))
 			}
 		})
 	}
@@ -460,10 +551,12 @@ func TestUpdateSCIMUser(t *testing.T) {
 		existingUser      *models.User // User already in the system.
 		expectedSCIMUser  *models.User // Updates user.
 		name              string
+		notLinked         bool // User is managed by another IDP's SCIM client.
 		expectedErrorCode errors.CodeType
 	}{
 		{
-			name: "positive: valid 'replace' operation; expect SCIMExternalID to be updated.",
+			// Only the SCIM external ID changes; the login identity stays linked (asserted below).
+			name: "positive: 'replace' operation changing the externalId; expect it to be updated.",
 			input: &UpdateResourceInput{
 				ID: resourceUUID,
 				Operations: []Operation{
@@ -476,13 +569,25 @@ func TestUpdateSCIMUser(t *testing.T) {
 			},
 			existingUser: sampleUser,
 			expectedSCIMUser: &models.User{
-				Metadata: models.ResourceMetadata{
-					ID: resourceUUID,
-				},
+				Metadata:       models.ResourceMetadata{ID: resourceUUID},
 				Username:       "input-user",
 				SCIMExternalID: "new-external-id",
 			},
-			// We expect no error from this.
+		},
+		{
+			name: "positive: 'replace' operation with the current externalId; expect no change.",
+			input: &UpdateResourceInput{
+				ID: resourceUUID,
+				Operations: []Operation{
+					{
+						OP:    replaceOPType,
+						Path:  "externalId",
+						Value: externalID,
+					},
+				},
+			},
+			existingUser:     sampleUser,
+			expectedSCIMUser: sampleUser,
 		},
 		{
 			name: "positive: valid 'replace' operation on email; expect email and username to be updated.",
@@ -512,6 +617,45 @@ func TestUpdateSCIMUser(t *testing.T) {
 				Email:          "new.user@example.com",
 				SCIMExternalID: externalID,
 			},
+		},
+		{
+			name: "negative: user not managed by SCIM; expect error ENotFound",
+			input: &UpdateResourceInput{
+				ID:         resourceUUID,
+				Operations: []Operation{},
+			},
+			existingUser: &models.User{
+				Metadata: models.ResourceMetadata{
+					ID: resourceUUID,
+				},
+				Username: "input-user",
+			},
+			expectedErrorCode: errors.ENotFound,
+		},
+		{
+			name: "negative: SCIM user not linked to the caller's IDP; expect error ENotFound",
+			input: &UpdateResourceInput{
+				ID:         resourceUUID,
+				Operations: []Operation{},
+			},
+			existingUser:      sampleUser,
+			notLinked:         true,
+			expectedErrorCode: errors.ENotFound,
+		},
+		{
+			name: "negative: 'replace' operation with an empty externalId; expect error EInvalid.",
+			input: &UpdateResourceInput{
+				ID: resourceUUID,
+				Operations: []Operation{
+					{
+						OP:    replaceOPType,
+						Path:  "externalId",
+						Value: "",
+					},
+				},
+			},
+			existingUser:      sampleUser,
+			expectedErrorCode: errors.EInvalid,
 		},
 		{
 			name: "negative: invalid Metadata ID; expect error ENotFound",
@@ -566,28 +710,45 @@ func TestUpdateSCIMUser(t *testing.T) {
 			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
 			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+			issuer := "https://example.com/scim"
+
+			// SCIM users are managed by the caller's IDP, or by another one when notLinked; a user without a
+			// SCIM external ID has no issuer. Copies, since the cases share user models.
+			existingUser, expectedSCIMUser := test.existingUser, test.expectedSCIMUser
+			if existingUser != nil && existingUser.SCIMExternalID != "" {
+				u := *existingUser
+				u.SCIMIDPIssuerURL = issuer
+				if test.notLinked {
+					u.SCIMIDPIssuerURL = "https://other-idp.example.com"
+				}
+				existingUser = &u
+			}
+			if expectedSCIMUser != nil {
+				u := *expectedSCIMUser
+				u.SCIMIDPIssuerURL = issuer
+				expectedSCIMUser = &u
+			}
 
 			// This function just updates the user in the db layer.
 			// Actual fields are updated via a private func.
-			mockUsers.On("UnlinkUserExternalID", mock.Anything, "https://example.com/scim", mock.AnythingOfType("string")).Return(nil).Maybe()
-			mockUsers.On("LinkUserWithExternalID", mock.Anything, "https://example.com/scim", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Maybe()
-			mockUsers.On("UpdateUser", mock.Anything, test.expectedSCIMUser).Return(test.expectedSCIMUser, nil).Maybe()
-			mockUsers.On("GetUserByID", mock.Anything, test.input.ID).Return(test.existingUser, nil).Maybe()
+			mockUsers.On("UpdateUser", mock.Anything, expectedSCIMUser).Return(expectedSCIMUser, nil).Maybe()
+			mockUsers.On("GetUserByID", mock.Anything, test.input.ID).Return(existingUser, nil).Maybe()
 
 			dbClient := &db.Client{
 				Users:        &mockUsers,
 				Transactions: &mockTransactions,
 			}
 
-			scimCaller := auth.NewSCIMCaller(dbClient, mockMaintenanceMonitor, "https://example.com/scim")
+			scimCaller := auth.NewSCIMCaller(mockMaintenanceMonitor, issuer)
 
 			logger, _ := logger.NewForTest()
 			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
 			user, err := service.UpdateSCIMUser(auth.WithCaller(ctx, scimCaller), test.input)
+
+			// Login identities must never change through a SCIM update.
+			mockUsers.AssertNotCalled(t, "LinkUserWithExternalID", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
 			if test.expectedErrorCode != "" {
 				// Negative cases.
 				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
@@ -595,92 +756,85 @@ func TestUpdateSCIMUser(t *testing.T) {
 				t.Fatal(err)
 			} else {
 				// Positive case.
-				assert.Equal(t, test.expectedSCIMUser, user)
+				assert.Equal(t, expectedSCIMUser, user)
 			}
 		})
 	}
 }
 
 func TestDeleteSCIMUser(t *testing.T) {
+	issuer := "https://test-idp.example.com"
+
 	testCases := []struct {
 		name              string
-		input             *DeleteSCIMResourceInput
 		existingUser      *models.User
-		authError         error
 		expectedErrorCode errors.CodeType
 	}{
 		{
-			name: "positive: user was created via SCIM; expect no error.",
-			input: &DeleteSCIMResourceInput{
-				ID: resourceUUID,
-			},
+			name: "positive: user is managed by the caller's IDP; expect no error.",
 			existingUser: &models.User{
-				Metadata: models.ResourceMetadata{
-					ID: resourceUUID,
-				},
-				SCIMExternalID: externalID,
-				// None of the other fields matter here.
+				Metadata:         models.ResourceMetadata{ID: resourceUUID},
+				SCIMExternalID:   externalID,
+				SCIMIDPIssuerURL: issuer,
 			},
 		},
 		{
-			name: "negative: user being deleted was not created via SCIM; expect error ENotFound.",
-			input: &DeleteSCIMResourceInput{
-				ID: resourceUUID,
-			},
+			name: "negative: user is managed by another IDP; expect error ENotFound.",
 			existingUser: &models.User{
-				Metadata: models.ResourceMetadata{
-					ID: resourceUUID,
-				},
-				// None of the other fields matter here.
+				Metadata:         models.ResourceMetadata{ID: resourceUUID},
+				SCIMExternalID:   externalID,
+				SCIMIDPIssuerURL: "https://other-idp.example.com",
 			},
-			authError:         errors.New("Resource not found", errors.WithErrorCode(errors.ENotFound)),
+			expectedErrorCode: errors.ENotFound,
+		},
+		{
+			name: "negative: user being deleted was not created via SCIM; expect error ENotFound.",
+			existingUser: &models.User{
+				Metadata: models.ResourceMetadata{ID: resourceUUID},
+			},
+			expectedErrorCode: errors.ENotFound,
+		},
+		{
+			name:              "negative: user does not exist; expect error ENotFound.",
 			expectedErrorCode: errors.ENotFound,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			mockUsers := db.MockUsers{}
-			mockUsers.Test(t)
+			mockUsers := db.NewMockUsers(t)
 
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
 
-			// Caller function mocks.
-			mockCaller.On("RequirePermission", mock.Anything, models.DeleteUserPermission, mock.Anything).Return(test.authError)
+			ctx := auth.WithCaller(context.Background(), auth.NewSCIMCaller(mockMaintenanceMonitor, issuer))
 
-			ctx := auth.WithCaller(context.Background(), &mockCaller)
-
-			mockUsers.On("GetUserByID", mock.Anything, test.input.ID).Return(test.existingUser, nil)
-			mockUsers.On("DeleteUser", mock.Anything, test.existingUser).Return(nil)
-
-			dbClient := &db.Client{
-				Users: &mockUsers,
+			mockUsers.On("GetUserByID", mock.Anything, resourceUUID).Return(test.existingUser, nil)
+			if test.expectedErrorCode == "" {
+				mockUsers.On("DeleteUser", mock.Anything, test.existingUser).Return(nil)
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
+			service := NewService(logger, &db.Client{Users: mockUsers}, nil, []config.IdpConfig{})
 
-			err := service.DeleteSCIMUser(ctx, test.input)
+			err := service.DeleteSCIMUser(ctx, &DeleteSCIMResourceInput{ID: resourceUUID})
 			if test.expectedErrorCode != "" {
-				// Negative case.
 				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
-			} else if err != nil {
-				t.Fatal(err)
-			} else {
-				// Positive case.
-				assert.Nil(t, err)
+				return
 			}
+			assert.Nil(t, err)
 		})
 	}
 }
 
 func TestGetSCIMGroups(t *testing.T) {
-	ctx := auth.WithCaller(context.Background(), &auth.SCIMCaller{})
+	issuerURL := "https://test-idp.example.com"
+	ctx := auth.WithCaller(context.Background(), auth.NewSCIMCaller(nil, issuerURL))
 
 	expectedSCIMGroup := models.Team{
-		Name:           "expected-scim-group",
-		SCIMExternalID: externalID,
+		Name:             "expected-scim-group",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: issuerURL,
 		Metadata: models.ResourceMetadata{
 			ID: resourceUUID,
 		},
@@ -693,6 +847,13 @@ func TestGetSCIMGroups(t *testing.T) {
 		expectedError      string
 		expectedSCIMGroups []models.Team
 	}{
+		{
+			// The external ID only exists for another IDP; the lookup is scoped to the caller's IDP.
+			name: "negative: SCIMExternalID of another IDP's team; expect no groups.",
+			input: &GetSCIMGroupsInput{
+				SCIMExternalID: getFilter("externalId", expectedSCIMGroup.SCIMExternalID),
+			},
+		},
 		{
 			name: "positive: SCIMExternalID is valid; expect a slice of SCIM groups (teams).",
 			input: &GetSCIMGroupsInput{
@@ -719,19 +880,20 @@ func TestGetSCIMGroups(t *testing.T) {
 			mockTeams := db.MockTeams{}
 			mockTeams.Test(t)
 
+			// The list is scoped to the caller's IDP.
 			getTeamsInput := &db.GetTeamsInput{
 				Filter: &db.TeamFilter{
-					SCIMExternalID: true,
+					SCIMIDPIssuerURL: &issuerURL,
 				},
 			}
 
-			returnedSCIMGroup := &expectedSCIMGroup
-			if len(test.expectedSCIMGroups) == 0 {
-				returnedSCIMGroup = nil
+			var returnedSCIMGroup *models.Team
+			if len(test.expectedSCIMGroups) > 0 {
+				returnedSCIMGroup = &expectedSCIMGroup
 			}
 
-			mockTeams.On("GetTeamBySCIMExternalID", mock.Anything, test.input.SCIMExternalID).Return(returnedSCIMGroup, nil)
-			mockTeams.On("GetTeams", mock.Anything, getTeamsInput).Return(&db.TeamsResult{Teams: expectedSCIMGroupsList}, nil)
+			mockTeams.On("GetTeamBySCIMExternalID", mock.Anything, issuerURL, test.input.SCIMExternalID).Return(returnedSCIMGroup, nil).Maybe()
+			mockTeams.On("GetTeams", mock.Anything, getTeamsInput).Return(&db.TeamsResult{Teams: expectedSCIMGroupsList}, nil).Maybe()
 
 			dbClient := &db.Client{
 				Teams: &mockTeams,
@@ -754,27 +916,76 @@ func TestGetSCIMGroups(t *testing.T) {
 }
 
 func TestCreateSCIMGroup(t *testing.T) {
+	issuerURL := "https://test-idp.example.com"
 	sampleSCIMGroup := &models.Team{
-		Name:           "input-team",
-		SCIMExternalID: externalID,
+		Name:             "input-team",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: issuerURL,
 	}
 
-	// testCases should never return an error since CreateSCIMGroup is idempotent.
 	testCases := []struct {
 		input             *CreateSCIMGroupInput
 		existingSCIMGroup *models.Team
 		returnedSCIMGroup *models.Team
 		name              string
+		expectedErrorCode errors.CodeType
 	}{
 		{
-			name: "positive: SCIM group already exists in the system without a scimExternalID; expect updated SCIM group.",
+			name: "negative: empty external id; expect EInvalid.",
 			input: &CreateSCIMGroupInput{
 				Name: sampleSCIMGroup.Name,
+			},
+			expectedErrorCode: errors.EInvalid,
+		},
+		{
+			name: "negative: manually managed team with the same name exists; expect EConflict.",
+			input: &CreateSCIMGroupInput{
+				Name:           sampleSCIMGroup.Name,
+				SCIMExternalID: sampleSCIMGroup.SCIMExternalID,
 			},
 			existingSCIMGroup: &models.Team{
 				Name: sampleSCIMGroup.Name,
 			},
+			expectedErrorCode: errors.EConflict,
+		},
+		{
+			name: "positive: SCIM-managed team with the same name exists; expect updated SCIM group.",
+			input: &CreateSCIMGroupInput{
+				Name:           sampleSCIMGroup.Name,
+				SCIMExternalID: sampleSCIMGroup.SCIMExternalID,
+			},
+			existingSCIMGroup: &models.Team{
+				Name:             sampleSCIMGroup.Name,
+				SCIMExternalID:   "previous-external-id",
+				SCIMIDPIssuerURL: issuerURL,
+			},
 			returnedSCIMGroup: sampleSCIMGroup,
+		},
+		{
+			name: "negative: another IDP's team with the same name exists; expect EConflict.",
+			input: &CreateSCIMGroupInput{
+				Name:           sampleSCIMGroup.Name,
+				SCIMExternalID: sampleSCIMGroup.SCIMExternalID,
+			},
+			existingSCIMGroup: &models.Team{
+				Name:             sampleSCIMGroup.Name,
+				SCIMExternalID:   "previous-external-id",
+				SCIMIDPIssuerURL: "https://other-idp.example.com",
+			},
+			expectedErrorCode: errors.EConflict,
+		},
+		{
+			// Existing SCIM teams have no issuer until they're backfilled, so none is adopted.
+			name: "negative: SCIM team with no IDP recorded exists; expect EConflict.",
+			input: &CreateSCIMGroupInput{
+				Name:           sampleSCIMGroup.Name,
+				SCIMExternalID: sampleSCIMGroup.SCIMExternalID,
+			},
+			existingSCIMGroup: &models.Team{
+				Name:           sampleSCIMGroup.Name,
+				SCIMExternalID: "previous-external-id",
+			},
+			expectedErrorCode: errors.EConflict,
 		},
 		{
 			name: "positive: SCIM group does not already exist in the system; expect SCIM group to be created.",
@@ -794,14 +1005,13 @@ func TestCreateSCIMGroup(t *testing.T) {
 			mockTeams := db.MockTeams{}
 			mockTeams.Test(t)
 
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
+			maintenanceMonitor := maintenance.NewMockMonitor(t)
+			maintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+			scimCaller := auth.NewSCIMCaller(maintenanceMonitor, issuerURL)
 
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateTeamPermission).Return(nil)
-
-			mockTeams.On("GetTeamByTRN", mock.Anything, trn.TypeTeam.Build(test.input.Name)).Return(test.existingSCIMGroup, nil)
-			mockTeams.On("UpdateTeam", mock.Anything, test.existingSCIMGroup).Return(test.returnedSCIMGroup, nil)
-			mockTeams.On("CreateTeam", mock.Anything, sampleSCIMGroup).Return(test.returnedSCIMGroup, nil)
+			mockTeams.On("GetTeamByTRN", mock.Anything, trn.TypeTeam.Build(test.input.Name)).Return(test.existingSCIMGroup, nil).Maybe()
+			mockTeams.On("UpdateTeam", mock.Anything, test.existingSCIMGroup).Return(test.returnedSCIMGroup, nil).Maybe()
+			mockTeams.On("CreateTeam", mock.Anything, sampleSCIMGroup).Return(test.returnedSCIMGroup, nil).Maybe()
 
 			dbClient := &db.Client{
 				Teams: &mockTeams,
@@ -810,30 +1020,45 @@ func TestCreateSCIMGroup(t *testing.T) {
 			logger, _ := logger.NewForTest()
 			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
 
-			group, err := service.CreateSCIMGroup(auth.WithCaller(ctx, &mockCaller), test.input)
-			if err != nil {
-				t.Fatal(err)
-			} else {
-				assert.Equal(t, test.returnedSCIMGroup, group)
+			group, err := service.CreateSCIMGroup(auth.WithCaller(ctx, scimCaller), test.input)
+			if test.expectedErrorCode != "" {
+				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
+				mockTeams.AssertNotCalled(t, "UpdateTeam", mock.Anything, mock.Anything)
+				return
 			}
+
+			require.Nil(t, err)
+			assert.Equal(t, test.returnedSCIMGroup, group)
 		})
 	}
 }
 
 func TestUpdateSCIMGroup(t *testing.T) {
 	scimGroupID := "663a2ffa-5e95-41fa-9119-c7bcad3d775e"
+	issuerURL := "https://test-idp.example.com"
 
 	// sampleSCIMGroup is the model for several user inputs.
 	sampleSCIMGroup := &models.Team{
 		Metadata: models.ResourceMetadata{
 			ID: scimGroupID,
 		},
-		Name:           "input-team",
-		SCIMExternalID: externalID,
+		Name:             "input-team",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: issuerURL,
 	}
 
 	// sampleUser is used when adding or removing SCIM group (team) member.
 	sampleUser := &models.User{
+		Username: "sample-users-name",
+		Metadata: models.ResourceMetadata{
+			ID: resourceUUID,
+		},
+		SCIMExternalID:   "user-external-id",
+		SCIMIDPIssuerURL: issuerURL,
+	}
+
+	// unmanagedUser is not managed by the group's IDP.
+	unmanagedUser := &models.User{
 		Username: "sample-users-name",
 		Metadata: models.ResourceMetadata{
 			ID: resourceUUID,
@@ -850,6 +1075,7 @@ func TestUpdateSCIMGroup(t *testing.T) {
 		inputID                 string
 		existingSCIMGroup       *models.Team       // SCIM Group (team) already in system.
 		existingSCIMGroupMember *models.TeamMember // SCIM Group (team) member already in system.
+		memberUser              *models.User       // User the member operation refers to; sampleUser if nil.
 		expectedSCIMGroup       *models.Team       // Updated SCIM Group (team).
 		name                    string
 		expectedErrorCode       errors.CodeType
@@ -871,7 +1097,8 @@ func TestUpdateSCIMGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: scimGroupID,
 				},
-				SCIMExternalID: externalID,
+				SCIMExternalID:   externalID,
+				SCIMIDPIssuerURL: issuerURL,
 			},
 			// We expect no error from this.
 		},
@@ -892,6 +1119,37 @@ func TestUpdateSCIMGroup(t *testing.T) {
 				},
 			},
 			expectedSCIMGroup: sampleSCIMGroup, // Team model does not update for modifying team members.
+		},
+		{
+			name:              "negative: 'add' operation for a user not managed by the group's IDP; expect ENotFound.",
+			inputID:           scimGroupID,
+			existingSCIMGroup: sampleSCIMGroup,
+			memberUser:        unmanagedUser,
+			operations: []Operation{
+				{
+					OP:   addOPType,
+					Path: "members",
+					Value: []interface{}{
+						map[string]interface{}{
+							"value": gid.ToGlobalID(types.UserModelType, resourceUUID),
+						},
+					},
+				},
+			},
+			expectedErrorCode: errors.ENotFound,
+		},
+		{
+			name:              "negative: 'replace' operation with an empty externalId; expect EInvalid.",
+			inputID:           scimGroupID,
+			existingSCIMGroup: sampleSCIMGroup,
+			operations: []Operation{
+				{
+					OP:    replaceOPType,
+					Path:  "externalId",
+					Value: "",
+				},
+			},
+			expectedErrorCode: errors.EInvalid,
 		},
 		{
 			name:                    "positive: SCIM group member is already added to the SCIM group; expect no updates.",
@@ -947,10 +1205,44 @@ func TestUpdateSCIMGroup(t *testing.T) {
 			expectedSCIMGroup: sampleSCIMGroup, // Team model does not update for modifying team members.
 		},
 		{
-			name:              "negative: invalid Metadata ID; expect error EInternal",
+			name:              "negative: invalid Metadata ID; expect error ENotFound",
 			inputID:           "bogus-id",
 			operations:        []Operation{}, // Operation won't matter for this.
-			expectedErrorCode: errors.EInternal,
+			expectedErrorCode: errors.ENotFound,
+		},
+		{
+			name:    "negative: team is managed by another IDP; expect error ENotFound",
+			inputID: scimGroupID,
+			existingSCIMGroup: &models.Team{
+				Metadata:         models.ResourceMetadata{ID: scimGroupID},
+				Name:             "input-team",
+				SCIMExternalID:   externalID,
+				SCIMIDPIssuerURL: "https://other-idp.example.com",
+			},
+			operations: []Operation{
+				{
+					OP:    replaceOPType,
+					Path:  "externalId",
+					Value: "new-external-id",
+				},
+			},
+			expectedErrorCode: errors.ENotFound,
+		},
+		{
+			name:    "negative: team is not managed by SCIM; expect error ENotFound",
+			inputID: scimGroupID,
+			existingSCIMGroup: &models.Team{
+				Metadata: models.ResourceMetadata{ID: scimGroupID},
+				Name:     "input-team",
+			},
+			operations: []Operation{
+				{
+					OP:    replaceOPType,
+					Path:  "externalId",
+					Value: "new-external-id",
+				},
+			},
+			expectedErrorCode: errors.ENotFound,
 		},
 		{
 			name:              "negative: invalid operation OP; expect error EInvalid.",
@@ -996,10 +1288,10 @@ func TestUpdateSCIMGroup(t *testing.T) {
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
 
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
 
-			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTeamPermission, mock.Anything).Return(nil)
+			scimCaller := auth.NewSCIMCaller(mockMaintenanceMonitor, issuerURL)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -1036,7 +1328,11 @@ func TestUpdateSCIMGroup(t *testing.T) {
 			mockTeamMembers.On("RemoveUserFromTeam", mock.Anything, test.existingSCIMGroupMember).Return(nil)
 
 			// User function mocks.
-			mockUsers.On("GetUserByID", mock.Anything, sampleUser.Metadata.ID).Return(sampleUser, nil)
+			memberUser := test.memberUser
+			if memberUser == nil {
+				memberUser = sampleUser
+			}
+			mockUsers.On("GetUserByID", mock.Anything, sampleUser.Metadata.ID).Return(memberUser, nil)
 
 			dbClient := &db.Client{
 				Teams:        &mockTeams,
@@ -1053,9 +1349,10 @@ func TestUpdateSCIMGroup(t *testing.T) {
 				Operations: test.operations,
 			}
 
-			group, err := service.UpdateSCIMGroup(auth.WithCaller(ctx, &mockCaller), input)
+			group, err := service.UpdateSCIMGroup(auth.WithCaller(ctx, scimCaller), input)
 			if test.expectedErrorCode != "" {
 				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
+				mockTeamMembers.AssertNotCalled(t, "AddUserToTeam", mock.Anything, mock.Anything)
 			} else if err != nil {
 				t.Fatal(err)
 			} else {
@@ -1066,75 +1363,66 @@ func TestUpdateSCIMGroup(t *testing.T) {
 }
 
 func TestDeleteSCIMGroup(t *testing.T) {
+	issuer := "https://test-idp.example.com"
+
 	testCases := []struct {
 		name              string
-		input             *DeleteSCIMResourceInput
 		existingSCIMGroup *models.Team
-		authError         error
 		expectedErrorCode errors.CodeType
 	}{
 		{
-			name: "positive: team was created via SCIM; expect no error.",
-			input: &DeleteSCIMResourceInput{
-				ID: resourceUUID,
-			},
+			name: "positive: team is managed by the caller's IDP; expect no error.",
 			existingSCIMGroup: &models.Team{
-				Metadata: models.ResourceMetadata{
-					ID: resourceUUID,
-				},
-				SCIMExternalID: externalID,
-				// Rest of the fields won't matter here.
+				Metadata:         models.ResourceMetadata{ID: resourceUUID},
+				SCIMExternalID:   externalID,
+				SCIMIDPIssuerURL: issuer,
 			},
 		},
 		{
-			name: "negative: team being deleted was not created via SCIM; expect error ENotFound.",
-			input: &DeleteSCIMResourceInput{
-				ID: resourceUUID,
-			},
+			name: "negative: team is managed by another IDP; expect error ENotFound.",
 			existingSCIMGroup: &models.Team{
-				Metadata: models.ResourceMetadata{
-					ID: resourceUUID,
-				},
+				Metadata:         models.ResourceMetadata{ID: resourceUUID},
+				SCIMExternalID:   externalID,
+				SCIMIDPIssuerURL: "https://other-idp.example.com",
 			},
-			authError:         errors.New("Resource not found", errors.WithErrorCode(errors.ENotFound)),
+			expectedErrorCode: errors.ENotFound,
+		},
+		{
+			name: "negative: team being deleted was not created via SCIM; expect error ENotFound.",
+			existingSCIMGroup: &models.Team{
+				Metadata: models.ResourceMetadata{ID: resourceUUID},
+			},
+			expectedErrorCode: errors.ENotFound,
+		},
+		{
+			name:              "negative: team does not exist; expect error ENotFound.",
 			expectedErrorCode: errors.ENotFound,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			mockTeams := db.MockTeams{}
-			mockTeams.Test(t)
+			mockTeams := db.NewMockTeams(t)
 
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
 
-			// Caller function mocks.
-			mockCaller.On("RequirePermission", mock.Anything, models.DeleteTeamPermission, mock.Anything).Return(test.authError)
+			ctx := auth.WithCaller(context.Background(), auth.NewSCIMCaller(mockMaintenanceMonitor, issuer))
 
-			ctx := auth.WithCaller(context.Background(), &mockCaller)
-
-			// Team mocks.
-			mockTeams.On("GetTeamByID", mock.Anything, test.input.ID).Return(test.existingSCIMGroup, nil)
-			mockTeams.On("DeleteTeam", mock.Anything, test.existingSCIMGroup).Return(nil)
-
-			dbClient := &db.Client{
-				Teams: &mockTeams,
+			mockTeams.On("GetTeamByID", mock.Anything, resourceUUID).Return(test.existingSCIMGroup, nil)
+			if test.expectedErrorCode == "" {
+				mockTeams.On("DeleteTeam", mock.Anything, test.existingSCIMGroup).Return(nil)
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
+			service := NewService(logger, &db.Client{Teams: mockTeams}, nil, []config.IdpConfig{})
 
-			err := service.DeleteSCIMGroup(ctx, test.input)
+			err := service.DeleteSCIMGroup(ctx, &DeleteSCIMResourceInput{ID: resourceUUID})
 			if test.expectedErrorCode != "" {
-				// Negative case.
 				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
-			} else if err != nil {
-				t.Fatal(err)
-			} else {
-				// Positive case.
-				assert.Nil(t, err)
+				return
 			}
+			assert.Nil(t, err)
 		})
 	}
 }
@@ -1142,4 +1430,57 @@ func TestDeleteSCIMGroup(t *testing.T) {
 // getFilter is a helper function to prepare a SCIM resource filter.
 func getFilter(attribute, value string) string {
 	return attribute + " Eq \"" + value + "\""
+}
+
+// TestSCIMListsRequireSCIMCaller checks that only the IDP's SCIM client can list SCIM users and
+// groups: the results include every provisioned user and team and their SCIM external IDs, while the
+// SCIM routes only require an authenticated caller. The empty DB client fails the test on any query,
+// so a refused caller is refused before anything is read.
+func TestSCIMListsRequireSCIMCaller(t *testing.T) {
+	callers := map[string]auth.Caller{
+		"user":            &auth.UserCaller{User: &models.User{Username: "someone"}},
+		"service account": &auth.ServiceAccountCaller{ServiceAccountPath: "group/sa"},
+		"job":             &auth.JobCaller{Job: &models.Job{Metadata: models.ResourceMetadata{ID: "job-1"}}},
+	}
+
+	for name, caller := range callers {
+		t.Run(name, func(t *testing.T) {
+			ctx := auth.WithCaller(context.Background(), caller)
+			service := &service{dbClient: &db.Client{}}
+
+			for _, input := range []*GetSCIMUsersInput{{}, {SCIMExternalID: ptr.String(externalID)}, {Username: ptr.String("someone")}} {
+				_, err := service.GetSCIMUsers(ctx, input)
+				assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
+			}
+
+			for _, input := range []*GetSCIMGroupsInput{{}, {SCIMExternalID: externalID}} {
+				_, err := service.GetSCIMGroups(ctx, input)
+				assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
+			}
+		})
+	}
+}
+
+// TestSCIMMutationsRequireSCIMCaller checks that a caller other than the IDP's SCIM client, such as an admin
+// user who has the permission, can't update or delete users or teams through SCIM: only a SCIM caller has an
+// IDP to check ownership against. The empty DB client fails the test on any query, so a refused caller is
+// refused before anything is read.
+func TestSCIMMutationsRequireSCIMCaller(t *testing.T) {
+	mockCaller := auth.NewMockCaller(t)
+	mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	ctx := auth.WithCaller(context.Background(), mockCaller)
+	service := &service{dbClient: &db.Client{}}
+
+	_, err := service.UpdateSCIMUser(ctx, &UpdateResourceInput{ID: resourceUUID})
+	assert.Equal(t, errors.EForbidden, errors.ErrorCode(err), "UpdateSCIMUser")
+
+	err = service.DeleteSCIMUser(ctx, &DeleteSCIMResourceInput{ID: resourceUUID})
+	assert.Equal(t, errors.EForbidden, errors.ErrorCode(err), "DeleteSCIMUser")
+
+	_, err = service.UpdateSCIMGroup(ctx, &UpdateResourceInput{ID: resourceUUID})
+	assert.Equal(t, errors.EForbidden, errors.ErrorCode(err), "UpdateSCIMGroup")
+
+	err = service.DeleteSCIMGroup(ctx, &DeleteSCIMResourceInput{ID: resourceUUID})
+	assert.Equal(t, errors.EForbidden, errors.ErrorCode(err), "DeleteSCIMGroup")
 }

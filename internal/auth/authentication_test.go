@@ -154,6 +154,48 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 	linkID := uuid.NewString()
 	workspaceID := uuid.NewString()
 
+	activeJob := func(status models.JobStatus) *models.Job {
+		job := &models.Job{
+			Metadata:    models.ResourceMetadata{ID: jobID},
+			Type:        models.JobPlanType,
+			RunID:       runID,
+			WorkspaceID: workspaceID,
+		}
+		require.NoError(t, job.SetStatus(models.JobPending))
+		if status != models.JobPending {
+			require.NoError(t, job.SetStatus(models.JobRunning))
+		}
+		if status != models.JobPending && status != models.JobRunning {
+			require.NoError(t, job.SetStatus(status))
+		}
+		return job
+	}
+
+	// jobTokenMocks sets up a valid job token whose job lookup returns job.
+	jobTokenMocks := func(job *models.Job) func(*MockSigningKeyManager, *db.Client) {
+		return func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
+			mockJobs := db.NewMockJobs(t)
+			mockJobs.On("GetJobByID", mock.Anything, jobID).Return(job, nil)
+			mockDBClient.Jobs = mockJobs
+
+			mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
+				Token: jwt.New(),
+				PrivateClaims: map[string]string{
+					"type":         JobTokenType,
+					"job_id":       gid.ToGlobalID(types.JobModelType, jobID),
+					"run_id":       gid.ToGlobalID(types.RunModelType, runID),
+					"workspace_id": gid.ToGlobalID(types.WorkspaceModelType, workspaceID),
+				},
+			}, nil)
+		}
+	}
+
+	// jobTokenCaller is the caller authenticating a jobTokenMocks token for job should produce: it
+	// carries the job loaded during authentication (the token has no subject, so no TRN).
+	jobTokenCaller := func(job *models.Job) *JobCaller {
+		return &JobCaller{Job: job, RunID: runID, WorkspaceID: workspaceID}
+	}
+
 	tests := []struct {
 		name               string
 		tokenString        string
@@ -208,7 +250,11 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "job token type",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
+				mockJobs := db.NewMockJobs(t)
+				mockJobs.On("GetJobByID", mock.Anything, jobID).Return(activeJob(models.JobRunning), nil)
+				mockDBClient.Jobs = mockJobs
+
 				token := jwt.New()
 				jobTRN := "trn:job:group/workspace/" + gid.ToGlobalID(types.JobModelType, jobID)
 				err := token.Set(jwt.SubjectKey, jobTRN)
@@ -219,20 +265,78 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 					PrivateClaims: map[string]string{
 						"type":         JobTokenType,
 						"job_id":       gid.ToGlobalID(types.JobModelType, jobID),
+						"job_trn":      jobTRN,
 						"run_id":       gid.ToGlobalID(types.RunModelType, runID),
 						"workspace_id": gid.ToGlobalID(types.WorkspaceModelType, workspaceID),
 					},
 				}, nil)
 			},
 			expectCaller: &JobCaller{
-				JobID:       jobID,
+				Job:         activeJob(models.JobRunning),
 				JobTRN:      "trn:job:group/workspace/" + gid.ToGlobalID(types.JobModelType, jobID),
 				RunID:       runID,
 				WorkspaceID: workspaceID,
 			},
 		},
 		{
+			// The caller is limited to reading the job itself; see TestJobCaller_FinishedJob.
+			name:         "job token for a finished job is accepted",
+			tokenString:  "test-token",
+			setupMocks:   jobTokenMocks(activeJob(models.JobFinished)),
+			expectCaller: jobTokenCaller(activeJob(models.JobFinished)),
+		},
+		{
+			name:         "job token for a canceled job is accepted",
+			tokenString:  "test-token",
+			setupMocks:   jobTokenMocks(activeJob(models.JobCanceled)),
+			expectCaller: jobTokenCaller(activeJob(models.JobCanceled)),
+		},
+		{
+			name:               "job token for a missing job is rejected",
+			tokenString:        "test-token",
+			setupMocks:         jobTokenMocks(nil),
+			expectErrorMessage: "job token is no longer valid",
+		},
+		{
+			name:        "job token whose claims do not match the job is rejected",
+			tokenString: "test-token",
+			setupMocks: jobTokenMocks(func() *models.Job {
+				job := activeJob(models.JobRunning)
+				job.RunID = uuid.NewString()
+				return job
+			}()),
+			expectErrorMessage: "job token is no longer valid",
+		},
+		{
+			name:         "job token for a canceling job is accepted",
+			tokenString:  "test-token",
+			setupMocks:   jobTokenMocks(activeJob(models.JobCanceling)),
+			expectCaller: jobTokenCaller(activeJob(models.JobCanceling)),
+		},
+		{
 			name:        "scim token type with valid token",
+			tokenString: "test-token",
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
+				token := jwt.New()
+				err := token.Set(jwt.JwtIDKey, "test-jti")
+				require.NoError(t, err)
+
+				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
+					Token: token,
+					PrivateClaims: map[string]string{
+						"type":                SCIMTokenType,
+						IDPIssuerURLClaimName: "https://idp.example.com",
+					},
+				}, nil)
+
+				mockSCIMTokens := db.NewMockSCIMTokens(t)
+				mockSCIMTokens.On("GetTokenByNonce", mock.Anything, "test-jti").Return(&models.SCIMToken{}, nil)
+				mockDBClient.SCIMTokens = mockSCIMTokens
+			},
+			expectCaller: &SCIMCaller{},
+		},
+		{
+			name:        "scim token type without an idp issuer url",
 			tokenString: "test-token",
 			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
@@ -250,7 +354,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 				mockSCIMTokens.On("GetTokenByNonce", mock.Anything, "test-jti").Return(&models.SCIMToken{}, nil)
 				mockDBClient.SCIMTokens = mockSCIMTokens
 			},
-			expectCaller: &SCIMCaller{},
+			expectErrorMessage: "scim token is missing the idp_issuer_url claim",
 		},
 		{
 			name:        "scim token type with invalid token",
@@ -401,6 +505,17 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.NotNil(t, caller)
+
+				// A job caller carries the job loaded during authentication.
+				if expected, ok := test.expectCaller.(*JobCaller); ok {
+					require.NotNil(t, expected.Job, "job token cases must set the expected job")
+					jobCaller, ok := caller.(*JobCaller)
+					require.True(t, ok)
+					assert.Equal(t, expected.Job, jobCaller.Job)
+					assert.Equal(t, expected.JobTRN, jobCaller.JobTRN)
+					assert.Equal(t, expected.RunID, jobCaller.RunID)
+					assert.Equal(t, expected.WorkspaceID, jobCaller.WorkspaceID)
+				}
 			}
 		})
 	}

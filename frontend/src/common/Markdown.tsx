@@ -3,10 +3,12 @@ import Link from '@mui/material/Link';
 import Table from "@mui/material/Table";
 import TableContainer from "@mui/material/TableContainer";
 import Typography, { TypographyProps } from '@mui/material/Typography';
+import { createContext, useContext, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
+import ConfirmationDialog from './ConfirmationDialog';
 import { StyledCode } from './StyledCode';
 
 function MarkdownParagraph({ ...props }: any) {
@@ -93,19 +95,91 @@ function MarkdownTableHead({ ...props }: any) {
     return <TableHead sx={{ textAlign: 'left' }}>{props.children}</TableHead>
 }
 
-function isAllowedHref(href: string | undefined): boolean {
-    if (!href) return false;
+// When set, off-site content is treated as untrusted: external images are not loaded and external
+// links open only after the user confirms the destination. Used for text written by the AI
+// assistant, which can be steered by content it reads (job logs, READMEs) into writing a URL that
+// carries the user's data — an image would send it the moment the message renders, a link on click.
+const RestrictExternalContentContext = createContext(false);
+
+function parseUrl(href: string | undefined): URL | null {
+    if (!href) return null;
     try {
-        const url = new URL(href, window.location.origin);
-        return url.protocol === 'https:';
+        return new URL(href, window.location.origin);
     } catch {
-        return false;
+        return null;
     }
 }
 
+function isAllowedHref(href: string | undefined): boolean {
+    return parseUrl(href)?.protocol === 'https:';
+}
+
+function isSameOrigin(href: string | undefined): boolean {
+    return parseUrl(href)?.origin === window.location.origin;
+}
+
+// Hosts whose links open without the external-link confirmation. A link carries data only to whoever
+// can read the requests its host receives, so a host belongs here only if its owner is trusted and it
+// can't forward a request elsewhere: no open redirects, no user-hosted content on the same host.
+// Matched exactly over https, without subdomains other than a leading "www.", which is stripped first.
+const SAFE_EXTERNAL_LINK_HOSTS = new Set([
+    'tharsis.martian-cloud.io', // Tharsis documentation (config.docsUrl)
+    'developer.hashicorp.com', // Terraform documentation
+    'registry.terraform.io', // Public Terraform registry
+    'github.com',
+    'gitlab.com',
+    'youtube.com'
+]);
+
+function isSafeExternalLink(href: string | undefined): boolean {
+    const url = parseUrl(href);
+    return url?.protocol === 'https:' && SAFE_EXTERNAL_LINK_HOSTS.has(url.host.replace(/^www\./, ''));
+}
+
+function ExternalLinkConfirmation({ href, children }: { href: string, children: React.ReactNode }) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <>
+            <Link
+                color="secondary"
+                underline="none"
+                href={href}
+                onClick={(e: React.MouseEvent) => {
+                    e.preventDefault();
+                    setOpen(true);
+                }}>
+                {children}
+            </Link>
+            {open && <ConfirmationDialog
+                title="Open external link?"
+                maxWidth="sm"
+                confirmLabel="Open link"
+                confirmColor="primary"
+                confirmInProgress={false}
+                confirmHref={href}
+                onConfirm={() => setOpen(false)}
+                onClose={() => setOpen(false)}
+            >
+                <Typography variant="body2" gutterBottom>
+                    This link leaves Tharsis. Only open it if you recognize and trust the destination.
+                </Typography>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                    {href}
+                </Typography>
+            </ConfirmationDialog>}
+        </>
+    );
+}
+
 function MarkdownLink({ ...props }: any) {
+    const restrictExternalContent = useContext(RestrictExternalContentContext);
+
     if (!isAllowedHref(props.href)) {
         return <>{props.children}</>;
+    }
+    if (restrictExternalContent && !isSameOrigin(props.href) && !isSafeExternalLink(props.href)) {
+        return <ExternalLinkConfirmation href={props.href}>{props.children}</ExternalLinkConfirmation>;
     }
     return <Link
         color="secondary"
@@ -144,6 +218,15 @@ function MarkdownCode({ className, children, ...props }: any) {
 }
 
 function MarkdownImage({ ...props }: any) {
+    const restrictExternalContent = useContext(RestrictExternalContentContext);
+
+    // An off-site image is fetched as soon as it renders, so when external content is restricted it
+    // is shown as a link (which goes through the external-link confirmation) instead of loaded. Without
+    // alt text the label stays generic rather than the URL, which screen readers spell out; the
+    // confirmation shows the URL anyway.
+    if (restrictExternalContent && !isSameOrigin(props.src)) {
+        return <MarkdownLink href={props.src}>{props.alt ? `Image: ${props.alt}` : 'Image (external link)'}</MarkdownLink>;
+    }
     return <img style={{ maxWidth: '100%' }} {...props} />;
 }
 
@@ -224,8 +307,15 @@ const components = {
     input: MarkdownInput,
 };
 
-export default function Markdown(props: { children: string | null | undefined; }) {
+interface MarkdownProps {
+    children: string | null | undefined
+    // Treat off-site images and links as untrusted (see RestrictExternalContentContext).
+    restrictExternalContent?: boolean
+}
+
+export default function Markdown(props: MarkdownProps) {
     return (
+        <RestrictExternalContentContext.Provider value={!!props.restrictExternalContent}>
         <Box
             sx={{
                 '&>:first-of-type': {
@@ -240,5 +330,6 @@ export default function Markdown(props: { children: string | null | undefined; }
                 {props.children}
             </ReactMarkdown>
         </Box>
+        </RestrictExternalContentContext.Provider>
     );
 }

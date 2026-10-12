@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"slices"
 
 	"github.com/aws/smithy-go/ptr"
 
@@ -113,11 +114,11 @@ func Create(
 		ModuleSource:          input.ModuleRegistrySource,
 		ModuleSemanticVersion: input.ModuleVersion,
 	}
-	for _, mi := range managedIdentities {
-		miCopy := mi
-		if err := ruleEnforcer.EnforceRules(ctx, &miCopy, runDetails); err != nil {
-			return nil, err
-		}
+	// The identities that pass the rules are recorded on the run's nodes: a job may only create
+	// credentials for the identities on its own node, so one assigned after this check is not usable.
+	managedIdentityIDs, err := ruleEnforcer.EnforceRules(ctx, managedIdentities, runDetails)
+	if err != nil {
+		return nil, err
 	}
 
 	// Determine if the run is speculative.
@@ -136,6 +137,16 @@ func Create(
 		isSpeculative = configVersion.Speculative
 		if input.Speculative != nil {
 			isSpeculative = *input.Speculative
+		}
+	}
+
+	// An auto-apply run's apply is started by the system rather than a principal, so StartApply never
+	// checks its apply-stage rules. Verify them here instead, against the subject creating the run.
+	if input.AutoApply && !isSpeculative {
+		applyDetails := *runDetails
+		applyDetails.RunStage = models.JobApplyType
+		if _, err := ruleEnforcer.EnforceRules(ctx, managedIdentities, &applyDetails); err != nil {
+			return nil, err
 		}
 	}
 
@@ -203,13 +214,17 @@ func Create(
 		RefreshOnly:             input.RefreshOnly,
 		IsAssessmentRun:         input.IsAssessmentRun,
 		VariablesObjectStoreKey: &input.VariablesObjectStoreKey,
-		Plan:                    models.Plan{Status: models.PlanCreated},
+		Plan:                    models.Plan{Status: models.PlanCreated, ManagedIdentityIDs: managedIdentityIDs},
 	}
 	if input.Comment != nil {
 		runModel.Comment = *input.Comment
 	}
 	if !isSpeculative {
 		runModel.Apply = &models.Apply{Status: models.ApplyCreated}
+		if input.AutoApply {
+			// Authorized by the apply-stage check above. A manual apply records its own when started.
+			runModel.Apply.ManagedIdentityIDs = slices.Clone(managedIdentityIDs)
+		}
 	}
 	runModel.TaskStages = taskStages
 

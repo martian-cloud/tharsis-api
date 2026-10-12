@@ -1,6 +1,7 @@
 import { OidcClient, SigninRequest } from "oidc-client-ts";
 import { Cookies } from 'react-cookie';
 import cfg from '../common/config';
+import { toSameOriginPath } from './returnPath';
 
 const LOGIN_RETURN_TO = 'tharsis_oidc_login_return_to';
 const CSRF_TOKEN_COOKIE_NAME = 'tharsis_csrf_token';
@@ -141,7 +142,7 @@ abstract class AuthenticationService {
             window.sessionStorage.removeItem(LOGIN_RETURN_TO);
         }
 
-        this._redirectAfterLogin(returnToPath ?? '/')
+        this._redirectAfterLogin(toSameOriginPath(returnToPath))
     }
 
     initialize(): Promise<void> {

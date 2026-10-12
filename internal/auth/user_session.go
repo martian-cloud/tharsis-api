@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -195,7 +196,10 @@ func (u *userSessionManager) ExchangeOAuthCodeForSessionToken(ctx context.Contex
 		return nil, errors.New("missing required fields in input", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	var token string
+	var (
+		token      string
+		expiration time.Time
+	)
 	if err := u.dbClient.RetryOnOLE(ctx, func() error {
 		// Find session using auth code
 		sessions, err := u.dbClient.UserSessions.GetUserSessions(ctx, &db.GetUserSessionsInput{
@@ -241,7 +245,7 @@ func (u *userSessionManager) ExchangeOAuthCodeForSessionToken(ctx context.Contex
 				return fmt.Errorf("error updating user session: %w", err)
 			}
 
-			token, err = u.generateAccessToken(ctx, updatedSession)
+			token, expiration, err = u.generateAccessToken(ctx, updatedSession)
 			if err != nil {
 				return fmt.Errorf("error generating access token: %w", err)
 			}
@@ -255,16 +259,38 @@ func (u *userSessionManager) ExchangeOAuthCodeForSessionToken(ctx context.Contex
 	if token != "" {
 		return &ExchangeOAuthCodeForSessionTokenResponse{
 			AccessToken: string(token),
-			ExpiresIn:   int(u.accessTokenExpirationMinutes.Seconds()),
+			ExpiresIn:   expiresIn(expiration),
 		}, nil
 	}
 
 	return nil, errors.New("no user session found for auth code", errors.WithErrorCode(errors.EUnauthorized))
 }
 
+// ValidateOAuthRedirectURI checks that an OAuth redirect URI points at the local machine, which is
+// the only redirect target the built-in OAuth provider supports (the CLI listens on localhost). The
+// URI is parsed rather than prefix-matched: "http://localhost:@evil.com" starts with
+// "http://localhost:" but its host is evil.com, with "localhost:" as userinfo.
+func ValidateOAuthRedirectURI(redirectURI string) error {
+	invalid := errors.New("invalid redirect uri %s, only redirects to %s are supported", redirectURI, validRedirectURL, errors.WithErrorCode(errors.EInvalid))
+
+	u, err := url.Parse(redirectURI)
+	if err != nil {
+		return invalid
+	}
+	if u.Scheme != "http" || u.Opaque != "" || u.User != nil || u.Fragment != "" || u.Hostname() != "localhost" {
+		return invalid
+	}
+	if port := u.Port(); port != "" {
+		if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 {
+			return invalid
+		}
+	}
+	return nil
+}
+
 func (u *userSessionManager) InitiateSessionOauthCodeFlow(ctx context.Context, input *InitiateSessionOauthCodeFlowInput) (string, error) {
-	if input.RedirectURI != validRedirectURL && !strings.HasPrefix(input.RedirectURI, validRedirectURL+":") {
-		return "", errors.New("invalid redirect uri %s, only redirects to %s are supported", input.RedirectURI, validRedirectURL, errors.WithErrorCode(errors.EInvalid))
+	if err := ValidateOAuthRedirectURI(input.RedirectURI); err != nil {
+		return "", err
 	}
 
 	if input.CodeChallengeMethod != validCodeChallengeMethod {
@@ -405,7 +431,7 @@ func (u *userSessionManager) CreateSession(ctx context.Context, input *CreateSes
 	}
 
 	// Generate tokens
-	accessToken, err := u.generateAccessToken(ctx, session)
+	accessToken, accessTokenExpiration, err := u.generateAccessToken(ctx, session)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate access token for user session")
 	}
@@ -431,7 +457,7 @@ func (u *userSessionManager) CreateSession(ctx context.Context, input *CreateSes
 		RefreshToken: refreshToken,
 		CSRFToken:    csrfToken,
 		Session:      session,
-		ExpiresIn:    int(u.accessTokenExpirationMinutes.Seconds()),
+		ExpiresIn:    expiresIn(accessTokenExpiration),
 	}, nil
 }
 
@@ -488,7 +514,7 @@ func (u *userSessionManager) RefreshSession(ctx context.Context, refreshToken st
 	}
 
 	// Generate new tokens
-	accessToken, err := u.generateAccessToken(ctx, updatedSession)
+	accessToken, _, err := u.generateAccessToken(ctx, updatedSession)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate access token for user session")
 	}
@@ -599,6 +625,12 @@ func (u *userSessionManager) VerifyCSRFToken(ctx context.Context, requestSession
 // setTokenCookies sets the access and refresh token cookies
 func (u *userSessionManager) SetUserSessionCookies(w http.ResponseWriter, input *SetUserSessionCookiesInput) {
 	accessExpiration := time.Now().Add(u.accessTokenExpirationMinutes)
+	// The access token cookie must not outlive the session. The CSRF cookie expires with the session
+	// and is not re-issued on refresh, so an access cookie that outlasted it would arrive without a
+	// CSRF cookie and be rejected.
+	if !input.SessionExpiration.IsZero() && input.SessionExpiration.Before(accessExpiration) {
+		accessExpiration = input.SessionExpiration
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     u.GetUserSessionAccessTokenCookieName(),
@@ -723,9 +755,14 @@ func (u *userSessionManager) generateCSRFToken(ctx context.Context, session *mod
 	return string(token), nil
 }
 
-// generateAccessToken creates a short-lived access token
-func (u *userSessionManager) generateAccessToken(ctx context.Context, session *models.UserSession) (string, error) {
+// generateAccessToken creates a short-lived access token and returns it with its expiration. The token
+// never outlives its session: a refresh near the end of the session gets a token that expires with it,
+// since authenticating an access token doesn't check the session.
+func (u *userSessionManager) generateAccessToken(ctx context.Context, session *models.UserSession) (string, time.Time, error) {
 	expiration := time.Now().Add(u.accessTokenExpirationMinutes).UTC()
+	if session.Expiration.Before(expiration) {
+		expiration = session.Expiration.UTC()
+	}
 	token, err := u.signingKeyManager.GenerateToken(ctx, &TokenInput{
 		Expiration: &expiration,
 		Subject:    gid.ToGlobalID(types.UserModelType, session.UserID),
@@ -736,10 +773,16 @@ func (u *userSessionManager) generateAccessToken(ctx context.Context, session *m
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to generate access token: %w", err)
+		return "", time.Time{}, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	return string(token), nil
+	return string(token), expiration, nil
+}
+
+// expiresIn returns the seconds left until expiration, for an OAuth expires_in field. It rounds so a
+// token issued just now reports its full lifetime.
+func expiresIn(expiration time.Time) int {
+	return max(0, int(time.Until(expiration).Round(time.Second).Seconds()))
 }
 
 // generateRefreshToken creates a long-lived refresh token

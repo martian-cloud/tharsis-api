@@ -49,4 +49,6 @@ message Plan {
   PlanSummary               summary           = 5;
   optional string           latest_job_id     = 6;
   PlanStatus                status            = 7;
+  // Global IDs of the managed identities the plan job may create credentials for.
+  repeated string           managed_identity_ids = 8;
 }

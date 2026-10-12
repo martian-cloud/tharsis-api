@@ -20,10 +20,10 @@ import (
 
 // Users encapsulates the logic to access users from the database
 type Users interface {
-	GetUserBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.User, error)
+	GetUserBySCIMExternalID(ctx context.Context, scimIDPIssuerURL string, scimExternalID string) (*models.User, error)
 	GetUserByExternalID(ctx context.Context, issuer string, externalID string) (*models.User, error)
 	LinkUserWithExternalID(ctx context.Context, issuer string, externalID string, userID string) error
-	UnlinkUserExternalID(ctx context.Context, issuer string, externalID string) error
+	HasExternalIdentity(ctx context.Context, userID string, issuer *string) (bool, error)
 	GetUserByID(ctx context.Context, id string) (*models.User, error)
 	GetUserByTRN(ctx context.Context, trnValue string) (*models.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
@@ -66,6 +66,8 @@ type UserFilter struct {
 	SCIMExternalID bool
 	Admin          *bool
 	Active         bool
+	// SCIMIDPIssuerURL returns only users managed by the SCIM client of this IDP.
+	SCIMIDPIssuerURL *string
 }
 
 // GetUsersInput is the input for listing users
@@ -88,7 +90,7 @@ type users struct {
 	dbClient *Client
 }
 
-var userFieldList = append(metadataFieldList, "username", "email", "admin", "scim_external_id", "active", "password_hash", "admin_mode_expiration")
+var userFieldList = append(metadataFieldList, "username", "email", "admin", "scim_external_id", "active", "password_hash", "admin_mode_expiration", "scim_idp_issuer_url")
 
 // NewUsers returns an instance of the Users interface
 func NewUsers(dbClient *Client) Users {
@@ -132,12 +134,17 @@ func (u *users) GetUserByUsername(ctx context.Context, username string) (*models
 	return u.getUser(ctx, goqu.Ex{"users.username": username})
 }
 
-func (u *users) GetUserBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.User, error) {
+// GetUserBySCIMExternalID returns the user with the SCIM external ID among those managed by the SCIM client of
+// the given IDP. External IDs are only unique per IDP.
+func (u *users) GetUserBySCIMExternalID(ctx context.Context, scimIDPIssuerURL string, scimExternalID string) (*models.User, error) {
 	ctx, span := tracer.Start(ctx, "db.GetUserBySCIMExternalID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	return u.getUser(ctx, goqu.Ex{"users.scim_external_id": scimExternalID})
+	return u.getUser(ctx, goqu.Ex{
+		"users.scim_idp_issuer_url": scimIDPIssuerURL,
+		"users.scim_external_id":    scimExternalID,
+	})
 }
 
 func (u *users) GetUserByExternalID(ctx context.Context, issuer string, externalID string) (*models.User, error) {
@@ -203,26 +210,34 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 	return nil
 }
 
-func (u *users) UnlinkUserExternalID(ctx context.Context, issuer string, externalID string) error {
-	ctx, span := tracer.Start(ctx, "db.UnlinkUserExternalID")
+// HasExternalIdentity reports whether the user is linked to any external identity, or to one from the
+// given issuer when issuer is non-nil.
+func (u *users) HasExternalIdentity(ctx context.Context, userID string, issuer *string) (bool, error) {
+	ctx, span := tracer.Start(ctx, "db.HasExternalIdentity")
 	defer span.End()
 
-	sql, args, err := toSQLWithTag("user.UnlinkUserExternalID", dialect.Delete("user_external_identities").
-		Prepared(true).
-		Where(goqu.Ex{
-			"issuer":      issuer,
-			"external_id": externalID,
-		}))
-	if err != nil {
-		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	ex := goqu.Ex{"user_external_identities.user_id": userID}
+	if issuer != nil {
+		ex["user_external_identities.issuer"] = *issuer
 	}
 
-	_, err = u.dbClient.getConnection(ctx).Exec(ctx, sql, args...)
+	inner := dialect.From(goqu.T("user_external_identities")).
+		Select(goqu.L("1")).
+		Where(ex)
+
+	sql, args, err := toSQLWithTag("user.HasExternalIdentity", dialect.
+		Select(goqu.L("exists ?", inner)).
+		Prepared(true))
 	if err != nil {
-		return errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+		return false, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	return nil
+	var exists bool
+	if err := u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...).Scan(&exists); err != nil {
+		return false, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+
+	return exists, nil
 }
 
 func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResult, error) {
@@ -244,6 +259,9 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 		}
 		if input.Filter.SCIMExternalID {
 			ex = ex.Append(goqu.I("users.scim_external_id").IsNotNull())
+		}
+		if input.Filter.SCIMIDPIssuerURL != nil {
+			ex = ex.Append(goqu.I("users.scim_idp_issuer_url").Eq(*input.Filter.SCIMIDPIssuerURL))
 		}
 		if input.Filter.Active {
 			ex = ex.Append(goqu.I("users.active").IsTrue()) // Return only active users.
@@ -325,6 +343,7 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 				"username":              user.Username,
 				"email":                 user.Email,
 				"scim_external_id":      nullableString(user.SCIMExternalID),
+				"scim_idp_issuer_url":   nullableString(user.SCIMIDPIssuerURL),
 				"active":                user.Active,
 				"admin":                 user.Admin,
 				"password_hash":         user.PasswordHash,
@@ -342,7 +361,15 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.New("user with username %s already exists", user.Username, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
+				switch pgErr.ConstraintName {
+				case "index_users_on_username":
+					return nil, errors.New("user with username %s already exists", user.Username, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
+				case "index_users_on_email":
+					return nil, errors.New("user with email %s already exists", user.Email, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
+				case "index_users_on_scim_idp_issuer_url_scim_external_id":
+					return nil, errors.New("user with SCIM external id %s already exists", user.SCIMExternalID, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
+				}
+				return nil, errors.New("user conflicts with an existing user", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
 		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
@@ -368,6 +395,7 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 			"email":                 user.Email,
 			"admin":                 user.Admin,
 			"scim_external_id":      nullableString(user.SCIMExternalID),
+			"scim_idp_issuer_url":   nullableString(user.SCIMIDPIssuerURL),
 			"active":                user.Active,
 			"password_hash":         user.PasswordHash,
 			"admin_mode_expiration": user.AdminModeExpiration,
@@ -386,6 +414,8 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 					return nil, errors.New("user with username %s already exists", user.Username, errors.WithErrorCode(errors.EConflict))
 				case "index_users_on_email":
 					return nil, errors.New("user with email %s already exists", user.Email, errors.WithErrorCode(errors.EConflict))
+				case "index_users_on_scim_idp_issuer_url_scim_external_id":
+					return nil, errors.New("user with SCIM external id %s already exists", user.SCIMExternalID, errors.WithErrorCode(errors.EConflict))
 				}
 			}
 		}
@@ -465,7 +495,7 @@ func (u *users) getSelectFields() []interface{} {
 }
 
 func scanUser(row scanner) (*models.User, error) {
-	var scimExternalID sql.NullString
+	var scimExternalID, scimIDPIssuerURL sql.NullString
 	user := &models.User{}
 
 	fields := []interface{}{
@@ -480,6 +510,7 @@ func scanUser(row scanner) (*models.User, error) {
 		&user.Active,
 		&user.PasswordHash,
 		&user.AdminModeExpiration,
+		&scimIDPIssuerURL,
 	}
 
 	err := row.Scan(fields...)
@@ -489,6 +520,9 @@ func scanUser(row scanner) (*models.User, error) {
 
 	if scimExternalID.Valid {
 		user.SCIMExternalID = scimExternalID.String
+	}
+	if scimIDPIssuerURL.Valid {
+		user.SCIMIDPIssuerURL = scimIDPIssuerURL.String
 	}
 
 	user.Metadata.TRN = trn.TypeUser.Build(user.Username)

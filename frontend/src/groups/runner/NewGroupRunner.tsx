@@ -48,7 +48,8 @@ function NewGroupRunner({ fragmentRef }: Props) {
         description: '',
         disabled: false,
         tags: [],
-        runUntaggedJobs: false
+        runUntaggedJobs: false,
+        jobLimit: 0
     });
 
     const onSave = () => {
@@ -60,6 +61,7 @@ function NewGroupRunner({ fragmentRef }: Props) {
                     groupPath: group.fullPath,
                     disabled: formData.disabled,
                     runUntaggedJobs: formData.runUntaggedJobs,
+                    jobLimit: formData.jobLimit,
                     tags: formData.tags
                 },
                 connections: GetConnections(group.id)

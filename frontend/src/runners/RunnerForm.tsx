@@ -8,6 +8,7 @@ export interface FormData {
     disabled: boolean
     tags: string[]
     runUntaggedJobs: boolean
+    jobLimit: number
 }
 
 interface Props {
@@ -63,6 +64,24 @@ function RunnerForm({ data, onChange, editMode, error }: Props) {
                         onChange={event => onChange({ ...data, runUntaggedJobs: event.target.checked })}
                     />}
                     label="Run Untagged Jobs"
+                />
+            </Box>
+            <Typography sx={{ mt: 2 }} variant="subtitle1" gutterBottom>Job Limit</Typography>
+            <Divider light sx={{ mb: 2 }} />
+            <Box sx={{ mb: 3 }}>
+                <TextField
+                    // MUI only links helperText to the input via aria-describedby when the field has an id.
+                    id="runner-job-limit"
+                    size="small"
+                    type="number"
+                    label="Job Limit"
+                    helperText="The maximum number of jobs this runner can run concurrently. Set to 0 for no limit."
+                    value={data.jobLimit}
+                    slotProps={{ htmlInput: { min: 0 } }}
+                    onChange={event => {
+                        const value = parseInt(event.target.value, 10);
+                        onChange({ ...data, jobLimit: isNaN(value) ? 0 : Math.max(0, value) });
+                    }}
                 />
             </Box>
             <Typography sx={{ mt: 2 }} variant="subtitle1" gutterBottom>Status</Typography>
