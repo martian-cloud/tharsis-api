@@ -92,6 +92,8 @@ func NewGraphQL(
 	maxBodySize int,
 	maxSubscriptionDuration time.Duration,
 	tharsisUIOrigin string,
+	allowedOrigins []string,
+	accessTokenCookieName string,
 ) (*GraphQL, error) {
 	schemaStr, err := schema.String()
 	if err != nil {
@@ -181,6 +183,8 @@ func NewGraphQL(
 			authenticator,
 			maxSubscriptionDuration,
 			tharsisUIOrigin,
+			allowedOrigins,
+			accessTokenCookieName,
 		),
 	}, nil
 }
@@ -308,6 +312,10 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						h.logger.WithContextFields(ctx).Errorf("Unexpected error occurred: %s", e.Err.Error())
 						// Avoid exposing sensitive error messages
 						e.Message = errors.InternalErrorMessage
+					case errors.EDataLoss:
+						// The message describes what is missing (it never contains sensitive values), so
+						// it is kept for the client; the error is still logged as a server fault.
+						h.logger.WithContextFields(ctx).Errorf("Data loss error occurred: %s", e.Err.Error())
 					case errors.EUnauthorized:
 						responseStatusCode = http.StatusUnauthorized
 					}

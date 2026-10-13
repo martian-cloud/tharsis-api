@@ -416,6 +416,10 @@ type Plan struct {
 	DiffSize            int
 	Summary             PlanSummary
 	HasChanges          bool
+	// ManagedIdentityIDs are the managed identities the plan job may create credentials for: those
+	// assigned to the workspace when the run passed its plan-stage access rules. Nil only for runs that
+	// finished before they were recorded; a nil list authorizes no identities.
+	ManagedIdentityIDs []string
 }
 
 // GetID returns the node ID
@@ -448,6 +452,11 @@ type Apply struct {
 	Status       ApplyStatus
 	TriggeredBy  string
 	Comment      string
+	// ManagedIdentityIDs are the managed identities the apply job may create credentials for: those
+	// assigned to the workspace when the apply passed its apply-stage access rules. Set when auto-apply
+	// is enabled (including at run creation) or the apply is approved, and cleared when auto-apply is
+	// disabled; a nil list authorizes no identities.
+	ManagedIdentityIDs []string
 }
 
 // GetID returns the node ID
@@ -1082,6 +1091,7 @@ func (n *Plan) Copy() RunNode {
 		CacheObjectStoreKey: n.CacheObjectStoreKey,
 		JSONObjectStoreKey:  n.JSONObjectStoreKey,
 		DiffObjectStoreKey:  n.DiffObjectStoreKey,
+		ManagedIdentityIDs:  slices.Clone(n.ManagedIdentityIDs),
 	}
 }
 
@@ -1105,18 +1115,20 @@ func (n *Plan) ShallowCompare(other RunNode) bool {
 		ptrStringEqual(n.JSONObjectStoreKey, o.JSONObjectStoreKey) &&
 		ptrStringEqual(n.DiffObjectStoreKey, o.DiffObjectStoreKey) &&
 		ptrStringEqual(n.LatestJobID, o.LatestJobID) &&
-		ptrStringEqual(n.ErrorMessage, o.ErrorMessage)
+		ptrStringEqual(n.ErrorMessage, o.ErrorMessage) &&
+		slices.Equal(n.ManagedIdentityIDs, o.ManagedIdentityIDs)
 }
 
 // Copy creates a deep copy of the Apply.
 func (n *Apply) Copy() RunNode {
 	return &Apply{
-		ErrorMessage: n.ErrorMessage,
-		LatestJobID:  n.LatestJobID,
-		ID:           n.ID,
-		Status:       n.Status,
-		TriggeredBy:  n.TriggeredBy,
-		Comment:      n.Comment,
+		ErrorMessage:       n.ErrorMessage,
+		LatestJobID:        n.LatestJobID,
+		ID:                 n.ID,
+		Status:             n.Status,
+		TriggeredBy:        n.TriggeredBy,
+		Comment:            n.Comment,
+		ManagedIdentityIDs: slices.Clone(n.ManagedIdentityIDs),
 	}
 }
 
@@ -1136,7 +1148,8 @@ func (n *Apply) ShallowCompare(other RunNode) bool {
 		n.TriggeredBy == o.TriggeredBy &&
 		n.Comment == o.Comment &&
 		ptrStringEqual(n.LatestJobID, o.LatestJobID) &&
-		ptrStringEqual(n.ErrorMessage, o.ErrorMessage)
+		ptrStringEqual(n.ErrorMessage, o.ErrorMessage) &&
+		slices.Equal(n.ManagedIdentityIDs, o.ManagedIdentityIDs)
 }
 
 func ptrStringEqual(a, b *string) bool {

@@ -58,6 +58,9 @@ func NewRunController(
 	}
 }
 
+// maxCreateRunBodySize caps a create-run request: the run's attributes and any run variables.
+const maxCreateRunBodySize = 10 * 1024 * 1024 // 10 MiB
+
 // RegisterRoutes adds routes to the router
 func (c *runController) RegisterRoutes(router chi.Router) {
 	// Require JWT authentication
@@ -78,7 +81,8 @@ func (c *runController) RegisterRoutes(router chi.Router) {
 	router.Get("/plans/{id}/content", c.DownloadPlan)
 	router.Get("/plans/{id}/json-output", c.DownloadPlanJSON)
 
-	router.Post("/runs", c.CreateRun)
+	// CreateRun reads the whole request into memory, so it is capped.
+	router.With(middleware.LimitRequestBody(maxCreateRunBodySize, c.respWriter)).Post("/runs", c.CreateRun)
 	router.Post("/runs/{id}/actions/apply", c.ApplyRun)
 	router.Post("/runs/{id}/actions/cancel", c.CancelRun)
 	router.Post("/runs/{id}/actions/discard", c.DiscardRun)
@@ -318,7 +322,7 @@ func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 	// Always return a LogReadURL; the Terraform CLI requires one on every plan response,
 	// even before the plan's job has been created. The URL is scoped to the run node so
 	// the log endpoint can resolve the job lazily once it exists.
-	if c.tharsisAPIURL != "" {
+	if c.tharsisAPIURL != "" && canReadRunLogs(r.Context(), run) {
 		token, err := c.createRunLogToken(r.Context(), run.GetGlobalID())
 		if err != nil {
 			c.respWriter.RespondWithError(r.Context(), w, err)
@@ -355,7 +359,7 @@ func (c *runController) GetApply(w http.ResponseWriter, r *http.Request) {
 	// Always return a LogReadURL; the Terraform CLI requires one on every apply response,
 	// even before the apply's job has been created. The URL is scoped to the run node so
 	// the log endpoint can resolve the job lazily once it exists.
-	if c.tharsisAPIURL != "" {
+	if c.tharsisAPIURL != "" && canReadRunLogs(r.Context(), run) {
 		token, err := c.createRunLogToken(r.Context(), run.GetGlobalID())
 		if err != nil {
 			c.respWriter.RespondWithError(r.Context(), w, err)
@@ -729,6 +733,17 @@ func toTFEPlanStatus(status models.PlanStatus) gotfe.PlanStatus {
 		return gotfe.PlanUnreachable
 	}
 	return gotfe.PlanStatus(status)
+}
+
+// canReadRunLogs reports whether the caller may be handed a log URL for the run. Log URLs are
+// bearer tokens served without further authorization, so they must not reach a caller who could
+// not read the logs directly. A job may view runs across its root group, but may only read its
+// own run's logs, and only while it is running.
+func canReadRunLogs(ctx context.Context, run *models.Run) bool {
+	if jobCaller, ok := auth.GetCaller(ctx).(*auth.JobCaller); ok {
+		return jobCaller.RunID == run.Metadata.ID && !jobCaller.Job.GetStatus().IsFinal()
+	}
+	return true
 }
 
 // createRunLogToken mints a short-lived token authorizing reads of a run's node logs.

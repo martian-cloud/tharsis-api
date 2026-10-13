@@ -23,6 +23,7 @@ var errorToStatusCode = map[errors.CodeType]codes.Code{
 	errors.ETooManyRequests:    codes.ResourceExhausted,
 	errors.EUnauthorized:       codes.Unauthenticated,
 	errors.EServiceUnavailable: codes.Unavailable,
+	errors.EDataLoss:           codes.DataLoss,
 }
 
 // ErrorHandlerUnary handles any errors that occur by returning the correct grpc error code
@@ -80,7 +81,7 @@ func buildStatusError(err error) error {
 func handleError(ctx context.Context, err error, logger logger.Logger) error {
 	// Log certain errors to make troubleshooting easier.
 	switch errors.ErrorCode(err) {
-	case errors.EInternal:
+	case errors.EInternal, errors.EDataLoss:
 		// Don't log context deadline expired and context cancelled errors.
 		if errors.FilterContextError(err) != nil {
 			logger.WithContextFields(ctx).Errorf("Unexpected gRPC error occurred: %s", err.Error())

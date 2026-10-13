@@ -61,15 +61,12 @@ func TestStartApply_Prepare(t *testing.T) {
 			Return(&models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}}, nil)
 
 		mockRuleEnforcer := rules.NewMockRuleEnforcer(t)
-		// Each assigned managed identity must be checked, with an apply-stage RunDetails.
-		mockRuleEnforcer.On("EnforceRules", ctx, mock.MatchedBy(func(mi *models.ManagedIdentity) bool {
-			return mi.Metadata.ID == "mi-1"
+		// Every assigned managed identity must be checked, with an apply-stage RunDetails.
+		mockRuleEnforcer.On("EnforceRules", ctx, mock.MatchedBy(func(mis []models.ManagedIdentity) bool {
+			return len(mis) == 2 && mis[0].Metadata.ID == "mi-1" && mis[1].Metadata.ID == "mi-2"
 		}), mock.MatchedBy(func(d *rules.RunDetails) bool {
 			return d.RunStage == models.JobApplyType
-		})).Return(nil)
-		mockRuleEnforcer.On("EnforceRules", ctx, mock.MatchedBy(func(mi *models.ManagedIdentity) bool {
-			return mi.Metadata.ID == "mi-2"
-		}), mock.Anything).Return(nil)
+		})).Return([]string{"mi-1", "mi-2"}, nil)
 
 		cmd := &StartApply{
 			dbClient:     &db.Client{Runs: mockRuns, ManagedIdentities: mockManagedIdentities, Workspaces: mockWorkspaces},
@@ -78,6 +75,8 @@ func TestStartApply_Prepare(t *testing.T) {
 		}
 
 		require.NoError(t, cmd.Prepare(ctx))
+		// The identities that passed are kept for Execute to record on the apply node.
+		assert.Equal(t, []string{"mi-1", "mi-2"}, cmd.managedIdentityIDs)
 	})
 
 	t.Run("rule enforcement denial is returned", func(t *testing.T) {
@@ -98,7 +97,7 @@ func TestStartApply_Prepare(t *testing.T) {
 
 		mockRuleEnforcer := rules.NewMockRuleEnforcer(t)
 		mockRuleEnforcer.On("EnforceRules", ctx, mock.Anything, mock.Anything).
-			Return(errors.New("rule denied", errors.WithErrorCode(errors.EForbidden)))
+			Return(nil, errors.New("rule denied", errors.WithErrorCode(errors.EForbidden)))
 
 		cmd := &StartApply{
 			dbClient:     &db.Client{Runs: mockRuns, ManagedIdentities: mockManagedIdentities, Workspaces: mockWorkspaces},
@@ -185,6 +184,7 @@ func TestStartApply_Execute(t *testing.T) {
 					TriggeredBy: "user@example.com",
 					Comment:     "go",
 				},
+				managedIdentityIDs: []string{"mi-1"},
 			}
 
 			err := cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore})
@@ -201,6 +201,7 @@ func TestStartApply_Execute(t *testing.T) {
 			assert.Equal(t, tt.wantApply, cmd.Updated.Apply.Status)
 			assert.Equal(t, "user@example.com", cmd.Updated.Apply.TriggeredBy)
 			assert.Equal(t, "go", cmd.Updated.Apply.Comment)
+			assert.Equal(t, []string{"mi-1"}, cmd.Updated.Apply.ManagedIdentityIDs)
 		})
 	}
 }

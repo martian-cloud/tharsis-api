@@ -1087,8 +1087,10 @@ func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadClose
 		return nil, errors.New("plan with ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
-	if err != nil {
+	// The plan embeds the run's input variable values, sensitive ones included, and the prior state, so
+	// it takes the permission that guards state data rather than view access to the run. The run ID
+	// limits a job to its own run's plan.
+	if err = caller.RequirePermission(ctx, models.ViewStateVersionDataPermission, auth.WithWorkspaceID(run.WorkspaceID), auth.WithRunID(run.Metadata.ID)); err != nil {
 		return nil, err
 	}
 
@@ -1122,8 +1124,10 @@ func (s *service) DownloadPlanJSON(ctx context.Context, planID string) (io.ReadC
 		return nil, errors.New("plan with ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
-	if err != nil {
+	// The plan embeds the run's input variable values, sensitive ones included, and the prior state, so
+	// it takes the permission that guards state data rather than view access to the run. The run ID
+	// limits a job to its own run's plan.
+	if err = caller.RequirePermission(ctx, models.ViewStateVersionDataPermission, auth.WithWorkspaceID(run.WorkspaceID), auth.WithRunID(run.Metadata.ID)); err != nil {
 		return nil, err
 	}
 

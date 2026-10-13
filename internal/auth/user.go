@@ -218,6 +218,9 @@ type externalIdentity struct {
 	Email    string
 }
 
+// subjectClaim is the default claim that identifies a user.
+const subjectClaim = "sub"
+
 // UserAuth implements JWT authentication
 type UserAuth struct {
 	idpMap             map[string]config.IdpConfig
@@ -225,9 +228,11 @@ type UserAuth struct {
 	logger             logger.Logger
 	dbClient           *db.Client
 	maintenanceMonitor maintenance.Monitor
+	adminUserEmail     string
 }
 
-// NewUserAuth creates an instance of UserAuth
+// NewUserAuth creates an instance of UserAuth. A user created on first SSO sign-in, through an IDP with
+// AllowAdminBootstrap set, whose email matches adminUserEmail is made an admin.
 func NewUserAuth(
 	ctx context.Context,
 	identityProviders []config.IdpConfig,
@@ -235,18 +240,22 @@ func NewUserAuth(
 	dbClient *db.Client,
 	maintenanceMonitor maintenance.Monitor,
 	oidcConfigFetcher OpenIDConfigFetcher,
+	adminUserEmail string,
 ) *UserAuth {
 	idpMap := make(map[string]config.IdpConfig)
 	issuers := []string{}
 
 	for _, idp := range identityProviders {
+		if idp.ExternalIDClaim == "" {
+			idp.ExternalIDClaim = subjectClaim
+		}
 		idpMap[idp.IssuerURL] = idp
 		issuers = append(issuers, idp.IssuerURL)
 	}
 
 	oidcTokenVerifier := NewOIDCTokenVerifier(ctx, issuers, oidcConfigFetcher, true)
 
-	return &UserAuth{idpMap, oidcTokenVerifier, logger, dbClient, maintenanceMonitor}
+	return &UserAuth{idpMap, oidcTokenVerifier, logger, dbClient, maintenanceMonitor, strings.ToLower(adminUserEmail)}
 }
 
 // Use checks if the UserAuth instance can handle the given issuer URL
@@ -267,7 +276,13 @@ func (u *UserAuth) GetUsernameClaim(token jwt.Token) (string, error) {
 		return "", terrors.New("Token with issuer "+token.Issuer()+" is missing "+idp.UsernameClaim+" field", terrors.WithErrorCode(terrors.EUnauthorized))
 	}
 
-	return username.(string), nil
+	// Claim values are arbitrary JSON, so a non-string username must be rejected rather than panic.
+	usernameStr, ok := username.(string)
+	if !ok {
+		return "", terrors.New("Token with issuer "+token.Issuer()+" has a non-string "+idp.UsernameClaim+" field", terrors.WithErrorCode(terrors.EUnauthorized))
+	}
+
+	return usernameStr, nil
 }
 
 // Authenticate validates a user JWT and returns a UserCaller
@@ -294,24 +309,40 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 		return nil, err
 	}
 
-	// Get user from DB, user will be created if this is the first login
-	userModel, err := u.getUserWithExternalID(ctx, issuer, decodedToken.Subject())
+	externalID, err := getExternalIDClaim(decodedToken, idp.ExternalIDClaim)
 	if err != nil {
 		return nil, err
 	}
 
+	// Get user from DB, user will be created if this is the first login
+	userModel, err := u.getUserWithExternalID(ctx, issuer, externalID)
+	if err != nil {
+		return nil, err
+	}
+
+	if userModel == nil && idp.ExternalIDClaim != subjectClaim {
+		userModel, err = u.linkExternalIDToSubjectUser(ctx, issuer, decodedToken.Subject(), externalID, idp.ExternalIDClaim)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if userModel == nil {
-		email, ok := decodedToken.Get("email")
+		rawEmail, ok := decodedToken.Get("email")
 		if !ok {
 			return nil, terrors.New("email claim missing from token", terrors.WithErrorCode(terrors.EUnauthorized))
+		}
+		email, ok := rawEmail.(string)
+		if !ok || email == "" {
+			return nil, terrors.New("email claim in token is not a non-empty string", terrors.WithErrorCode(terrors.EUnauthorized))
 		}
 
 		userModel, err = u.createUser(ctx, &externalIdentity{
 			Issuer:   issuer,
-			ID:       decodedToken.Subject(),
+			ID:       externalID,
 			Username: ParseUsername(username),
-			Email:    strings.ToLower(email.(string)),
-		})
+			Email:    strings.ToLower(email),
+		}, idp.EmailLinking)
 		if err != nil {
 			u.logger.WithContextFields(ctx).Errorf("Failed to create user in db: %v", err)
 			return nil, terrors.Wrap(err, "failed to create user in db")
@@ -335,6 +366,33 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 	), nil
 }
 
+// linkExternalIDToSubjectUser finds a user linked by the token's subject, which identified users before the
+// IDP's external ID claim was configured, and links the external ID claim to them. Both values come from the
+// same verified token, so this migrates existing users as they sign in.
+func (u *UserAuth) linkExternalIDToSubjectUser(ctx context.Context, issuer, subject, externalID, claim string) (*models.User, error) {
+	if subject == "" {
+		return nil, nil
+	}
+
+	user, err := u.getUserWithExternalID(ctx, issuer, subject)
+	if err != nil || user == nil {
+		return user, err
+	}
+
+	// Ignore conflict errors since another instance may have already linked the external identity
+	if err = u.dbClient.Users.LinkUserWithExternalID(ctx, issuer, externalID, user.Metadata.ID); err != nil && terrors.ErrorCode(err) != terrors.EConflict {
+		return nil, terrors.Wrap(err, "failed to link user with external identity")
+	}
+
+	u.logger.WithContextFields(ctx).Infow("Linked user to the identity provider's external ID claim.",
+		"userID", user.Metadata.ID,
+		"issuer", issuer,
+		"claim", claim,
+	)
+
+	return user, nil
+}
+
 func (u *UserAuth) getUserWithExternalID(ctx context.Context, issuer string, externalID string) (*models.User, error) {
 	user, err := u.dbClient.Users.GetUserByExternalID(ctx, issuer, externalID)
 	if err != nil {
@@ -343,13 +401,17 @@ func (u *UserAuth) getUserWithExternalID(ctx context.Context, issuer string, ext
 	return user, nil
 }
 
-func (u *UserAuth) createUser(ctx context.Context, identity *externalIdentity) (*models.User, error) {
+func (u *UserAuth) createUser(ctx context.Context, identity *externalIdentity, emailLinking bool) (*models.User, error) {
 	// Create user since this if the first time we've seen this user identity
 	user, err := u.createUserWithExternalID(ctx, identity)
 	if err != nil && terrors.ErrorCode(err) == terrors.EConflict {
-		// The conflict error may be due to an existing user that is using the same username or the user for
-		// the external identity may already exist but this is the first time we've seen this external ID. If
-		// the user's email matches then we can link the external ID to the existing user.
+		// The conflict error may be due to an existing user that is using the same username, an existing user
+		// with the same email, or another instance creating the user for this external identity concurrently.
+
+		linkedUser, lErr := u.getUserWithExternalID(ctx, identity.Issuer, identity.ID)
+		if lErr != nil || linkedUser != nil {
+			return linkedUser, lErr
+		}
 
 		// Query user by email to check if email matches
 		user, err = u.dbClient.Users.GetUserByEmail(ctx, identity.Email)
@@ -358,12 +420,8 @@ func (u *UserAuth) createUser(ctx context.Context, identity *externalIdentity) (
 		}
 
 		if user != nil {
-			err = u.dbClient.Users.LinkUserWithExternalID(ctx, identity.Issuer, identity.ID, user.Metadata.ID)
-			// Ignore conflict errors since another instance may have already linked the external identity
-			if err != nil && terrors.ErrorCode(err) != terrors.EConflict {
-				return nil, terrors.Wrap(
-					err,
-					"failed to link user with external identity")
+			if err = u.linkExistingUserByEmail(ctx, identity, user, emailLinking); err != nil {
+				return nil, err
 			}
 		} else {
 			// User not found with email so we need to create a new user with a number added to their username
@@ -396,6 +454,43 @@ func (u *UserAuth) createUser(ctx context.Context, identity *externalIdentity) (
 	return user, nil
 }
 
+// linkExistingUserByEmail links the external identity to an existing user with the same email. The email is only
+// asserted by the IDP, so this is opt-in per IDP and limited to users with no external identity yet, such as a
+// user created before SSO was enabled. An account that already signs in through SSO is never relinked.
+func (u *UserAuth) linkExistingUserByEmail(ctx context.Context, identity *externalIdentity, user *models.User, emailLinking bool) error {
+	if emailLinking {
+		linked, err := u.dbClient.Users.HasExternalIdentity(ctx, user.Metadata.ID, nil)
+		if err != nil {
+			return terrors.Wrap(err, "failed to check user external identity")
+		}
+
+		if !linked {
+			// Ignore conflict errors since another instance may have already linked the external identity
+			if err = u.dbClient.Users.LinkUserWithExternalID(ctx, identity.Issuer, identity.ID, user.Metadata.ID); err != nil && terrors.ErrorCode(err) != terrors.EConflict {
+				return terrors.Wrap(err, "failed to link user with external identity")
+			}
+
+			u.logger.WithContextFields(ctx).Infow("Linked an existing user to an external identity by email.",
+				"userID", user.Metadata.ID,
+				"issuer", identity.Issuer,
+			)
+
+			return nil
+		}
+	}
+
+	u.logger.WithContextFields(ctx).Warnf(
+		"Refused to link an external identity from issuer %s to existing user %s with the same email (email linking enabled: %t)",
+		identity.Issuer, user.Metadata.ID, emailLinking,
+	)
+
+	return terrors.New(
+		"an account with email %s already exists and can't be linked to this identity automatically; contact an administrator",
+		identity.Email,
+		terrors.WithErrorCode(terrors.EUnauthorized),
+	)
+}
+
 func (u *UserAuth) createUserWithExternalID(ctx context.Context, identity *externalIdentity) (*models.User, error) {
 	txContext, err := u.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
@@ -412,6 +507,9 @@ func (u *UserAuth) createUserWithExternalID(ctx context.Context, identity *exter
 		Username: identity.Username,
 		Email:    identity.Email,
 		Active:   true, // Make sure this user is set as active or auth will fail.
+		// The bootstrap admin is created on their first SSO sign-in rather than at startup, and only through an
+		// IDP trusted to assert the admin's email.
+		Admin: u.adminUserEmail != "" && identity.Email == u.adminUserEmail && u.idpMap[identity.Issuer].AllowAdminBootstrap,
 	}
 
 	user, err := u.dbClient.Users.CreateUser(txContext, input)
@@ -428,7 +526,36 @@ func (u *UserAuth) createUserWithExternalID(ctx context.Context, identity *exter
 		return nil, err
 	}
 
+	if user.Admin {
+		u.logger.WithContextFields(ctx).Infof("User with email %s created as admin on first sign-in.", user.Email)
+	}
+
 	return user, nil
+}
+
+// getExternalIDClaim returns the value of the claim that identifies the user. A missing claim is an error rather
+// than a fallback to another claim, so users are never matched on an identifier the IDP wasn't configured for.
+func getExternalIDClaim(token jwt.Token, claim string) (string, error) {
+	var value string
+	if claim == subjectClaim {
+		value = token.Subject()
+	} else if raw, ok := token.Get(claim); ok {
+		if value, ok = raw.(string); !ok {
+			return "", terrors.New(
+				"token with issuer %s has a non-string %s claim used to identify users", token.Issuer(), claim,
+				terrors.WithErrorCode(terrors.EUnauthorized),
+			)
+		}
+	}
+
+	if value == "" {
+		return "", terrors.New(
+			"token with issuer %s is missing the %s claim used to identify users", token.Issuer(), claim,
+			terrors.WithErrorCode(terrors.EUnauthorized),
+		)
+	}
+
+	return value, nil
 }
 
 // ParseUsername parses the username, if any, from the email.

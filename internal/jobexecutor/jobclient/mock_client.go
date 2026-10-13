@@ -347,36 +347,6 @@ func (_m *MockClient) DownloadStateVersionJSON(ctx context.Context, stateVersion
 	return r0
 }
 
-// GetAssignedManagedIdentities provides a mock function with given fields: ctx, workspaceID
-func (_m *MockClient) GetAssignedManagedIdentities(ctx context.Context, workspaceID string) ([]*gen.ManagedIdentity, error) {
-	ret := _m.Called(ctx, workspaceID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAssignedManagedIdentities")
-	}
-
-	var r0 []*gen.ManagedIdentity
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]*gen.ManagedIdentity, error)); ok {
-		return rf(ctx, workspaceID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []*gen.ManagedIdentity); ok {
-		r0 = rf(ctx, workspaceID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*gen.ManagedIdentity)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, workspaceID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetAvailableProviderVersions provides a mock function with given fields: ctx, input
 func (_m *MockClient) GetAvailableProviderVersions(ctx context.Context, input *gen.GetAvailableProviderVersionsRequest) (map[string]struct{}, error) {
 	ret := _m.Called(ctx, input)
@@ -455,6 +425,36 @@ func (_m *MockClient) GetJob(ctx context.Context, id string) (*gen.Job, error) {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*gen.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetManagedIdentity provides a mock function with given fields: ctx, id
+func (_m *MockClient) GetManagedIdentity(ctx context.Context, id string) (*gen.ManagedIdentity, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetManagedIdentity")
+	}
+
+	var r0 *gen.ManagedIdentity
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*gen.ManagedIdentity, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *gen.ManagedIdentity); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*gen.ManagedIdentity)
 		}
 	}
 

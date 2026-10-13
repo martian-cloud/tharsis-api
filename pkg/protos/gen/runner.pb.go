@@ -253,6 +253,7 @@ type CreateRunnerRequest struct {
 	Disabled        *bool                  `protobuf:"varint,4,opt,name=disabled,proto3,oneof" json:"disabled,omitempty"`
 	RunUntaggedJobs bool                   `protobuf:"varint,5,opt,name=run_untagged_jobs,json=runUntaggedJobs,proto3" json:"run_untagged_jobs,omitempty"`
 	Tags            []string               `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"`
+	JobLimit        int32                  `protobuf:"varint,7,opt,name=job_limit,json=jobLimit,proto3" json:"job_limit,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -329,6 +330,13 @@ func (x *CreateRunnerRequest) GetTags() []string {
 	return nil
 }
 
+func (x *CreateRunnerRequest) GetJobLimit() int32 {
+	if x != nil {
+		return x.JobLimit
+	}
+	return 0
+}
+
 // UpdateRunnerRequest is the input for updating a Runner.
 type UpdateRunnerRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
@@ -338,6 +346,7 @@ type UpdateRunnerRequest struct {
 	Disabled        *bool                  `protobuf:"varint,4,opt,name=disabled,proto3,oneof" json:"disabled,omitempty"`
 	RunUntaggedJobs *bool                  `protobuf:"varint,5,opt,name=run_untagged_jobs,json=runUntaggedJobs,proto3,oneof" json:"run_untagged_jobs,omitempty"`
 	Tags            []string               `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"`
+	JobLimit        *int32                 `protobuf:"varint,7,opt,name=job_limit,json=jobLimit,proto3,oneof" json:"job_limit,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -412,6 +421,13 @@ func (x *UpdateRunnerRequest) GetTags() []string {
 		return x.Tags
 	}
 	return nil
+}
+
+func (x *UpdateRunnerRequest) GetJobLimit() int32 {
+	if x != nil && x.JobLimit != nil {
+		return *x.JobLimit
+	}
+	return 0
 }
 
 // DeleteRunnerRequest is the input for deleting a Runner.
@@ -585,6 +601,7 @@ type Runner struct {
 	Disabled        bool                   `protobuf:"varint,7,opt,name=disabled,proto3" json:"disabled,omitempty"`
 	RunUntaggedJobs bool                   `protobuf:"varint,8,opt,name=run_untagged_jobs,json=runUntaggedJobs,proto3" json:"run_untagged_jobs,omitempty"`
 	Tags            []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`
+	JobLimit        int32                  `protobuf:"varint,10,opt,name=job_limit,json=jobLimit,proto3" json:"job_limit,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -682,6 +699,13 @@ func (x *Runner) GetTags() []string {
 	return nil
 }
 
+func (x *Runner) GetJobLimit() int32 {
+	if x != nil {
+		return x.JobLimit
+	}
+	return 0
+}
+
 // GetRunnersResponse is the paginated list of Runners.
 type GetRunnersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -752,27 +776,31 @@ const file_runner_proto_rawDesc = "" +
 	"\x13_pagination_optionsB\a\n" +
 	"\x05_sortB\x11\n" +
 	"\x0f_namespace_pathB\x0e\n" +
-	"\f_runner_type\"\xd4\x01\n" +
+	"\f_runner_type\"\xf1\x01\n" +
 	"\x13CreateRunnerRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x19\n" +
 	"\bgroup_id\x18\x03 \x01(\tR\agroupId\x12\x1f\n" +
 	"\bdisabled\x18\x04 \x01(\bH\x00R\bdisabled\x88\x01\x01\x12*\n" +
 	"\x11run_untagged_jobs\x18\x05 \x01(\bR\x0frunUntaggedJobs\x12\x12\n" +
-	"\x04tags\x18\x06 \x03(\tR\x04tagsB\v\n" +
-	"\t_disabled\"\x90\x02\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x12\x1b\n" +
+	"\tjob_limit\x18\a \x01(\x05R\bjobLimitB\v\n" +
+	"\t_disabled\"\xc0\x02\n" +
 	"\x13UpdateRunnerRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\vdescription\x18\x02 \x01(\tH\x00R\vdescription\x88\x01\x01\x12\x1d\n" +
 	"\aversion\x18\x03 \x01(\x03H\x01R\aversion\x88\x01\x01\x12\x1f\n" +
 	"\bdisabled\x18\x04 \x01(\bH\x02R\bdisabled\x88\x01\x01\x12/\n" +
 	"\x11run_untagged_jobs\x18\x05 \x01(\bH\x03R\x0frunUntaggedJobs\x88\x01\x01\x12\x12\n" +
-	"\x04tags\x18\x06 \x03(\tR\x04tagsB\x0e\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x12 \n" +
+	"\tjob_limit\x18\a \x01(\x05H\x04R\bjobLimit\x88\x01\x01B\x0e\n" +
 	"\f_descriptionB\n" +
 	"\n" +
 	"\b_versionB\v\n" +
 	"\t_disabledB\x14\n" +
-	"\x12_run_untagged_jobs\"P\n" +
+	"\x12_run_untagged_jobsB\f\n" +
+	"\n" +
+	"_job_limit\"P\n" +
 	"\x13DeleteRunnerRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01B\n" +
@@ -783,7 +811,7 @@ const file_runner_proto_rawDesc = "" +
 	"\x12service_account_id\x18\x02 \x01(\tR\x10serviceAccountId\"t\n" +
 	"'UnassignServiceAccountFromRunnerRequest\x12\x1b\n" +
 	"\trunner_id\x18\x01 \x01(\tR\brunnerId\x12,\n" +
-	"\x12service_account_id\x18\x02 \x01(\tR\x10serviceAccountId\"\xcb\x02\n" +
+	"\x12service_account_id\x18\x02 \x01(\tR\x10serviceAccountId\"\xe8\x02\n" +
 	"\x06Runner\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -794,7 +822,9 @@ const file_runner_proto_rawDesc = "" +
 	"created_by\x18\x06 \x01(\tR\tcreatedBy\x12\x1a\n" +
 	"\bdisabled\x18\a \x01(\bR\bdisabled\x12*\n" +
 	"\x11run_untagged_jobs\x18\b \x01(\bR\x0frunUntaggedJobs\x12\x12\n" +
-	"\x04tags\x18\t \x03(\tR\x04tagsB\v\n" +
+	"\x04tags\x18\t \x03(\tR\x04tags\x12\x1b\n" +
+	"\tjob_limit\x18\n" +
+	" \x01(\x05R\bjobLimitB\v\n" +
 	"\t_group_id\"\xa3\x01\n" +
 	"\x12GetRunnersResponse\x12A\n" +
 	"\arunners\x18\x01 \x03(\v2'.martiancloud.tharsis.api.runner.RunnerR\arunners\x12J\n" +

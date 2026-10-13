@@ -2,12 +2,16 @@ package servers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // TestToPBRunStatus_PostApplyRunning verifies the new status maps to its protobuf counterpart.
@@ -83,4 +87,30 @@ func TestRunAnnotations_EmptyAndNil(t *testing.T) {
 	assert.Nil(t, toPBRunAnnotations([]*models.RunAnnotation{}))
 	assert.Nil(t, fromPBRunAnnotations(nil))
 	assert.Nil(t, fromPBRunAnnotations([]*pb.RunAnnotation{}))
+}
+
+// TestToPBRunNodes_ManagedIdentityIDsAreGlobalIDs verifies the plan and apply nodes return their
+// authorized managed identities as global IDs, which the job executor passes back to the API.
+func TestToPBRunNodes_ManagedIdentityIDsAreGlobalIDs(t *testing.T) {
+	now := time.Now()
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{
+			ID:                   "run-1",
+			TRN:                  trn.TypeRun.Build("group", "ws", "run-1"),
+			CreationTimestamp:    &now,
+			LastUpdatedTimestamp: &now,
+		},
+		Plan:  models.Plan{ID: "plan-1", ManagedIdentityIDs: []string{"mi-1", "mi-2"}},
+		Apply: &models.Apply{ID: "apply-1", ManagedIdentityIDs: []string{"mi-3"}},
+	}
+
+	assert.Equal(t, []string{
+		gid.ToGlobalID(types.ManagedIdentityModelType, "mi-1"),
+		gid.ToGlobalID(types.ManagedIdentityModelType, "mi-2"),
+	}, toPBPlan(run).ManagedIdentityIds)
+	assert.Equal(t, []string{gid.ToGlobalID(types.ManagedIdentityModelType, "mi-3")}, toPBApply(run).ManagedIdentityIds)
+
+	// An apply that has not been approved yet has none.
+	run.Apply.ManagedIdentityIDs = nil
+	assert.Empty(t, toPBApply(run).ManagedIdentityIds)
 }

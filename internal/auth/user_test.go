@@ -5,14 +5,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 func TestUserCaller_GetSubject(t *testing.T) {
@@ -273,6 +276,380 @@ func TestUserCaller_RequireInheritedPermissions(t *testing.T) {
 				return
 			}
 			require.Nil(t, err)
+		})
+	}
+}
+
+func TestUserAuth_createUserWithExternalID(t *testing.T) {
+	testCases := []struct {
+		name                string
+		adminUserEmail      string
+		email               string
+		allowAdminBootstrap bool
+		expectAdmin         bool
+	}{
+		{name: "email matches the configured admin email", adminUserEmail: "Admin@Example.com", email: "admin@example.com", allowAdminBootstrap: true, expectAdmin: true},
+		{name: "email matches but the IDP is not allowed to bootstrap the admin", adminUserEmail: "admin@example.com", email: "admin@example.com"},
+		{name: "email does not match the configured admin email", adminUserEmail: "admin@example.com", email: "user@example.com", allowAdminBootstrap: true},
+		{name: "no admin email configured", email: "admin@example.com", allowAdminBootstrap: true},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockUsers := db.NewMockUsers(t)
+			mockTransactions := db.NewMockTransactions(t)
+
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+			mockUsers.On("CreateUser", mock.Anything, mock.Anything).Return(func(_ context.Context, user *models.User) (*models.User, error) {
+				user.Metadata.ID = "user-1"
+				return user, nil
+			})
+			mockUsers.On("LinkUserWithExternalID", mock.Anything, "https://idp.example.com", "sub-1", "user-1").Return(nil)
+
+			testLogger, _ := logger.NewForTest()
+			idps := []config.IdpConfig{{IssuerURL: "https://idp.example.com", AllowAdminBootstrap: test.allowAdminBootstrap}}
+			userAuth := NewUserAuth(ctx, idps, testLogger, &db.Client{Users: mockUsers, Transactions: mockTransactions}, nil, newTestOIDCConfigFetcher(t), test.adminUserEmail)
+
+			user, err := userAuth.createUserWithExternalID(ctx, &externalIdentity{
+				Issuer:   "https://idp.example.com",
+				ID:       "sub-1",
+				Username: ParseUsername(test.email),
+				Email:    test.email,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, test.expectAdmin, user.Admin)
+			assert.True(t, user.Active)
+		})
+	}
+}
+
+func TestUserAuth_Authenticate_ExternalIDClaim(t *testing.T) {
+	issuer := "https://login.example.com/tenant/v2.0"
+	clientID := "tharsis"
+	existingUser := &models.User{Metadata: models.ResourceMetadata{ID: "user-1"}, Username: "jdoe", Email: "jdoe@example.com", Active: true}
+
+	testCases := []struct {
+		name            string
+		externalIDClaim string
+		omitOID         bool
+		email           any // Defaults to a valid email.
+		userByOID       *models.User
+		userBySub       *models.User
+		linkErr         error
+		expectLinkOID   bool
+		expectCreate    bool
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:      "default claim matches the user linked by sub",
+			userBySub: existingUser,
+		},
+		{
+			name:            "oid claim matches the user linked by oid",
+			externalIDClaim: "oid",
+			userByOID:       existingUser,
+		},
+		{
+			name:            "oid claim falls back to the user linked by sub and links the oid",
+			externalIDClaim: "oid",
+			userBySub:       existingUser,
+			expectLinkOID:   true,
+		},
+		{
+			name:            "oid link conflict from a concurrent sign-in is ignored",
+			externalIDClaim: "oid",
+			userBySub:       existingUser,
+			linkErr:         errors.New("already linked", errors.WithErrorCode(errors.EConflict)),
+			expectLinkOID:   true,
+		},
+		{
+			name:            "oid claim creates a new user linked by oid",
+			externalIDClaim: "oid",
+			expectCreate:    true,
+		},
+		{
+			name:            "missing oid claim is rejected rather than falling back to sub",
+			externalIDClaim: "oid",
+			omitOID:         true,
+			userBySub:       existingUser,
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			// The claim is only read for a new user, and must be rejected rather than panic.
+			name:            "a new user with a non-string email claim is rejected",
+			email:           []string{"jdoe@example.com"},
+			expectErrorCode: errors.EUnauthorized,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			email := test.email
+			if email == nil {
+				email = "jdoe@example.com"
+			}
+
+			token := jwt.New()
+			require.NoError(t, token.Set(jwt.IssuerKey, issuer))
+			require.NoError(t, token.Set(jwt.AudienceKey, []string{clientID}))
+			require.NoError(t, token.Set(jwt.SubjectKey, "pairwise-sub"))
+			require.NoError(t, token.Set("preferred_username", "jdoe@example.com"))
+			require.NoError(t, token.Set("email", email))
+			if !test.omitOID {
+				require.NoError(t, token.Set("oid", "object-id"))
+			}
+
+			mockVerifier := NewMockOIDCTokenVerifier(t)
+			mockVerifier.On("VerifyToken", mock.Anything, "token", mock.Anything).Return(token, nil)
+
+			mockUsers := db.NewMockUsers(t)
+			mockTransactions := db.NewMockTransactions(t)
+
+			if test.expectErrorCode == "" || test.email != nil {
+				if test.externalIDClaim == "oid" {
+					mockUsers.On("GetUserByExternalID", mock.Anything, issuer, "object-id").Return(test.userByOID, nil)
+				}
+				if test.userByOID == nil {
+					mockUsers.On("GetUserByExternalID", mock.Anything, issuer, "pairwise-sub").Return(test.userBySub, nil)
+				}
+			}
+
+			if test.expectLinkOID {
+				mockUsers.On("LinkUserWithExternalID", mock.Anything, issuer, "object-id", "user-1").Return(test.linkErr)
+			}
+
+			if test.expectCreate {
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				mockUsers.On("CreateUser", mock.Anything, mock.Anything).Return(&models.User{Metadata: models.ResourceMetadata{ID: "user-2"}, Active: true}, nil)
+				mockUsers.On("LinkUserWithExternalID", mock.Anything, issuer, "object-id", "user-2").Return(nil)
+			}
+
+			testLogger, _ := logger.NewForTest()
+			userAuth := NewUserAuth(ctx, []config.IdpConfig{{
+				IssuerURL:       issuer,
+				ClientID:        clientID,
+				UsernameClaim:   "preferred_username",
+				ExternalIDClaim: test.externalIDClaim,
+			}}, testLogger, &db.Client{Users: mockUsers, Transactions: mockTransactions}, nil, newTestOIDCConfigFetcher(t), "")
+			userAuth.oidcTokenVerifier = mockVerifier
+
+			caller, err := userAuth.Authenticate(ctx, "token", false)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			userCaller, ok := caller.(*UserCaller)
+			require.True(t, ok)
+
+			if test.expectCreate {
+				assert.Equal(t, "user-2", userCaller.User.Metadata.ID)
+			} else {
+				assert.Equal(t, existingUser.Metadata.ID, userCaller.User.Metadata.ID)
+			}
+		})
+	}
+}
+
+func TestUserAuth_createUser_EmailLinking(t *testing.T) {
+	identity := &externalIdentity{
+		Issuer:   "https://idp.example.com",
+		ID:       "object-id",
+		Username: "jdoe",
+		Email:    "jdoe@example.com",
+	}
+	emailUser := &models.User{Metadata: models.ResourceMetadata{ID: "user-1"}, Username: "jdoe", Email: "jdoe@example.com", Active: true}
+
+	testCases := []struct {
+		name               string
+		emailLinking       bool
+		concurrentUser     *models.User
+		emailUserLinked    bool
+		expectLink         bool
+		expectUser         *models.User
+		expectErrorCode    errors.CodeType
+		skipEmailUserCheck bool
+	}{
+		{
+			name:            "email linking disabled; existing user with the same email is not linked",
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			name:            "email linking enabled; links an existing user with no external identity",
+			emailLinking:    true,
+			expectLink:      true,
+			expectUser:      emailUser,
+			emailUserLinked: false,
+		},
+		{
+			name:            "email linking enabled; refuses a user who already has an external identity",
+			emailLinking:    true,
+			emailUserLinked: true,
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			name:               "user for this identity was created concurrently; returns it without email matching",
+			concurrentUser:     emailUser,
+			expectUser:         emailUser,
+			skipEmailUserCheck: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockUsers := db.NewMockUsers(t)
+			mockTransactions := db.NewMockTransactions(t)
+
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+
+			mockUsers.On("CreateUser", mock.Anything, mock.Anything).Return(nil, errors.New("username taken", errors.WithErrorCode(errors.EConflict)))
+			mockUsers.On("GetUserByExternalID", mock.Anything, identity.Issuer, identity.ID).Return(test.concurrentUser, nil)
+
+			if !test.skipEmailUserCheck {
+				mockUsers.On("GetUserByEmail", mock.Anything, identity.Email).Return(emailUser, nil)
+			}
+
+			if test.emailLinking {
+				mockUsers.On("HasExternalIdentity", mock.Anything, emailUser.Metadata.ID, (*string)(nil)).Return(test.emailUserLinked, nil)
+			}
+
+			if test.expectLink {
+				mockUsers.On("LinkUserWithExternalID", mock.Anything, identity.Issuer, identity.ID, emailUser.Metadata.ID).Return(nil)
+			}
+
+			testLogger, _ := logger.NewForTest()
+			userAuth := NewUserAuth(ctx, nil, testLogger, &db.Client{Users: mockUsers, Transactions: mockTransactions}, nil, newTestOIDCConfigFetcher(t), "")
+
+			user, err := userAuth.createUser(ctx, identity, test.emailLinking)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectUser, user)
+		})
+	}
+}
+
+func TestUserAuth_GetUsernameClaim(t *testing.T) {
+	issuer := "https://idp.example.com"
+
+	tests := []struct {
+		name              string
+		issuer            string
+		username          any
+		expectUsername    string
+		expectErrorCode   errors.CodeType
+		expectAnyError    bool
+		omitUsernameClaim bool
+	}{
+		{name: "returns the username claim", issuer: issuer, username: "jdoe", expectUsername: "jdoe"},
+		{name: "a missing username claim is unauthorized", issuer: issuer, omitUsernameClaim: true, expectErrorCode: errors.EUnauthorized},
+		{name: "a non-string username claim is unauthorized", issuer: issuer, username: 42, expectErrorCode: errors.EUnauthorized},
+		{name: "an object username claim is unauthorized", issuer: issuer, username: map[string]any{"a": "b"}, expectErrorCode: errors.EUnauthorized},
+		{name: "an unknown issuer is an error", issuer: "https://other.example.com", username: "jdoe", expectAnyError: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testLogger, _ := logger.NewForTest()
+			userAuth := NewUserAuth(context.Background(), []config.IdpConfig{{
+				IssuerURL:     issuer,
+				ClientID:      "client",
+				UsernameClaim: "preferred_username",
+			}}, testLogger, &db.Client{}, nil, newTestOIDCConfigFetcher(t), "")
+
+			token := jwt.New()
+			require.NoError(t, token.Set(jwt.IssuerKey, test.issuer))
+			if !test.omitUsernameClaim {
+				require.NoError(t, token.Set("preferred_username", test.username))
+			}
+
+			username, err := userAuth.GetUsernameClaim(token)
+			switch {
+			case test.expectErrorCode != "":
+				require.Error(t, err)
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			case test.expectAnyError:
+				require.Error(t, err)
+			default:
+				require.NoError(t, err)
+				assert.Equal(t, test.expectUsername, username)
+			}
+		})
+	}
+}
+
+func TestGetExternalIDClaim(t *testing.T) {
+	testCases := []struct {
+		name               string
+		claim              string
+		value              any
+		expectValue        string
+		expectErrorMessage string
+	}{
+		{
+			name:        "sub claim",
+			claim:       subjectClaim,
+			expectValue: "pairwise-sub",
+		},
+		{
+			name:        "string custom claim",
+			claim:       "oid",
+			value:       "object-id",
+			expectValue: "object-id",
+		},
+		{
+			name:               "missing custom claim",
+			claim:              "oid",
+			expectErrorMessage: "token with issuer https://idp.example.com is missing the oid claim used to identify users",
+		},
+		{
+			name:               "empty custom claim",
+			claim:              "oid",
+			value:              "",
+			expectErrorMessage: "token with issuer https://idp.example.com is missing the oid claim used to identify users",
+		},
+		{
+			name:               "non-string custom claim",
+			claim:              "oid",
+			value:              123456,
+			expectErrorMessage: "token with issuer https://idp.example.com has a non-string oid claim used to identify users",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			token := jwt.New()
+			require.NoError(t, token.Set(jwt.IssuerKey, "https://idp.example.com"))
+			require.NoError(t, token.Set(jwt.SubjectKey, "pairwise-sub"))
+			if test.value != nil {
+				require.NoError(t, token.Set(test.claim, test.value))
+			}
+
+			value, err := getExternalIDClaim(token, test.claim)
+			if test.expectErrorMessage != "" {
+				assert.Equal(t, errors.EUnauthorized, errors.ErrorCode(err))
+				assert.Equal(t, test.expectErrorMessage, errors.ErrorMessage(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectValue, value)
 		})
 	}
 }

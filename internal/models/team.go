@@ -12,7 +12,10 @@ type Team struct {
 	Name           string
 	Description    string
 	SCIMExternalID string
-	Metadata       ResourceMetadata
+	// SCIMIDPIssuerURL is the issuer URL of the IDP whose SCIM client manages the team; empty if the team
+	// is not managed by SCIM.
+	SCIMIDPIssuerURL string
+	Metadata         ResourceMetadata
 }
 
 // GetID returns the Metadata ID.

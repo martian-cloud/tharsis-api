@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
@@ -754,10 +755,13 @@ func TestCommonRegistrySource_GetVersionsUsingModuleRegistryProtocol(t *testing.
 			}
 		} else if r.URL.Path == "/namespace/invalid-module/aws/versions" {
 			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("not found"))
+			w.Write([]byte("not found: internal-secret"))
 		} else if r.URL.Path == "/namespace/bad-json/aws/versions" {
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{invalid json`))
+			w.Write([]byte(`{invalid json internal-secret`))
+		} else if r.URL.Path == "/namespace/long-unauthorized/aws/versions" {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(strings.Repeat("x", 1000)))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -774,6 +778,8 @@ func TestCommonRegistrySource_GetVersionsUsingModuleRegistryProtocol(t *testing.
 		token              string
 		expectedVersions   map[string]bool
 		expectErrorMessage string
+		// The host is user-supplied, so response bodies must not be echoed back in errors.
+		expectErrorOmits string
 	}{
 		{
 			name: "successful version retrieval",
@@ -825,6 +831,7 @@ func TestCommonRegistrySource_GetVersionsUsingModuleRegistryProtocol(t *testing.
 			},
 			token:              "test-token",
 			expectErrorMessage: "failed to get module versions",
+			expectErrorOmits:   "internal-secret",
 		},
 		{
 			name: "invalid json response",
@@ -837,6 +844,21 @@ func TestCommonRegistrySource_GetVersionsUsingModuleRegistryProtocol(t *testing.
 			},
 			token:              "test-token",
 			expectErrorMessage: "failed to unmarshal body",
+			expectErrorOmits:   "internal-secret",
+		},
+		{
+			// An auth failure's message is shown to help fix access, but capped.
+			name: "long unauthorized message is truncated",
+			source: commonRegistrySource{
+				namespace:    "namespace",
+				name:         "long-unauthorized",
+				targetSystem: "aws",
+				registryURL:  serverURL,
+				httpClient:   server.Client(),
+			},
+			token:              "test-token",
+			expectErrorMessage: strings.Repeat("x", maxUnauthorizedMessageSize) + "...",
+			expectErrorOmits:   strings.Repeat("x", maxUnauthorizedMessageSize+1),
 		},
 	}
 
@@ -854,6 +876,9 @@ func TestCommonRegistrySource_GetVersionsUsingModuleRegistryProtocol(t *testing.
 			if tc.expectErrorMessage != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.expectErrorMessage)
+				if tc.expectErrorOmits != "" {
+					assert.NotContains(t, err.Error(), tc.expectErrorOmits)
+				}
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tc.expectedVersions, versions)

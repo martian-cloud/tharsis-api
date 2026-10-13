@@ -5,14 +5,21 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
-	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 )
 
 const (
-	xTerraformGet = "x-terraform-get"
+	xTerraformGet     = "x-terraform-get"
+	httpClientTimeout = 5 * time.Minute
 )
+
+// newHTTPClient creates an HTTP client for the job executor. The executor runs on the runner, not
+// the API, so its requests aren't restricted by an outbound policy.
+func newHTTPClient() *http.Client {
+	return &http.Client{Timeout: httpClientTimeout}
+}
 
 // resolveModuleSource returns the final pre-signed URL for a module source.
 func resolveModuleSource(moduleSource string, moduleVersion string, hostTokenMap map[string]string) (string, error) {
@@ -40,7 +47,7 @@ func resolveModuleSource(moduleSource string, moduleVersion string, hostTokenMap
 	}
 
 	// Create an HTTP client to use for the next requests:
-	httpClient := tharsishttp.NewHTTPClient()
+	httpClient := newHTTPClient()
 
 	// Visit the 'well-known' URL for the server in question:
 	registryURL, err := module.GetModuleRegistryEndpointForHost(httpClient, host)

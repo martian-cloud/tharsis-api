@@ -124,6 +124,7 @@ type runNode struct {
 	StageName            *string
 	Policies             []byte
 	MessagesSummary      []byte
+	ManagedIdentityIDs   []byte
 	CacheObjectStoreKey  *string
 	JSONObjectStoreKey   *string
 	DiffObjectStoreKey   *string
@@ -204,6 +205,7 @@ var runNodeKinds = []runNodeKind{
 						"plan_cache_object_store_key": p.CacheObjectStoreKey,
 						"plan_json_object_store_key":  p.JSONObjectStoreKey,
 						"plan_diff_object_store_key":  p.DiffObjectStoreKey,
+						"managed_identity_ids":        marshalManagedIdentityIDs(p.ManagedIdentityIDs),
 					}
 				},
 				sortOrder: sortOrderPlan,
@@ -235,6 +237,11 @@ var runNodeKinds = []runNodeKind{
 			plan.CacheObjectStoreKey = n.CacheObjectStoreKey
 			plan.JSONObjectStoreKey = n.JSONObjectStoreKey
 			plan.DiffObjectStoreKey = n.DiffObjectStoreKey
+			ids, err := unmarshalManagedIdentityIDs(n.ManagedIdentityIDs)
+			if err != nil {
+				return errors.Wrap(err, "failed to decode managed identity ids of plan %s", n.ID)
+			}
+			plan.ManagedIdentityIDs = ids
 			run.Plan = plan
 			return nil
 		},
@@ -256,11 +263,12 @@ var runNodeKinds = []runNodeKind{
 				},
 				contentColumns: func() goqu.Record {
 					return goqu.Record{
-						"status":             string(a.Status),
-						"latest_job_id":      a.LatestJobID,
-						"error_message":      a.ErrorMessage,
-						"apply_triggered_by": nullableString(a.TriggeredBy),
-						"apply_comment":      nullableString(a.Comment),
+						"status":               string(a.Status),
+						"latest_job_id":        a.LatestJobID,
+						"error_message":        a.ErrorMessage,
+						"apply_triggered_by":   nullableString(a.TriggeredBy),
+						"apply_comment":        nullableString(a.Comment),
+						"managed_identity_ids": marshalManagedIdentityIDs(a.ManagedIdentityIDs),
 					}
 				},
 				sortOrder: sortOrderApply,
@@ -279,6 +287,11 @@ var runNodeKinds = []runNodeKind{
 			if n.Comment != nil {
 				apply.Comment = *n.Comment
 			}
+			ids, err := unmarshalManagedIdentityIDs(n.ManagedIdentityIDs)
+			if err != nil {
+				return errors.Wrap(err, "failed to decode managed identity ids of apply %s", n.ID)
+			}
+			apply.ManagedIdentityIDs = ids
 			run.Apply = apply
 			return nil
 		},
@@ -374,11 +387,17 @@ var runNodeKinds = []runNodeKind{
 			if n.StageName != nil {
 				check.StageName = models.RunTaskStageName(*n.StageName)
 			}
+			// Decode errors fail the read: a check whose pinned policies were silently dropped would
+			// pass with an empty report.
 			if len(n.Policies) > 0 {
-				_ = json.Unmarshal(n.Policies, &check.Policies)
+				if err := json.Unmarshal(n.Policies, &check.Policies); err != nil {
+					return errors.Wrap(err, "failed to decode policies of policy check %s", n.ID)
+				}
 			}
 			if len(n.MessagesSummary) > 0 {
-				_ = json.Unmarshal(n.MessagesSummary, &check.MessagesSummary)
+				if err := json.Unmarshal(n.MessagesSummary, &check.MessagesSummary); err != nil {
+					return errors.Wrap(err, "failed to decode messages summary of policy check %s", n.ID)
+				}
 			}
 			// The load order guarantees every task_stage row hydrates before any policy_check row (see
 			// sortOrder constants), so the owning stage should already be present. A missing stage means
@@ -471,6 +490,31 @@ var runNodeColumns = []struct {
 	{"plan_cache_object_store_key", func(n *runNode) any { return &n.CacheObjectStoreKey }},
 	{"plan_json_object_store_key", func(n *runNode) any { return &n.JSONObjectStoreKey }},
 	{"plan_diff_object_store_key", func(n *runNode) any { return &n.DiffObjectStoreKey }},
+	{"managed_identity_ids", func(n *runNode) any { return &n.ManagedIdentityIDs }},
+}
+
+// marshalManagedIdentityIDs encodes a node's managed identity IDs for the managed_identity_ids
+// column. A nil list is stored as SQL NULL and an empty one as '[]'; both authorize no identities.
+// A string slice always marshals.
+func marshalManagedIdentityIDs(ids []string) []byte {
+	if ids == nil {
+		return nil
+	}
+	b, _ := json.Marshal(ids)
+	return b
+}
+
+// unmarshalManagedIdentityIDs decodes the managed_identity_ids column; SQL NULL decodes to nil and
+// '[]' to an empty, non-nil list.
+func unmarshalManagedIdentityIDs(b []byte) ([]string, error) {
+	if len(b) == 0 {
+		return nil, nil
+	}
+	ids := []string{}
+	if err := json.Unmarshal(b, &ids); err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 type runs struct {

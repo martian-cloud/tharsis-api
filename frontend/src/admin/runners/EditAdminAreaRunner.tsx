@@ -23,6 +23,7 @@ function EditAdminAreaRunner() {
                     disabled
                     tags
                     runUntaggedJobs
+                    jobLimit
                 }
             }
         }
@@ -51,7 +52,8 @@ function EditAdminAreaRunner() {
         description: runner.description,
         disabled: runner.disabled,
         tags: runner.tags,
-        runUntaggedJobs: runner.runUntaggedJobs
+        runUntaggedJobs: runner.runUntaggedJobs,
+        jobLimit: runner.jobLimit
     });
 
     const onUpdate = () => {
@@ -63,7 +65,8 @@ function EditAdminAreaRunner() {
                         description: formData.description,
                         disabled: formData.disabled,
                         tags: formData.tags,
-                        runUntaggedJobs: formData.runUntaggedJobs
+                        runUntaggedJobs: formData.runUntaggedJobs,
+                        jobLimit: formData.jobLimit
                     }
                 },
                 onCompleted: data => {

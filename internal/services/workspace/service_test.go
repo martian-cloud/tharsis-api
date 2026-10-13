@@ -2444,8 +2444,12 @@ func TestCreateStateVersion(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
+			// A state version that belongs to a run is authorized with the run ID as well as the
+			// workspace, so a job caller can be held to writing state only for its own apply.
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateStateVersionPermission, mock.Anything).
-				Return(test.workspacePermissionError)
+				Return(test.workspacePermissionError).Maybe()
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateStateVersionPermission, mock.Anything, mock.Anything).
+				Return(test.workspacePermissionError).Maybe()
 
 			mockCaller.On("GetSubject").Return("mockSubject")
 

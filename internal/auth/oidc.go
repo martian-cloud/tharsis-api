@@ -44,6 +44,10 @@ type OIDCConfiguration struct {
 type OpenIDConfigFetcher interface {
 	// GetOpenIDConfig returns the OIDC configuration for the given issuer
 	GetOpenIDConfig(ctx context.Context, issuer string) (*OIDCConfiguration, error)
+	// HTTPClient returns the client to fetch an issuer's JWKS with. Issuers can be user-supplied (e.g.
+	// service account trust policies), so the keys must be fetched with the same restricted client as
+	// the discovery document, which names the JWKS URI.
+	HTTPClient() *http.Client
 }
 
 type leveledLoggerAdapter struct {
@@ -72,14 +76,20 @@ type openIDConfigFetcher struct {
 	client *retryablehttp.Client
 }
 
-// NewOpenIDConfigFetcher returns a new NewOpenIDConfigFetcher
-func NewOpenIDConfigFetcher(logger logger.Logger) OpenIDConfigFetcher {
+// NewOpenIDConfigFetcher returns a new NewOpenIDConfigFetcher. httpClient makes the requests; issuers
+// can be user-supplied, so it should restrict which addresses it connects to.
+func NewOpenIDConfigFetcher(logger logger.Logger, httpClient *http.Client) OpenIDConfigFetcher {
 	// Retryablehttp client defaults to 4 retries.
 	client := retryablehttp.NewClient()
+	client.HTTPClient = httpClient
 	client.RetryWaitMin = retryWaitMinimum
 	client.Logger = &leveledLoggerAdapter{logger: logger}
 
 	return &openIDConfigFetcher{client: client}
+}
+
+func (o *openIDConfigFetcher) HTTPClient() *http.Client {
+	return o.client.HTTPClient
 }
 
 func (o *openIDConfigFetcher) GetOpenIDConfig(ctx context.Context, issuer string) (*OIDCConfiguration, error) {
@@ -105,7 +115,9 @@ func (o *openIDConfigFetcher) GetOpenIDConfig(ctx context.Context, issuer string
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received invalid response from OIDC discovery endpoint %s: %s", resp.Status, body)
+		// The body is left out: the issuer is user-supplied, so echoing it would let a caller read
+		// whatever the address returned.
+		return nil, fmt.Errorf("received invalid response from OIDC discovery endpoint: %s", resp.Status)
 	}
 
 	var cfg OIDCConfiguration
@@ -131,8 +143,10 @@ type oidcTokenVerifier struct {
 	cache             *jwk.Cache
 	oidcConfigMap     map[string]*OIDCConfiguration
 	oidcConfigFetcher OpenIDConfigFetcher
-	issuerMap         map[string]struct{}
-	mu                sync.RWMutex
+	// httpClient fetches JWKS; it is the fetcher's restricted client since the discovery document names the JWKS URI
+	httpClient *http.Client
+	issuerMap  map[string]struct{}
+	mu         sync.RWMutex
 }
 
 // NewOIDCTokenVerifier creates a new OIDCTokenVerifier instance
@@ -151,6 +165,7 @@ func NewOIDCTokenVerifier(ctx context.Context, issuers []string, oidcConfigFetch
 		cache:             cache,
 		oidcConfigMap:     map[string]*OIDCConfiguration{},
 		oidcConfigFetcher: oidcConfigFetcher,
+		httpClient:        oidcConfigFetcher.HTTPClient(),
 		issuerMap:         issuerMap,
 	}
 }
@@ -212,7 +227,10 @@ func (o *oidcTokenVerifier) loadOIDCConfig(ctx context.Context, issuer string) (
 	}
 
 	if o.cache != nil {
-		err := o.cache.Register(cfg.JwksURI, jwk.WithRefreshInterval(jwtRefreshIntervalInMinutes*time.Minute))
+		err := o.cache.Register(cfg.JwksURI,
+			jwk.WithRefreshInterval(jwtRefreshIntervalInMinutes*time.Minute),
+			jwk.WithHTTPClient(o.httpClient),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to register OIDC config for issuer url %s: %w", issuer, err)
 		}
@@ -258,7 +276,7 @@ func (o *oidcTokenVerifier) getKeySet(ctx context.Context, token []byte, jwksURI
 	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	// Get issuer JWK response
-	keySet, err := jwk.Fetch(fetchCtx, jwksURI)
+	keySet, err := jwk.Fetch(fetchCtx, jwksURI, jwk.WithHTTPClient(o.httpClient))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to query JWK URL %s", jwksURI)
 	}

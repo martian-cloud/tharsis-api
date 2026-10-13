@@ -18,7 +18,7 @@ import (
 
 // RuleEnforcer is used to enforce managed identity access rules
 type RuleEnforcer interface {
-	EnforceRules(ctx context.Context, managedIdentity *models.ManagedIdentity, input *RunDetails) error
+	EnforceRules(ctx context.Context, managedIdentities []models.ManagedIdentity, input *RunDetails) ([]string, error)
 }
 
 type ruleTypeHandler func(ctx context.Context, dbClient *db.Client, rule *models.ManagedIdentityAccessRule, input *RunDetails) (string, error)
@@ -52,9 +52,23 @@ func NewRuleEnforcer(
 	}
 }
 
-// EnforceRules verifies all the managed identity rules are satisfied. An error will be returned if any rules do
-// not pass.
-func (r *ruleEnforcer) EnforceRules(ctx context.Context, managedIdentity *models.ManagedIdentity, input *RunDetails) error {
+// EnforceRules verifies the rules of every managed identity are satisfied for the run stage in input, stopping
+// at the first identity that fails, and returns the IDs of the identities it checked (never nil).
+func (r *ruleEnforcer) EnforceRules(ctx context.Context, managedIdentities []models.ManagedIdentity, input *RunDetails) ([]string, error) {
+	ids := make([]string, 0, len(managedIdentities))
+	for _, mi := range managedIdentities {
+		miCopy := mi
+		if err := r.enforceRulesForManagedIdentity(ctx, &miCopy, input); err != nil {
+			return nil, err
+		}
+		ids = append(ids, mi.Metadata.ID)
+	}
+	return ids, nil
+}
+
+// enforceRulesForManagedIdentity verifies all the managed identity's rules are satisfied. An error will be
+// returned if any rules do not pass.
+func (r *ruleEnforcer) enforceRulesForManagedIdentity(ctx context.Context, managedIdentity *models.ManagedIdentity, input *RunDetails) error {
 	results, err := r.dbClient.ManagedIdentities.GetManagedIdentityAccessRules(ctx,
 		&db.GetManagedIdentityAccessRulesInput{
 			Filter: &db.ManagedIdentityAccessRuleFilter{

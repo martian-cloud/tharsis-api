@@ -62,6 +62,11 @@ func (a *oauthCodeFlowParams) validate(validClientID string) error {
 	if a.redirectURI == "" {
 		return errors.New("redirect_uri is required")
 	}
+	// Checked here as well as when the code is issued, so an invalid redirect_uri is rejected before
+	// the user is sent to the login page rather than after they have signed in.
+	if err := auth.ValidateOAuthRedirectURI(a.redirectURI); err != nil {
+		return err
+	}
 	if a.responseType == "" {
 		return errors.New("response_type is required")
 	}

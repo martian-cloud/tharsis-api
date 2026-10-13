@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ad204e77b1ecefbd442d2111d435df9f>>
+ * @generated SignedSource<<4d821a39f828a3a826ad6679296c7d9d>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,6 +16,7 @@ export type UpdateRunnerInput = {
   description: string;
   disabled?: boolean | null | undefined;
   id: string;
+  jobLimit?: number | null | undefined;
   metadata?: ResourceMetadataInput | null | undefined;
   runUntaggedJobs?: boolean | null | undefined;
   tags?: ReadonlyArray<string> | null | undefined;

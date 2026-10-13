@@ -9,11 +9,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	modeltypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -143,7 +141,7 @@ func TestResolveModule_PublicModule_NormalizesVersion(t *testing.T) {
 	assert.Equal(t, digest, resolved.Digest)
 }
 
-func TestResolveModule_PrivateModule_Authorization(t *testing.T) {
+func TestResolveModule_PrivateModule_GroupContainment(t *testing.T) {
 	source := "registry.example.com/namespace/name/aws"
 	module := &models.TerraformModule{Private: true, GroupID: "group-1"}
 
@@ -154,49 +152,106 @@ func TestResolveModule_PrivateModule_Authorization(t *testing.T) {
 		return mockResolver
 	}
 
-	t.Run("authorized caller proceeds to resolve version", func(t *testing.T) {
-		mockCaller := auth.NewMockCaller(t)
-		mockCaller.On("RequireAccessToInheritableResource", mock.Anything,
-			modeltypes.TerraformModuleModelType, mock.Anything).Return(nil)
-		ctx := auth.WithCaller(context.Background(), mockCaller)
+	// withGroupAndWorkspace stubs a workspace at wsPath and a module group at groupPath.
+	withGroupAndWorkspace := func(ctx context.Context, t *testing.T, wsPath, groupPath string) *db.Client {
+		t.Helper()
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", ctx, resolveWorkspaceID).
+			Return(&models.Workspace{FullPath: wsPath}, nil)
+		mockGroups := db.NewMockGroups(t)
+		mockGroups.On("GetGroupByID", ctx, module.GroupID).
+			Return(&models.Group{Metadata: models.ResourceMetadata{ID: module.GroupID}, FullPath: groupPath}, nil)
+		return &db.Client{Workspaces: mockWorkspaces, Groups: mockGroups}
+	}
 
+	t.Run("workspace directly in the module's own group is allowed", func(t *testing.T) {
+		ctx := context.Background()
 		mockSource := registry.NewMockModuleRegistrySource(t)
 		mockSource.On("LocalRegistryModule", ctx).Return(module, nil)
 		mockSource.On("ResolveSemanticVersion", ctx, mock.Anything, false).Return("2.0.0", nil)
 		mockSource.On("ResolveDigest", ctx, "2.0.0").Return([]byte{0xAA}, nil)
 
-		resolved, err := ResolveModule(ctx, &db.Client{Workspaces: withWorkspace(ctx, t)},
+		resolved, err := ResolveModule(ctx, withGroupAndWorkspace(ctx, t, "top-group/ws", "top-group"),
 			newResolver(t, ctx, mockSource), resolveWorkspaceID, &source, nil, false, nil)
 		require.NoError(t, err)
 		require.NotNil(t, resolved.Version)
 		assert.Equal(t, "2.0.0", *resolved.Version)
 	})
 
-	t.Run("unauthorized caller is rejected", func(t *testing.T) {
-		mockCaller := auth.NewMockCaller(t)
-		mockCaller.On("RequireAccessToInheritableResource", mock.Anything,
-			modeltypes.TerraformModuleModelType, mock.Anything).
-			Return(errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
-		ctx := auth.WithCaller(context.Background(), mockCaller)
-
+	t.Run("workspace in a descendant subgroup of the module's group is allowed", func(t *testing.T) {
+		ctx := context.Background()
 		mockSource := registry.NewMockModuleRegistrySource(t)
 		mockSource.On("LocalRegistryModule", ctx).Return(module, nil)
+		mockSource.On("ResolveSemanticVersion", ctx, mock.Anything, false).Return("2.0.0", nil)
+		mockSource.On("ResolveDigest", ctx, "2.0.0").Return([]byte{0xAA}, nil)
 
-		resolved, err := ResolveModule(ctx, &db.Client{Workspaces: withWorkspace(ctx, t)},
+		resolved, err := ResolveModule(ctx, withGroupAndWorkspace(ctx, t, "top-group/sub-group/ws", "top-group"),
 			newResolver(t, ctx, mockSource), resolveWorkspaceID, &source, nil, false, nil)
-		require.Error(t, err)
-		assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
-		assert.Nil(t, resolved)
+		require.NoError(t, err)
+		require.NotNil(t, resolved.Version)
+		assert.Equal(t, "2.0.0", *resolved.Version)
 	})
 
-	t.Run("no caller on context is rejected", func(t *testing.T) {
+	t.Run("workspace outside the module's group tree is rejected as not found", func(t *testing.T) {
 		ctx := context.Background()
 		mockSource := registry.NewMockModuleRegistrySource(t)
 		mockSource.On("LocalRegistryModule", ctx).Return(module, nil)
 
-		resolved, err := ResolveModule(ctx, &db.Client{Workspaces: withWorkspace(ctx, t)},
+		resolved, err := ResolveModule(ctx, withGroupAndWorkspace(ctx, t, "other-group/ws", "top-group"),
 			newResolver(t, ctx, mockSource), resolveWorkspaceID, &source, nil, false, nil)
 		require.Error(t, err)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+		assert.Nil(t, resolved)
+	})
+
+	t.Run("a sibling group whose path shares a prefix is still rejected as not found", func(t *testing.T) {
+		// "top-group-2" must not be treated as a descendant of "top-group" merely because it
+		// shares a string prefix; IsDescendantOfGroup requires a "/" separator.
+		ctx := context.Background()
+		mockSource := registry.NewMockModuleRegistrySource(t)
+		mockSource.On("LocalRegistryModule", ctx).Return(module, nil)
+
+		resolved, err := ResolveModule(ctx, withGroupAndWorkspace(ctx, t, "top-group-2/ws", "top-group"),
+			newResolver(t, ctx, mockSource), resolveWorkspaceID, &source, nil, false, nil)
+		require.Error(t, err)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+		assert.Nil(t, resolved)
+	})
+
+	t.Run("group lookup error propagates", func(t *testing.T) {
+		ctx := context.Background()
+		mockSource := registry.NewMockModuleRegistrySource(t)
+		mockSource.On("LocalRegistryModule", ctx).Return(module, nil)
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", ctx, resolveWorkspaceID).
+			Return(&models.Workspace{FullPath: "top-group/ws"}, nil)
+		mockGroups := db.NewMockGroups(t)
+		mockGroups.On("GetGroupByID", ctx, module.GroupID).
+			Return(nil, errors.New("boom", errors.WithErrorCode(errors.EInternal)))
+
+		resolved, err := ResolveModule(ctx, &db.Client{Workspaces: mockWorkspaces, Groups: mockGroups},
+			newResolver(t, ctx, mockSource), resolveWorkspaceID, &source, nil, false, nil)
+		require.Error(t, err)
+		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+		assert.Nil(t, resolved)
+	})
+
+	t.Run("group not found is rejected", func(t *testing.T) {
+		ctx := context.Background()
+		mockSource := registry.NewMockModuleRegistrySource(t)
+		mockSource.On("LocalRegistryModule", ctx).Return(module, nil)
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", ctx, resolveWorkspaceID).
+			Return(&models.Workspace{FullPath: "top-group/ws"}, nil)
+		mockGroups := db.NewMockGroups(t)
+		mockGroups.On("GetGroupByID", ctx, module.GroupID).Return(nil, nil)
+
+		resolved, err := ResolveModule(ctx, &db.Client{Workspaces: mockWorkspaces, Groups: mockGroups},
+			newResolver(t, ctx, mockSource), resolveWorkspaceID, &source, nil, false, nil)
+		require.Error(t, err)
+		assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 		assert.Nil(t, resolved)
 	})
 }

@@ -12,16 +12,20 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity/kubernetesfederated"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity/tharsisfederated"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type authenticatorFactoryFunc func() (managedidentity.Authenticator, error)
 
 type managedIdentities struct {
-	client         jobclient.Client
-	jobLogger      joblogger.Logger
-	factoryMap     map[string]authenticatorFactoryFunc
-	workspaceID    string
-	authenticators []managedidentity.Authenticator
+	client     jobclient.Client
+	jobLogger  joblogger.Logger
+	factoryMap map[string]authenticatorFactoryFunc
+	// managedIdentityIDs are the identities the job's run node was authorized to use. The API only
+	// creates credentials for these, so identities assigned to the workspace later are not loaded.
+	managedIdentityIDs []string
+	authenticators     []managedidentity.Authenticator
 }
 
 type managedIdentityInitializeResponse struct {
@@ -30,16 +34,16 @@ type managedIdentityInitializeResponse struct {
 }
 
 func newManagedIdentities(
-	workspaceID string,
+	managedIdentityIDs []string,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
 	jobCfg *JobConfig,
 ) *managedIdentities {
 	return &managedIdentities{
-		workspaceID:    workspaceID,
-		jobLogger:      jobLogger,
-		client:         client,
-		authenticators: []managedidentity.Authenticator{},
+		managedIdentityIDs: managedIdentityIDs,
+		jobLogger:          jobLogger,
+		client:             client,
+		authenticators:     []managedidentity.Authenticator{},
 		factoryMap: map[string]authenticatorFactoryFunc{
 			pb.ManagedIdentityType_aws_federated.String(): func() (managedidentity.Authenticator, error) {
 				return awsfederated.New()
@@ -72,13 +76,18 @@ func (l *managedIdentities) initialize(ctx context.Context) (*managedIdentityIni
 		HostCredentialFileMapping: map[string]string{},
 	}
 
-	identities, err := l.client.GetAssignedManagedIdentities(ctx, l.workspaceID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get assigned managed identities for workspace %v", err)
-	}
-
 	identitiesMap := map[string][]*pb.ManagedIdentity{}
-	for _, identity := range identities {
+	for _, id := range l.managedIdentityIDs {
+		identity, err := l.client.GetManagedIdentity(ctx, id)
+		if status.Code(err) == codes.NotFound || (err == nil && identity == nil) {
+			// The identity was deleted after the run node was authorized to use it. Skip it so the
+			// job still runs; anything that needed its credentials will fail on its own.
+			l.jobLogger.Warningf("Managed identity %s was not found and will be skipped; it may have been deleted", id)
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to get managed identity %s: %v", id, err)
+		}
 		identitiesMap[identity.Type] = append(identitiesMap[identity.Type], identity)
 	}
 

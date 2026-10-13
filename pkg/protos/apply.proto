@@ -41,4 +41,8 @@ message Apply {
   optional string           error_message     = 4;
   optional string           latest_job_id     = 5;
   ApplyStatus               status            = 6;
+  // Global IDs of the managed identities the apply job may create credentials for. Set when
+  // auto-apply is enabled (including at run creation) or when the apply is approved; empty
+  // otherwise.
+  repeated string           managed_identity_ids = 7;
 }

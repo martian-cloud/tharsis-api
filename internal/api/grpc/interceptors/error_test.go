@@ -58,6 +58,12 @@ func TestBuildStatusError(t *testing.T) {
 			expectedMsg:  "resource not found",
 		},
 		{
+			name:         "data loss",
+			err:          errors.New("log stream s1 chunk 0 is missing the 4 bytes at offset 0", errors.WithErrorCode(errors.EDataLoss)),
+			expectedCode: codes.DataLoss,
+			expectedMsg:  "log stream s1 chunk 0 is missing the 4 bytes at offset 0",
+		},
+		{
 			name:         "invalid",
 			err:          errors.New("bad input", errors.WithErrorCode(errors.EInvalid)),
 			expectedCode: codes.InvalidArgument,

@@ -56,6 +56,7 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
             createdBy
             tags
             runUntaggedJobs
+            jobLimit
             metadata {
                 createdAt
                 trn
@@ -276,6 +277,10 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
                     <Box mb={2}>
                         <Typography mb={1}>Run Untagged Jobs</Typography>
                         <Typography color="textSecondary">{runner.runUntaggedJobs ? 'Yes' : 'No'}</Typography>
+                    </Box>
+                    <Box mb={2}>
+                        <Typography mb={1}>Job Limit</Typography>
+                        <Typography color="textSecondary">{runner.jobLimit === 0 ? 'Unlimited' : runner.jobLimit}</Typography>
                     </Box>
                     <Typography mb={0.25}>Status</Typography>
                     <RunnerChip disabled={runner.disabled} />

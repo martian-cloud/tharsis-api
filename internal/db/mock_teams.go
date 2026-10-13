@@ -92,9 +92,9 @@ func (_m *MockTeams) GetTeamByID(ctx context.Context, id string) (*models.Team, 
 	return r0, r1
 }
 
-// GetTeamBySCIMExternalID provides a mock function with given fields: ctx, scimExternalID
-func (_m *MockTeams) GetTeamBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.Team, error) {
-	ret := _m.Called(ctx, scimExternalID)
+// GetTeamBySCIMExternalID provides a mock function with given fields: ctx, scimIDPIssuerURL, scimExternalID
+func (_m *MockTeams) GetTeamBySCIMExternalID(ctx context.Context, scimIDPIssuerURL string, scimExternalID string) (*models.Team, error) {
+	ret := _m.Called(ctx, scimIDPIssuerURL, scimExternalID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTeamBySCIMExternalID")
@@ -102,19 +102,19 @@ func (_m *MockTeams) GetTeamBySCIMExternalID(ctx context.Context, scimExternalID
 
 	var r0 *models.Team
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Team, error)); ok {
-		return rf(ctx, scimExternalID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*models.Team, error)); ok {
+		return rf(ctx, scimIDPIssuerURL, scimExternalID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Team); ok {
-		r0 = rf(ctx, scimExternalID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *models.Team); ok {
+		r0 = rf(ctx, scimIDPIssuerURL, scimExternalID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Team)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, scimExternalID)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, scimIDPIssuerURL, scimExternalID)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -116,13 +117,19 @@ func NewVCSController(
 	}
 }
 
+// maxVCSWebhookBodySize caps a VCS webhook payload. Push and merge request events are usually a few KB;
+// this leaves room for large pushes without accepting GitHub's 25 MB maximum.
+const maxVCSWebhookBodySize = 5 * 1024 * 1024 // 5 MiB
+
 // RegisterRoutes adds routes to the router.
 func (c *vcsController) RegisterRoutes(router chi.Router) {
 	// OAuth handler.
 	router.Get("/vcs/auth/callback", c.OAuthHandler)
 
 	// Webhook handler.
-	router.Post("/vcs/events", c.DesignateEventHandler)
+	// Webhooks authenticate in the handler, so they would otherwise get the unauthenticated cap.
+	router.With(middleware.LimitRequestBody(maxVCSWebhookBodySize, c.respWriter)).
+		Post("/vcs/events", c.DesignateEventHandler)
 }
 
 func (c *vcsController) OAuthHandler(w http.ResponseWriter, r *http.Request) {

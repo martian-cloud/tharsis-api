@@ -1,11 +1,14 @@
 package vcs
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	context "context"
 	"io"
 	http "net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -1259,7 +1262,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				ProviderID:      "provider-id",
 				RepositoryPath:  "owner/repository",
 				Branch:          ptr.String("main"),
-				ModuleDirectory: ptr.String("hidden/../../path"),
+				ModuleDirectory: ptr.String("hidden/../path"),
 				GlobPatterns:    []string{"/**/directory/*"},
 				WebhookDisabled: true, // Tharsis should still configure the webhook.
 			},
@@ -1297,7 +1300,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				Branch:          "main",
 				CreatedBy:       "some@some-email",
 				TokenNonce:      "some-token-nonce",
-				ModuleDirectory: ptr.String("hidden/../../path"), // Should be cleaned.
+				ModuleDirectory: ptr.String("hidden/../path"), // Should be cleaned.
 				GlobPatterns:    []string{"/**/directory/*"},
 				// Other fields should remain unchanged.
 			},
@@ -1312,7 +1315,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				CreatedBy:       "some@some-email",
 				WebhookID:       "webhook-id", // Only present if Tharsis configures Git provider.
 				TokenNonce:      "some-token-nonce",
-				ModuleDirectory: ptr.String("../path"), // Should be cleaned.
+				ModuleDirectory: ptr.String("path"), // Should be cleaned.
 				GlobPatterns:    []string{"/**/directory/*"},
 				WebhookDisabled: true,
 				// Other fields should remain unchanged.
@@ -1329,7 +1332,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 					CreatedBy:       "some@some-email",
 					WebhookID:       "webhook-id", // Only present if Tharsis configures Git provider.
 					TokenNonce:      "some-token-nonce",
-					ModuleDirectory: ptr.String("../path"), // Should be cleaned.
+					ModuleDirectory: ptr.String("path"), // Should be cleaned.
 					GlobPatterns:    []string{"/**/directory/*"},
 					WebhookDisabled: true,
 					// Other fields should remain unchanged.
@@ -1553,8 +1556,25 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 		input             *UpdateWorkspaceVCSProviderLinkInput
 		existingLink      *models.WorkspaceVCSProviderLink
 		expectedLink      *models.WorkspaceVCSProviderLink
+		expectedModuleDir *string
 		expectedErrorCode errors.CodeType
 	}{
+		{
+			name:   "positive: module directory is cleaned before update; expect no errors",
+			caller: &auth.SystemCaller{},
+			input: &UpdateWorkspaceVCSProviderLinkInput{
+				Link: &models.WorkspaceVCSProviderLink{
+					Metadata: models.ResourceMetadata{
+						ID: resourceUUID,
+					},
+					RepositoryPath:  "owner/repository",
+					Branch:          "main",
+					ModuleDirectory: ptr.String("./modules/../modules/network/"),
+				},
+			},
+			expectedLink:      &models.WorkspaceVCSProviderLink{},
+			expectedModuleDir: ptr.String("modules/network"),
+		},
 		{
 			name:   "positive: valid update input; expect no errors",
 			caller: &auth.SystemCaller{},
@@ -1627,6 +1647,10 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 				t.Fatal(err)
 			} else {
 				assert.Equal(t, test.expectedLink, link)
+			}
+
+			if test.expectedModuleDir != nil {
+				assert.Equal(t, test.expectedModuleDir, test.input.Link.ModuleDirectory)
 			}
 		})
 	}
@@ -2075,12 +2099,12 @@ func TestProcessWebhookEvent(t *testing.T) {
 				SourceBranch:     "feature/branch",
 				TargetBranch:     "main",
 				Action:           "opened",
-				HeadCommitID:     "sample-commit-id",
+				HeadCommitID:     sampleAfterCommit,
 			},
 			equivalentEventType: models.MergeRequestEventType,
 			createEventInput: &models.VCSEvent{
 				SourceReferenceName: &sampleReferenceNames[2],
-				CommitID:            ptr.String("sample-commit-id"),
+				CommitID:            &sampleAfterCommit,
 				WorkspaceID:         sampleWorkspace.Metadata.ID,
 				Type:                models.MergeRequestEventType,
 				Status:              models.VCSEventPending,
@@ -2102,15 +2126,63 @@ func TestProcessWebhookEvent(t *testing.T) {
 				SourceBranch:     "feature/branch",
 				TargetBranch:     "main",
 				Action:           "opened",
+				HeadCommitID:     sampleAfterCommit,
+			},
+			equivalentEventType: models.MergeRequestEventType,
+			createEventInput: &models.VCSEvent{
+				SourceReferenceName: &sampleReferenceNames[2],
+				CommitID:            &sampleAfterCommit,
+				WorkspaceID:         sampleWorkspace.Metadata.ID,
+				Type:                models.MergeRequestEventType,
+				Status:              models.VCSEventPending,
+				RepositoryURL:       sampleRepositoryURL,
+			},
+		},
+		{
+			name: "after commit is not a full hex hash; expect an errored event",
+			link: &models.WorkspaceVCSProviderLink{
+				RepositoryPath: "owner/repository",
+				WorkspaceID:    "workspace-id",
+				Branch:         "main",
+			},
+			input: &ProcessWebhookEventInput{
+				EventHeader: "push",
+				Ref:         "refs/heads/main",
+				After:       "abc123-not-a-hash",
+			},
+			equivalentEventType: models.BranchEventType,
+			createEventInput: &models.VCSEvent{
+				SourceReferenceName: &sampleReferenceNames[0],
+				WorkspaceID:         sampleWorkspace.Metadata.ID,
+				Type:                models.BranchEventType,
+				Status:              models.VCSEventErrored,
+				ErrorMessage:        ptr.String("after commit ID must be a full hex git commit hash"),
+				RepositoryURL:       sampleRepositoryURL,
+			},
+		},
+		{
+			name: "head commit is not a full hex hash; expect an errored event",
+			link: &models.WorkspaceVCSProviderLink{
+				RepositoryPath:      "owner/repository",
+				WorkspaceID:         "workspace-id",
+				Branch:              "main",
+				AutoSpeculativePlan: true,
+			},
+			input: &ProcessWebhookEventInput{
+				EventHeader:      "pull_request",
+				SourceRepository: "owner/repository",
+				SourceBranch:     "feature/branch",
+				TargetBranch:     "main",
+				Action:           "opened",
 				HeadCommitID:     "sample-commit-id",
 			},
 			equivalentEventType: models.MergeRequestEventType,
 			createEventInput: &models.VCSEvent{
 				SourceReferenceName: &sampleReferenceNames[2],
-				CommitID:            ptr.String("sample-commit-id"),
 				WorkspaceID:         sampleWorkspace.Metadata.ID,
 				Type:                models.MergeRequestEventType,
-				Status:              models.VCSEventPending,
+				Status:              models.VCSEventErrored,
+				ErrorMessage:        ptr.String("head commit ID must be a full hex git commit hash"),
 				RepositoryURL:       sampleRepositoryURL,
 			},
 		},
@@ -2207,6 +2279,11 @@ func TestProcessWebhookEvent(t *testing.T) {
 				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
 			} else if err != nil {
 				t.Fatal(err)
+			}
+
+			if test.createEventInput != nil && test.createEventInput.Status == models.VCSEventErrored {
+				mockVCSEvents.AssertCalled(t, "CreateEvent", mock.Anything, test.createEventInput)
+				mockManager.AssertNotCalled(t, "StartTask", mock.Anything)
 			}
 		})
 	}
@@ -2899,4 +2976,88 @@ func createRepositoryArchive() (*os.File, error) {
 	}
 
 	return os.Open(tarFilePath)
+}
+
+func TestResolveModulePath(t *testing.T) {
+	repo := t.TempDir()
+	outside := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(repo, "modules", "network"), 0o700))
+	// A symlink committed to the repository that points outside the checkout.
+	require.NoError(t, os.Symlink(outside, filepath.Join(repo, "escape")))
+
+	tests := []struct {
+		name            string
+		moduleDirectory string
+		expectErr       bool
+	}{
+		{name: "repository root", moduleDirectory: ""},
+		{name: "subdirectory", moduleDirectory: "modules/network"},
+		{name: "parent traversal", moduleDirectory: "../", expectErr: true},
+		{name: "nested parent traversal", moduleDirectory: "modules/../../", expectErr: true},
+		{name: "symlink out of the repository", moduleDirectory: "escape", expectErr: true},
+		{name: "missing directory", moduleDirectory: "missing", expectErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			modulePath, err := resolveModulePath(repo, test.moduleDirectory)
+			if test.expectErr {
+				assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+				return
+			}
+			require.NoError(t, err)
+			root, err := filepath.EvalSymlinks(repo)
+			require.NoError(t, err)
+			assert.Equal(t, filepath.Join(root, test.moduleDirectory), modulePath)
+		})
+	}
+}
+
+func TestRepositoryDecompressorLimits(t *testing.T) {
+	// The repository size limit only caps the compressed download, so extraction must be capped too,
+	// in proportion to it.
+	tgz := newRepositoryDecompressor(5 * 1024 * 1024)
+	assert.Equal(t, int64(100*1024*1024), tgz.FileSizeLimit)
+	assert.Equal(t, maxRepositoryFiles, tgz.FilesLimit)
+
+	// go-getter treats a zero limit as unlimited, so a zero repository size limit must not produce one.
+	assert.Positive(t, newRepositoryDecompressor(0).FileSizeLimit)
+}
+
+func TestRepositoryDecompressorRejectsExpansion(t *testing.T) {
+	const repositorySizeLimit = 1024 // extracted cap: 20 KiB
+
+	// writeArchive builds a repository-style archive holding one file of the given size. Zeros
+	// compress to almost nothing, like a decompression bomb.
+	writeArchive := func(t *testing.T, fileSize int) string {
+		path := filepath.Join(t.TempDir(), "repo.tar.gz")
+		f, err := os.Create(path)
+		require.NoError(t, err)
+		defer f.Close()
+
+		gz := gzip.NewWriter(f)
+		tw := tar.NewWriter(gz)
+		require.NoError(t, tw.WriteHeader(&tar.Header{Name: "owner-repo-sha/", Typeflag: tar.TypeDir, Mode: 0o755}))
+		require.NoError(t, tw.WriteHeader(&tar.Header{Name: "owner-repo-sha/main.tf", Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(fileSize)}))
+		_, err = tw.Write(make([]byte, fileSize))
+		require.NoError(t, err)
+		require.NoError(t, tw.Close())
+		require.NoError(t, gz.Close())
+		return path
+	}
+
+	t.Run("within the extracted cap", func(t *testing.T) {
+		err := newRepositoryDecompressor(repositorySizeLimit).Decompress(t.TempDir(), writeArchive(t, 10*1024), true, 0o000)
+		assert.NoError(t, err)
+	})
+
+	t.Run("beyond the extracted cap", func(t *testing.T) {
+		archive := writeArchive(t, 30*1024)
+		info, err := os.Stat(archive)
+		require.NoError(t, err)
+		require.Less(t, info.Size(), int64(repositorySizeLimit), "the archive must fit the compressed download limit")
+
+		err = newRepositoryDecompressor(repositorySizeLimit).Decompress(t.TempDir(), archive, true, 0o000)
+		assert.ErrorContains(t, err, "larger than limit")
+	})
 }

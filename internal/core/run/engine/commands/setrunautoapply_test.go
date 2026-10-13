@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/store"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/rules"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -35,6 +36,100 @@ func TestSetRunAutoApply_Prepare(t *testing.T) {
 
 		require.NoError(t, cmd.Prepare(ctx))
 		assert.Equal(t, "groupA/ws", cmd.namespacePath)
+	})
+
+	t.Run("enabling auto-apply enforces apply-stage rules", func(t *testing.T) {
+		mockRuns := db.NewMockRuns(t)
+		mockRuns.On("GetRunByID", ctx, "run-1").Return(&models.Run{
+			Metadata:    models.ResourceMetadata{ID: "run-1"},
+			WorkspaceID: "ws-1",
+			Apply:       &models.Apply{Status: models.ApplyCreated},
+		}, nil)
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", ctx, "ws-1").Return(&models.Workspace{FullPath: "groupA/ws"}, nil)
+
+		mockManagedIdentities := db.NewMockManagedIdentities(t)
+		mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").
+			Return([]models.ManagedIdentity{{Metadata: models.ResourceMetadata{ID: "mi-1"}}}, nil)
+
+		mockRuleEnforcer := rules.NewMockRuleEnforcer(t)
+		mockRuleEnforcer.On("EnforceRules", ctx, mock.Anything, mock.MatchedBy(func(d *rules.RunDetails) bool {
+			return d.RunStage == models.JobApplyType
+		})).Return(nil, errors.New("rule violation", errors.WithErrorCode(errors.EForbidden)))
+
+		cmd := &SetRunAutoApply{
+			dbClient:     &db.Client{Runs: mockRuns, Workspaces: mockWorkspaces, ManagedIdentities: mockManagedIdentities},
+			ruleEnforcer: mockRuleEnforcer,
+			in:           &SetRunAutoApplyInput{RunID: "run-1", AutoApply: true},
+		}
+
+		err := cmd.Prepare(ctx)
+		require.Error(t, err)
+		assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
+	})
+
+	t.Run("enabling auto-apply records the identities that passed the apply-stage rules", func(t *testing.T) {
+		mockRuns := db.NewMockRuns(t)
+		mockRuns.On("GetRunByID", ctx, "run-1").Return(&models.Run{
+			Metadata:    models.ResourceMetadata{ID: "run-1"},
+			WorkspaceID: "ws-1",
+			Apply:       &models.Apply{Status: models.ApplyCreated},
+		}, nil)
+
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockWorkspaces.On("GetWorkspaceByID", ctx, "ws-1").Return(&models.Workspace{FullPath: "groupA/ws"}, nil)
+
+		mockManagedIdentities := db.NewMockManagedIdentities(t)
+		mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", ctx, "ws-1").Return([]models.ManagedIdentity{
+			{Metadata: models.ResourceMetadata{ID: "mi-1"}},
+			{Metadata: models.ResourceMetadata{ID: "mi-2"}},
+		}, nil)
+
+		mockRuleEnforcer := rules.NewMockRuleEnforcer(t)
+		mockRuleEnforcer.On("EnforceRules", ctx, mock.Anything, mock.Anything).Return([]string{"mi-1", "mi-2"}, nil)
+
+		cmd := &SetRunAutoApply{
+			dbClient:     &db.Client{Runs: mockRuns, Workspaces: mockWorkspaces, ManagedIdentities: mockManagedIdentities},
+			ruleEnforcer: mockRuleEnforcer,
+			in:           &SetRunAutoApplyInput{RunID: "run-1", AutoApply: true},
+		}
+
+		require.NoError(t, cmd.Prepare(ctx))
+		assert.Equal(t, []string{"mi-1", "mi-2"}, cmd.managedIdentityIDs)
+	})
+
+	t.Run("enforcement is skipped when auto-apply is already enabled or being disabled", func(t *testing.T) {
+		for _, tc := range []struct {
+			name      string
+			current   bool
+			requested bool
+		}{
+			{name: "already enabled", current: true, requested: true},
+			{name: "disabling", current: true, requested: false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				mockRuns := db.NewMockRuns(t)
+				mockRuns.On("GetRunByID", ctx, "run-1").Return(&models.Run{
+					Metadata:    models.ResourceMetadata{ID: "run-1"},
+					WorkspaceID: "ws-1",
+					AutoApply:   tc.current,
+					Apply:       &models.Apply{Status: models.ApplyCreated},
+				}, nil)
+
+				mockWorkspaces := db.NewMockWorkspaces(t)
+				mockWorkspaces.On("GetWorkspaceByID", ctx, "ws-1").Return(&models.Workspace{FullPath: "groupA/ws"}, nil)
+
+				// ManagedIdentities and the rule enforcer are not stubbed, so any enforcement fails the test.
+				cmd := &SetRunAutoApply{
+					dbClient:     &db.Client{Runs: mockRuns, Workspaces: mockWorkspaces},
+					ruleEnforcer: rules.NewMockRuleEnforcer(t),
+					in:           &SetRunAutoApplyInput{RunID: "run-1", AutoApply: tc.requested},
+				}
+
+				require.NoError(t, cmd.Prepare(ctx))
+			})
+		}
 	})
 
 	t.Run("missing run yields not found", func(t *testing.T) {
@@ -99,14 +194,40 @@ func TestSetRunAutoApply_Execute(t *testing.T) {
 			dbClient:      &db.Client{ActivityEvents: mockActivityEvents},
 			in:            &SetRunAutoApplyInput{RunID: "run-1", AutoApply: true},
 			namespacePath: "groupA/ws",
+			// As set by Prepare after the apply-stage rules passed.
+			managedIdentityIDs: []string{"mi-1"},
 		}
 
 		require.NoError(t, cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore}))
 		require.NotNil(t, cmd.Updated)
 		assert.True(t, cmd.Updated.AutoApply)
+		// The apply job may only use the identities the rule check authorized.
+		assert.Equal(t, []string{"mi-1"}, cmd.Updated.Apply.ManagedIdentityIDs)
 	})
 
-	t.Run("disabling auto-apply records a disable activity event", func(t *testing.T) {
+	t.Run("enabling auto-apply without a rule check from Prepare is refused", func(t *testing.T) {
+		// Prepare read auto-apply as already enabled and skipped the check, but it was disabled
+		// before Execute ran.
+		run := &models.Run{
+			Metadata: models.ResourceMetadata{ID: "run-1"},
+			Status:   models.RunPlanning,
+			Plan:     models.Plan{ID: "plan-1", Status: models.PlanRunning},
+			Apply:    &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+		}
+		runStore := store.NewRunStore(&db.Client{})
+		runStore.AddRun(run)
+
+		cmd := &SetRunAutoApply{
+			dbClient: &db.Client{},
+			in:       &SetRunAutoApplyInput{RunID: "run-1", AutoApply: true},
+		}
+
+		err := cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore})
+		require.Error(t, err)
+		assert.Equal(t, errors.EConflict, errors.ErrorCode(err))
+	})
+
+	t.Run("disabling auto-apply records a disable activity event and clears the apply's identities", func(t *testing.T) {
 		mockActivityEvents := db.NewMockActivityEvents(t)
 		mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.MatchedBy(func(in *models.ActivityEvent) bool {
 			var payload models.ActivityEventUpdateRunPayload
@@ -121,7 +242,7 @@ func TestSetRunAutoApply_Execute(t *testing.T) {
 			Status:    models.RunPlanning,
 			AutoApply: true,
 			Plan:      models.Plan{ID: "plan-1", Status: models.PlanRunning},
-			Apply:     &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+			Apply:     &models.Apply{ID: "apply-1", Status: models.ApplyCreated, ManagedIdentityIDs: []string{"mi-1"}},
 		}
 		runStore := store.NewRunStore(&db.Client{})
 		runStore.AddRun(run)
@@ -134,6 +255,7 @@ func TestSetRunAutoApply_Execute(t *testing.T) {
 		require.NoError(t, cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore}))
 		require.NotNil(t, cmd.Updated)
 		assert.False(t, cmd.Updated.AutoApply)
+		assert.Nil(t, cmd.Updated.Apply.ManagedIdentityIDs, "a manual apply is authorized when it is started")
 	})
 
 	t.Run("no-op when the setting already matches and records no activity event", func(t *testing.T) {

@@ -289,6 +289,12 @@ func (s *JobServer) SubscribeToJobLogStream(req *pb.SubscribeToJobLogStreamReque
 	}
 
 	for event := range eventChan {
+		if event.Err != nil {
+			// Return the failure (rather than ending the stream cleanly, which reads as completion)
+			// so the client can reconnect on a transient error.
+			return event.Err
+		}
+
 		pbEvent := &pb.JobLogStreamEvent{
 			Completed: event.Completed,
 			Size:      int32(event.Size),

@@ -55,7 +55,7 @@ type Client interface {
 	GetRunVariables(ctx context.Context, runID string, includeSensitiveValues bool) ([]*pb.RunVariable, error)
 	GetPackageVersion(ctx context.Context, source, versionConstraint string) (*pb.PackageVersion, error)
 	DownloadPackage(ctx context.Context, packageVersionID string) (io.ReadCloser, error)
-	GetAssignedManagedIdentities(ctx context.Context, workspaceID string) ([]*pb.ManagedIdentity, error)
+	GetManagedIdentity(ctx context.Context, id string) (*pb.ManagedIdentity, error)
 	GetConfigurationVersion(ctx context.Context, id string) (*pb.ConfigurationVersion, error)
 	CreateStateVersion(ctx context.Context, runID string, body io.Reader) (*pb.StateVersion, error)
 	GetRunStateVersion(ctx context.Context, runID string) (*pb.StateVersion, error)
@@ -157,16 +157,9 @@ func (c *jobClient) CreateManagedIdentityCredentials(ctx context.Context, manage
 	return []byte(resp.Data), nil
 }
 
-// GetAssignedManagedIdentities returns a list of assigned managed identities for a workspace
-func (c *jobClient) GetAssignedManagedIdentities(ctx context.Context, workspaceID string) ([]*pb.ManagedIdentity, error) {
-	resp, err := c.grpcClient.ManagedIdentitiesClient.GetManagedIdentitiesForWorkspace(ctx, &pb.GetManagedIdentitiesForWorkspaceRequest{
-		WorkspaceId: workspaceID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return resp.ManagedIdentities, nil
+// GetManagedIdentity returns a managed identity by ID
+func (c *jobClient) GetManagedIdentity(ctx context.Context, id string) (*pb.ManagedIdentity, error) {
+	return c.grpcClient.ManagedIdentitiesClient.GetManagedIdentityByID(ctx, &pb.GetManagedIdentityByIDRequest{Id: id})
 }
 
 // GetRun returns a run by ID

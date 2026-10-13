@@ -74,7 +74,7 @@ const (
 
 // CurrentJobProtocolVersion is the current version of the job protocol.
 // This should only be incremented when the protocol between the job executor and the API changes.
-const CurrentJobProtocolVersion = "1.0.0"
+const CurrentJobProtocolVersion = "1.1.0"
 
 // JobTimestamps includes the timestamp for each job state change
 type JobTimestamps struct {

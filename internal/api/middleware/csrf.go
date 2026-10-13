@@ -14,7 +14,14 @@ import (
 func validateCSRFToken(ctx context.Context, r *http.Request, requestSessionID string, sessionManager auth.UserSessionManager) error {
 	csrfTokenCookie, _ := r.Cookie(sessionManager.GetUserSessionCSRFTokenCookieName())
 	if csrfTokenCookie == nil {
-		// Return here since we only need to verify the csrf header if the cookie is included in the request
+		// A request authenticated by the session cookie must always carry the CSRF token: the browser
+		// attaches that cookie automatically, which is exactly what CSRF exploits, so a missing CSRF
+		// cookie fails closed. A session token sent in the Authorization header (the CLI/SDK) is never
+		// attached by a browser on its own, so those requests do not need one. FindToken rejects a
+		// request carrying both, so a present access token cookie means the cookie authenticated it.
+		if accessTokenCookie, _ := r.Cookie(sessionManager.GetUserSessionAccessTokenCookieName()); accessTokenCookie != nil {
+			return errors.New("csrf token cookie is missing in request", errors.WithErrorCode(errors.EUnauthorized))
+		}
 		return nil
 	}
 

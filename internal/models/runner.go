@@ -34,6 +34,8 @@ type Runner struct {
 	Disabled        bool
 	Tags            []string
 	RunUntaggedJobs bool
+	// JobLimit is the max number of concurrent jobs the runner can execute; 0 means no limit
+	JobLimit int
 }
 
 // GetID returns the Metadata ID.
@@ -76,6 +78,10 @@ func (r *Runner) Validate() error {
 
 	if err := verifyValidDescription(r.Description); err != nil {
 		return err
+	}
+
+	if r.JobLimit < 0 {
+		return errors.New("job limit cannot be negative", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if r.Type == "" {

@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
@@ -12,19 +11,16 @@ import (
 
 // SCIMCaller represents a SCIM subject.
 type SCIMCaller struct {
-	dbClient           *db.Client
 	idpIssuerURL       string
 	maintenanceMonitor maintenance.Monitor
 }
 
 // NewSCIMCaller returns a new SCIM caller.
 func NewSCIMCaller(
-	dbClient *db.Client,
 	maintenanceMonitor maintenance.Monitor,
 	idpIssuerURL string,
 ) *SCIMCaller {
 	return &SCIMCaller{
-		dbClient:           dbClient,
 		maintenanceMonitor: maintenanceMonitor,
 		idpIssuerURL:       idpIssuerURL,
 	}
@@ -38,6 +34,12 @@ func (s *SCIMCaller) GetSubject() string {
 // GetIDPIssuerURL returns the IDP issuer URL
 func (s *SCIMCaller) GetIDPIssuerURL() string {
 	return s.idpIssuerURL
+}
+
+// Manages returns true if a user or team with the given SCIM IDP issuer URL is managed by this caller's IDP.
+// Users and teams not managed by SCIM have no issuer, so they never match.
+func (s *SCIMCaller) Manages(scimIDPIssuerURL string) bool {
+	return s.idpIssuerURL != "" && scimIDPIssuerURL == s.idpIssuerURL
 }
 
 // IsAdminModeActivated returns true if the caller is an admin.
@@ -103,53 +105,16 @@ func (s *SCIMCaller) RequireAccessToInheritableResource(ctx context.Context, _ t
 	return s.UnauthorizedError(ctx, false)
 }
 
-// requireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
-func (s *SCIMCaller) requireTeamDeleteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
-	if checks.teamID == nil {
-		return errMissingConstraints
-	}
-
-	team, err := s.dbClient.Teams.GetTeamByID(ctx, *checks.teamID)
-	if err != nil {
-		return err
-	}
-
-	// Only allow deleting teams which are created via SCIM.
-	if team != nil && team.SCIMExternalID != "" {
-		return nil
-	}
-
-	return s.UnauthorizedError(ctx, false)
-}
-
-// requireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
-func (s *SCIMCaller) requireUserDeleteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
-	if checks.userID == nil {
-		return errMissingConstraints
-	}
-
-	user, err := s.dbClient.Users.GetUserByID(ctx, *checks.userID)
-	if err != nil {
-		return err
-	}
-
-	// Only allow deleting users created via SCIM.
-	if user != nil && user.SCIMExternalID != "" {
-		return nil
-	}
-
-	return s.UnauthorizedError(ctx, false)
-}
-
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
 func (s *SCIMCaller) getPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
+	// Only the SCIM-specific permissions are granted. The generic team and user permissions are
+	// checked by the team and user services, which are reachable over GraphQL and gRPC and don't
+	// limit a SCIM caller to its own IDP's resources, so granting them would let a SCIM token
+	// create, modify or delete any team. The SCIM service checks that the caller's IDP manages each
+	// user or team it acts on.
 	handlerMap := map[models.Permission]permissionTypeHandler{
-		models.DeleteTeamPermission: s.requireTeamDeleteAccess,
-		models.DeleteUserPermission: s.requireUserDeleteAccess,
-		models.CreateTeamPermission: noopPermissionHandler,
-		models.UpdateTeamPermission: noopPermissionHandler,
-		models.CreateUserPermission: noopPermissionHandler,
-		models.UpdateUserPermission: noopPermissionHandler,
+		models.ManageSCIMTeamPermission: noopPermissionHandler,
+		models.ManageSCIMUserPermission: noopPermissionHandler,
 	}
 
 	handlerFunc, ok := handlerMap[perm]

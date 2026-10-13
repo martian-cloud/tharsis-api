@@ -40,6 +40,7 @@ type SCIMMetadata struct {
 type ScimErrorResponse struct {
 	Detail     string          `json:"detail"`
 	Status     string          `json:"status"`
+	ScimType   string          `json:"scimType,omitempty"`
 	SchemaURIs []SCIMSchemaURI `json:"schemas"`
 }
 
@@ -504,6 +505,11 @@ func (c *scimController) respondWithSCIMError(ctx context.Context, w http.Respon
 		Detail:     errors.ErrorMessage(err),
 		SchemaURIs: []SCIMSchemaURI{ErrorSchemaURI},
 		Status:     fmt.Sprintf("%d", code), // Must be a string.
+	}
+
+	// RFC 7644 section 3.12: a 409 for a create or update must identify the uniqueness conflict.
+	if code == http.StatusConflict {
+		scimErr.ScimType = "uniqueness"
 	}
 
 	c.respWriter.RespondWithJSON(ctx, w, scimErr, code)

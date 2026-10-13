@@ -9,10 +9,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/aws/smithy-go/ptr"
 	version "github.com/hashicorp/go-version"
@@ -33,6 +33,13 @@ type TokenGetterFunc func(ctx context.Context, hostname string) (string, error)
 
 // FederatedRegistryGetterFunc is a function that retrieves a federated registry for a given hostname.
 type FederatedRegistryGetterFunc func(ctx context.Context, hostname string) (*models.FederatedRegistry, error)
+
+const (
+	// maxVersionsResponseSize caps the module versions response read; the host is user-supplied.
+	maxVersionsResponseSize = 10 * 1024 * 1024
+	// maxUnauthorizedMessageSize caps the auth failure message echoed to the caller.
+	maxUnauthorizedMessageSize = 256
+)
 
 // ErrRemoteModuleSource is returned when a module source is not a valid registry source.
 var ErrRemoteModuleSource = errors.New("remote module source")
@@ -345,16 +352,19 @@ func (m *commonRegistrySource) getVersionsUsingModuleRegistryProtocol(_ context.
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := module.ReadAllLimited(resp.Body, maxVersionsResponseSize)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read body of versions URL: %s", versionsURLString)
+		return nil, fmt.Errorf("failed to read body of versions URL: %s: %v", versionsURLString, err)
 	}
 
+	// Response bodies are left out of errors, since the host is user-supplied and echoing them would
+	// let a caller read whatever the address returned. The one exception is an auth failure, whose
+	// message explains how to grant access (e.g. a federated registry trust policy); it is capped.
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return nil, handleUnauthorizedFunc(string(body))
+		return nil, handleUnauthorizedFunc(truncateMessage(string(body), maxUnauthorizedMessageSize))
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get module versions for module source %s: %s: url=%s: status=%s", m.source, string(body), versionsURLString, resp.Status)
+		return nil, fmt.Errorf("failed to get module versions for module source %s: url=%s: status=%s", m.source, versionsURLString, resp.Status)
 	}
 
 	var unpacked struct {
@@ -367,7 +377,7 @@ func (m *commonRegistrySource) getVersionsUsingModuleRegistryProtocol(_ context.
 
 	err = json.Unmarshal(body, &unpacked)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal body of versions URL: %s: %s", versionsURLString, body)
+		return nil, fmt.Errorf("failed to unmarshal body of versions URL: %s", versionsURLString)
 	}
 
 	results := map[string]bool{}
@@ -378,6 +388,17 @@ func (m *commonRegistrySource) getVersionsUsingModuleRegistryProtocol(_ context.
 	}
 
 	return results, nil
+}
+
+// truncateMessage shortens s to at most n bytes, without splitting a UTF-8 character.
+func truncateMessage(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n] + "..."
 }
 
 // ModuleResolver encapsulates the logic to resolve module source version string(s).

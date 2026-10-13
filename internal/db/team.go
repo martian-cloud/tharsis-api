@@ -19,7 +19,7 @@ import (
 
 // Teams encapsulates the logic to access teams from the database
 type Teams interface {
-	GetTeamBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.Team, error)
+	GetTeamBySCIMExternalID(ctx context.Context, scimIDPIssuerURL string, scimExternalID string) (*models.Team, error)
 	GetTeamByID(ctx context.Context, id string) (*models.Team, error)
 	GetTeamByTRN(ctx context.Context, trnValue string) (*models.Team, error)
 	GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResult, error)
@@ -63,6 +63,8 @@ type TeamFilter struct {
 	UserID         *string
 	TeamIDs        []string
 	SCIMExternalID bool
+	// SCIMIDPIssuerURL returns only teams managed by the SCIM client of this IDP.
+	SCIMIDPIssuerURL *string
 }
 
 // GetTeamsInput is the input for listing teams
@@ -85,19 +87,27 @@ type teams struct {
 	dbClient *Client
 }
 
-var teamFieldList = append(metadataFieldList, "name", "description", "scim_external_id")
+// teamSCIMExternalIDIndex is the unique index on a team's SCIM external ID within its IDP.
+const teamSCIMExternalIDIndex = "index_teams_on_scim_idp_issuer_url_scim_external_id"
+
+var teamFieldList = append(metadataFieldList, "name", "description", "scim_external_id", "scim_idp_issuer_url")
 
 // NewTeams returns an instance of the Teams interface
 func NewTeams(dbClient *Client) Teams {
 	return &teams{dbClient: dbClient}
 }
 
-func (t *teams) GetTeamBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.Team, error) {
+// GetTeamBySCIMExternalID returns the team with the SCIM external ID among those managed by the SCIM client of
+// the given IDP. External IDs are only unique per IDP.
+func (t *teams) GetTeamBySCIMExternalID(ctx context.Context, scimIDPIssuerURL string, scimExternalID string) (*models.Team, error) {
 	ctx, span := tracer.Start(ctx, "db.GetTeamBySCIMExternalID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	return t.getTeam(ctx, goqu.Ex{"teams.scim_external_id": scimExternalID})
+	return t.getTeam(ctx, goqu.Ex{
+		"teams.scim_idp_issuer_url": scimIDPIssuerURL,
+		"teams.scim_external_id":    scimExternalID,
+	})
 }
 
 func (t *teams) GetTeamByID(ctx context.Context, id string) (*models.Team, error) {
@@ -140,6 +150,9 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 		}
 		if input.Filter.SCIMExternalID {
 			ex = ex.Append(goqu.I("teams.scim_external_id").IsNotNull())
+		}
+		if input.Filter.SCIMIDPIssuerURL != nil {
+			ex = ex.Append(goqu.I("teams.scim_idp_issuer_url").Eq(*input.Filter.SCIMIDPIssuerURL))
 		}
 	}
 
@@ -213,13 +226,14 @@ func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team
 	sql, args, err := toSQLWithTag("team.CreateTeam", dialect.Insert("teams").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":               newResourceID(),
-			"version":          initialResourceVersion,
-			"created_at":       timestamp,
-			"updated_at":       timestamp,
-			"name":             team.Name,
-			"description":      team.Description,
-			"scim_external_id": nullableString(team.SCIMExternalID),
+			"id":                  newResourceID(),
+			"version":             initialResourceVersion,
+			"created_at":          timestamp,
+			"updated_at":          timestamp,
+			"name":                team.Name,
+			"description":         team.Description,
+			"scim_external_id":    nullableString(team.SCIMExternalID),
+			"scim_idp_issuer_url": nullableString(team.SCIMIDPIssuerURL),
 		}).
 		Returning(teamFieldList...))
 	if err != nil {
@@ -230,6 +244,9 @@ func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				if pgErr.ConstraintName == teamSCIMExternalIDIndex {
+					return nil, errors.New("team with SCIM external id %s already exists", team.SCIMExternalID, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
+				}
 				return nil, errors.New("team with name %s already exists", team.Name, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
@@ -250,10 +267,11 @@ func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team
 		Prepared(true).
 		Set(
 			goqu.Record{
-				"version":          goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":       timestamp,
-				"description":      team.Description,
-				"scim_external_id": nullableString(team.SCIMExternalID),
+				"version":             goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":          timestamp,
+				"description":         team.Description,
+				"scim_external_id":    nullableString(team.SCIMExternalID),
+				"scim_idp_issuer_url": nullableString(team.SCIMIDPIssuerURL),
 			},
 		).Where(goqu.Ex{"id": team.Metadata.ID, "version": team.Metadata.Version}).Returning(teamFieldList...))
 	if err != nil {
@@ -264,6 +282,9 @@ func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
+		}
+		if pgErr := asPgError(err); pgErr != nil && isUniqueViolation(pgErr) && pgErr.ConstraintName == teamSCIMExternalIDIndex {
+			return nil, errors.New("team with SCIM external id %s already exists", team.SCIMExternalID, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 		}
 		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
@@ -338,7 +359,7 @@ func (t *teams) getSelectFields() []interface{} {
 }
 
 func scanTeam(row scanner) (*models.Team, error) {
-	var scimExternalID sql.NullString
+	var scimExternalID, scimIDPIssuerURL sql.NullString
 	team := &models.Team{}
 
 	fields := []interface{}{
@@ -349,6 +370,7 @@ func scanTeam(row scanner) (*models.Team, error) {
 		&team.Name,
 		&team.Description,
 		&scimExternalID,
+		&scimIDPIssuerURL,
 	}
 
 	err := row.Scan(fields...)
@@ -358,6 +380,9 @@ func scanTeam(row scanner) (*models.Team, error) {
 
 	if scimExternalID.Valid {
 		team.SCIMExternalID = scimExternalID.String
+	}
+	if scimIDPIssuerURL.Valid {
+		team.SCIMIDPIssuerURL = scimIDPIssuerURL.String
 	}
 
 	team.Metadata.TRN = trn.TypeTeam.Build(team.Name)

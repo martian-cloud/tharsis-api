@@ -18,6 +18,8 @@ import (
 
 func TestGetRunHandler(t *testing.T) {
 	runID := gid.ToGlobalID(types.RunModelType, "550e8400-e29b-41d4-a716-446655440000")
+	planJobID := "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+	applyJobID := "6ba7b811-9dad-11d1-80b4-00c04fd430c8"
 	now := time.Now()
 
 	type testCase struct {
@@ -43,6 +45,21 @@ func TestGetRunHandler(t *testing.T) {
 				assert.Equal(t, "user@example.com", output.Run.CreatedBy)
 				assert.Equal(t, "1.5.0", output.Run.TerraformVersion)
 				assert.True(t, output.Run.HasChanges)
+				assert.Nil(t, output.Run.Plan.LatestJobID)
+				assert.Nil(t, output.Run.Apply)
+			},
+		},
+		{
+			name: "plan and apply latest job IDs are global IDs",
+			runModel: &models.Run{
+				Metadata: models.ResourceMetadata{ID: gid.FromGlobalID(runID)},
+				Status:   models.RunApplying,
+				Plan:     models.Plan{Status: models.PlanFinished, LatestJobID: &planJobID},
+				Apply:    &models.Apply{Status: models.ApplyRunning, LatestJobID: &applyJobID},
+			},
+			validate: func(t *testing.T, output getRunOutput) {
+				assert.Equal(t, gid.ToGlobalID(types.JobModelType, planJobID), *output.Run.Plan.LatestJobID)
+				assert.Equal(t, gid.ToGlobalID(types.JobModelType, applyJobID), *output.Run.Apply.LatestJobID)
 			},
 		},
 		{

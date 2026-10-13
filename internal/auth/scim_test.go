@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
@@ -43,73 +42,36 @@ func TestSCIMCaller_GetRootNamespaceMemberships(t *testing.T) {
 }
 
 func TestSCIMCaller_RequirePermissions(t *testing.T) {
-	invalid := "invalid"
-	teamID := "team-1"
-	userID := "user-1"
-
-	caller := SCIMCaller{}
+	caller := SCIMCaller{idpIssuerURL: "https://idp.example.com"}
 	ctx := WithCaller(context.Background(), &caller)
 
 	testCases := []struct {
 		expectErrorCode   errors.CodeType
-		team              *models.Team
-		user              *models.User
 		name              string
 		perms             []models.Permission
-		constraints       []func(*constraints)
 		inMaintenanceMode bool
 	}{
 		{
-			name: "viewing, creating, updating a team or a user; grant access",
+			// The SCIM service checks that the caller's IDP manages the user or team.
+			name: "managing SCIM users and teams; grant access",
 			perms: []models.Permission{
-				models.CreateTeamPermission,
-				models.UpdateTeamPermission,
-				models.CreateUserPermission,
-				models.UpdateUserPermission,
+				models.ManageSCIMTeamPermission,
+				models.ManageSCIMUserPermission,
 			},
 		},
 		{
-			name:        "deleting a team created by SCIM",
-			team:        &models.Team{SCIMExternalID: "scim-team-1"},
-			perms:       []models.Permission{models.DeleteTeamPermission},
-			constraints: []func(*constraints){WithTeamID(teamID)},
-		},
-		{
-			name:            "access denied because deleting a team not created by SCIM",
-			team:            &models.Team{},
-			perms:           []models.Permission{models.DeleteTeamPermission},
-			constraints:     []func(*constraints){WithTeamID(teamID)},
+			// The team and user services don't limit a SCIM caller to its IDP's resources, so the
+			// generic permissions must never be granted.
+			name: "generic team and user permissions; access denied",
+			perms: []models.Permission{
+				models.CreateTeamPermission,
+				models.UpdateTeamPermission,
+				models.DeleteTeamPermission,
+				models.CreateUserPermission,
+				models.UpdateUserPermission,
+				models.DeleteUserPermission,
+			},
 			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:            "access denied because deleting a team that doesn't exist",
-			perms:           []models.Permission{models.DeleteTeamPermission},
-			constraints:     []func(*constraints){WithTeamID(invalid)},
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:        "deleting a user created by SCIM",
-			user:        &models.User{SCIMExternalID: "scim-user-1"},
-			perms:       []models.Permission{models.DeleteUserPermission},
-			constraints: []func(*constraints){WithUserID(userID)},
-		},
-		{
-			name:            "access denied because deleting a user not created by SCIM",
-			user:            &models.User{},
-			perms:           []models.Permission{models.DeleteUserPermission},
-			constraints:     []func(*constraints){WithUserID(userID)},
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:            "access denied because deleting a user that doesn't exist",
-			perms:           []models.Permission{models.DeleteUserPermission},
-			constraints:     []func(*constraints){WithUserID(invalid)},
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:            "access denied because required constraints not provided",
-			perms:           []models.Permission{models.DeleteTeamPermission, models.DeleteUserPermission},
-			expectErrorCode: errors.EInternal,
 		},
 		{
 			name:            "access denied because permission is never available to caller",
@@ -118,7 +80,7 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 		},
 		{
 			name:              "cannot have write permission when server in maintenance mode",
-			perms:             []models.Permission{models.CreateTeamPermission},
+			perms:             []models.Permission{models.ManageSCIMTeamPermission, models.ManageSCIMUserPermission},
 			expectErrorCode:   errors.EServiceUnavailable,
 			inMaintenanceMode: true,
 		},
@@ -126,33 +88,20 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			mockTeams := db.NewMockTeams(t)
-			mockUsers := db.NewMockUsers(t)
 			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
 
 			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(test.inMaintenanceMode, nil)
 
-			constraints := getConstraints(test.constraints...)
-
-			if constraints.teamID != nil {
-				mockTeams.On("GetTeamByID", mock.Anything, mock.Anything).Return(test.team, nil)
-			}
-
-			if constraints.userID != nil {
-				mockUsers.On("GetUserByID", mock.Anything, mock.Anything).Return(test.user, nil)
-			}
-
 			caller.maintenanceMonitor = mockMaintenanceMonitor
-			caller.dbClient = &db.Client{Teams: mockTeams, Users: mockUsers}
 
 			for _, perm := range test.perms {
-				err := caller.RequirePermission(ctx, perm, test.constraints...)
+				err := caller.RequirePermission(ctx, perm)
 				if test.expectErrorCode != "" {
-					require.NotNil(t, err)
-					assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-					return
+					require.NotNil(t, err, perm.String())
+					assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err), perm.String())
+					continue
 				}
-				require.Nil(t, err)
+				require.Nil(t, err, perm.String())
 			}
 		})
 	}
@@ -162,4 +111,28 @@ func TestSCIMCaller_RequireInheritedPermissions(t *testing.T) {
 	caller := SCIMCaller{}
 	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.RunnerModelType, nil)
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+}
+
+func TestSCIMCaller_Manages(t *testing.T) {
+	issuer := "https://idp.example.com"
+
+	testCases := []struct {
+		name         string
+		callerIssuer string
+		objectIssuer string
+		expect       bool
+	}{
+		{name: "object managed by the caller's IDP", callerIssuer: issuer, objectIssuer: issuer, expect: true},
+		{name: "object managed by another IDP", callerIssuer: issuer, objectIssuer: "https://other-idp.example.com"},
+		{name: "object not managed by SCIM", callerIssuer: issuer},
+		// A caller without an issuer must never match unmanaged objects, whose issuer is also empty.
+		{name: "caller without an issuer and an unmanaged object", callerIssuer: ""},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			caller := SCIMCaller{idpIssuerURL: test.callerIssuer}
+			assert.Equal(t, test.expect, caller.Manages(test.objectIssuer))
+		})
+	}
 }

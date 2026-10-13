@@ -272,8 +272,10 @@ type Plan struct {
 	Summary          *PlanSummary `protobuf:"bytes,5,opt,name=summary,proto3" json:"summary,omitempty"`
 	LatestJobId      *string      `protobuf:"bytes,6,opt,name=latest_job_id,json=latestJobId,proto3,oneof" json:"latest_job_id,omitempty"`
 	Status           PlanStatus   `protobuf:"varint,7,opt,name=status,proto3,enum=martiancloud.tharsis.api.plan.PlanStatus" json:"status,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Global IDs of the managed identities the plan job may create credentials for.
+	ManagedIdentityIds []string `protobuf:"bytes,8,rep,name=managed_identity_ids,json=managedIdentityIds,proto3" json:"managed_identity_ids,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Plan) Reset() {
@@ -356,6 +358,13 @@ func (x *Plan) GetStatus() PlanStatus {
 	return PlanStatus_UNSPECIFIED
 }
 
+func (x *Plan) GetManagedIdentityIds() []string {
+	if x != nil {
+		return x.ManagedIdentityIds
+	}
+	return nil
+}
+
 var File_plan_proto protoreflect.FileDescriptor
 
 const file_plan_proto_rawDesc = "" +
@@ -376,7 +385,7 @@ const file_plan_proto_rawDesc = "" +
 	"\vPlanSummary\x12-\n" +
 	"\x12resource_additions\x18\x01 \x01(\x05R\x11resourceAdditions\x12)\n" +
 	"\x10resource_changes\x18\x02 \x01(\x05R\x0fresourceChanges\x123\n" +
-	"\x15resource_destructions\x18\x03 \x01(\x05R\x14resourceDestructions\"\xa9\x03\n" +
+	"\x15resource_destructions\x18\x03 \x01(\x05R\x14resourceDestructions\"\xdb\x03\n" +
 	"\x04Plan\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12/\n" +
 	"\x11deprecated_status\x18\x02 \x01(\tB\x02\x18\x01R\x10deprecatedStatus\x12(\n" +
@@ -385,7 +394,8 @@ const file_plan_proto_rawDesc = "" +
 	"hasChanges\x12D\n" +
 	"\asummary\x18\x05 \x01(\v2*.martiancloud.tharsis.api.plan.PlanSummaryR\asummary\x12'\n" +
 	"\rlatest_job_id\x18\x06 \x01(\tH\x01R\vlatestJobId\x88\x01\x01\x12A\n" +
-	"\x06status\x18\a \x01(\x0e2).martiancloud.tharsis.api.plan.PlanStatusR\x06statusB\x10\n" +
+	"\x06status\x18\a \x01(\x0e2).martiancloud.tharsis.api.plan.PlanStatusR\x06status\x120\n" +
+	"\x14managed_identity_ids\x18\b \x03(\tR\x12managedIdentityIdsB\x10\n" +
 	"\x0e_error_messageB\x10\n" +
 	"\x0e_latest_job_id*y\n" +
 	"\n" +

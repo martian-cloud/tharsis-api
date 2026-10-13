@@ -43,6 +43,7 @@ var tharsisErrorToStatusCode = map[te.CodeType]int{
 	te.EUnauthorized:       http.StatusUnauthorized,
 	te.ETooLarge:           http.StatusRequestEntityTooLarge,
 	te.EServiceUnavailable: http.StatusServiceUnavailable,
+	te.EDataLoss:           http.StatusInternalServerError,
 }
 
 // NewWriter creates an instance of Writer
@@ -52,7 +53,7 @@ func NewWriter(logger logger.Logger) Writer {
 
 // RespondWithError responds to an http request with an error response
 func (rh *responseHelper) RespondWithError(ctx context.Context, w http.ResponseWriter, err error) {
-	if !te.IsContextCanceledError(err) && te.ErrorCode(err) == te.EInternal {
+	if code := te.ErrorCode(err); !te.IsContextCanceledError(err) && (code == te.EInternal || code == te.EDataLoss) {
 		// Log error message
 		rh.logger.WithContextFields(ctx).Errorf("Unexpected error occurred: %s", err.Error())
 	}

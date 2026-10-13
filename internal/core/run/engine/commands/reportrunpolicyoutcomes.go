@@ -63,8 +63,11 @@ type ReportRunPolicyOutcomes struct {
 // retain callbacks are only invoked once Execute is inside the transaction. An upload whose
 // transaction never commits is left unlinked for the janitor.
 //
-// A policy reporting more than maxPolicyMessagesSize is rejected with EInvalid, which fails the
-// policy-eval job rather than recording a partial result. Invalid UTF-8 needs no handling here: both
+// The whole report is validated before anything is uploaded, so a rejected report leaves no objects
+// behind: the outcomes must name every policy pinned on the check exactly once (the pinned set is a
+// snapshot taken at run creation, so checking it here agrees with Execute), and a policy reporting more than
+// maxPolicyMessagesSize is rejected with EInvalid, which fails the policy-eval job rather than
+// recording a partial result. Invalid UTF-8 needs no handling here: both
 // the uploaded object and the check summary go through encoding/json, which replaces invalid bytes.
 func (c *ReportRunPolicyOutcomes) Prepare(ctx context.Context) error {
 	run, err := c.dbClient.Runs.GetRunByNodeID(ctx, c.PolicyCheckID)
@@ -76,11 +79,28 @@ func (c *ReportRunPolicyOutcomes) Prepare(ctx context.Context) error {
 	}
 	c.runID = run.Metadata.ID
 
-	c.messageKeys = map[string]string{}
-	c.messageRetainFns = map[string]db.RetainObjectRefFunc{}
+	check := run.PolicyCheckByID(c.PolicyCheckID)
+	if check == nil {
+		return errors.New("run %s has no matching policy check node %s", c.runID, c.PolicyCheckID, errors.WithErrorCode(errors.ENotFound))
+	}
+	pinned := make(map[string]struct{}, len(check.Policies))
+	for _, p := range check.Policies {
+		pinned[p.ID] = struct{}{}
+	}
 
-	var summarySource []string
-	for _, outcome := range c.Outcomes {
+	// Validate every outcome before uploading any of them. Requiring distinct, pinned policy ids bounds
+	// the report to one outcome per pinned policy, and the count check below makes it exactly one.
+	reported := make(map[string]struct{}, len(c.Outcomes))
+	bodies := make([][]byte, len(c.Outcomes))
+	for i, outcome := range c.Outcomes {
+		if _, ok := pinned[outcome.PolicyID]; !ok {
+			return errors.New("policy %q does not exist in policy check %q", outcome.PolicyID, c.PolicyCheckID, errors.WithErrorCode(errors.EInvalid))
+		}
+		if _, ok := reported[outcome.PolicyID]; ok {
+			return errors.New("policy %q is reported more than once", outcome.PolicyID, errors.WithErrorCode(errors.EInvalid))
+		}
+		reported[outcome.PolicyID] = struct{}{}
+
 		if len(outcome.Messages) == 0 {
 			continue
 		}
@@ -97,10 +117,28 @@ func (c *ReportRunPolicyOutcomes) Prepare(ctx context.Context) error {
 			return errors.New("policy %s reported %d bytes of messages, above the %d byte limit",
 				outcome.PolicyID, len(body), maxPolicyMessagesSize, errors.WithErrorCode(errors.EInvalid))
 		}
+		bodies[i] = body
+	}
+
+	// The verdict is computed from the reported outcomes alone, so a policy left out of the report
+	// would never fail the check.
+	if len(reported) != len(pinned) {
+		return errors.New("policy check %q reported %d of its %d policies; every policy must be reported",
+			c.PolicyCheckID, len(reported), len(pinned), errors.WithErrorCode(errors.EInvalid))
+	}
+
+	c.messageKeys = map[string]string{}
+	c.messageRetainFns = map[string]db.RetainObjectRefFunc{}
+
+	var summarySource []string
+	for i, outcome := range c.Outcomes {
+		if bodies[i] == nil {
+			continue
+		}
 
 		summarySource = append(summarySource, outcome.Messages...)
 
-		retainFn, key, err := c.artifactStore.UploadPolicyCheckPolicyMessages(ctx, run, bytes.NewReader(body))
+		retainFn, key, err := c.artifactStore.UploadPolicyCheckPolicyMessages(ctx, run, bytes.NewReader(bodies[i]))
 		if err != nil {
 			return errors.Wrap(err, "failed to write policy messages to object storage")
 		}

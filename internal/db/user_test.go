@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -465,4 +466,198 @@ func TestUsers_LinkUserWithExternalID(t *testing.T) {
 	// Test duplicate external ID returns conflict error
 	err = testClient.client.Users.LinkUserWithExternalID(ctx, "https://example.com", "ext-123", user.Metadata.ID)
 	assert.Equal(t, errors.EConflict, errors.ErrorCode(err))
+}
+
+func TestUsers_HasExternalIdentity(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	linkedUser, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "linked-user",
+		Email:    "linked@example.com",
+		Active:   true,
+	})
+	require.Nil(t, err)
+
+	unlinkedUser, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "unlinked-user",
+		Email:    "unlinked@example.com",
+		Active:   true,
+	})
+	require.Nil(t, err)
+
+	issuer := "https://example.com"
+	require.Nil(t, testClient.client.Users.LinkUserWithExternalID(ctx, issuer, "ext-123", linkedUser.Metadata.ID))
+
+	testCases := []struct {
+		name   string
+		userID string
+		issuer *string
+		expect bool
+	}{
+		{name: "linked user, any issuer", userID: linkedUser.Metadata.ID, expect: true},
+		{name: "linked user, matching issuer", userID: linkedUser.Metadata.ID, issuer: &issuer, expect: true},
+		{name: "linked user, other issuer", userID: linkedUser.Metadata.ID, issuer: ptr.String("https://other.com")},
+		{name: "unlinked user, any issuer", userID: unlinkedUser.Metadata.ID},
+		{name: "unlinked user, matching issuer", userID: unlinkedUser.Metadata.ID, issuer: &issuer},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			exists, err := testClient.client.Users.HasExternalIdentity(ctx, test.userID, test.issuer)
+			require.Nil(t, err)
+			assert.Equal(t, test.expect, exists)
+		})
+	}
+}
+
+// TestUsers_SCIMIDPIssuerURL checks that a user's SCIM IDP issuer URL is stored, kept across updates and
+// usable as a filter, which is how a SCIM client is limited to its own IDP's users.
+func TestUsers_SCIMIDPIssuerURL(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	const (
+		issuerA = "https://idp-a.example.com"
+		issuerB = "https://idp-b.example.com"
+	)
+
+	users := map[string]*models.User{}
+	for _, user := range []*models.User{
+		{Username: "user-a", Email: "user-a@example.com", SCIMExternalID: "11111111-1111-1111-1111-111111111111", SCIMIDPIssuerURL: issuerA},
+		{Username: "user-b", Email: "user-b@example.com", SCIMExternalID: "22222222-2222-2222-2222-222222222222", SCIMIDPIssuerURL: issuerB},
+		{Username: "user-manual", Email: "user-manual@example.com"},
+	} {
+		created, err := testClient.client.Users.CreateUser(ctx, user)
+		require.NoError(t, err)
+		assert.Equal(t, user.SCIMIDPIssuerURL, created.SCIMIDPIssuerURL)
+		users[user.Username] = created
+	}
+
+	t.Run("kept across an update", func(t *testing.T) {
+		user := users["user-a"]
+		user.Active = !user.Active
+		updated, err := testClient.client.Users.UpdateUser(ctx, user)
+		require.NoError(t, err)
+		assert.Equal(t, issuerA, updated.SCIMIDPIssuerURL)
+
+		fetched, err := testClient.client.Users.GetUserByID(ctx, user.Metadata.ID)
+		require.NoError(t, err)
+		assert.Equal(t, issuerA, fetched.SCIMIDPIssuerURL)
+	})
+
+	for _, test := range []struct {
+		issuer        string
+		expectedUsers []string
+	}{
+		{issuer: issuerA, expectedUsers: []string{"user-a"}},
+		{issuer: issuerB, expectedUsers: []string{"user-b"}},
+		{issuer: "https://unknown.example.com", expectedUsers: []string{}},
+	} {
+		t.Run("filter by "+test.issuer, func(t *testing.T) {
+			issuer := test.issuer
+			result, err := testClient.client.Users.GetUsers(ctx, &GetUsersInput{
+				Filter: &UserFilter{SCIMExternalID: true, SCIMIDPIssuerURL: &issuer},
+			})
+			require.NoError(t, err)
+
+			got := []string{}
+			for _, user := range result.Users {
+				got = append(got, user.Username)
+			}
+			assert.ElementsMatch(t, test.expectedUsers, got)
+		})
+	}
+}
+
+func TestUsers_GetUserBySCIMExternalID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	issuer := "https://idp.example.com"
+	externalID := uuid.New().String()
+
+	createdUser, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username:         "scim-user",
+		Email:            "scim-user@example.com",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: issuer,
+		Active:           true,
+	})
+	require.Nil(t, err)
+
+	// The same external ID is allowed for a user of another IDP.
+	_, err = testClient.client.Users.CreateUser(ctx, &models.User{
+		Username:         "other-idp-user",
+		Email:            "other-idp-user@example.com",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: "https://other-idp.example.com",
+		Active:           true,
+	})
+	require.Nil(t, err)
+
+	// But not twice for the same IDP.
+	_, err = testClient.client.Users.CreateUser(ctx, &models.User{
+		Username:         "duplicate-user",
+		Email:            "duplicate-user@example.com",
+		SCIMExternalID:   externalID,
+		SCIMIDPIssuerURL: issuer,
+		Active:           true,
+	})
+	assert.Equal(t, errors.EConflict, errors.ErrorCode(err))
+
+	gotUser, err := testClient.client.Users.GetUserBySCIMExternalID(ctx, issuer, externalID)
+	require.Nil(t, err)
+	require.NotNil(t, gotUser)
+	assert.Equal(t, createdUser.Metadata.ID, gotUser.Metadata.ID)
+
+	gotUser, err = testClient.client.Users.GetUserBySCIMExternalID(ctx, "https://unknown-idp.example.com", externalID)
+	require.Nil(t, err)
+	assert.Nil(t, gotUser)
+}
+
+func TestUsers_UpdateUserConflicts(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	_, err := testClient.client.Users.CreateUser(ctx, &models.User{Username: "existing-user", Email: "existing@example.com", Active: true})
+	require.Nil(t, err)
+
+	tests := []struct {
+		name          string
+		update        func(u *models.User)
+		expectMessage string
+	}{
+		{
+			name:          "duplicate username",
+			update:        func(u *models.User) { u.Username = "existing-user" },
+			expectMessage: "user with username existing-user already exists",
+		},
+		{
+			name:          "duplicate email",
+			update:        func(u *models.User) { u.Email = "existing@example.com" },
+			expectMessage: "user with email existing@example.com already exists",
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+				Username: fmt.Sprintf("other-user-%d", i),
+				Email:    fmt.Sprintf("other-%d@example.com", i),
+				Active:   true,
+			})
+			require.Nil(t, err)
+
+			test.update(user)
+			_, err = testClient.client.Users.UpdateUser(ctx, user)
+			require.NotNil(t, err)
+			assert.Equal(t, errors.EConflict, errors.ErrorCode(err))
+			assert.Equal(t, test.expectMessage, errors.ErrorMessage(err))
+		})
+	}
 }

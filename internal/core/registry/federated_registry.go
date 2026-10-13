@@ -80,12 +80,21 @@ type federatedRegistryClient struct {
 	version             string
 	remoteClientBuilder func(ctx context.Context, cfg *client.GRPCClientConfig) (remoteClient, error)
 	endpointResolver    func(httpClient *http.Client, host string) (*url.URL, error)
+	dialer              client.ContextDialer
 }
 
-// NewFederatedRegistryClient returns a new FederatedRegistryClient registry.
-func NewFederatedRegistryClient(logger logger.Logger, identityProvider auth.SigningKeyManager, version string) FederatedRegistryClient {
+// NewFederatedRegistryClient returns a new FederatedRegistryClient registry. A federated registry's
+// hostname is user-supplied, so both its service discovery and its gRPC connection go through the
+// outbound policy.
+func NewFederatedRegistryClient(
+	logger logger.Logger,
+	identityProvider auth.SigningKeyManager,
+	version string,
+	outboundPolicy *tharsishttp.OutboundPolicy,
+) FederatedRegistryClient {
 	return &federatedRegistryClient{
-		httpClient:          tharsishttp.NewHTTPClient(),
+		httpClient:          outboundPolicy.HTTPClient(),
+		dialer:              outboundPolicy,
 		identityProvider:    identityProvider,
 		remoteClientBuilder: remoteClientBuilder,
 		endpointResolver:    module.GetModuleRegistryEndpointForHost,
@@ -184,6 +193,7 @@ func (r *federatedRegistryClient) initializeRemoteClient(ctx context.Context, fe
 		TokenResolver: tokenResolver,
 		UserAgent:     client.BuildUserAgent("tharsis-federated-registry", r.version),
 		Logger:        r.logger.Slog(),
+		Dialer:        r.dialer,
 	})
 }
 

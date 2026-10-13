@@ -922,6 +922,41 @@ func TestUserSessionManager_ExchangeOAuthCodeForSessionToken(t *testing.T) {
 		})
 	}
 }
+func TestValidateOAuthRedirectURI(t *testing.T) {
+	tests := []struct {
+		uri   string
+		valid bool
+	}{
+		{uri: "http://localhost", valid: true},
+		{uri: "http://localhost:8080", valid: true},
+		{uri: "http://localhost:8080/callback?x=1", valid: true},
+		// Userinfo makes the real host evil.com while still matching a "http://localhost:" prefix.
+		{uri: "http://localhost:@evil.com/cb", valid: false},
+		{uri: "http://localhost:8080@evil.com", valid: false},
+		{uri: "http://user:pass@localhost:8080", valid: false},
+		{uri: "http://localhost.evil.com", valid: false},
+		{uri: "http://localhost:8080#frag", valid: false},
+		{uri: "http://localhost:0", valid: false},
+		{uri: "http://localhost:70000", valid: false},
+		{uri: "https://localhost:8080", valid: false},
+		{uri: "http://example.com", valid: false},
+		{uri: "http:localhost", valid: false},
+		{uri: "//localhost:8080", valid: false},
+		{uri: "", valid: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.uri, func(t *testing.T) {
+			err := ValidateOAuthRedirectURI(test.uri)
+			if test.valid {
+				assert.NoError(t, err)
+			} else {
+				assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+			}
+		})
+	}
+}
+
 func TestUserSessionManager_InitiateSessionOauthCodeFlow(t *testing.T) {
 	sessionID := "01234567-89ab-cdef-0123-456789abcdef"
 	userID := "user-123"
@@ -950,6 +985,16 @@ func TestUserSessionManager_InitiateSessionOauthCodeFlow(t *testing.T) {
 				mockUserSessions.On("GetUserSessionByID", mock.Anything, sessionID).Return(session, nil)
 				mockUserSessions.On("UpdateUserSession", mock.Anything, mock.AnythingOfType("*models.UserSession")).Return(session, nil)
 			},
+		},
+		{
+			name: "invalid redirect uri - localhost as userinfo",
+			input: &InitiateSessionOauthCodeFlowInput{
+				CodeChallenge:       "test-challenge",
+				CodeChallengeMethod: "S256",
+				RedirectURI:         "http://localhost:@evil.com",
+				UserSessionID:       sessionID,
+			},
+			expectErrorMessage: "invalid redirect uri",
 		},
 		{
 			name: "invalid redirect uri - not localhost",
@@ -1092,6 +1137,70 @@ func TestUserSessionManager_SetUserSessionCookies(t *testing.T) {
 			assert.Equal(t, test.enableSecureCookies, accessCookie.Secure)
 		})
 	}
+}
+
+func TestUserSessionManager_GenerateAccessToken(t *testing.T) {
+	tests := []struct {
+		name              string
+		sessionRemaining  time.Duration
+		expectedExpiresIn time.Duration
+	}{
+		{name: "full lifetime when the session outlasts it", sessionRemaining: time.Hour, expectedExpiresIn: 15 * time.Minute},
+		{name: "capped at the session expiration near its end", sessionRemaining: 2 * time.Minute, expectedExpiresIn: 2 * time.Minute},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			session := &models.UserSession{
+				UserID:     "user-123",
+				Expiration: time.Now().Add(test.sessionRemaining).UTC(),
+				Metadata:   models.ResourceMetadata{ID: "01234567-89ab-cdef-0123-456789abcdef"},
+			}
+
+			mockSigning := NewMockSigningKeyManager(t)
+			// The JWT itself must not outlive the session: authenticating an access token doesn't check it.
+			mockSigning.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *TokenInput) bool {
+				return !input.Expiration.After(session.Expiration)
+			})).Return([]byte("access-token"), nil)
+
+			manager := &userSessionManager{
+				signingKeyManager:            mockSigning,
+				accessTokenExpirationMinutes: 15 * time.Minute,
+			}
+
+			token, expiration, err := manager.generateAccessToken(context.Background(), session)
+			require.NoError(t, err)
+			assert.Equal(t, "access-token", token)
+			assert.False(t, expiration.After(session.Expiration))
+			assert.Equal(t, int(test.expectedExpiresIn.Seconds()), expiresIn(expiration))
+		})
+	}
+}
+
+func TestUserSessionManager_SetUserSessionCookies_AccessCookieCappedAtSessionExpiration(t *testing.T) {
+	manager := &userSessionManager{
+		tharsisUIDomain:              "ui.example.com",
+		accessTokenExpirationMinutes: 15 * time.Minute,
+	}
+
+	// A refresh near the end of the session: the access token lifetime runs past the session.
+	sessionExpiration := time.Now().Add(5 * time.Minute).UTC().Truncate(time.Second)
+
+	recorder := httptest.NewRecorder()
+	manager.SetUserSessionCookies(recorder, &SetUserSessionCookiesInput{
+		AccessToken:       "access-token",
+		RefreshToken:      "refresh-token",
+		SessionExpiration: sessionExpiration,
+	})
+
+	for _, cookie := range recorder.Result().Cookies() {
+		if cookie.Name == manager.GetUserSessionAccessTokenCookieName() {
+			// The CSRF cookie expires with the session, so the access cookie must not outlive it.
+			assert.True(t, cookie.Expires.Equal(sessionExpiration), "access cookie expires %v, session %v", cookie.Expires, sessionExpiration)
+			return
+		}
+	}
+	t.Fatal("access token cookie not set")
 }
 
 func TestUserSessionManager_ClearUserSessionCookies(t *testing.T) {

@@ -29,9 +29,9 @@ import (
 	"github.com/martian-cloud/terraform-exec/tfexec"
 	"github.com/zclconf/go-cty/cty"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 )
@@ -96,6 +96,19 @@ type terraformWorkspace struct {
 	terraformVersion  *version.Version
 }
 
+// jobManagedIdentityIDs returns the managed identities the job's run node was authorized to use: the
+// plan's for a plan job and the apply's for an apply job.
+func jobManagedIdentityIDs(run *pb.Run, job *pb.Job) []string {
+	switch job.Type {
+	case string(models.JobPlanType):
+		return run.GetPlan().GetManagedIdentityIds()
+	case string(models.JobApplyType):
+		return run.GetApply().GetManagedIdentityIds()
+	default:
+		return nil
+	}
+}
+
 func newTerraformWorkspace(
 	cancellableCtx context.Context,
 	jobCfg *JobConfig,
@@ -107,7 +120,7 @@ func newTerraformWorkspace(
 	client jobclient.Client,
 ) (*terraformWorkspace, error) {
 	managedIdentities := newManagedIdentities(
-		workspace.Metadata.Id,
+		jobManagedIdentityIDs(run, job),
 		jobLogger,
 		client,
 		jobCfg,
@@ -135,7 +148,7 @@ func newTerraformWorkspace(
 		managedIdentities: managedIdentities,
 		fullEnv:           map[string]string{},
 		cliDownloader: *newCLIDownloader(
-			http.NewHTTPClient(),
+			newHTTPClient(),
 			client,
 			jobLogger,
 		),

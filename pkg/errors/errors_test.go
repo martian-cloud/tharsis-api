@@ -31,6 +31,7 @@ func TestIsClientError(t *testing.T) {
 		{"internal", New("boom", WithErrorCode(EInternal)), false},
 		{"not implemented", New("nyi", WithErrorCode(ENotImplemented)), false},
 		{"service unavailable", New("down", WithErrorCode(EServiceUnavailable)), false},
+		{"data loss", New("gone", WithErrorCode(EDataLoss)), false},
 		{"plain non-TharsisError", fmt.Errorf("raw"), false},
 		{"wrapped client error via %w", fmt.Errorf("outer: %w", New("nope", WithErrorCode(EForbidden))), true},
 		{"nil", nil, true},

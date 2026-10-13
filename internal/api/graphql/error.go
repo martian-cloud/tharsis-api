@@ -23,6 +23,8 @@ var tharsisErrorToStatusCode = map[errors.CodeType]string{
 	errors.ETooManyRequests:    "RATE_LIMIT_EXCEEDED",
 	errors.EUnauthorized:       "UNAUTHENTICATED",
 	errors.EServiceUnavailable: "SERVICE_UNAVAILABLE",
+	// Reported as an internal error so clients see no new code; the message says what was lost.
+	errors.EDataLoss: "INTERNAL_SERVER_ERROR",
 }
 
 func getErrExtensions(queryError *grapherrors.QueryError) map[string]interface{} {

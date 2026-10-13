@@ -222,3 +222,113 @@ func TestLogStreamChunks_UpdateOptimisticLock(t *testing.T) {
 	require.NotNil(t, err)
 	assert.Equal(t, ErrOptimisticLockError, err)
 }
+
+func TestLogStreamChunks_ChecksumRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	logStream := createTestLogStreamForChunks(ctx, t, testClient)
+
+	// A checksum above MaxInt32 exercises the BIGINT storage of an unsigned 32-bit value.
+	checksum := uint32(0xFFFFFFF0)
+	created, err := testClient.client.LogStreamChunks.CreateLogStreamChunk(ctx, &models.LogStreamChunk{
+		LogStreamID:    logStream.Metadata.ID,
+		ChunkIndex:     0,
+		Size:           4,
+		ObjectStoreKey: "k",
+		Checksum:       &checksum,
+	})
+	require.Nil(t, err)
+	require.NotNil(t, created.Checksum)
+	assert.Equal(t, checksum, *created.Checksum)
+
+	created.Checksum = nil
+	updated, err := testClient.client.LogStreamChunks.UpdateLogStreamChunk(ctx, created)
+	require.Nil(t, err)
+	assert.Nil(t, updated.Checksum)
+}
+
+func TestLogStreamChunks_ClaimLogStreamChunkLease(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	logStream := createTestLogStreamForChunks(ctx, t, testClient)
+
+	created, err := testClient.client.LogStreamChunks.CreateLogStreamChunk(ctx, &models.LogStreamChunk{
+		LogStreamID:    logStream.Metadata.ID,
+		ChunkIndex:     0,
+		Size:           4,
+		ObjectStoreKey: "k",
+	})
+	require.Nil(t, err)
+	assert.Nil(t, created.LeaseExpiresAt)
+
+	claimed, err := testClient.client.LogStreamChunks.ClaimLogStreamChunkLease(ctx, created, time.Minute)
+	require.Nil(t, err)
+	assert.Equal(t, created.Metadata.Version+1, claimed.Metadata.Version)
+	require.NotNil(t, claimed.LeaseExpiresAt)
+	assert.WithinDuration(t, time.Now().UTC().Add(time.Minute), *claimed.LeaseExpiresAt, 10*time.Second)
+
+	// A second claim with the version the holder claimed at is still blocked by the unexpired lease.
+	_, err = testClient.client.LogStreamChunks.ClaimLogStreamChunkLease(ctx, claimed, time.Minute)
+	assert.Equal(t, ErrOptimisticLockError, err)
+
+	// A claim from a stale read (the pre-claim version) is rejected.
+	_, err = testClient.client.LogStreamChunks.ClaimLogStreamChunkLease(ctx, created, time.Minute)
+	assert.Equal(t, ErrOptimisticLockError, err)
+
+	// Releasing with the claimed version frees the chunk without changing its version.
+	require.Nil(t, testClient.client.LogStreamChunks.ReleaseLogStreamChunkLease(ctx, claimed))
+	reclaimed, err := testClient.client.LogStreamChunks.ClaimLogStreamChunkLease(ctx, claimed, time.Minute)
+	require.Nil(t, err)
+	assert.Equal(t, claimed.Metadata.Version+1, reclaimed.Metadata.Version)
+
+	// A release with a superseded version is a no-op: it must not free a lease another writer holds.
+	require.Nil(t, testClient.client.LogStreamChunks.ReleaseLogStreamChunkLease(ctx, claimed))
+	_, err = testClient.client.LogStreamChunks.ClaimLogStreamChunkLease(ctx, reclaimed, time.Minute)
+	assert.Equal(t, ErrOptimisticLockError, err)
+
+	// The holder's update clears the lease and is fenced by the claimed version.
+	reclaimed.Size = 8
+	reclaimed.LeaseExpiresAt = nil
+	finalized, err := testClient.client.LogStreamChunks.UpdateLogStreamChunk(ctx, reclaimed)
+	require.Nil(t, err)
+	assert.Nil(t, finalized.LeaseExpiresAt)
+
+	// Once released by the update, the chunk can be claimed again.
+	_, err = testClient.client.LogStreamChunks.ClaimLogStreamChunkLease(ctx, finalized, time.Minute)
+	require.Nil(t, err)
+}
+
+func TestLogStreamChunks_ClaimExpiredLease(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	logStream := createTestLogStreamForChunks(ctx, t, testClient)
+
+	created, err := testClient.client.LogStreamChunks.CreateLogStreamChunk(ctx, &models.LogStreamChunk{
+		LogStreamID:    logStream.Metadata.ID,
+		ChunkIndex:     0,
+		Size:           4,
+		ObjectStoreKey: "k",
+	})
+	require.Nil(t, err)
+
+	// A holder that died: its lease expires (a zero duration expires immediately).
+	abandoned, err := testClient.client.LogStreamChunks.ClaimLogStreamChunkLease(ctx, created, 0)
+	require.Nil(t, err)
+
+	taken, err := testClient.client.LogStreamChunks.ClaimLogStreamChunkLease(ctx, abandoned, time.Minute)
+	require.Nil(t, err)
+
+	// The abandoned holder's late update is fenced out by the version bump of the takeover.
+	abandoned.Size = 8
+	_, err = testClient.client.LogStreamChunks.UpdateLogStreamChunk(ctx, abandoned)
+	assert.Equal(t, ErrOptimisticLockError, err)
+
+	_, err = testClient.client.LogStreamChunks.UpdateLogStreamChunk(ctx, taken)
+	require.Nil(t, err)
+}

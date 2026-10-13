@@ -122,6 +122,7 @@ func (s *RunnerServer) CreateRunner(ctx context.Context, req *pb.CreateRunnerReq
 		GroupID:         groupID,
 		Disabled:        req.Disabled,
 		RunUntaggedJobs: req.RunUntaggedJobs,
+		JobLimit:        int(req.JobLimit),
 		Tags:            req.Tags,
 	}
 
@@ -159,6 +160,10 @@ func (s *RunnerServer) UpdateRunner(ctx context.Context, req *pb.UpdateRunnerReq
 
 	if req.RunUntaggedJobs != nil {
 		gotRunner.RunUntaggedJobs = *req.RunUntaggedJobs
+	}
+
+	if req.JobLimit != nil {
+		gotRunner.JobLimit = int(*req.JobLimit)
 	}
 
 	if len(req.Tags) > 0 {
@@ -428,6 +433,12 @@ func (s *RunnerServer) SubscribeToRunnerSessionErrorLog(req *pb.SubscribeToRunne
 	}
 
 	for event := range eventChan {
+		if event.Err != nil {
+			// Return the failure (rather than ending the stream cleanly, which reads as completion)
+			// so the client can reconnect on a transient error.
+			return event.Err
+		}
+
 		pbEvent := &pb.RunnerSessionErrorLogEvent{
 			Completed: event.Completed,
 			Size:      int32(event.Size),
@@ -458,6 +469,7 @@ func toPBRunner(r *models.Runner) *pb.Runner {
 		CreatedBy:       r.CreatedBy,
 		Disabled:        r.Disabled,
 		RunUntaggedJobs: r.RunUntaggedJobs,
+		JobLimit:        int32(r.JobLimit),
 		Tags:            r.Tags,
 	}
 

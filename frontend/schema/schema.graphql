@@ -909,6 +909,8 @@ input CreateRunnerInput {
   disabled: Boolean
   groupId: String
   groupPath: String
+  """Max concurrent jobs; 0 (default when omitted) means no limit."""
+  jobLimit: Int
   name: String!
   runUntaggedJobs: Boolean!
   tags: [String!]!
@@ -3292,6 +3294,8 @@ type Runner implements Node {
   group: Group!
   groupPath: String!
   id: ID!
+  """Max concurrent jobs; 0 means no limit."""
+  jobLimit: Int!
   jobs(after: String, before: String, first: Int, last: Int, sort: JobSort): JobConnection!
   metadata: ResourceMetadata!
   name: String!
@@ -4218,6 +4222,8 @@ input UpdateRunnerInput {
   description: String!
   disabled: Boolean
   id: ID!
+  """Max concurrent jobs; 0 means no limit. Omit to leave the current limit unchanged."""
+  jobLimit: Int
   metadata: ResourceMetadataInput
   runUntaggedJobs: Boolean
   tags: [String!]

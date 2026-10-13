@@ -31,6 +31,10 @@ type StartApply struct {
 	ruleEnforcer   rules.RuleEnforcer
 	in             *StartApplyInput
 
+	// Populated by Prepare: the identities that passed the apply-stage rules, recorded on the apply
+	// node so the apply job can only use those.
+	managedIdentityIDs []string
+
 	// Updated is populated with the run once Execute succeeds.
 	Updated *models.Run
 }
@@ -49,20 +53,35 @@ func (c *StartApply) Prepare(ctx context.Context) error {
 		return errors.New("run with ID %s not found", c.in.RunID, errors.WithErrorCode(errors.ENotFound))
 	}
 
+	c.managedIdentityIDs, err = enforceApplyRules(ctx, dbClient, c.moduleResolver, c.ruleEnforcer, run)
+	return err
+}
+
+// enforceApplyRules verifies the managed-identity apply-stage rules for every identity assigned to
+// the run's workspace, against the caller in ctx, and returns the IDs of the identities it checked
+// (never nil) for the caller to record on the apply node. It performs registry/network I/O, so
+// callers run it from Prepare, before the transaction is opened.
+func enforceApplyRules(
+	ctx context.Context,
+	dbClient *db.Client,
+	moduleResolver registry.ModuleResolver,
+	ruleEnforcer rules.RuleEnforcer,
+	run *models.Run,
+) ([]string, error) {
 	managedIdentities, err := dbClient.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, run.WorkspaceID)
 	if err != nil {
-		return errors.Wrap(err, "failed to get managed identities assigned to workspace")
+		return nil, errors.Wrap(err, "failed to get managed identities assigned to workspace")
 	}
 	if len(managedIdentities) == 0 {
-		return nil
+		return []string{}, nil
 	}
 
 	ws, err := dbClient.Workspaces.GetWorkspaceByID(ctx, run.WorkspaceID)
 	if err != nil {
-		return errors.Wrap(err, "failed to get workspace by ID")
+		return nil, errors.Wrap(err, "failed to get workspace by ID")
 	}
 	if ws == nil {
-		return errors.New("failed to get workspace ID %s associated with run ID %s", run.WorkspaceID, run.Metadata.ID, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("failed to get workspace ID %s associated with run ID %s", run.WorkspaceID, run.Metadata.ID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	var currentStateVersionID *string
@@ -72,10 +91,10 @@ func (c *StartApply) Prepare(ctx context.Context) error {
 
 	var moduleSource registry.ModuleRegistrySource
 	if run.ModuleSource != nil && run.ModuleDigest != nil {
-		moduleSource, err = c.moduleResolver.ParseModuleRegistrySource(
+		moduleSource, err = moduleResolver.ParseModuleRegistrySource(
 			ctx, *run.ModuleSource, runvariables.ModuleRegistryToken(nil), corerun.GetFederatedRegistry(dbClient, ws))
 		if err != nil {
-			return errors.Wrap(err, "failed to parse module registry source")
+			return nil, errors.Wrap(err, "failed to parse module registry source")
 		}
 	}
 
@@ -86,14 +105,7 @@ func (c *StartApply) Prepare(ctx context.Context) error {
 		ModuleSource:          moduleSource,
 		ModuleSemanticVersion: run.ModuleVersion,
 	}
-	for _, mi := range managedIdentities {
-		miCopy := mi
-		if err := c.ruleEnforcer.EnforceRules(ctx, &miCopy, runDetails); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return ruleEnforcer.EnforceRules(ctx, managedIdentities, runDetails)
 }
 
 // Execute executes the start apply command.
@@ -113,6 +125,7 @@ func (c *StartApply) Execute(ctx context.Context, input *types.ExecuteInput) err
 
 	applyNode.TriggeredBy = c.in.TriggeredBy
 	applyNode.Comment = c.in.Comment
+	applyNode.ManagedIdentityIDs = c.managedIdentityIDs
 
 	switch run.Status {
 	case models.RunPostPlanRunning, models.RunPostPlanAwaitingDecision, models.RunPostPlanCompleted:

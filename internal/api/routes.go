@@ -19,7 +19,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/mcp"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
@@ -50,6 +49,7 @@ func BuildRouter(
 	searchManager universalsearch.Manager,
 	userSessionManager auth.UserSessionManager,
 	signingKeyManager auth.SigningKeyManager,
+	outboundHTTPClient *http.Client,
 	apiVersion string,
 ) (chi.Router, error) {
 	resolverState := resolver.State{
@@ -62,7 +62,25 @@ func BuildRouter(
 	// The connection timeout will use the same timeout as the session refresh token to ensure that a graphql subscription
 	// cannot persist longer than the refresh token duration
 	maxSubscriptionDuration := time.Duration(cfg.UserSessionRefreshTokenExpirationMinutes) * time.Minute
-	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, authenticator, cfg.MaxGraphQLComplexity, cfg.MaxGraphQLRequestBodySize, maxSubscriptionDuration, cfg.TharsisUIURL)
+
+	allowedOrigins := strings.Split(cfg.CorsAllowedOrigins, ",")
+	for i, part := range allowedOrigins {
+		allowedOrigins[i] = strings.TrimSpace(part)
+	}
+
+	graphqlHandler, err := graphql.NewGraphQL(
+		&resolverState,
+		logger,
+		pluginCatalog.GraphqlRateLimitStore,
+		authenticator,
+		cfg.MaxGraphQLComplexity,
+		cfg.MaxGraphQLRequestBodySize,
+		maxSubscriptionDuration,
+		cfg.TharsisUIURL,
+		// Cookie-authenticated subscriptions are held to the same origins as CORS.
+		allowedOrigins,
+		userSessionManager.GetUserSessionAccessTokenCookieName(),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize graphql handler %v", err)
 	}
@@ -82,11 +100,6 @@ func BuildRouter(
 		return nil, fmt.Errorf("failed to build service discovery controller %v", err)
 	}
 
-	allowedOrigins := strings.Split(cfg.CorsAllowedOrigins, ",")
-	for i, part := range allowedOrigins {
-		allowedOrigins[i] = strings.TrimSpace(part)
-	}
-
 	commonMiddleware := []func(http.Handler) http.Handler{
 		cors.Handler(cors.Options{
 			AllowedOrigins:   allowedOrigins,
@@ -104,6 +117,8 @@ func BuildRouter(
 			respWriter,
 			pluginCatalog.HTTPRateLimitStore,
 		),
+		// Caps unauthenticated request bodies, so it runs after authentication sets the caller.
+		middleware.NewHTTPBodyLimitMiddleware(),
 	}
 
 	csrfMiddleware := middleware.NewCSRFMiddleware(respWriter, userSessionManager, logger)
@@ -170,8 +185,9 @@ func BuildRouter(
 		ServicesCatalog: serviceCatalog,
 		Version:         apiVersion,
 		Config:          &cfg.MCPServerConfig,
-		HTTPClient:      tharsishttp.NewHTTPClient(),
-		Logger:          logger,
+		// Restricted by the outbound policy like the API's other user-reachable clients.
+		HTTPClient: outboundHTTPClient,
+		Logger:     logger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize MCP handler: %v", err)

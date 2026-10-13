@@ -739,6 +739,7 @@ func toPBPlan(run *models.Run) *pb.Plan {
 			ResourceChanges:      p.Summary.ResourceChanges,
 			ResourceDestructions: p.Summary.ResourceDestructions,
 		},
+		ManagedIdentityIds: toManagedIdentityGIDs(p.ManagedIdentityIDs),
 	}
 	if p.LatestJobID != nil {
 		jobID := gid.ToGlobalID(types.JobModelType, *p.LatestJobID)
@@ -755,15 +756,28 @@ func toPBApply(run *models.Run) *pb.Apply {
 		return nil
 	}
 	pbApply := &pb.Apply{
-		Metadata:         toPBMetadataWithGID(a.Metadata(run), a.GetGlobalID()),
-		DeprecatedStatus: string(a.Status),
-		Status:           toPBApplyStatus(a.Status),
-		TriggeredBy:      a.TriggeredBy,
-		ErrorMessage:     a.ErrorMessage,
+		Metadata:           toPBMetadataWithGID(a.Metadata(run), a.GetGlobalID()),
+		DeprecatedStatus:   string(a.Status),
+		Status:             toPBApplyStatus(a.Status),
+		TriggeredBy:        a.TriggeredBy,
+		ErrorMessage:       a.ErrorMessage,
+		ManagedIdentityIds: toManagedIdentityGIDs(a.ManagedIdentityIDs),
 	}
 	if a.LatestJobID != nil {
 		jobID := gid.ToGlobalID(types.JobModelType, *a.LatestJobID)
 		pbApply.LatestJobId = &jobID
 	}
 	return pbApply
+}
+
+// toManagedIdentityGIDs converts a run node's managed identity IDs to global IDs.
+func toManagedIdentityGIDs(ids []string) []string {
+	if len(ids) == 0 {
+		return nil
+	}
+	gids := make([]string, len(ids))
+	for i, id := range ids {
+		gids[i] = gid.ToGlobalID(types.ManagedIdentityModelType, id)
+	}
+	return gids
 }

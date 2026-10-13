@@ -50,27 +50,20 @@ func NewSubjectMiddleware(
 	}
 }
 
+// getSourceIP returns the client IP for an unauthenticated request, which is the rate-limit subject.
+//
+// Only the right-most X-Forwarded-For entry is trusted: it is the address the load balancer in front
+// of the API saw, and a load balancer appends to whatever X-Forwarded-For the client sent rather than
+// replacing it, so every earlier entry is client-supplied. The Forwarded header is ignored for the
+// same reason: load balancers such as AWS ALB pass it through untouched, so a client could set a new
+// value on every request to get a fresh rate-limit bucket.
 func getSourceIP(req *http.Request) (string, error) {
-	// Check the Forward header
-	forwardedHeader := req.Header.Get("Forwarded")
-	if forwardedHeader != "" {
-		parts := strings.Split(forwardedHeader, ",")
-		firstPart := strings.TrimSpace(parts[0])
-		subParts := strings.Split(firstPart, ";")
-		for _, part := range subParts {
-			normalisedPart := strings.ToLower(strings.TrimSpace(part))
-			if strings.HasPrefix(normalisedPart, "for=") {
-				return normalisedPart[4:], nil
-			}
+	// A client may send several X-Forwarded-For lines; the proxy's entry is the last one overall.
+	if values := req.Header.Values("X-Forwarded-For"); len(values) > 0 {
+		parts := strings.Split(values[len(values)-1], ",")
+		if ip := stripPort(strings.TrimSpace(parts[len(parts)-1])); ip != "" {
+			return ip, nil
 		}
-	}
-
-	// Check the X-Forwarded-For header
-	xForwardedForHeader := req.Header.Get("X-Forwarded-For")
-	if xForwardedForHeader != "" {
-		parts := strings.Split(xForwardedForHeader, ",")
-		firstPart := strings.TrimSpace(parts[0])
-		return firstPart, nil
 	}
 
 	// Check on the request
@@ -84,4 +77,14 @@ func getSourceIP(req *http.Request) (string, error) {
 	}
 
 	return host, nil
+}
+
+// stripPort removes a port from an X-Forwarded-For entry ("1.2.3.4:5678", "[::1]:5678"). Some
+// proxies append the client's source port, which changes on every connection and would otherwise
+// give each request its own rate-limit bucket. A bare IPv6 address is returned unchanged.
+func stripPort(entry string) string {
+	if host, _, err := net.SplitHostPort(entry); err == nil {
+		return host
+	}
+	return strings.TrimSuffix(strings.TrimPrefix(entry, "["), "]")
 }

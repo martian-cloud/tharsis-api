@@ -141,13 +141,13 @@ func TestWriteChunk(t *testing.T) {
 		},
 		{
 			// byteOffset is the committed chunk size, so an object shorter than it is object-store data
-			// loss, not a client gap: it must surface as an internal error.
-			name:         "object shorter than committed size is an internal error",
+			// loss, not a client gap: it must surface as data loss.
+			name:         "object shorter than committed size is data loss",
 			existingLogs: "this",
 			logsToUpload: " is a test",
 			byteOffset:   100,
 			expectErr:    true,
-			expectedCode: errors.EInternal,
+			expectedCode: errors.EDataLoss,
 		},
 		{
 			name:           "overwrite truncates chunk",

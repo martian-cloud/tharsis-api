@@ -15,13 +15,13 @@ If the user provides a run ID, use it directly.
 
 Collect all relevant information in parallel:
 
-1. **Run details**: Use `get_run` to get status, error messages, plan/apply IDs, whether it's a destroy run, configuration version ID, and module source.
+1. **Run details**: Use `get_run` to get status, error messages, plan/apply nodes, whether it's a destroy run, configuration version ID, and module source.
 
-2. **Apply Status**: If the run reached the apply stage (status is `errored` and apply ID exists), check the `error_message` field to get the error.
+2. **Apply Status**: The apply status is returned in the apply node on the run type.
 
-2. **Plan Status**: Use `get_plan` with the plan ID from the run to get the plan details, if the plan failed check the `error_message` field to get the error.
+2. **Plan Status**: The plan status is returned in the plan node on the run type, if the plan failed check the `error_message` field to get the error.
 
-3. **Job Logs**: Only if the error message is not clear, use `get_job_logs` with that latest job ID to get additional information on why the plan/apply failed.
+3. **Job Logs**: Only if the error message is not clear, use `get_job_logs` with that latest job ID to get additional information on why the plan/apply failed. The `latest_job_id` field contains the job id for the plan/apply node.
 
 ## Step 3: Analyze the Error
 

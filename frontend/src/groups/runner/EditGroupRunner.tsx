@@ -38,6 +38,7 @@ function EditGroupRunner({ fragmentRef }: Props) {
                     disabled
                     tags
                     runUntaggedJobs
+                    jobLimit
                 }
             }
         }
@@ -66,7 +67,8 @@ function EditGroupRunner({ fragmentRef }: Props) {
         description: runner.description,
         disabled: runner.disabled,
         tags: runner.tags,
-        runUntaggedJobs: runner.runUntaggedJobs
+        runUntaggedJobs: runner.runUntaggedJobs,
+        jobLimit: runner.jobLimit
     });
 
     const onUpdate = () => {
@@ -78,7 +80,8 @@ function EditGroupRunner({ fragmentRef }: Props) {
                         description: formData.description,
                         disabled: formData.disabled,
                         tags: formData.tags,
-                        runUntaggedJobs: formData.runUntaggedJobs
+                        runUntaggedJobs: formData.runUntaggedJobs,
+                        jobLimit: formData.jobLimit
                     }
                 },
                 onCompleted: data => {

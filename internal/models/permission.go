@@ -38,6 +38,7 @@ var (
 	CreateTeamPermission                    = registerPermission(types.TeamModelType, CreateAction, false)
 	UpdateTeamPermission                    = registerPermission(types.TeamModelType, UpdateAction, false)
 	DeleteTeamPermission                    = registerPermission(types.TeamModelType, DeleteAction, false)
+	ManageSCIMTeamPermission                = registerPermission(types.TeamModelType, ManageSCIMAction, false) // SCIM-only: create, update and delete SCIM-managed teams.
 	ViewRunPermission                       = registerPermission(types.RunModelType, ViewAction, true)
 	CreateRunPermission                     = registerPermission(types.RunModelType, CreateAction, true)
 	ViewJobPermission                       = registerPermission(types.JobModelType, ViewAction, true)
@@ -53,6 +54,7 @@ var (
 	CreateUserPermission                    = registerPermission(types.UserModelType, CreateAction, true)
 	UpdateUserPermission                    = registerPermission(types.UserModelType, UpdateAction, true)
 	DeleteUserPermission                    = registerPermission(types.UserModelType, DeleteAction, true)
+	ManageSCIMUserPermission                = registerPermission(types.UserModelType, ManageSCIMAction, false)   // SCIM-only: create, update and delete SCIM-managed users.
 	ViewSensitiveVariableValuePermission    = registerPermission(types.VariableModelType, ViewValueAction, true) // Viewing sensitive variable values.
 	ViewVariablePermission                  = registerPermission(types.VariableModelType, ViewAction, true)
 	CreateVariablePermission                = registerPermission(types.VariableModelType, CreateAction, true)
@@ -118,6 +120,7 @@ const (
 	DeleteAction     Action = "delete"
 	ClaimAction      Action = "claim"
 	IssueTokenAction Action = "issue_token"
+	ManageSCIMAction Action = "manage_scim"
 )
 
 // HasViewerAccess returns true if Action is viewer access or greater.

@@ -3,6 +3,8 @@ package moduleregistry
 //go:generate go tool mockery --name Service --inpackage --case underscore
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -98,6 +100,14 @@ const (
 	IntotoPayloadType = "application/vnd.in-toto+json"
 	// MaxModuleAttestationSize is the max size in bytes for a module attestation
 	MaxModuleAttestationSize = 1024 * 10
+	// moduleExpansionRatio caps the total size of the files in an unpacked module package at this
+	// multiple of the upload size limit (the compressed package cap). Incompressible content such as
+	// vendored binaries unpacks to about its compressed size, and no real module has enough text to
+	// expand much further, so this covers any legitimate package up to the upload limit while stopping
+	// one built to expand (256 MiB at the default 128 MiB upload limit).
+	moduleExpansionRatio = 2
+	// maxModuleFiles caps the number of entries in a module package.
+	maxModuleFiles = 50000
 )
 
 var (
@@ -160,6 +170,8 @@ type service struct {
 	registryStore RegistryStore
 	taskManager   asynctask.Manager
 	handleCaller  handleCallerFunc
+	// maxExtractedSize caps the total size of the files in an unpacked module package.
+	maxExtractedSize int64
 }
 
 // NewService creates an instance of Service
@@ -169,6 +181,7 @@ func NewService(
 	limitChecker limits.LimitChecker,
 	registryStore RegistryStore,
 	taskManager asynctask.Manager,
+	maxUploadSize int,
 ) Service {
 	return newService(
 		logger,
@@ -177,6 +190,7 @@ func NewService(
 		registryStore,
 		taskManager,
 		auth.HandleCaller,
+		maxUploadSize,
 	)
 }
 
@@ -187,14 +201,17 @@ func newService(
 	registryStore RegistryStore,
 	taskManager asynctask.Manager,
 	handleCaller handleCallerFunc,
+	maxUploadSize int,
 ) Service {
 	return &service{
-		logger,
-		dbClient,
-		limitChecker,
-		registryStore,
-		taskManager,
-		handleCaller,
+		logger:        logger,
+		dbClient:      dbClient,
+		limitChecker:  limitChecker,
+		registryStore: registryStore,
+		taskManager:   taskManager,
+		handleCaller:  handleCaller,
+		// Never zero: the cap must stay in place even if the upload size limit is misconfigured.
+		maxExtractedSize: max(int64(maxUploadSize), 1) * moduleExpansionRatio,
 	}
 }
 
@@ -1502,6 +1519,47 @@ func (s *service) getModuleVersionByID(ctx context.Context, id string) (*models.
 	return version, nil
 }
 
+// checkModulePackageLimits reads a module package's tar headers and rejects it if it would unpack
+// to more than maxExtractedSize bytes or maxModuleFiles entries. It streams the archive without
+// writing anything, and rewinds it so the caller can then unpack it. The sizes come from the headers,
+// which the tar reader holds each entry to, so they bound what unpacking writes.
+func checkModulePackageLimits(pkg io.ReadSeeker, maxExtractedSize int64) error {
+	if _, err := pkg.Seek(0, io.SeekStart); err != nil {
+		return errors.Wrap(err, "failed to rewind module package")
+	}
+
+	gz, err := gzip.NewReader(pkg)
+	if err != nil {
+		return errors.Wrap(err, "failed to decompress module package", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	var size int64
+	entries := 0
+	for tr := tar.NewReader(gz); ; {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return errors.Wrap(err, "failed to read module package", errors.WithErrorCode(errors.EInvalid))
+		}
+
+		entries++
+		if entries > maxModuleFiles {
+			return errors.New("module package has more than %d files", maxModuleFiles, errors.WithErrorCode(errors.ETooLarge))
+		}
+		size += header.Size
+		if size > maxExtractedSize {
+			return errors.New("module package unpacks to more than %d bytes", maxExtractedSize, errors.WithErrorCode(errors.ETooLarge))
+		}
+	}
+
+	if _, err = pkg.Seek(0, io.SeekStart); err != nil {
+		return errors.Wrap(err, "failed to rewind module package")
+	}
+	return nil
+}
+
 func (s *service) uploadModuleMetadata(ctx context.Context, module *models.TerraformModule, moduleVersion *models.TerraformModuleVersion) error {
 	slugFile, err := os.CreateTemp("", "terraform-slug.tgz")
 	if err != nil {
@@ -1521,6 +1579,12 @@ func (s *service) uploadModuleMetadata(ctx context.Context, module *models.Terra
 	defer os.RemoveAll(moduleDir)
 
 	s.logger.WithContextFields(ctx).Infof("Unpacking slug to temp dir %s", moduleDir)
+
+	// The upload size limit applies to the compressed package, so check what it expands to before
+	// writing anything to disk.
+	if err = checkModulePackageLimits(slugFile, s.maxExtractedSize); err != nil {
+		return err
+	}
 
 	// Unpack slug
 	if err = slug.Unpack(slugFile, moduleDir); err != nil {

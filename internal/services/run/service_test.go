@@ -3011,16 +3011,20 @@ func TestDownloadPlan(t *testing.T) {
 		WorkspaceID: "workspace-1",
 	}
 
+	forbidden := errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden))
+
 	type testCase struct {
-		authError       error
+		stateDataErr    error
 		name            string
 		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
 		{
-			name:            "subject is not authorized",
-			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			// A viewer: the plan embeds every input variable value and the prior state, so viewing the
+			// run is not enough.
+			name:            "subject cannot view state version data",
+			stateDataErr:    forbidden,
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -3035,7 +3039,7 @@ func TestDownloadPlan(t *testing.T) {
 			mockArtifactStore := workspace.NewMockArtifactStore(t)
 
 			mockRuns.On("GetRunByNodeID", mock.Anything, "plan-1").Return(sampleRun, nil)
-			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewStateVersionDataPermission, mock.Anything, mock.Anything).Return(test.stateDataErr)
 			if test.expectErrorCode == "" {
 				// On the authorized path the plan cache is streamed from the artifact store.
 				mockArtifactStore.On("GetPlanCache", mock.Anything, sampleRun).
@@ -3065,16 +3069,20 @@ func TestService_DownloadPlanJSON(t *testing.T) {
 		WorkspaceID: "workspace-1",
 	}
 
+	forbidden := errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden))
+
 	type testCase struct {
-		authError       error
+		stateDataErr    error
 		name            string
 		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
 		{
-			name:            "subject is not authorized",
-			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			// A viewer: the plan embeds every input variable value and the prior state, so viewing the
+			// run is not enough.
+			name:            "subject cannot view state version data",
+			stateDataErr:    forbidden,
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -3089,7 +3097,7 @@ func TestService_DownloadPlanJSON(t *testing.T) {
 			mockArtifactStore := workspace.NewMockArtifactStore(t)
 
 			mockRuns.On("GetRunByNodeID", mock.Anything, "plan-1").Return(sampleRun, nil)
-			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewStateVersionDataPermission, mock.Anything, mock.Anything).Return(test.stateDataErr)
 			if test.expectErrorCode == "" {
 				// On the authorized path the plan JSON is streamed from the artifact store.
 				mockArtifactStore.On("GetPlanJSON", mock.Anything, sampleRun).

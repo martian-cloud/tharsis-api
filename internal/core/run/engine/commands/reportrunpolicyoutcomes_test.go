@@ -282,12 +282,17 @@ func TestReportRunPolicyOutcomes_Prepare(t *testing.T) {
 				ID:        "stage-1",
 				StageName: models.RunTaskStageNamePostPlan,
 				CheckType: models.PolicyKindOPA,
+				Policies: []*models.PolicyCheckPolicy{
+					policyCheckPolicy("pol-1", models.PolicyEnforcementAdvisory),
+					policyCheckPolicy("pol-2", models.PolicyEnforcementAdvisory),
+				},
 			}},
 		}},
 	}
 
 	type testCase struct {
 		name            string
+		policyCheckID   string
 		outcomes        []RunPolicyOutcome
 		wantUploads     int
 		wantSummary     []string
@@ -309,6 +314,7 @@ func TestReportRunPolicyOutcomes_Prepare(t *testing.T) {
 			name: "a policy reporting nothing is not uploaded",
 			outcomes: []RunPolicyOutcome{
 				{PolicyID: "pol-1", Passed: true},
+				{PolicyID: "pol-2", Passed: true},
 			},
 			wantUploads: 0,
 		},
@@ -316,6 +322,7 @@ func TestReportRunPolicyOutcomes_Prepare(t *testing.T) {
 			name: "messages beyond the summary budget are truncated rather than rejected",
 			outcomes: []RunPolicyOutcome{
 				{PolicyID: "pol-1", Messages: []string{strings.Repeat("a", maxPolicyCheckMessagesSummarySize+10)}},
+				{PolicyID: "pol-2", Passed: true},
 			},
 			wantUploads:   1,
 			wantSummary:   []string{strings.Repeat("a", maxPolicyCheckMessagesSummarySize)},
@@ -336,14 +343,58 @@ func TestReportRunPolicyOutcomes_Prepare(t *testing.T) {
 			},
 			expectErrorCode: errors.EInvalid,
 		},
+		{
+			// Rejected before anything is uploaded, so no object is orphaned for the valid outcome.
+			name: "a policy not pinned on the check is rejected",
+			outcomes: []RunPolicyOutcome{
+				{PolicyID: "pol-1", Messages: []string{"denied by rule X"}},
+				{PolicyID: "pol-unknown", Messages: []string{"denied by rule Y"}},
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			// The verdict only sees reported outcomes, so an omitted failing policy would pass the check.
+			name: "a pinned policy left out of the report is rejected",
+			outcomes: []RunPolicyOutcome{
+				{PolicyID: "pol-1", Messages: []string{"denied by rule X"}},
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "a policy reported twice is rejected",
+			outcomes: []RunPolicyOutcome{
+				{PolicyID: "pol-1", Messages: []string{"denied by rule X"}},
+				{PolicyID: "pol-1", Messages: []string{"denied by rule X"}},
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "a later policy over the message limit is rejected before any upload",
+			outcomes: []RunPolicyOutcome{
+				{PolicyID: "pol-1", Messages: []string{"denied by rule X"}},
+				{PolicyID: "pol-2", Messages: []string{strings.Repeat("a", maxPolicyMessagesSize+1)}},
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "a node that is not a policy check of the run is not found",
+			policyCheckID:   "ts-post",
+			outcomes:        []RunPolicyOutcome{{PolicyID: "pol-1", Passed: true}},
+			expectErrorCode: errors.ENotFound,
+		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 
+			policyCheckID := test.policyCheckID
+			if policyCheckID == "" {
+				policyCheckID = "stage-1"
+			}
+
 			mockRuns := db.NewMockRuns(t)
-			mockRuns.On("GetRunByNodeID", mock.Anything, "stage-1").Return(run, nil)
+			mockRuns.On("GetRunByNodeID", mock.Anything, policyCheckID).Return(run, nil)
 
 			mockArtifactStore := workspace.NewMockArtifactStore(t)
 			retainFn := func(_ context.Context, _ string) error { return nil }
@@ -356,7 +407,7 @@ func TestReportRunPolicyOutcomes_Prepare(t *testing.T) {
 			cmd := &ReportRunPolicyOutcomes{
 				dbClient:      &db.Client{Runs: mockRuns},
 				artifactStore: mockArtifactStore,
-				PolicyCheckID: "stage-1",
+				PolicyCheckID: policyCheckID,
 				Outcomes:      test.outcomes,
 			}
 

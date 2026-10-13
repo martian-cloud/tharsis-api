@@ -471,6 +471,12 @@ func (r RootResolver) runnerSessionErrorLogSubscription(ctx context.Context, inp
 
 	go func() {
 		for event := range events {
+			if event.Err != nil {
+				// GraphQL subscriptions can't carry a mid-stream error, so end the subscription;
+				// the failure itself has already been logged by the log stream manager.
+				break
+			}
+
 			select {
 			case <-ctx.Done():
 			case outgoing <- &RunnerSessionErrorLogEventResolver{event: event}:

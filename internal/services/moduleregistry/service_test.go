@@ -1,6 +1,9 @@
 package moduleregistry
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -91,7 +94,7 @@ func TestGetModuleByID(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			module, err := service.GetModuleByID(auth.WithCaller(ctx, mockCaller), moduleID)
 
@@ -314,7 +317,7 @@ func TestGetModuleByAddress(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			module, err := service.GetModuleByAddress(auth.WithCaller(ctx, mockCaller), namespace, moduleName, system)
 
@@ -417,7 +420,7 @@ func TestGetModulesByIDs(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			modules, err := service.GetModulesByIDs(auth.WithCaller(ctx, mockCaller), []string{moduleID})
 
@@ -591,7 +594,7 @@ func TestGetModules(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := newService(testLogger, &dbClient, nil, nil, nil, test.handleCaller)
+			service := newService(testLogger, &dbClient, nil, nil, nil, test.handleCaller, testMaxUploadSize)
 
 			resp, err := service.GetModules(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -782,7 +785,7 @@ func TestCreateModule(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, asynctask.NewMockManager(t))
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, asynctask.NewMockManager(t), testMaxUploadSize)
 
 			module, err := service.CreateModule(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -869,7 +872,7 @@ func TestUpdateModule(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, asynctask.NewMockManager(t))
+			service := NewService(testLogger, &dbClient, nil, nil, asynctask.NewMockManager(t), testMaxUploadSize)
 
 			module, err := service.UpdateModule(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -953,7 +956,7 @@ func TestDeleteModule(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, asynctask.NewMockManager(t))
+			service := NewService(testLogger, &dbClient, nil, nil, asynctask.NewMockManager(t), testMaxUploadSize)
 
 			err := service.DeleteModule(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -1056,7 +1059,7 @@ func TestGetModuleVersionByID(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			moduleVersion, err := service.GetModuleVersionByID(auth.WithCaller(ctx, mockCaller), moduleVersionID)
 
@@ -1267,7 +1270,7 @@ func TestGetModuleVersions(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			response, err := service.GetModuleVersions(auth.WithCaller(ctx, mockCaller), &GetModuleVersionsInput{
 				ModuleID: moduleID,
@@ -1412,7 +1415,7 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			moduleVersions, err := service.GetModuleVersionsByIDs(auth.WithCaller(ctx, mockCaller), []string{moduleVersionID})
 
@@ -1716,7 +1719,7 @@ func TestCreateModuleVersion(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, asynctask.NewMockManager(t))
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, asynctask.NewMockManager(t), testMaxUploadSize)
 
 			moduleVersion, err := service.CreateModuleVersion(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -1928,7 +1931,7 @@ func TestDeleteModuleVersion(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			err := service.DeleteModuleVersion(auth.WithCaller(ctx, &mockCaller), &test.moduleVersionToDelete)
 			if test.expectErrCode != "" {
@@ -2040,7 +2043,7 @@ func TestGetModuleConfigurationDetails(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, mockRegistryStore, nil)
+			service := NewService(testLogger, &dbClient, nil, mockRegistryStore, nil, testMaxUploadSize)
 
 			details, err := service.GetModuleConfigurationDetails(auth.WithCaller(ctx, mockCaller), test.input, test.path)
 
@@ -2231,7 +2234,7 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, mockRegistryStore, mockTaskManager)
+			service := NewService(testLogger, &dbClient, nil, mockRegistryStore, mockTaskManager, testMaxUploadSize)
 
 			err := service.UploadModuleVersionPackage(auth.WithCaller(ctx, mockCaller), test.input, strings.NewReader(test.data))
 			if test.expectErrCode != "" {
@@ -2342,7 +2345,7 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, mockRegistryStore, nil)
+			service := NewService(testLogger, &dbClient, nil, mockRegistryStore, nil, testMaxUploadSize)
 
 			url, err := service.GetModuleVersionPackageDownloadURL(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2536,7 +2539,7 @@ func TestCreateModuleAttestation(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, nil)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, nil, testMaxUploadSize)
 
 			moduleAttestation, err := service.CreateModuleAttestation(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -2638,7 +2641,7 @@ func TestGetModuleAttestationByID(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			moduleAttestation, err := service.GetModuleAttestationByID(auth.WithCaller(ctx, mockCaller), moduleAttestationID)
 
@@ -2846,7 +2849,7 @@ func TestGetModuleAttestations(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			response, err := service.GetModuleAttestations(auth.WithCaller(ctx, mockCaller), &GetModuleAttestationsInput{
 				ModuleID: moduleID,
@@ -2935,7 +2938,7 @@ func TestUpdateModuleAttestation(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			updatedAttestation, err := service.UpdateModuleAttestation(auth.WithCaller(ctx, &mockCaller), &test.moduleAttestationToUpdate)
 			if test.expectErrCode != "" {
@@ -3015,7 +3018,7 @@ func TestDeleteModuleAttestation(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, testMaxUploadSize)
 
 			err := service.DeleteModuleAttestation(auth.WithCaller(ctx, &mockCaller), &test.moduleAttestationToDelete)
 			if test.expectErrCode != "" {
@@ -3028,4 +3031,92 @@ func TestDeleteModuleAttestation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// buildModulePackage builds a gzipped tar from headers. A header whose size is larger than its
+// content is written without the content: the scan only reads headers, so the archive doesn't have
+// to be complete for the limit to trip.
+func buildModulePackage(t *testing.T, headers []*tar.Header, contents map[string]string) []byte {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	for _, h := range headers {
+		require.NoError(t, tw.WriteHeader(h))
+		if c, ok := contents[h.Name]; ok {
+			_, err := tw.Write([]byte(c))
+			require.NoError(t, err)
+		}
+	}
+	// Close errors when an entry's content was left out on purpose; the bytes are already written.
+	_ = tw.Close()
+	require.NoError(t, gz.Close())
+	return buf.Bytes()
+}
+
+// testMaxUploadSize is the module upload size limit the tests build the service with (the default).
+const testMaxUploadSize = 128 * 1024 * 1024
+
+func TestNewServiceExtractedSizeLimit(t *testing.T) {
+	// The extracted cap scales with the upload limit: 256 MiB at the default 128 MiB.
+	svc := newService(nil, nil, nil, nil, nil, nil, testMaxUploadSize).(*service)
+	assert.Equal(t, int64(256*1024*1024), svc.maxExtractedSize)
+
+	// A zero upload limit must not remove the cap.
+	svc = newService(nil, nil, nil, nil, nil, nil, 0).(*service)
+	assert.Positive(t, svc.maxExtractedSize)
+}
+
+func TestCheckModulePackageLimits(t *testing.T) {
+	maxExtractedSize := int64(1024)
+
+	t.Run("a package that unpacks to exactly the size limit passes", func(t *testing.T) {
+		// Contents are written so the scan can skip past the first entry to the second header.
+		half := strings.Repeat("x", int(maxExtractedSize/2))
+		pkg := bytes.NewReader(buildModulePackage(t, []*tar.Header{
+			{Name: "a", Mode: 0o600, Size: maxExtractedSize / 2, Typeflag: tar.TypeReg},
+			{Name: "b", Mode: 0o600, Size: maxExtractedSize / 2, Typeflag: tar.TypeReg},
+		}, map[string]string{"a": half, "b": half}))
+
+		assert.NoError(t, checkModulePackageLimits(pkg, maxExtractedSize))
+	})
+
+	t.Run("a normal package passes and is rewound for unpacking", func(t *testing.T) {
+		pkg := bytes.NewReader(buildModulePackage(t, []*tar.Header{
+			{Name: "main.tf", Mode: 0o600, Size: 5, Typeflag: tar.TypeReg},
+			{Name: "modules/", Mode: 0o700, Typeflag: tar.TypeDir},
+		}, map[string]string{"main.tf": "hello"}))
+
+		require.NoError(t, checkModulePackageLimits(pkg, maxExtractedSize))
+		pos, err := pkg.Seek(0, io.SeekCurrent)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), pos)
+	})
+
+	t.Run("a package that unpacks past the size limit is rejected", func(t *testing.T) {
+		pkg := bytes.NewReader(buildModulePackage(t, []*tar.Header{
+			{Name: "bomb", Mode: 0o600, Size: maxExtractedSize + 1, Typeflag: tar.TypeReg},
+		}, nil))
+
+		err := checkModulePackageLimits(pkg, maxExtractedSize)
+		require.Error(t, err)
+		assert.Equal(t, errors.ETooLarge, errors.ErrorCode(err))
+	})
+
+	t.Run("a package with too many files is rejected", func(t *testing.T) {
+		headers := make([]*tar.Header, maxModuleFiles+1)
+		for i := range headers {
+			headers[i] = &tar.Header{Name: fmt.Sprintf("d%d/", i), Mode: 0o700, Typeflag: tar.TypeDir}
+		}
+		pkg := bytes.NewReader(buildModulePackage(t, headers, nil))
+
+		err := checkModulePackageLimits(pkg, maxExtractedSize)
+		require.Error(t, err)
+		assert.Equal(t, errors.ETooLarge, errors.ErrorCode(err))
+	})
+
+	t.Run("a package that isn't gzipped is rejected", func(t *testing.T) {
+		err := checkModulePackageLimits(bytes.NewReader([]byte("not a package")), maxExtractedSize)
+		require.Error(t, err)
+		assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+	})
 }

@@ -140,7 +140,7 @@ func (f *Factory) NewCancelRun(in *CancelRunInput) *CancelRun {
 
 // NewSetRunAutoApply creates a SetRunAutoApply command.
 func (f *Factory) NewSetRunAutoApply(in *SetRunAutoApplyInput) *SetRunAutoApply {
-	return &SetRunAutoApply{dbClient: f.dbClient, in: in}
+	return &SetRunAutoApply{dbClient: f.dbClient, moduleResolver: f.moduleResolver, ruleEnforcer: f.ruleEnforcer, in: in}
 }
 
 // NewRetryRunNode creates a RetryRunNode command.

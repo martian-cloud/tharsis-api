@@ -77,6 +77,7 @@ message CreateRunnerRequest {
   optional bool   disabled          = 4;
   bool            run_untagged_jobs = 5;
   repeated string tags              = 6;
+  int32           job_limit         = 7;
 }
 
 // UpdateRunnerRequest is the input for updating a Runner.
@@ -87,6 +88,7 @@ message UpdateRunnerRequest {
   optional bool   disabled          = 4;
   optional bool   run_untagged_jobs = 5;
   repeated string tags              = 6;
+  optional int32  job_limit         = 7;
 }
 
 // DeleteRunnerRequest is the input for deleting a Runner.
@@ -118,6 +120,7 @@ message Runner {
   bool                      disabled          = 7;
   bool                      run_untagged_jobs = 8;
   repeated string           tags              = 9;
+  int32                     job_limit         = 10;
 }
 
 // GetRunnersResponse is the paginated list of Runners.

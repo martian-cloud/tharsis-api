@@ -14,7 +14,9 @@ import (
 	gotfe "github.com/hashicorp/go-tfe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	runvariables "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/variables"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -329,4 +331,32 @@ func newPolicyCheckLogsRequest(checkGID string) *http.Request {
 	rctx.URLParams.Add("id", checkGID)
 	req := httptest.NewRequest(http.MethodGet, "/policy-checks/"+checkGID+"/output", nil)
 	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+}
+
+func TestCanReadRunLogs(t *testing.T) {
+	jobCaller := func(runID string, status models.JobStatus) *auth.JobCaller {
+		job := &models.Job{}
+		require.NoError(t, job.SetStatus(status))
+		return &auth.JobCaller{RunID: runID, Job: job}
+	}
+
+	run := &models.Run{Metadata: models.ResourceMetadata{ID: "run-1"}}
+
+	tests := []struct {
+		name   string
+		caller auth.Caller
+		expect bool
+	}{
+		{name: "job for the same run", caller: jobCaller("run-1", models.JobRunning), expect: true},
+		// A job can view runs across its root group, but must not be handed another run's logs.
+		{name: "job for a different run", caller: jobCaller("run-2", models.JobRunning), expect: false},
+		{name: "finished job for the same run", caller: jobCaller("run-1", models.JobFinished), expect: false},
+		{name: "non-job caller", caller: auth.NewMockCaller(t), expect: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expect, canReadRunLogs(auth.WithCaller(context.Background(), test.caller), run))
+		})
+	}
 }

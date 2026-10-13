@@ -2,6 +2,7 @@ package managedidentity
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/aws/smithy-go/ptr"
@@ -12,7 +13,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -110,7 +110,6 @@ type service struct {
 	limitChecker     limits.LimitChecker
 	delegateMap      map[models.ManagedIdentityType]Delegate
 	workspaceService workspace.Service
-	jobService       job.Service
 }
 
 // NewService creates an instance of Service
@@ -120,7 +119,6 @@ func NewService(
 	limitChecker limits.LimitChecker,
 	managedIdentityDelegateMap map[models.ManagedIdentityType]Delegate,
 	workspaceService workspace.Service,
-	jobService job.Service,
 ) Service {
 	return &service{
 		logger:           logger,
@@ -128,7 +126,6 @@ func NewService(
 		limitChecker:     limitChecker,
 		delegateMap:      managedIdentityDelegateMap,
 		workspaceService: workspaceService,
-		jobService:       jobService,
 	}
 }
 
@@ -1372,10 +1369,13 @@ func (s *service) CreateCredentials(ctx context.Context, identity *models.Manage
 		return nil, errors.New("Only job callers can create managed identity credentials", errors.WithErrorCode(errors.EForbidden))
 	}
 
-	// Get Job
-	job, err := s.jobService.GetJobByID(ctx, jobCaller.JobID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get job", errors.WithSpan(span))
+	// Only jobs that run Terraform use managed identities, and only while they are running.
+	job := jobCaller.Job
+	if job.GetStatus().IsFinal() {
+		return nil, errors.New("job %s has finished and cannot create managed identity credentials", job.Metadata.ID, errors.WithErrorCode(errors.EUnauthorized))
+	}
+	if job.Type != models.JobPlanType && job.Type != models.JobApplyType {
+		return nil, errors.New("%s jobs cannot create managed identity credentials", job.Type, errors.WithErrorCode(errors.EForbidden))
 	}
 
 	// Verify job is in a workspace that has access to this managed identity
@@ -1394,6 +1394,38 @@ func (s *service) CreateCredentials(ctx context.Context, identity *models.Manage
 
 	if !found {
 		return nil, errors.New("managed identity %s is not assigned to workspace %s", identity.Metadata.ID, job.WorkspaceID, errors.WithErrorCode(errors.EUnauthorized))
+	}
+
+	// The identity must also be one the job's stage was authorized for: the access rules are checked
+	// when a stage is approved, so an identity assigned to the workspace after that has not passed them.
+	// The authorized identities are recorded on the job's run node: the plan for a plan job and the
+	// apply for an apply job.
+	run, err := s.dbClient.Runs.GetRunByID(ctx, job.RunID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get run", errors.WithSpan(span))
+	}
+	if run == nil {
+		return nil, errors.New("run %s not found", job.RunID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	var authorizedIDs []string
+	switch job.Type {
+	case models.JobPlanType:
+		authorizedIDs = run.Plan.ManagedIdentityIDs
+	case models.JobApplyType:
+		if run.Apply == nil {
+			return nil, errors.New("run %s has no apply", run.Metadata.ID, errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+		}
+		authorizedIDs = run.Apply.ManagedIdentityIDs
+	default:
+		return nil, errors.New("%s jobs cannot use managed identities", job.Type, errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	if !slices.Contains(authorizedIDs, identity.Metadata.ID) {
+		return nil, errors.New(
+			"managed identity %s was not authorized for this %s, it may have been assigned to the workspace after the %s was approved",
+			identity.Metadata.ID, job.Type, job.Type, errors.WithErrorCode(errors.EForbidden),
+		)
 	}
 
 	delegate, err := s.getDelegate(identity.Type)

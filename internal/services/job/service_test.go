@@ -238,13 +238,14 @@ func TestGetNextAvailableJob(t *testing.T) {
 		{
 			name: "shared runner should not get next job because runner is over job limit",
 			runner: &models.Runner{
-				Type: models.SharedRunnerType,
+				Type:     models.SharedRunnerType,
+				JobLimit: 100,
 			},
 			queuedJobs: []models.Job{
 				{Metadata: models.ResourceMetadata{ID: "job1"}, WorkspaceID: "ws1"},
 			},
 			runners:               []models.Runner{},
-			currentRunnerJobCount: runnerJobsLimit,
+			currentRunnerJobCount: 100,
 			expectLimitReached:    true,
 			workspaceMap: map[string]models.Workspace{
 				"ws1": {
@@ -252,6 +253,41 @@ func TestGetNextAvailableJob(t *testing.T) {
 					FullPath: "group1/group2/group3/ws1",
 				},
 			},
+		},
+		{
+			name: "shared runner should get next job because runner is below job limit",
+			runner: &models.Runner{
+				Type:     models.SharedRunnerType,
+				JobLimit: 100,
+			},
+			queuedJobs: []models.Job{
+				{Metadata: models.ResourceMetadata{ID: "job1"}, WorkspaceID: "ws1"},
+			},
+			runners:               []models.Runner{},
+			currentRunnerJobCount: 99,
+			workspaceMap: map[string]models.Workspace{
+				"ws1": {
+					Locked: false,
+				},
+			},
+			expectJobID: "job1",
+		},
+		{
+			name: "shared runner with no job limit should get next job regardless of current job count",
+			runner: &models.Runner{
+				Type: models.SharedRunnerType,
+			},
+			queuedJobs: []models.Job{
+				{Metadata: models.ResourceMetadata{ID: "job1"}, WorkspaceID: "ws1"},
+			},
+			runners:               []models.Runner{},
+			currentRunnerJobCount: 10000,
+			workspaceMap: map[string]models.Workspace{
+				"ws1": {
+					Locked: false,
+				},
+			},
+			expectJobID: "job1",
 		},
 		{
 			name: "group runner should get next job because it's in the same group as the workspace",
@@ -455,6 +491,43 @@ func TestGetNextAvailableJob(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWaitForRunnerJobSlotWakesOnJobLimitChange(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	runnerID := "runner1"
+
+	mockEvents := db.NewMockEvents(t)
+	mockJobs := db.NewMockJobs(t)
+	mockRunners := db.NewMockRunners(t)
+
+	mockEventChannel := make(chan db.Event, 1)
+	var roEventChan <-chan db.Event = mockEventChannel
+	mockEvents.On("Listen", mock.Anything).Return(roEventChan, make(<-chan error)).Maybe()
+
+	// The runner starts at its job limit, then the limit is removed.
+	mockRunners.On("GetRunnerByID", mock.Anything, runnerID).
+		Return(&models.Runner{Metadata: models.ResourceMetadata{ID: runnerID}, JobLimit: 2}, nil).Once()
+	mockRunners.On("GetRunnerByID", mock.Anything, runnerID).
+		Return(&models.Runner{Metadata: models.ResourceMetadata{ID: runnerID}}, nil).Once()
+
+	// Send the runner update event once the subscription is in place and the runner is at its limit.
+	mockJobs.On("GetJobCountForRunner", mock.Anything, runnerID).Return(2, nil).Once().Run(func(_ mock.Arguments) {
+		mockEventChannel <- db.Event{Table: "runners", Action: "UPDATE", ID: runnerID}
+	})
+	mockJobs.On("GetJobCountForRunner", mock.Anything, runnerID).Return(2, nil).Once()
+
+	dbClient := db.Client{Jobs: mockJobs, Runners: mockRunners, Events: mockEvents}
+
+	logger, _ := logger.NewForTest()
+	eventManager := events.NewEventManager(&dbClient, logger)
+	eventManager.Start(ctx)
+
+	service := &service{dbClient: &dbClient, eventManager: eventManager, logger: logger}
+
+	require.NoError(t, service.waitForRunnerJobSlot(ctx, runnerID))
 }
 
 func TestClaimableJobEventFilter(t *testing.T) {
@@ -1248,6 +1321,63 @@ func TestSubscribeToCancellationEvent(t *testing.T) {
 	}
 }
 
+func TestSubscribeToCancellationEventStaysOpenUntilCanceled(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	mockCaller := auth.NewMockCaller(t)
+	mockEvents := db.NewMockEvents(t)
+	mockJobs := db.NewMockJobs(t)
+
+	mockEventChannel := make(chan db.Event, 1)
+	var roEventChan <-chan db.Event = mockEventChannel
+	mockEvents.On("Listen", mock.Anything).Return(roEventChan, make(<-chan error)).Maybe()
+
+	mockCaller.On("RequirePermission", mock.Anything, models.ViewJobPermission, mock.Anything, mock.Anything).Return(nil)
+
+	canceling := jobWithStatus(&models.Job{Metadata: models.ResourceMetadata{ID: "job1"}}, models.JobCanceling)
+	forceCanceled := jobWithStatus(&models.Job{Metadata: models.ResourceMetadata{ID: "job1"}}, models.JobCanceled)
+	forceCanceled.ForceCanceled = true
+
+	// Authorization lookup, then the lookup after the subscription is set up: the job is canceling.
+	mockJobs.On("GetJobByID", mock.Anything, "job1").Return(canceling, nil).Twice()
+	// Lookup for the force cancel event.
+	mockJobs.On("GetJobByID", mock.Anything, "job1").Return(forceCanceled, nil).Once()
+
+	dbClient := db.Client{Jobs: mockJobs, Events: mockEvents}
+
+	logger, _ := logger.NewForTest()
+	eventManager := events.NewEventManager(&dbClient, logger)
+	eventManager.Start(ctx)
+
+	service := &service{dbClient: &dbClient, eventManager: eventManager, logger: logger}
+
+	eventChan, err := service.SubscribeToCancellationEvent(auth.WithCaller(ctx, mockCaller), &CancellationSubscriptionsOptions{JobID: "job1"})
+	require.NoError(t, err)
+
+	// The current canceling status is delivered first, and the stream stays open.
+	first := <-eventChan
+	require.NotNil(t, first)
+	assert.Equal(t, models.JobCanceling, first.Job.GetStatus())
+
+	encoded, err := json.Marshal(db.JobEventData{ID: "job1", Status: string(models.JobCanceled)})
+	require.NoError(t, err)
+	mockEventChannel <- db.Event{Table: "jobs", Action: "UPDATE", ID: "job1", Data: encoded}
+
+	// The force cancel is delivered on the same stream, which then closes since the job is final.
+	second := <-eventChan
+	require.NotNil(t, second)
+	assert.Equal(t, models.JobCanceled, second.Job.GetStatus())
+	assert.True(t, second.Job.ForceCanceled)
+
+	select {
+	case _, ok := <-eventChan:
+		assert.False(t, ok, "expected the stream to close after the job was canceled")
+	case <-ctx.Done():
+		t.Fatal("stream did not close after the job was canceled")
+	}
+}
+
 func TestSetJobStatus(t *testing.T) {
 	jobID := "job-1"
 	workspaceID := "workspace-1"
@@ -1808,7 +1938,7 @@ func TestGetLogStreamsByJobIDs(t *testing.T) {
 
 func TestIsProtocolVersionOutdated(t *testing.T) {
 	// Tests run against the package-level currentProtocolVersion which is
-	// models.CurrentJobProtocolVersion ("1.0.0" at the time of writing).
+	// models.CurrentJobProtocolVersion ("1.1.0" at the time of writing).
 	tests := []struct {
 		name            string
 		executorVersion string
@@ -1817,8 +1947,9 @@ func TestIsProtocolVersionOutdated(t *testing.T) {
 		{"older major", "0.9.0", true},
 		{"older minor", "0.1.0", true},
 		{"older patch", "0.0.1", true},
+		{"previous minor", "1.0.0", true},
 		{"same version", models.CurrentJobProtocolVersion, false},
-		{"newer minor", "1.1.0", false},
+		{"newer minor", "1.2.0", false},
 		{"newer major", "2.0.0", false},
 		{"invalid executor version", "invalid", true},
 		{"empty executor version", "", true},

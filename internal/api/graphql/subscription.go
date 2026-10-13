@@ -25,7 +25,43 @@ const (
 // subscriptionAuthenticator is used to authenticate graphql subscription requests. The BuildContext function will be called
 // when the connection is established; therefore, the caller will be added to the context if the request has a valid token.
 type subscriptionAuthenticator struct {
-	tharsisUIOrigin string
+	tharsisUIOrigin       string
+	allowedOrigins        map[string]struct{}
+	allowAnyOrigin        bool
+	accessTokenCookieName string
+}
+
+func newSubscriptionAuthenticator(tharsisUIOrigin string, allowedOrigins []string, accessTokenCookieName string) *subscriptionAuthenticator {
+	a := &subscriptionAuthenticator{
+		tharsisUIOrigin:       tharsisUIOrigin,
+		allowedOrigins:        map[string]struct{}{},
+		accessTokenCookieName: accessTokenCookieName,
+	}
+	for _, origin := range allowedOrigins {
+		origin = normalizeOrigin(origin)
+		switch origin {
+		case "":
+		case "*":
+			a.allowAnyOrigin = true
+		default:
+			a.allowedOrigins[origin] = struct{}{}
+		}
+	}
+	return a
+}
+
+// normalizeOrigin lowercases an origin and drops a trailing slash, since a configured URL may have
+// one and the browser's Origin header never does.
+func normalizeOrigin(origin string) string {
+	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(origin), "/"))
+}
+
+func (c *subscriptionAuthenticator) isAllowedOrigin(origin string) bool {
+	if c.allowAnyOrigin {
+		return true
+	}
+	_, ok := c.allowedOrigins[normalizeOrigin(origin)]
+	return ok
 }
 
 func (c *subscriptionAuthenticator) BuildContext(ctx context.Context, r *http.Request) (context.Context, error) {
@@ -38,6 +74,15 @@ func (c *subscriptionAuthenticator) BuildContext(ctx context.Context, r *http.Re
 	}
 
 	if caller != nil {
+		// A browser attaches the session cookie to a websocket upgrade from any same-site page, and
+		// websockets are not covered by CORS, so a page that can open the socket can read everything
+		// sent over it. A connection authenticated by the session cookie is therefore only accepted
+		// from an allowed origin. A token in the Authorization header or in the connection params
+		// cannot be supplied by a browser on the user's behalf, so those clients need no Origin.
+		if cookie, _ := r.Cookie(c.accessTokenCookieName); cookie != nil && !c.isAllowedOrigin(r.Header.Get("Origin")) {
+			return nil, errors.New("websocket connection origin is not allowed", errors.WithErrorCode(errors.EForbidden))
+		}
+
 		// Add caller to context if it exists
 		ctx = auth.WithCaller(ctx, caller)
 	}
@@ -53,6 +98,8 @@ func newSubscriptionHandler(
 	authenticator auth.Authenticator,
 	maxConnectionDuration time.Duration,
 	tharsisUIOrigin string,
+	allowedOrigins []string,
+	accessTokenCookieName string,
 ) http.HandlerFunc {
 	return graphqlws.NewHandlerFunc(
 		&graphqlSubscriptions{schema: schema, authenticator: authenticator},
@@ -63,7 +110,7 @@ func newSubscriptionHandler(
 			// Disable cache for subscriptions since they don't refresh the context per response
 			disableCache: true,
 		}),
-		graphqlws.WithContextGenerator(&subscriptionAuthenticator{tharsisUIOrigin: tharsisUIOrigin}),
+		graphqlws.WithContextGenerator(newSubscriptionAuthenticator(tharsisUIOrigin, allowedOrigins, accessTokenCookieName)),
 		graphqlws.WithReadLimit(graphqlSubscriptionMaxMessageSize),
 		graphqlws.WithWriteTimeout(graphqlSubscriptionWriteTimeout),
 		graphqlws.WithConnectionTimeout(maxConnectionDuration),

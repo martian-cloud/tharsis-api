@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<1f4fa1c833905d1cd7220619bdd7a5fa>>
+ * @generated SignedSource<<8f5e30c28820d371c1cca694d628e9b6>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,6 +17,7 @@ export type EditGroupRunnerQuery$data = {
     readonly description?: string;
     readonly disabled?: boolean;
     readonly id?: string;
+    readonly jobLimit?: number;
     readonly name?: string;
     readonly runUntaggedJobs?: boolean;
     readonly tags?: ReadonlyArray<string>;
@@ -83,6 +84,13 @@ v7 = {
   "kind": "ScalarField",
   "name": "runUntaggedJobs",
   "storageKey": null
+},
+v8 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "jobLimit",
+  "storageKey": null
 };
 return {
   "fragment": {
@@ -107,7 +115,8 @@ return {
               (v4/*: any*/),
               (v5/*: any*/),
               (v6/*: any*/),
-              (v7/*: any*/)
+              (v7/*: any*/),
+              (v8/*: any*/)
             ],
             "type": "Runner",
             "abstractKey": null
@@ -148,7 +157,8 @@ return {
               (v4/*: any*/),
               (v5/*: any*/),
               (v6/*: any*/),
-              (v7/*: any*/)
+              (v7/*: any*/),
+              (v8/*: any*/)
             ],
             "type": "Runner",
             "abstractKey": null
@@ -159,16 +169,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "bfe54f06acc3178951368e23c2316e4a",
+    "cacheID": "5db36cd380df688a224b7179b8a5577e",
     "id": null,
     "metadata": {},
     "name": "EditGroupRunnerQuery",
     "operationKind": "query",
-    "text": "query EditGroupRunnerQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Runner {\n      id\n      name\n      description\n      disabled\n      tags\n      runUntaggedJobs\n    }\n    id\n  }\n}\n"
+    "text": "query EditGroupRunnerQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Runner {\n      id\n      name\n      description\n      disabled\n      tags\n      runUntaggedJobs\n      jobLimit\n    }\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "c71eab37685ef7ad8d1f68724ee44b26";
+(node as any).hash = "34f68c1d037c6a64b719dd728831bb40";
 
 export default node;
