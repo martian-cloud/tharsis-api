@@ -581,7 +581,6 @@ type Config {
   asymmetricSigningKeyRotationPeriodDays: Int!
   asyncTaskTimeout: Int!
   cliLoginOIDCClientID: String
-  cliLoginOIDCScopes: String
   corsAllowedOrigins: String!
   dbAutoMigrateEnabled: Boolean!
   dbHost: String!
@@ -1797,7 +1796,10 @@ enum GroupSort {
 }
 
 type IdpConfig {
+  allowAdminBootstrap: Boolean!
   clientId: String!
+  emailLinking: Boolean!
+  externalIdClaim: String!
   issuerUrl: String!
   scope: String!
   usernameClaim: String!

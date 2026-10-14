@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -196,6 +197,43 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		return &JobCaller{Job: job, RunID: runID, WorkspaceID: workspaceID}
 	}
 
+	userID := uuid.NewString()
+	sessionID := uuid.NewString()
+
+	// userSessionTokenMocks sets up a valid user session access token whose session and user lookups
+	// return session and user.
+	userSessionTokenMocks := func(session *models.UserSession, user *models.User) func(*MockSigningKeyManager, *db.Client) {
+		return func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
+			token := jwt.New()
+			require.NoError(t, token.Set(jwt.SubjectKey, gid.ToGlobalID(types.UserModelType, userID)))
+
+			mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
+				Token: token,
+				PrivateClaims: map[string]string{
+					"type":         UserSessionAccessTokenType,
+					SessionIDClaim: gid.ToGlobalID(types.UserSessionModelType, sessionID),
+				},
+			}, nil)
+
+			mockSessions := db.NewMockUserSessions(t)
+			mockSessions.On("GetUserSessionByID", mock.Anything, sessionID).Return(session, nil)
+			mockDBClient.UserSessions = mockSessions
+
+			if user != nil {
+				mockUsers := db.NewMockUsers(t)
+				mockUsers.On("GetUserByID", mock.Anything, userID).Return(user, nil)
+				mockDBClient.Users = mockUsers
+			}
+		}
+	}
+
+	activeSession := &models.UserSession{
+		Metadata:   models.ResourceMetadata{ID: sessionID},
+		UserID:     userID,
+		Expiration: time.Now().Add(time.Hour),
+	}
+	activeUser := &models.User{Metadata: models.ResourceMetadata{ID: userID}, Active: true}
+
 	tests := []struct {
 		name               string
 		tokenString        string
@@ -232,6 +270,47 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 				}, nil)
 			},
 			expectErrorMessage: "unsupported token type received",
+		},
+		{
+			name:         "user session token with an active session",
+			tokenString:  "test-token",
+			setupMocks:   userSessionTokenMocks(activeSession, activeUser),
+			expectCaller: &UserCaller{},
+		},
+		{
+			name:               "user session token whose session was deleted",
+			tokenString:        "test-token",
+			setupMocks:         userSessionTokenMocks(nil, nil),
+			expectErrorMessage: "user session is no longer valid",
+		},
+		{
+			name:        "user session token whose session has expired",
+			tokenString: "test-token",
+			setupMocks: userSessionTokenMocks(&models.UserSession{
+				Metadata:   models.ResourceMetadata{ID: sessionID},
+				UserID:     userID,
+				Expiration: time.Now().Add(-time.Minute),
+			}, nil),
+			expectErrorMessage: "user session is no longer valid",
+		},
+		{
+			name:        "user session token whose session belongs to another user",
+			tokenString: "test-token",
+			setupMocks: userSessionTokenMocks(&models.UserSession{
+				Metadata:   models.ResourceMetadata{ID: sessionID},
+				UserID:     uuid.NewString(),
+				Expiration: time.Now().Add(time.Hour),
+			}, nil),
+			expectErrorMessage: "user session is no longer valid",
+		},
+		{
+			name:        "user session token for a disabled user",
+			tokenString: "test-token",
+			setupMocks: userSessionTokenMocks(activeSession, &models.User{
+				Metadata: models.ResourceMetadata{ID: userID},
+				Active:   false,
+			}),
+			expectErrorMessage: "User has been disabled",
 		},
 		{
 			name:        "service account token type",

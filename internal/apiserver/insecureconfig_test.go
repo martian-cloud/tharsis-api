@@ -10,6 +10,7 @@ import (
 func TestInsecureConfigWarnings(t *testing.T) {
 	secureConfig := func() *config.Config {
 		return &config.Config{
+			TharsisAPIURL:           "https://api.example.com",
 			SecretManagerPluginType: "awskms",
 			JWSProviderPluginType:   "awskms",
 			AdminUserEmail:          "admin@example.com",
@@ -74,6 +75,19 @@ func TestInsecureConfigWarnings(t *testing.T) {
 				}
 			},
 			expectedCount: 1,
+		},
+		{
+			name: "oauth provider with an api url that is not https",
+			modify: func(cfg *config.Config) {
+				cfg.TharsisAPIURL = "http://api.example.com"
+				cfg.OauthProviders = []config.IdpConfig{{IssuerURL: "https://idp.example.com"}}
+			},
+			expectedCount: 1,
+		},
+		{
+			name:          "api url that is not https without an oauth provider",
+			modify:        func(cfg *config.Config) { cfg.TharsisAPIURL = "http://api.example.com" },
+			expectedCount: 0,
 		},
 		{
 			name: "local job dispatcher",

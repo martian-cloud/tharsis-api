@@ -38,6 +38,9 @@ type OIDCConfiguration struct {
 	JwksURI       string `json:"jwks_uri"`
 	TokenEndpoint string `json:"token_endpoint"`
 	AuthEndpoint  string `json:"authorization_endpoint"`
+	// AuthorizationResponseIssParameterSupported is whether the provider returns the iss parameter in
+	// authorization responses (RFC 9207).
+	AuthorizationResponseIssParameterSupported bool `json:"authorization_response_iss_parameter_supported"`
 }
 
 // OpenIDConfigFetcher is an interface for fetching OIDC configuration

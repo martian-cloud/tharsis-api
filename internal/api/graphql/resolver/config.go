@@ -83,17 +83,10 @@ func (r *ConfigResolver) CLILoginOIDCClientID() *string {
 	return &r.cfg.CLILoginOIDCClientID
 }
 
-// CLILoginOIDCScopes resolver
-func (r *ConfigResolver) CLILoginOIDCScopes() *string {
-	if r.cfg.CLILoginOIDCScopes == "" {
-		return nil
-	}
-	return &r.cfg.CLILoginOIDCScopes
-}
-
-// OIDCInternalIdentityProviderClientID resolver
+// OIDCInternalIdentityProviderClientID resolver. The client ID is no longer configurable; it is reported here
+// so the field keeps working for existing clients.
 func (r *ConfigResolver) OIDCInternalIdentityProviderClientID() string {
-	return r.cfg.OIDCInternalIdentityProviderClientID
+	return auth.TharsisOAuthClientID
 }
 
 // MaxGraphQLComplexity resolver
@@ -408,6 +401,24 @@ func (r *IdpConfigResolver) Scope() string {
 	return r.cfg.Scope
 }
 
+// ExternalIDClaim resolver. An unset claim is reported as "sub", the claim used in its place.
+func (r *IdpConfigResolver) ExternalIDClaim() string {
+	if r.cfg.ExternalIDClaim == "" {
+		return "sub"
+	}
+	return r.cfg.ExternalIDClaim
+}
+
+// EmailLinking resolver
+func (r *IdpConfigResolver) EmailLinking() bool {
+	return r.cfg.EmailLinking
+}
+
+// AllowAdminBootstrap resolver
+func (r *IdpConfigResolver) AllowAdminBootstrap() bool {
+	return r.cfg.AllowAdminBootstrap
+}
+
 // Name resolver
 func (r *RunnerConfigResolver) Name() string {
 	return r.cfg.Name
@@ -472,27 +483,48 @@ func configQuery(ctx context.Context) (*ConfigResolver, error) {
 func filterSensitiveFields(cfg config.Config) *config.Config {
 	// Create a copy of the config
 	filtered := cfg
-	v := reflect.ValueOf(&filtered).Elem()
-	t := reflect.TypeOf(filtered)
+	redactSensitiveFields(reflect.ValueOf(&filtered).Elem())
+	return &filtered
+}
+
+// redactSensitiveFields redacts the struct's fields marked as sensitive, including the fields of nested structs
+// and of structs in slices (e.g. an oauth provider's client secret). The struct is a copy, but its slices still
+// share their elements with the original, so a slice is copied before any of its elements are redacted.
+func redactSensitiveFields(v reflect.Value) {
+	t := v.Type()
 
 	for i := 0; i < v.NumField(); i++ {
-		field := t.Field(i)
+		fieldValue := v.Field(i)
+		if !fieldValue.CanSet() {
+			continue
+		}
 
 		// Check if field is marked as sensitive
-		if field.Tag.Get("sensitive") == "true" {
-			fieldValue := v.Field(i)
-			if fieldValue.CanSet() {
-				switch fieldValue.Kind() {
-				case reflect.String:
-					fieldValue.SetString("***")
-				case reflect.Map:
-					fieldValue.Set(reflect.MakeMap(fieldValue.Type()))
-				case reflect.Slice:
-					fieldValue.Set(reflect.MakeSlice(fieldValue.Type(), 0, 0))
-				}
+		if t.Field(i).Tag.Get("sensitive") == "true" {
+			switch fieldValue.Kind() {
+			case reflect.String:
+				fieldValue.SetString("***")
+			case reflect.Map:
+				fieldValue.Set(reflect.MakeMap(fieldValue.Type()))
+			case reflect.Slice:
+				fieldValue.Set(reflect.MakeSlice(fieldValue.Type(), 0, 0))
 			}
+			continue
+		}
+
+		switch fieldValue.Kind() {
+		case reflect.Struct:
+			redactSensitiveFields(fieldValue)
+		case reflect.Slice:
+			if fieldValue.Type().Elem().Kind() != reflect.Struct || fieldValue.Len() == 0 {
+				continue
+			}
+			copied := reflect.MakeSlice(fieldValue.Type(), fieldValue.Len(), fieldValue.Len())
+			reflect.Copy(copied, fieldValue)
+			for j := 0; j < copied.Len(); j++ {
+				redactSensitiveFields(copied.Index(j))
+			}
+			fieldValue.Set(copied)
 		}
 	}
-
-	return &filtered
 }

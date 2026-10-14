@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<2233cdfb6004e75aef776bf8b3388c99>>
+ * @generated SignedSource<<a2ce8d6dd541bf9f2d659df112c9ff08>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -23,7 +23,6 @@ export type AdminAreaConfigurationSettingsQuery$data = {
     readonly asymmetricSigningKeyRotationPeriodDays: number;
     readonly asyncTaskTimeout: number;
     readonly cliLoginOIDCClientID: string | null | undefined;
-    readonly cliLoginOIDCScopes: string | null | undefined;
     readonly corsAllowedOrigins: string;
     readonly dbAutoMigrateEnabled: boolean;
     readonly dbHost: string;
@@ -68,7 +67,10 @@ export type AdminAreaConfigurationSettingsQuery$data = {
     };
     readonly moduleRegistryMaxUploadSize: number;
     readonly oauthProviders: ReadonlyArray<{
+      readonly allowAdminBootstrap: boolean;
       readonly clientId: string;
+      readonly emailLinking: boolean;
+      readonly externalIdClaim: string;
       readonly issuerUrl: string;
       readonly scope: string;
       readonly usernameClaim: string;
@@ -230,13 +232,6 @@ v2 = [
       {
         "alias": null,
         "args": null,
-        "kind": "ScalarField",
-        "name": "cliLoginOIDCScopes",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
         "concreteType": "IdpConfig",
         "kind": "LinkedField",
         "name": "oauthProviders",
@@ -262,6 +257,27 @@ v2 = [
             "args": null,
             "kind": "ScalarField",
             "name": "scope",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "externalIdClaim",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "emailLinking",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "allowAdminBootstrap",
             "storageKey": null
           }
         ],
@@ -708,16 +724,16 @@ return {
     "selections": (v2/*: any*/)
   },
   "params": {
-    "cacheID": "058b0a58483aa7591810c5cb907235b5",
+    "cacheID": "4f1eee24b46ac9dc234d741c3a9ae53e",
     "id": null,
     "metadata": {},
     "name": "AdminAreaConfigurationSettingsQuery",
     "operationKind": "query",
-    "text": "query AdminAreaConfigurationSettingsQuery {\n  config {\n    serverPort\n    tharsisApiUrl\n    tharsisUiUrl\n    tharsisSupportUrl\n    serviceDiscoveryHost\n    corsAllowedOrigins\n    tlsEnabled\n    httpRateLimit\n    jwtIssuerUrl\n    oidcInternalIdentityProviderClientID\n    cliLoginOIDCClientID\n    cliLoginOIDCScopes\n    oauthProviders {\n      issuerUrl\n      clientId\n      usernameClaim\n      scope\n    }\n    userSessionAccessTokenExpirationMinutes\n    userSessionRefreshTokenExpirationMinutes\n    userSessionMaxSessionsPerUser\n    maxGraphQlComplexity\n    moduleRegistryMaxUploadSize\n    asyncTaskTimeout\n    vcsRepositorySizeLimit\n    serviceAccountClientSecretMaxExpirationDays\n    terraformCliVersionConstraint\n    workspaceAssessmentIntervalHours\n    workspaceAssessmentRunLimit\n    asymmetricSigningKeyRotationPeriodDays\n    asymmetricSigningKeyDecommissionPeriodDays\n    aiEnabled\n    disableSensitiveVariableFeature\n    emailFooter\n    emailEphemeralRetentionDays\n    objectStorePluginType\n    rateLimitStorePluginType\n    jwsProviderPluginType\n    secretManagerPluginType\n    emailClientPluginType\n    adminLogTailStorePluginType\n    objectStorePluginData {\n      key\n      value\n    }\n    rateLimitStorePluginData {\n      key\n      value\n    }\n    jwsProviderPluginData {\n      key\n      value\n    }\n    secretManagerPluginData {\n      key\n      value\n    }\n    emailClientPluginData {\n      key\n      value\n    }\n    adminLogTailStorePluginData {\n      key\n      value\n    }\n    dbHost\n    dbName\n    dbSslMode\n    dbPort\n    dbMaxConnections\n    dbAutoMigrateEnabled\n    tlsCertFile\n    tlsKeyFile\n    adminUserEmail\n    otelTraceEnabled\n    otelTraceType\n    otelTraceCollectorHost\n    otelTraceCollectorPort\n    federatedRegistryTrustPolicies {\n      issuerUrl\n      subject\n      audience\n      groupGlobPatterns\n    }\n    internalRunners {\n      name\n      jobDispatcherType\n      jobDispatcherData {\n        key\n        value\n      }\n    }\n    mcpServerConfig {\n      enabledToolsets\n      enabledTools\n      readOnly\n    }\n    sensitiveFields\n  }\n}\n"
+    "text": "query AdminAreaConfigurationSettingsQuery {\n  config {\n    serverPort\n    tharsisApiUrl\n    tharsisUiUrl\n    tharsisSupportUrl\n    serviceDiscoveryHost\n    corsAllowedOrigins\n    tlsEnabled\n    httpRateLimit\n    jwtIssuerUrl\n    oidcInternalIdentityProviderClientID\n    cliLoginOIDCClientID\n    oauthProviders {\n      issuerUrl\n      clientId\n      usernameClaim\n      scope\n      externalIdClaim\n      emailLinking\n      allowAdminBootstrap\n    }\n    userSessionAccessTokenExpirationMinutes\n    userSessionRefreshTokenExpirationMinutes\n    userSessionMaxSessionsPerUser\n    maxGraphQlComplexity\n    moduleRegistryMaxUploadSize\n    asyncTaskTimeout\n    vcsRepositorySizeLimit\n    serviceAccountClientSecretMaxExpirationDays\n    terraformCliVersionConstraint\n    workspaceAssessmentIntervalHours\n    workspaceAssessmentRunLimit\n    asymmetricSigningKeyRotationPeriodDays\n    asymmetricSigningKeyDecommissionPeriodDays\n    aiEnabled\n    disableSensitiveVariableFeature\n    emailFooter\n    emailEphemeralRetentionDays\n    objectStorePluginType\n    rateLimitStorePluginType\n    jwsProviderPluginType\n    secretManagerPluginType\n    emailClientPluginType\n    adminLogTailStorePluginType\n    objectStorePluginData {\n      key\n      value\n    }\n    rateLimitStorePluginData {\n      key\n      value\n    }\n    jwsProviderPluginData {\n      key\n      value\n    }\n    secretManagerPluginData {\n      key\n      value\n    }\n    emailClientPluginData {\n      key\n      value\n    }\n    adminLogTailStorePluginData {\n      key\n      value\n    }\n    dbHost\n    dbName\n    dbSslMode\n    dbPort\n    dbMaxConnections\n    dbAutoMigrateEnabled\n    tlsCertFile\n    tlsKeyFile\n    adminUserEmail\n    otelTraceEnabled\n    otelTraceType\n    otelTraceCollectorHost\n    otelTraceCollectorPort\n    federatedRegistryTrustPolicies {\n      issuerUrl\n      subject\n      audience\n      groupGlobPatterns\n    }\n    internalRunners {\n      name\n      jobDispatcherType\n      jobDispatcherData {\n        key\n        value\n      }\n    }\n    mcpServerConfig {\n      enabledToolsets\n      enabledTools\n      readOnly\n    }\n    sensitiveFields\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "31599e93ad40d7685222c49812253492";
+(node as any).hash = "4f74ed07b14ceff99a96f5d789e91098";
 
 export default node;

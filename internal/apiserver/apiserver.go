@@ -123,6 +123,10 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		logger.Warnf("Insecure configuration: %s", warning)
 	}
 
+	for _, warning := range oauthProviderScopeWarnings(cfg) {
+		logger.Warnf("OAuth provider configuration: %s", warning)
+	}
+
 	// Requests whose destination comes from user input (registries, VCS providers, OIDC issuers) go
 	// through this policy, so they can't reach the API's own network or cloud metadata.
 	outboundPolicy := tharsishttp.NewOutboundPolicy(trustedOutboundURLs(cfg)...)
@@ -524,7 +528,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		Authenticator:   authenticator,
 		APIServerConfig: cfg,
 		ServiceCatalog:  serviceCatalog,
-		OAuthProviders:  cfg.OauthProviders,
 		RateLimitStore:  pluginCatalog.HTTPRateLimitStore,
 	})
 

@@ -140,7 +140,20 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 
 	switch tokenType {
 	case UserSessionAccessTokenType:
-		user, err := t.dbClient.Users.GetUserByID(ctx, gid.FromGlobalID(output.Token.Subject()))
+		userID := gid.FromGlobalID(output.Token.Subject())
+
+		// The session is loaded on every request so that logging out, session eviction and session expiry
+		// take effect immediately rather than when the access token expires.
+		sessionID := gid.FromGlobalID(output.PrivateClaims[SessionIDClaim])
+		session, err := t.dbClient.UserSessions.GetUserSessionByID(ctx, sessionID)
+		if err != nil {
+			return nil, err
+		}
+		if session == nil || session.IsExpired() || session.UserID != userID {
+			return nil, errors.New("user session is no longer valid", errors.WithErrorCode(errors.EUnauthorized))
+		}
+
+		user, err := t.dbClient.Users.GetUserByID(ctx, userID)
 		if err != nil {
 			return nil, err
 		}
@@ -155,13 +168,12 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 			)
 		}
 
-		sessionGID := output.PrivateClaims[SessionIDClaim]
 		return NewUserCaller(
 			user,
 			newNamespaceMembershipAuthorizer(t.dbClient, &user.Metadata.ID, nil, useCache),
 			t.dbClient,
 			t.maintenanceMonitor,
-			ptr.String(gid.FromGlobalID(sessionGID)),
+			ptr.String(session.Metadata.ID),
 		), nil
 	case ServiceAccountTokenType:
 		serviceAccountID := gid.FromGlobalID(output.PrivateClaims["service_account_id"])

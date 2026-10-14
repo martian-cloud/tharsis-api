@@ -59,7 +59,6 @@ services:
       - THARSIS_OAUTH_PROVIDERS_0_SCOPE=openid profile email
       # Let the local Keycloak create the admin below on its first sign-in (opt-in per IDP).
       - THARSIS_OAUTH_PROVIDERS_0_ALLOW_ADMIN_BOOTSTRAP=true
-      - THARSIS_CLI_LOGIN_OIDC_SCOPES=openid tharsis
       - THARSIS_ADMIN_USER_EMAIL=martian@tharsis.local
       - THARSIS_DB_USERNAME=postgres
       - THARSIS_DB_NAME=tharsis

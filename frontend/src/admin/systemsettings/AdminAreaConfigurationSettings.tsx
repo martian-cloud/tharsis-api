@@ -43,12 +43,14 @@ const query = graphql`
             jwtIssuerUrl
             oidcInternalIdentityProviderClientID
             cliLoginOIDCClientID
-            cliLoginOIDCScopes
             oauthProviders {
                 issuerUrl
                 clientId
                 usernameClaim
                 scope
+                externalIdClaim
+                emailLinking
+                allowAdminBootstrap
             }
             userSessionAccessTokenExpirationMinutes
             userSessionRefreshTokenExpirationMinutes

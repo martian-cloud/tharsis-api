@@ -38,21 +38,22 @@ const (
 	defaultWorkspaceAssessmentIntervalHours            = 24
 	defaultEmailEphemeralRetentionDays                 = 7
 	defaultWorkspaceAssessmentRunLimit                 = 20
-	defaultUserSessionAccessTokenExpirationMinutes     = 5
+	defaultUserSessionAccessTokenExpirationMinutes     = 60
 	defaultUserSessionRefreshTokenExpirationMinutes    = 60 * 12 // 12 hours
 	defaultUserSessionMaxSessionsPerUser               = 20
 	defaultAsymmetricSigningKeyDecommissionPeriodDays  = 7
-	defaultCLILoginOIDCScopes                          = "openid tharsis"
 	defaultJWSProviderPluginType                       = "memory"
-	defaultOIDCInternalIdentityProviderClientID        = "tharsis"
 	defaultServiceAccountClientSecretMaxExpirationDays = 90
 	defaultMaxLogStreamSizeBytes                       = 1024 * 1024 * 10 // 10 MiB
 )
 
 // IdpConfig contains the config fields for an Identity Provider
 type IdpConfig struct {
-	IssuerURL     string `yaml:"issuer_url"`
-	ClientID      string `yaml:"client_id"`
+	IssuerURL string `yaml:"issuer_url"`
+	ClientID  string `yaml:"client_id"`
+	// ClientSecret is optional. It is only used when the API redeems an authorization code for CLI login,
+	// and is required if the IDP registers the API's /oauth/callback redirect URI as a confidential client.
+	ClientSecret  string `yaml:"client_secret" sensitive:"true"`
 	UsernameClaim string `yaml:"username_claim"`
 	Scope         string `yaml:"scope"`
 	// ExternalIDClaim is the token claim that identifies a user, and must match the externalId the IDP sends
@@ -153,8 +154,9 @@ type Config struct {
 	DBPassword string `yaml:"db_password" env:"DB_PASSWORD,secret" sensitive:"true"`
 
 	// CLI Login
+	// CLILoginOIDCClientID selects the identity provider the API signs CLI users in with; it defaults to the first
+	// oauth provider. The CLI itself always signs in against the API, which proxies the login to that provider.
 	CLILoginOIDCClientID string `yaml:"cli_login_oidc_client_id" env:"CLI_LOGIN_OIDC_CLIENT_ID"`
-	CLILoginOIDCScopes   string `yaml:"cli_login_oidc_scopes" env:"CLI_LOGIN_OIDC_SCOPES"`
 
 	// ServiceDiscoveryHost is optional and will default to the API URL host if it's not defined
 	ServiceDiscoveryHost string `yaml:"service_discovery_host" env:"SERVICE_DISCOVERY_HOST"`
@@ -239,9 +241,6 @@ type Config struct {
 	// AsymmetricSigningKeyDecommissionPeriodDays is the number of days after which an asymmetric signing key should be decommissioned
 	AsymmetricSigningKeyDecommissionPeriodDays int `yaml:"asymmetric_signing_key_decommission_period_days" env:"ASYMMETRIC_SIGNING_KEY_DECOMMISSION_PERIOD_DAYS"`
 
-	// OIDCInternalIdentityProviderClientID is the client ID to use for OIDC authentication flows with the internal identity provider
-	OIDCInternalIdentityProviderClientID string `yaml:"oidc_internal_identity_provider_client_id" env:"OIDC_INTERNAL_IDENTITY_PROVIDER_CLIENT_ID"`
-
 	// ServiceAccountClientSecretMaxExpirationDays is the maximum number of days a service account client secret can be valid
 	ServiceAccountClientSecretMaxExpirationDays int `yaml:"service_account_client_secret_max_expiration_days" env:"SERVICE_ACCOUNT_CLIENT_SECRET_MAX_EXPIRATION_DAYS"`
 
@@ -288,9 +287,7 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		UserSessionRefreshTokenExpirationMinutes:    defaultUserSessionRefreshTokenExpirationMinutes,
 		UserSessionMaxSessionsPerUser:               defaultUserSessionMaxSessionsPerUser,
 		AsymmetricSigningKeyDecommissionPeriodDays:  defaultAsymmetricSigningKeyDecommissionPeriodDays,
-		CLILoginOIDCScopes:                          defaultCLILoginOIDCScopes,
 		JWSProviderPluginType:                       defaultJWSProviderPluginType,
-		OIDCInternalIdentityProviderClientID:        defaultOIDCInternalIdentityProviderClientID,
 		ServiceAccountClientSecretMaxExpirationDays: defaultServiceAccountClientSecretMaxExpirationDays,
 		AdminLogTailStorePluginType:                 defaultAdminLogTailStorePluginType,
 	}
@@ -466,6 +463,26 @@ func loadPluginData(envPrefix string) map[string]string {
 	return pluginData
 }
 
+// CLILoginIDP returns the identity provider that CLI logins are proxied to, or nil if no oauth providers
+// are configured. It is the provider whose client ID is CLILoginOIDCClientID, or the first provider.
+func (c *Config) CLILoginIDP() (*IdpConfig, error) {
+	if len(c.OauthProviders) == 0 {
+		return nil, nil
+	}
+
+	if c.CLILoginOIDCClientID == "" {
+		return &c.OauthProviders[0], nil
+	}
+
+	for i := range c.OauthProviders {
+		if c.OauthProviders[i].ClientID == c.CLILoginOIDCClientID {
+			return &c.OauthProviders[i], nil
+		}
+	}
+
+	return nil, errors.New("no oauth provider has the CLI login client ID %q", c.CLILoginOIDCClientID)
+}
+
 func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 	var idpConfigs []IdpConfig
 	for _, e := range os.Environ() {
@@ -479,6 +496,7 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 			issuerURL := val
 
 			clientIDKey := envOidcProviderConfigPrefix + index + "_CLIENT_ID"
+			clientSecretKey := envOidcProviderConfigPrefix + index + "_CLIENT_SECRET"
 			usernameClaimKey := envOidcProviderConfigPrefix + index + "_USERNAME_CLAIM"
 			scopeKey := envOidcProviderConfigPrefix + index + "_SCOPE"
 			externalIDClaimKey := envOidcProviderConfigPrefix + index + "_EXTERNAL_ID_CLAIM"
@@ -486,6 +504,7 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 			allowAdminBootstrapKey := envOidcProviderConfigPrefix + index + "_ALLOW_ADMIN_BOOTSTRAP"
 
 			clientID := os.Getenv(clientIDKey)
+			clientSecret := os.Getenv(clientSecretKey)
 			usernameClaim := os.Getenv(usernameClaimKey)
 			scope := os.Getenv(scopeKey)
 			externalIDClaim := os.Getenv(externalIDClaimKey)
@@ -519,6 +538,7 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 			idpConfigs = append(idpConfigs, IdpConfig{
 				IssuerURL:           issuerURL,
 				ClientID:            clientID,
+				ClientSecret:        clientSecret,
 				UsernameClaim:       usernameClaim,
 				Scope:               scope,
 				ExternalIDClaim:     externalIDClaim,

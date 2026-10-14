@@ -304,11 +304,6 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 		return nil, terrors.New("token from issuer %s missing required aud %s", issuer, idp.ClientID, terrors.WithErrorCode(terrors.EUnauthorized))
 	}
 
-	username, err := u.GetUsernameClaim(decodedToken)
-	if err != nil {
-		return nil, err
-	}
-
 	externalID, err := getExternalIDClaim(decodedToken, idp.ExternalIDClaim)
 	if err != nil {
 		return nil, err
@@ -328,6 +323,13 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 	}
 
 	if userModel == nil {
+		// The username and email claims are only needed to create the user; an existing user is found by their
+		// external ID, so a sign-in isn't refused over claims that are no longer used.
+		username, err := u.GetUsernameClaim(decodedToken)
+		if err != nil {
+			return nil, err
+		}
+
 		rawEmail, ok := decodedToken.Get("email")
 		if !ok {
 			return nil, terrors.New("email claim missing from token", terrors.WithErrorCode(terrors.EUnauthorized))
