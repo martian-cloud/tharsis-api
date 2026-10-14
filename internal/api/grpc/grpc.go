@@ -29,7 +29,6 @@ type ServerOptions struct {
 	Authenticator   auth.Authenticator
 	APIServerConfig *config.Config
 	ServiceCatalog  *services.Catalog
-	OAuthProviders  []config.IdpConfig
 	RateLimitStore  ratelimitstore.Store
 }
 
@@ -85,7 +84,7 @@ func NewServer(ctx context.Context, options *ServerOptions) *Server {
 
 	// Create server instances.
 	var (
-		authSettingsServer            = servers.NewAuthSettingsServer(options.OAuthProviders)
+		authSettingsServer            = servers.NewAuthSettingsServer(options.APIServerConfig)
 		callerIdentityServer          = servers.NewCallerIdentityServer(options.ServiceCatalog)
 		configurationVersionServer    = servers.NewConfigurationVersionServer(options.ServiceCatalog)
 		federatedRegistryServer       = servers.NewFederatedRegistryServer(options.ServiceCatalog)

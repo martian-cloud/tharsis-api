@@ -35,6 +35,10 @@ var ErrSessionAlreadyExists = errors.New("an active session already exists for t
 // ErrInvalidLoginCredentials is returned when the provided login credentials are invalid
 var ErrInvalidLoginCredentials = errors.New("invalid username or password", errors.WithErrorCode(errors.EUnauthorized))
 
+// TharsisOAuthClientID is the client ID of the API's built-in OAuth authorization server, used by the Tharsis
+// CLI and Terraform to log in. It is fixed because Tharsis CLI releases hard code it.
+const TharsisOAuthClientID = "tharsis"
+
 const (
 	// SessionIDClaim is the claim name for the session id in the jwt token
 	SessionIDClaim = "sid"
@@ -157,12 +161,6 @@ func NewUserSessionManager(
 		return nil, fmt.Errorf("failed to parse tharsis ui url: %v", err)
 	}
 
-	// Check if external url uses https to determine if secure cookies should be enabled
-	enableSecureCookies := false
-	if parsedAPIURL, err := url.Parse(tharsisAPIURL); err == nil && parsedAPIURL.Scheme == "https" {
-		enableSecureCookies = true
-	}
-
 	return &userSessionManager{
 		dbClient:                      dbClient,
 		signingKeyManager:             signingKeyManager,
@@ -171,7 +169,7 @@ func NewUserSessionManager(
 		accessTokenExpirationMinutes:  time.Duration(accessTokenExpirationMinutes) * time.Minute,
 		refreshTokenExpirationMinutes: time.Duration(refreshTokenExpirationMinutes) * time.Minute,
 		maxSessionsPerUser:            maxSessionsPerUser,
-		enableSecureCookies:           enableSecureCookies,
+		enableSecureCookies:           SecureCookiesEnabled(tharsisAPIURL),
 		tharsisUIDomain:               parsedUIURL.Hostname(),
 		userCredentialLoginEnabled:    userCredentialLoginEnabled,
 	}, nil
@@ -264,6 +262,13 @@ func (u *userSessionManager) ExchangeOAuthCodeForSessionToken(ctx context.Contex
 	}
 
 	return nil, errors.New("no user session found for auth code", errors.WithErrorCode(errors.EUnauthorized))
+}
+
+// SecureCookiesEnabled returns whether the API's cookies are marked Secure, which is when the API is served
+// over https. Cookies that must only be set by the API's exact host also use the __Host- prefix then.
+func SecureCookiesEnabled(apiURL string) bool {
+	parsedAPIURL, err := url.Parse(apiURL)
+	return err == nil && parsedAPIURL.Scheme == "https"
 }
 
 // ValidateOAuthRedirectURI checks that an OAuth redirect URI points at the local machine, which is

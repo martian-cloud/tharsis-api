@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"fmt"
+	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 )
@@ -33,6 +34,12 @@ func insecureConfigWarnings(cfg *config.Config) []string {
 		warnings = append(warnings, fmt.Sprintf("THARSIS_ADMIN_USER_PASSWORD is set: the password for admin user %q "+
 			"will be reset to this value on every restart, reverting any change made through the UI. Unset it "+
 			"once the admin user has been created.", cfg.AdminUserEmail))
+	}
+
+	if len(cfg.OauthProviders) > 0 && !strings.HasPrefix(cfg.TharsisAPIURL, "https://") {
+		warnings = append(warnings, "THARSIS_API_URL does not use https: session and CLI login cookies are not "+
+			"marked Secure or host-only, so a network attacker or another subdomain can plant a login cookie and "+
+			"sign a browser in to the attacker's account. Serve the API over https for production deployments.")
 	}
 
 	for _, idp := range cfg.OauthProviders {

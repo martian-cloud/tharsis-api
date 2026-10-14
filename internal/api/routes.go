@@ -85,10 +85,7 @@ func BuildRouter(
 		return nil, fmt.Errorf("failed to initialize graphql handler %v", err)
 	}
 
-	tfeHandler, err := tfe.BuildTFEServiceDiscoveryHandler(ctx, logger, tfeBasePath, openIDConfigFetcher, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build TFE discovery document handler %v", err)
-	}
+	tfeHandler := tfe.BuildTFEServiceDiscoveryHandler(ctx, logger, tfeBasePath, cfg)
 
 	discoveryController, err := controllers.NewServiceDiscoveryController(
 		logger,
@@ -109,7 +106,7 @@ func BuildRouter(
 		}),
 		middleware.NewRequestIDMiddleware(),
 		middleware.NewUserAgentMiddleware(),
-		middleware.NewAuthenticationMiddleware(authenticator, respWriter, userSessionManager),
+		middleware.NewAuthenticationMiddleware(logger, authenticator, respWriter, userSessionManager),
 		middleware.NewSubjectMiddleware(logger, respWriter),
 		middleware.PrometheusMiddleware,
 		middleware.HTTPRateLimiterMiddleware(
@@ -146,13 +143,23 @@ func BuildRouter(
 		respWriter,
 	))
 
+	// CLI logins are proxied to the external identity provider, if one is configured.
+	cliLoginIDP, err := cfg.CLILoginIDP()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get identity provider for CLI login: %v", err)
+	}
+
 	oidcController, err := controllers.NewOIDCController(
+		ctx,
+		logger,
 		respWriter,
 		signingKeyManager,
 		userSessionManager,
+		openIDConfigFetcher,
+		cliLoginIDP,
 		cfg.TharsisAPIURL,
 		cfg.TharsisUIURL,
-		cfg.OIDCInternalIdentityProviderClientID,
+		auth.TharsisOAuthClientID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OIDC controller: %v", err)
@@ -162,9 +169,7 @@ func BuildRouter(
 
 	AddRoutes(router, discoveryController)
 
-	if tfeHandler != nil {
-		router.Method("GET", "/.well-known/terraform.json", tfeHandler)
-	}
+	router.Method("GET", "/.well-known/terraform.json", tfeHandler)
 
 	// OAuth Protected Resource Metadata (RFC 9728) for MCP
 	router.Get("/.well-known/oauth-protected-resource", func(w http.ResponseWriter, r *http.Request) {

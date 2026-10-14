@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -95,6 +96,28 @@ func TestConfigQuery(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFilterSensitiveFields_NestedFields(t *testing.T) {
+	input := config.Config{
+		OauthProviders: []config.IdpConfig{
+			{IssuerURL: "https://idp-1.example.com", ClientID: "client-1", ClientSecret: "secret-1"},
+			{IssuerURL: "https://idp-2.example.com", ClientID: "client-2"},
+		},
+	}
+
+	result := filterSensitiveFields(input)
+
+	require.Len(t, result.OauthProviders, 2)
+	assert.Equal(t, "***", result.OauthProviders[0].ClientSecret)
+	assert.Equal(t, "***", result.OauthProviders[1].ClientSecret)
+	// Fields that aren't sensitive are kept.
+	assert.Equal(t, "https://idp-1.example.com", result.OauthProviders[0].IssuerURL)
+	assert.Equal(t, "client-2", result.OauthProviders[1].ClientID)
+
+	// The original config shares nothing that was redacted.
+	assert.Equal(t, "secret-1", input.OauthProviders[0].ClientSecret)
+	assert.Equal(t, "", input.OauthProviders[1].ClientSecret)
 }
 
 func TestFilterSensitiveFields(t *testing.T) {

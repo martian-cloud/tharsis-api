@@ -337,6 +337,7 @@ func TestUserAuth_Authenticate_ExternalIDClaim(t *testing.T) {
 		name            string
 		externalIDClaim string
 		omitOID         bool
+		omitUsername    bool
 		email           any // Defaults to a valid email.
 		userByOID       *models.User
 		userBySub       *models.User
@@ -385,6 +386,18 @@ func TestUserAuth_Authenticate_ExternalIDClaim(t *testing.T) {
 			email:           []string{"jdoe@example.com"},
 			expectErrorCode: errors.EUnauthorized,
 		},
+		{
+			name:            "an existing user signs in without the username claim",
+			externalIDClaim: "oid",
+			omitUsername:    true,
+			userByOID:       existingUser,
+		},
+		{
+			name:            "a new user without the username claim is rejected",
+			externalIDClaim: "oid",
+			omitUsername:    true,
+			expectErrorCode: errors.EUnauthorized,
+		},
 	}
 
 	for _, test := range testCases {
@@ -400,7 +413,9 @@ func TestUserAuth_Authenticate_ExternalIDClaim(t *testing.T) {
 			require.NoError(t, token.Set(jwt.IssuerKey, issuer))
 			require.NoError(t, token.Set(jwt.AudienceKey, []string{clientID}))
 			require.NoError(t, token.Set(jwt.SubjectKey, "pairwise-sub"))
-			require.NoError(t, token.Set("preferred_username", "jdoe@example.com"))
+			if !test.omitUsername {
+				require.NoError(t, token.Set("preferred_username", "jdoe@example.com"))
+			}
 			require.NoError(t, token.Set("email", email))
 			if !test.omitOID {
 				require.NoError(t, token.Set("oid", "object-id"))
@@ -412,7 +427,7 @@ func TestUserAuth_Authenticate_ExternalIDClaim(t *testing.T) {
 			mockUsers := db.NewMockUsers(t)
 			mockTransactions := db.NewMockTransactions(t)
 
-			if test.expectErrorCode == "" || test.email != nil {
+			if test.expectErrorCode == "" || test.email != nil || test.omitUsername {
 				if test.externalIDClaim == "oid" {
 					mockUsers.On("GetUserByExternalID", mock.Anything, issuer, "object-id").Return(test.userByOID, nil)
 				}

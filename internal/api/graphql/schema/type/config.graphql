@@ -6,7 +6,6 @@ type Config {
   tlsEnabled: Boolean!
   jwtIssuerUrl: String!
   cliLoginOIDCClientID: String
-  cliLoginOIDCScopes: String
   oidcInternalIdentityProviderClientID: String!
   maxGraphQlComplexity: Int!
   moduleRegistryMaxUploadSize: Int!
@@ -73,6 +72,9 @@ type IdpConfig {
   clientId: String!
   usernameClaim: String!
   scope: String!
+  externalIdClaim: String!
+  emailLinking: Boolean!
+  allowAdminBootstrap: Boolean!
 }
 
 type RunnerConfig {

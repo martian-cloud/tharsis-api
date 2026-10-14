@@ -922,6 +922,13 @@ func TestUserSessionManager_ExchangeOAuthCodeForSessionToken(t *testing.T) {
 		})
 	}
 }
+func TestSecureCookiesEnabled(t *testing.T) {
+	assert.True(t, SecureCookiesEnabled("https://api.example.com"))
+	assert.False(t, SecureCookiesEnabled("http://api.example.com"))
+	assert.False(t, SecureCookiesEnabled("http://localhost:8000"))
+	assert.False(t, SecureCookiesEnabled("://invalid"))
+}
+
 func TestValidateOAuthRedirectURI(t *testing.T) {
 	tests := []struct {
 		uri   string
