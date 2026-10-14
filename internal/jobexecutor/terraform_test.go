@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 )
 
 func TestRemoveStateFiles(t *testing.T) {
@@ -83,4 +84,48 @@ func TestRemoveStateFiles_FailsWhenCannotDelete(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to remove state file")
+}
+
+func TestSetBuiltInEnvVars(t *testing.T) {
+	tests := []struct {
+		name     string
+		memLimit string
+		want     map[string]string
+	}{
+		{
+			name:     "forwards GOMEMLIMIT when set on the executor",
+			memLimit: "900B",
+			want: map[string]string{
+				"THARSIS_GROUP_PATH":       "group",
+				"THARSIS_ENDPOINT":         "https://api.example.com",
+				"GOMEMLIMIT":               "900B",
+				"TF_TOKEN_api_example_com": "token",
+			},
+		},
+		{
+			name: "omits GOMEMLIMIT when the executor has none",
+			want: map[string]string{
+				"THARSIS_GROUP_PATH":       "group",
+				"THARSIS_ENDPOINT":         "https://api.example.com",
+				"TF_TOKEN_api_example_com": "token",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("GOMEMLIMIT", test.memLimit)
+
+			workspace := &terraformWorkspace{
+				fullEnv:   map[string]string{},
+				jobCfg:    &JobConfig{APIEndpoint: "https://api.example.com", JobToken: "token"},
+				workspace: &pb.Workspace{FullPath: "group/ws"},
+			}
+
+			err := workspace.setBuiltInEnvVars(t.Context(), map[string]string{})
+			require.NoError(t, err)
+
+			assert.Equal(t, test.want, workspace.fullEnv)
+		})
+	}
 }

@@ -604,6 +604,12 @@ func (t *terraformWorkspace) setBuiltInEnvVars(_ context.Context, hostCredential
 	// Set THARSIS_ENDPOINT which is used by the Terraform Tharsis Provider
 	t.fullEnv["THARSIS_ENDPOINT"] = t.jobCfg.APIEndpoint
 
+	// tfexec replaces the child's environment with fullEnv, so forward the executor's GOMEMLIMIT
+	// to the Terraform/Tofu process that actually drives memory usage.
+	if v := os.Getenv("GOMEMLIMIT"); v != "" {
+		t.fullEnv["GOMEMLIMIT"] = v
+	}
+
 	err := t.setAPIHostTfTokenEnvVar(hostCredentialFileMapping)
 	if err != nil {
 		return err
