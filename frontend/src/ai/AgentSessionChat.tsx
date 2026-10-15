@@ -125,8 +125,11 @@ function AgentSessionChat({ showToolCalls = true }: { showToolCalls?: boolean })
 
             <ThreadPrimitive.Viewport autoScroll style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <ThreadPrimitive.Empty>
-                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, opacity: 0.6 }}>
+                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, px: 3, textAlign: 'center', opacity: 0.6 }}>
                         <Typography variant="h6" color="text.secondary">How can I help you?</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            I'm an AI assistant. I can help troubleshoot failed runs, explain plan changes, answer questions about Tharsis, and more.
+                        </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, px: 2, pb: 2 }}>
                         <ThreadPrimitive.Suggestions>
@@ -140,6 +143,7 @@ function AgentSessionChat({ showToolCalls = true }: { showToolCalls?: boolean })
             <Box sx={{
                 p: 1,
                 m: 1.5,
+                mb: 1,
                 border: 1,
                 borderColor: 'divider',
                 borderRadius: 3,
@@ -173,6 +177,9 @@ function AgentSessionChat({ showToolCalls = true }: { showToolCalls?: boolean })
                     </AuiIf>
                 </ComposerPrimitive.Root>
             </Box>
+            <Typography variant="caption" color="text.secondary" align="center" sx={{ px: 1.5, mb: 1 }}>
+                Copilot is AI and can make mistakes. Please verify responses.
+            </Typography>
         </ThreadPrimitive.Root>
     );
 }
