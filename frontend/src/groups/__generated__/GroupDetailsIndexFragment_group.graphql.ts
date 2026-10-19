@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e94fd7dcd756e9b63707e8d39440e27a>>
+ * @generated SignedSource<<405d5947993a75944b05505ff572ce90>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -24,7 +24,7 @@ export type GroupDetailsIndexFragment_group$data = {
   readonly workspaces: {
     readonly totalCount: number;
   };
-  readonly " $fragmentSpreads": FragmentRefs<"GroupNotificationPreferenceFragment_group" | "MigrateGroupDialogFragment_group" | "WorkspaceListFragment_group">;
+  readonly " $fragmentSpreads": FragmentRefs<"GroupNotificationPreferenceFragment_group" | "MigrateGroupDialogFragment_group">;
   readonly " $fragmentType": "GroupDetailsIndexFragment_group";
 };
 export type GroupDetailsIndexFragment_group$key = {
@@ -104,16 +104,6 @@ return {
     {
       "alias": null,
       "args": (v0/*: any*/),
-      "concreteType": "WorkspaceConnection",
-      "kind": "LinkedField",
-      "name": "workspaces",
-      "plural": false,
-      "selections": (v1/*: any*/),
-      "storageKey": "workspaces(first:0)"
-    },
-    {
-      "alias": null,
-      "args": (v0/*: any*/),
       "concreteType": "GroupConnection",
       "kind": "LinkedField",
       "name": "descendentGroups",
@@ -122,9 +112,14 @@ return {
       "storageKey": "descendentGroups(first:0)"
     },
     {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "WorkspaceListFragment_group"
+      "alias": null,
+      "args": (v0/*: any*/),
+      "concreteType": "WorkspaceConnection",
+      "kind": "LinkedField",
+      "name": "workspaces",
+      "plural": false,
+      "selections": (v1/*: any*/),
+      "storageKey": "workspaces(first:0)"
     },
     {
       "args": null,
@@ -142,6 +137,6 @@ return {
 };
 })();
 
-(node as any).hash = "4c226d46b407fe09877eb79b447c7521";
+(node as any).hash = "d294d2d63133a1059bb34ed8d9bd6503";
 
 export default node;

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -39,6 +40,16 @@ type Groups interface {
 	GetChildDepth(ctx context.Context, group *models.Group) (int, error)
 	// MigrateGroup re-parents an existing group
 	MigrateGroup(ctx context.Context, group, newParentGroup *models.Group) (*models.Group, error)
+	// GetHasChildrenByGroupIDs reports, for each of the given groups, whether it contains any subgroups or workspaces.
+	// Groups that don't exist are left out of the result.
+	GetHasChildrenByGroupIDs(ctx context.Context, idList []string) ([]GroupHasChildren, error)
+}
+
+// GroupHasChildren reports whether a group contains any subgroups or workspaces.
+type GroupHasChildren struct {
+	GroupID     string
+	FullPath    string
+	HasChildren bool
 }
 
 // GroupFilter contains the supported fields for filtering Group resources
@@ -258,7 +269,7 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 	// Scan rows
 	results := []models.Group{}
 	for rows.Next() {
-		item, err := scanGroup(rows, true)
+		item, err := scanGroup(rows)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
@@ -292,25 +303,30 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 		runnerTags = decoded
 	}
 
-	// Use transaction to update groups and namespaces tables
-	tx, err := g.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
-	}
+	fullPath := group.Name
 
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			g.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateGroup: %v", txErr)
+	// Lookup namespace for parent group if this is a nested group
+	if group.ParentID != "" {
+		parentNamespace, err := getNamespaceByGroupID(ctx, g.dbClient.getConnection(ctx), group.ParentID)
+		if err != nil {
+			if pgErr := asPgError(err); pgErr != nil && isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+			return nil, errors.Wrap(err, "failed to get namespace by group ID", errors.WithSpan(span))
 		}
-	}()
+
+		if parentNamespace == nil {
+			return nil, errors.New("invalid group parent: the specified parent group does not exist", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
+		}
+
+		fullPath = fmt.Sprintf("%s/%s", parentNamespace.path, fullPath)
+	}
 
 	timestamp := currentTime()
 
-	sql, args, err := toSQLWithTag("group.CreateGroup", dialect.Insert("groups").
-		Prepared(true).
-		Rows(goqu.Record{
+	// Creates the group and its namespace in one statement
+	sql, args, err := toSQLWithTag("group.CreateGroup", insertWithNamespace("groups", "group_id", fullPath,
+		dialect.Insert("groups").Rows(goqu.Record{
 			"id":                      newResourceID(),
 			"version":                 initialResourceVersion,
 			"created_at":              timestamp,
@@ -323,15 +339,20 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 			"drift_detection_enabled": group.EnableDriftDetection,
 			"provider_mirror_enabled": group.EnableProviderMirror,
 			"output_visibility":       group.OutputVisibility,
-		}).
-		Returning(groupFieldList...))
+		}),
+		g.getSelectFields(),
+	))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	createdGroup, err := scanGroup(tx.QueryRow(ctx, sql, args...), false)
+	createdGroup, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
+			if isUniqueViolation(pgErr) {
+				return nil, errors.New("namespace %s already exists", fullPath, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
+			}
+
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
 				return nil, errors.New("invalid group parent: the specified parent group does not exist", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
@@ -343,30 +364,6 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 
 		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
-
-	fullPath := group.Name
-
-	// Lookup namespace for parent group if this is a nested group
-	if group.ParentID != "" {
-		parentNamespace, err := getNamespaceByGroupID(ctx, tx, group.ParentID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get namespace by group ID", errors.WithSpan(span))
-		}
-
-		fullPath = fmt.Sprintf("%s/%s", parentNamespace.path, fullPath)
-	}
-
-	// Create new namespace resource for group
-	if _, err := createNamespace(ctx, tx, &namespaceRow{path: fullPath, groupID: createdGroup.Metadata.ID}); err != nil {
-		return nil, errors.Wrap(err, "failed to create namespace for group", errors.WithSpan(span))
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
-	}
-
-	createdGroup.FullPath = fullPath
-	createdGroup.Metadata.TRN = trn.TypeGroup.Build(fullPath)
 
 	return createdGroup, nil
 }
@@ -409,7 +406,7 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	updatedGroup, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
+	updatedGroup, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -559,7 +556,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 		return nil, errors.Wrap(err, "failed to generate SQL to update the migrating group's parent ID", errors.WithSpan(span))
 	}
 
-	migratedGroup, err := scanGroup(tx.QueryRow(ctx, sql, args...), true)
+	migratedGroup, err := scanGroup(tx.QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -877,7 +874,7 @@ func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	if _, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true); err != nil {
+	if _, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
 				return errors.New("all nested groups and workspaces must be deleted before this group can be deleted", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
@@ -909,7 +906,7 @@ func (g *groups) getGroup(ctx context.Context, exp goqu.Ex) (*models.Group, erro
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	group, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
+	group, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -927,59 +924,134 @@ func (g *groups) getGroup(ctx context.Context, exp goqu.Ex) (*models.Group, erro
 	return group, nil
 }
 
-func (g *groups) getSelectFields() []interface{} {
-	selectFields := []interface{}{}
-	for _, field := range groupFieldList {
-		selectFields = append(selectFields, fmt.Sprintf("groups.%s", field))
-	}
-	selectFields = append(selectFields, "namespaces.path")
+func (g *groups) GetHasChildrenByGroupIDs(ctx context.Context, idList []string) ([]GroupHasChildren, error) {
+	ctx, span := tracer.Start(ctx, "db.GetHasChildrenByGroupIDs")
+	defer span.End()
 
-	return selectFields
+	if len(idList) == 0 {
+		return []GroupHasChildren{}, nil
+	}
+
+	ids, err := textArrayLiteral(idList)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to encode group IDs", errors.WithSpan(span))
+	}
+
+	// Each EXISTS stops at the first match through the parent_id and group_id indexes. The ids go in as a single
+	// array parameter so every batch size shares one prepared statement.
+	sql, args, err := toSQLWithTag("group.GetHasChildrenByGroupIDs", dialect.From(goqu.T("namespaces")).
+		Prepared(true).
+		Select(
+			goqu.I("namespaces.group_id"),
+			goqu.I("namespaces.path"),
+			goqu.L("EXISTS (SELECT 1 FROM groups child WHERE child.parent_id = namespaces.group_id) "+
+				"OR EXISTS (SELECT 1 FROM workspaces child WHERE child.group_id = namespaces.group_id)"),
+		).
+		Where(goqu.L("namespaces.group_id = ANY(?::text::uuid[])", ids)))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	rows, err := g.dbClient.getConnection(ctx).Query(ctx, sql, args...)
+	if err != nil {
+		if pgErr := asPgError(err); pgErr != nil && isInvalidIDViolation(pgErr) {
+			return nil, ErrInvalidID
+		}
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+	defer rows.Close()
+
+	results := []GroupHasChildren{}
+	for rows.Next() {
+		var item GroupHasChildren
+		if err := rows.Scan(&item.GroupID, &item.FullPath, &item.HasChildren); err != nil {
+			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
+		}
+		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		if pgErr := asPgError(err); pgErr != nil && isInvalidIDViolation(pgErr) {
+			return nil, ErrInvalidID
+		}
+		return nil, errors.Wrap(err, "failed to read rows", errors.WithSpan(span))
+	}
+
+	return results, nil
 }
 
-func scanGroup(row scanner, withFullPath bool) (*models.Group, error) {
-	var parentID sql.NullString
-	var description sql.NullString
-	var err error
+func (g *groups) getSelectFields() []interface{} {
+	return append(qualifiedFields("groups", groupFieldList), "namespaces.path")
+}
 
-	group := &models.Group{}
+// groupRow holds the groupFieldList columns. Every target accepts NULL so the same row also scans
+// the groups side of a LEFT JOIN, where a non-group row has NULL in every column.
+type groupRow struct {
+	id                   sql.NullString
+	createdAt, updatedAt *time.Time
+	version              sql.NullInt64
+	name                 sql.NullString
+	description          sql.NullString
+	parentID             sql.NullString
+	createdBy            sql.NullString
+	runnerTags           []string
+	driftDetection       *bool
+	providerMirror       *bool
+	outputVisibility     *models.NamespaceOutputVisibilityLevel
+}
 
-	fields := []interface{}{
-		&group.Metadata.ID,
-		&group.Metadata.CreationTimestamp,
-		&group.Metadata.LastUpdatedTimestamp,
-		&group.Metadata.Version,
-		&group.Name,
-		&description,
-		&parentID,
-		&group.CreatedBy,
-		&group.RunnerTags,
-		&group.EnableDriftDetection,
-		&group.EnableProviderMirror,
-		&group.OutputVisibility,
+// targets returns the scan destinations in groupFieldList order.
+func (r *groupRow) targets() []interface{} {
+	return []interface{}{
+		&r.id,
+		&r.createdAt,
+		&r.updatedAt,
+		&r.version,
+		&r.name,
+		&r.description,
+		&r.parentID,
+		&r.createdBy,
+		&r.runnerTags,
+		&r.driftDetection,
+		&r.providerMirror,
+		&r.outputVisibility,
 	}
+}
 
-	if withFullPath {
-		fields = append(fields, &group.FullPath)
+// valid reports whether the row holds a group rather than the NULLs of an unmatched LEFT JOIN.
+func (r *groupRow) valid() bool {
+	return r.id.Valid
+}
+
+func (r *groupRow) toModel(fullPath string) *models.Group {
+	return &models.Group{
+		Metadata: models.ResourceMetadata{
+			ID:                   r.id.String,
+			CreationTimestamp:    r.createdAt,
+			LastUpdatedTimestamp: r.updatedAt,
+			Version:              int(r.version.Int64),
+			TRN:                  trn.TypeGroup.Build(fullPath),
+		},
+		Name:                 r.name.String,
+		Description:          r.description.String,
+		ParentID:             r.parentID.String,
+		FullPath:             fullPath,
+		CreatedBy:            r.createdBy.String,
+		RunnerTags:           r.runnerTags,
+		EnableDriftDetection: r.driftDetection,
+		EnableProviderMirror: r.providerMirror,
+		OutputVisibility:     r.outputVisibility,
 	}
+}
 
-	err = row.Scan(fields...)
+// scanGroup scans a row selected with getSelectFields.
+func scanGroup(row scanner) (*models.Group, error) {
+	r := &groupRow{}
+	var fullPath string
 
-	if err != nil {
+	if err := row.Scan(append(r.targets(), &fullPath)...); err != nil {
 		return nil, err
 	}
 
-	if parentID.Valid {
-		group.ParentID = parentID.String
-	}
-
-	if description.Valid {
-		group.Description = description.String
-	}
-
-	if withFullPath {
-		group.Metadata.TRN = trn.TypeGroup.Build(group.FullPath)
-	}
-
-	return group, nil
+	return r.toModel(fullPath), nil
 }

@@ -3,11 +3,12 @@ import MembersIcon from '@mui/icons-material/PeopleOutline';
 import SettingsIcon from '@mui/icons-material/SettingsOutlined';
 import ActivityIcon from '@mui/icons-material/TimelineOutlined';
 import VariablesIcon from '@mui/icons-material/WindowOutlined';
-import { Avatar, Box, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Typography, useMediaQuery, useTheme } from '@mui/material';
+import { Box, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { AccountLockOutline as ManagedIdentityIcon, ContentDuplicate as ProviderMirrorIcon, DeleteClockOutline as CleanupPolicyIcon, RocketLaunchOutline as RunIcon, ShieldAccountOutline as RoleBindingIcon, ShieldLockOutline as PolicyIcon } from 'mdi-material-ui';
 import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
+import NamespaceAvatar from '../common/NamespaceAvatar';
 
 interface Props {
     workspacePath: string
@@ -100,30 +101,34 @@ function WorkspaceDetailsDrawer(props: Props) {
                 <ListItemButton
                     component={Link}
                     to={`/groups/${workspacePath}`}
+                    selected={route === ''}
                     sx={{
                         py: theme.spacing(0.75),
                         px: theme.spacing(1),
                         borderRadius: '8px',
                         minHeight: 0,
                         gap: theme.spacing(1.25),
+                        position: 'relative',
                         justifyContent: fullSize ? 'flex-start' : 'center',
                         '&:hover': { background: theme.palette.action.hover },
+                        // The header doubles as the nav item for the index page
+                        '&.Mui-selected': {
+                            background: alpha(theme.palette.primary.main, 0.08),
+                            '&::before': {
+                                content: '""',
+                                position: 'absolute',
+                                left: 0,
+                                top: theme.spacing(0.75),
+                                bottom: theme.spacing(0.75),
+                                width: '3px',
+                                borderRadius: '0 3px 3px 0',
+                                background: theme.palette.primary.main,
+                            },
+                            '&:hover': { background: alpha(theme.palette.primary.main, 0.12) },
+                        },
                     }}
                 >
-                    <Avatar
-                        sx={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: '6px',
-                            background: `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                            fontSize: theme.typography.caption.fontSize,
-                            fontWeight: 600,
-                            color: theme.palette.primary.contrastText,
-                            flexShrink: 0,
-                        }}
-                    >
-                        {workspaceName[0].toUpperCase()}
-                    </Avatar>
+                    <NamespaceAvatar name={workspaceName} type="workspace" size="sm" appearance="gradient" />
                     {fullSize && (
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="subtitle2" component="div" sx={{ color: theme.palette.text.primary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>

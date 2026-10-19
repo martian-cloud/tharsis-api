@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f44e730db5e462d76bed2c1b723603a2>>
+ * @generated SignedSource<<605e5c4e4d08e074a7285fdfeeb5339e>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -13,6 +13,7 @@ import { FragmentRefs } from "relay-runtime";
 export type RunSubscriptionInput = {
   ancestorGroupId?: string | null | undefined;
   runId?: string | null | undefined;
+  workspaceAssessment?: boolean | null | undefined;
   workspaceId?: string | null | undefined;
   workspacePath?: string | null | undefined;
 };

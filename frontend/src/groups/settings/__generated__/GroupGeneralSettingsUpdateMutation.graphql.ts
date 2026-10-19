@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<0fd0f8dc91ad5a73a30096eeec5a2b12>>
+ * @generated SignedSource<<29db05547e13e933b34d4e8c80534a16>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -49,7 +49,7 @@ export type GroupGeneralSettingsUpdateMutation$data = {
   readonly updateGroup: {
     readonly group: {
       readonly id: string;
-      readonly " $fragmentSpreads": FragmentRefs<"GroupListItemFragment_group">;
+      readonly " $fragmentSpreads": FragmentRefs<"NamespaceListItemFragment_namespace">;
     } | null | undefined;
     readonly problems: ReadonlyArray<{
       readonly field: ReadonlyArray<string> | null | undefined;
@@ -116,23 +116,7 @@ v3 = {
     }
   ],
   "storageKey": null
-},
-v4 = [
-  {
-    "kind": "Literal",
-    "name": "first",
-    "value": 0
-  }
-],
-v5 = [
-  {
-    "alias": null,
-    "args": null,
-    "kind": "ScalarField",
-    "name": "totalCount",
-    "storageKey": null
-  }
-];
+};
 return {
   "fragment": {
     "argumentDefinitions": (v0/*: any*/),
@@ -160,7 +144,7 @@ return {
               {
                 "args": null,
                 "kind": "FragmentSpread",
-                "name": "GroupListItemFragment_group"
+                "name": "NamespaceListItemFragment_namespace"
               }
             ],
             "storageKey": null
@@ -197,63 +181,92 @@ return {
             "selections": [
               (v2/*: any*/),
               {
-                "alias": null,
-                "args": null,
-                "concreteType": "ResourceMetadata",
-                "kind": "LinkedField",
-                "name": "metadata",
-                "plural": false,
+                "kind": "InlineFragment",
                 "selections": [
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "updatedAt",
+                    "name": "__typename",
                     "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "name",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "description",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "fullPath",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "hasChildren",
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "Group",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "destroyed",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "WorkspaceLabel",
+                        "kind": "LinkedField",
+                        "name": "labels",
+                        "plural": true,
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "key",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "value",
+                            "storageKey": null
+                          }
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "Workspace",
+                    "abstractKey": null
                   }
                 ],
-                "storageKey": null
-              },
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "name",
-                "storageKey": null
-              },
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "description",
-                "storageKey": null
-              },
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "fullPath",
-                "storageKey": null
-              },
-              {
-                "alias": null,
-                "args": (v4/*: any*/),
-                "concreteType": "GroupConnection",
-                "kind": "LinkedField",
-                "name": "descendentGroups",
-                "plural": false,
-                "selections": (v5/*: any*/),
-                "storageKey": "descendentGroups(first:0)"
-              },
-              {
-                "alias": null,
-                "args": (v4/*: any*/),
-                "concreteType": "WorkspaceConnection",
-                "kind": "LinkedField",
-                "name": "workspaces",
-                "plural": false,
-                "selections": (v5/*: any*/),
-                "storageKey": "workspaces(first:0)"
+                "type": "Namespace",
+                "abstractKey": "__isNamespace"
               }
             ],
             "storageKey": null
@@ -265,16 +278,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "42effe5dbca2a0ba93f7c072aafd125f",
+    "cacheID": "75445c1efc61e1c2bcf2967db35dd241",
     "id": null,
     "metadata": {},
     "name": "GroupGeneralSettingsUpdateMutation",
     "operationKind": "mutation",
-    "text": "mutation GroupGeneralSettingsUpdateMutation(\n  $input: UpdateGroupInput!\n) {\n  updateGroup(input: $input) {\n    group {\n      id\n      ...GroupListItemFragment_group\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment GroupListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n"
+    "text": "mutation GroupGeneralSettingsUpdateMutation(\n  $input: UpdateGroupInput!\n) {\n  updateGroup(input: $input) {\n    group {\n      id\n      ...NamespaceListItemFragment_namespace\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment NamespaceListItemFragment_namespace on Namespace {\n  __isNamespace: __typename\n  __typename\n  id\n  name\n  description\n  fullPath\n  ... on Group {\n    hasChildren\n  }\n  ... on Workspace {\n    destroyed\n    labels {\n      key\n      value\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "ace08f155eff9349fc57a68854ae140d";
+(node as any).hash = "319a4d58a1b19ecafe2161cf31b290ec";
 
 export default node;

@@ -1541,10 +1541,12 @@ func TestSubscribeToRunEvents(t *testing.T) {
 		// drive the non-admin root namespace membership access check. When nil, every workspace
 		// resolves to rootNamespacePath (so the membership check passes).
 		workspacePaths map[string]string
-		isAdmin        bool
-		useUserCaller  bool
-		nilUserMember  bool
-		nilWorkspaceID bool
+		// assessmentRunIDs marks which of the sent runs are assessment runs
+		assessmentRunIDs map[string]bool
+		isAdmin          bool
+		useUserCaller    bool
+		nilUserMember    bool
+		nilWorkspaceID   bool
 	}{
 		{
 			name: "subscribe to run events for a workspace",
@@ -1703,6 +1705,52 @@ func TestSubscribeToRunEvents(t *testing.T) {
 				},
 			},
 		},
+		{
+			// The assessment run is sent first, so receiving only run2 shows it was dropped
+			name: "exclude assessment runs",
+			input: &EventSubscriptionOptions{
+				WorkspaceID:         ptr.String("workspace1"),
+				WorkspaceAssessment: ptr.Bool(false),
+			},
+			sendEventData: []*db.RunEventData{
+				{ID: "run1", WorkspaceID: "workspace1"},
+				{ID: "run2", WorkspaceID: "workspace1"},
+			},
+			assessmentRunIDs: map[string]bool{"run1": true},
+			expectedEvents: []Event{
+				{
+					Run: &models.Run{
+						Metadata: models.ResourceMetadata{
+							ID: "run2",
+						},
+					},
+					Action: "UPDATE",
+				},
+			},
+		},
+		{
+			name: "only assessment runs",
+			input: &EventSubscriptionOptions{
+				WorkspaceID:         ptr.String("workspace1"),
+				WorkspaceAssessment: ptr.Bool(true),
+			},
+			sendEventData: []*db.RunEventData{
+				{ID: "run1", WorkspaceID: "workspace1"},
+				{ID: "run2", WorkspaceID: "workspace1"},
+			},
+			assessmentRunIDs: map[string]bool{"run2": true},
+			expectedEvents: []Event{
+				{
+					Run: &models.Run{
+						Metadata: models.ResourceMetadata{
+							ID: "run2",
+						},
+						IsAssessmentRun: true,
+					},
+					Action: "UPDATE",
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1737,6 +1785,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 						Metadata: models.ResourceMetadata{
 							ID: dCopy.ID,
 						},
+						IsAssessmentRun: test.assessmentRunIDs[dCopy.ID],
 					}, nil).Maybe()
 			}
 

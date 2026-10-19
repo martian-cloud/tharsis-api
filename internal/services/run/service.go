@@ -43,6 +43,8 @@ type EventSubscriptionOptions struct {
 	WorkspaceID     *string
 	RunID           *string // RunID is optional
 	AncestorGroupID *string
+	// WorkspaceAssessment can be used to only receive assessment runs or to exclude them
+	WorkspaceAssessment *bool
 }
 
 // SetVariablesIncludedInTFConfigInput is the input for setting variables
@@ -443,6 +445,11 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 
 			if run == nil {
 				// Run no longer exists.
+				continue
+			}
+
+			// The event payload doesn't say whether it's an assessment run, so this waits for the run itself
+			if options.WorkspaceAssessment != nil && run.IsAssessmentRun != *options.WorkspaceAssessment {
 				continue
 			}
 

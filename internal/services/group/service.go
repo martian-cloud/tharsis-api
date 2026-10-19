@@ -52,6 +52,8 @@ type Service interface {
 	GetGroupByTRN(ctx context.Context, trn string) (*models.Group, error)
 	// GetGroupByIDs returns a list of groups by IDs
 	GetGroupsByIDs(ctx context.Context, idList []string) ([]models.Group, error)
+	// GetHasChildrenByGroupIDs returns, keyed by group ID, whether each group contains any subgroups or workspaces
+	GetHasChildrenByGroupIDs(ctx context.Context, idList []string) (map[string]bool, error)
 	// GetGroups returns a list of groups
 	GetGroups(ctx context.Context, input *GetGroupsInput) (*db.GroupsResult, error)
 	// DeleteGroup deletes a group by name
@@ -194,6 +196,37 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 	}
 
 	return s.dbClient.Groups.GetGroups(ctx, &dbInput)
+}
+
+func (s *service) GetHasChildrenByGroupIDs(ctx context.Context, idList []string) (map[string]bool, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetHasChildrenByGroupIDs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	hasChildren, err := s.dbClient.Groups.GetHasChildrenByGroupIDs(ctx, idList)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get whether groups have children", errors.WithSpan(span))
+	}
+
+	paths := make([]string, len(hasChildren))
+	result := make(map[string]bool, len(hasChildren))
+	for i, p := range hasChildren {
+		paths[i] = p.FullPath
+		result[p.GroupID] = p.HasChildren
+	}
+
+	// One check covers the whole batch
+	if len(paths) > 0 {
+		if err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePaths(paths)); err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
 }
 
 func (s *service) GetGroupByID(ctx context.Context, id string) (*models.Group, error) {

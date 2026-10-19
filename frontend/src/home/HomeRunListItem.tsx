@@ -95,7 +95,8 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
                             <MiddleDot />
                             <Timestamp variant="body2" sx={{ color: alpha(theme.palette.text.primary, 0.5) }} timestamp={data.metadata.createdAt} />
                         </Box>
-                        <Tooltip title={data.workspace.fullPath}>
+                        {/* Only collapsed paths hide anything, so only they need the full path on hover */}
+                        <Tooltip placement="top" title={formattedWorkspacePath !== data.workspace.fullPath ? data.workspace.fullPath : ''}>
                             <Link
                                 sx={{ mb: 0.5, wordWrap: 'break-word' }}
                                 to={workspacePath}

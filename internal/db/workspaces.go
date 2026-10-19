@@ -300,7 +300,7 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 	// Scan rows
 	results := []models.Workspace{}
 	for rows.Next() {
-		item, err := scanWorkspace(rows, true)
+		item, err := scanWorkspace(rows)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
@@ -376,7 +376,7 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	updatedWorkspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
+	updatedWorkspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -411,25 +411,26 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 		labelsJSON = []byte("{}")
 	}
 
-	// Use transaction to update workspaces and namespaces tables
-	tx, err := w.dbClient.getConnection(ctx).Begin(ctx)
+	// Lookup namespace for parent group
+	parentNamespace, err := getNamespaceByGroupID(ctx, w.dbClient.getConnection(ctx), workspace.GroupID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
+		if pgErr := asPgError(err); pgErr != nil && isInvalidIDViolation(pgErr) {
+			return nil, ErrInvalidID
+		}
+		return nil, errors.Wrap(err, "failed to get namespace by group ID", errors.WithSpan(span))
 	}
 
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			w.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateWorkspace: %v", txErr)
-		}
-	}()
+	if parentNamespace == nil {
+		return nil, errors.New("invalid group parent: the specified parent group does not exist", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
+	}
+
+	fullPath := fmt.Sprintf("%s/%s", parentNamespace.path, workspace.Name)
 
 	timestamp := currentTime()
 
-	sql, args, err := toSQLWithTag("workspaces.CreateWorkspace", dialect.Insert("workspaces").
-		Prepared(true).
-		Rows(goqu.Record{
+	// Creates the workspace and its namespace in one statement
+	sql, args, err := toSQLWithTag("workspaces.CreateWorkspace", insertWithNamespace("workspaces", "workspace_id", fullPath,
+		dialect.Insert("workspaces").Rows(goqu.Record{
 			"id":                       newResourceID(),
 			"version":                  initialResourceVersion,
 			"created_at":               timestamp,
@@ -450,15 +451,20 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"provider_mirror_enabled":  workspace.EnableProviderMirror,
 			"labels":                   labelsJSON,
 			"output_visibility":        workspace.OutputVisibility,
-		}).
-		Returning(workspaceFieldList...))
+		}),
+		w.getSelectFields(),
+	))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	createdWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql, args...), false)
+	createdWorkspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
+			if isUniqueViolation(pgErr) {
+				return nil, errors.New("namespace %s already exists", fullPath, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
+			}
+
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
 				return nil, errors.New("invalid group parent: the specified parent group does not exist", errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
@@ -470,26 +476,6 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 
 		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
-
-	// Lookup namespace for parent group
-	parentNamespace, err := getNamespaceByGroupID(ctx, tx, workspace.GroupID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get namespace by group ID", errors.WithSpan(span))
-	}
-
-	fullPath := fmt.Sprintf("%s/%s", parentNamespace.path, workspace.Name)
-
-	// Create new namespace resource for workspace
-	if _, err := createNamespace(ctx, tx, &namespaceRow{path: fullPath, workspaceID: createdWorkspace.Metadata.ID}); err != nil {
-		return nil, errors.Wrap(err, "failed to create namespace", errors.WithSpan(span))
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
-	}
-
-	createdWorkspace.FullPath = fullPath
-	createdWorkspace.Metadata.TRN = trn.TypeWorkspace.Build(fullPath)
 
 	return createdWorkspace, nil
 }
@@ -515,7 +501,7 @@ func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Work
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	if _, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true); err != nil {
+	if _, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -551,7 +537,7 @@ func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, manage
 	// Scan rows
 	results := []models.Workspace{}
 	for rows.Next() {
-		item, err := scanWorkspace(rows, true)
+		item, err := scanWorkspace(rows)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to scan row", errors.WithSpan(span))
 		}
@@ -609,7 +595,7 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 		return nil, errors.Wrap(err, "failed to generate SQL to update the migrating workspace's group ID", errors.WithSpan(span))
 	}
 
-	migratedWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql, args...), true)
+	migratedWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -721,7 +707,7 @@ func (w *workspaces) getWorkspace(ctx context.Context, exp goqu.Ex) (*models.Wor
 		return nil, err
 	}
 
-	workspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
+	workspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -740,73 +726,103 @@ func (w *workspaces) getWorkspace(ctx context.Context, exp goqu.Ex) (*models.Wor
 }
 
 func (w *workspaces) getSelectFields() []interface{} {
-	selectFields := []interface{}{}
-	for _, field := range workspaceFieldList {
-		selectFields = append(selectFields, fmt.Sprintf("workspaces.%s", field))
-	}
-
-	selectFields = append(selectFields, "namespaces.path")
-
-	return selectFields
+	return append(qualifiedFields("workspaces", workspaceFieldList), "namespaces.path")
 }
 
-func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
-	var description sql.NullString
-	var currentStateVersionID sql.NullString
-	var labelsJSON []byte
+// workspaceRow holds the workspaceFieldList columns. Every target accepts NULL so the same row also
+// scans the workspaces side of a LEFT JOIN, where a non-workspace row has NULL in every column.
+type workspaceRow struct {
+	id                    sql.NullString
+	createdAt, updatedAt  *time.Time
+	version               sql.NullInt64
+	name                  sql.NullString
+	groupID               sql.NullString
+	description           sql.NullString
+	currentStateVersionID sql.NullString
+	currentApplyRunID     *string
+	dirtyState            sql.NullBool
+	locked                sql.NullBool
+	maxJobDuration        *int32
+	createdBy             sql.NullString
+	terraformVersion      sql.NullString
+	preventDestroyPlan    sql.NullBool
+	runnerTags            []string
+	driftDetection        *bool
+	providerMirror        *bool
+	labelsJSON            []byte
+	outputVisibility      *models.NamespaceOutputVisibilityLevel
+}
 
-	ws := &models.Workspace{}
+// targets returns the scan destinations in workspaceFieldList order.
+func (r *workspaceRow) targets() []interface{} {
+	return []interface{}{
+		&r.id,
+		&r.createdAt,
+		&r.updatedAt,
+		&r.version,
+		&r.name,
+		&r.groupID,
+		&r.description,
+		&r.currentStateVersionID,
+		&r.currentApplyRunID,
+		&r.dirtyState,
+		&r.locked,
+		&r.maxJobDuration,
+		&r.createdBy,
+		&r.terraformVersion,
+		&r.preventDestroyPlan,
+		&r.runnerTags,
+		&r.driftDetection,
+		&r.providerMirror,
+		&r.labelsJSON,
+		&r.outputVisibility,
+	}
+}
 
-	fields := []interface{}{
-		&ws.Metadata.ID,
-		&ws.Metadata.CreationTimestamp,
-		&ws.Metadata.LastUpdatedTimestamp,
-		&ws.Metadata.Version,
-		&ws.Name,
-		&ws.GroupID,
-		&description,
-		&currentStateVersionID,
-		&ws.CurrentApplyRunID,
-		&ws.DirtyState,
-		&ws.Locked,
-		&ws.MaxJobDuration,
-		&ws.CreatedBy,
-		&ws.TerraformVersion,
-		&ws.PreventDestroyPlan,
-		&ws.RunnerTags,
-		&ws.EnableDriftDetection,
-		&ws.EnableProviderMirror,
-		&labelsJSON,
-		&ws.OutputVisibility,
+func (r *workspaceRow) toModel(fullPath string) (*models.Workspace, error) {
+	ws := &models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID:                   r.id.String,
+			CreationTimestamp:    r.createdAt,
+			LastUpdatedTimestamp: r.updatedAt,
+			Version:              int(r.version.Int64),
+			TRN:                  trn.TypeWorkspace.Build(fullPath),
+		},
+		Name:                  r.name.String,
+		FullPath:              fullPath,
+		GroupID:               r.groupID.String,
+		Description:           r.description.String,
+		CurrentStateVersionID: r.currentStateVersionID.String,
+		CurrentApplyRunID:     r.currentApplyRunID,
+		DirtyState:            r.dirtyState.Bool,
+		Locked:                r.locked.Bool,
+		MaxJobDuration:        r.maxJobDuration,
+		CreatedBy:             r.createdBy.String,
+		TerraformVersion:      r.terraformVersion.String,
+		PreventDestroyPlan:    r.preventDestroyPlan.Bool,
+		RunnerTags:            r.runnerTags,
+		EnableDriftDetection:  r.driftDetection,
+		EnableProviderMirror:  r.providerMirror,
+		OutputVisibility:      r.outputVisibility,
 	}
 
-	if withFullPath {
-		fields = append(fields, &ws.FullPath)
-	}
-
-	err := row.Scan(fields...)
-	if err != nil {
-		return nil, err
-	}
-
-	if description.Valid {
-		ws.Description = description.String
-	}
-
-	if currentStateVersionID.Valid {
-		ws.CurrentStateVersionID = currentStateVersionID.String
-	}
-
-	// Parse JSONB labels
-	if len(labelsJSON) > 0 {
-		if err := json.Unmarshal(labelsJSON, &ws.Labels); err != nil {
+	if len(r.labelsJSON) > 0 {
+		if err := json.Unmarshal(r.labelsJSON, &ws.Labels); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal labels JSON: %w", err)
 		}
 	}
 
-	if withFullPath {
-		ws.Metadata.TRN = trn.TypeWorkspace.Build(ws.FullPath)
+	return ws, nil
+}
+
+// scanWorkspace scans a row selected with getSelectFields.
+func scanWorkspace(row scanner) (*models.Workspace, error) {
+	r := &workspaceRow{}
+	var fullPath string
+
+	if err := row.Scan(append(r.targets(), &fullPath)...); err != nil {
+		return nil, err
 	}
 
-	return ws, nil
+	return r.toModel(fullPath)
 }

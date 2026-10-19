@@ -50,6 +50,8 @@ type Group implements Node, Namespace {
   fullPath: String!
   createdBy: String!
   parent: Group
+  "Whether the group contains any subgroups or workspaces"
+  hasChildren: Boolean!
   gpgKeys(
     after: String
     before: String
@@ -72,6 +74,15 @@ type Group implements Node, Namespace {
     last: Int
     sort: WorkspaceSort
   ): WorkspaceConnection!
+  namespaces(
+    after: String
+    before: String
+    first: Int
+    includeNested: Boolean
+    last: Int
+    search: String
+    sort: NamespaceSort
+  ): NamespaceConnection!
   serviceAccounts(
     after: String
     before: String

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<dae85debf9e74318b42ea4e3297a6910>>
+ * @generated SignedSource<<372ae1fd787431cb535d8c59409912cc>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,27 +10,27 @@
 
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type WorkspaceListFragment_workspaces$data = {
-  readonly workspaces: {
+export type NestedNamespaceListFragment_namespaces$data = {
+  readonly namespaces: {
     readonly edges: ReadonlyArray<{
       readonly node: {
         readonly id: string;
-        readonly " $fragmentSpreads": FragmentRefs<"WorkspaceListItemFragment_workspace">;
+        readonly " $fragmentSpreads": FragmentRefs<"NamespaceListItemFragment_namespace">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
   };
-  readonly " $fragmentType": "WorkspaceListFragment_workspaces";
+  readonly " $fragmentType": "NestedNamespaceListFragment_namespaces";
 };
-export type WorkspaceListFragment_workspaces$key = {
-  readonly " $data"?: WorkspaceListFragment_workspaces$data;
-  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceListFragment_workspaces">;
+export type NestedNamespaceListFragment_namespaces$key = {
+  readonly " $data"?: NestedNamespaceListFragment_namespaces$data;
+  readonly " $fragmentSpreads": FragmentRefs<"NestedNamespaceListFragment_namespaces">;
 };
 
-import WorkspaceListPaginationQuery_graphql from './WorkspaceListPaginationQuery.graphql';
+import NestedNamespaceListPaginationQuery_graphql from './NestedNamespaceListPaginationQuery.graphql';
 
 const node: ReaderFragment = (function(){
 var v0 = [
-  "workspaces"
+  "namespaces"
 ];
 return {
   "argumentDefinitions": [
@@ -48,15 +48,11 @@ return {
     },
     {
       "kind": "RootArgument",
-      "name": "groupId"
-    },
-    {
-      "kind": "RootArgument",
       "name": "last"
     },
     {
       "kind": "RootArgument",
-      "name": "search"
+      "name": "parentId"
     }
   ],
   "kind": "Fragment",
@@ -82,23 +78,18 @@ return {
         "path": (v0/*: any*/)
       },
       "fragmentPathInResult": [],
-      "operation": WorkspaceListPaginationQuery_graphql
+      "operation": NestedNamespaceListPaginationQuery_graphql
     }
   },
-  "name": "WorkspaceListFragment_workspaces",
+  "name": "NestedNamespaceListFragment_namespaces",
   "selections": [
     {
-      "alias": "workspaces",
+      "alias": "namespaces",
       "args": [
         {
           "kind": "Variable",
-          "name": "groupId",
-          "variableName": "groupId"
-        },
-        {
-          "kind": "Variable",
-          "name": "search",
-          "variableName": "search"
+          "name": "parentId",
+          "variableName": "parentId"
         },
         {
           "kind": "Literal",
@@ -106,15 +97,15 @@ return {
           "value": "FULL_PATH_ASC"
         }
       ],
-      "concreteType": "WorkspaceConnection",
+      "concreteType": "NamespaceConnection",
       "kind": "LinkedField",
-      "name": "__WorkspaceList_workspaces_connection",
+      "name": "__NestedNamespaceList_namespaces_connection",
       "plural": false,
       "selections": [
         {
           "alias": null,
           "args": null,
-          "concreteType": "WorkspaceEdge",
+          "concreteType": "NamespaceEdge",
           "kind": "LinkedField",
           "name": "edges",
           "plural": true,
@@ -122,7 +113,7 @@ return {
             {
               "alias": null,
               "args": null,
-              "concreteType": "Workspace",
+              "concreteType": null,
               "kind": "LinkedField",
               "name": "node",
               "plural": false,
@@ -137,7 +128,7 @@ return {
                 {
                   "args": null,
                   "kind": "FragmentSpread",
-                  "name": "WorkspaceListItemFragment_workspace"
+                  "name": "NamespaceListItemFragment_namespace"
                 },
                 {
                   "alias": null,
@@ -207,6 +198,6 @@ return {
 };
 })();
 
-(node as any).hash = "926f91c556efd89ff03b7ceaeb9ca6c2";
+(node as any).hash = "346b8fb69531b5944186da39fb0cf7ea";
 
 export default node;

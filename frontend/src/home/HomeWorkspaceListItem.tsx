@@ -1,9 +1,10 @@
-import { Avatar, ListItemButton, ListItemText, Tooltip, Typography } from '@mui/material';
+import { ListItemButton, ListItemText, Tooltip, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { Link } from 'react-router-dom';
 import { HomeWorkspaceListItemFragment_workspace$key } from "./__generated__/HomeWorkspaceListItemFragment_workspace.graphql";
+import NamespaceAvatar from '../common/NamespaceAvatar';
 
 interface Props {
     fragmentRef: HomeWorkspaceListItemFragment_workspace$key
@@ -35,15 +36,7 @@ function HomeWorkspaceListItem({ fragmentRef, last }: Props) {
             to={`/groups/${data.fullPath}`}
             divider={!last}
         >
-            <Avatar
-                sx={{
-                    width: 24,
-                    height: 24,
-                    mr: 2,
-                    bgcolor: 'avatar.default'
-                }}
-                variant="rounded">{data.name[0].toUpperCase()}
-            </Avatar>
+            <NamespaceAvatar name={data.name} type="workspace" size="xs" sx={{ mr: 2 }} />
             <ListItemText
                 sx={{ overflow: "hidden" }}
                 primary={

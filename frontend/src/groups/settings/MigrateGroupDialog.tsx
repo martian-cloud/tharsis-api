@@ -62,6 +62,13 @@ function MigrateGroupDialog({ onClose, fragmentRef }: Props) {
                     newParentPath: newParentPath === '<< no parent >>' ? null : newParentPath
                 }
             },
+            // Namespace lists are cached per view, search and expanded group, so mark the whole store stale and let
+            // whichever list mounts next refetch instead of patching each connection
+            updater: (store, data) => {
+                if (data?.migrateGroup.group) {
+                    store.invalidateStore();
+                }
+            },
             onCompleted: data => {
                 if (data.migrateGroup.problems.length) {
                     setError({

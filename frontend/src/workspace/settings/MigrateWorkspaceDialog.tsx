@@ -59,6 +59,13 @@ function MigrateWorkspaceDialog({ onClose, fragmentRef }: Props) {
                     newGroupPath: newGroupPath
                 }
             },
+            // Namespace lists are cached per view, search and expanded group, so mark the whole store stale and let
+            // whichever list mounts next refetch instead of patching each connection
+            updater: (store, data) => {
+                if (data?.migrateWorkspace.workspace) {
+                    store.invalidateStore();
+                }
+            },
             onCompleted: data => {
                 if (data.migrateWorkspace.problems.length) {
                     setError({

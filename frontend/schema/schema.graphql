@@ -1752,11 +1752,14 @@ type Group implements Namespace & Node {
   federatedRegistries(after: String, before: String, first: Int, last: Int, sort: FederatedRegistrySort): FederatedRegistryConnection!
   fullPath: String!
   gpgKeys(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: GPGKeySort): GPGKeyConnection!
+  """Whether the group contains any subgroups or workspaces"""
+  hasChildren: Boolean!
   id: ID!
   managedIdentities(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: ManagedIdentitySort): ManagedIdentityConnection!
   memberships: [NamespaceMembership!]!
   metadata: ResourceMetadata!
   name: String!
+  namespaces(after: String, before: String, first: Int, includeNested: Boolean, last: Int, search: String, sort: NamespaceSort): NamespaceConnection!
   outputVisibility: NamespaceOutputVisibility!
   packages(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: PackageSort): PackageConnection!
   parent: Group
@@ -2306,6 +2309,12 @@ interface Namespace {
   variables: [NamespaceVariable!]!
 }
 
+type NamespaceConnection {
+  edges: [NamespaceEdge]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
 type NamespaceDriftDetectionEnabled {
   inherited: Boolean!
   namespacePath: String!
@@ -2315,6 +2324,11 @@ type NamespaceDriftDetectionEnabled {
 input NamespaceDriftDetectionEnabledInput {
   enabled: Boolean
   inherit: Boolean!
+}
+
+type NamespaceEdge {
+  cursor: String!
+  node: Namespace
 }
 
 type NamespaceFavorite implements Node {
@@ -2417,6 +2431,11 @@ type NamespaceRunnerTags {
 input NamespaceRunnerTagsInput {
   inherit: Boolean!
   tags: [String!]
+}
+
+enum NamespaceSort {
+  FULL_PATH_ASC
+  FULL_PATH_DESC
 }
 
 enum NamespaceType {
@@ -2894,6 +2913,7 @@ type Query {
   me: MeResponse
   namespace(fullPath: String!): Namespace
   namespaceVariableVersion(id: String!, includeSensitiveValue: Boolean): NamespaceVariableVersion
+  namespaces(after: String, before: String, first: Int, includeNested: Boolean, last: Int, parentId: String, search: String, sort: NamespaceSort, topLevel: Boolean): NamespaceConnection!
   node(id: String!): Node
   packages(after: String, before: String, first: Int, last: Int, search: String, sort: PackageSort): PackageConnection!
   resourceLimits: [ResourceLimit!]!
@@ -3237,6 +3257,8 @@ enum RunStatus {
 input RunSubscriptionInput {
   ancestorGroupId: String
   runId: String
+  """true only sends assessment runs, false leaves them out; unset sends every run"""
+  workspaceAssessment: Boolean
   workspaceId: String
   workspacePath: String
 }

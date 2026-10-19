@@ -52,6 +52,18 @@ func TestGroups_CreateGroup(t *testing.T) {
 			fullPath:        "missing-parent/orphan-child",
 			expectErrorCode: errors.EInvalid,
 		},
+		{
+			name:            "negative, parent does not exist",
+			groupName:       "missing-parent-child",
+			parentID:        nonExistentID,
+			expectErrorCode: errors.EConflict,
+		},
+		{
+			// Runs after "create group", so its namespace path is already taken
+			name:            "negative, duplicate name",
+			groupName:       "test-group",
+			expectErrorCode: errors.EConflict,
+		},
 	}
 
 	for _, test := range testCases {
@@ -1115,4 +1127,53 @@ func TestGroups_MigrateGroup(t *testing.T) {
 			assert.Equal(t, test.expectKept, link != nil)
 		})
 	}
+}
+
+func TestGroups_GetHasChildrenByGroupIDs(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	withWorkspace, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "presence-with-workspace", CreatedBy: "db-integration-tests"})
+	require.NoError(t, err)
+	_, err = testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "presence-workspace",
+		GroupID:        withWorkspace.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	withSubgroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "presence-with-subgroup", CreatedBy: "db-integration-tests"})
+	require.NoError(t, err)
+	subgroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "presence-subgroup", ParentID: withSubgroup.Metadata.ID, CreatedBy: "db-integration-tests"})
+	require.NoError(t, err)
+
+	t.Run("reports each requested group and skips unknown ids", func(t *testing.T) {
+		got, err := testClient.client.Groups.GetHasChildrenByGroupIDs(ctx, []string{
+			withWorkspace.Metadata.ID, withSubgroup.Metadata.ID, subgroup.Metadata.ID, nonExistentID,
+		})
+		require.NoError(t, err)
+
+		byID := map[string]GroupHasChildren{}
+		for _, p := range got {
+			byID[p.GroupID] = p
+		}
+		require.Len(t, byID, 3)
+		assert.True(t, byID[withWorkspace.Metadata.ID].HasChildren)
+		assert.True(t, byID[withSubgroup.Metadata.ID].HasChildren)
+		assert.False(t, byID[subgroup.Metadata.ID].HasChildren)
+		assert.Equal(t, subgroup.FullPath, byID[subgroup.Metadata.ID].FullPath)
+	})
+
+	t.Run("no ids returns an empty result", func(t *testing.T) {
+		got, err := testClient.client.Groups.GetHasChildrenByGroupIDs(ctx, nil)
+		require.NoError(t, err)
+		assert.Empty(t, got)
+	})
+
+	t.Run("invalid id returns ErrInvalidID", func(t *testing.T) {
+		_, err := testClient.client.Groups.GetHasChildrenByGroupIDs(ctx, []string{invalidID})
+		assert.Equal(t, ErrInvalidID, err)
+	})
 }

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<4c6d65139d0c667e5c2055496a999cb3>>
+ * @generated SignedSource<<20e15b8203f9aa6a8e19c1ecf2920423>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,27 +10,27 @@
 
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type GroupListFragment_groups$data = {
-  readonly groups: {
+export type NamespaceListFragment_namespaces$data = {
+  readonly namespaces: {
     readonly edges: ReadonlyArray<{
       readonly node: {
         readonly id: string;
-        readonly " $fragmentSpreads": FragmentRefs<"GroupListItemFragment_group">;
+        readonly " $fragmentSpreads": FragmentRefs<"NamespaceListItemFragment_namespace">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
   };
-  readonly " $fragmentType": "GroupListFragment_groups";
+  readonly " $fragmentType": "NamespaceListFragment_namespaces";
 };
-export type GroupListFragment_groups$key = {
-  readonly " $data"?: GroupListFragment_groups$data;
-  readonly " $fragmentSpreads": FragmentRefs<"GroupListFragment_groups">;
+export type NamespaceListFragment_namespaces$key = {
+  readonly " $data"?: NamespaceListFragment_namespaces$data;
+  readonly " $fragmentSpreads": FragmentRefs<"NamespaceListFragment_namespaces">;
 };
 
-import GroupListPaginationQuery_graphql from './GroupListPaginationQuery.graphql';
+import NamespaceListPaginationQuery_graphql from './NamespaceListPaginationQuery.graphql';
 
 const node: ReaderFragment = (function(){
 var v0 = [
-  "groups"
+  "namespaces"
 ];
 return {
   "argumentDefinitions": [
@@ -48,15 +48,23 @@ return {
     },
     {
       "kind": "RootArgument",
+      "name": "includeNested"
+    },
+    {
+      "kind": "RootArgument",
       "name": "last"
     },
     {
       "kind": "RootArgument",
-      "name": "parentPath"
+      "name": "parentId"
     },
     {
       "kind": "RootArgument",
       "name": "search"
+    },
+    {
+      "kind": "RootArgument",
+      "name": "topLevel"
     }
   ],
   "kind": "Fragment",
@@ -82,18 +90,23 @@ return {
         "path": (v0/*: any*/)
       },
       "fragmentPathInResult": [],
-      "operation": GroupListPaginationQuery_graphql
+      "operation": NamespaceListPaginationQuery_graphql
     }
   },
-  "name": "GroupListFragment_groups",
+  "name": "NamespaceListFragment_namespaces",
   "selections": [
     {
-      "alias": "groups",
+      "alias": "namespaces",
       "args": [
         {
           "kind": "Variable",
-          "name": "parentPath",
-          "variableName": "parentPath"
+          "name": "includeNested",
+          "variableName": "includeNested"
+        },
+        {
+          "kind": "Variable",
+          "name": "parentId",
+          "variableName": "parentId"
         },
         {
           "kind": "Variable",
@@ -104,17 +117,22 @@ return {
           "kind": "Literal",
           "name": "sort",
           "value": "FULL_PATH_ASC"
+        },
+        {
+          "kind": "Variable",
+          "name": "topLevel",
+          "variableName": "topLevel"
         }
       ],
-      "concreteType": "GroupConnection",
+      "concreteType": "NamespaceConnection",
       "kind": "LinkedField",
-      "name": "__GroupList_groups_connection",
+      "name": "__NamespaceList_namespaces_connection",
       "plural": false,
       "selections": [
         {
           "alias": null,
           "args": null,
-          "concreteType": "GroupEdge",
+          "concreteType": "NamespaceEdge",
           "kind": "LinkedField",
           "name": "edges",
           "plural": true,
@@ -122,7 +140,7 @@ return {
             {
               "alias": null,
               "args": null,
-              "concreteType": "Group",
+              "concreteType": null,
               "kind": "LinkedField",
               "name": "node",
               "plural": false,
@@ -137,7 +155,7 @@ return {
                 {
                   "args": null,
                   "kind": "FragmentSpread",
-                  "name": "GroupListItemFragment_group"
+                  "name": "NamespaceListItemFragment_namespace"
                 },
                 {
                   "alias": null,
@@ -207,6 +225,6 @@ return {
 };
 })();
 
-(node as any).hash = "cbaf49207b745e57d363fee50c49adf5";
+(node as any).hash = "25b518af2407cb98d40f0e2d8f135c5d";
 
 export default node;

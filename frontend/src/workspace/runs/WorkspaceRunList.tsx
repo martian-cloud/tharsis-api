@@ -15,9 +15,11 @@ interface Props {
     includeAssessmentRuns: boolean
 }
 
-export function GetConnections(workspaceId: string): string[] {
+// Returns the run list connections a new run belongs in: an assessment run only goes in the list that
+// includes assessment runs, not the one filtering them out
+export function GetConnections(workspaceId: string, assessmentRun = false): string[] {
     return [
-        { workspaceId, sort: 'CREATED_AT_DESC', workspaceAssessment: false },
+        ...(assessmentRun ? [] : [{ workspaceId, sort: 'CREATED_AT_DESC', workspaceAssessment: false }]),
         { workspaceId, sort: 'CREATED_AT_DESC', workspaceAssessment: null }
     ].map(vars => ConnectionHandler.getConnectionID(
         "root",

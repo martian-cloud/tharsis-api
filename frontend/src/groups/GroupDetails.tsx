@@ -1,25 +1,19 @@
-import { TabContext, TabList } from '@mui/lab';
-import MuiTabPanel, { TabPanelProps } from '@mui/lab/TabPanel';
-import { Avatar, Box, Button, CircularProgress, Stack, styled, Typography } from '@mui/material';
-import { TabProps } from '@mui/material/Tab';
+import { Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import React, { Suspense, useEffect, useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
-import { LinkProps, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import ConfirmationDialog from '../common/ConfirmationDialog';
-import { GroupIcon, WorkspaceIcon } from '../common/Icons';
 import TRNButton from '../common/TRNButton';
 import Variables from '../namespace/variables/Variables';
 import NamespaceMemberships from '../namespace/members/NamespaceMemberships';
 import NamespaceBreadcrumbs from '../namespace/NamespaceBreadcrumbs';
-import TabLink from '../routes/TabLink';
 import ListSkeleton from '../skeletons/ListSkeleton';
 import GroupSettings from './settings/GroupSettings'
 import GroupDetailsDrawer from './GroupDetailsDrawer';
-import GroupList from './GroupList';
 import ManagedIdentities from './managedidentity/ManagedIdentities';
 import GroupRunners from './runner/GroupRunners';
-import WorkspaceList from './WorkspaceList';
+import NamespaceList from './NamespaceList';
 import { GroupDetailsFragment_group$key } from './__generated__/GroupDetailsFragment_group.graphql';
 import { GroupDetailsIndexFragment_group$key } from './__generated__/GroupDetailsIndexFragment_group.graphql';
 import { GroupDetailsDeleteMutation } from './__generated__/GroupDetailsDeleteMutation.graphql';
@@ -41,22 +35,12 @@ import GroupRuns from './GroupRuns';
 import NamespaceFavoriteButton from '../common/NamespaceFavoriteButton';
 import { useAgentCopilot } from '../ai/AgentCopilotProvider';
 import { PageLayoutProvider } from '../layout/PageLayoutContext';
-
-const TABS = ['workspaces', 'subgroups'];
+import NamespaceAvatar from '../common/NamespaceAvatar';
 
 interface Props {
     fragmentRef: GroupDetailsFragment_group$key
     route: string
 }
-
-const Tab = styled(TabLink)<TabProps | LinkProps>(() => ({
-    textTransform: "none",
-    minHeight: 48
-}));
-
-const TabPanel = styled(MuiTabPanel)<TabPanelProps>(() => ({
-    padding: 1
-}));
 
 function GroupDetails(props: Props) {
     const { route } = props;
@@ -107,7 +91,7 @@ function GroupDetails(props: Props) {
                     </Box>}>
                     <PageLayoutProvider>
                         <Routes>
-                            <Route path={`${groupPath}/*`} element={<GroupDetailsIndex route={route} fragmentRef={data} />} />
+                            <Route path={`${groupPath}/*`} element={<GroupDetailsIndex fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/activity/*`} element={<NamespaceActivity fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/runs/*`} element={<GroupRuns fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/managed_identities/*`} element={<ManagedIdentities fragmentRef={data} />} />
@@ -134,13 +118,10 @@ function GroupDetails(props: Props) {
 
 interface GroupDetailsIndexProps {
     fragmentRef: GroupDetailsIndexFragment_group$key
-    route: string
 }
 
 function GroupDetailsIndex(props: GroupDetailsIndexProps) {
-    const { route } = props;
     const theme = useTheme();
-    const [tab, setTab] = useState('');
     const [showDeleteConfirmationDialog, setShowDeleteConfirmationDialog] = useState<boolean>(false);
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
@@ -156,19 +137,21 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                 metadata {
                     trn
                 }
-                workspaces(first: 0) {
-                    totalCount
-                }
                 descendentGroups(first: 0) {
                     totalCount
                 }
-                ...WorkspaceListFragment_group
+                workspaces(first: 0) {
+                    totalCount
+                }
                 ...MigrateGroupDialogFragment_group
                 ...GroupNotificationPreferenceFragment_group
             }
         `,
         props.fragmentRef
     );
+
+    const subgroupCount = data.descendentGroups.totalCount;
+    const workspaceCount = data.workspaces.totalCount;
 
     const [commit, commitInFlight] = useMutation<GroupDetailsDeleteMutation>(
         graphql`
@@ -184,20 +167,6 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
         `
     );
 
-    useEffect(() => {
-        if (TABS.includes(route)) {
-            setTab(route);
-        } else {
-            const workspaceCount = data.workspaces.totalCount ?? 0;
-            const subgroupCount = data.descendentGroups.totalCount ?? 0;
-            setTab(workspaceCount > 0 ? 'workspaces' : (subgroupCount > 0 ? 'subgroups' : 'workspaces'));
-        }
-    }, [route, data]);
-
-    const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
-        setTab(newValue);
-    };
-
     const onDeleteConfirmationDialogClosed = (confirm?: boolean) => {
         if (confirm) {
             commit({
@@ -205,6 +174,13 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                     input: {
                         groupPath: data.fullPath
                     },
+                },
+                // Namespace lists are cached per view, search and expanded group, so mark the whole store stale and let
+                // whichever list mounts next refetch instead of patching each connection
+                updater: (store, deleteData) => {
+                    if (!deleteData?.deleteGroup.problems.length) {
+                        store.invalidateStore();
+                    }
                 },
                 onCompleted: deleteData => {
                     setShowDeleteConfirmationDialog(false);
@@ -241,7 +217,7 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
     return (
         <Box>
             <NamespaceBreadcrumbs namespacePath={data.fullPath} />
-            {(!route || TABS.includes(route)) && <React.Fragment>
+            {<React.Fragment>
                 <Box sx={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -251,11 +227,14 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                         '& > *': { marginBottom: 2 },
                     }
                 }}>
-                    <Box display="flex" marginBottom={4} alignItems="center">
-                        <Avatar sx={{ width: 56, height: 56, marginRight: 2, bgcolor: 'avatar.default' }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
+                    <Box display="flex" marginBottom={3} alignItems="center">
+                        <NamespaceAvatar name={data.name} type="group" size="lg" sx={{ marginRight: 2 }} />
                         <Stack>
                             <Typography noWrap variant="h5" sx={{ maxWidth: 400, fontWeight: "bold" }}>{data.name}</Typography>
                             <Typography color="textSecondary" variant="subtitle2">{data.description}</Typography>
+                            <Typography color="textSecondary" variant="caption">
+                                {subgroupCount} subgroup{subgroupCount === 1 ? '' : 's'} · {workspaceCount} workspace{workspaceCount === 1 ? '' : 's'}
+                            </Typography>
                         </Stack>
                     </Box>
                     <Box>
@@ -275,42 +254,10 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                         </Box>
                     </Box>
                 </Box>
-                {tab && <TabContext value={tab}>
-                    <Box sx={{ border: 1, borderColor: 'divider' }}>
-                        <TabList onChange={handleTabChange} aria-label="group tabs" sx={{ minHeight: 0 }}>
-                            <Tab
-                                icon={<WorkspaceIcon />}
-                                iconPosition="start"
-                                label={`${data.workspaces.totalCount} Workspace${data.workspaces.totalCount === 1 ? '' : 's'}`}
-                                value="workspaces"
-                                to={`/groups/${data.fullPath}/-/workspaces`}
-                            />
-                            <Tab
-                                icon={<GroupIcon />}
-                                iconPosition="start"
-                                label={`${data.descendentGroups.totalCount} Subgroup${data.descendentGroups.totalCount === 1 ? '' : 's'}`}
-                                value="subgroups"
-                                to={`/groups/${data.fullPath}/-/subgroups`}
-                            />
-                        </TabList>
-                    </Box>
-                    <TabPanel value="workspaces">
-                        {data.workspaces.totalCount > 0 && <Suspense fallback={<ListSkeleton rowCount={10} />}>
-                            <WorkspaceList fragmentRef={data} />
-                        </Suspense>}
-                        {data.workspaces.totalCount === 0 && <Box padding={4} display="flex" justifyContent="center" alignItems="center">
-                            <Typography color="textSecondary">No workspaces in this group</Typography>
-                        </Box>}
-                    </TabPanel>
-                    <TabPanel value="subgroups">
-                        {data.descendentGroups.totalCount > 0 && <Suspense fallback={<ListSkeleton rowCount={10} />}>
-                            <GroupList groupPath={data.fullPath} />
-                        </Suspense>}
-                        {data.descendentGroups.totalCount === 0 && <Box padding={4} display="flex" justifyContent="center" alignItems="center">
-                            <Typography color="textSecondary">No subgroups in this group</Typography>
-                        </Box>}
-                    </TabPanel>
-                </TabContext>}
+                <Suspense fallback={<ListSkeleton rowCount={10} />}>
+                    {/* Keyed by group so the view and search start fresh when navigating to another group */}
+                    <NamespaceList key={data.id} parentPath={data.fullPath} />
+                </Suspense>
             </React.Fragment>}
             {showDeleteConfirmationDialog && (
                 <ConfirmationDialog

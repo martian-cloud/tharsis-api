@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9cf17764e2d55ac5d45d03157c76289c>>
+ * @generated SignedSource<<b978d752a09604124873a40b6d019608>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,20 +10,19 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type GroupListPaginationQuery$variables = {
+export type NestedNamespaceListPaginationQuery$variables = {
   after?: string | null | undefined;
   before?: string | null | undefined;
   first?: number | null | undefined;
   last?: number | null | undefined;
-  parentPath?: string | null | undefined;
-  search?: string | null | undefined;
+  parentId?: string | null | undefined;
 };
-export type GroupListPaginationQuery$data = {
-  readonly " $fragmentSpreads": FragmentRefs<"GroupListFragment_groups">;
+export type NestedNamespaceListPaginationQuery$data = {
+  readonly " $fragmentSpreads": FragmentRefs<"NestedNamespaceListFragment_namespaces">;
 };
-export type GroupListPaginationQuery = {
-  response: GroupListPaginationQuery$data;
-  variables: GroupListPaginationQuery$variables;
+export type NestedNamespaceListPaginationQuery = {
+  response: NestedNamespaceListPaginationQuery$data;
+  variables: NestedNamespaceListPaginationQuery$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -51,12 +50,7 @@ var v0 = [
   {
     "defaultValue": null,
     "kind": "LocalArgument",
-    "name": "parentPath"
-  },
-  {
-    "defaultValue": null,
-    "kind": "LocalArgument",
-    "name": "search"
+    "name": "parentId"
   }
 ],
 v1 = [
@@ -82,34 +76,13 @@ v1 = [
   },
   {
     "kind": "Variable",
-    "name": "parentPath",
-    "variableName": "parentPath"
-  },
-  {
-    "kind": "Variable",
-    "name": "search",
-    "variableName": "search"
+    "name": "parentId",
+    "variableName": "parentId"
   },
   {
     "kind": "Literal",
     "name": "sort",
     "value": "FULL_PATH_ASC"
-  }
-],
-v2 = [
-  {
-    "kind": "Literal",
-    "name": "first",
-    "value": 0
-  }
-],
-v3 = [
-  {
-    "alias": null,
-    "args": null,
-    "kind": "ScalarField",
-    "name": "totalCount",
-    "storageKey": null
   }
 ];
 return {
@@ -117,12 +90,12 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "GroupListPaginationQuery",
+    "name": "NestedNamespaceListPaginationQuery",
     "selections": [
       {
         "args": null,
         "kind": "FragmentSpread",
-        "name": "GroupListFragment_groups"
+        "name": "NestedNamespaceListFragment_namespaces"
       }
     ],
     "type": "Query",
@@ -132,20 +105,20 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "GroupListPaginationQuery",
+    "name": "NestedNamespaceListPaginationQuery",
     "selections": [
       {
         "alias": null,
         "args": (v1/*: any*/),
-        "concreteType": "GroupConnection",
+        "concreteType": "NamespaceConnection",
         "kind": "LinkedField",
-        "name": "groups",
+        "name": "namespaces",
         "plural": false,
         "selections": [
           {
             "alias": null,
             "args": null,
-            "concreteType": "GroupEdge",
+            "concreteType": "NamespaceEdge",
             "kind": "LinkedField",
             "name": "edges",
             "plural": true,
@@ -153,7 +126,7 @@ return {
               {
                 "alias": null,
                 "args": null,
-                "concreteType": "Group",
+                "concreteType": null,
                 "kind": "LinkedField",
                 "name": "node",
                 "plural": false,
@@ -162,26 +135,19 @@ return {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "id",
+                    "name": "__typename",
                     "storageKey": null
                   },
                   {
                     "alias": null,
                     "args": null,
-                    "concreteType": "ResourceMetadata",
-                    "kind": "LinkedField",
-                    "name": "metadata",
-                    "plural": false,
-                    "selections": [
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "updatedAt",
-                        "storageKey": null
-                      }
-                    ],
+                    "kind": "ScalarField",
+                    "name": "id",
                     "storageKey": null
+                  },
+                  {
+                    "kind": "TypeDiscriminator",
+                    "abstractKey": "__isNamespace"
                   },
                   {
                     "alias": null,
@@ -205,31 +171,57 @@ return {
                     "storageKey": null
                   },
                   {
-                    "alias": null,
-                    "args": (v2/*: any*/),
-                    "concreteType": "GroupConnection",
-                    "kind": "LinkedField",
-                    "name": "descendentGroups",
-                    "plural": false,
-                    "selections": (v3/*: any*/),
-                    "storageKey": "descendentGroups(first:0)"
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "hasChildren",
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "Group",
+                    "abstractKey": null
                   },
                   {
-                    "alias": null,
-                    "args": (v2/*: any*/),
-                    "concreteType": "WorkspaceConnection",
-                    "kind": "LinkedField",
-                    "name": "workspaces",
-                    "plural": false,
-                    "selections": (v3/*: any*/),
-                    "storageKey": "workspaces(first:0)"
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "__typename",
-                    "storageKey": null
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "destroyed",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "WorkspaceLabel",
+                        "kind": "LinkedField",
+                        "name": "labels",
+                        "plural": true,
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "key",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "value",
+                            "storageKey": null
+                          }
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "Workspace",
+                    "abstractKey": null
                   }
                 ],
                 "storageKey": null
@@ -290,28 +282,27 @@ return {
         "alias": null,
         "args": (v1/*: any*/),
         "filters": [
-          "parentPath",
-          "search",
+          "parentId",
           "sort"
         ],
         "handle": "connection",
-        "key": "GroupList_groups",
+        "key": "NestedNamespaceList_namespaces",
         "kind": "LinkedHandle",
-        "name": "groups"
+        "name": "namespaces"
       }
     ]
   },
   "params": {
-    "cacheID": "a3ee6e7089c12a455ac2b9f008ec94e1",
+    "cacheID": "2908e38d62a30b6eb1c7fe35777da75d",
     "id": null,
     "metadata": {},
-    "name": "GroupListPaginationQuery",
+    "name": "NestedNamespaceListPaginationQuery",
     "operationKind": "query",
-    "text": "query GroupListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $parentPath: String\n  $search: String\n) {\n  ...GroupListFragment_groups\n}\n\nfragment GroupListFragment_groups on Query {\n  groups(after: $after, before: $before, first: $first, last: $last, parentPath: $parentPath, search: $search, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        id\n        ...GroupListItemFragment_group\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment GroupListItemFragment_group on Group {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  descendentGroups(first: 0) {\n    totalCount\n  }\n  workspaces(first: 0) {\n    totalCount\n  }\n}\n"
+    "text": "query NestedNamespaceListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $parentId: String\n) {\n  ...NestedNamespaceListFragment_namespaces\n}\n\nfragment NamespaceListItemFragment_namespace on Namespace {\n  __isNamespace: __typename\n  __typename\n  id\n  name\n  description\n  fullPath\n  ... on Group {\n    hasChildren\n  }\n  ... on Workspace {\n    destroyed\n    labels {\n      key\n      value\n    }\n  }\n}\n\nfragment NestedNamespaceListFragment_namespaces on Query {\n  namespaces(after: $after, before: $before, first: $first, last: $last, parentId: $parentId, sort: FULL_PATH_ASC) {\n    edges {\n      node {\n        __typename\n        id\n        ...NamespaceListItemFragment_namespace\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "cbaf49207b745e57d363fee50c49adf5";
+(node as any).hash = "346b8fb69531b5944186da39fb0cf7ea";
 
 export default node;
