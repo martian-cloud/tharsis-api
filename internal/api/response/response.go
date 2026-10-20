@@ -37,6 +37,7 @@ var tharsisErrorToStatusCode = map[te.CodeType]int{
 	te.ENotImplemented:     http.StatusNotImplemented,
 	te.EInvalid:            http.StatusBadRequest,
 	te.EConflict:           http.StatusConflict,
+	te.EOptimisticLock:     http.StatusConflict,
 	te.ENotFound:           http.StatusNotFound,
 	te.EForbidden:          http.StatusForbidden,
 	te.ETooManyRequests:    http.StatusTooManyRequests,

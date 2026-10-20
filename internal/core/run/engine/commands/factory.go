@@ -158,6 +158,11 @@ func (f *Factory) NewUndiscardRun(in *UndiscardRunInput) *UndiscardRun {
 	return &UndiscardRun{dbClient: f.dbClient, in: in}
 }
 
+// NewUploadPlanBinary creates an UploadPlanBinary command.
+func (f *Factory) NewUploadPlanBinary(in *UploadPlanBinaryInput) *UploadPlanBinary {
+	return &UploadPlanBinary{dbClient: f.dbClient, artifactStore: f.artifactStore, in: in}
+}
+
 // NewUpdatePlanSummary creates an UpdatePlanSummary command.
 func (f *Factory) NewUpdatePlanSummary(in *UpdatePlanSummaryInput) *UpdatePlanSummary {
 	return &UpdatePlanSummary{dbClient: f.dbClient, planParser: f.planParser, artifactStore: f.artifactStore, in: in}

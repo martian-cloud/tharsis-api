@@ -1311,33 +1311,13 @@ func (s *service) UploadPlanBinary(ctx context.Context, planID string, reader io
 		return err
 	}
 
-	retainFn, cacheKey, err := s.artifactStore.UploadPlanCache(ctx, run, reader)
-	if err != nil {
-		return errors.Wrap(err, "failed to upload plan cache", errors.WithSpan(span))
-	}
+	cmd := s.cmdFactory.NewUploadPlanBinary(&commands.UploadPlanBinaryInput{
+		PlanID: planID,
+		Body:   reader,
+	})
 
-	txCtx, err := s.dbClient.Transactions.BeginTx(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to begin transaction", errors.WithSpan(span))
-	}
-
-	defer func() {
-		if txErr := s.dbClient.Transactions.RollbackTx(txCtx); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback UploadPlanBinary tx: %v", txErr)
-		}
-	}()
-
-	run.Plan.CacheObjectStoreKey = &cacheKey
-	if _, err = s.dbClient.Runs.UpdateRun(txCtx, run, run.Plan.GetID()); err != nil {
-		return errors.Wrap(err, "failed to update run", errors.WithSpan(span))
-	}
-
-	if err = retainFn(txCtx, run.Metadata.ID); err != nil {
-		return errors.Wrap(err, "failed to link plan cache object store ref", errors.WithSpan(span))
-	}
-
-	if err = s.dbClient.Transactions.CommitTx(txCtx); err != nil {
-		return errors.Wrap(err, "failed to commit transaction", errors.WithSpan(span))
+	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
+		return errors.Wrap(err, "failed to upload plan binary", errors.WithSpan(span))
 	}
 
 	return nil

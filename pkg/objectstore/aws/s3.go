@@ -105,6 +105,24 @@ func New(ctx context.Context, logger logger.Logger, pluginData map[string]string
 	return &ObjectStore{logger, client, uploader, downloader, bucket}, nil
 }
 
+// logRequestFailure logs a failed S3 request at a level that matches how expected the failure is.
+// A canceled context is not logged, because it means the caller went away. A deadline exceeded is
+// logged as a warning, since it can point to slowness worth a look but isn't a fault. Anything else
+// is logged as an error. The caller is responsible for returning err.
+func (s *ObjectStore) logRequestFailure(ctx context.Context, err error, format string, args ...interface{}) {
+	if te.IsContextCanceledError(err) {
+		return
+	}
+
+	l := s.logger.WithContextFields(ctx)
+	if te.IsDeadlineExceededError(err) {
+		l.Warnf(format, args...)
+		return
+	}
+
+	l.Errorf(format, args...)
+}
+
 // UploadObject uploads an object to the object store
 func (s *ObjectStore) UploadObject(ctx context.Context, key string, body io.Reader) error {
 	_, err := s.uploader.Upload(ctx, &s3.PutObjectInput{
@@ -113,7 +131,7 @@ func (s *ObjectStore) UploadObject(ctx context.Context, key string, body io.Read
 		Body:   body,
 	})
 	if err != nil {
-		s.logger.WithContextFields(ctx).Errorf("Failed to upload file to location %v", err)
+		s.logRequestFailure(ctx, err, "Failed to upload file to location %v", err)
 		return err
 	}
 
@@ -143,7 +161,7 @@ func (s *ObjectStore) DownloadObject(ctx context.Context, key string, w io.Write
 			return te.New("Range %s not found in %s", *options.ContentRange, key, te.WithErrorCode(te.ENotFound))
 		}
 
-		s.logger.WithContextFields(ctx).Errorf("Failed to download file from key %s %v", key, err)
+		s.logRequestFailure(ctx, err, "Failed to download file from key %s %v", key, err)
 		return err
 	}
 
@@ -173,7 +191,7 @@ func (s *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 			return nil, te.New("Range %s not found in %s", *options.ContentRange, key, te.WithErrorCode(te.ENotFound))
 		}
 
-		s.logger.WithContextFields(ctx).Errorf("Failed to get file from key %s %v", key, err)
+		s.logRequestFailure(ctx, err, "Failed to get file from key %s %v", key, err)
 		return nil, err
 	}
 
@@ -246,11 +264,12 @@ func (s *ObjectStore) DeleteObjects(ctx context.Context, keys []string) error {
 			Delete: &types.Delete{Objects: identifiers, Quiet: aws.Bool(true)},
 		})
 		if err != nil {
-			s.logger.WithContextFields(ctx).Errorf("Failed to delete objects: %v", err)
+			s.logRequestFailure(ctx, err, "Failed to delete objects: %v", err)
 			return err
 		}
 
 		// With Quiet=true, only errors are returned. Missing keys are not errors.
+		// These are failures S3 reported for specific keys, not context errors, so they stay at ERROR.
 		if len(output.Errors) > 0 {
 			for _, e := range output.Errors {
 				s.logger.WithContextFields(ctx).Errorf("Failed to delete object at key %s: %s", aws.ToString(e.Key), aws.ToString(e.Message))

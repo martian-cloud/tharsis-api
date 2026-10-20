@@ -507,8 +507,9 @@ func (c *scimController) respondWithSCIMError(ctx context.Context, w http.Respon
 		Status:     fmt.Sprintf("%d", code), // Must be a string.
 	}
 
-	// RFC 7644 section 3.12: a 409 for a create or update must identify the uniqueness conflict.
-	if code == http.StatusConflict {
+	// RFC 7644 section 3.12: a 409 for a create or update must identify the uniqueness conflict. An optimistic
+	// lock error also maps to a 409, but it means the resource was modified concurrently, so it is not one.
+	if errors.ErrorCode(err) == errors.EConflict {
 		scimErr.ScimType = "uniqueness"
 	}
 
