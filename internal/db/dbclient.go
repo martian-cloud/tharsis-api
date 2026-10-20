@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -368,6 +369,26 @@ func (db *Client) RetryOnOLE(ctx context.Context, fn func() error, options ...Re
 		retry.LastErrorOnly(true),
 		retry.Context(ctx),
 	)
+}
+
+// textArrayLiteral encodes values as a Postgres text array literal, e.g. {a,"b c"}. goqu expands a slice argument
+// into a list of placeholders, so passing the literal as one string (cast in SQL, e.g. ?::text::uuid[]) keeps the
+// whole array in a single parameter.
+func textArrayLiteral(values []string) (string, error) {
+	buf, err := pgtype.NewMap().Encode(pgtype.TextArrayOID, pgtype.TextFormatCode, values, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(buf), nil
+}
+
+// qualifiedFields prefixes each field with its table name, e.g. for selecting from a join.
+func qualifiedFields(table string, fields []interface{}) []interface{} {
+	qualified := make([]interface{}, len(fields))
+	for i, field := range fields {
+		qualified[i] = fmt.Sprintf("%s.%s", table, field)
+	}
+	return qualified
 }
 
 type scanner interface {

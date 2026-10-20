@@ -11,8 +11,6 @@ import NamespaceBreadcrumbs from '../namespace/NamespaceBreadcrumbs';
 import Link from '../routes/Link';
 import { NewGroupMutation } from './__generated__/NewGroupMutation.graphql';
 import GroupForm, { FormData } from './GroupForm';
-import { GetConnections } from './GroupList';
-import { GetConnections as GetTopLevelConnections } from './tree/GroupTreeContainer';
 import { PageLayoutProvider } from '../layout/PageLayoutContext';
 
 function NewGroup() {
@@ -26,12 +24,11 @@ function NewGroup() {
     });
 
     const [commit, isInFlight] = useMutation<NewGroupMutation>(graphql`
-        mutation NewGroupMutation($input: CreateGroupInput!, $connections: [ID!]!) {
+        mutation NewGroupMutation($input: CreateGroupInput!) {
             createGroup(input: $input) {
-                group @prependNode(connections: $connections, edgeTypeName: "GroupEdge") {
+                group {
                     id
                     fullPath
-                    ...GroupListItemFragment_group
                 }
                 problems {
                     message
@@ -50,7 +47,13 @@ function NewGroup() {
                     description: formData.description,
                     parentPath: parentGroupPath
                 },
-                connections: parentGroupPath ? GetConnections(parentGroupPath) : GetTopLevelConnections()
+            },
+            // Namespace lists are cached per view, search and expanded group, so mark the whole store stale and let
+            // whichever list mounts next refetch instead of patching each connection
+            updater: (store, data) => {
+                if (data?.createGroup.group) {
+                    store.invalidateStore();
+                }
             },
 
             onCompleted: data => {

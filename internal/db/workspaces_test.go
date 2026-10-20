@@ -60,6 +60,19 @@ func TestWorkspaces_CreateWorkspace(t *testing.T) {
 			description:     "invalid workspace",
 			expectErrorCode: errors.EInvalid,
 		},
+		{
+			name:            "negative, group does not exist",
+			workspaceName:   "missing-group-workspace",
+			groupID:         nonExistentID,
+			expectErrorCode: errors.EConflict,
+		},
+		{
+			// Runs after "create workspace", so its namespace path is already taken
+			name:            "negative, duplicate name",
+			workspaceName:   "test-workspace",
+			groupID:         group.Metadata.ID,
+			expectErrorCode: errors.EConflict,
+		},
 	}
 
 	for _, test := range testCases {

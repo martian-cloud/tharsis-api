@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 func TestGetNamespace(t *testing.T) {
@@ -294,94 +295,166 @@ func TestGetNamespaceByPath(t *testing.T) {
 	}
 }
 
-func TestCreateNamespace(t *testing.T) {
+func TestGetNamespaces(t *testing.T) {
 	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// It is not feasible to make a direct positive test case here, because the group_id/workspace_id
-	// foreign keys must point to an existing group or workspace, and creating a group or workspace
-	// already creates its namespace row (see TestGetNamespace and friends for indirect coverage).
-	// These fixtures exist only to give the duplicate-conflict cases a real group/workspace ID to
-	// collide with.
-	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name:      "test-create-namespace-group",
-		CreatedBy: "db-integration-tests",
-	})
+	parent, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "list-parent", CreatedBy: "db-integration-tests"})
 	require.NoError(t, err)
-
-	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
-		Name:           "test-create-namespace-workspace",
-		GroupID:        group.Metadata.ID,
+	child, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "child-group", ParentID: parent.Metadata.ID, CreatedBy: "db-integration-tests"})
+	require.NoError(t, err)
+	_, err = testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "child-workspace",
+		GroupID:        parent.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
 		CreatedBy:      "db-integration-tests",
 	})
 	require.NoError(t, err)
+	// A grandchild, which a direct-children listing must leave out
+	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "grandchild-group", ParentID: child.Metadata.ID, CreatedBy: "db-integration-tests"})
+	require.NoError(t, err)
+	// A second top-level group, so top-level listings have more than one row
+	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "other-top", CreatedBy: "db-integration-tests"})
+	require.NoError(t, err)
 
-	type testCase struct {
-		name            string
-		input           *namespaceRow
-		expectErrorCode errors.CodeType
+	list := func(input *GetNamespacesInput) []string {
+		got, err := testClient.client.Namespaces.GetNamespaces(ctx, input)
+		require.NoError(t, err)
+		return namespacePaths(got.Namespaces)
 	}
 
-	testCases := []testCase{
-		{
-			name: "negative, duplicate group",
-			input: &namespaceRow{
-				path:    "would/duplicate/a/group",
-				groupID: group.Metadata.ID,
-			},
-			expectErrorCode: errors.EConflict,
-		},
-		{
-			name: "negative, duplicate workspace",
-			input: &namespaceRow{
-				path:        "would/duplicate/a/workspace",
-				workspaceID: workspace.Metadata.ID,
-			},
-			expectErrorCode: errors.EConflict,
-		},
-		{
-			name: "negative, non-existent group id",
-			input: &namespaceRow{
-				path:    "group/id/does/not/exist",
-				groupID: nonExistentID,
-			},
-			expectErrorCode: errors.EInternal,
-		},
-		{
-			name: "negative, non-existent workspace id",
-			input: &namespaceRow{
-				path:        "workspace/id/does/not/exist",
-				workspaceID: nonExistentID,
-			},
-			expectErrorCode: errors.EInternal,
-		},
-		{
-			name: "negative, invalid group id",
-			input: &namespaceRow{
-				path:    "group/id/invalid",
-				groupID: invalidID,
-			},
-			expectErrorCode: errors.EInternal,
-		},
-		{
-			name: "negative, invalid workspace id",
-			input: &namespaceRow{
-				path:        "workspace/id/invalid",
-				workspaceID: invalidID,
-			},
-			expectErrorCode: errors.EInternal,
-		},
-	}
+	t.Run("parent group lists only its direct children, sorted by path", func(t *testing.T) {
+		assert.Equal(t, []string{"list-parent/child-group", "list-parent/child-workspace"}, list(&GetNamespacesInput{
+			Filter: &NamespaceFilter{ParentPath: &parent.FullPath},
+		}))
+	})
 
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			gotNamespace, err := createNamespace(ctx, testClient.client.getConnection(ctx), test.input)
-			assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-			assert.Nil(t, gotNamespace)
-		})
+	t.Run("FULL_PATH_DESC reverses the order", func(t *testing.T) {
+		sort := NamespaceSortableFieldFullPathDesc
+		assert.Equal(t, []string{"list-parent/child-workspace", "list-parent/child-group"}, list(&GetNamespacesInput{
+			Sort:   &sort,
+			Filter: &NamespaceFilter{ParentPath: &parent.FullPath},
+		}))
+	})
+
+	t.Run("top level without memberships lists root groups only", func(t *testing.T) {
+		assert.Equal(t, []string{"list-parent", "other-top"}, list(&GetNamespacesInput{
+			Filter: &NamespaceFilter{TopLevel: true},
+		}))
+	})
+
+	t.Run("memberships restrict to the root namespaces and their descendants", func(t *testing.T) {
+		memberships := []models.MembershipNamespace{{ID: child.Metadata.ID, GroupID: &child.Metadata.ID, Path: child.FullPath}}
+
+		assert.Equal(t, []string{"list-parent/child-group", "list-parent/child-group/grandchild-group"}, list(&GetNamespacesInput{
+			Filter: &NamespaceFilter{RootNamespaceMemberships: memberships},
+		}))
+		// Top level with memberships lists the membership roots themselves, even when nested
+		assert.Equal(t, []string{"list-parent/child-group"}, list(&GetNamespacesInput{
+			Filter: &NamespaceFilter{RootNamespaceMemberships: memberships, TopLevel: true},
+		}))
+	})
+
+	t.Run("empty memberships match nothing", func(t *testing.T) {
+		empty := []models.MembershipNamespace{}
+
+		assert.Empty(t, list(&GetNamespacesInput{Filter: &NamespaceFilter{RootNamespaceMemberships: empty}}))
+		assert.Empty(t, list(&GetNamespacesInput{Filter: &NamespaceFilter{RootNamespaceMemberships: empty, TopLevel: true}}))
+	})
+
+	t.Run("pagination", func(t *testing.T) {
+		filter := &NamespaceFilter{ParentPath: &parent.FullPath, IncludeNested: true}
+		all := []string{
+			"list-parent/child-group",
+			"list-parent/child-group/grandchild-group",
+			"list-parent/child-workspace",
+		}
+
+		page := func(opts *pagination.Options) *NamespacesResult {
+			got, err := testClient.client.Namespaces.GetNamespaces(ctx, &GetNamespacesInput{Filter: filter, PaginationOptions: opts})
+			require.NoError(t, err)
+			return got
+		}
+		cursor := func(result *NamespacesResult, i int) *string {
+			c, err := result.PageInfo.Cursor(namespaceModelForTest(&result.Namespaces[i]))
+			require.NoError(t, err)
+			return c
+		}
+
+		first := page(&pagination.Options{First: ptr.Int32(2)})
+		assert.Equal(t, all[:2], namespacePaths(first.Namespaces))
+		assert.True(t, first.PageInfo.HasNextPage)
+		totalCount, err := first.PageInfo.TotalCount(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, int32(3), totalCount)
+
+		next := page(&pagination.Options{First: ptr.Int32(2), After: cursor(first, 1)})
+		assert.Equal(t, all[2:], namespacePaths(next.Namespaces))
+		assert.False(t, next.PageInfo.HasNextPage)
+		assert.True(t, next.PageInfo.HasPreviousPage)
+
+		last := page(&pagination.Options{Last: ptr.Int32(2)})
+		assert.Equal(t, all[1:], namespacePaths(last.Namespaces))
+		assert.True(t, last.PageInfo.HasPreviousPage)
+
+		prev := page(&pagination.Options{Last: ptr.Int32(2), Before: cursor(last, 0)})
+		assert.Equal(t, all[:1], namespacePaths(prev.Namespaces))
+		assert.False(t, prev.PageInfo.HasPreviousPage)
+	})
+
+	t.Run("search matches anywhere in the path below the ancestor", func(t *testing.T) {
+		search := func(term string) []string {
+			return list(&GetNamespacesInput{Filter: &NamespaceFilter{ParentPath: &parent.FullPath, IncludeNested: true, Search: &term}})
+		}
+
+		// The grandchild matches through its parent's name, not its own
+		assert.Equal(t, []string{
+			"list-parent/child-group",
+			"list-parent/child-group/grandchild-group",
+			"list-parent/child-workspace",
+		}, search("child"))
+		// The ancestor's own path segments never match
+		assert.Empty(t, search("parent"))
+	})
+
+	t.Run("search of direct children matches the child's own name only", func(t *testing.T) {
+		search := func(term string) []string {
+			return list(&GetNamespacesInput{Filter: &NamespaceFilter{ParentPath: &parent.FullPath, Search: &term}})
+		}
+
+		assert.Equal(t, []string{"list-parent/child-group"}, search("group"))
+		assert.Equal(t, []string{"list-parent/child-workspace"}, search("WORKSPACE"))
+		// The parent's own path segments don't match every child
+		assert.Empty(t, search("parent"))
+	})
+
+	t.Run("unknown parent path lists nothing", func(t *testing.T) {
+		assert.Empty(t, list(&GetNamespacesInput{
+			Filter: &NamespaceFilter{ParentPath: ptr.String("no-such-group")},
+		}))
+	})
+}
+
+// namespacePaths returns the full path of each namespace, in order.
+func namespacePaths(namespaces []Namespace) []string {
+	paths := []string{}
+	for i := range namespaces {
+		if namespaces[i].Group != nil {
+			paths = append(paths, namespaces[i].Group.FullPath)
+		} else {
+			paths = append(paths, namespaces[i].Workspace.FullPath)
+		}
 	}
+	return paths
+}
+
+// namespaceModelForTest returns whichever of the namespace's group or workspace is set, for building cursors.
+func namespaceModelForTest(ns *Namespace) models.Model {
+	if ns.Group != nil {
+		return ns.Group
+	}
+	return ns.Workspace
 }
 
 // compareNamespaceRows compares two namespace row objects.

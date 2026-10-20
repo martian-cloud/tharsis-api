@@ -127,6 +127,74 @@ func TestGetGroupByID(t *testing.T) {
 	}
 }
 
+func TestGetHasChildrenByGroupIDs(t *testing.T) {
+	dbResults := []db.GroupHasChildren{
+		{GroupID: "group-1", FullPath: "root/group-1", HasChildren: true},
+		{GroupID: "group-2", FullPath: "root/group-2", HasChildren: false},
+	}
+
+	type testCase struct {
+		name            string
+		idList          []string
+		dbResults       []db.GroupHasChildren
+		authError       error
+		expectResult    map[string]bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:         "returns whether each group has children",
+			idList:       []string{"group-1", "group-2"},
+			dbResults:    dbResults,
+			expectResult: map[string]bool{"group-1": true, "group-2": false},
+		},
+		{
+			name:         "no matching groups skips the permission check",
+			idList:       []string{"missing"},
+			dbResults:    []db.GroupHasChildren{},
+			expectResult: map[string]bool{},
+		},
+		{
+			name:            "subject is not authorized to view every group",
+			idList:          []string{"group-1", "group-2"},
+			dbResults:       dbResults,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockGroups := db.NewMockGroups(t)
+
+			mockGroups.On("GetHasChildrenByGroupIDs", mock.Anything, test.idList).Return(test.dbResults, nil)
+
+			if len(test.dbResults) > 0 {
+				// One permission check covers every group in the batch
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewGroupPermission, mock.Anything).Return(test.authError).Once()
+			}
+
+			service := &service{
+				dbClient: &db.Client{Groups: mockGroups},
+			}
+
+			result, err := service.GetHasChildrenByGroupIDs(auth.WithCaller(ctx, mockCaller), test.idList)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectResult, result)
+		})
+	}
+}
+
 func TestGroupByTRN(t *testing.T) {
 	sampleGroup := &models.Group{
 		Metadata: models.ResourceMetadata{

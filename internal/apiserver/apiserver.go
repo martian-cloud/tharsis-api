@@ -65,6 +65,7 @@ import (
 	maint "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
+	namespacesvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/packageregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/policy"
@@ -332,6 +333,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		providerMirrorService      = providermirror.NewService(logger, dbClient, providerRegistryClient, limits, mirrorStore)
 		maintenanceModeService     = maint.NewService(logger, dbClient)
 		emailService               = emailsvc.NewService(logger, dbClient)
+		namespaceService           = namespacesvc.New(dbClient)
 	)
 
 	versionService, err := version.NewService(dbClient, apiVersion, buildTimestamp)
@@ -372,6 +374,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		NamespaceMembershipService:       namespaceMembershipService,
 		PackageService:                   packageRegistryService,
 		PolicyService:                    policySetService,
+		NamespaceService:                 namespaceService,
 		ResourceLimitService:             resourceLimitService,
 		RoleService:                      roleService,
 		RunnerService:                    runnerService,

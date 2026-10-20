@@ -182,16 +182,15 @@ func (c *cursorPaginatedRows) Finalize(resultsPtr any) error {
 	}
 
 	if c.limit != nil && c.count > *c.limit {
-		// Remove the extra row fetched to detect another page; rows are fetched nearest the cursor first,
-		// so it is always the last one.
+		// Remove the extra row fetched to detect another page; it is always the last one fetched.
 		array.Set(array.Slice(0, int(*c.limit)))
 	}
 
-	// first+before (a forward traversal stepping back a page) and last+after (a reverse traversal stepping
-	// back a page) fetch rows walking away from the cursor. Reverse them into the order being traversed. This
-	// is done here rather than with an outer SQL query because re-sorting a subquery by column name fails
-	// when the query selects more than one column with the same name (e.g. two joined tables' id columns).
-	if (c.before != nil && c.first != nil) || (c.after != nil && c.last != nil) {
+	// Per the Relay spec, edges are always returned in the sort order. Last fetches rows from the end of the
+	// list backward, so reverse them. This is done here rather than with an outer SQL query because re-sorting
+	// a subquery by column name fails when the query selects more than one column with the same name (e.g.
+	// two joined tables' id columns).
+	if c.last != nil {
 		swap := reflect.Swapper(array.Interface())
 		for i, j := 0, array.Len()-1; i < j; i, j = i+1, j-1 {
 			swap(i, j)
@@ -208,31 +207,15 @@ func (c *cursorPaginatedRows) GetPageInfo() *PageInfo {
 		HasResults: c.count > 0,
 	}
 
-	// Handle all possible permutations
-	// Limit will be non nil if first or last is set
-	if c.after != nil && c.first != nil {
-		pageInfo.HasNextPage = c.count > *c.limit
-		pageInfo.HasPreviousPage = true
-	} else if c.after != nil && c.last != nil {
-		pageInfo.HasNextPage = c.count > *c.limit
-		pageInfo.HasPreviousPage = true
-	} else if c.before != nil && c.first != nil {
+	// Follows the Relay spec: first determines hasNextPage and last determines hasPreviousPage from the extra
+	// row fetched. Otherwise a cursor implies the rows on its other side exist (the cursor row itself, at least).
+	// Limit will be non nil if first or last is set.
+	pageInfo.HasNextPage = c.before != nil
+	pageInfo.HasPreviousPage = c.after != nil
+
+	if c.first != nil && c.count > *c.limit {
 		pageInfo.HasNextPage = true
-		pageInfo.HasPreviousPage = c.count > *c.limit
-	} else if c.before != nil && c.last != nil {
-		pageInfo.HasNextPage = true
-		pageInfo.HasPreviousPage = c.count > *c.limit
-	} else if c.first != nil {
-		pageInfo.HasNextPage = c.count > *c.limit
-		pageInfo.HasPreviousPage = false
-	} else if c.last != nil {
-		pageInfo.HasNextPage = false
-		pageInfo.HasPreviousPage = c.count > *c.limit
-	} else if c.last == nil && c.first == nil && c.before != nil {
-		pageInfo.HasNextPage = true
-		pageInfo.HasPreviousPage = false
-	} else if c.last == nil && c.first == nil && c.after != nil {
-		pageInfo.HasNextPage = false
+	} else if c.last != nil && c.count > *c.limit {
 		pageInfo.HasPreviousPage = true
 	}
 
@@ -534,11 +517,10 @@ func (p *PaginatedQueryBuilder) buildOrderBy() []exp.OrderedExpression {
 		backward = asc
 	}
 
-	// Rows are fetched walking away from the cursor so the limit keeps the rows nearest to it: backward for
-	// last (with or without before) and for first+before, forward for first (with or without after) and for
-	// last+after. The latter two are reversed into traversal order by Finalize.
+	// Per the Relay spec, first takes rows from the start of the (cursor-bounded) list and last takes them
+	// from the end, so last is fetched backward and reversed into sort order by Finalize.
 	direction := forward
-	if (p.options.Last != nil && p.options.After == nil) || (p.options.Before != nil && p.options.First != nil) {
+	if p.options.Last != nil {
 		direction = backward
 	}
 

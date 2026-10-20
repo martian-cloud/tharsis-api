@@ -31,6 +31,7 @@ const runSubscription = graphql`subscription WorkspaceDetailsRunSubscription($in
     action
     run {
       id
+      assessment
       ...RunListItemFragment_run
       ...RunDetailsSidebarFragment_details
       ...RunDetailsPlanStageFragment_plan
@@ -94,7 +95,7 @@ function WorkspaceDetails(props: Props) {
       if (record == null) {
         return;
       }
-      GetConnections(data.id).forEach(id => {
+      GetConnections(data.id, payload.workspaceRunEvents.run.assessment).forEach(id => {
         const connectionRecord = store.get(id);
         if (connectionRecord) {
           const { NODE, EDGES } = ConnectionInterface.get();

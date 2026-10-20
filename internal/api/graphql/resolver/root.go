@@ -53,6 +53,11 @@ func (r RootResolver) Namespace(ctx context.Context, args *NamespaceQueryArgs) (
 	return namespaceQuery(ctx, args)
 }
 
+// Namespaces query returns a unified connection of groups and workspaces
+func (r RootResolver) Namespaces(ctx context.Context, args *NamespaceConnectionQueryArgs) (*NamespaceConnectionResolver, error) {
+	return namespacesQuery(ctx, args)
+}
+
 /* Workspace Queries and Mutations */
 
 // Workspace query returns a workspace by full path

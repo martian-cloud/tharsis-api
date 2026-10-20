@@ -134,7 +134,7 @@ function GroupRunList({ groupPath, includeAssessmentRuns }: Props) {
                 }
             });
         }
-    }), [data.group?.id]);
+    }), [data.group?.id, groupPath, includeAssessmentRuns]);
 
     useSubscription(runSubscriptionConfig);
 

@@ -1,5 +1,5 @@
 import NoResults from '@/common/NoResults';
-import { Alert, AlertTitle, Avatar, Box, Button, Chip, FormControlLabel, Paper, Stack, Switch, Tab, Tabs, Tooltip, Typography, useTheme } from '@mui/material';
+import { Alert, AlertTitle, Box, Button, Chip, FormControlLabel, Paper, Stack, Switch, Tab, Tabs, Tooltip, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import React, { useEffect, useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
@@ -25,6 +25,7 @@ import WorkspaceDetailsDriftDetection from './WorkspaceDetailsDriftDetection';
 import WorkspaceNotificationPreference from '../notifications/WorkspaceNotificationPreference';
 import NamespaceFavoriteButton from '../common/NamespaceFavoriteButton';
 import { useAgentCopilot } from '../ai/AgentCopilotProvider';
+import NamespaceAvatar from '../common/NamespaceAvatar';
 
 const DRIFT_ALERT_DESCRIPTION = "This workspace has drifted from its configuration; this can happen if the resources were modified outside of Tharsis, or if the infrastructure was changed directly through the cloud provider console."
 
@@ -219,7 +220,7 @@ function WorkspaceDetailsIndex(props: Props) {
                 sx={{
                     display: "flex",
                     justifyContent: "space-between",
-                    mb: 4,
+                    mb: 3,
                     [theme.breakpoints.down('lg')]: {
                         flexDirection: 'column',
                         alignItems: 'flex-start',
@@ -227,7 +228,7 @@ function WorkspaceDetailsIndex(props: Props) {
                     }
                 }}>
                 <Box display="flex" alignItems="center">
-                    <Avatar sx={{ width: 56, height: 56, marginRight: 2, bgcolor: 'avatar.default' }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
+                    <NamespaceAvatar name={data.name} type="workspace" size="lg" sx={{ marginRight: 2 }} />
                     <Stack>
                         <Stack direction="row" spacing={1} alignItems="center">
                             <Typography variant="h5" sx={{ fontWeight: "bold" }}>{data.name}</Typography>

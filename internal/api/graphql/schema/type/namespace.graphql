@@ -1,3 +1,19 @@
+enum NamespaceSort {
+  FULL_PATH_ASC
+  FULL_PATH_DESC
+}
+
+type NamespaceEdge {
+  cursor: String!
+  node: Namespace
+}
+
+type NamespaceConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [NamespaceEdge]
+}
+
 enum NamespaceType {
   GROUP
   WORKSPACE

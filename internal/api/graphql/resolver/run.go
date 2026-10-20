@@ -1218,16 +1218,19 @@ func (r *RunEventResolver) Run() *RunResolver {
 
 // RunSubscriptionInput is the input for subscribing to run events
 type RunSubscriptionInput struct {
-	RunID           *string
-	WorkspaceID     *string
-	WorkspacePath   *string // DEPRECATED: use workspaceID instead with a TRN
-	AncestorGroupID *string
+	RunID               *string
+	WorkspaceID         *string
+	WorkspacePath       *string // DEPRECATED: use workspaceID instead with a TRN
+	AncestorGroupID     *string
+	WorkspaceAssessment *bool
 }
 
 func (r RootResolver) workspaceRunEventsSubscription(ctx context.Context, input *RunSubscriptionInput) (<-chan *RunEventResolver, error) {
 	serviceCatalog := getServiceCatalog(ctx)
 
-	subscriptionInput := &run.EventSubscriptionOptions{}
+	subscriptionInput := &run.EventSubscriptionOptions{
+		WorkspaceAssessment: input.WorkspaceAssessment,
+	}
 
 	if input.WorkspaceID != nil && input.WorkspacePath != nil {
 		return nil, errors.New("workspaceId and workspacePath cannot both be set", errors.WithErrorCode(errors.EInvalid))

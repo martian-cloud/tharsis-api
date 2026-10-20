@@ -16,6 +16,17 @@ type Query {
   scimToken: SCIMToken
   node(id: String!): Node
   namespace(fullPath: String!): Namespace
+  namespaces(
+    after: String
+    before: String
+    first: Int
+    includeNested: Boolean
+    last: Int
+    parentId: String
+    search: String
+    sort: NamespaceSort
+    topLevel: Boolean
+  ): NamespaceConnection!
   group(fullPath: String!): Group
     @deprecated(
       reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"

@@ -176,11 +176,12 @@ type sortableField interface {
 	getValue() string
 }
 
-// testCursorPageWalks checks cursor pagination against the unpaginated order for one sort. It walks every
-// page forward (First/After) and backward (Last/Before), and steps back one page from the middle
-// (First/Before and Last/After), expecting the rows immediately adjacent to the cursor each time. The page
-// size is smaller than the remaining rows so a query that returns rows from the wrong end of the list, or in
-// the wrong order, is detected. Resources are identified by their cursor, which is unique per row.
+// testCursorPageWalks checks cursor pagination against the unpaginated order for one sort, following the
+// Relay spec: every page is returned in the sort order, First takes rows from the start of the
+// cursor-bounded list and Last takes them from the end. It walks every page forward (First/After) and
+// backward (Last/Before), and checks First/Before and Last/After from the middle. The page size is smaller
+// than the remaining rows so a query that returns rows from the wrong end of the list, or in the wrong order,
+// is detected. Resources are identified by their cursor, which is unique per row.
 func testCursorPageWalks(
 	ctx context.Context,
 	t *testing.T,
@@ -211,14 +212,6 @@ func testCursorPageWalks(
 		return pageInfo, ids, cursors
 	}
 
-	reversed := func(s []string) []string {
-		out := make([]string, 0, len(s))
-		for i := len(s) - 1; i >= 0; i-- {
-			out = append(out, s[i])
-		}
-		return out
-	}
-
 	_, expected, expectedCursors := getPage(&pagination.Options{})
 	require.Len(t, expected, totalCount)
 
@@ -235,31 +228,31 @@ func testCursorPageWalks(
 	}
 	assert.Equal(t, expected, walked, "forward walk with sort by %s", sortByField.getValue())
 
-	// Backward walk. Last returns rows in reverse order, so the walk visits the list back to front.
+	// Backward walk. Each page is in sort order and precedes the previous one, so prepend it.
 	walked = []string{}
 	cursor = nil
 	for range totalCount + 1 {
 		pageInfo, ids, cursors := getPage(&pagination.Options{Last: ptr.Int32(pageSize), Before: cursor})
-		walked = append(walked, ids...)
+		walked = append(append([]string{}, ids...), walked...)
 		if len(ids) == 0 || !pageInfo.HasPreviousPage {
 			break
 		}
-		cursor = cursors[len(cursors)-1]
+		cursor = cursors[0]
 	}
-	assert.Equal(t, expected, reversed(walked), "backward walk with sort by %s", sortByField.getValue())
+	assert.Equal(t, expected, walked, "backward walk with sort by %s", sortByField.getValue())
 
-	// Step back one page from the middle in each direction.
+	// First/Before and Last/After from the middle take rows from the far ends of the list, not next to the cursor.
 	middle := totalCount / 2
 
 	pageInfo, ids, _ := getPage(&pagination.Options{First: ptr.Int32(pageSize), Before: expectedCursors[middle]})
-	assert.Equal(t, expected[middle-pageSize:middle], ids, "first before with sort by %s", sortByField.getValue())
+	assert.Equal(t, expected[:pageSize], ids, "first before with sort by %s", sortByField.getValue())
 	assert.True(t, pageInfo.HasNextPage, "first before with sort by %s", sortByField.getValue())
-	assert.Equal(t, middle-pageSize > 0, pageInfo.HasPreviousPage, "first before with sort by %s", sortByField.getValue())
+	assert.False(t, pageInfo.HasPreviousPage, "first before with sort by %s", sortByField.getValue())
 
 	pageInfo, ids, _ = getPage(&pagination.Options{Last: ptr.Int32(pageSize), After: expectedCursors[middle]})
-	assert.Equal(t, reversed(expected[middle+1:middle+1+pageSize]), ids, "last after with sort by %s", sortByField.getValue())
+	assert.Equal(t, expected[totalCount-pageSize:], ids, "last after with sort by %s", sortByField.getValue())
 	assert.True(t, pageInfo.HasPreviousPage, "last after with sort by %s", sortByField.getValue())
-	assert.Equal(t, middle+1+pageSize < totalCount, pageInfo.HasNextPage, "last after with sort by %s", sortByField.getValue())
+	assert.False(t, pageInfo.HasNextPage, "last after with sort by %s", sortByField.getValue())
 }
 
 func testResourcePaginationAndSorting(
@@ -307,7 +300,7 @@ func testResourcePaginationAndSorting(
 	assert.False(t, pageInfo.HasNextPage)
 	assert.True(t, pageInfo.HasPreviousPage)
 
-	cursor, err = pageInfo.Cursor(resources[len(resources)-1])
+	cursor, err = pageInfo.Cursor(resources[0])
 	require.Nil(t, err)
 
 	remaining = totalCount - middleIndex

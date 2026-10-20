@@ -4,7 +4,7 @@ import LabelChip from './LabelChip';
 import { Label } from './types';
 
 interface Props {
-    labels: Label[];
+    labels: readonly Label[];
     maxVisible?: number;
     size?: 'small' | 'medium' | 'xs';
     variant?: 'filled' | 'outlined';

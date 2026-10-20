@@ -148,9 +148,9 @@ func TestExecute(t *testing.T) {
 			name:                "limit results by last with after cursor",
 			paginationOptions:   Options{Last: &optionsNum, After: buildTestCursor("1", "")},
 			resultCount:         6,
-			expectSQL:           `SELECT * FROM "tests" WHERE ("tests"."id" > ?) ORDER BY "tests"."id" ASC LIMIT ?`,
+			expectSQL:           `SELECT * FROM "tests" WHERE ("tests"."id" > ?) ORDER BY "tests"."id" DESC LIMIT ?`,
 			expectArguments:     []interface{}{"1", int64(6)},
-			expectHasNextPage:   true,
+			expectHasNextPage:   false,
 			expectHasPrevPage:   true,
 			expectedResultCount: 5,
 		},
@@ -160,20 +160,20 @@ func TestExecute(t *testing.T) {
 			sortByField:         &FieldDescriptor{Key: "name", Table: "tests", Col: "name"},
 			sortDirection:       DescSort,
 			resultCount:         6,
-			expectSQL:           `SELECT * FROM "tests" WHERE (("tests"."name" >= ?) AND (("tests"."name" > ?) OR (("tests"."id" > ?) AND ("tests"."name" = ?)))) ORDER BY "tests"."name" ASC, "tests"."id" ASC LIMIT ?`,
+			expectSQL:           `SELECT * FROM "tests" WHERE (("tests"."name" >= ?) AND (("tests"."name" > ?) OR (("tests"."id" > ?) AND ("tests"."name" = ?)))) ORDER BY "tests"."name" DESC, "tests"."id" DESC LIMIT ?`,
 			expectArguments:     []interface{}{"test1", "test1", "1", "test1", int64(6)},
 			expectHasNextPage:   true,
-			expectHasPrevPage:   true,
+			expectHasPrevPage:   false,
 			expectedResultCount: 5,
 		},
 		{
 			name:                "limit results by first with before cursor",
 			paginationOptions:   Options{First: &optionsNum, Before: buildTestCursor("1", "")},
 			resultCount:         6,
-			expectSQL:           `SELECT * FROM "tests" WHERE ("tests"."id" < ?) ORDER BY "tests"."id" DESC LIMIT ?`,
+			expectSQL:           `SELECT * FROM "tests" WHERE ("tests"."id" < ?) ORDER BY "tests"."id" ASC LIMIT ?`,
 			expectArguments:     []interface{}{"1", int64(6)},
 			expectHasNextPage:   true,
-			expectHasPrevPage:   true,
+			expectHasPrevPage:   false,
 			expectedResultCount: 5,
 		},
 	}
@@ -256,6 +256,45 @@ func TestExecute(t *testing.T) {
 			} else {
 				assert.Nil(t, cursor.secondary)
 			}
+		})
+	}
+}
+
+// TestFinalize_ResultOrder verifies that results are always returned in the sort order, as the Relay spec
+// requires: first is fetched forward and kept as is, last is fetched backward and reversed. In both cases the
+// extra row fetched to detect another page is dropped.
+func TestFinalize_ResultOrder(t *testing.T) {
+	limit := int32(3)
+	cursor := ptr.String("c")
+
+	tests := []struct {
+		name    string
+		rows    *cursorPaginatedRows
+		fetched []string
+		expect  []string
+	}{
+		{name: "first", rows: &cursorPaginatedRows{first: &limit}, fetched: []string{"1", "2", "3", "4"}, expect: []string{"1", "2", "3"}},
+		{name: "first with after", rows: &cursorPaginatedRows{first: &limit, after: cursor}, fetched: []string{"1", "2", "3", "4"}, expect: []string{"1", "2", "3"}},
+		{name: "first with before", rows: &cursorPaginatedRows{first: &limit, before: cursor}, fetched: []string{"1", "2", "3", "4"}, expect: []string{"1", "2", "3"}},
+		{name: "last", rows: &cursorPaginatedRows{last: &limit}, fetched: []string{"9", "8", "7", "6"}, expect: []string{"7", "8", "9"}},
+		{name: "last with before", rows: &cursorPaginatedRows{last: &limit, before: cursor}, fetched: []string{"9", "8", "7", "6"}, expect: []string{"7", "8", "9"}},
+		{name: "last with after", rows: &cursorPaginatedRows{last: &limit, after: cursor}, fetched: []string{"9", "8", "7", "6"}, expect: []string{"7", "8", "9"}},
+		{name: "last without extra row", rows: &cursorPaginatedRows{last: &limit}, fetched: []string{"9", "8"}, expect: []string{"8", "9"}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockRows := mocks.Rows{}
+			mockRows.Test(t)
+			mockRows.On("Err").Return(nil)
+
+			test.rows.Rows = &mockRows
+			test.rows.limit = &limit
+			test.rows.count = int32(len(test.fetched))
+
+			results := append([]string{}, test.fetched...)
+			assert.NoError(t, test.rows.Finalize(&results))
+			assert.Equal(t, test.expect, results)
 		})
 	}
 }

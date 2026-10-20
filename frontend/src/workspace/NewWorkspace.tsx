@@ -7,7 +7,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import NamespaceBreadcrumbs from '../namespace/NamespaceBreadcrumbs';
 import WorkspaceForm, { FormData } from './WorkspaceForm';
 import { NewWorkspaceMutation } from './__generated__/NewWorkspaceMutation.graphql';
-import { GetConnections } from '../groups/WorkspaceList';
 import { sanitizeLabels } from './labels/labelErrorHandling';
 import { PageLayoutProvider } from '../layout/PageLayoutContext';
 
@@ -23,9 +22,9 @@ function NewWorkspace(){
     });
 
     const [commit, isInFlight] = useMutation<NewWorkspaceMutation>(graphql`
-        mutation NewWorkspaceMutation($input: CreateWorkspaceInput!, $connections: [ID!]!) {
+        mutation NewWorkspaceMutation($input: CreateWorkspaceInput!) {
             createWorkspace(input: $input) {
-                workspace @prependNode(connections: $connections, edgeTypeName: "WorkspaceEdge") {
+                workspace {
                     id
                     name
                     fullPath
@@ -57,7 +56,13 @@ function NewWorkspace(){
                         value: label.value
                     }))
                 },
-                connections: GetConnections(parentGroupPath)
+            },
+            // Namespace lists are cached per view, search and expanded group, so mark the whole store stale and let
+            // whichever list mounts next refetch instead of patching each connection
+            updater: (store, data) => {
+                if (data?.createWorkspace.workspace) {
+                    store.invalidateStore();
+                }
             },
             onCompleted: data => {
                 if (data.createWorkspace.problems.length) {

@@ -180,6 +180,36 @@ func (_m *MockGroups) GetGroups(ctx context.Context, input *GetGroupsInput) (*Gr
 	return r0, r1
 }
 
+// GetHasChildrenByGroupIDs provides a mock function with given fields: ctx, idList
+func (_m *MockGroups) GetHasChildrenByGroupIDs(ctx context.Context, idList []string) ([]GroupHasChildren, error) {
+	ret := _m.Called(ctx, idList)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetHasChildrenByGroupIDs")
+	}
+
+	var r0 []GroupHasChildren
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]GroupHasChildren, error)); ok {
+		return rf(ctx, idList)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []GroupHasChildren); ok {
+		r0 = rf(ctx, idList)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]GroupHasChildren)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, idList)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // MigrateGroup provides a mock function with given fields: ctx, group, newParentGroup
 func (_m *MockGroups) MigrateGroup(ctx context.Context, group *models.Group, newParentGroup *models.Group) (*models.Group, error) {
 	ret := _m.Called(ctx, group, newParentGroup)

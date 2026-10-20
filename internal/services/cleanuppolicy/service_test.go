@@ -202,7 +202,7 @@ func TestCreateCleanupPolicy(t *testing.T) {
 					models.CreateCleanupPolicyPermission, mock.Anything).
 					Return(nil)
 				m.namespaces.On("GetNamespace", mock.Anything, groupPath).
-					Return(&db.NamespaceResult{Type: models.NamespaceTypeGroup, Group: &models.Group{Metadata: models.ResourceMetadata{ID: groupID}, FullPath: groupPath}}, nil)
+					Return(&db.Namespace{Type: models.NamespaceTypeGroup, Group: &models.Group{Metadata: models.ResourceMetadata{ID: groupID}, FullPath: groupPath}}, nil)
 				m.transactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
@@ -219,7 +219,7 @@ func TestCreateCleanupPolicy(t *testing.T) {
 					models.CreateCleanupPolicyPermission, mock.Anything).
 					Return(nil)
 				m.namespaces.On("GetNamespace", mock.Anything, groupPath).
-					Return(&db.NamespaceResult{Type: models.NamespaceTypeGroup, Group: &models.Group{Metadata: models.ResourceMetadata{ID: groupID}, FullPath: groupPath}}, nil)
+					Return(&db.Namespace{Type: models.NamespaceTypeGroup, Group: &models.Group{Metadata: models.ResourceMetadata{ID: groupID}, FullPath: groupPath}}, nil)
 				m.transactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
@@ -237,7 +237,7 @@ func TestCreateCleanupPolicy(t *testing.T) {
 					models.CreateCleanupPolicyPermission, mock.Anything).
 					Return(nil)
 				m.namespaces.On("GetNamespace", mock.Anything, groupPath).
-					Return(&db.NamespaceResult{Type: models.NamespaceTypeWorkspace, Workspace: &models.Workspace{Metadata: models.ResourceMetadata{ID: "workspace-id"}, FullPath: groupPath}}, nil)
+					Return(&db.Namespace{Type: models.NamespaceTypeWorkspace, Workspace: &models.Workspace{Metadata: models.ResourceMetadata{ID: "workspace-id"}, FullPath: groupPath}}, nil)
 				m.transactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)
@@ -253,7 +253,7 @@ func TestCreateCleanupPolicy(t *testing.T) {
 					models.CreateCleanupPolicyPermission, mock.Anything).
 					Return(nil)
 				m.namespaces.On("GetNamespace", mock.Anything, groupPath).
-					Return(&db.NamespaceResult{Type: models.NamespaceTypeGroup, Group: &models.Group{Metadata: models.ResourceMetadata{ID: groupID}, FullPath: groupPath}}, nil)
+					Return(&db.Namespace{Type: models.NamespaceTypeGroup, Group: &models.Group{Metadata: models.ResourceMetadata{ID: groupID}, FullPath: groupPath}}, nil)
 				m.transactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
 				m.transactions.On("CommitTx", mock.Anything).Return(nil)

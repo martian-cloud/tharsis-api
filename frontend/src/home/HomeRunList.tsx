@@ -64,7 +64,8 @@ function HomeRunList() {
 
     const runSubscriptionConfig = useMemo<GraphQLSubscriptionConfig<HomeRunListSubscription>>(() => ({
         subscription: runSubscription,
-        variables: { input: {} },
+        // The home list never shows assessment runs
+        variables: { input: { workspaceAssessment: false } },
         onCompleted: () => console.log("Subscription completed"),
         onError: (error) => console.warn(`Subscription error: ${error.message}`),
         updater: (store: RecordSourceProxy, payload: HomeRunListSubscription$data | null | undefined) => {

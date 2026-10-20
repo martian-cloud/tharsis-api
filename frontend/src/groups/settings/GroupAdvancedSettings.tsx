@@ -55,6 +55,13 @@ function GroupAdvancedSettings({ fragmentRef }: Props) {
                         force: true
                     }
                 },
+                // Namespace lists are cached per view, search and expanded group, so mark the whole store stale and let
+                // whichever list mounts next refetch instead of patching each connection
+                updater: (store, deleteData) => {
+                    if (!deleteData?.deleteGroup.problems.length) {
+                        store.invalidateStore();
+                    }
+                },
                 onCompleted: deleteData => {
                     setShowDeleteConfirmationDialog(false);
                     setConfirmInput('');

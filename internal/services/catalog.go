@@ -21,6 +21,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
+	namespacesvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/packageregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/policy"
@@ -65,6 +66,7 @@ type Catalog struct {
 	NamespaceMembershipService       namespacemembership.Service
 	PackageService                   packageregistry.Service
 	PolicyService                    policy.Service
+	NamespaceService                 namespacesvc.Service
 	ResourceLimitService             resourcelimit.Service
 	RoleService                      role.Service
 	RunnerService                    runner.Service

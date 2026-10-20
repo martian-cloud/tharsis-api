@@ -120,6 +120,7 @@ func NewGraphQL(
 	resolver.RegisterTerraformModuleLoader(loaderCollection)
 	resolver.RegisterTerraformModuleVersionLoader(loaderCollection)
 	resolver.RegisterGPGKeyLoader(loaderCollection)
+	resolver.RegisterGroupHasChildrenLoader(loaderCollection)
 	resolver.RegisterManagedIdentityLoader(loaderCollection)
 	resolver.RegisterManagedIdentityAccessRuleLoader(loaderCollection)
 	resolver.RegisterNamespaceMembershipLoader(loaderCollection)

@@ -186,6 +186,11 @@ func (r *GroupResolver) Parent(ctx context.Context) (*GroupResolver, error) {
 	return &GroupResolver{group: group}, nil
 }
 
+// HasChildren resolver reports whether the group contains any subgroups or workspaces
+func (r *GroupResolver) HasChildren(ctx context.Context) (bool, error) {
+	return loadGroupHasChildren(ctx, r.group.Metadata.ID)
+}
+
 // DescendentGroups resolver
 func (r *GroupResolver) DescendentGroups(ctx context.Context, args ConnectionQueryArgs) (*GroupConnectionResolver, error) {
 	if err := args.Validate(); err != nil {
@@ -222,6 +227,15 @@ func (r *GroupResolver) Workspaces(ctx context.Context, args *ConnectionQueryArg
 	}
 
 	return NewWorkspaceConnectionResolver(ctx, &input)
+}
+
+// Namespaces resolver returns a unified connection of direct sub-groups and workspaces
+func (r *GroupResolver) Namespaces(ctx context.Context, args *NamespaceConnectionQueryArgs) (*NamespaceConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	return NewNamespaceConnectionResolver(ctx, newGetNamespacesInput(args, &r.group.Metadata.ID))
 }
 
 // Runs resolver
@@ -1006,6 +1020,48 @@ func groupBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error)
 	batch := loader.DataBatch{}
 	for _, result := range groups {
 		batch[result.Metadata.ID] = result
+	}
+
+	return batch, nil
+}
+
+/* Group has children loader */
+
+const groupHasChildrenLoaderKey = "groupHasChildren"
+
+// RegisterGroupHasChildrenLoader registers a loader that batches the hasChildren checks for every group in a request
+func RegisterGroupHasChildrenLoader(collection *loader.Collection) {
+	collection.Register(groupHasChildrenLoaderKey, groupHasChildrenBatchFunc)
+}
+
+func loadGroupHasChildren(ctx context.Context, groupID string) (bool, error) {
+	ldr, err := loader.Extract(ctx, groupHasChildrenLoaderKey)
+	if err != nil {
+		return false, err
+	}
+
+	data, err := ldr.Load(ctx, dataloader.StringKey(groupID))()
+	if err != nil {
+		return false, err
+	}
+
+	hasChildren, ok := data.(bool)
+	if !ok {
+		return false, errors.New("Wrong type")
+	}
+
+	return hasChildren, nil
+}
+
+func groupHasChildrenBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
+	hasChildren, err := getServiceCatalog(ctx).GroupService.GetHasChildrenByGroupIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	batch := loader.DataBatch{}
+	for id, v := range hasChildren {
+		batch[id] = v
 	}
 
 	return batch, nil

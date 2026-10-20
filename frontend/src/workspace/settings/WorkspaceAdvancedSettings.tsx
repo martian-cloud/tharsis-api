@@ -7,7 +7,6 @@ import {
     TextField,
     Typography
 } from '@mui/material'
-import { GetConnections } from '../../groups/WorkspaceList'
 import { useFragment, useMutation } from 'react-relay';
 import { useSnackbar } from 'notistack';
 import { useNavigate } from 'react-router-dom';
@@ -44,11 +43,8 @@ function WorkspaceAdvancedSettings({ fragmentRef }: Props) {
 
     const [commitDelete, commitDeleteInFlight] = useMutation<WorkspaceAdvancedSettingsDeleteMutation>(
         graphql`
-        mutation WorkspaceAdvancedSettingsDeleteMutation($input: DeleteWorkspaceInput!, $connections: [ID!]!) {
+        mutation WorkspaceAdvancedSettingsDeleteMutation($input: DeleteWorkspaceInput!) {
             deleteWorkspace(input: $input){
-                workspace {
-                    id @deleteEdge(connections: $connections)
-                }
                 problems {
                     message
                     field
@@ -66,7 +62,13 @@ function WorkspaceAdvancedSettings({ fragmentRef }: Props) {
                         workspacePath: data.fullPath,
                         force: true
                     },
-                    connections: GetConnections(data.fullPath.substring(0, ((data.fullPath.length - data.name.length - 1))))
+                },
+                // Namespace lists are cached per view, search and expanded group, so mark the whole store stale and let
+                // whichever list mounts next refetch instead of patching each connection
+                updater: (store, data) => {
+                    if (!data?.deleteWorkspace.problems.length) {
+                        store.invalidateStore();
+                    }
                 },
                 onCompleted: deleteData => {
                     setShowDeleteConfirmationDialog(false);

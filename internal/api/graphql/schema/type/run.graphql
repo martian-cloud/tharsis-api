@@ -319,6 +319,8 @@ input RunSubscriptionInput {
   workspaceId: String
   runId: String
   ancestorGroupId: String
+  "true only sends assessment runs, false leaves them out; unset sends every run"
+  workspaceAssessment: Boolean
 }
 
 type RunMutationPayload {

@@ -38,7 +38,7 @@ function GroupGeneralSettings(props: Props) {
             updateGroup(input: $input) {
                 group {
                     id
-                    ...GroupListItemFragment_group
+                    ...NamespaceListItemFragment_namespace
                 }
                 problems {
                     message

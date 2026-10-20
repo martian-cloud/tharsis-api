@@ -1,4 +1,4 @@
-import { Avatar, Box, Stack, Typography } from '@mui/material';
+import { Box, Stack, Typography } from '@mui/material';
 import Link from '@mui/material/Link';
 import ListItemButton from '@mui/material/ListItemButton';
 import { useTheme } from '@mui/material/styles';
@@ -7,6 +7,7 @@ import { useFragment } from "react-relay/hooks";
 import { Link as LinkRouter } from 'react-router-dom';
 import Timestamp from '../../common/Timestamp';
 import { ManagedIdentityWorkspaceListItemFragment_workspace$key } from './__generated__/ManagedIdentityWorkspaceListItemFragment_workspace.graphql';
+import NamespaceAvatar from '../../common/NamespaceAvatar';
 
 interface Props {
     workspaceKey: ManagedIdentityWorkspaceListItemFragment_workspace$key
@@ -34,7 +35,7 @@ function ManagedIdentityWorkspaceListItem(props: Props) {
             divider={!last}
             component={LinkRouter}
             to={`/groups/${data.fullPath}`}>
-            <Avatar sx={{ width: 32, height: 32, marginRight: 2, bgcolor: 'avatar.default' }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
+            <NamespaceAvatar name={data.name} type="workspace" sx={{ marginRight: 2 }} />
             <Box sx={{
                 display: 'flex',
                 flexDirection: 'column',
