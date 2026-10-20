@@ -159,6 +159,39 @@ func TestHandleError(t *testing.T) {
 			expectedCode: codes.Internal,
 			expectLog:    true,
 		},
+		{
+			// Mirrors the job claim path: DB error wrapped with %w at every layer.
+			name: "deadline exceeded wrapped through the job claim chain is not logged",
+			err: errors.Wrap(
+				fmt.Errorf("failed to request next job: %w",
+					errors.Wrap(fmt.Errorf("paginated query failed: SELECT 1: %w", context.DeadlineExceeded), "failed to execute query"),
+				),
+				"failed to get next available queued job",
+			),
+			expectedCode: codes.DeadlineExceeded,
+			expectLog:    false,
+		},
+		{
+			name: "context canceled wrapped through the job claim chain is not logged",
+			err: errors.Wrap(
+				fmt.Errorf("failed to request next job: %w",
+					errors.Wrap(fmt.Errorf("paginated query failed: SELECT 1: %w", context.Canceled), "failed to execute query"),
+				),
+				"failed to get next available queued job",
+			),
+			expectedCode: codes.Canceled,
+			expectLog:    false,
+		},
+		{
+			// Flattening with %v drops the context error, so it is treated as internal and logged.
+			name: "deadline exceeded flattened with %v is logged as internal",
+			err: errors.Wrap(
+				fmt.Errorf("failed to request next job %v", context.DeadlineExceeded),
+				"failed to get next available queued job",
+			),
+			expectedCode: codes.Internal,
+			expectLog:    true,
+		},
 	}
 
 	for _, test := range tests {

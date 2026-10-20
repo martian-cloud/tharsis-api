@@ -493,6 +493,55 @@ func TestGetNextAvailableJob(t *testing.T) {
 	}
 }
 
+func TestGetNextAvailableJobPreservesContextErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		dbErr     error
+		expectErr error
+	}{
+		{
+			name:      "context canceled from the jobs query is preserved",
+			dbErr:     errors.Wrap(context.Canceled, "failed to execute query"),
+			expectErr: context.Canceled,
+		},
+		{
+			name:      "deadline exceeded from the jobs query is preserved",
+			dbErr:     errors.Wrap(context.DeadlineExceeded, "failed to execute query"),
+			expectErr: context.DeadlineExceeded,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			runner := &models.Runner{Type: models.SharedRunnerType}
+
+			mockJobs := db.NewMockJobs(t)
+			mockRunners := db.NewMockRunners(t)
+
+			mockRunners.On("GetRunnerByID", mock.Anything, mock.Anything).Return(runner, nil)
+			mockJobs.On("GetJobCountForRunner", ctx, runner.Metadata.ID).Return(0, nil)
+			mockJobs.On("GetJobs", ctx, mock.Anything).Return(nil, test.dbErr)
+
+			testLogger, _ := logger.NewForTest()
+			jobService := service{
+				logger: testLogger,
+				dbClient: &db.Client{
+					Jobs:    mockJobs,
+					Runners: mockRunners,
+				},
+			}
+
+			job, err := jobService.getNextAvailableJob(ctx, runner.Metadata.ID)
+			require.Nil(t, job)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, test.expectErr)
+		})
+	}
+}
+
 func TestWaitForRunnerJobSlotWakesOnJobLimitChange(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

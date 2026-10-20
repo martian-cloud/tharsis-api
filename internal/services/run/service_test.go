@@ -1355,22 +1355,20 @@ func TestGetPolicyCheckPolicyMessages(t *testing.T) {
 }
 
 func TestUploadPlanBinary(t *testing.T) {
-	workspaceID := "ws1"
-	runID := "run1"
-
 	run := &models.Run{
-		Metadata:    models.ResourceMetadata{ID: runID},
-		WorkspaceID: workspaceID,
+		Metadata:    models.ResourceMetadata{ID: "run1"},
+		WorkspaceID: "ws1",
 		Plan:        models.Plan{ID: "plan-1"},
 	}
 
 	planID := run.Plan.GetID()
-	cacheKey := "workspaces/ws1/runs/run1/plan/plan-1"
 
 	type testCase struct {
-		authError       error
-		linkRefErr      error
 		name            string
+		authError       error
+		missingRun      bool
+		processorErr    error
+		expectProcessed bool
 		expectErrorCode errors.CodeType
 	}
 
@@ -1381,11 +1379,24 @@ func TestUploadPlanBinary(t *testing.T) {
 			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name: "upload plan binary",
+			name:            "plan does not exist",
+			missingRun:      true,
+			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:            "retainFn error is propagated",
-			linkRefErr:      errors.New("link failed", errors.WithErrorCode(errors.EInternal)),
+			name:            "upload plan binary",
+			expectProcessed: true,
+		},
+		{
+			name:            "a conflict that outlasts the processor retries keeps its error code",
+			processorErr:    db.ErrOptimisticLockError,
+			expectProcessed: true,
+			expectErrorCode: errors.EOptimisticLock,
+		},
+		{
+			name:            "a failure in the command keeps its error code",
+			processorErr:    errors.New("upload failed", errors.WithErrorCode(errors.EInternal)),
+			expectProcessed: true,
 			expectErrorCode: errors.EInternal,
 		},
 	}
@@ -1396,43 +1407,44 @@ func TestUploadPlanBinary(t *testing.T) {
 			defer cancel()
 
 			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			// Authorization happens before the command runs, so a missing plan never reaches the permission check.
+			if !test.missingRun {
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			}
 
 			mockRuns := db.NewMockRuns(t)
-			mockRuns.On("GetRunByNodeID", mock.Anything, planID).Return(run, nil).Maybe()
-			mockRuns.On("UpdateRun", mock.Anything, run, run.Plan.GetID()).Return(run, nil).Maybe()
+			if test.missingRun {
+				mockRuns.On("GetRunByNodeID", mock.Anything, planID).Return(nil, nil)
+			} else {
+				mockRuns.On("GetRunByNodeID", mock.Anything, planID).Return(run, nil)
+			}
 
-			mockTransactions := db.NewMockTransactions(t)
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
-
-			mockObjectStoreRefs := db.NewMockObjectStoreRefs(t)
-			mockObjectStoreRefs.On("LinkRef", mock.Anything, cacheKey, db.ObjectStoreRefOwnerRun, runID).Return(test.linkRefErr).Maybe()
-
-			mockArtifactStore := workspace.NewMockArtifactStore(t)
-			mockArtifactStore.On("UploadPlanCache", mock.Anything, run, mock.Anything).
-				Return(db.RetainObjectRefFunc(func(ctx context.Context, ownerID string) error {
-					return mockObjectStoreRefs.LinkRef(ctx, cacheKey, db.ObjectStoreRefOwnerRun, ownerID)
-				}), cacheKey, nil).Maybe()
+			// The database step, including the retry on conflicts, belongs to the command processor. The
+			// service must hand it an UploadPlanBinary command, and only once the caller is authorized.
+			mockCmdProcessor := engine.NewMockCmdProcessor(t)
+			if test.expectProcessed {
+				mockCmdProcessor.On("ProcessCommand", mock.Anything, mock.AnythingOfType("*commands.UploadPlanBinary")).
+					Return(test.processorErr).Once()
+			}
 
 			testLogger, _ := logger.NewForTest()
 
 			service := &service{
-				logger:        testLogger,
-				dbClient:      &db.Client{Runs: mockRuns, Transactions: mockTransactions},
-				artifactStore: mockArtifactStore,
+				logger:       testLogger,
+				dbClient:     &db.Client{Runs: mockRuns},
+				cmdProcessor: mockCmdProcessor,
+				cmdFactory:   &commands.Factory{},
 			}
 
 			err := service.UploadPlanBinary(auth.WithCaller(ctx, mockCaller), planID, strings.NewReader("test data"))
 
 			if test.expectErrorCode != "" {
+				require.Error(t, err)
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, &cacheKey, run.Plan.CacheObjectStoreKey)
 		})
 	}
 }

@@ -18,6 +18,8 @@ func TestErrorCodeToStatusCode(t *testing.T) {
 		{code: te.EServiceUnavailable, expect: http.StatusServiceUnavailable},
 		// Data loss is a server fault, so it is a 500 rather than a 404 for the resource being read.
 		{code: te.EDataLoss, expect: http.StatusInternalServerError},
+		{code: te.EOptimisticLock, expect: http.StatusConflict},
+		{code: te.EConflict, expect: http.StatusConflict},
 	}
 
 	for _, test := range tests {

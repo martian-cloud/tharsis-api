@@ -1490,7 +1490,7 @@ func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*mo
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to request next job %v", err)
+		return nil, fmt.Errorf("failed to request next job: %w", err)
 	}
 
 	if len(jobsResult.Jobs) > 0 {
