@@ -224,11 +224,6 @@ func NewGRPCClient(ctx context.Context, c *GRPCClientConfig) (*GRPCClient, error
 		)
 	}
 
-	if c.TLSSkipVerify {
-		// Override the default transport to skip TLS verification.
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12} // #nosec G402 -- This is used in development
-	}
-
 	// Fetch discovery document from API.
 	discoveryDocument, err := NewGRPCDiscoveryDocument(ctx, c.HTTPEndpoint, discoveryOptions...)
 	if err != nil && errors.Is(err, context.DeadlineExceeded) {
