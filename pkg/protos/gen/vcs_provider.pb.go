@@ -914,17 +914,24 @@ func (x *CreateVCSRunRequest) GetIsDestroy() bool {
 
 // VCSProvider defines a version control system provider within Tharsis.
 type VCSProvider struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	Metadata           *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Name               string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description        string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	GroupId            string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	Type               string                 `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
-	Url                string                 `protobuf:"bytes,6,opt,name=url,proto3" json:"url,omitempty"`
-	CreatedBy          string                 `protobuf:"bytes,7,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	AutoCreateWebhooks bool                   `protobuf:"varint,8,opt,name=auto_create_webhooks,json=autoCreateWebhooks,proto3" json:"auto_create_webhooks,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Name        string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	GroupId     string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	Type        string                 `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
+	Url         string                 `protobuf:"bytes,6,opt,name=url,proto3" json:"url,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in vcs_provider.proto.
+	CreatedBy          string `protobuf:"bytes,7,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	AutoCreateWebhooks bool   `protobuf:"varint,8,opt,name=auto_create_webhooks,json=autoCreateWebhooks,proto3" json:"auto_create_webhooks,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,9,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *VCSProvider) Reset() {
@@ -999,6 +1006,7 @@ func (x *VCSProvider) GetUrl() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in vcs_provider.proto.
 func (x *VCSProvider) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -1013,23 +1021,37 @@ func (x *VCSProvider) GetAutoCreateWebhooks() bool {
 	return false
 }
 
+func (x *VCSProvider) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
+}
+
 // WorkspaceVCSProviderLink defines a link between a workspace and a VCS provider.
 type WorkspaceVCSProviderLink struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	Metadata            *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	CreatedBy           string                 `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	WorkspaceId         string                 `protobuf:"bytes,3,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	VcsProviderId       string                 `protobuf:"bytes,4,opt,name=vcs_provider_id,json=vcsProviderId,proto3" json:"vcs_provider_id,omitempty"`
-	RepositoryPath      string                 `protobuf:"bytes,5,opt,name=repository_path,json=repositoryPath,proto3" json:"repository_path,omitempty"`
-	WebhookId           string                 `protobuf:"bytes,6,opt,name=webhook_id,json=webhookId,proto3" json:"webhook_id,omitempty"`
-	ModuleDirectory     *string                `protobuf:"bytes,7,opt,name=module_directory,json=moduleDirectory,proto3,oneof" json:"module_directory,omitempty"`
-	Branch              string                 `protobuf:"bytes,8,opt,name=branch,proto3" json:"branch,omitempty"`
-	TagRegex            *string                `protobuf:"bytes,9,opt,name=tag_regex,json=tagRegex,proto3,oneof" json:"tag_regex,omitempty"`
-	GlobPatterns        []string               `protobuf:"bytes,10,rep,name=glob_patterns,json=globPatterns,proto3" json:"glob_patterns,omitempty"`
-	AutoSpeculativePlan bool                   `protobuf:"varint,11,opt,name=auto_speculative_plan,json=autoSpeculativePlan,proto3" json:"auto_speculative_plan,omitempty"`
-	WebhookDisabled     bool                   `protobuf:"varint,12,opt,name=webhook_disabled,json=webhookDisabled,proto3" json:"webhook_disabled,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in vcs_provider.proto.
+	CreatedBy           string   `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	WorkspaceId         string   `protobuf:"bytes,3,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	VcsProviderId       string   `protobuf:"bytes,4,opt,name=vcs_provider_id,json=vcsProviderId,proto3" json:"vcs_provider_id,omitempty"`
+	RepositoryPath      string   `protobuf:"bytes,5,opt,name=repository_path,json=repositoryPath,proto3" json:"repository_path,omitempty"`
+	WebhookId           string   `protobuf:"bytes,6,opt,name=webhook_id,json=webhookId,proto3" json:"webhook_id,omitempty"`
+	ModuleDirectory     *string  `protobuf:"bytes,7,opt,name=module_directory,json=moduleDirectory,proto3,oneof" json:"module_directory,omitempty"`
+	Branch              string   `protobuf:"bytes,8,opt,name=branch,proto3" json:"branch,omitempty"`
+	TagRegex            *string  `protobuf:"bytes,9,opt,name=tag_regex,json=tagRegex,proto3,oneof" json:"tag_regex,omitempty"`
+	GlobPatterns        []string `protobuf:"bytes,10,rep,name=glob_patterns,json=globPatterns,proto3" json:"glob_patterns,omitempty"`
+	AutoSpeculativePlan bool     `protobuf:"varint,11,opt,name=auto_speculative_plan,json=autoSpeculativePlan,proto3" json:"auto_speculative_plan,omitempty"`
+	WebhookDisabled     bool     `protobuf:"varint,12,opt,name=webhook_disabled,json=webhookDisabled,proto3" json:"webhook_disabled,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,13,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *WorkspaceVCSProviderLink) Reset() {
@@ -1069,6 +1091,7 @@ func (x *WorkspaceVCSProviderLink) GetMetadata() *ResourceMetadata {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in vcs_provider.proto.
 func (x *WorkspaceVCSProviderLink) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -1144,6 +1167,13 @@ func (x *WorkspaceVCSProviderLink) GetWebhookDisabled() bool {
 		return x.WebhookDisabled
 	}
 	return false
+}
+
+func (x *WorkspaceVCSProviderLink) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
 }
 
 // GetVCSProvidersResponse is the paginated list of VCS Providers.
@@ -1370,7 +1400,7 @@ var File_vcs_provider_proto protoreflect.FileDescriptor
 
 const file_vcs_provider_proto_rawDesc = "" +
 	"\n" +
-	"\x12vcs_provider.proto\x12%martiancloud.tharsis.api.vcs_provider\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\"+\n" +
+	"\x12vcs_provider.proto\x12%martiancloud.tharsis.api.vcs_provider\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\"+\n" +
 	"\x19GetVCSProviderByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xfa\x02\n" +
 	"\x16GetVCSProvidersRequest\x12j\n" +
@@ -1459,21 +1489,22 @@ const file_vcs_provider_proto_rawDesc = "" +
 	"\x0ereference_name\x18\x02 \x01(\tH\x00R\rreferenceName\x88\x01\x01\x12\x1d\n" +
 	"\n" +
 	"is_destroy\x18\x03 \x01(\bR\tisDestroyB\x11\n" +
-	"\x0f_reference_name\"\xa6\x02\n" +
+	"\x0f_reference_name\"\xfb\x02\n" +
 	"\vVCSProvider\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x19\n" +
 	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12\x12\n" +
 	"\x04type\x18\x05 \x01(\tR\x04type\x12\x10\n" +
-	"\x03url\x18\x06 \x01(\tR\x03url\x12\x1d\n" +
+	"\x03url\x18\x06 \x01(\tR\x03url\x12!\n" +
 	"\n" +
-	"created_by\x18\a \x01(\tR\tcreatedBy\x120\n" +
-	"\x14auto_create_webhooks\x18\b \x01(\bR\x12autoCreateWebhooks\"\xae\x04\n" +
+	"created_by\x18\a \x01(\tB\x02\x18\x01R\tcreatedBy\x120\n" +
+	"\x14auto_create_webhooks\x18\b \x01(\bR\x12autoCreateWebhooks\x12O\n" +
+	"\x10created_by_actor\x18\t \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\"\x83\x05\n" +
 	"\x18WorkspaceVCSProviderLink\x12O\n" +
-	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x1d\n" +
+	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12!\n" +
 	"\n" +
-	"created_by\x18\x02 \x01(\tR\tcreatedBy\x12!\n" +
+	"created_by\x18\x02 \x01(\tB\x02\x18\x01R\tcreatedBy\x12!\n" +
 	"\fworkspace_id\x18\x03 \x01(\tR\vworkspaceId\x12&\n" +
 	"\x0fvcs_provider_id\x18\x04 \x01(\tR\rvcsProviderId\x12'\n" +
 	"\x0frepository_path\x18\x05 \x01(\tR\x0erepositoryPath\x12\x1d\n" +
@@ -1485,7 +1516,8 @@ const file_vcs_provider_proto_rawDesc = "" +
 	"\rglob_patterns\x18\n" +
 	" \x03(\tR\fglobPatterns\x122\n" +
 	"\x15auto_speculative_plan\x18\v \x01(\bR\x13autoSpeculativePlan\x12)\n" +
-	"\x10webhook_disabled\x18\f \x01(\bR\x0fwebhookDisabledB\x13\n" +
+	"\x10webhook_disabled\x18\f \x01(\bR\x0fwebhookDisabled\x12O\n" +
+	"\x10created_by_actor\x18\r \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActorB\x13\n" +
 	"\x11_module_directoryB\f\n" +
 	"\n" +
 	"_tag_regex\"\xbe\x01\n" +
@@ -1565,47 +1597,50 @@ var file_vcs_provider_proto_goTypes = []any{
 	(*CreateWorkspaceVCSProviderLinkResponse)(nil), // 18: martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse
 	(*PaginationOptions)(nil),                      // 19: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*ResourceMetadata)(nil),                       // 20: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                               // 21: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),                          // 22: google.protobuf.Empty
+	(*Actor)(nil),                                  // 21: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                               // 22: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),                          // 23: google.protobuf.Empty
 }
 var file_vcs_provider_proto_depIdxs = []int32{
 	19, // 0: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	1,  // 1: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest.sort:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProviderSortableField
 	0,  // 2: martiancloud.tharsis.api.vcs_provider.CreateVCSProviderRequest.type:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProviderType
 	20, // 3: martiancloud.tharsis.api.vcs_provider.VCSProvider.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	20, // 4: martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	13, // 5: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse.vcs_providers:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
-	21, // 6: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	13, // 7: martiancloud.tharsis.api.vcs_provider.CreateVCSProviderResponse.vcs_provider:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
-	13, // 8: martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenResponse.vcs_provider:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
-	14, // 9: martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse.vcs_provider_link:type_name -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
-	2,  // 10: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviderByID:input_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProviderByIDRequest
-	3,  // 11: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviders:input_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest
-	4,  // 12: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSProviderRequest
-	5,  // 13: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.UpdateVCSProviderRequest
-	6,  // 14: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.DeleteVCSProviderRequest
-	7,  // 15: martiancloud.tharsis.api.vcs_provider.VCSProviders.ResetVCSProviderOAuthToken:input_type -> martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenRequest
-	8,  // 16: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetWorkspaceVCSProviderLinkByID:input_type -> martiancloud.tharsis.api.vcs_provider.GetWorkspaceVCSProviderLinkByIDRequest
-	9,  // 17: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkRequest
-	10, // 18: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.UpdateWorkspaceVCSProviderLinkRequest
-	11, // 19: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.DeleteWorkspaceVCSProviderLinkRequest
-	12, // 20: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSRun:input_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSRunRequest
-	13, // 21: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviderByID:output_type -> martiancloud.tharsis.api.vcs_provider.VCSProvider
-	15, // 22: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviders:output_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse
-	16, // 23: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSProvider:output_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSProviderResponse
-	13, // 24: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateVCSProvider:output_type -> martiancloud.tharsis.api.vcs_provider.VCSProvider
-	22, // 25: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteVCSProvider:output_type -> google.protobuf.Empty
-	17, // 26: martiancloud.tharsis.api.vcs_provider.VCSProviders.ResetVCSProviderOAuthToken:output_type -> martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenResponse
-	14, // 27: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetWorkspaceVCSProviderLinkByID:output_type -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
-	18, // 28: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateWorkspaceVCSProviderLink:output_type -> martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse
-	14, // 29: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateWorkspaceVCSProviderLink:output_type -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
-	22, // 30: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteWorkspaceVCSProviderLink:output_type -> google.protobuf.Empty
-	22, // 31: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSRun:output_type -> google.protobuf.Empty
-	21, // [21:32] is the sub-list for method output_type
-	10, // [10:21] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	21, // 4: martiancloud.tharsis.api.vcs_provider.VCSProvider.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	20, // 5: martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	21, // 6: martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	13, // 7: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse.vcs_providers:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
+	22, // 8: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	13, // 9: martiancloud.tharsis.api.vcs_provider.CreateVCSProviderResponse.vcs_provider:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
+	13, // 10: martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenResponse.vcs_provider:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
+	14, // 11: martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse.vcs_provider_link:type_name -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
+	2,  // 12: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviderByID:input_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProviderByIDRequest
+	3,  // 13: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviders:input_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest
+	4,  // 14: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSProviderRequest
+	5,  // 15: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.UpdateVCSProviderRequest
+	6,  // 16: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.DeleteVCSProviderRequest
+	7,  // 17: martiancloud.tharsis.api.vcs_provider.VCSProviders.ResetVCSProviderOAuthToken:input_type -> martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenRequest
+	8,  // 18: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetWorkspaceVCSProviderLinkByID:input_type -> martiancloud.tharsis.api.vcs_provider.GetWorkspaceVCSProviderLinkByIDRequest
+	9,  // 19: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkRequest
+	10, // 20: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.UpdateWorkspaceVCSProviderLinkRequest
+	11, // 21: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.DeleteWorkspaceVCSProviderLinkRequest
+	12, // 22: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSRun:input_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSRunRequest
+	13, // 23: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviderByID:output_type -> martiancloud.tharsis.api.vcs_provider.VCSProvider
+	15, // 24: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviders:output_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse
+	16, // 25: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSProvider:output_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSProviderResponse
+	13, // 26: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateVCSProvider:output_type -> martiancloud.tharsis.api.vcs_provider.VCSProvider
+	23, // 27: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteVCSProvider:output_type -> google.protobuf.Empty
+	17, // 28: martiancloud.tharsis.api.vcs_provider.VCSProviders.ResetVCSProviderOAuthToken:output_type -> martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenResponse
+	14, // 29: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetWorkspaceVCSProviderLinkByID:output_type -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
+	18, // 30: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateWorkspaceVCSProviderLink:output_type -> martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse
+	14, // 31: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateWorkspaceVCSProviderLink:output_type -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
+	23, // 32: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteWorkspaceVCSProviderLink:output_type -> google.protobuf.Empty
+	23, // 33: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSRun:output_type -> google.protobuf.Empty
+	23, // [23:34] is the sub-list for method output_type
+	12, // [12:23] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_vcs_provider_proto_init() }
@@ -1613,6 +1648,7 @@ func file_vcs_provider_proto_init() {
 	if File_vcs_provider_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_vcs_provider_proto_msgTypes[1].OneofWrappers = []any{}

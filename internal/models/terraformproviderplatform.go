@@ -15,7 +15,7 @@ type TerraformProviderPlatform struct {
 	SHASum               string
 	Filename             string
 	BinaryObjectStoreKey *string
-	CreatedBy            string
+	CreatedBy            Actor
 	Metadata             ResourceMetadata
 	BinaryUploaded       bool
 }

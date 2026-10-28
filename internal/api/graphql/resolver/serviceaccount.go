@@ -186,7 +186,13 @@ func (r *ServiceAccountResolver) Group(ctx context.Context) (*GroupResolver, err
 
 // CreatedBy resolver
 func (r *ServiceAccountResolver) CreatedBy() string {
-	return r.serviceAccount.CreatedBy
+	return r.serviceAccount.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *ServiceAccountResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.serviceAccount.CreatedBy)
 }
 
 // ClientCredentialsEnabled resolver

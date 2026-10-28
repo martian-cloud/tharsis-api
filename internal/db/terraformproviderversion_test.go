@@ -28,7 +28,7 @@ func TestTerraformProviderVersions_CreateProviderVersion(t *testing.T) {
 		Name:        "test-group-provider-version",
 		Description: "test group for provider version",
 		FullPath:    "test-group-provider-version",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -36,7 +36,7 @@ func TestTerraformProviderVersions_CreateProviderVersion(t *testing.T) {
 		Name:        "test-provider-version",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -66,7 +66,7 @@ func TestTerraformProviderVersions_CreateProviderVersion(t *testing.T) {
 			providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 				SemanticVersion: test.version,
 				ProviderID:      test.providerID,
-				CreatedBy:       "db-integration-tests",
+				CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 			})
 
 			if test.expectErrorCode != "" {
@@ -93,7 +93,7 @@ func TestTerraformProviderVersions_UpdateProviderVersion(t *testing.T) {
 		Name:        "test-group-provider-version-update",
 		Description: "test group for provider version update",
 		FullPath:    "test-group-provider-version-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -101,14 +101,14 @@ func TestTerraformProviderVersions_UpdateProviderVersion(t *testing.T) {
 		Name:        "test-provider-version-update",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
 	createdProviderVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -175,7 +175,7 @@ func TestTerraformProviderVersions_DeleteProviderVersion(t *testing.T) {
 		Name:        "test-group-provider-version-delete",
 		Description: "test group for provider version delete",
 		FullPath:    "test-group-provider-version-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -183,14 +183,14 @@ func TestTerraformProviderVersions_DeleteProviderVersion(t *testing.T) {
 		Name:        "test-provider-version-delete",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
 	createdProviderVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -253,7 +253,7 @@ func TestTerraformProviderVersions_GetProviderVersionByID(t *testing.T) {
 		Name:        "test-group-provider-version-get-by-id",
 		Description: "test group for provider version get by id",
 		FullPath:    "test-group-provider-version-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -262,14 +262,14 @@ func TestTerraformProviderVersions_GetProviderVersionByID(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	createdProviderVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -325,7 +325,7 @@ func TestTerraformProviderVersions_GetProviderVersions(t *testing.T) {
 		Name:        "test-group-provider-versions-list",
 		Description: "test group for provider versions list",
 		FullPath:    "test-group-provider-versions-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -334,7 +334,7 @@ func TestTerraformProviderVersions_GetProviderVersions(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -342,12 +342,12 @@ func TestTerraformProviderVersions_GetProviderVersions(t *testing.T) {
 		{
 			SemanticVersion: "1.0.0",
 			ProviderID:      provider.Metadata.ID,
-			CreatedBy:       "db-integration-tests",
+			CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			SemanticVersion: "1.1.0",
 			ProviderID:      provider.Metadata.ID,
-			CreatedBy:       "db-integration-tests",
+			CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -423,7 +423,7 @@ func TestTerraformProviderVersions_GetProviderVersionsWithPaginationAndSorting(t
 		Name:        "test-group-provider-versions-pagination",
 		Description: "test group for provider versions pagination",
 		FullPath:    "test-group-provider-versions-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -432,7 +432,7 @@ func TestTerraformProviderVersions_GetProviderVersionsWithPaginationAndSorting(t
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -441,7 +441,7 @@ func TestTerraformProviderVersions_GetProviderVersionsWithPaginationAndSorting(t
 		_, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 			SemanticVersion: fmt.Sprintf("1.%d.0", i),
 			ProviderID:      provider.Metadata.ID,
-			CreatedBy:       "db-integration-tests",
+			CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -483,7 +483,7 @@ func TestTerraformProviderVersions_GetProviderVersionByTRN(t *testing.T) {
 		Name:        "test-group-provider-version-trn",
 		Description: "test group for provider version trn",
 		FullPath:    "test-group-provider-version-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -492,14 +492,14 @@ func TestTerraformProviderVersions_GetProviderVersionByTRN(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	createdProviderVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -554,7 +554,7 @@ func TestTerraformProviderVersions_DeleteProviderVersionBatch(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-delete-provider-versions",
 		FullPath:  "test-group-delete-provider-versions",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -562,7 +562,7 @@ func TestTerraformProviderVersions_DeleteProviderVersionBatch(t *testing.T) {
 		Name:        "test-provider-delete-versions",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -573,7 +573,7 @@ func TestTerraformProviderVersions_DeleteProviderVersionBatch(t *testing.T) {
 		pv, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 			SemanticVersion: fmt.Sprintf("%d.0.0", versionSeq),
 			ProviderID:      provider.Metadata.ID,
-			CreatedBy:       "db-integration-tests",
+			CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 		return pv

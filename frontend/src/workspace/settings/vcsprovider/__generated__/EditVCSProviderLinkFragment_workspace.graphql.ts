@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e8687162fe0a457dd1dbb5a8cffe6949>>
+ * @generated SignedSource<<58c8c7a5253603ac5e047fec2f92cbe6>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,6 +17,9 @@ export type EditVCSProviderLinkFragment_workspace$data = {
     readonly autoSpeculativePlan: boolean;
     readonly branch: string;
     readonly createdBy: string;
+    readonly createdByActor: {
+      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    } | null | undefined;
     readonly globPatterns: ReadonlyArray<string>;
     readonly id: string;
     readonly metadata: {
@@ -95,6 +98,22 @@ return {
           "args": null,
           "kind": "ScalarField",
           "name": "createdBy",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": null,
+          "kind": "LinkedField",
+          "name": "createdByActor",
+          "plural": false,
+          "selections": [
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActorDisplayFragment_actor"
+            }
+          ],
           "storageKey": null
         },
         {
@@ -200,6 +219,6 @@ return {
 };
 })();
 
-(node as any).hash = "d1705e81e31f35228d7448af8b42c0aa";
+(node as any).hash = "32fca361c74b07c49a30252b0d37e062";
 
 export default node;

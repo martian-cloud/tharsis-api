@@ -562,13 +562,14 @@ func (s *ManagedIdentityServer) MoveManagedIdentity(ctx context.Context, req *pb
 // toPBManagedIdentity converts from ManagedIdentity model to ProtoBuf model.
 func toPBManagedIdentity(m *models.ManagedIdentity) *pb.ManagedIdentity {
 	resp := &pb.ManagedIdentity{
-		Metadata:    toPBMetadata(&m.Metadata, types.ManagedIdentityModelType),
-		Name:        m.Name,
-		Description: m.Description,
-		GroupId:     gid.ToGlobalID(types.GroupModelType, m.GroupID),
-		Type:        string(m.Type),
-		Data:        string(m.Data),
-		CreatedBy:   m.CreatedBy,
+		Metadata:       toPBMetadata(&m.Metadata, types.ManagedIdentityModelType),
+		Name:           m.Name,
+		Description:    m.Description,
+		GroupId:        gid.ToGlobalID(types.GroupModelType, m.GroupID),
+		Type:           string(m.Type),
+		Data:           string(m.Data),
+		CreatedBy:      m.CreatedBy.Subject,
+		CreatedByActor: toPBActor(m.CreatedBy),
 	}
 
 	if m.AliasSourceID != nil {

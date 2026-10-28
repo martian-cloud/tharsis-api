@@ -45,7 +45,7 @@ func TestGetAnnouncementByID(t *testing.T) {
 		EndTime:     &endTime,
 		Type:        models.AnnouncementTypeInfo,
 		Dismissible: true,
-		CreatedBy:   "test-user",
+		CreatedBy:   models.Actor{Subject: "test-user"},
 	}
 
 	type testCase struct {
@@ -119,7 +119,7 @@ func TestGetAnnouncementByTRN(t *testing.T) {
 		EndTime:     &endTime,
 		Type:        models.AnnouncementTypeInfo,
 		Dismissible: true,
-		CreatedBy:   "test-user",
+		CreatedBy:   models.Actor{Subject: "test-user"},
 	}
 
 	type testCase struct {
@@ -192,7 +192,7 @@ func TestGetAnnouncements(t *testing.T) {
 				EndTime:     &endTime,
 				Type:        models.AnnouncementTypeInfo,
 				Dismissible: true,
-				CreatedBy:   "test-user",
+				CreatedBy:   models.Actor{Subject: "test-user"},
 			},
 		},
 		PageInfo: &pagination.PageInfo{},
@@ -267,7 +267,7 @@ func TestGetAnnouncements(t *testing.T) {
 }
 
 func TestCreateAnnouncement(t *testing.T) {
-	testSubject := "testSubject"
+	testActor := mockCallerActor().WithSubject("testSubject")
 	startTime := time.Now().Add(time.Hour)
 	endTime := time.Now().Add(2 * time.Hour)
 
@@ -300,7 +300,7 @@ func TestCreateAnnouncement(t *testing.T) {
 				EndTime:     &endTime,
 				Type:        models.AnnouncementTypeInfo,
 				Dismissible: true,
-				CreatedBy:   testSubject,
+				CreatedBy:   testActor,
 			},
 			isAdmin: true,
 		},
@@ -322,7 +322,7 @@ func TestCreateAnnouncement(t *testing.T) {
 				EndTime:     &endTime,
 				Type:        models.AnnouncementTypeInfo,
 				Dismissible: true,
-				CreatedBy:   testSubject,
+				CreatedBy:   testActor,
 			},
 			isAdmin: true,
 		},
@@ -343,7 +343,7 @@ func TestCreateAnnouncement(t *testing.T) {
 				EndTime:     &endTime,
 				Type:        models.AnnouncementTypeInfo,
 				Dismissible: true,
-				CreatedBy:   testSubject,
+				CreatedBy:   testActor,
 			},
 			isAdmin:            true,
 			expectEmailSubject: defaultAnnouncementEmailSubject,
@@ -366,7 +366,7 @@ func TestCreateAnnouncement(t *testing.T) {
 				EndTime:     &endTime,
 				Type:        models.AnnouncementTypeInfo,
 				Dismissible: true,
-				CreatedBy:   testSubject,
+				CreatedBy:   testActor,
 			},
 			isAdmin:            true,
 			expectEmailSubject: "Custom Subject",
@@ -429,7 +429,7 @@ func TestCreateAnnouncement(t *testing.T) {
 				mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin)
 
 				if test.isAdmin && test.expectErrorCode == "" {
-					mockCaller.On("GetSubject").Return(testSubject)
+					mockCaller.On("GetActor").Return(testActor)
 					mockAnnouncements.On("CreateAnnouncement", mock.Anything, mock.AnythingOfType("*models.Announcement")).Return(test.expectAnnouncement, nil)
 				}
 
@@ -482,7 +482,7 @@ func TestUpdateAnnouncement(t *testing.T) {
 		EndTime:     &endTime,
 		Type:        models.AnnouncementTypeInfo,
 		Dismissible: true,
-		CreatedBy:   testSubject,
+		CreatedBy:   models.Actor{Subject: testSubject},
 	}
 
 	updatedMessage := "Updated message"
@@ -507,7 +507,7 @@ func TestUpdateAnnouncement(t *testing.T) {
 				StartTime:   existingAnnouncement.StartTime,
 				Type:        updatedType,
 				Dismissible: existingAnnouncement.Dismissible,
-				CreatedBy:   testSubject,
+				CreatedBy:   models.Actor{Subject: testSubject},
 			},
 			isAdmin:              true,
 			existingAnnouncement: existingAnnouncement,
@@ -584,7 +584,7 @@ func TestDeleteAnnouncement(t *testing.T) {
 		EndTime:     &endTime,
 		Type:        models.AnnouncementTypeInfo,
 		Dismissible: true,
-		CreatedBy:   testSubject,
+		CreatedBy:   models.Actor{Subject: testSubject},
 	}
 
 	type testCase struct {
@@ -652,4 +652,9 @@ func TestDeleteAnnouncement(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

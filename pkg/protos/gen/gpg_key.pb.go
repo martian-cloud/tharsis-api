@@ -290,15 +290,22 @@ func (x *DeleteGPGKeyRequest) GetId() string {
 
 // GPGKey defines a GPG key resource within Tharsis.
 type GPGKey struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	GroupId       string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	AsciiArmor    string                 `protobuf:"bytes,3,opt,name=ascii_armor,json=asciiArmor,proto3" json:"ascii_armor,omitempty"`
-	GpgKeyId      string                 `protobuf:"bytes,4,opt,name=gpg_key_id,json=gpgKeyId,proto3" json:"gpg_key_id,omitempty"`
-	Fingerprint   string                 `protobuf:"bytes,5,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
-	CreatedBy     string                 `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	GroupId     string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	AsciiArmor  string                 `protobuf:"bytes,3,opt,name=ascii_armor,json=asciiArmor,proto3" json:"ascii_armor,omitempty"`
+	GpgKeyId    string                 `protobuf:"bytes,4,opt,name=gpg_key_id,json=gpgKeyId,proto3" json:"gpg_key_id,omitempty"`
+	Fingerprint string                 `protobuf:"bytes,5,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in gpg_key.proto.
+	CreatedBy string `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,7,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GPGKey) Reset() {
@@ -366,11 +373,19 @@ func (x *GPGKey) GetFingerprint() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in gpg_key.proto.
 func (x *GPGKey) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
 	}
 	return ""
+}
+
+func (x *GPGKey) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
 }
 
 // GetGPGKeysResponse is the paginated list of GPG Keys.
@@ -430,7 +445,7 @@ var File_gpg_key_proto protoreflect.FileDescriptor
 
 const file_gpg_key_proto_rawDesc = "" +
 	"\n" +
-	"\rgpg_key.proto\x12 martiancloud.tharsis.api.gpg_key\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\"&\n" +
+	"\rgpg_key.proto\x12 martiancloud.tharsis.api.gpg_key\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\"&\n" +
 	"\x14GetGPGKeyByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xc3\x02\n" +
 	"\x11GetGPGKeysRequest\x12j\n" +
@@ -445,7 +460,7 @@ const file_gpg_key_proto_rawDesc = "" +
 	"\vascii_armor\x18\x02 \x01(\tR\n" +
 	"asciiArmor\"%\n" +
 	"\x13DeleteGPGKeyRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xf4\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xc9\x02\n" +
 	"\x06GPGKey\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x19\n" +
 	"\bgroup_id\x18\x02 \x01(\tR\agroupId\x12\x1f\n" +
@@ -453,9 +468,10 @@ const file_gpg_key_proto_rawDesc = "" +
 	"asciiArmor\x12\x1c\n" +
 	"\n" +
 	"gpg_key_id\x18\x04 \x01(\tR\bgpgKeyId\x12 \n" +
-	"\vfingerprint\x18\x05 \x01(\tR\vfingerprint\x12\x1d\n" +
+	"\vfingerprint\x18\x05 \x01(\tR\vfingerprint\x12!\n" +
 	"\n" +
-	"created_by\x18\x06 \x01(\tR\tcreatedBy\"\xa5\x01\n" +
+	"created_by\x18\x06 \x01(\tB\x02\x18\x01R\tcreatedBy\x12O\n" +
+	"\x10created_by_actor\x18\a \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\"\xa5\x01\n" +
 	"\x12GetGPGKeysResponse\x12C\n" +
 	"\bgpg_keys\x18\x01 \x03(\v2(.martiancloud.tharsis.api.gpg_key.GPGKeyR\agpgKeys\x12J\n" +
 	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo*i\n" +
@@ -495,28 +511,30 @@ var file_gpg_key_proto_goTypes = []any{
 	(*GetGPGKeysResponse)(nil),   // 6: martiancloud.tharsis.api.gpg_key.GetGPGKeysResponse
 	(*PaginationOptions)(nil),    // 7: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*ResourceMetadata)(nil),     // 8: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),             // 9: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),        // 10: google.protobuf.Empty
+	(*Actor)(nil),                // 9: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),             // 10: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),        // 11: google.protobuf.Empty
 }
 var file_gpg_key_proto_depIdxs = []int32{
 	7,  // 0: martiancloud.tharsis.api.gpg_key.GetGPGKeysRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.gpg_key.GetGPGKeysRequest.sort:type_name -> martiancloud.tharsis.api.gpg_key.GPGKeySortableField
 	8,  // 2: martiancloud.tharsis.api.gpg_key.GPGKey.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	5,  // 3: martiancloud.tharsis.api.gpg_key.GetGPGKeysResponse.gpg_keys:type_name -> martiancloud.tharsis.api.gpg_key.GPGKey
-	9,  // 4: martiancloud.tharsis.api.gpg_key.GetGPGKeysResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	1,  // 5: martiancloud.tharsis.api.gpg_key.GPGKeys.GetGPGKeyByID:input_type -> martiancloud.tharsis.api.gpg_key.GetGPGKeyByIDRequest
-	2,  // 6: martiancloud.tharsis.api.gpg_key.GPGKeys.GetGPGKeys:input_type -> martiancloud.tharsis.api.gpg_key.GetGPGKeysRequest
-	3,  // 7: martiancloud.tharsis.api.gpg_key.GPGKeys.CreateGPGKey:input_type -> martiancloud.tharsis.api.gpg_key.CreateGPGKeyRequest
-	4,  // 8: martiancloud.tharsis.api.gpg_key.GPGKeys.DeleteGPGKey:input_type -> martiancloud.tharsis.api.gpg_key.DeleteGPGKeyRequest
-	5,  // 9: martiancloud.tharsis.api.gpg_key.GPGKeys.GetGPGKeyByID:output_type -> martiancloud.tharsis.api.gpg_key.GPGKey
-	6,  // 10: martiancloud.tharsis.api.gpg_key.GPGKeys.GetGPGKeys:output_type -> martiancloud.tharsis.api.gpg_key.GetGPGKeysResponse
-	5,  // 11: martiancloud.tharsis.api.gpg_key.GPGKeys.CreateGPGKey:output_type -> martiancloud.tharsis.api.gpg_key.GPGKey
-	10, // 12: martiancloud.tharsis.api.gpg_key.GPGKeys.DeleteGPGKey:output_type -> google.protobuf.Empty
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	9,  // 3: martiancloud.tharsis.api.gpg_key.GPGKey.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	5,  // 4: martiancloud.tharsis.api.gpg_key.GetGPGKeysResponse.gpg_keys:type_name -> martiancloud.tharsis.api.gpg_key.GPGKey
+	10, // 5: martiancloud.tharsis.api.gpg_key.GetGPGKeysResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	1,  // 6: martiancloud.tharsis.api.gpg_key.GPGKeys.GetGPGKeyByID:input_type -> martiancloud.tharsis.api.gpg_key.GetGPGKeyByIDRequest
+	2,  // 7: martiancloud.tharsis.api.gpg_key.GPGKeys.GetGPGKeys:input_type -> martiancloud.tharsis.api.gpg_key.GetGPGKeysRequest
+	3,  // 8: martiancloud.tharsis.api.gpg_key.GPGKeys.CreateGPGKey:input_type -> martiancloud.tharsis.api.gpg_key.CreateGPGKeyRequest
+	4,  // 9: martiancloud.tharsis.api.gpg_key.GPGKeys.DeleteGPGKey:input_type -> martiancloud.tharsis.api.gpg_key.DeleteGPGKeyRequest
+	5,  // 10: martiancloud.tharsis.api.gpg_key.GPGKeys.GetGPGKeyByID:output_type -> martiancloud.tharsis.api.gpg_key.GPGKey
+	6,  // 11: martiancloud.tharsis.api.gpg_key.GPGKeys.GetGPGKeys:output_type -> martiancloud.tharsis.api.gpg_key.GetGPGKeysResponse
+	5,  // 12: martiancloud.tharsis.api.gpg_key.GPGKeys.CreateGPGKey:output_type -> martiancloud.tharsis.api.gpg_key.GPGKey
+	11, // 13: martiancloud.tharsis.api.gpg_key.GPGKeys.DeleteGPGKey:output_type -> google.protobuf.Empty
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_gpg_key_proto_init() }
@@ -524,6 +542,7 @@ func file_gpg_key_proto_init() {
 	if File_gpg_key_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_gpg_key_proto_msgTypes[1].OneofWrappers = []any{}

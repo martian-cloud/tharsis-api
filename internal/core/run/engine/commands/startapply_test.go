@@ -181,7 +181,7 @@ func TestStartApply_Execute(t *testing.T) {
 			cmd := &StartApply{
 				in: &StartApplyInput{
 					RunID:       "run-1",
-					TriggeredBy: "user@example.com",
+					TriggeredBy: models.Actor{Subject: "user@example.com"},
 					Comment:     "go",
 				},
 				managedIdentityIDs: []string{"mi-1"},
@@ -199,7 +199,7 @@ func TestStartApply_Execute(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cmd.Updated)
 			assert.Equal(t, tt.wantApply, cmd.Updated.Apply.Status)
-			assert.Equal(t, "user@example.com", cmd.Updated.Apply.TriggeredBy)
+			assert.Equal(t, &models.Actor{Subject: "user@example.com"}, cmd.Updated.Apply.TriggeredBy)
 			assert.Equal(t, "go", cmd.Updated.Apply.Comment)
 			assert.Equal(t, []string{"mi-1"}, cmd.Updated.Apply.ManagedIdentityIDs)
 		})

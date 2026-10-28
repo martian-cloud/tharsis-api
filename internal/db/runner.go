@@ -106,8 +106,8 @@ type terraformRunners struct {
 	dbClient *Client
 }
 
-var runnerFieldList = append(metadataFieldList,
-	"type", "name", "description", "group_id", "created_by", "disabled",
+var runnerFieldList = append(metadataAndCreatedByFieldList,
+	"type", "name", "description", "group_id", "disabled",
 	"tags", "run_untagged_jobs", "job_limit",
 )
 
@@ -261,6 +261,11 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(runner.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	tags, err := json.Marshal(runner.Tags)
 	if err != nil {
 		return nil, err
@@ -274,19 +279,22 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 			dialect.Insert("runners").
 				Rows(
 					goqu.Record{
-						"id":                newResourceID(),
-						"version":           initialResourceVersion,
-						"created_at":        timestamp,
-						"updated_at":        timestamp,
-						"type":              runner.Type,
-						"group_id":          runner.GroupID,
-						"name":              runner.Name,
-						"description":       runner.Description,
-						"created_by":        runner.CreatedBy,
-						"disabled":          runner.Disabled,
-						"tags":              tags,
-						"run_untagged_jobs": runner.RunUntaggedJobs,
-						"job_limit":         runner.JobLimit,
+						"id":                    newResourceID(),
+						"version":               initialResourceVersion,
+						"created_at":            timestamp,
+						"updated_at":            timestamp,
+						"type":                  runner.Type,
+						"group_id":              runner.GroupID,
+						"name":                  runner.Name,
+						"description":           runner.Description,
+						"created_by":            runner.CreatedBy.Subject,
+						"created_by_actor_type": createdByActorType,
+						"created_by_actor_id":   createdByActorID,
+						"created_by_actor_trn":  createdByActorTRN,
+						"disabled":              runner.Disabled,
+						"tags":                  tags,
+						"run_untagged_jobs":     runner.RunUntaggedJobs,
+						"job_limit":             runner.JobLimit,
 					}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})))
@@ -431,6 +439,7 @@ func (t *terraformRunners) getSelectFields() []interface{} {
 }
 
 func scanRunner(row scanner) (*models.Runner, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var namespacePath sql.NullString
 	runner := &models.Runner{}
 
@@ -439,11 +448,14 @@ func scanRunner(row scanner) (*models.Runner, error) {
 		&runner.Metadata.CreationTimestamp,
 		&runner.Metadata.LastUpdatedTimestamp,
 		&runner.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&runner.Type,
 		&runner.Name,
 		&runner.Description,
 		&runner.GroupID,
-		&runner.CreatedBy,
 		&runner.Disabled,
 		&runner.Tags,
 		&runner.RunUntaggedJobs,
@@ -455,6 +467,9 @@ func scanRunner(row scanner) (*models.Runner, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	runner.CreatedBy = parsedActor
 
 	if namespacePath.Valid {
 		runner.Metadata.TRN = trn.TypeRunner.Build(namespacePath.String, runner.Name)

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -109,12 +110,12 @@ func GetRun(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getRunInput, getRunOu
 				RunID:                  r.GetGlobalID(),
 				TRN:                    r.Metadata.TRN,
 				Status:                 r.Status,
-				CreatedBy:              r.CreatedBy,
+				CreatedBy:              r.CreatedBy.Subject,
 				TerraformVersion:       r.TerraformVersion,
 				WorkspaceID:            gid.ToGlobalID(types.WorkspaceModelType, r.WorkspaceID),
 				ModuleSource:           r.ModuleSource,
 				ModuleVersion:          r.ModuleVersion,
-				ForceCanceledBy:        r.ForceCanceledBy,
+				ForceCanceledBy:        models.ActorSubjectPtr(r.ForceCanceledBy),
 				ConfigurationVersionID: r.ConfigurationVersionID,
 				ForceCancelAvailableAt: r.ForceCancelAvailableAt,
 				TargetAddresses:        r.TargetAddresses,
@@ -153,7 +154,7 @@ func GetRun(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getRunInput, getRunOu
 			output.Run.Apply = &apply{
 				ApplyID:      applyNode.GetGlobalID(),
 				Status:       applyNode.Status,
-				TriggeredBy:  applyNode.TriggeredBy,
+				TriggeredBy:  ptr.ToString(models.ActorSubjectPtr(applyNode.TriggeredBy)),
 				Comment:      applyNode.Comment,
 				ErrorMessage: applyNode.ErrorMessage,
 				LatestJobID:  jobGlobalID(applyNode.LatestJobID),

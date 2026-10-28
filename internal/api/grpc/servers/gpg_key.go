@@ -142,11 +142,12 @@ func (s *GPGKeyServer) DeleteGPGKey(ctx context.Context, req *pb.DeleteGPGKeyReq
 // toPBGPGKey converts from GPGKey model to ProtoBuf model.
 func toPBGPGKey(g *models.GPGKey) *pb.GPGKey {
 	return &pb.GPGKey{
-		Metadata:    toPBMetadata(&g.Metadata, types.GPGKeyModelType),
-		GroupId:     gid.ToGlobalID(types.GroupModelType, g.GroupID),
-		AsciiArmor:  g.ASCIIArmor,
-		GpgKeyId:    g.GetHexGPGKeyID(),
-		Fingerprint: g.Fingerprint,
-		CreatedBy:   g.CreatedBy,
+		Metadata:       toPBMetadata(&g.Metadata, types.GPGKeyModelType),
+		GroupId:        gid.ToGlobalID(types.GroupModelType, g.GroupID),
+		AsciiArmor:     g.ASCIIArmor,
+		GpgKeyId:       g.GetHexGPGKeyID(),
+		Fingerprint:    g.Fingerprint,
+		CreatedBy:      g.CreatedBy.Subject,
+		CreatedByActor: toPBActor(g.CreatedBy),
 	}
 }

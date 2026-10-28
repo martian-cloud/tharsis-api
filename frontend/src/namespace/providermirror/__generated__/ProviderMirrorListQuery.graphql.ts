@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<206e1296cba5bf30ae76775ba0313439>>
+ * @generated SignedSource<<cf791076f7ec7b45c5b60ee3f9cde2fe>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -101,6 +101,15 @@ v8 = [
     "kind": "Literal",
     "name": "sort",
     "value": "TYPE_ASC"
+  }
+],
+v9 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
   }
 ];
 return {
@@ -247,8 +256,75 @@ return {
                       {
                         "alias": null,
                         "args": null,
-                        "kind": "ScalarField",
-                        "name": "createdBy",
+                        "concreteType": null,
+                        "kind": "LinkedField",
+                        "name": "createdByActor",
+                        "plural": false,
+                        "selections": [
+                          (v7/*: any*/),
+                          {
+                            "kind": "TypeDiscriminator",
+                            "abstractKey": "__isActor"
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "type",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "principalId",
+                            "storageKey": null
+                          },
+                          {
+                            "kind": "InlineFragment",
+                            "selections": [
+                              {
+                                "alias": null,
+                                "args": null,
+                                "concreteType": "User",
+                                "kind": "LinkedField",
+                                "name": "user",
+                                "plural": false,
+                                "selections": [
+                                  {
+                                    "alias": null,
+                                    "args": null,
+                                    "kind": "ScalarField",
+                                    "name": "email",
+                                    "storageKey": null
+                                  },
+                                  (v6/*: any*/)
+                                ],
+                                "storageKey": null
+                              }
+                            ],
+                            "type": "UserActor",
+                            "abstractKey": null
+                          },
+                          {
+                            "kind": "InlineFragment",
+                            "selections": (v9/*: any*/),
+                            "type": "ServiceAccountActor",
+                            "abstractKey": null
+                          },
+                          {
+                            "kind": "InlineFragment",
+                            "selections": (v9/*: any*/),
+                            "type": "VCSProviderActor",
+                            "abstractKey": null
+                          },
+                          {
+                            "kind": "InlineFragment",
+                            "selections": (v9/*: any*/),
+                            "type": "JobActor",
+                            "abstractKey": null
+                          }
+                        ],
                         "storageKey": null
                       },
                       (v7/*: any*/)
@@ -325,12 +401,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "e8d5540e0e61bfeffa9b2c1df66875e2",
+    "cacheID": "c07b7788fd07cff900c893573310f83e",
     "id": null,
     "metadata": {},
     "name": "ProviderMirrorListQuery",
     "operationKind": "query",
-    "text": "query ProviderMirrorListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $namespacePath: String!\n  $search: String\n) {\n  ...ProviderMirrorListFragment_mirrors\n}\n\nfragment ProviderMirrorListFragment_mirrors on Query {\n  namespace(fullPath: $namespacePath) {\n    id\n    __typename\n    providerMirrorEnabled {\n      value\n    }\n    terraformProviderMirrors(after: $after, before: $before, first: $first, last: $last, sort: TYPE_ASC, search: $search) {\n      totalCount\n      edges {\n        node {\n          id\n          version\n          groupPath\n          providerAddress\n          ...ProviderMirrorListItemFragment_mirror\n          __typename\n        }\n        cursor\n      }\n      pageInfo {\n        endCursor\n        hasNextPage\n        hasPreviousPage\n        startCursor\n      }\n    }\n  }\n}\n\nfragment ProviderMirrorListItemFragment_mirror on TerraformProviderVersionMirror {\n  id\n  metadata {\n    createdAt\n  }\n  version\n  createdBy\n  providerAddress\n}\n"
+    "text": "query ProviderMirrorListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $namespacePath: String!\n  $search: String\n) {\n  ...ProviderMirrorListFragment_mirrors\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment ProviderMirrorListFragment_mirrors on Query {\n  namespace(fullPath: $namespacePath) {\n    id\n    __typename\n    providerMirrorEnabled {\n      value\n    }\n    terraformProviderMirrors(after: $after, before: $before, first: $first, last: $last, sort: TYPE_ASC, search: $search) {\n      totalCount\n      edges {\n        node {\n          id\n          version\n          groupPath\n          providerAddress\n          ...ProviderMirrorListItemFragment_mirror\n          __typename\n        }\n        cursor\n      }\n      pageInfo {\n        endCursor\n        hasNextPage\n        hasPreviousPage\n        startCursor\n      }\n    }\n  }\n}\n\nfragment ProviderMirrorListItemFragment_mirror on TerraformProviderVersionMirror {\n  id\n  metadata {\n    createdAt\n  }\n  version\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  providerAddress\n}\n"
   }
 };
 })();

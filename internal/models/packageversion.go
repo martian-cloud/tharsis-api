@@ -25,7 +25,7 @@ const (
 
 // PackageVersion represents a version of a policy set
 type PackageVersion struct {
-	CreatedBy              string
+	CreatedBy              Actor
 	PackageID              string
 	SemanticVersion        string
 	Status                 PackageVersionStatus

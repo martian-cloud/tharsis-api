@@ -10,7 +10,7 @@ var _ Model = (*SCIMToken)(nil)
 // SCIMToken represents a SCIM token.
 type SCIMToken struct {
 	Nonce     string
-	CreatedBy string
+	CreatedBy Actor
 	Metadata  ResourceMetadata
 }
 

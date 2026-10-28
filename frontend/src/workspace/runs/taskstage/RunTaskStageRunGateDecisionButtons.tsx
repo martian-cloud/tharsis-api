@@ -37,6 +37,9 @@ function RunTaskStageRunGateDecisionButtons({ gateId, canOverride, connectionIds
                         decision
                         comment
                         createdBy
+                        createdByActor {
+                            ...ActorDisplayFragment_actor
+                        }
                         coveredRules
                         metadata {
                             createdAt

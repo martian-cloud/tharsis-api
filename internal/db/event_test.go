@@ -27,7 +27,7 @@ func TestListen(t *testing.T) {
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:        "test-group-1",
 		Description: "this is a common/shared foundational group",
-		CreatedBy:   "test-group-1-creator",
+		CreatedBy:   models.Actor{Subject: "test-group-1-creator"},
 	})
 	require.Nil(t, err)
 	require.NotNil(t, group1)
@@ -36,7 +36,7 @@ func TestListen(t *testing.T) {
 		Name:           "test-workspace-1",
 		Description:    "this is a common/shared foundational workspace",
 		GroupID:        group1.Metadata.ID,
-		CreatedBy:      "test-workspace-1-creator",
+		CreatedBy:      models.Actor{Subject: "test-workspace-1-creator"},
 		MaxJobDuration: ptr.Int32(int32(10)),
 	})
 	require.Nil(t, err)
@@ -89,7 +89,7 @@ func TestListen(t *testing.T) {
 
 				run1, rErr := testClient.client.Runs.CreateRun(ctx, &models.Run{
 					WorkspaceID: workspace1.Metadata.ID,
-					CreatedBy:   "test-run-1-creator",
+					CreatedBy:   models.Actor{Subject: "test-run-1-creator"},
 				})
 				require.Nil(t, rErr)
 				require.NotNil(t, run1)
@@ -214,7 +214,7 @@ func TestListen(t *testing.T) {
 				var cErr error
 				createdRun, cErr = testClient.client.Runs.CreateRun(ctx, &models.Run{
 					WorkspaceID: workspace1.Metadata.ID,
-					CreatedBy:   "run-creator",
+					CreatedBy:   models.Actor{Subject: "run-creator"},
 				})
 				if cErr != nil {
 					return fmt.Errorf("failed to create run: %w", cErr)

@@ -29,7 +29,7 @@ func TestLogStreams_CreateLogStream(t *testing.T) {
 		Name:        "test-group-log-stream",
 		Description: "test group for log stream",
 		FullPath:    "test-group-log-stream",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -37,7 +37,7 @@ func TestLogStreams_CreateLogStream(t *testing.T) {
 		Name:           "test-workspace-log-stream",
 		GroupID:        group.Metadata.ID,
 		Description:    "test workspace for log stream",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.Nil(t, err)
@@ -45,7 +45,7 @@ func TestLogStreams_CreateLogStream(t *testing.T) {
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
 		Status:      models.RunPending,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -109,7 +109,7 @@ func TestLogStreams_UpdateLogStream(t *testing.T) {
 		Name:        "test-group-log-stream-update",
 		Description: "test group for log stream update",
 		FullPath:    "test-group-log-stream-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -117,7 +117,7 @@ func TestLogStreams_UpdateLogStream(t *testing.T) {
 		Name:           "test-workspace-log-stream-update",
 		GroupID:        group.Metadata.ID,
 		Description:    "test workspace for log stream update",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.Nil(t, err)
@@ -125,7 +125,7 @@ func TestLogStreams_UpdateLogStream(t *testing.T) {
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
 		Status:      models.RunPending,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -195,7 +195,7 @@ func TestLogStreams_GetLogStreamByID(t *testing.T) {
 		Name:        "test-group-log-stream-get-by-id",
 		Description: "test group for log stream get by id",
 		FullPath:    "test-group-log-stream-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -204,14 +204,14 @@ func TestLogStreams_GetLogStreamByID(t *testing.T) {
 		Name:           "test-workspace-log-stream-get-by-id",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a run for the job
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -283,7 +283,7 @@ func TestLogStreams_GetLogStreams(t *testing.T) {
 		Name:        "test-group-log-streams-list",
 		Description: "test group for log streams list",
 		FullPath:    "test-group-log-streams-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -292,14 +292,14 @@ func TestLogStreams_GetLogStreams(t *testing.T) {
 		Name:           "test-workspace-log-streams-list",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a run for the jobs
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -385,7 +385,7 @@ func TestLogStreams_GetLogStreamsWithPaginationAndSorting(t *testing.T) {
 		Name:        "test-group-log-streams-pagination",
 		Description: "test group for log streams pagination",
 		FullPath:    "test-group-log-streams-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -394,14 +394,14 @@ func TestLogStreams_GetLogStreamsWithPaginationAndSorting(t *testing.T) {
 		Name:           "test-workspace-log-streams-pagination",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a run for the jobs
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -457,7 +457,7 @@ func TestLogStreams_GetLogStreamByJobID(t *testing.T) {
 		Name:        "test-group-log-stream-job-id",
 		Description: "test group for log stream job id",
 		FullPath:    "test-group-log-stream-job-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -466,14 +466,14 @@ func TestLogStreams_GetLogStreamByJobID(t *testing.T) {
 		Name:           "test-workspace-log-stream-job-id",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a run for the job
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

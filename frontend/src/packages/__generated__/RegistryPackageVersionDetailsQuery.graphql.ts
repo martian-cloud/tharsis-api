@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b1f260241a1902a1a872f60fb717f705>>
+ * @generated SignedSource<<ccd8fe0e4422a29a23fb010f5fb03922>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -125,14 +125,90 @@ v12 = {
   "name": "latest",
   "storageKey": null
 },
-v13 = {
+v13 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+],
+v14 = {
   "alias": null,
   "args": null,
-  "kind": "ScalarField",
-  "name": "createdBy",
+  "concreteType": null,
+  "kind": "LinkedField",
+  "name": "createdByActor",
+  "plural": false,
+  "selections": [
+    (v9/*: any*/),
+    {
+      "kind": "TypeDiscriminator",
+      "abstractKey": "__isActor"
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "type",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "principalId",
+      "storageKey": null
+    },
+    {
+      "kind": "InlineFragment",
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": "User",
+          "kind": "LinkedField",
+          "name": "user",
+          "plural": false,
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "email",
+              "storageKey": null
+            },
+            (v6/*: any*/)
+          ],
+          "storageKey": null
+        }
+      ],
+      "type": "UserActor",
+      "abstractKey": null
+    },
+    {
+      "kind": "InlineFragment",
+      "selections": (v13/*: any*/),
+      "type": "ServiceAccountActor",
+      "abstractKey": null
+    },
+    {
+      "kind": "InlineFragment",
+      "selections": (v13/*: any*/),
+      "type": "VCSProviderActor",
+      "abstractKey": null
+    },
+    {
+      "kind": "InlineFragment",
+      "selections": (v13/*: any*/),
+      "type": "JobActor",
+      "abstractKey": null
+    }
+  ],
   "storageKey": null
 },
-v14 = {
+v15 = {
   "alias": null,
   "args": null,
   "concreteType": "ResourceMetadata",
@@ -150,7 +226,7 @@ v14 = {
   ],
   "storageKey": null
 },
-v15 = [
+v16 = [
   {
     "kind": "Variable",
     "name": "after",
@@ -287,7 +363,7 @@ return {
                     "storageKey": null
                   },
                   (v12/*: any*/),
-                  (v13/*: any*/),
+                  (v14/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -302,7 +378,7 @@ return {
                     "name": "size",
                     "storageKey": null
                   },
-                  (v14/*: any*/)
+                  (v15/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -322,7 +398,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v15/*: any*/),
+                "args": (v16/*: any*/),
                 "concreteType": "PackageVersionConnection",
                 "kind": "LinkedField",
                 "name": "versions",
@@ -345,9 +421,9 @@ return {
                         "plural": false,
                         "selections": [
                           (v6/*: any*/),
-                          (v14/*: any*/),
+                          (v15/*: any*/),
                           (v10/*: any*/),
-                          (v13/*: any*/),
+                          (v14/*: any*/),
                           (v12/*: any*/),
                           (v11/*: any*/),
                           (v9/*: any*/)
@@ -408,7 +484,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v15/*: any*/),
+                "args": (v16/*: any*/),
                 "filters": [
                   "sort"
                 ],
@@ -427,12 +503,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "ec5f1861d7d10efbe5c0961d6e6b7b7d",
+    "cacheID": "cad6bbca438e6cabe2b98b121d2876ee",
     "id": null,
     "metadata": {},
     "name": "RegistryPackageVersionDetailsQuery",
     "operationKind": "query",
-    "text": "query RegistryPackageVersionDetailsQuery(\n  $id: String!\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n) {\n  node(id: $id) {\n    __typename\n    ... on Package {\n      id\n      name\n      metadata {\n        trn\n      }\n      ...PackageDetailsIndexFragment_package\n    }\n    id\n  }\n}\n\nfragment PackageDetailsIndexFragment_package on Package {\n  id\n  name\n  description\n  groupPath\n  allowMutableVersions\n  latestVersion {\n    id\n    ...PackageDetailsIndexFragment_version\n  }\n  ...PackageDetailsSidebarFragment_package\n  ...PackageVersionListFragment_package\n}\n\nfragment PackageDetailsIndexFragment_version on PackageVersion {\n  id\n  version\n  status\n  error\n  latest\n  ...PackageDetailsSidebarFragment_version\n}\n\nfragment PackageDetailsSidebarFragment_package on Package {\n  visibility\n  kind\n  groupPath\n  allowMutableVersions\n}\n\nfragment PackageDetailsSidebarFragment_version on PackageVersion {\n  version\n  latest\n  createdBy\n  shaSum\n  size\n  metadata {\n    createdAt\n  }\n}\n\nfragment PackageVersionListFragment_package on Package {\n  id\n  versions(after: $after, before: $before, first: $first, last: $last, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...PackageVersionListItemFragment_version\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment PackageVersionListItemFragment_version on PackageVersion {\n  metadata {\n    createdAt\n  }\n  id\n  version\n  createdBy\n  latest\n  status\n}\n"
+    "text": "query RegistryPackageVersionDetailsQuery(\n  $id: String!\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n) {\n  node(id: $id) {\n    __typename\n    ... on Package {\n      id\n      name\n      metadata {\n        trn\n      }\n      ...PackageDetailsIndexFragment_package\n    }\n    id\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment PackageDetailsIndexFragment_package on Package {\n  id\n  name\n  description\n  groupPath\n  allowMutableVersions\n  latestVersion {\n    id\n    ...PackageDetailsIndexFragment_version\n  }\n  ...PackageDetailsSidebarFragment_package\n  ...PackageVersionListFragment_package\n}\n\nfragment PackageDetailsIndexFragment_version on PackageVersion {\n  id\n  version\n  status\n  error\n  latest\n  ...PackageDetailsSidebarFragment_version\n}\n\nfragment PackageDetailsSidebarFragment_package on Package {\n  visibility\n  kind\n  groupPath\n  allowMutableVersions\n}\n\nfragment PackageDetailsSidebarFragment_version on PackageVersion {\n  version\n  latest\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  shaSum\n  size\n  metadata {\n    createdAt\n  }\n}\n\nfragment PackageVersionListFragment_package on Package {\n  id\n  versions(after: $after, before: $before, first: $first, last: $last, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...PackageVersionListItemFragment_version\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment PackageVersionListItemFragment_version on PackageVersion {\n  metadata {\n    createdAt\n  }\n  id\n  version\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  latest\n  status\n}\n"
   }
 };
 })();

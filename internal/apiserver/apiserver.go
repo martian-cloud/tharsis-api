@@ -469,7 +469,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		runnerModel, err := dbClient.Runners.CreateRunner(ctx, &models.Runner{
 			Type:            models.SharedRunnerType,
 			Name:            r.Name,
-			CreatedBy:       auth.System,
+			CreatedBy:       models.SystemActor(),
 			RunUntaggedJobs: true,
 		})
 		if err != nil {

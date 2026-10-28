@@ -28,14 +28,14 @@ func TestGetManagedIdentityByID(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "managed-identity-0",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("managed-identity-0-data"),
 	})
@@ -44,7 +44,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:          "an-alias-created-for-testing",
 		GroupID:       group1.Metadata.ID,
-		CreatedBy:     "someone-ma1",
+		CreatedBy:     models.Actor{Subject: "someone-ma1"},
 		AliasSourceID: &managedIdentity1.Metadata.ID,
 	})
 	require.NoError(t, err)
@@ -176,14 +176,14 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	workspace1, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:           "workspace-0-for-managed-identities",
 		GroupID:        group1.Metadata.ID,
-		CreatedBy:      "someone-w0",
+		CreatedBy:      models.Actor{Subject: "someone-w0"},
 		MaxJobDuration: ptr.Int32(int32(forTestMaxJobDuration.Minutes())),
 	})
 	require.NoError(t, err)
@@ -191,7 +191,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "managed-identity-0",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("managed-identity-0-data"),
 	})
@@ -200,7 +200,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:          "an-alias-created-for-testing",
 		GroupID:       group1.Metadata.ID,
-		CreatedBy:     "someone-ma1",
+		CreatedBy:     models.Actor{Subject: "someone-ma1"},
 		AliasSourceID: &managedIdentity1.Metadata.ID,
 	})
 	require.NoError(t, err)
@@ -239,14 +239,14 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	workspace1, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:           "workspace-0-for-managed-identities",
 		GroupID:        group1.Metadata.ID,
-		CreatedBy:      "someone-w0",
+		CreatedBy:      models.Actor{Subject: "someone-w0"},
 		MaxJobDuration: ptr.Int32(int32(forTestMaxJobDuration.Minutes())),
 	})
 	require.NoError(t, err)
@@ -254,7 +254,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "managed-identity-0",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("managed-identity-0-data"),
 	})
@@ -318,14 +318,14 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	workspace1, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:           "workspace-0-for-managed-identities",
 		GroupID:        group1.Metadata.ID,
-		CreatedBy:      "someone-w0",
+		CreatedBy:      models.Actor{Subject: "someone-w0"},
 		MaxJobDuration: ptr.Int32(int32(forTestMaxJobDuration.Minutes())),
 	})
 	require.NoError(t, err)
@@ -333,7 +333,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "managed-identity-0",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("managed-identity-0-data"),
 	})
@@ -382,13 +382,13 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	aliasGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "top-level-group-1-for-managed-identity-aliases",
-		CreatedBy: "someone-g1",
+		CreatedBy: models.Actor{Subject: "someone-g1"},
 	})
 	require.NoError(t, err)
 
@@ -398,7 +398,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 		Name:        "a-managed-identity-for-testing-aliases",
 		Description: "a description for this managed identity",
 		GroupID:     group1.Metadata.ID,
-		CreatedBy:   "creator-of-managed-identities",
+		CreatedBy:   models.Actor{Subject: "creator-of-managed-identities"},
 		Data:        []byte("some-data-for-the-source-managed-identity"),
 	})
 	require.NoError(t, err)
@@ -418,7 +418,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				GroupID:     group1.Metadata.ID,
 				Type:        models.ManagedIdentityAWSFederated,
 				Data:        []byte("some-data"),
-				CreatedBy:   "creator-of-managed-identities",
+				CreatedBy:   models.Actor{Subject: "creator-of-managed-identities"},
 			},
 		},
 		{
@@ -427,7 +427,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Name:          "positive-create-managed-identity-alias",
 				GroupID:       aliasGroup.Metadata.ID,
 				AliasSourceID: &aliasSourceIdentity.Metadata.ID,
-				CreatedBy:     "creator-of-managed-identities",
+				CreatedBy:     models.Actor{Subject: "creator-of-managed-identities"},
 			},
 		},
 		{
@@ -437,7 +437,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				GroupID:   group1.Metadata.ID,
 				Type:      models.ManagedIdentityAWSFederated,
 				Data:      []byte("some-data"),
-				CreatedBy: "creator-of-managed-identities",
+				CreatedBy: models.Actor{Subject: "creator-of-managed-identities"},
 			},
 			expectErrorCode: errors.EConflict,
 		},
@@ -501,13 +501,13 @@ func TestUpdateManagedIdentity(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	otherGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "top-level-group-1-for-managed-identities",
-		CreatedBy: "someone-g1",
+		CreatedBy: models.Actor{Subject: "someone-g1"},
 	})
 	require.NoError(t, err)
 
@@ -515,7 +515,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 		Name:        "managed-identity-0",
 		Description: "original description",
 		GroupID:     group1.Metadata.ID,
-		CreatedBy:   "someone-sa0",
+		CreatedBy:   models.Actor{Subject: "someone-sa0"},
 		Type:        models.ManagedIdentityAWSFederated,
 		Data:        []byte("managed-identity-0-data"),
 	})
@@ -566,14 +566,14 @@ func TestDeleteManagedIdentity(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	createdManagedIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "managed-identity-0",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("managed-identity-0-data"),
 	})
@@ -640,20 +640,20 @@ func TestGetManagedIdentities(t *testing.T) {
 
 	group0, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "top-level-group-1-for-managed-identities",
-		CreatedBy: "someone-g1",
+		CreatedBy: models.Actor{Subject: "someone-g1"},
 	})
 	require.NoError(t, err)
 
 	apple, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "identity-apple",
 		GroupID:   group0.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("apple-data"),
 	})
@@ -662,7 +662,7 @@ func TestGetManagedIdentities(t *testing.T) {
 	banana, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "identity-banana",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa1",
+		CreatedBy: models.Actor{Subject: "someone-sa1"},
 		Type:      models.ManagedIdentityAzureFederated,
 		Data:      []byte("banana-data"),
 	})
@@ -671,7 +671,7 @@ func TestGetManagedIdentities(t *testing.T) {
 	alias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:          "identity-apple-alias",
 		GroupID:       group0.Metadata.ID,
-		CreatedBy:     "someone-ma0",
+		CreatedBy:     models.Actor{Subject: "someone-ma0"},
 		AliasSourceID: &apple.Metadata.ID,
 	})
 	require.NoError(t, err)
@@ -762,7 +762,7 @@ func TestGetManagedIdentitiesWithPaginationAndSorting(t *testing.T) {
 
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-managed-identity-pagination",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -771,7 +771,7 @@ func TestGetManagedIdentitiesWithPaginationAndSorting(t *testing.T) {
 		_, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 			Name:      fmt.Sprintf("test-managed-identity-pagination-%d", i),
 			GroupID:   group.Metadata.ID,
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 			Type:      models.ManagedIdentityAWSFederated,
 			Data:      []byte("some-data"),
 		})
@@ -812,14 +812,14 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "managed-identity-0",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("managed-identity-0-data"),
 	})
@@ -828,7 +828,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:          "an-alias-created-for-testing",
 		GroupID:       group1.Metadata.ID,
-		CreatedBy:     "someone-ma1",
+		CreatedBy:     models.Actor{Subject: "someone-ma1"},
 		AliasSourceID: &managedIdentity1.Metadata.ID,
 	})
 	require.NoError(t, err)
@@ -901,14 +901,14 @@ func TestGetManagedIdentityAccessRuleByID(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "managed-identity-0",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("managed-identity-0-data"),
 	})
@@ -1058,14 +1058,14 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "managed-identity-0",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("managed-identity-0-data"),
 	})
@@ -1080,7 +1080,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
 		Name:      "service-account-0",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 	})
 	require.NoError(t, err)
 
@@ -1155,14 +1155,14 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 
 	group0, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	managedIdentity0, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "managed-identity-0",
 		GroupID:   group0.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("managed-identity-0-data"),
 	})
@@ -1237,14 +1237,14 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 
 	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		FullPath:  "top-level-group-0-for-managed-identities",
-		CreatedBy: "someone-g0",
+		CreatedBy: models.Actor{Subject: "someone-g0"},
 	})
 	require.NoError(t, err)
 
 	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Name:      "managed-identity-0",
 		GroupID:   group1.Metadata.ID,
-		CreatedBy: "someone-sa0",
+		CreatedBy: models.Actor{Subject: "someone-sa0"},
 		Type:      models.ManagedIdentityAWSFederated,
 		Data:      []byte("managed-identity-0-data"),
 	})

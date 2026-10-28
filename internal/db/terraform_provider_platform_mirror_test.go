@@ -29,7 +29,7 @@ func TestTerraformProviderPlatformMirrors_CreateTerraformProviderPlatformMirror(
 		Name:        "test-group-provider-platform-mirror",
 		Description: "test group for provider platform mirror",
 		FullPath:    "test-group-provider-platform-mirror",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -40,7 +40,7 @@ func TestTerraformProviderPlatformMirrors_CreateTerraformProviderPlatformMirror(
 		RegistryNamespace: "hashicorp",
 		Type:              "aws",
 		SemanticVersion:   "5.0.0",
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -89,7 +89,7 @@ func TestTerraformProviderPlatformMirrors_DeleteTerraformProviderPlatformMirror(
 		Name:        "test-group-provider-platform-mirror-delete",
 		Description: "test group for provider platform mirror delete",
 		FullPath:    "test-group-provider-platform-mirror-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -100,7 +100,7 @@ func TestTerraformProviderPlatformMirrors_DeleteTerraformProviderPlatformMirror(
 		RegistryNamespace: "hashicorp",
 		Type:              "aws",
 		SemanticVersion:   "5.0.0",
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -157,7 +157,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrorByID(t *testing.T) {
 		Name:        "test-group-platform-mirror-get-by-id",
 		Description: "test group for platform mirror get by id",
 		FullPath:    "test-group-platform-mirror-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -168,7 +168,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrorByID(t *testing.T) {
 		RegistryNamespace: "test-namespace",
 		RegistryHostname:  "registry.terraform.io",
 		GroupID:           group.Metadata.ID,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -234,7 +234,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrors(t *testing.T) {
 		Name:        "test-group-platform-mirrors-list",
 		Description: "test group for platform mirrors list",
 		FullPath:    "test-group-platform-mirrors-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -245,7 +245,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrors(t *testing.T) {
 		RegistryNamespace: "test-namespace-list",
 		RegistryHostname:  "registry.terraform.io",
 		GroupID:           group.Metadata.ID,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -338,7 +338,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrorsWithPaginationAndSor
 		Name:        "test-group-platform-mirrors-pagination",
 		Description: "test group for platform mirrors pagination",
 		FullPath:    "test-group-platform-mirrors-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -349,7 +349,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrorsWithPaginationAndSor
 		RegistryNamespace: "test-namespace-pagination",
 		RegistryHostname:  "registry.terraform.io",
 		GroupID:           group.Metadata.ID,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -417,7 +417,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrorByTRN(t *testing.T) {
 		Name:        "test-group-platform-mirror-get-by-trn",
 		Description: "test group for platform mirror get by trn",
 		FullPath:    "test-group-platform-mirror-get-by-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -428,7 +428,7 @@ func TestTerraformProviderPlatformMirrors_GetPlatformMirrorByTRN(t *testing.T) {
 		RegistryNamespace: "test-namespace-trn",
 		RegistryHostname:  "registry.terraform.io",
 		GroupID:           group.Metadata.ID,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<fd37bc12332d82d0ddafd47721083bc0>>
+ * @generated SignedSource<<a4f818f372537a866450031fdc37fd51>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,14 +11,18 @@
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type StateVersionListItemFragment_stateVersion$data = {
-  readonly createdBy: string;
+  readonly createdByActor: {
+    readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+  } | null | undefined;
   readonly id: string;
   readonly metadata: {
     readonly createdAt: any;
     readonly trn: string;
   };
   readonly run: {
-    readonly createdBy: string;
+    readonly createdByActor: {
+      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    } | null | undefined;
     readonly id: string;
   } | null | undefined;
   readonly " $fragmentType": "StateVersionListItemFragment_stateVersion";
@@ -39,8 +43,17 @@ var v0 = {
 v1 = {
   "alias": null,
   "args": null,
-  "kind": "ScalarField",
-  "name": "createdBy",
+  "concreteType": null,
+  "kind": "LinkedField",
+  "name": "createdByActor",
+  "plural": false,
+  "selections": [
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "ActorDisplayFragment_actor"
+    }
+  ],
   "storageKey": null
 };
 return {
@@ -95,6 +108,6 @@ return {
 };
 })();
 
-(node as any).hash = "85b5a6b9518a556bdb8c47bd265069f7";
+(node as any).hash = "20e1fc472984f487defa7409aee69202";
 
 export default node;

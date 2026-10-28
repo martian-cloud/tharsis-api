@@ -12,7 +12,7 @@ var _ Model = (*GPGKey)(nil)
 
 // GPGKey represents a GPG key used for signing
 type GPGKey struct {
-	CreatedBy   string
+	CreatedBy   Actor
 	GroupID     string
 	ASCIIArmor  string
 	Fingerprint string

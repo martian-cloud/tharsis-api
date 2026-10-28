@@ -33,7 +33,7 @@ func TestCreateAssessmentRun_Prepare(t *testing.T) {
 
 	cmd := &CreateAssessmentRun{
 		dbClient: dbClient,
-		in:       &CreateAssessmentRunInput{Subject: "u", WorkspaceID: "ws-1"},
+		in:       &CreateAssessmentRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"},
 	}
 
 	err := cmd.Prepare(ctx)
@@ -115,8 +115,8 @@ func TestCreateAssessmentRun_Execute(t *testing.T) {
 						Plan:     models.Plan{Status: models.PlanCreated},
 					}, nil
 				},
-				in:          &CreateAssessmentRunInput{Subject: "u", WorkspaceID: "ws-1", LatestAssessmentVersion: test.latestVersionArg},
-				createInput: &corerun.CreateRunInput{Subject: "u", WorkspaceID: "ws-1"},
+				in:          &CreateAssessmentRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1", LatestAssessmentVersion: test.latestVersionArg},
+				createInput: &corerun.CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"},
 			}
 
 			runStore := store.NewRunStore(&db.Client{})

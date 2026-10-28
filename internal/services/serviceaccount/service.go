@@ -296,19 +296,47 @@ func (s *service) GetServiceAccountsByIDs(ctx context.Context, idList []string) 
 		return nil, errors.Wrap(err, "failed to get service accounts", errors.WithSpan(span))
 	}
 
+	// Service accounts the caller cannot view are left out rather than failing the whole
+	// request, so one inaccessible ID in a batch does not hide the rest. Callers that need a
+	// specific service account treat a missing one as not found. The caller can usually view
+	// every group, so one check covering all of them is tried first, and each group is checked
+	// on its own only if that fails.
 	namespacePaths := []string{}
 	for _, sa := range result.ServiceAccounts {
 		namespacePaths = append(namespacePaths, sa.GetGroupPath())
 	}
 
-	if len(namespacePaths) > 0 {
-		err = caller.RequireAccessToInheritableResource(ctx, types.ServiceAccountModelType, auth.WithNamespacePaths(namespacePaths))
-		if err != nil {
-			return nil, err
+	if len(namespacePaths) == 0 {
+		return result.ServiceAccounts, nil
+	}
+
+	err = caller.RequireAccessToInheritableResource(ctx, types.ServiceAccountModelType, auth.WithNamespacePaths(namespacePaths))
+	if err == nil {
+		return result.ServiceAccounts, nil
+	}
+	if code := errors.ErrorCode(err); code != errors.EForbidden && code != errors.ENotFound {
+		return nil, err
+	}
+
+	allowedPaths := map[string]bool{}
+	serviceAccounts := []models.ServiceAccount{}
+	for _, sa := range result.ServiceAccounts {
+		groupPath := sa.GetGroupPath()
+		allowed, checked := allowedPaths[groupPath]
+		if !checked {
+			err = caller.RequireAccessToInheritableResource(ctx, types.ServiceAccountModelType, auth.WithNamespacePaths([]string{groupPath}))
+			if code := errors.ErrorCode(err); err != nil && code != errors.EForbidden && code != errors.ENotFound {
+				return nil, err
+			}
+			allowed = err == nil
+			allowedPaths[groupPath] = allowed
+		}
+		if allowed {
+			serviceAccounts = append(serviceAccounts, sa)
 		}
 	}
 
-	return result.ServiceAccounts, nil
+	return serviceAccounts, nil
 }
 
 func (s *service) DeleteServiceAccount(ctx context.Context, input *DeleteServiceAccountInput) error {
@@ -456,7 +484,7 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *CreateService
 		Description:       input.Description,
 		GroupID:           input.GroupID,
 		OIDCTrustPolicies: input.OIDCTrustPolicies,
-		CreatedBy:         caller.GetSubject(),
+		CreatedBy:         caller.GetActor(),
 	}
 
 	var clientSecret *string

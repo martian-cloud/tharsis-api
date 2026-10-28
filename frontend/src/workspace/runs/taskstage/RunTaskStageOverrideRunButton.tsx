@@ -32,6 +32,9 @@ function RunTaskStageOverrideRunButton(props: Props) {
                     id
                     status
                     overriddenBy
+                    overriddenByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     overrideComment
                     metadata {
                         updatedAt

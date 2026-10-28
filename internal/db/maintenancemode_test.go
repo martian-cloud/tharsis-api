@@ -18,7 +18,7 @@ func TestGetMaintenanceMode(t *testing.T) {
 	defer testClient.close(ctx)
 
 	mode, err := testClient.client.MaintenanceModes.CreateMaintenanceMode(ctx, &models.MaintenanceMode{
-		CreatedBy: "test-user",
+		CreatedBy: models.Actor{Subject: "test-user"},
 	})
 	require.Nil(t, err)
 
@@ -75,7 +75,7 @@ func TestCreateMaintenanceMode(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			mode, err := testClient.client.MaintenanceModes.CreateMaintenanceMode(ctx, &models.MaintenanceMode{
-				CreatedBy: test.createdBy,
+				CreatedBy: models.Actor{Subject: test.createdBy},
 			})
 
 			if test.expectErrorCode != "" {
@@ -95,7 +95,7 @@ func TestDeleteMaintenanceMode(t *testing.T) {
 	defer testClient.close(ctx)
 
 	mode, err := testClient.client.MaintenanceModes.CreateMaintenanceMode(ctx, &models.MaintenanceMode{
-		CreatedBy: "test-user",
+		CreatedBy: models.Actor{Subject: "test-user"},
 	})
 	require.Nil(t, err)
 

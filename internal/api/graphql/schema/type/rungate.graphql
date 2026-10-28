@@ -31,7 +31,8 @@ type RunGateApproval implements Node {
   metadata: ResourceMetadata!
   decision: RunGateDecision!
   comment: String!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   coveredRules: [String!]!
   user: User
   serviceAccount: ServiceAccount
@@ -81,7 +82,8 @@ type RunGate implements Node {
   account's resource path. Null unless status is OVERRIDDEN; a gate that reached APPROVED by
   collecting its approvals was not overridden by anyone.
   """
-  overriddenBy: String
+  overriddenBy: String @deprecated(reason: "Use overriddenByActor instead.")
+  overriddenByActor: Actor @complexity(value: 0)
   """
   The reason given for the override. Empty when no reason was supplied, or when the gate was not
   overridden.

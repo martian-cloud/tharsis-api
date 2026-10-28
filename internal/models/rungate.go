@@ -80,11 +80,11 @@ type RunGate struct {
 	Type          RunGateType
 	ApprovalRules []*RunGateApprovalRule
 	Status        RunGateStatus
-	// OverriddenBy is the subject that bypassed the gate's approval requirements — a user's email
-	// or a service account's resource path — and OverrideComment the reason they gave. Both are set
+	// OverriddenBy is the principal that bypassed the gate's approval requirements and
+	// OverrideComment the reason they gave. Both are set
 	// only when Status is RunGateOverridden; a gate that reached RunGateApproved by collecting its
 	// approvals leaves them nil, which is what distinguishes the two ways a gate is cleared.
-	OverriddenBy    *string
+	OverriddenBy    *Actor
 	OverrideComment *string
 	Metadata        ResourceMetadata
 }
@@ -174,10 +174,10 @@ func (g *RunGate) Validate() error {
 
 	// OverriddenBy/OverrideComment record who bypassed the gate and why, so they are meaningful only
 	// for an overridden gate. A gate cleared by collecting approvals (approved) or closed out
-	// (pending/canceled) must leave both nil; an overridden gate must record the overriding subject.
+	// (pending/canceled) must leave both unset; an overridden gate must record the overriding principal.
 	if g.Status == RunGateOverridden {
 		if g.OverriddenBy == nil {
-			return errors.New("an overridden run gate must record the subject that overrode it",
+			return errors.New("an overridden run gate must record the principal that overrode it",
 				errors.WithErrorCode(errors.EInvalid))
 		}
 	} else if g.OverriddenBy != nil || g.OverrideComment != nil {

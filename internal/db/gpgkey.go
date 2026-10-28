@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -92,7 +93,7 @@ type terraformGPGKeys struct {
 	dbClient *Client
 }
 
-var gpgKeyFieldList = append(metadataFieldList, "group_id", "gpg_key_id", "fingerprint", "ascii_armor", "created_by")
+var gpgKeyFieldList = append(metadataAndCreatedByFieldList, "group_id", "gpg_key_id", "fingerprint", "ascii_armor")
 
 // NewGPGKeys returns an instance of the GPGKeys interface
 func NewGPGKeys(dbClient *Client) GPGKeys {
@@ -213,6 +214,11 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(gpgKey.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("gpgkey.CreateGPGKey", dialect.From("gpg_keys").
@@ -221,15 +227,18 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 			dialect.Insert("gpg_keys").
 				Rows(
 					goqu.Record{
-						"id":          newResourceID(),
-						"version":     initialResourceVersion,
-						"created_at":  timestamp,
-						"updated_at":  timestamp,
-						"group_id":    gpgKey.GroupID,
-						"gpg_key_id":  int64(gpgKey.GPGKeyID), // Cast uint64 to int64 for PostgreSQL BIGINT
-						"fingerprint": gpgKey.Fingerprint,
-						"ascii_armor": gpgKey.ASCIIArmor,
-						"created_by":  gpgKey.CreatedBy,
+						"id":                    newResourceID(),
+						"version":               initialResourceVersion,
+						"created_at":            timestamp,
+						"updated_at":            timestamp,
+						"group_id":              gpgKey.GroupID,
+						"gpg_key_id":            int64(gpgKey.GPGKeyID), // Cast uint64 to int64 for PostgreSQL BIGINT
+						"fingerprint":           gpgKey.Fingerprint,
+						"ascii_armor":           gpgKey.ASCIIArmor,
+						"created_by":            gpgKey.CreatedBy.Subject,
+						"created_by_actor_type": createdByActorType,
+						"created_by_actor_id":   createdByActorID,
+						"created_by_actor_trn":  createdByActorTRN,
 					},
 				).Returning("*"),
 		).Select(t.getSelectFields()...).
@@ -331,6 +340,7 @@ func (t *terraformGPGKeys) getSelectFields() []interface{} {
 }
 
 func scanGPGKey(row scanner) (*models.GPGKey, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var groupPath string
 	var gpgKeyID int64 // Scan as int64 from PostgreSQL BIGINT
 	gpgKey := &models.GPGKey{}
@@ -340,11 +350,14 @@ func scanGPGKey(row scanner) (*models.GPGKey, error) {
 		&gpgKey.Metadata.CreationTimestamp,
 		&gpgKey.Metadata.LastUpdatedTimestamp,
 		&gpgKey.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&gpgKey.GroupID,
 		&gpgKeyID, // Scan into int64
 		&gpgKey.Fingerprint,
 		&gpgKey.ASCIIArmor,
-		&gpgKey.CreatedBy,
 		&groupPath,
 	}
 
@@ -352,6 +365,9 @@ func scanGPGKey(row scanner) (*models.GPGKey, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	gpgKey.CreatedBy = parsedActor
 
 	// Cast int64 to uint64 for the model
 	gpgKey.GPGKeyID = uint64(gpgKeyID)

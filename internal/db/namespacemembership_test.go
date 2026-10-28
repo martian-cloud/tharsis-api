@@ -28,7 +28,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-create-membership",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -41,7 +41,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 	serviceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
 		Name:      "test-sa-create-membership",
 		GroupID:   group.Metadata.ID,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -52,7 +52,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 
 	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:      "test-role-create-membership",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -210,7 +210,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-update-membership",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -222,13 +222,13 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 
 	roleA, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:      "test-role-update-membership-a",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
 	roleB, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:      "test-role-update-membership-b",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -302,7 +302,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-delete-membership",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -314,7 +314,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 
 	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:      "test-role-delete-membership",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -386,7 +386,7 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-get-by-id",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -398,7 +398,7 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 
 	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:      "test-role-get-by-id",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -528,21 +528,21 @@ func TestGetNamespaceMemberships(t *testing.T) {
 
 	groupA, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-list-a",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
 	groupB, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-list-b",
 		ParentID:  groupA.Metadata.ID,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
 	workspaceA1, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:           "test-ws-list-a1",
 		GroupID:        groupA.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(int32(forTestMaxJobDuration.Minutes())),
 	})
 	require.Nil(t, err)
@@ -562,7 +562,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 	serviceAccount0, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
 		Name:      "test-sa-list-0",
 		GroupID:   groupA.Metadata.ID,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -579,7 +579,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 
 	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:      "test-role-list",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -833,13 +833,13 @@ func TestGetNamespaceMembershipsWithPaginationAndSorting(t *testing.T) {
 
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-membership-pagination",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
 	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:      "test-role-membership-pagination",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -848,7 +848,7 @@ func TestGetNamespaceMembershipsWithPaginationAndSorting(t *testing.T) {
 		workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 			Name:           fmt.Sprintf("test-ws-membership-pagination-%d", i),
 			GroupID:        group.Metadata.ID,
-			CreatedBy:      "db-integration-tests",
+			CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 			MaxJobDuration: ptr.Int32(int32(forTestMaxJobDuration.Minutes())),
 		})
 		require.Nil(t, err)

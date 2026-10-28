@@ -85,7 +85,7 @@ func TestGetFederatedRegistriesByIDs(t *testing.T) {
 		Hostname:  hostname,
 		GroupID:   groupID,
 		Audience:  "test-audience",
-		CreatedBy: "test-user",
+		CreatedBy: models.Actor{Subject: "test-user"},
 	}
 
 	type testCase struct {
@@ -218,7 +218,7 @@ func TestGetFederatedRegistryByID(t *testing.T) {
 		Hostname:  hostname,
 		GroupID:   groupID,
 		Audience:  "test-audience",
-		CreatedBy: "test-user",
+		CreatedBy: models.Actor{Subject: "test-user"},
 	}
 
 	type testCase struct {
@@ -315,7 +315,7 @@ func TestFederatedRegistryByTRN(t *testing.T) {
 		},
 		GroupID:   "group-1",
 		Audience:  "test-audience",
-		CreatedBy: "test-user",
+		CreatedBy: models.Actor{Subject: "test-user"},
 	}
 
 	type testCase struct {
@@ -393,7 +393,7 @@ func TestGetFederatedRegistries(t *testing.T) {
 		Hostname:  hostname,
 		GroupID:   groupID,
 		Audience:  "test-audience",
-		CreatedBy: "test-user",
+		CreatedBy: models.Actor{Subject: "test-user"},
 	}
 
 	type testCase struct {
@@ -640,7 +640,7 @@ func TestCreateFederatedRegistry(t *testing.T) {
 		Hostname:  hostname,
 		GroupID:   groupID,
 		Audience:  "test-audience",
-		CreatedBy: "test-user",
+		CreatedBy: models.Actor{Subject: "test-user"},
 	}
 
 	type testCase struct {
@@ -690,7 +690,7 @@ func TestCreateFederatedRegistry(t *testing.T) {
 
 			mockDBClient := buildDBClientWithMocks(t)
 
-			mockCaller.On("GetSubject").Return("test-subject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("test-subject")).Maybe()
 
 			mockCaller.On("RequireAccessToInheritableResource", mock.Anything,
 				types.FederatedRegistryModelType, mock.Anything).
@@ -778,7 +778,7 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 		Hostname:  hostname,
 		GroupID:   groupID,
 		Audience:  "test-audience",
-		CreatedBy: "test-user",
+		CreatedBy: models.Actor{Subject: "test-user"},
 	}
 
 	type testCase struct {
@@ -812,7 +812,7 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 				Hostname:  hostname,
 				GroupID:   groupID,
 				Audience:  "test-audience",
-				CreatedBy: "test-user",
+				CreatedBy: models.Actor{Subject: "test-user"},
 			},
 			expectErrCode: errors.ENotFound,
 		},
@@ -915,7 +915,7 @@ func TestDeleteFederatedRegistry(t *testing.T) {
 		Hostname:  hostname,
 		GroupID:   groupID,
 		Audience:  "test-audience",
-		CreatedBy: "test-user",
+		CreatedBy: models.Actor{Subject: "test-user"},
 	}
 
 	type testCase struct {
@@ -982,7 +982,7 @@ func TestDeleteFederatedRegistry(t *testing.T) {
 					Hostname:  hostname,
 					GroupID:   groupID,
 					Audience:  "test-audience",
-					CreatedBy: "test-user",
+					CreatedBy: models.Actor{Subject: "test-user"},
 				}).
 				Return(nil, errors.New("test registry not found", errors.WithErrorCode(errors.ENotFound))).Maybe()
 
@@ -1071,7 +1071,7 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 							Hostname:  hostname1,
 							GroupID:   "group-1",
 							Audience:  "test-audience",
-							CreatedBy: "test-user",
+							CreatedBy: models.Actor{Subject: "test-user"},
 						},
 					},
 				}, nil)
@@ -1142,4 +1142,9 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 			}
 		})
 	}
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

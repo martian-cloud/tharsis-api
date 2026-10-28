@@ -29,7 +29,7 @@ func TestGPGKeys_CreateGPGKey(t *testing.T) {
 		Name:        "test-group-gpg",
 		Description: "test group for gpg key",
 		FullPath:    "test-group-gpg",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -81,7 +81,7 @@ func TestGPGKeys_CreateGPGKey(t *testing.T) {
 				Fingerprint: test.fingerprint,
 				GroupID:     test.groupID,
 				ASCIIArmor:  test.asciiArmor,
-				CreatedBy:   "db-integration-tests",
+				CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			})
 
 			if test.expectErrorCode != "" {
@@ -110,7 +110,7 @@ func TestGPGKeys_DeleteGPGKey(t *testing.T) {
 		Name:        "test-group-gpg-delete",
 		Description: "test group for gpg key delete",
 		FullPath:    "test-group-gpg-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -118,7 +118,7 @@ func TestGPGKeys_DeleteGPGKey(t *testing.T) {
 		GPGKeyID:   98765,
 		GroupID:    group.Metadata.ID,
 		ASCIIArmor: "-----BEGIN PGP PUBLIC KEY BLOCK-----\nkey to delete\n-----END PGP PUBLIC KEY BLOCK-----",
-		CreatedBy:  "db-integration-tests",
+		CreatedBy:  models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -177,7 +177,7 @@ func TestGPGKeys_GetGPGKeyByID(t *testing.T) {
 		Name:        "test-group-gpg-key-get-by-id",
 		Description: "test group for gpg key get by id",
 		FullPath:    "test-group-gpg-key-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -186,7 +186,7 @@ func TestGPGKeys_GetGPGKeyByID(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		ASCIIArmor:  "-----BEGIN PGP PUBLIC KEY BLOCK-----\ntest-key-content\n-----END PGP PUBLIC KEY BLOCK-----",
 		Fingerprint: "1234567890ABCDEF1234567890ABCDEF12345678",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -243,7 +243,7 @@ func TestGPGKeys_GetGPGKeys(t *testing.T) {
 		Name:        "test-group-gpg-keys-list",
 		Description: "test group for gpg keys list",
 		FullPath:    "test-group-gpg-keys-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -253,13 +253,13 @@ func TestGPGKeys_GetGPGKeys(t *testing.T) {
 			GroupID:     group.Metadata.ID,
 			ASCIIArmor:  "-----BEGIN PGP PUBLIC KEY BLOCK-----\ntest-key-1\n-----END PGP PUBLIC KEY BLOCK-----",
 			Fingerprint: "1111111111111111111111111111111111111111",
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			GroupID:     group.Metadata.ID,
 			ASCIIArmor:  "-----BEGIN PGP PUBLIC KEY BLOCK-----\ntest-key-2\n-----END PGP PUBLIC KEY BLOCK-----",
 			Fingerprint: "2222222222222222222222222222222222222222",
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -318,7 +318,7 @@ func TestGPGKeys_GetGPGKeysWithPaginationAndSorting(t *testing.T) {
 		Name:        "test-group-gpg-keys-pagination",
 		Description: "test group for gpg keys pagination",
 		FullPath:    "test-group-gpg-keys-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -328,7 +328,7 @@ func TestGPGKeys_GetGPGKeysWithPaginationAndSorting(t *testing.T) {
 			GroupID:     group.Metadata.ID,
 			ASCIIArmor:  fmt.Sprintf("-----BEGIN PGP PUBLIC KEY BLOCK-----\ntest-key-%d\n-----END PGP PUBLIC KEY BLOCK-----", i),
 			Fingerprint: fmt.Sprintf("%040d", i), // 40-character fingerprint
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -370,7 +370,7 @@ func TestGPGKeys_GetGPGKeyByTRN(t *testing.T) {
 		Name:        "test-group-gpg-key-get-by-trn",
 		Description: "test group for gpg key get by trn",
 		FullPath:    "test-group-gpg-key-get-by-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -379,7 +379,7 @@ func TestGPGKeys_GetGPGKeyByTRN(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		ASCIIArmor:  "-----BEGIN PGP PUBLIC KEY BLOCK-----\ntest-key-trn\n-----END PGP PUBLIC KEY BLOCK-----",
 		Fingerprint: "ABCDABCDABCDABCDABCDABCDABCDABCDABCDABCD",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

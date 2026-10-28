@@ -142,7 +142,13 @@ func (r *FederatedRegistryResolver) Audience() string {
 
 // CreatedBy resolver
 func (r *FederatedRegistryResolver) CreatedBy() string {
-	return r.federatedRegistry.CreatedBy
+	return r.federatedRegistry.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *FederatedRegistryResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.federatedRegistry.CreatedBy)
 }
 
 // Group resolver

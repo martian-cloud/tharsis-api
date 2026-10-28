@@ -53,6 +53,9 @@ function PolicyCard({ fragmentRef, showGroupPath, showActions = true, onDelete }
             description
             kind
             createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             requiredApprovals
             opaData {
                 packageSource

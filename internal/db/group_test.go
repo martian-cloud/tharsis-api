@@ -73,7 +73,7 @@ func TestGroups_CreateGroup(t *testing.T) {
 				Description: test.description,
 				ParentID:    test.parentID,
 				FullPath:    test.fullPath,
-				CreatedBy:   "db-integration-tests",
+				CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			})
 
 			if test.expectErrorCode != "" {
@@ -102,7 +102,7 @@ func TestGroups_UpdateGroup(t *testing.T) {
 		Name:        "test-group-update",
 		Description: "original description",
 		FullPath:    "test-group-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -159,7 +159,7 @@ func TestGroups_DeleteGroup(t *testing.T) {
 		Name:        "test-group-delete",
 		Description: "group to delete",
 		FullPath:    "test-group-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -218,7 +218,7 @@ func TestGroups_GetGroupByID(t *testing.T) {
 		Name:        "test-group-get-by-id",
 		Description: "test group for get by id",
 		FullPath:    "test-group-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -276,13 +276,13 @@ func TestGroups_GetGroups(t *testing.T) {
 			Name:        "test-group-list-1",
 			Description: "test group for list 1",
 			FullPath:    "test-group-list-1",
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			Name:        "test-group-list-2",
 			Description: "test group for list 2",
 			FullPath:    "test-group-list-2",
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -298,7 +298,7 @@ func TestGroups_GetGroups(t *testing.T) {
 		Name:      "child-group",
 		ParentID:  createdGroups[0].Metadata.ID,
 		FullPath:  "test-group-list-1/child-group",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -403,37 +403,37 @@ func TestGroups_GetGroupsWithMembershipFilters(t *testing.T) {
 	//   teamXa              top-level decoy: an unescaped "team_a/%" LIKE would match its tree
 	//   teamXa/child        the decoy descendant that must NOT leak into team_a's results
 	root, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "mbr-root", CreatedBy: "db-integration-tests",
+		Name: "mbr-root", CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "mbr-child", ParentID: root.Metadata.ID, CreatedBy: "db-integration-tests",
+		Name: "mbr-child", ParentID: root.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "mbr-other", CreatedBy: "db-integration-tests",
+		Name: "mbr-other", CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	teamA, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "team_a", CreatedBy: "db-integration-tests",
+		Name: "team_a", CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "child", ParentID: teamA.Metadata.ID, CreatedBy: "db-integration-tests",
+		Name: "child", ParentID: teamA.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	teamX, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "teamXa", CreatedBy: "db-integration-tests",
+		Name: "teamXa", CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "child", ParentID: teamX.Metadata.ID, CreatedBy: "db-integration-tests",
+		Name: "child", ParentID: teamX.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -516,7 +516,7 @@ func TestGroups_GetGroupsWithPaginationAndSorting(t *testing.T) {
 			Name:        fmt.Sprintf("test-group-pagination-%d", i),
 			Description: fmt.Sprintf("test group for pagination %d", i),
 			FullPath:    fmt.Sprintf("test-group-pagination-%d", i),
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -558,7 +558,7 @@ func TestGroups_GetGroupByTRN(t *testing.T) {
 		Name:        "test-group-trn",
 		Description: "test group for trn",
 		FullPath:    "test-group-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -627,7 +627,7 @@ func TestGroups_MigrateGroup_LiteralPrefix(t *testing.T) {
 			Name:      name,
 			ParentID:  parentID,
 			FullPath:  fullPath,
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 		groups[fullPath] = group
@@ -699,7 +699,7 @@ func TestGroups_MigrateGroup(t *testing.T) {
 			Name:      name,
 			ParentID:  parentID,
 			FullPath:  fullPath,
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -719,7 +719,7 @@ func TestGroups_MigrateGroup(t *testing.T) {
 			GroupID:        groups[fullPath[:i]].Metadata.ID,
 			FullPath:       fullPath,
 			MaxJobDuration: &maxJobDuration,
-			CreatedBy:      "db-integration-tests",
+			CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -740,7 +740,7 @@ func TestGroups_MigrateGroup(t *testing.T) {
 		serviceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
 			Name:      "approver",
 			GroupID:   groups[groupPath].Metadata.ID,
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -842,7 +842,7 @@ func TestGroups_MigrateGroup(t *testing.T) {
 			},
 			RequiredApprovals:        1,
 			AllowedServiceAccountIDs: []string{serviceAccounts[test.principalPath].Metadata.ID},
-			CreatedBy:                "db-integration-tests",
+			CreatedBy:                models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -884,7 +884,7 @@ func TestGroups_MigrateGroup(t *testing.T) {
 			GroupID:   groups[test.principalPath].Metadata.ID,
 			Type:      models.ManagedIdentityAWSFederated,
 			Data:      []byte("test-identity-data"),
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -924,7 +924,7 @@ func TestGroups_MigrateGroup(t *testing.T) {
 				Name:      fmt.Sprintf("test-runner-%d", len(runners)),
 				GroupID:   &groupID,
 				Type:      models.GroupRunnerType,
-				CreatedBy: "db-integration-tests",
+				CreatedBy: models.Actor{Subject: "db-integration-tests"},
 			})
 			require.NoError(t, err)
 
@@ -965,7 +965,7 @@ func TestGroups_MigrateGroup(t *testing.T) {
 
 	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:      "test-role",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -1020,7 +1020,7 @@ func TestGroups_MigrateGroup(t *testing.T) {
 			GroupID:   groups[test.principalPath].Metadata.ID,
 			Type:      models.GitLabProviderType,
 			URL:       url.URL{Scheme: "https", Host: "gitlab.example.com"},
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -1030,7 +1030,7 @@ func TestGroups_MigrateGroup(t *testing.T) {
 			TokenNonce:     uuid.New().String(),
 			RepositoryPath: "test-org/test-repo",
 			Branch:         "main",
-			CreatedBy:      "db-integration-tests",
+			CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -1134,19 +1134,19 @@ func TestGroups_GetHasChildrenByGroupIDs(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	withWorkspace, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "presence-with-workspace", CreatedBy: "db-integration-tests"})
+	withWorkspace, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "presence-with-workspace", CreatedBy: models.Actor{Subject: "db-integration-tests"}})
 	require.NoError(t, err)
 	_, err = testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:           "presence-workspace",
 		GroupID:        withWorkspace.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
-	withSubgroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "presence-with-subgroup", CreatedBy: "db-integration-tests"})
+	withSubgroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "presence-with-subgroup", CreatedBy: models.Actor{Subject: "db-integration-tests"}})
 	require.NoError(t, err)
-	subgroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "presence-subgroup", ParentID: withSubgroup.Metadata.ID, CreatedBy: "db-integration-tests"})
+	subgroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "presence-subgroup", ParentID: withSubgroup.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"}})
 	require.NoError(t, err)
 
 	t.Run("reports each requested group and skips unknown ids", func(t *testing.T) {

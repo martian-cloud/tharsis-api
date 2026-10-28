@@ -521,7 +521,13 @@ func (r *GroupResolver) EffectiveCleanupPolicies(ctx context.Context) ([]*Cleanu
 
 // CreatedBy resolver
 func (r *GroupResolver) CreatedBy() string {
-	return r.group.CreatedBy
+	return r.group.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *GroupResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.group.CreatedBy)
 }
 
 // ActivityEvents resolver

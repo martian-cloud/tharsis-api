@@ -1,9 +1,8 @@
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import { Box, Chip, ListItemButton, Tooltip, Typography, useTheme } from '@mui/material';
+import { Box, Chip, ListItemButton, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from "react-relay/hooks";
 import { Link } from 'react-router-dom';
-import Gravatar from '../../common/Gravatar';
+import ActorDisplay from '../../common/ActorDisplay';
 import Timestamp from '../../common/Timestamp';
 import { ProviderMirrorListItemFragment_mirror$key } from './__generated__/ProviderMirrorListItemFragment_mirror.graphql';
 
@@ -21,7 +20,9 @@ function ProviderMirrorListItem({ fragmentRef }: Props) {
                 createdAt
             }
             version
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             providerAddress
         }
     `, fragmentRef);
@@ -46,15 +47,9 @@ function ProviderMirrorListItem({ fragmentRef }: Props) {
                     <Typography variant="caption" color="textSecondary">
                         Cached <Timestamp component="span" timestamp={data.metadata.createdAt} /> by
                     </Typography>
-                    {data.createdBy.startsWith('trn:') ? (
-                        <Tooltip title={data.createdBy}>
-                            <SmartToyIcon sx={{ ml: 0.5, width: 16, height: 16, color: 'text.secondary' }} />
-                        </Tooltip>
-                    ) : (
-                        <Tooltip title={data.createdBy}>
-                            <Box><Gravatar width={16} height={16} sx={{ ml: 0.5 }} email={data.createdBy} /></Box>
-                        </Tooltip>
-                    )}
+                    <Box sx={{ display: 'flex', ml: 0.5 }}>
+                        <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={16} />
+                    </Box>
                 </Box>
             </Box>
         </ListItemButton>

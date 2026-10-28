@@ -56,7 +56,13 @@ func (r *RunGateResolver) ApprovalRules() []*RunGateApprovalRuleResolver {
 // unless the gate was overridden — a gate that reached approved by collecting its approvals was not
 // overridden by anyone, and its decisions are listed under Approvals instead.
 func (r *RunGateResolver) OverriddenBy() *string {
-	return r.runGate.OverriddenBy
+	return models.ActorSubjectPtr(r.runGate.OverriddenBy)
+}
+
+// OverriddenByActor resolver returns the structured identity behind overriddenBy, or null when
+// none was recorded.
+func (r *RunGateResolver) OverriddenByActor() *ActorResolver {
+	return newOptionalActorResolver(r.runGate.OverriddenBy)
 }
 
 // OverrideComment resolver returns the reason given for the override, or an empty string when none
@@ -216,7 +222,13 @@ func (r *RunGateApprovalResolver) Comment() string {
 
 // CreatedBy resolver.
 func (r *RunGateApprovalResolver) CreatedBy() string {
-	return r.approval.CreatedBy
+	return r.approval.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *RunGateApprovalResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.approval.CreatedBy)
 }
 
 // CoveredRules resolver returns the names of the gate's approval rules this decision counts toward.

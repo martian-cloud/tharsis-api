@@ -482,7 +482,7 @@ func TestCreateRunner(t *testing.T) {
 				Type:            models.GroupRunnerType,
 				Name:            "test-runner",
 				GroupID:         &groupID,
-				CreatedBy:       "mockSubject",
+				CreatedBy:       models.Actor{Subject: "mockSubject"},
 				Tags:            []string{"some-tag"},
 				RunUntaggedJobs: false,
 				JobLimit:        10,
@@ -524,7 +524,7 @@ func TestCreateRunner(t *testing.T) {
 				Type:      models.GroupRunnerType,
 				Name:      "test-runner",
 				GroupID:   &groupID,
-				CreatedBy: "mockSubject",
+				CreatedBy: models.Actor{Subject: "mockSubject"},
 				Tags:      []string{"some-tag"},
 			},
 			limit:                 5,
@@ -544,7 +544,7 @@ func TestCreateRunner(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunnerPermission, mock.Anything).Return(test.authError)
 			mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin).Maybe()
 
-			mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 			mockTransactions := db.NewMockTransactions(t)
 			mockRunners := db.NewMockRunners(t)
@@ -2439,4 +2439,9 @@ func TestSubscribeToRunnerSessions(t *testing.T) {
 			}
 		})
 	}
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

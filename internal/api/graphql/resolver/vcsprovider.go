@@ -150,7 +150,13 @@ func (r *VCSProviderResolver) Metadata() *MetadataResolver {
 
 // CreatedBy resolver
 func (r *VCSProviderResolver) CreatedBy() string {
-	return r.vcsProvider.CreatedBy
+	return r.vcsProvider.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *VCSProviderResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.vcsProvider.CreatedBy)
 }
 
 // Group resolver

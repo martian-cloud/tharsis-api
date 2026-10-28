@@ -29,7 +29,7 @@ func TestSCIMTokens_CreateSCIMToken(t *testing.T) {
 			name: "successfully create SCIM token",
 			token: &models.SCIMToken{
 				Nonce:     uuid.New().String(),
-				CreatedBy: "db-integration-tests",
+				CreatedBy: models.Actor{Subject: "db-integration-tests"},
 			},
 		},
 	}
@@ -59,7 +59,7 @@ func TestSCIMTokens_DeleteSCIMToken(t *testing.T) {
 	// Create a SCIM token to delete
 	createdToken, err := testClient.client.SCIMTokens.CreateToken(ctx, &models.SCIMToken{
 		Nonce:     uuid.New().String(),
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -105,7 +105,7 @@ func TestSCIMTokens_GetTokenByNonce(t *testing.T) {
 	// Create a SCIM token for testing
 	createdToken, err := testClient.client.SCIMTokens.CreateToken(ctx, &models.SCIMToken{
 		Nonce:     "550e8400-e29b-41d4-a716-446655440000",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -156,11 +156,11 @@ func TestSCIMTokens_GetTokens(t *testing.T) {
 	tokens := []models.SCIMToken{
 		{
 			Nonce:     "550e8400-e29b-41d4-a716-446655440001",
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			Nonce:     "550e8400-e29b-41d4-a716-446655440002",
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 

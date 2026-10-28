@@ -577,15 +577,17 @@ func toPBApplyStatus(s models.ApplyStatus) pb.ApplyStatus {
 // toPBRun converts from Run model to ProtoBuf model.
 func toPBRun(r *models.Run) *pb.Run {
 	pbRun := &pb.Run{
-		Metadata:        toPBMetadata(&r.Metadata, types.RunModelType),
-		CreatedBy:       r.CreatedBy,
-		ForceCanceled:   r.ForceCanceled,
-		ForceCanceledBy: r.ForceCanceledBy,
-		HasChanges:      r.HasChanges(),
-		IsDestroy:       r.IsDestroy,
-		Speculative:     r.Speculative(),
-		IsAssessmentRun: r.IsAssessmentRun,
-		AutoApply:       r.AutoApply,
+		Metadata:             toPBMetadata(&r.Metadata, types.RunModelType),
+		CreatedBy:            r.CreatedBy.Subject,
+		CreatedByActor:       toPBActor(r.CreatedBy),
+		ForceCanceled:        r.ForceCanceled,
+		ForceCanceledBy:      models.ActorSubjectPtr(r.ForceCanceledBy),
+		ForceCanceledByActor: toPBOptionalActor(r.ForceCanceledBy),
+		HasChanges:           r.HasChanges(),
+		IsDestroy:            r.IsDestroy,
+		Speculative:          r.Speculative(),
+		IsAssessmentRun:      r.IsAssessmentRun,
+		AutoApply:            r.AutoApply,
 
 		ModuleSource:     r.ModuleSource,
 		ModuleVersion:    r.ModuleVersion,
@@ -759,7 +761,8 @@ func toPBApply(run *models.Run) *pb.Apply {
 		Metadata:           toPBMetadataWithGID(a.Metadata(run), a.GetGlobalID()),
 		DeprecatedStatus:   string(a.Status),
 		Status:             toPBApplyStatus(a.Status),
-		TriggeredBy:        a.TriggeredBy,
+		TriggeredBy:        ptr.ToString(models.ActorSubjectPtr(a.TriggeredBy)),
+		TriggeredByActor:   toPBOptionalActor(a.TriggeredBy),
 		ErrorMessage:       a.ErrorMessage,
 		ManagedIdentityIds: toManagedIdentityGIDs(a.ManagedIdentityIDs),
 	}

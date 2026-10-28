@@ -1,0 +1,4 @@
+-- The backfilled values need no revert: the down migration of
+-- 20261014190000_add_actor_columns drops the columns, which discards them. The
+-- up migration re-enables the notify_event triggers it disabled before it
+-- commits, so there is nothing else to undo.

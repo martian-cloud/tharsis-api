@@ -600,7 +600,7 @@ func TestCreateProvider(t *testing.T) {
 				GroupID:       groupID,
 				RootGroupID:   groupID,
 				Private:       true,
-				CreatedBy:     "mockSubject",
+				CreatedBy:     mockCallerActor().WithSubject("mockSubject"),
 			},
 			limit:                   5,
 			injectProvidersPerGroup: 5,
@@ -623,7 +623,7 @@ func TestCreateProvider(t *testing.T) {
 				GroupID:       groupID,
 				RootGroupID:   "root-group",
 				Private:       true,
-				CreatedBy:     "mockSubject",
+				CreatedBy:     mockCallerActor().WithSubject("mockSubject"),
 			},
 			limit:                   5,
 			injectProvidersPerGroup: 5,
@@ -656,7 +656,7 @@ func TestCreateProvider(t *testing.T) {
 				GroupID:       groupID,
 				RootGroupID:   groupID,
 				Private:       true,
-				CreatedBy:     "mockSubject",
+				CreatedBy:     mockCallerActor().WithSubject("mockSubject"),
 			},
 			limit:                   5,
 			injectProvidersPerGroup: 6,
@@ -673,7 +673,7 @@ func TestCreateProvider(t *testing.T) {
 			mockCaller.Test(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateTerraformProviderPermission, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 			mockTransactions := db.NewMockTransactions(t)
 			mockProviders := db.NewMockTerraformProviders(t)
@@ -922,7 +922,7 @@ func TestCreateProviderVersion(t *testing.T) {
 			mockCaller.Test(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTerraformProviderPermission, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
@@ -1260,7 +1260,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 				Architecture:      "some-arch",
 				SHASum:            "some-sum",
 				Filename:          "some-filename",
-				CreatedBy:         "mockSubject",
+				CreatedBy:         mockCallerActor().WithSubject("mockSubject"),
 				BinaryUploaded:    false,
 			},
 			limit:                      5,
@@ -1282,7 +1282,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 				Architecture:      "some-arch",
 				SHASum:            "some-sum",
 				Filename:          "some-filename",
-				CreatedBy:         "mockSubject",
+				CreatedBy:         mockCallerActor().WithSubject("mockSubject"),
 				BinaryUploaded:    false,
 			},
 			limit:                      5,
@@ -1301,7 +1301,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 			mockCaller.Test(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTerraformProviderPermission, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 			mockProviders := db.NewMockTerraformProviders(t)
 			mockProviderVersions := db.NewMockTerraformProviderVersions(t)
@@ -1524,4 +1524,9 @@ func TestDeleteProvider(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

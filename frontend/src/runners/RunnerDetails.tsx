@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { useFragment, useMutation, useSubscription } from 'react-relay/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ConnectionHandler, ConnectionInterface, GraphQLSubscriptionConfig, RecordSourceProxy } from "relay-runtime";
+import ActorDisplay from '../common/ActorDisplay';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import { RunnerIcon } from "../common/Icons";
 import TabContent from "../common/TabContent";
@@ -53,7 +54,9 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
             type
             disabled
             description
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             tags
             runUntaggedJobs
             jobLimit
@@ -297,7 +300,7 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
                         <Collapse in={showMore} timeout="auto" unmountOnExit>
                             <Box mt={2}>
                                 <Typography variant="body2">
-                                    Created <Timestamp timestamp={runner.metadata.createdAt as string} /> by {runner.createdBy}
+                                    Created <Timestamp timestamp={runner.metadata.createdAt as string} /> by <ActorDisplay fragmentRef={runner.createdByActor} variant="text" />
                                 </Typography>
                             </Box>
                         </Collapse>

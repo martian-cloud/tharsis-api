@@ -28,7 +28,7 @@ func TestNewService(t *testing.T) {
 
 func TestGetMaintenanceMode(t *testing.T) {
 	sampleMaintenanceMode := &models.MaintenanceMode{
-		CreatedBy: "testSubject",
+		CreatedBy: models.Actor{Subject: "testSubject"},
 	}
 
 	type testCase struct {
@@ -94,7 +94,7 @@ func TestEnableMaintenanceMode(t *testing.T) {
 	testSubject := "testSubject"
 
 	sampleMaintenanceMode := &models.MaintenanceMode{
-		CreatedBy: testSubject,
+		CreatedBy: mockCallerActor().WithSubject(testSubject),
 	}
 
 	type testCase struct {
@@ -127,7 +127,7 @@ func TestEnableMaintenanceMode(t *testing.T) {
 			mockCaller.On("IsAdminModeActivated", mock.Anything).Return(test.isAdmin)
 
 			if test.expectCreated {
-				mockCaller.On("GetSubject").Return(testSubject)
+				mockCaller.On("GetActor").Return(mockCallerActor().WithSubject(testSubject))
 
 				mockMaintenanceModes.On("CreateMaintenanceMode", mock.Anything, sampleMaintenanceMode).Return(sampleMaintenanceMode, nil)
 			}
@@ -160,7 +160,7 @@ func TestDisableMaintenanceMode(t *testing.T) {
 	testSubject := "testSubject"
 
 	sampleMaintenanceMode := &models.MaintenanceMode{
-		CreatedBy: testSubject,
+		CreatedBy: models.Actor{Subject: testSubject},
 	}
 
 	type testCase struct {
@@ -226,4 +226,9 @@ func TestDisableMaintenanceMode(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

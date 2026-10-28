@@ -50,7 +50,7 @@ func TestRoles_CreateRole(t *testing.T) {
 			role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 				Name:        test.roleName,
 				Description: test.description,
-				CreatedBy:   "db-integration-tests",
+				CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			})
 
 			if test.expectErrorCode != "" {
@@ -80,7 +80,7 @@ func TestRoles_UpdateRole(t *testing.T) {
 	createdRole, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:        "test-role-update",
 		Description: "original description",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -136,7 +136,7 @@ func TestRoles_DeleteRole(t *testing.T) {
 	createdRole, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:        "test-role-delete",
 		Description: "role to delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -193,7 +193,7 @@ func TestRoles_GetRoleByID(t *testing.T) {
 	roleToCreate := &models.Role{
 		Name:        "test-role-get-by-id",
 		Description: "Test role for get by ID",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	}
 	roleToCreate.SetPermissions([]models.Permission{
 		{Action: "read", ResourceType: "workspace"},
@@ -254,12 +254,12 @@ func TestRoles_GetRoles(t *testing.T) {
 		{
 			Name:        "test-role-1",
 			Description: "Test role 1",
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			Name:        "test-role-2",
 			Description: "Test role 2",
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -335,7 +335,7 @@ func TestRoles_GetRolesWithPaginationAndSorting(t *testing.T) {
 		role := &models.Role{
 			Name:        fmt.Sprintf("role-%d", i),
 			Description: fmt.Sprintf("Role %d", i),
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		}
 		// Set permissions for each role
 		role.SetPermissions([]models.Permission{
@@ -406,7 +406,7 @@ func TestRoles_GetRolesDefaultSortOrder(t *testing.T) {
 	customRole, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:        "custom-role-default-sort-test",
 		Description: "custom role",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -465,7 +465,7 @@ func TestRoles_GetRoleByTRN(t *testing.T) {
 	roleToCreate := &models.Role{
 		Name:        "test-role-trn",
 		Description: "Test role for TRN",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	}
 	roleToCreate.SetPermissions([]models.Permission{
 		{Action: "read", ResourceType: "workspace"},

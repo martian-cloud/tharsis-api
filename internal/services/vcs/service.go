@@ -454,19 +454,47 @@ func (s *service) GetVCSProvidersByIDs(ctx context.Context, idList []string) ([]
 		return nil, errors.Wrap(err, "failed to get providers", errors.WithSpan(span))
 	}
 
+	// Providers the caller cannot view are left out rather than failing the whole request, so
+	// one inaccessible ID in a batch does not hide the rest. Callers that need a specific
+	// provider treat a missing one as not found. The caller can usually view every group, so
+	// one check covering all of them is tried first, and each group is checked on its own only
+	// if that fails.
 	namespacePaths := []string{}
 	for _, vp := range result.VCSProviders {
 		namespacePaths = append(namespacePaths, vp.GetGroupPath())
 	}
 
-	if len(namespacePaths) > 0 {
-		err = caller.RequireAccessToInheritableResource(ctx, mtypes.VCSProviderModelType, auth.WithNamespacePaths(namespacePaths))
-		if err != nil {
-			return nil, err
+	if len(namespacePaths) == 0 {
+		return result.VCSProviders, nil
+	}
+
+	err = caller.RequireAccessToInheritableResource(ctx, mtypes.VCSProviderModelType, auth.WithNamespacePaths(namespacePaths))
+	if err == nil {
+		return result.VCSProviders, nil
+	}
+	if code := errors.ErrorCode(err); code != errors.EForbidden && code != errors.ENotFound {
+		return nil, err
+	}
+
+	allowedPaths := map[string]bool{}
+	providers := []models.VCSProvider{}
+	for _, vp := range result.VCSProviders {
+		groupPath := vp.GetGroupPath()
+		allowed, checked := allowedPaths[groupPath]
+		if !checked {
+			err = caller.RequireAccessToInheritableResource(ctx, mtypes.VCSProviderModelType, auth.WithNamespacePaths([]string{groupPath}))
+			if code := errors.ErrorCode(err); err != nil && code != errors.EForbidden && code != errors.ENotFound {
+				return nil, err
+			}
+			allowed = err == nil
+			allowedPaths[groupPath] = allowed
+		}
+		if allowed {
+			providers = append(providers, vp)
 		}
 	}
 
-	return result.VCSProviders, nil
+	return providers, nil
 }
 
 func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProviderInput) (*CreateVCSProviderResponse, error) {
@@ -528,7 +556,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 	toCreate := &models.VCSProvider{
 		Name:               input.Name,
 		Description:        input.Description,
-		CreatedBy:          caller.GetSubject(),
+		CreatedBy:          caller.GetActor(),
 		GroupID:            input.GroupID,
 		URL:                providerURL,
 		OAuthClientID:      input.OAuthClientID,
@@ -916,7 +944,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 	jwtID := uuid.New().String()
 
 	toCreate := &models.WorkspaceVCSProviderLink{
-		CreatedBy:           caller.GetSubject(),
+		CreatedBy:           caller.GetActor(),
 		WorkspaceID:         input.Workspace.Metadata.ID,
 		ProviderID:          input.ProviderID,
 		TokenNonce:          jwtID,

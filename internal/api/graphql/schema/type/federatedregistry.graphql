@@ -37,7 +37,8 @@ type FederatedRegistry implements Node {
   hostname: String!
   audience: String!
   group: Group!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
 }
 
 input CreateFederatedRegistryInput {

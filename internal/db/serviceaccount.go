@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -111,7 +112,7 @@ type serviceAccounts struct {
 	dbClient *Client
 }
 
-var serviceAccountFieldList = append(metadataFieldList, "name", "description", "group_id", "created_by", "oidc_trust_policies", "client_secret_hash", "client_secret_expires_at", "secret_expiration_email_sent_at")
+var serviceAccountFieldList = append(metadataAndCreatedByFieldList, "name", "description", "group_id", "oidc_trust_policies", "client_secret_hash", "client_secret_expires_at", "secret_expiration_email_sent_at")
 
 // NewServiceAccounts returns an instance of the ServiceAccount interface
 func NewServiceAccounts(dbClient *Client) ServiceAccounts {
@@ -291,6 +292,11 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(serviceAccount.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	trustPoliciesJSON, err := s.marshalOIDCTrustPolicies(serviceAccount.OIDCTrustPolicies)
@@ -310,7 +316,10 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 					"name":                            serviceAccount.Name,
 					"description":                     serviceAccount.Description,
 					"group_id":                        serviceAccount.GroupID,
-					"created_by":                      serviceAccount.CreatedBy,
+					"created_by":                      serviceAccount.CreatedBy.Subject,
+					"created_by_actor_type":           createdByActorType,
+					"created_by_actor_id":             createdByActorID,
+					"created_by_actor_trn":            createdByActorTRN,
 					"oidc_trust_policies":             trustPoliciesJSON,
 					"client_secret_hash":              serviceAccount.ClientSecretHash,
 					"client_secret_expires_at":        serviceAccount.ClientSecretExpiresAt,
@@ -536,6 +545,7 @@ func (s *serviceAccounts) marshalOIDCTrustPolicies(input []models.OIDCTrustPolic
 }
 
 func scanServiceAccount(row scanner) (*models.ServiceAccount, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var groupPath string
 	serviceAccount := &models.ServiceAccount{}
 
@@ -546,10 +556,13 @@ func scanServiceAccount(row scanner) (*models.ServiceAccount, error) {
 		&serviceAccount.Metadata.CreationTimestamp,
 		&serviceAccount.Metadata.LastUpdatedTimestamp,
 		&serviceAccount.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&serviceAccount.Name,
 		&serviceAccount.Description,
 		&serviceAccount.GroupID,
-		&serviceAccount.CreatedBy,
 		&policies,
 		&serviceAccount.ClientSecretHash,
 		&serviceAccount.ClientSecretExpiresAt,
@@ -561,6 +574,9 @@ func scanServiceAccount(row scanner) (*models.ServiceAccount, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	serviceAccount.CreatedBy = parsedActor
 
 	serviceAccount.OIDCTrustPolicies = []models.OIDCTrustPolicy{}
 	for _, p := range policies {

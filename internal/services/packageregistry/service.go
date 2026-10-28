@@ -391,7 +391,7 @@ func (s *service) CreatePackage(ctx context.Context, input *CreatePackageInput) 
 		RootGroupID:          rootGroupID,
 		Kind:                 packageKind,
 		Visibility:           visibility,
-		CreatedBy:            caller.GetSubject(),
+		CreatedBy:            caller.GetActor(),
 		AllowMutableVersions: input.AllowMutableVersions,
 	}
 
@@ -810,7 +810,7 @@ func (s *service) CreatePackageVersion(ctx context.Context, input *CreatePackage
 		Latest:          isLatest,
 		SHASum:          input.SHASum,
 		Status:          models.PackageVersionStatusPending,
-		CreatedBy:       caller.GetSubject(),
+		CreatedBy:       caller.GetActor(),
 	}
 	if vErr := versionToCreate.Validate(); vErr != nil {
 		return nil, errors.Wrap(vErr, "invalid package version", errors.WithSpan(span))

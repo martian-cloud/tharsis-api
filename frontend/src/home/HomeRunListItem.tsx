@@ -1,6 +1,5 @@
 import MiddleDot from '@/common/MiddleDot';
 import {
-    Avatar,
     Box, alpha, Chip, Link,
     ListItem,
     ListItemSecondaryAction,
@@ -12,16 +11,11 @@ import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { Link as LinkRouter } from 'react-router-dom';
-import Gravatar from '../common/Gravatar';
+import ActorDisplay from '../common/ActorDisplay';
 import Timestamp from '../common/Timestamp';
 import RunAnnotations from '../workspace/runs/RunAnnotations';
 import RunStageIcons from '../workspace/runs/RunStageIcons';
 import { HomeRunListItemFragment_run$key } from './__generated__/HomeRunListItemFragment_run.graphql';
-
-const getServiceAccountInitial = (serviceAccount: string): string => {
-    const lastSlashIndex = serviceAccount.lastIndexOf('/');
-    return serviceAccount.charAt(lastSlashIndex + 1).toUpperCase();
-};
 
 interface Props {
     fragmentRef: HomeRunListItemFragment_run$key;
@@ -34,7 +28,9 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
     const data = useFragment(graphql`
         fragment HomeRunListItemFragment_run on Run {
             id
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             isDestroy
             metadata {
                 createdAt
@@ -57,22 +53,6 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
         return pathParts.length > 3 ? `${pathParts[0]} / ... / ${pathParts[pathParts.length - 1]}` : path;
 
     }, [data.workspace.fullPath]);
-
-    const avatar = useMemo(() => {
-        return data.createdBy.includes('/') ?
-            <Avatar variant="rounded"
-                sx={{
-                    width: 20,
-                    height: 20,
-                    bgcolor: 'avatar.default',
-                    fontSize: 14,
-                    fontWeight: 500
-                }}>
-                {getServiceAccountInitial(data.createdBy)}
-            </Avatar>
-            :
-            <Gravatar width={20} height={20} email={data.createdBy} />
-    }, [data.createdBy]);
 
     return (
         <ListItem
@@ -120,11 +100,7 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
                 <Chip size="small" label="Destroy" sx={{ position: 'absolute', top: 12, right: 16, color: 'runStatus.destroy' }} />
             )}
             <ListItemSecondaryAction>
-                <Tooltip title={data.createdBy}>
-                    <Box>
-                        {avatar}
-                    </Box>
-                </Tooltip>
+                <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={20} />
             </ListItemSecondaryAction>
         </ListItem>
     );

@@ -9,7 +9,7 @@ var _ Model = (*TerraformModuleAttestation)(nil)
 
 // TerraformModuleAttestation represents a terraform module attestation
 type TerraformModuleAttestation struct {
-	CreatedBy     string
+	CreatedBy     Actor
 	Description   string
 	ModuleID      string
 	SchemaType    string

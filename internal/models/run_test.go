@@ -92,12 +92,12 @@ func TestRun_ShallowCompare_AllFields(t *testing.T) {
 		return &Run{
 			ConfigurationVersionID: ptr("cv-1"),
 			ForceCancelAvailableAt: &now,
-			ForceCanceledBy:        ptr("user-1"),
+			ForceCanceledBy:        new(NewUserActor("8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c").WithSubject("user-1")),
 			ModuleVersion:          ptr("1.0.0"),
 			ModuleSource:           ptr("registry/mod"),
 			TargetAddresses:        []string{"a", "b"},
 			ModuleDigest:           []byte{1, 2, 3},
-			CreatedBy:              "creator",
+			CreatedBy:              NewUserActor("6f2c4d8e-1a3b-4c5d-8e9f-0a1b2c3d4e5f").WithSubject("creator"),
 			WorkspaceID:            "ws-1",
 			Status:                 RunPending,
 			Comment:                "hello",
@@ -118,7 +118,8 @@ func TestRun_ShallowCompare_AllFields(t *testing.T) {
 	// Every run-level content field, mutated one at a time, must be detected.
 	cases := map[string]func(*Run){
 		"Status":                 func(r *Run) { r.Status = RunApplied },
-		"CreatedBy":              func(r *Run) { r.CreatedBy = "other" },
+		"CreatedBy":              func(r *Run) { r.CreatedBy = SystemActor() },
+		"CreatedBy.Subject":      func(r *Run) { r.CreatedBy.Subject = "other" },
 		"WorkspaceID":            func(r *Run) { r.WorkspaceID = "ws-2" },
 		"Comment":                func(r *Run) { r.Comment = "changed" },
 		"TerraformVersion":       func(r *Run) { r.TerraformVersion = "1.8.0" },
@@ -131,7 +132,9 @@ func TestRun_ShallowCompare_AllFields(t *testing.T) {
 		"ConfigurationVersionID": func(r *Run) { r.ConfigurationVersionID = ptr("cv-2") },
 		"ModuleSource":           func(r *Run) { r.ModuleSource = ptr("registry/other") },
 		"ModuleVersion":          func(r *Run) { r.ModuleVersion = ptr("2.0.0") },
-		"ForceCanceledBy":        func(r *Run) { r.ForceCanceledBy = ptr("user-2") },
+		"ForceCanceledBy": func(r *Run) {
+			r.ForceCanceledBy = new(NewUserActor("8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c").WithSubject("user-2"))
+		},
 		"ForceCancelAvailableAt": func(r *Run) { later := now.Add(time.Hour); r.ForceCancelAvailableAt = &later },
 		"TargetAddresses":        func(r *Run) { r.TargetAddresses = []string{"a", "c"} },
 		"ModuleDigest":           func(r *Run) { r.ModuleDigest = []byte{1, 2, 4} },
@@ -612,4 +615,62 @@ func TestRunNodes_ManagedIdentityIDs_CopyAndCompare(t *testing.T) {
 	assert.Equal(t, []string{"mi-2"}, orig.Apply.ManagedIdentityIDs)
 	assert.False(t, orig.Plan.ShallowCompare(&cp.Plan))
 	assert.False(t, orig.Apply.ShallowCompare(cp.Apply))
+}
+
+// TestApply_TriggeredBy covers Copy and ShallowCompare, which drive the run
+// engine's change detection. A field the engine cannot see is a field that
+// silently fails to persist, so both must account for the whole actor,
+// including its Subject.
+func TestApply_TriggeredBy(t *testing.T) {
+	const actorID = "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e"
+
+	t.Run("copy is deep and does not share the actor", func(t *testing.T) {
+		original := &Apply{Status: ApplyPending, TriggeredBy: new(NewUserActor(actorID).WithSubject("user@example.com"))}
+
+		copied, ok := original.Copy().(*Apply)
+		require.True(t, ok)
+		assert.Equal(t, original.TriggeredBy, copied.TriggeredBy)
+
+		// A copy must not alias the original's actor.
+		copied.TriggeredBy.ID = "mutated"
+		assert.Equal(t, actorID, original.TriggeredBy.ID)
+	})
+
+	t.Run("copy preserves an absent actor", func(t *testing.T) {
+		copied, ok := (&Apply{Status: ApplyPending}).Copy().(*Apply)
+		require.True(t, ok)
+		assert.Nil(t, copied.TriggeredBy)
+	})
+
+	t.Run("shallow compare detects an actor change", func(t *testing.T) {
+		base := &Apply{Status: ApplyPending, TriggeredBy: new(NewUserActor(actorID).WithSubject("user@example.com"))}
+
+		assert.True(t, base.ShallowCompare(base.Copy()), "a copy must compare equal")
+
+		differentActor := &Apply{Status: ApplyPending, TriggeredBy: new(SystemActor())}
+		assert.False(t, base.ShallowCompare(differentActor), "a different actor is a change")
+
+		differentSubject := &Apply{Status: ApplyPending, TriggeredBy: new(NewUserActor(actorID).WithSubject("renamed@example.com"))}
+		assert.False(t, base.ShallowCompare(differentSubject), "a different subject is a change")
+
+		noActor := &Apply{Status: ApplyPending}
+		assert.False(t, base.ShallowCompare(noActor), "losing the actor is a change")
+		assert.False(t, noActor.ShallowCompare(base), "gaining the actor is a change")
+		assert.True(t, noActor.ShallowCompare(&Apply{Status: ApplyPending}), "both absent is equal")
+	})
+
+	t.Run("separately built equal actors compare equal", func(t *testing.T) {
+		assert.True(t, (&Apply{TriggeredBy: new(NewUserActor(actorID))}).ShallowCompare(&Apply{TriggeredBy: new(NewUserActor(actorID))}))
+	})
+}
+
+// TestRun_CopyCreatedBy covers that Run.Copy copies the creator, so the
+// engine's pristine copy cannot be changed through the live run.
+func TestRun_CopyCreatedBy(t *testing.T) {
+	original := &Run{CreatedBy: NewUserActor("2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e").WithSubject("user@example.com")}
+
+	copied := original.Copy()
+	assert.Equal(t, original.CreatedBy, copied.CreatedBy)
+	copied.CreatedBy.ID = "mutated"
+	assert.Equal(t, "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e", original.CreatedBy.ID)
 }

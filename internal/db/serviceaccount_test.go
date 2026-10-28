@@ -31,7 +31,7 @@ func TestServiceAccounts_CreateServiceAccount(t *testing.T) {
 		Name:        "test-group-sa",
 		Description: "test group for service account",
 		FullPath:    "test-group-sa",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -75,7 +75,7 @@ func TestServiceAccounts_CreateServiceAccount(t *testing.T) {
 				Name:        test.saName,
 				Description: test.description,
 				GroupID:     test.groupID,
-				CreatedBy:   "db-integration-tests",
+				CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			}
 
 			var secret string
@@ -118,7 +118,7 @@ func TestServiceAccounts_UpdateServiceAccount(t *testing.T) {
 		Name:        "test-group-sa-update",
 		Description: "test group for service account update",
 		FullPath:    "test-group-sa-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -126,7 +126,7 @@ func TestServiceAccounts_UpdateServiceAccount(t *testing.T) {
 		Name:        "test-sa-update",
 		Description: "original description",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -177,7 +177,7 @@ func TestServiceAccounts_DeleteServiceAccount(t *testing.T) {
 		Name:        "test-group-sa-delete",
 		Description: "test group for service account delete",
 		FullPath:    "test-group-sa-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -185,7 +185,7 @@ func TestServiceAccounts_DeleteServiceAccount(t *testing.T) {
 		Name:        "test-sa-delete",
 		Description: "service account to delete",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -244,7 +244,7 @@ func TestServiceAccounts_GetServiceAccountByID(t *testing.T) {
 		Name:        "test-group-service-account-get-by-id",
 		Description: "test group for service account get by id",
 		FullPath:    "test-group-service-account-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -253,7 +253,7 @@ func TestServiceAccounts_GetServiceAccountByID(t *testing.T) {
 		Name:        "test-service-account-get-by-id",
 		Description: "test service account for get by id",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -310,7 +310,7 @@ func TestServiceAccounts_GetServiceAccounts(t *testing.T) {
 		Name:        "test-group-service-accounts-list",
 		Description: "test group for service accounts list",
 		FullPath:    "test-group-service-accounts-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -321,13 +321,13 @@ func TestServiceAccounts_GetServiceAccounts(t *testing.T) {
 			Name:        "test-service-account-1",
 			Description: "test service account 1",
 			GroupID:     group.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			Name:        "test-service-account-2",
 			Description: "test service account 2",
 			GroupID:     group.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -431,7 +431,7 @@ func TestServiceAccounts_GetServiceAccountsWithPaginationAndSorting(t *testing.T
 		Name:        "test-group-service-accounts-pagination",
 		Description: "test group for service accounts pagination",
 		FullPath:    "test-group-service-accounts-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -441,7 +441,7 @@ func TestServiceAccounts_GetServiceAccountsWithPaginationAndSorting(t *testing.T
 			Name:        fmt.Sprintf("test-service-account-%d", i),
 			Description: fmt.Sprintf("test service account %d", i),
 			GroupID:     group.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -485,7 +485,7 @@ func TestServiceAccounts_GetServiceAccountByTRN(t *testing.T) {
 		Name:        "test-group-service-account-get-by-trn",
 		Description: "test group for service account get by trn",
 		FullPath:    "test-group-service-account-get-by-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -494,7 +494,7 @@ func TestServiceAccounts_GetServiceAccountByTRN(t *testing.T) {
 		Name:        "test-service-account-get-by-trn",
 		Description: "test service account for get by trn",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -551,7 +551,7 @@ func TestServiceAccounts_AssignServiceAccountToRunner(t *testing.T) {
 		Name:        "test-group-service-account-assign",
 		Description: "test group for service account assign",
 		FullPath:    "test-group-service-account-assign",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -560,7 +560,7 @@ func TestServiceAccounts_AssignServiceAccountToRunner(t *testing.T) {
 		Name:        "test-service-account-assign",
 		Description: "test service account for assign",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -569,7 +569,7 @@ func TestServiceAccounts_AssignServiceAccountToRunner(t *testing.T) {
 		Name:        "test-runner-assign",
 		Description: "test runner for assign",
 		GroupID:     &group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -624,7 +624,7 @@ func TestServiceAccounts_UnassignServiceAccountFromRunner(t *testing.T) {
 		Name:        "test-group-service-account-unassign",
 		Description: "test group for service account unassign",
 		FullPath:    "test-group-service-account-unassign",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -633,7 +633,7 @@ func TestServiceAccounts_UnassignServiceAccountFromRunner(t *testing.T) {
 		Name:        "test-service-account-unassign",
 		Description: "test service account for unassign",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -642,7 +642,7 @@ func TestServiceAccounts_UnassignServiceAccountFromRunner(t *testing.T) {
 		Name:        "test-runner-unassign",
 		Description: "test runner for unassign",
 		GroupID:     &group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

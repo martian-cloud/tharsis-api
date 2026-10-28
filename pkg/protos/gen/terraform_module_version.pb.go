@@ -321,8 +321,12 @@ func (x *DeleteTerraformModuleVersionRequest) GetVersion() int64 {
 
 // TerraformModuleVersion represents a version of a Terraform module.
 type TerraformModuleVersion struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	Metadata               *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in terraform_module_version.proto.
 	CreatedBy              string                 `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	Diagnostics            string                 `protobuf:"bytes,3,opt,name=diagnostics,proto3" json:"diagnostics,omitempty"`
 	Error                  string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
@@ -333,8 +337,11 @@ type TerraformModuleVersion struct {
 	Status                 string                 `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
 	Submodules             []string               `protobuf:"bytes,10,rep,name=submodules,proto3" json:"submodules,omitempty"`
 	UploadStartedTimestamp *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=upload_started_timestamp,json=uploadStartedTimestamp,proto3,oneof" json:"upload_started_timestamp,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,12,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *TerraformModuleVersion) Reset() {
@@ -374,6 +381,7 @@ func (x *TerraformModuleVersion) GetMetadata() *ResourceMetadata {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in terraform_module_version.proto.
 func (x *TerraformModuleVersion) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -440,6 +448,13 @@ func (x *TerraformModuleVersion) GetSubmodules() []string {
 func (x *TerraformModuleVersion) GetUploadStartedTimestamp() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UploadStartedTimestamp
+	}
+	return nil
+}
+
+func (x *TerraformModuleVersion) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
 	}
 	return nil
 }
@@ -570,7 +585,7 @@ var File_terraform_module_version_proto protoreflect.FileDescriptor
 
 const file_terraform_module_version_proto_rawDesc = "" +
 	"\n" +
-	"\x1eterraform_module_version.proto\x121martiancloud.tharsis.api.terraform_module_version\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"6\n" +
+	"\x1eterraform_module_version.proto\x121martiancloud.tharsis.api.terraform_module_version\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"6\n" +
 	"$GetTerraformModuleVersionByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xd2\x03\n" +
 	"!GetTerraformModuleVersionsRequest\x12j\n" +
@@ -593,11 +608,11 @@ const file_terraform_module_version_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01B\n" +
 	"\n" +
-	"\b_version\"\xe9\x03\n" +
+	"\b_version\"\xbe\x04\n" +
 	"\x16TerraformModuleVersion\x12O\n" +
-	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x1d\n" +
+	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12!\n" +
 	"\n" +
-	"created_by\x18\x02 \x01(\tR\tcreatedBy\x12 \n" +
+	"created_by\x18\x02 \x01(\tB\x02\x18\x01R\tcreatedBy\x12 \n" +
 	"\vdiagnostics\x18\x03 \x01(\tR\vdiagnostics\x12\x14\n" +
 	"\x05error\x18\x04 \x01(\tR\x05error\x12\x16\n" +
 	"\x06latest\x18\x05 \x01(\bR\x06latest\x12\x1b\n" +
@@ -609,7 +624,8 @@ const file_terraform_module_version_proto_rawDesc = "" +
 	"submodules\x18\n" +
 	" \x03(\tR\n" +
 	"submodules\x12Y\n" +
-	"\x18upload_started_timestamp\x18\v \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x16uploadStartedTimestamp\x88\x01\x01B\x1b\n" +
+	"\x18upload_started_timestamp\x18\v \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x16uploadStartedTimestamp\x88\x01\x01\x12O\n" +
+	"\x10created_by_actor\x18\f \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActorB\x1b\n" +
 	"\x19_upload_started_timestamp\"\xb9\x01\n" +
 	"(GetTerraformModuleVersionBySourceRequest\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x12\n" +
@@ -652,20 +668,22 @@ var file_terraform_module_version_proto_goTypes = []any{
 	(*PaginationOptions)(nil),                        // 8: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*ResourceMetadata)(nil),                         // 9: martiancloud.tharsis.api.metadata.ResourceMetadata
 	(*timestamppb.Timestamp)(nil),                    // 10: google.protobuf.Timestamp
-	(*PageInfo)(nil),                                 // 11: martiancloud.tharsis.api.pagination.PageInfo
+	(*Actor)(nil),                                    // 11: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                                 // 12: martiancloud.tharsis.api.pagination.PageInfo
 }
 var file_terraform_module_version_proto_depIdxs = []int32{
 	8,  // 0: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsRequest.sort:type_name -> martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersionSortableField
 	9,  // 2: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
 	10, // 3: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion.upload_started_timestamp:type_name -> google.protobuf.Timestamp
-	5,  // 4: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsResponse.versions:type_name -> martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion
-	11, // 5: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	6,  // [6:6] is the sub-list for method output_type
-	6,  // [6:6] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	11, // 4: martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	5,  // 5: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsResponse.versions:type_name -> martiancloud.tharsis.api.terraform_module_version.TerraformModuleVersion
+	12, // 6: martiancloud.tharsis.api.terraform_module_version.GetTerraformModuleVersionsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	7,  // [7:7] is the sub-list for method output_type
+	7,  // [7:7] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_terraform_module_version_proto_init() }
@@ -673,6 +691,7 @@ func file_terraform_module_version_proto_init() {
 	if File_terraform_module_version_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_terraform_module_version_proto_msgTypes[1].OneofWrappers = []any{}

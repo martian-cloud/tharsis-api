@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<dfdab85dadd1ae8dc9700be272d8762e>>
+ * @generated SignedSource<<285b3dc7ffecf3f623ba1dacad9c3b2b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -104,6 +104,15 @@ v8 = [
     "kind": "Literal",
     "name": "sort",
     "value": "GROUP_LEVEL_DESC"
+  }
+],
+v9 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
   }
 ];
 return {
@@ -245,8 +254,75 @@ return {
                           {
                             "alias": null,
                             "args": null,
-                            "kind": "ScalarField",
-                            "name": "createdBy",
+                            "concreteType": null,
+                            "kind": "LinkedField",
+                            "name": "createdByActor",
+                            "plural": false,
+                            "selections": [
+                              (v6/*: any*/),
+                              {
+                                "kind": "TypeDiscriminator",
+                                "abstractKey": "__isActor"
+                              },
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "type",
+                                "storageKey": null
+                              },
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "principalId",
+                                "storageKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": [
+                                  {
+                                    "alias": null,
+                                    "args": null,
+                                    "concreteType": "User",
+                                    "kind": "LinkedField",
+                                    "name": "user",
+                                    "plural": false,
+                                    "selections": [
+                                      {
+                                        "alias": null,
+                                        "args": null,
+                                        "kind": "ScalarField",
+                                        "name": "email",
+                                        "storageKey": null
+                                      },
+                                      (v7/*: any*/)
+                                    ],
+                                    "storageKey": null
+                                  }
+                                ],
+                                "type": "UserActor",
+                                "abstractKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": (v9/*: any*/),
+                                "type": "ServiceAccountActor",
+                                "abstractKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": (v9/*: any*/),
+                                "type": "VCSProviderActor",
+                                "abstractKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": (v9/*: any*/),
+                                "type": "JobActor",
+                                "abstractKey": null
+                              }
+                            ],
                             "storageKey": null
                           },
                           (v6/*: any*/)
@@ -327,12 +403,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "fe6df6e07bb04266569f600d92081848",
+    "cacheID": "b0dccffc3bea1273890e5df1d436b73d",
     "id": null,
     "metadata": {},
     "name": "GPGKeyListPaginationQuery",
     "operationKind": "query",
-    "text": "query GPGKeyListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...GPGKeyListFragment_keys\n    id\n  }\n}\n\nfragment GPGKeyListFragment_keys on Group {\n  gpgKeys(after: $after, before: $before, first: $first, last: $last, includeInherited: true, sort: GROUP_LEVEL_DESC) {\n    totalCount\n    edges {\n      node {\n        id\n        gpgKeyId\n        groupPath\n        ...GPGKeyListItemFragment_key\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n  id\n}\n\nfragment GPGKeyListItemFragment_key on GPGKey {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  gpgKeyId\n  fingerprint\n  createdBy\n  groupPath\n}\n"
+    "text": "query GPGKeyListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...GPGKeyListFragment_keys\n    id\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment GPGKeyListFragment_keys on Group {\n  gpgKeys(after: $after, before: $before, first: $first, last: $last, includeInherited: true, sort: GROUP_LEVEL_DESC) {\n    totalCount\n    edges {\n      node {\n        id\n        gpgKeyId\n        groupPath\n        ...GPGKeyListItemFragment_key\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n  id\n}\n\nfragment GPGKeyListItemFragment_key on GPGKey {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  gpgKeyId\n  fingerprint\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  groupPath\n}\n"
   }
 };
 })();

@@ -24,7 +24,7 @@ func TestWorkspaceVCSProviderLinks_CreateLink(t *testing.T) {
 		Name:        "test-group-vcs-link",
 		Description: "test group for vcs provider link",
 		FullPath:    "test-group-vcs-link",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -32,7 +32,7 @@ func TestWorkspaceVCSProviderLinks_CreateLink(t *testing.T) {
 		Name:           "test-workspace-vcs-link",
 		Description:    "test workspace for vcs provider link",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -41,7 +41,7 @@ func TestWorkspaceVCSProviderLinks_CreateLink(t *testing.T) {
 		Name:        "test-vcs-provider-link",
 		Description: "test vcs provider for link",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Type:        models.GitLabProviderType,
 		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
 	})
@@ -90,7 +90,7 @@ func TestWorkspaceVCSProviderLinks_CreateLink(t *testing.T) {
 				TokenNonce:          uuid.New().String(),
 				RepositoryPath:      test.repositoryPath,
 				Branch:              test.branch,
-				CreatedBy:           "db-integration-tests",
+				CreatedBy:           models.Actor{Subject: "db-integration-tests"},
 				AutoSpeculativePlan: true,
 				WebhookDisabled:     false,
 			})
@@ -119,7 +119,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByID(t *testing.T) {
 		Name:        "test-group-get-link",
 		Description: "test group for get link",
 		FullPath:    "test-group-get-link",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -127,7 +127,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByID(t *testing.T) {
 		Name:           "test-workspace-get-link",
 		Description:    "test workspace for get link",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByID(t *testing.T) {
 		Name:        "test-vcs-provider-get-link",
 		Description: "test vcs provider for get link",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Type:        models.GitLabProviderType,
 		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
 	})
@@ -148,7 +148,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByID(t *testing.T) {
 		TokenNonce:     uuid.New().String(),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -204,7 +204,7 @@ func TestWorkspaceVCSProviderLinks_GetLinksByProviderID(t *testing.T) {
 		Name:        "test-group-get-links",
 		Description: "test group for get links",
 		FullPath:    "test-group-get-links",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -212,7 +212,7 @@ func TestWorkspaceVCSProviderLinks_GetLinksByProviderID(t *testing.T) {
 		Name:           "test-workspace-get-links",
 		Description:    "test workspace for get links",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -221,7 +221,7 @@ func TestWorkspaceVCSProviderLinks_GetLinksByProviderID(t *testing.T) {
 		Name:        "test-vcs-provider-get-links",
 		Description: "test vcs provider for get links",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Type:        models.GitLabProviderType,
 		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
 	})
@@ -233,7 +233,7 @@ func TestWorkspaceVCSProviderLinks_GetLinksByProviderID(t *testing.T) {
 		TokenNonce:     uuid.New().String(),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -275,7 +275,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByTRN(t *testing.T) {
 		Name:        "test-group-get-trn",
 		Description: "test group for get trn",
 		FullPath:    "test-group-get-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -283,7 +283,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByTRN(t *testing.T) {
 		Name:           "test-workspace-get-trn",
 		Description:    "test workspace for get trn",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -292,7 +292,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByTRN(t *testing.T) {
 		Name:        "test-vcs-provider-get-trn",
 		Description: "test vcs provider for get trn",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Type:        models.GitLabProviderType,
 		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
 	})
@@ -304,7 +304,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByTRN(t *testing.T) {
 		TokenNonce:     uuid.New().String(),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -334,7 +334,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByWorkspaceID(t *testing.T) {
 		Name:        "test-group-get-workspace",
 		Description: "test group for get workspace",
 		FullPath:    "test-group-get-workspace",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -342,7 +342,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByWorkspaceID(t *testing.T) {
 		Name:           "test-workspace-get-workspace",
 		Description:    "test workspace for get workspace",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -351,7 +351,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByWorkspaceID(t *testing.T) {
 		Name:        "test-vcs-provider-get-workspace",
 		Description: "test vcs provider for get workspace",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Type:        models.GitLabProviderType,
 		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
 	})
@@ -363,7 +363,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByWorkspaceID(t *testing.T) {
 		TokenNonce:     uuid.New().String(),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -415,7 +415,7 @@ func TestWorkspaceVCSProviderLinks_UpdateLink(t *testing.T) {
 		Name:        "test-group-update-link",
 		Description: "test group for update link",
 		FullPath:    "test-group-update-link",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -423,7 +423,7 @@ func TestWorkspaceVCSProviderLinks_UpdateLink(t *testing.T) {
 		Name:           "test-workspace-update-link",
 		Description:    "test workspace for update link",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -432,7 +432,7 @@ func TestWorkspaceVCSProviderLinks_UpdateLink(t *testing.T) {
 		Name:        "test-vcs-provider-update-link",
 		Description: "test vcs provider for update link",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Type:        models.GitLabProviderType,
 		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
 	})
@@ -444,7 +444,7 @@ func TestWorkspaceVCSProviderLinks_UpdateLink(t *testing.T) {
 		TokenNonce:     uuid.New().String(),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -500,7 +500,7 @@ func TestWorkspaceVCSProviderLinks_DeleteLink(t *testing.T) {
 		Name:        "test-group-delete-link",
 		Description: "test group for delete link",
 		FullPath:    "test-group-delete-link",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -508,7 +508,7 @@ func TestWorkspaceVCSProviderLinks_DeleteLink(t *testing.T) {
 		Name:           "test-workspace-delete-link",
 		Description:    "test workspace for delete link",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -517,7 +517,7 @@ func TestWorkspaceVCSProviderLinks_DeleteLink(t *testing.T) {
 		Name:        "test-vcs-provider-delete-link",
 		Description: "test vcs provider for delete link",
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Type:        models.GitLabProviderType,
 		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
 	})
@@ -529,7 +529,7 @@ func TestWorkspaceVCSProviderLinks_DeleteLink(t *testing.T) {
 		TokenNonce:     uuid.New().String(),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

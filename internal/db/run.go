@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -118,7 +119,10 @@ func (s nodeIDFilterSet) includes(id string) bool {
 type runNode struct {
 	LatestJobID          *string
 	ErrorMessage         *string
-	TriggeredBy          *string
+	TriggeredBy          sql.NullString
+	TriggeredByActorType sql.NullString
+	TriggeredByActorID   sql.NullString
+	TriggeredByActorTRN  sql.NullString
 	Comment              *string
 	CheckType            *string
 	StageName            *string
@@ -155,7 +159,7 @@ type runNodeInstance struct {
 	// contentColumns returns all writable content columns for this instance (status,
 	// latest_job_id, error_message and the type-specific columns). Structural columns (id,
 	// run_id, type, sort_order) are added by the caller.
-	contentColumns func() goqu.Record
+	contentColumns func() (goqu.Record, error)
 	// sortOrder is the row's persisted position, written once on create (it never changes). It
 	// places a run's task stages and their checks in execution order so hydration can return them
 	// correctly ordered via a single ORDER BY, without an in-memory re-sort.
@@ -187,7 +191,7 @@ var runNodeKinds = []runNodeKind{
 					}
 					return p.ID
 				},
-				contentColumns: func() goqu.Record {
+				contentColumns: func() (goqu.Record, error) {
 					return goqu.Record{
 						"status":                      string(p.Status),
 						"latest_job_id":               p.LatestJobID,
@@ -206,7 +210,7 @@ var runNodeKinds = []runNodeKind{
 						"plan_json_object_store_key":  p.JSONObjectStoreKey,
 						"plan_diff_object_store_key":  p.DiffObjectStoreKey,
 						"managed_identity_ids":        marshalManagedIdentityIDs(p.ManagedIdentityIDs),
-					}
+					}, nil
 				},
 				sortOrder: sortOrderPlan,
 			}}
@@ -261,15 +265,22 @@ var runNodeKinds = []runNodeKind{
 					}
 					return a.ID
 				},
-				contentColumns: func() goqu.Record {
-					return goqu.Record{
-						"status":               string(a.Status),
-						"latest_job_id":        a.LatestJobID,
-						"error_message":        a.ErrorMessage,
-						"apply_triggered_by":   nullableString(a.TriggeredBy),
-						"apply_comment":        nullableString(a.Comment),
-						"managed_identity_ids": marshalManagedIdentityIDs(a.ManagedIdentityIDs),
+				contentColumns: func() (goqu.Record, error) {
+					triggeredBy, triggeredByActorType, triggeredByActorID, triggeredByActorTRN, err := optionalActorColumns(a.TriggeredBy)
+					if err != nil {
+						return nil, errors.Wrap(err, "failed to get apply triggered by actor columns")
 					}
+					return goqu.Record{
+						"status":                        string(a.Status),
+						"latest_job_id":                 a.LatestJobID,
+						"error_message":                 a.ErrorMessage,
+						"apply_triggered_by":            triggeredBy,
+						"apply_triggered_by_actor_type": triggeredByActorType,
+						"apply_triggered_by_actor_id":   triggeredByActorID,
+						"apply_triggered_by_actor_trn":  triggeredByActorTRN,
+						"apply_comment":                 nullableString(a.Comment),
+						"managed_identity_ids":          marshalManagedIdentityIDs(a.ManagedIdentityIDs),
+					}, nil
 				},
 				sortOrder: sortOrderApply,
 			}}
@@ -281,9 +292,7 @@ var runNodeKinds = []runNodeKind{
 				LatestJobID:  n.LatestJobID,
 				ErrorMessage: n.ErrorMessage,
 			}
-			if n.TriggeredBy != nil {
-				apply.TriggeredBy = *n.TriggeredBy
-			}
+			apply.TriggeredBy = scanOptionalActor(n.TriggeredBy, n.TriggeredByActorType, n.TriggeredByActorID, n.TriggeredByActorTRN)
 			if n.Comment != nil {
 				apply.Comment = *n.Comment
 			}
@@ -310,11 +319,11 @@ var runNodeKinds = []runNodeKind{
 						}
 						return stage.ID
 					},
-					contentColumns: func() goqu.Record {
+					contentColumns: func() (goqu.Record, error) {
 						return goqu.Record{
 							"status":     string(stage.Status),
 							"stage_name": string(stage.StageName),
-						}
+						}, nil
 					},
 					sortOrder: sortOrderTaskStage,
 				})
@@ -349,7 +358,7 @@ var runNodeKinds = []runNodeKind{
 						}
 						return check.ID
 					},
-					contentColumns: func() goqu.Record {
+					contentColumns: func() (goqu.Record, error) {
 						// PolicyCheckPolicy fields are all strings/enums and the summary is
 						// strings and a bool, so marshal cannot fail; a nil result (empty
 						// slice) is written as SQL NULL.
@@ -368,7 +377,7 @@ var runNodeKinds = []runNodeKind{
 							"stage_name":                    string(check.StageName),
 							"policy_check_policies":         policies,
 							"policy_check_messages_summary": messagesSummary,
-						}
+						}, nil
 					},
 					sortOrder: sortOrderPolicyCheck,
 				})
@@ -434,16 +443,15 @@ var runNodeKindByType = func() map[string]runNodeKind {
 }()
 
 var runFieldList = append(
-	metadataFieldList,
+	metadataAndCreatedByFieldList,
+	"force_canceled_by", "force_canceled_by_actor_type", "force_canceled_by_actor_id", "force_canceled_by_actor_trn",
 	"status",
 	"is_destroy",
 	"workspace_id",
 	"configuration_version_id",
-	"created_by",
 	"module_source",
 	"module_version",
 	"module_digest",
-	"force_canceled_by",
 	"force_cancel_available_at",
 	"force_canceled",
 	"comment",
@@ -482,6 +490,9 @@ var runNodeColumns = []struct {
 	{"plan_output_changes", func(n *runNode) any { return &n.OutputChanges }},
 	{"plan_output_destructions", func(n *runNode) any { return &n.OutputDestructions }},
 	{"apply_triggered_by", func(n *runNode) any { return &n.TriggeredBy }},
+	{"apply_triggered_by_actor_type", func(n *runNode) any { return &n.TriggeredByActorType }},
+	{"apply_triggered_by_actor_id", func(n *runNode) any { return &n.TriggeredByActorID }},
+	{"apply_triggered_by_actor_trn", func(n *runNode) any { return &n.TriggeredByActorTRN }},
 	{"apply_comment", func(n *runNode) any { return &n.Comment }},
 	{"policy_check_type", func(n *runNode) any { return &n.CheckType }},
 	{"stage_name", func(n *runNode) any { return &n.StageName }},
@@ -770,6 +781,16 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(run.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
+	forceCanceledBy, forceCanceledByActorType, forceCanceledByActorID, forceCanceledByActorTRN, err := optionalActorColumns(run.ForceCanceledBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get force canceled by actor columns", errors.WithSpan(span))
+	}
+
 	tx, err := r.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
@@ -799,31 +820,37 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 		With("runs",
 			dialect.Insert("runs").
 				Rows(goqu.Record{
-					"id":                         newResourceID(),
-					"version":                    initialResourceVersion,
-					"created_at":                 timestamp,
-					"updated_at":                 timestamp,
-					"status":                     run.Status,
-					"is_destroy":                 run.IsDestroy,
-					"workspace_id":               run.WorkspaceID,
-					"configuration_version_id":   run.ConfigurationVersionID,
-					"created_by":                 run.CreatedBy,
-					"module_source":              run.ModuleSource,
-					"module_version":             run.ModuleVersion,
-					"module_digest":              run.ModuleDigest,
-					"force_canceled_by":          run.ForceCanceledBy,
-					"force_cancel_available_at":  run.ForceCancelAvailableAt,
-					"force_canceled":             run.ForceCanceled,
-					"comment":                    run.Comment,
-					"auto_apply":                 run.AutoApply,
-					"terraform_version":          run.TerraformVersion,
-					"targets":                    targets,
-					"refresh":                    run.Refresh,
-					"refresh_only":               run.RefreshOnly,
-					"is_assessment_run":          run.IsAssessmentRun,
-					"variables_object_store_key": run.VariablesObjectStoreKey,
-					"has_advisory_failures":      run.HasAdvisoryFailures,
-					"annotations":                annotations,
+					"id":                           newResourceID(),
+					"version":                      initialResourceVersion,
+					"created_at":                   timestamp,
+					"updated_at":                   timestamp,
+					"status":                       run.Status,
+					"is_destroy":                   run.IsDestroy,
+					"workspace_id":                 run.WorkspaceID,
+					"configuration_version_id":     run.ConfigurationVersionID,
+					"created_by":                   run.CreatedBy.Subject,
+					"created_by_actor_type":        createdByActorType,
+					"created_by_actor_id":          createdByActorID,
+					"created_by_actor_trn":         createdByActorTRN,
+					"module_source":                run.ModuleSource,
+					"module_version":               run.ModuleVersion,
+					"module_digest":                run.ModuleDigest,
+					"force_canceled_by":            forceCanceledBy,
+					"force_canceled_by_actor_type": forceCanceledByActorType,
+					"force_canceled_by_actor_id":   forceCanceledByActorID,
+					"force_canceled_by_actor_trn":  forceCanceledByActorTRN,
+					"force_cancel_available_at":    run.ForceCancelAvailableAt,
+					"force_canceled":               run.ForceCanceled,
+					"comment":                      run.Comment,
+					"auto_apply":                   run.AutoApply,
+					"terraform_version":            run.TerraformVersion,
+					"targets":                      targets,
+					"refresh":                      run.Refresh,
+					"refresh_only":                 run.RefreshOnly,
+					"is_assessment_run":            run.IsAssessmentRun,
+					"variables_object_store_key":   run.VariablesObjectStoreKey,
+					"has_advisory_failures":        run.HasAdvisoryFailures,
+					"annotations":                  annotations,
 				}).Returning("*"),
 		).Select(r.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})))
@@ -874,6 +901,11 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string
 		}
 	}()
 
+	forceCanceledBy, forceCanceledByActorType, forceCanceledByActorID, forceCanceledByActorTRN, err := optionalActorColumns(run.ForceCanceledBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get force canceled by actor columns", errors.WithSpan(span))
+	}
+
 	nodeIDSet := nodeIDFilterSet{}
 	for _, id := range nodeIDs {
 		nodeIDSet[id] = struct{}{}
@@ -887,18 +919,21 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run, nodeIDs ...string
 			dialect.Update("runs").
 				Set(
 					goqu.Record{
-						"version":                    goqu.L("? + ?", goqu.C("version"), 1),
-						"updated_at":                 timestamp,
-						"status":                     run.Status,
-						"module_source":              run.ModuleSource,
-						"module_version":             run.ModuleVersion,
-						"module_digest":              run.ModuleDigest,
-						"auto_apply":                 run.AutoApply,
-						"force_canceled_by":          run.ForceCanceledBy,
-						"force_cancel_available_at":  run.ForceCancelAvailableAt,
-						"force_canceled":             run.ForceCanceled,
-						"variables_object_store_key": run.VariablesObjectStoreKey,
-						"has_advisory_failures":      run.HasAdvisoryFailures,
+						"version":                      goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":                   timestamp,
+						"status":                       run.Status,
+						"module_source":                run.ModuleSource,
+						"module_version":               run.ModuleVersion,
+						"module_digest":                run.ModuleDigest,
+						"auto_apply":                   run.AutoApply,
+						"force_canceled_by":            forceCanceledBy,
+						"force_canceled_by_actor_type": forceCanceledByActorType,
+						"force_canceled_by_actor_id":   forceCanceledByActorID,
+						"force_canceled_by_actor_trn":  forceCanceledByActorTRN,
+						"force_cancel_available_at":    run.ForceCancelAvailableAt,
+						"force_canceled":               run.ForceCanceled,
+						"variables_object_store_key":   run.VariablesObjectStoreKey,
+						"has_advisory_failures":        run.HasAdvisoryFailures,
 					},
 				).Where(goqu.Ex{"id": run.Metadata.ID, "version": run.Metadata.Version}).
 				Returning("*"),
@@ -1100,7 +1135,10 @@ func (r *runs) updateRunNodes(ctx context.Context, con connection, run *models.R
 				continue
 			}
 
-			record := inst.contentColumns()
+			record, err := inst.contentColumns()
+			if err != nil {
+				return err
+			}
 
 			query, args, err := dialect.Update("run_nodes").
 				Prepared(true).
@@ -1134,7 +1172,11 @@ func (r *runs) createRunNodes(ctx context.Context, con connection, run *models.R
 				"type":       kind.typeName,
 				"sort_order": inst.sortOrder,
 			}
-			maps.Copy(record, inst.contentColumns())
+			content, err := inst.contentColumns()
+			if err != nil {
+				return err
+			}
+			maps.Copy(record, content)
 			records = append(records, record)
 		}
 	}
@@ -1200,6 +1242,8 @@ func (r *runs) getSelectFields() []any {
 }
 
 func scanRun(row scanner) (*models.Run, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
+	var forceCanceledBy, forceCanceledByActorType, forceCanceledByActorID, forceCanceledByActorTRN sql.NullString
 	var (
 		workspacePath           string
 		variablesObjectStoreKey *string
@@ -1213,15 +1257,21 @@ func scanRun(row scanner) (*models.Run, error) {
 		&run.Metadata.CreationTimestamp,
 		&run.Metadata.LastUpdatedTimestamp,
 		&run.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
+		&forceCanceledBy,
+		&forceCanceledByActorType,
+		&forceCanceledByActorID,
+		&forceCanceledByActorTRN,
 		&run.Status,
 		&run.IsDestroy,
 		&run.WorkspaceID,
 		&run.ConfigurationVersionID,
-		&run.CreatedBy,
 		&run.ModuleSource,
 		&run.ModuleVersion,
 		&run.ModuleDigest,
-		&run.ForceCanceledBy,
 		&run.ForceCancelAvailableAt,
 		&run.ForceCanceled,
 		&run.Comment,
@@ -1239,6 +1289,9 @@ func scanRun(row scanner) (*models.Run, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	run.CreatedBy = scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	run.ForceCanceledBy = scanOptionalActor(forceCanceledBy, forceCanceledByActorType, forceCanceledByActorID, forceCanceledByActorTRN)
 
 	run.VariablesObjectStoreKey = variablesObjectStoreKey
 

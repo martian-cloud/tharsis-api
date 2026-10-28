@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b56656fe6d75261aca94a72863eabacd>>
+ * @generated SignedSource<<dabff8afdfe17c035bdfad70240c70d5>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,9 @@ export type TerraformModuleSearchListItemFragment_module$data = {
     readonly value: string;
   }>;
   readonly latestVersion: {
-    readonly createdBy: string;
+    readonly createdByActor: {
+      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    } | null | undefined;
     readonly metadata: {
       readonly createdAt: any;
     };
@@ -118,8 +120,17 @@ const node: ReaderFragment = {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "createdBy",
+          "concreteType": null,
+          "kind": "LinkedField",
+          "name": "createdByActor",
+          "plural": false,
+          "selections": [
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActorDisplayFragment_actor"
+            }
+          ],
           "storageKey": null
         },
         {
@@ -148,6 +159,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "7d6f3dde0eef67057e05b27ce7f12a52";
+(node as any).hash = "37808bf720923289d5a19dafb58286d5";
 
 export default node;

@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -82,10 +83,9 @@ type WorkspaceRoleBindingsResult struct {
 	WorkspaceRoleBindings []models.WorkspaceRoleBinding
 }
 
-var workspaceRoleBindingFieldList = append(metadataFieldList,
+var workspaceRoleBindingFieldList = append(metadataAndCreatedByFieldList,
 	"workspace_id",
 	"role_id",
-	"created_by",
 )
 
 type workspaceRoleBindings struct {
@@ -199,6 +199,11 @@ func (w *workspaceRoleBindings) CreateWorkspaceRoleBinding(ctx context.Context, 
 	ctx, span := tracer.Start(ctx, "db.CreateWorkspaceRoleBinding")
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(binding.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("workspacerolebinding.CreateWorkspaceRoleBinding",
@@ -207,13 +212,16 @@ func (w *workspaceRoleBindings) CreateWorkspaceRoleBinding(ctx context.Context, 
 			With("workspace_role_bindings",
 				dialect.Insert("workspace_role_bindings").
 					Rows(goqu.Record{
-						"id":           newResourceID(),
-						"version":      initialResourceVersion,
-						"created_at":   timestamp,
-						"updated_at":   timestamp,
-						"workspace_id": binding.WorkspaceID,
-						"role_id":      binding.RoleID,
-						"created_by":   binding.CreatedBy,
+						"id":                    newResourceID(),
+						"version":               initialResourceVersion,
+						"created_at":            timestamp,
+						"updated_at":            timestamp,
+						"workspace_id":          binding.WorkspaceID,
+						"role_id":               binding.RoleID,
+						"created_by":            binding.CreatedBy.Subject,
+						"created_by_actor_type": createdByActorType,
+						"created_by_actor_id":   createdByActorID,
+						"created_by_actor_trn":  createdByActorTRN,
 					}).
 					Returning("*"),
 			).Select(w.getSelectFields()...).
@@ -365,6 +373,7 @@ func (w *workspaceRoleBindings) getSelectFields() []interface{} {
 
 func scanWorkspaceRoleBinding(row scanner) (*models.WorkspaceRoleBinding, error) {
 	var workspacePath string
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 
 	binding := &models.WorkspaceRoleBinding{}
 
@@ -373,14 +382,19 @@ func scanWorkspaceRoleBinding(row scanner) (*models.WorkspaceRoleBinding, error)
 		&binding.Metadata.CreationTimestamp,
 		&binding.Metadata.LastUpdatedTimestamp,
 		&binding.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&binding.WorkspaceID,
 		&binding.RoleID,
-		&binding.CreatedBy,
 		&workspacePath,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	binding.CreatedBy = scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
 
 	binding.Metadata.TRN = trn.TypeWorkspaceRoleBinding.Build(workspacePath)
 

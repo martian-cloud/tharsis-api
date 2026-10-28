@@ -15,6 +15,24 @@ type MockCaller struct {
 	mock.Mock
 }
 
+// GetActor provides a mock function with no fields
+func (_m *MockCaller) GetActor() models.Actor {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetActor")
+	}
+
+	var r0 models.Actor
+	if rf, ok := ret.Get(0).(func() models.Actor); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(models.Actor)
+	}
+
+	return r0
+}
+
 // GetNamespacePermissions provides a mock function with given fields: ctx, namespacePath
 func (_m *MockCaller) GetNamespacePermissions(ctx context.Context, namespacePath string) ([]*models.Permission, error) {
 	ret := _m.Called(ctx, namespacePath)

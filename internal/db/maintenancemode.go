@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
@@ -29,7 +30,7 @@ type maintenanceModes struct {
 	dbClient *Client
 }
 
-var maintenanceModesFieldList = append(metadataFieldList, "created_by")
+var maintenanceModesFieldList = metadataAndCreatedByFieldList
 
 // NewMaintenanceModes returns an instance of the MaintenanceModes interface.
 func NewMaintenanceModes(dbClient *Client) MaintenanceModes {
@@ -62,16 +63,24 @@ func (s *maintenanceModes) CreateMaintenanceMode(ctx context.Context, mode *mode
 	ctx, span := tracer.Start(ctx, "db.CreateMaintenanceMode")
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(mode.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("maintenancemode.CreateMaintenanceMode", dialect.Insert("maintenance_mode").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":         maintenanceModeUUID,
-			"version":    initialResourceVersion,
-			"created_at": timestamp,
-			"updated_at": timestamp,
-			"created_by": mode.CreatedBy,
+			"id":                    maintenanceModeUUID,
+			"version":               initialResourceVersion,
+			"created_at":            timestamp,
+			"updated_at":            timestamp,
+			"created_by":            mode.CreatedBy.Subject,
+			"created_by_actor_type": createdByActorType,
+			"created_by_actor_id":   createdByActorID,
+			"created_by_actor_trn":  createdByActorTRN,
 		}).
 		Returning(maintenanceModesFieldList...))
 	if err != nil {
@@ -119,6 +128,7 @@ func (s *maintenanceModes) DeleteMaintenanceMode(ctx context.Context, mode *mode
 }
 
 func scanMaintenanceMode(row scanner) (*models.MaintenanceMode, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	mode := &models.MaintenanceMode{}
 
 	fields := []interface{}{
@@ -126,13 +136,19 @@ func scanMaintenanceMode(row scanner) (*models.MaintenanceMode, error) {
 		&mode.Metadata.CreationTimestamp,
 		&mode.Metadata.LastUpdatedTimestamp,
 		&mode.Metadata.Version,
-		&mode.CreatedBy,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 	}
 
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	mode.CreatedBy = parsedActor
 
 	mode.Metadata.TRN = trn.TypeMaintenanceMode.Build(mode.GetGlobalID())
 

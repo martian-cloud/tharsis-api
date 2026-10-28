@@ -19,7 +19,7 @@ func TestAutoApplyTransformer_Transform(t *testing.T) {
 		name        string
 		run         *models.Run
 		changes     []statemachine.NodeStatusChange
-		wantTrigger string
+		wantTrigger *models.Actor
 	}{
 		{
 			name: "auto-apply non-speculative run with apply pending transition gets system trigger",
@@ -28,7 +28,7 @@ func TestAutoApplyTransformer_Transform(t *testing.T) {
 				Apply:     &models.Apply{},
 			},
 			changes:     []statemachine.NodeStatusChange{applyPendingChange},
-			wantTrigger: "system",
+			wantTrigger: new(models.SystemActor()),
 		},
 		{
 			name: "run without auto-apply is left untouched",
@@ -37,7 +37,7 @@ func TestAutoApplyTransformer_Transform(t *testing.T) {
 				Apply:     &models.Apply{},
 			},
 			changes:     []statemachine.NodeStatusChange{applyPendingChange},
-			wantTrigger: "",
+			wantTrigger: nil,
 		},
 		{
 			name: "speculative run (no apply node) is skipped",
@@ -46,7 +46,7 @@ func TestAutoApplyTransformer_Transform(t *testing.T) {
 				Apply:     nil,
 			},
 			changes:     []statemachine.NodeStatusChange{applyPendingChange},
-			wantTrigger: "", // nothing to set; apply is nil
+			wantTrigger: nil, // nothing to set; apply is nil
 		},
 		{
 			name: "apply transition to a non-pending status does not set the trigger",
@@ -55,7 +55,7 @@ func TestAutoApplyTransformer_Transform(t *testing.T) {
 				Apply:     &models.Apply{},
 			},
 			changes:     []statemachine.NodeStatusChange{statemachine.ApplyStatusChange{NewStatus: models.ApplyQueued}},
-			wantTrigger: "",
+			wantTrigger: nil,
 		},
 		{
 			name: "a plan pending change is ignored (wrong node type)",
@@ -64,7 +64,7 @@ func TestAutoApplyTransformer_Transform(t *testing.T) {
 				Apply:     &models.Apply{},
 			},
 			changes:     []statemachine.NodeStatusChange{statemachine.PlanStatusChange{NewStatus: models.PlanPending}},
-			wantTrigger: "",
+			wantTrigger: nil,
 		},
 		{
 			name: "no node status changes leaves the trigger untouched",
@@ -73,7 +73,7 @@ func TestAutoApplyTransformer_Transform(t *testing.T) {
 				Apply:     &models.Apply{},
 			},
 			changes:     nil,
-			wantTrigger: "",
+			wantTrigger: nil,
 		},
 	}
 
@@ -97,7 +97,7 @@ func TestAutoApplyTransformer_Transform_PreservesExistingTrigger(t *testing.T) {
 	// When the run does not qualify, an already-set TriggeredBy must be preserved.
 	run := &models.Run{
 		AutoApply: false,
-		Apply:     &models.Apply{TriggeredBy: "user-123"},
+		Apply:     &models.Apply{TriggeredBy: &models.Actor{Subject: "user-123"}},
 	}
 	change := types.RunChange{
 		Run:               run,
@@ -107,5 +107,5 @@ func TestAutoApplyTransformer_Transform_PreservesExistingTrigger(t *testing.T) {
 	transformer := NewAutoApplyTransformer()
 	require := assert.New(t)
 	require.NoError(transformer.Transform(context.Background(), []types.RunChange{change}, nil))
-	require.Equal("user-123", run.Apply.TriggeredBy)
+	require.Equal(&models.Actor{Subject: "user-123"}, run.Apply.TriggeredBy)
 }

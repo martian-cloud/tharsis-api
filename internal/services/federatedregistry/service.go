@@ -289,7 +289,7 @@ func (s *service) CreateFederatedRegistry(ctx context.Context,
 	}
 
 	// Set the CreatedBy field to the caller's subject
-	federatedRegistry.CreatedBy = caller.GetSubject()
+	federatedRegistry.CreatedBy = caller.GetActor()
 
 	if validateErr := federatedRegistry.Validate(); validateErr != nil {
 		return nil, errors.Wrap(validateErr, "invalid federated registry", errors.WithSpan(span))

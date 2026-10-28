@@ -74,13 +74,14 @@ func toPBRunGateWithApprovals(ctx context.Context, serviceCatalog *services.Cata
 func toPBRunGate(gate *models.RunGate, approvals []models.RunGateApproval) *pb.RunGate {
 	counts := gate.ApprovalCounts(approvals)
 	pbGate := &pb.RunGate{
-		Metadata:      toPBMetadata(&gate.Metadata, types.RunGateModelType),
-		PolicyCheckId: models.RunNodeGID(gate.PolicyCheckID),
-		Type:          enumToPB[pb.RunGateType](gate.Type, pb.RunGateType_value, "RUN_GATE_TYPE_"),
-		Status:        enumToPB[pb.RunGateStatus](gate.Status, pb.RunGateStatus_value, "RUN_GATE_STATUS_"),
-		ApprovalRules: make([]*pb.RunGateApprovalRule, 0, len(gate.ApprovalRules)),
-		RunId:         gid.ToGlobalID(types.RunModelType, gate.RunID),
-		OverriddenBy:  gate.OverriddenBy,
+		Metadata:          toPBMetadata(&gate.Metadata, types.RunGateModelType),
+		PolicyCheckId:     models.RunNodeGID(gate.PolicyCheckID),
+		Type:              enumToPB[pb.RunGateType](gate.Type, pb.RunGateType_value, "RUN_GATE_TYPE_"),
+		Status:            enumToPB[pb.RunGateStatus](gate.Status, pb.RunGateStatus_value, "RUN_GATE_STATUS_"),
+		ApprovalRules:     make([]*pb.RunGateApprovalRule, 0, len(gate.ApprovalRules)),
+		RunId:             gid.ToGlobalID(types.RunModelType, gate.RunID),
+		OverriddenBy:      models.ActorSubjectPtr(gate.OverriddenBy),
+		OverriddenByActor: toPBOptionalActor(gate.OverriddenBy),
 	}
 	if gate.OverrideComment != nil {
 		pbGate.OverrideComment = *gate.OverrideComment

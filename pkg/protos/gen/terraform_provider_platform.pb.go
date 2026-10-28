@@ -338,17 +338,24 @@ func (x *DeleteTerraformProviderPlatformRequest) GetVersion() int64 {
 
 // TerraformProviderPlatform represents a platform for a Terraform provider version.
 type TerraformProviderPlatform struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Metadata          *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Architecture      string                 `protobuf:"bytes,2,opt,name=architecture,proto3" json:"architecture,omitempty"`
-	BinaryUploaded    bool                   `protobuf:"varint,3,opt,name=binary_uploaded,json=binaryUploaded,proto3" json:"binary_uploaded,omitempty"`
-	CreatedBy         string                 `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	Filename          string                 `protobuf:"bytes,5,opt,name=filename,proto3" json:"filename,omitempty"`
-	OperatingSystem   string                 `protobuf:"bytes,6,opt,name=operating_system,json=operatingSystem,proto3" json:"operating_system,omitempty"`
-	ProviderVersionId string                 `protobuf:"bytes,7,opt,name=provider_version_id,json=providerVersionId,proto3" json:"provider_version_id,omitempty"`
-	ShaSum            string                 `protobuf:"bytes,8,opt,name=sha_sum,json=shaSum,proto3" json:"sha_sum,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Metadata       *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Architecture   string                 `protobuf:"bytes,2,opt,name=architecture,proto3" json:"architecture,omitempty"`
+	BinaryUploaded bool                   `protobuf:"varint,3,opt,name=binary_uploaded,json=binaryUploaded,proto3" json:"binary_uploaded,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in terraform_provider_platform.proto.
+	CreatedBy         string `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	Filename          string `protobuf:"bytes,5,opt,name=filename,proto3" json:"filename,omitempty"`
+	OperatingSystem   string `protobuf:"bytes,6,opt,name=operating_system,json=operatingSystem,proto3" json:"operating_system,omitempty"`
+	ProviderVersionId string `protobuf:"bytes,7,opt,name=provider_version_id,json=providerVersionId,proto3" json:"provider_version_id,omitempty"`
+	ShaSum            string `protobuf:"bytes,8,opt,name=sha_sum,json=shaSum,proto3" json:"sha_sum,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,9,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *TerraformProviderPlatform) Reset() {
@@ -402,6 +409,7 @@ func (x *TerraformProviderPlatform) GetBinaryUploaded() bool {
 	return false
 }
 
+// Deprecated: Marked as deprecated in terraform_provider_platform.proto.
 func (x *TerraformProviderPlatform) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -435,6 +443,13 @@ func (x *TerraformProviderPlatform) GetShaSum() string {
 		return x.ShaSum
 	}
 	return ""
+}
+
+func (x *TerraformProviderPlatform) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
 }
 
 // GetTerraformProviderPlatformsResponse is the paginated list of TerraformProviderPlatforms.
@@ -494,7 +509,7 @@ var File_terraform_provider_platform_proto protoreflect.FileDescriptor
 
 const file_terraform_provider_platform_proto_rawDesc = "" +
 	"\n" +
-	"!terraform_provider_platform.proto\x124martiancloud.tharsis.api.terraform_provider_platform\x1a\x0emetadata.proto\x1a\x10pagination.proto\"9\n" +
+	"!terraform_provider_platform.proto\x124martiancloud.tharsis.api.terraform_provider_platform\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x10pagination.proto\"9\n" +
 	"'GetTerraformProviderPlatformByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xed\x04\n" +
 	"$GetTerraformProviderPlatformsRequest\x12j\n" +
@@ -523,17 +538,18 @@ const file_terraform_provider_platform_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01B\n" +
 	"\n" +
-	"\b_version\"\xe8\x02\n" +
+	"\b_version\"\xbd\x03\n" +
 	"\x19TerraformProviderPlatform\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\"\n" +
 	"\farchitecture\x18\x02 \x01(\tR\farchitecture\x12'\n" +
-	"\x0fbinary_uploaded\x18\x03 \x01(\bR\x0ebinaryUploaded\x12\x1d\n" +
+	"\x0fbinary_uploaded\x18\x03 \x01(\bR\x0ebinaryUploaded\x12!\n" +
 	"\n" +
-	"created_by\x18\x04 \x01(\tR\tcreatedBy\x12\x1a\n" +
+	"created_by\x18\x04 \x01(\tB\x02\x18\x01R\tcreatedBy\x12\x1a\n" +
 	"\bfilename\x18\x05 \x01(\tR\bfilename\x12)\n" +
 	"\x10operating_system\x18\x06 \x01(\tR\x0foperatingSystem\x12.\n" +
 	"\x13provider_version_id\x18\a \x01(\tR\x11providerVersionId\x12\x17\n" +
-	"\asha_sum\x18\b \x01(\tR\x06shaSum\"\xe2\x01\n" +
+	"\asha_sum\x18\b \x01(\tR\x06shaSum\x12O\n" +
+	"\x10created_by_actor\x18\t \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\"\xe2\x01\n" +
 	"%GetTerraformProviderPlatformsResponse\x12m\n" +
 	"\tplatforms\x18\x01 \x03(\v2O.martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatformR\tplatforms\x12J\n" +
 	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo*Q\n" +
@@ -565,19 +581,21 @@ var file_terraform_provider_platform_proto_goTypes = []any{
 	(*GetTerraformProviderPlatformsResponse)(nil),   // 6: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsResponse
 	(*PaginationOptions)(nil),                       // 7: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*ResourceMetadata)(nil),                        // 8: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                                // 9: martiancloud.tharsis.api.pagination.PageInfo
+	(*Actor)(nil),                                   // 9: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                                // 10: martiancloud.tharsis.api.pagination.PageInfo
 }
 var file_terraform_provider_platform_proto_depIdxs = []int32{
-	7, // 0: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
-	0, // 1: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsRequest.sort:type_name -> martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatformSortableField
-	8, // 2: martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	5, // 3: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsResponse.platforms:type_name -> martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform
-	9, // 4: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	7,  // 0: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	0,  // 1: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsRequest.sort:type_name -> martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatformSortableField
+	8,  // 2: martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	9,  // 3: martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	5,  // 4: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsResponse.platforms:type_name -> martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform
+	10, // 5: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	6,  // [6:6] is the sub-list for method output_type
+	6,  // [6:6] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_terraform_provider_platform_proto_init() }
@@ -585,6 +603,7 @@ func file_terraform_provider_platform_proto_init() {
 	if File_terraform_provider_platform_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_terraform_provider_platform_proto_msgTypes[1].OneofWrappers = []any{}

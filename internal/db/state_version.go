@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -84,7 +85,7 @@ type stateVersions struct {
 	dbClient *Client
 }
 
-var stateVersionFieldList = append(metadataFieldList, "workspace_id", "run_id", "created_by", "object_store_key", "json_object_store_key")
+var stateVersionFieldList = append(metadataAndCreatedByFieldList, "workspace_id", "run_id", "object_store_key", "json_object_store_key")
 
 // NewStateVersions returns an instance of the StateVersion interface
 func NewStateVersions(dbClient *Client) StateVersions {
@@ -204,6 +205,11 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(stateVersion.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("state_version.CreateStateVersion", dialect.From("state_versions").
@@ -217,7 +223,10 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 					"updated_at":            timestamp,
 					"workspace_id":          stateVersion.WorkspaceID,
 					"run_id":                stateVersion.RunID,
-					"created_by":            stateVersion.CreatedBy,
+					"created_by":            stateVersion.CreatedBy.Subject,
+					"created_by_actor_type": createdByActorType,
+					"created_by_actor_id":   createdByActorID,
+					"created_by_actor_trn":  createdByActorTRN,
 					"object_store_key":      nullableString(stateVersion.ObjectStoreKey),
 					"json_object_store_key": stateVersion.JSONObjectStoreKey,
 				}).Returning("*"),
@@ -320,6 +329,7 @@ func (s *stateVersions) getSelectFields() []interface{} {
 }
 
 func scanStateVersion(row scanner) (*models.StateVersion, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var (
 		workspacePath  string
 		objectStoreKey *string
@@ -331,9 +341,12 @@ func scanStateVersion(row scanner) (*models.StateVersion, error) {
 		&stateVersion.Metadata.CreationTimestamp,
 		&stateVersion.Metadata.LastUpdatedTimestamp,
 		&stateVersion.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&stateVersion.WorkspaceID,
 		&stateVersion.RunID,
-		&stateVersion.CreatedBy,
 		&objectStoreKey,
 		&stateVersion.JSONObjectStoreKey,
 		&workspacePath,
@@ -341,6 +354,8 @@ func scanStateVersion(row scanner) (*models.StateVersion, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	stateVersion.CreatedBy = scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
 
 	if objectStoreKey != nil {
 		stateVersion.ObjectStoreKey = *objectStoreKey

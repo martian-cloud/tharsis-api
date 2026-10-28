@@ -25,14 +25,14 @@ func createTestRunForGate(ctx context.Context, t *testing.T, testClient *testCli
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      groupName,
 		FullPath:  groupName,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:           groupName + "-ws",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -40,7 +40,7 @@ func createTestRunForGate(ctx context.Context, t *testing.T, testClient *testCli
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
 		Status:      models.RunPending,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -144,7 +144,7 @@ func TestRunGates_UpdateRunGate(t *testing.T) {
 		expectErrorCode errors.CodeType
 		version         int
 		status          models.RunGateStatus
-		overriddenBy    *string
+		overriddenBy    *models.Actor
 	}
 
 	testCases := []testCase{
@@ -152,7 +152,7 @@ func TestRunGates_UpdateRunGate(t *testing.T) {
 			name:         "update run gate to overridden",
 			version:      createdGate.Metadata.Version,
 			status:       models.RunGateOverridden,
-			overriddenBy: ptr.String("user@example.com"),
+			overriddenBy: new(models.NewUserActor("8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c").WithSubject("user@example.com")),
 		},
 		{
 			name:            "update will fail because resource version doesn't match",
@@ -491,7 +491,7 @@ func TestRunGates_GetRunGatesWithPaginationAndSorting(t *testing.T) {
 		run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 			WorkspaceID: workspace.Metadata.ID,
 			Status:      models.RunPending,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 

@@ -32,8 +32,7 @@ type workspaceVCSProviderLinks struct {
 }
 
 var workspaceVCSProviderLinksFieldList = append(
-	metadataFieldList,
-	"created_by",
+	metadataAndCreatedByFieldList,
 	"workspace_id",
 	"provider_id",
 	"token_nonce",
@@ -131,6 +130,11 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(link.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	globPatternsJSON, err := json.Marshal(link.GlobPatterns)
@@ -147,7 +151,10 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 					"version":               initialResourceVersion,
 					"created_at":            timestamp,
 					"updated_at":            timestamp,
-					"created_by":            link.CreatedBy,
+					"created_by":            link.CreatedBy.Subject,
+					"created_by_actor_type": createdByActorType,
+					"created_by_actor_id":   createdByActorID,
+					"created_by_actor_trn":  createdByActorTRN,
 					"workspace_id":          link.WorkspaceID,
 					"provider_id":           link.ProviderID,
 					"token_nonce":           link.TokenNonce,
@@ -312,6 +319,7 @@ func (wpl *workspaceVCSProviderLinks) getSelectFields() []interface{} {
 }
 
 func scanLink(row scanner) (*models.WorkspaceVCSProviderLink, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var webhookID sql.NullString
 	var workspacePath string
 
@@ -322,7 +330,10 @@ func scanLink(row scanner) (*models.WorkspaceVCSProviderLink, error) {
 		&wpl.Metadata.CreationTimestamp,
 		&wpl.Metadata.LastUpdatedTimestamp,
 		&wpl.Metadata.Version,
-		&wpl.CreatedBy,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&wpl.WorkspaceID,
 		&wpl.ProviderID,
 		&wpl.TokenNonce,
@@ -342,6 +353,9 @@ func scanLink(row scanner) (*models.WorkspaceVCSProviderLink, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	wpl.CreatedBy = parsedActor
 
 	if webhookID.Valid {
 		wpl.WebhookID = webhookID.String

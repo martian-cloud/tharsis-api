@@ -35,7 +35,7 @@ type Announcement struct {
 	Message     string
 	StartTime   time.Time
 	EndTime     *time.Time
-	CreatedBy   string
+	CreatedBy   Actor
 	Type        AnnouncementType
 	Dismissible bool
 }

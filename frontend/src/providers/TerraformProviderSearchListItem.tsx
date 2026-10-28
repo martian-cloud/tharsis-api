@@ -1,11 +1,11 @@
-import { Box, Chip, ListItemButton, ListItemIcon, Tooltip, Typography } from '@mui/material';
+import { Box, Chip, ListItemButton, ListItemIcon, Typography } from '@mui/material';
 import Link from '@mui/material/Link';
 import { useTheme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import { Terraform as TerraformIcon } from 'mdi-material-ui';
 import { useFragment } from "react-relay/hooks";
 import { Link as LinkRouter } from 'react-router-dom';
-import Gravatar from '../common/Gravatar';
+import ActorDisplay from '../common/ActorDisplay';
 import Timestamp from '../common/Timestamp';
 import { TerraformProviderSearchListItemFragment_provider$key } from './__generated__/TerraformProviderSearchListItemFragment_provider.graphql';
 
@@ -24,7 +24,9 @@ function TerraformProviderSearchListItem(props: Props) {
             private
             latestVersion {
                 version
-                createdBy
+                createdByActor {
+                    ...ActorDisplayFragment_actor
+                }
                 metadata {
                     createdAt
                 }
@@ -63,11 +65,9 @@ function TerraformProviderSearchListItem(props: Props) {
                     <Box>
                         {data.latestVersion && <Typography component="div" variant="body2" color="textSecondary">
                             {data.latestVersion.version} published <Timestamp component="span" timestamp={data.latestVersion.metadata.createdAt} /> by
-                            <Tooltip title={data.latestVersion.createdBy}>
-                                <Box sx={{ display: 'inline-flex', verticalAlign: 'middle', mx: 1 }}>
-                                    <Gravatar width={16} height={16} email={data.latestVersion.createdBy} />
-                                </Box>
-                            </Tooltip>
+                            <Box sx={{ display: 'inline-flex', verticalAlign: 'middle', mx: 1 }}>
+                                <ActorDisplay fragmentRef={data.latestVersion.createdByActor} variant="avatar" size={16} />
+                            </Box>
                         </Typography>}
                         {!data.latestVersion && <Typography variant="body2" color="textSecondary">
                             0 versions

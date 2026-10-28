@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<2d7f0393fee59178a6a87cccf4e46a9f>>
+ * @generated SignedSource<<c72559615198944f10acf6f8a365687f>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -26,7 +26,9 @@ export type JobDetailsQuery$data = {
       readonly trn: string;
     };
     readonly run?: {
-      readonly createdBy: string;
+      readonly createdByActor: {
+        readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+      } | null | undefined;
       readonly hasAdvisoryFailures: boolean;
       readonly id: string;
       readonly status: RunStatus;
@@ -192,17 +194,10 @@ v12 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "createdBy",
-  "storageKey": null
-},
-v13 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
   "name": "hasAdvisoryFailures",
   "storageKey": null
 },
-v14 = {
+v13 = {
   "alias": null,
   "args": null,
   "concreteType": "JobTimestamps",
@@ -234,6 +229,13 @@ v14 = {
   ],
   "storageKey": null
 },
+v14 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "__typename",
+  "storageKey": null
+},
 v15 = {
   "alias": null,
   "args": null,
@@ -246,7 +248,16 @@ v15 = {
     (v2/*: any*/)
   ],
   "storageKey": null
-};
+},
+v16 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+];
 return {
   "fragment": {
     "argumentDefinitions": (v0/*: any*/),
@@ -288,14 +299,29 @@ return {
                 "plural": false,
                 "selections": [
                   (v2/*: any*/),
-                  (v12/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": null,
+                    "kind": "LinkedField",
+                    "name": "createdByActor",
+                    "plural": false,
+                    "selections": [
+                      {
+                        "args": null,
+                        "kind": "FragmentSpread",
+                        "name": "ActorDisplayFragment_actor"
+                      }
+                    ],
+                    "storageKey": null
+                  },
                   (v3/*: any*/),
-                  (v13/*: any*/),
+                  (v12/*: any*/),
                   (v10/*: any*/)
                 ],
                 "storageKey": null
               },
-              (v14/*: any*/),
+              (v13/*: any*/),
               {
                 "args": null,
                 "kind": "FragmentSpread",
@@ -326,13 +352,7 @@ return {
         "name": "node",
         "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "__typename",
-            "storageKey": null
-          },
+          (v14/*: any*/),
           (v2/*: any*/),
           {
             "kind": "InlineFragment",
@@ -361,14 +381,81 @@ return {
                 "plural": false,
                 "selections": [
                   (v2/*: any*/),
-                  (v12/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": null,
+                    "kind": "LinkedField",
+                    "name": "createdByActor",
+                    "plural": false,
+                    "selections": [
+                      (v14/*: any*/),
+                      {
+                        "kind": "TypeDiscriminator",
+                        "abstractKey": "__isActor"
+                      },
+                      (v4/*: any*/),
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "principalId",
+                        "storageKey": null
+                      },
+                      {
+                        "kind": "InlineFragment",
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "concreteType": "User",
+                            "kind": "LinkedField",
+                            "name": "user",
+                            "plural": false,
+                            "selections": [
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "email",
+                                "storageKey": null
+                              },
+                              (v2/*: any*/)
+                            ],
+                            "storageKey": null
+                          }
+                        ],
+                        "type": "UserActor",
+                        "abstractKey": null
+                      },
+                      {
+                        "kind": "InlineFragment",
+                        "selections": (v16/*: any*/),
+                        "type": "ServiceAccountActor",
+                        "abstractKey": null
+                      },
+                      {
+                        "kind": "InlineFragment",
+                        "selections": (v16/*: any*/),
+                        "type": "VCSProviderActor",
+                        "abstractKey": null
+                      },
+                      {
+                        "kind": "InlineFragment",
+                        "selections": (v16/*: any*/),
+                        "type": "JobActor",
+                        "abstractKey": null
+                      }
+                    ],
+                    "storageKey": null
+                  },
                   (v3/*: any*/),
-                  (v13/*: any*/),
+                  (v12/*: any*/),
                   (v15/*: any*/)
                 ],
                 "storageKey": null
               },
-              (v14/*: any*/),
+              (v13/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -478,16 +565,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "7c8f61197a9890cbbd2f5042c0d75b9f",
+    "cacheID": "ae705d03c3a434198918c59daa7a1377",
     "id": null,
     "metadata": {},
     "name": "JobDetailsQuery",
     "operationKind": "query",
-    "text": "query JobDetailsQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Job {\n      id\n      status\n      type\n      tags\n      forceCanceled\n      ...OutdatedProtocolAlertFragment_job\n      runner {\n        id\n        name\n        type\n        groupPath\n      }\n      runnerPath\n      workspace {\n        fullPath\n        id\n      }\n      metadata {\n        createdAt\n        trn\n      }\n      run {\n        id\n        createdBy\n        status\n        hasAdvisoryFailures\n        workspace {\n          fullPath\n          id\n        }\n      }\n      timestamps {\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...JobDetailsResourceUsageCardFragment_job\n    }\n    id\n  }\n}\n\nfragment JobDetailsResourceUsageCardFragment_job on Job {\n  resourceUsageMetrics {\n    totalCpuTimeMs\n  }\n  ...JobResourceUsageMetricsFragment_job\n}\n\nfragment JobResourceUsageMetricsFragment_job on Job {\n  resourceUsageMetrics {\n    peakMemoryBytes\n    totalCpuTimeMs\n    totalNetworkReceivedBytes\n    totalNetworkSentBytes\n    totalDiskReadBytes\n    totalDiskWriteBytes\n  }\n  resourceUsageLimits {\n    memoryBytes\n    networkReceivedBytes\n    networkSentBytes\n    diskReadBytes\n    diskWriteBytes\n  }\n}\n\nfragment OutdatedProtocolAlertFragment_job on Job {\n  outdatedJobProtocolVersion\n}\n"
+    "text": "query JobDetailsQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Job {\n      id\n      status\n      type\n      tags\n      forceCanceled\n      ...OutdatedProtocolAlertFragment_job\n      runner {\n        id\n        name\n        type\n        groupPath\n      }\n      runnerPath\n      workspace {\n        fullPath\n        id\n      }\n      metadata {\n        createdAt\n        trn\n      }\n      run {\n        id\n        createdByActor {\n          __typename\n          ...ActorDisplayFragment_actor\n        }\n        status\n        hasAdvisoryFailures\n        workspace {\n          fullPath\n          id\n        }\n      }\n      timestamps {\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...JobDetailsResourceUsageCardFragment_job\n    }\n    id\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment JobDetailsResourceUsageCardFragment_job on Job {\n  resourceUsageMetrics {\n    totalCpuTimeMs\n  }\n  ...JobResourceUsageMetricsFragment_job\n}\n\nfragment JobResourceUsageMetricsFragment_job on Job {\n  resourceUsageMetrics {\n    peakMemoryBytes\n    totalCpuTimeMs\n    totalNetworkReceivedBytes\n    totalNetworkSentBytes\n    totalDiskReadBytes\n    totalDiskWriteBytes\n  }\n  resourceUsageLimits {\n    memoryBytes\n    networkReceivedBytes\n    networkSentBytes\n    diskReadBytes\n    diskWriteBytes\n  }\n}\n\nfragment OutdatedProtocolAlertFragment_job on Job {\n  outdatedJobProtocolVersion\n}\n"
   }
 };
 })();
 
-(node as any).hash = "2db089cd120d64097599e9fdf3fc8574";
+(node as any).hash = "c60877c4f7dc811bef0ab0d856903043";
 
 export default node;

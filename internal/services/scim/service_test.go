@@ -30,7 +30,7 @@ const (
 )
 
 func TestGetSCIMToken(t *testing.T) {
-	existingToken := models.SCIMToken{CreatedBy: "test-user", Metadata: models.ResourceMetadata{ID: resourceUUID}}
+	existingToken := models.SCIMToken{CreatedBy: models.Actor{Subject: "test-user"}, Metadata: models.ResourceMetadata{ID: resourceUUID}}
 	testCases := []struct {
 		name            string
 		admin           bool
@@ -164,7 +164,8 @@ func TestCreateSCIMToken(t *testing.T) {
 			if len(test.existingTokens) > 0 {
 				mockScimTokens.On("DeleteToken", ctx, &test.existingTokens[0]).Return(nil)
 			}
-			mockScimTokens.On("CreateToken", ctx, mock.Anything).Return(&models.SCIMToken{CreatedBy: test.caller.GetSubject()}, nil)
+			// Echo the input so the assertion below checks the creator the service recorded.
+			mockScimTokens.On("CreateToken", ctx, mock.Anything).Return(func(_ context.Context, token *models.SCIMToken) *models.SCIMToken { return token }, nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -199,7 +200,7 @@ func TestCreateSCIMToken(t *testing.T) {
 			} else {
 				// Positive case.
 				assert.Equal(t, []byte("signed-token"), output.PlaintextToken)
-				assert.Equal(t, test.caller.GetSubject(), output.SCIMToken.CreatedBy)
+				assert.Equal(t, models.NewUserActor(test.caller.User.Metadata.ID).WithSubject(test.caller.User.Email), output.SCIMToken.CreatedBy)
 			}
 		})
 	}

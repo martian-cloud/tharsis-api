@@ -40,6 +40,9 @@ function NewGPGKey(props: Props) {
                     gpgKeyId
                     fingerprint
                     createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     metadata {
                         createdAt
                     }

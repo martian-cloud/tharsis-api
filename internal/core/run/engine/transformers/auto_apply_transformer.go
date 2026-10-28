@@ -3,7 +3,6 @@ package transformers
 import (
 	"context"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/statemachine"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -42,7 +41,7 @@ func (t *AutoApplyTransformer) Transform(_ context.Context, changeList []types.R
 			}
 
 			if applyChange.NewStatus == models.ApplyPending {
-				run.Apply.TriggeredBy = auth.System
+				run.Apply.TriggeredBy = new(models.SystemActor())
 			}
 		}
 	}

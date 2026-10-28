@@ -1,9 +1,9 @@
-import { Chip, Link, Tooltip, Typography, TypographyProps, styled, useTheme } from '@mui/material';
+import { Chip, Link, Typography, TypographyProps, styled, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Drawer from '../common/Drawer';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from 'react-relay/hooks';
-import Gravatar from '../common/Gravatar';
+import ActorDisplay from '../common/ActorDisplay';
 import Timestamp from '../common/Timestamp';
 import { TerraformProviderVersionDetailsSidebarFragment_details$key } from './__generated__/TerraformProviderVersionDetailsSidebarFragment_details.graphql';
 
@@ -36,7 +36,9 @@ function TerraformProviderVersionDetailsSidebar(props: Props) {
     fragment TerraformProviderVersionDetailsSidebarFragment_details on TerraformProviderVersion
     {
       version
-      createdBy
+      createdByActor {
+        ...ActorDisplayFragment_actor
+      }
       gpgKeyId
       protocols
       latest
@@ -88,11 +90,7 @@ function TerraformProviderVersionDetailsSidebar(props: Props) {
             <Typography sx={{ marginRight: 1 }}>
               <Timestamp component="span" timestamp={data.metadata.createdAt} /> by
             </Typography>
-            <Tooltip title={data.createdBy}>
-              <Box>
-                <Gravatar width={20} height={20} email={data.createdBy} />
-              </Box>
-            </Tooltip>
+            <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={20} />
           </Box>
         </Section>}
         <Section>

@@ -242,6 +242,8 @@ func TestSetRunGateDecision_Override(t *testing.T) {
 		},
 	}
 
+	const overriderID = "8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c"
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gate := &models.RunGate{
@@ -256,18 +258,18 @@ func TestSetRunGateDecision_Override(t *testing.T) {
 			overriddenGate := &models.RunGate{
 				Metadata:        models.ResourceMetadata{ID: "gate-1"},
 				Status:          models.RunGateOverridden,
-				OverriddenBy:    ptr.String("admin@example.com"),
+				OverriddenBy:    new(models.NewUserActor(overriderID).WithSubject("admin@example.com")),
 				OverrideComment: tt.wantComment,
 			}
 
 			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("GetSubject").Return("admin@example.com")
+			mockCaller.On("GetActor").Return(models.NewUserActor(overriderID).WithSubject("admin@example.com"))
 
 			mockGates := db.NewMockRunGates(t)
 			mockGates.On("GetRunGateByID", mock.Anything, "gate-1").Return(gate, nil)
 			mockGates.On("UpdateRunGate", mock.Anything, mock.MatchedBy(func(g *models.RunGate) bool {
 				return g.Status == models.RunGateOverridden &&
-					g.OverriddenBy != nil && *g.OverriddenBy == "admin@example.com" &&
+					assert.ObjectsAreEqual(new(models.NewUserActor(overriderID).WithSubject("admin@example.com")), g.OverriddenBy) &&
 					assert.ObjectsAreEqual(tt.wantComment, g.OverrideComment)
 			})).Return(overriddenGate, nil)
 
@@ -282,8 +284,7 @@ func TestSetRunGateDecision_Override(t *testing.T) {
 
 			require.NotNil(t, cmd.UpdatedGate)
 			assert.Equal(t, models.RunGateOverridden, cmd.UpdatedGate.Status)
-			require.NotNil(t, cmd.UpdatedGate.OverriddenBy)
-			assert.Equal(t, "admin@example.com", *cmd.UpdatedGate.OverriddenBy)
+			assert.Equal(t, new(models.NewUserActor(overriderID).WithSubject("admin@example.com")), cmd.UpdatedGate.OverriddenBy)
 			assert.Equal(t, tt.wantComment, cmd.UpdatedGate.OverrideComment)
 			assert.Equal(t, models.PolicyCheckOverridden, run.AllPolicyChecks()[0].Status)
 		})

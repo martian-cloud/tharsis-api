@@ -29,7 +29,7 @@ type Runner struct {
 	Name            string
 	Description     string
 	GroupID         *string
-	CreatedBy       string
+	CreatedBy       Actor
 	Metadata        ResourceMetadata
 	Disabled        bool
 	Tags            []string

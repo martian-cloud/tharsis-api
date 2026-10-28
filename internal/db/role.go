@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -88,7 +89,7 @@ type roles struct {
 	dbClient *Client
 }
 
-var rolesFieldList = append(metadataFieldList, "created_by", "name", "description", "permissions", "sort_order")
+var rolesFieldList = append(metadataAndCreatedByFieldList, "name", "description", "permissions", "sort_order")
 
 // NewRoles returns an instance of the Roles interface.
 func NewRoles(dbClient *Client) Roles {
@@ -199,6 +200,11 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(role.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	permissions, err := r.marshalPermissions(role.GetPermissions())
@@ -209,14 +215,17 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 	sql, args, err := toSQLWithTag("role.CreateRole", dialect.Insert("roles").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":          newResourceID(),
-			"version":     initialResourceVersion,
-			"created_at":  timestamp,
-			"updated_at":  timestamp,
-			"created_by":  role.CreatedBy,
-			"name":        role.Name,
-			"description": role.Description,
-			"permissions": permissions,
+			"id":                    newResourceID(),
+			"version":               initialResourceVersion,
+			"created_at":            timestamp,
+			"updated_at":            timestamp,
+			"created_by":            role.CreatedBy.Subject,
+			"created_by_actor_type": createdByActorType,
+			"created_by_actor_id":   createdByActorID,
+			"created_by_actor_trn":  createdByActorTRN,
+			"name":                  role.Name,
+			"description":           role.Description,
+			"permissions":           permissions,
 		}).
 		Returning(rolesFieldList...))
 	if err != nil {
@@ -344,6 +353,7 @@ func (r *roles) getRole(ctx context.Context, exp exp.Ex) (*models.Role, error) {
 }
 
 func scanRole(row scanner) (*models.Role, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	r := &models.Role{}
 	perms := []models.Permission{}
 
@@ -352,7 +362,10 @@ func scanRole(row scanner) (*models.Role, error) {
 		&r.Metadata.CreationTimestamp,
 		&r.Metadata.LastUpdatedTimestamp,
 		&r.Metadata.Version,
-		&r.CreatedBy,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&r.Name,
 		&r.Description,
 		&perms,
@@ -362,6 +375,9 @@ func scanRole(row scanner) (*models.Role, error) {
 	if err := row.Scan(fields...); err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	r.CreatedBy = parsedActor
 
 	r.SetPermissions(perms)
 	r.Metadata.TRN = trn.TypeRole.Build(r.Name)

@@ -121,15 +121,22 @@ func (x *CreateConfigurationVersionRequest) GetSpeculative() bool {
 
 // ConfigurationVersion represents a terraform configuration that can be used by a single Run.
 type ConfigurationVersion struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	Speculative   bool                   `protobuf:"varint,3,opt,name=speculative,proto3" json:"speculative,omitempty"`
-	WorkspaceId   string                 `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	CreatedBy     string                 `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	VcsEventId    *string                `protobuf:"bytes,6,opt,name=vcs_event_id,json=vcsEventId,proto3,oneof" json:"vcs_event_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Status      string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Speculative bool                   `protobuf:"varint,3,opt,name=speculative,proto3" json:"speculative,omitempty"`
+	WorkspaceId string                 `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in configuration_version.proto.
+	CreatedBy  string  `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	VcsEventId *string `protobuf:"bytes,6,opt,name=vcs_event_id,json=vcsEventId,proto3,oneof" json:"vcs_event_id,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,7,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ConfigurationVersion) Reset() {
@@ -190,6 +197,7 @@ func (x *ConfigurationVersion) GetWorkspaceId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in configuration_version.proto.
 func (x *ConfigurationVersion) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -204,25 +212,33 @@ func (x *ConfigurationVersion) GetVcsEventId() string {
 	return ""
 }
 
+func (x *ConfigurationVersion) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
+}
+
 var File_configuration_version_proto protoreflect.FileDescriptor
 
 const file_configuration_version_proto_rawDesc = "" +
 	"\n" +
-	"\x1bconfiguration_version.proto\x12.martiancloud.tharsis.api.configuration_version\x1a\x0emetadata.proto\"4\n" +
+	"\x1bconfiguration_version.proto\x12.martiancloud.tharsis.api.configuration_version\x1a\vactor.proto\x1a\x0emetadata.proto\"4\n" +
 	"\"GetConfigurationVersionByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"h\n" +
 	"!CreateConfigurationVersionRequest\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12 \n" +
-	"\vspeculative\x18\x02 \x01(\bR\vspeculative\"\x9b\x02\n" +
+	"\vspeculative\x18\x02 \x01(\bR\vspeculative\"\xf0\x02\n" +
 	"\x14ConfigurationVersion\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12 \n" +
 	"\vspeculative\x18\x03 \x01(\bR\vspeculative\x12!\n" +
-	"\fworkspace_id\x18\x04 \x01(\tR\vworkspaceId\x12\x1d\n" +
+	"\fworkspace_id\x18\x04 \x01(\tR\vworkspaceId\x12!\n" +
 	"\n" +
-	"created_by\x18\x05 \x01(\tR\tcreatedBy\x12%\n" +
+	"created_by\x18\x05 \x01(\tB\x02\x18\x01R\tcreatedBy\x12%\n" +
 	"\fvcs_event_id\x18\x06 \x01(\tH\x00R\n" +
-	"vcsEventId\x88\x01\x01B\x0f\n" +
+	"vcsEventId\x88\x01\x01\x12O\n" +
+	"\x10created_by_actor\x18\a \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActorB\x0f\n" +
 	"\r_vcs_event_id2\x89\x03\n" +
 	"\x15ConfigurationVersions\x12\xb7\x01\n" +
 	"\x1bGetConfigurationVersionByID\x12R.martiancloud.tharsis.api.configuration_version.GetConfigurationVersionByIDRequest\x1aD.martiancloud.tharsis.api.configuration_version.ConfigurationVersion\x12\xb5\x01\n" +
@@ -246,18 +262,20 @@ var file_configuration_version_proto_goTypes = []any{
 	(*CreateConfigurationVersionRequest)(nil),  // 1: martiancloud.tharsis.api.configuration_version.CreateConfigurationVersionRequest
 	(*ConfigurationVersion)(nil),               // 2: martiancloud.tharsis.api.configuration_version.ConfigurationVersion
 	(*ResourceMetadata)(nil),                   // 3: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*Actor)(nil),                              // 4: martiancloud.tharsis.api.actor.Actor
 }
 var file_configuration_version_proto_depIdxs = []int32{
 	3, // 0: martiancloud.tharsis.api.configuration_version.ConfigurationVersion.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	0, // 1: martiancloud.tharsis.api.configuration_version.ConfigurationVersions.GetConfigurationVersionByID:input_type -> martiancloud.tharsis.api.configuration_version.GetConfigurationVersionByIDRequest
-	1, // 2: martiancloud.tharsis.api.configuration_version.ConfigurationVersions.CreateConfigurationVersion:input_type -> martiancloud.tharsis.api.configuration_version.CreateConfigurationVersionRequest
-	2, // 3: martiancloud.tharsis.api.configuration_version.ConfigurationVersions.GetConfigurationVersionByID:output_type -> martiancloud.tharsis.api.configuration_version.ConfigurationVersion
-	2, // 4: martiancloud.tharsis.api.configuration_version.ConfigurationVersions.CreateConfigurationVersion:output_type -> martiancloud.tharsis.api.configuration_version.ConfigurationVersion
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	4, // 1: martiancloud.tharsis.api.configuration_version.ConfigurationVersion.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	0, // 2: martiancloud.tharsis.api.configuration_version.ConfigurationVersions.GetConfigurationVersionByID:input_type -> martiancloud.tharsis.api.configuration_version.GetConfigurationVersionByIDRequest
+	1, // 3: martiancloud.tharsis.api.configuration_version.ConfigurationVersions.CreateConfigurationVersion:input_type -> martiancloud.tharsis.api.configuration_version.CreateConfigurationVersionRequest
+	2, // 4: martiancloud.tharsis.api.configuration_version.ConfigurationVersions.GetConfigurationVersionByID:output_type -> martiancloud.tharsis.api.configuration_version.ConfigurationVersion
+	2, // 5: martiancloud.tharsis.api.configuration_version.ConfigurationVersions.CreateConfigurationVersion:output_type -> martiancloud.tharsis.api.configuration_version.ConfigurationVersion
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_configuration_version_proto_init() }
@@ -265,6 +283,7 @@ func file_configuration_version_proto_init() {
 	if File_configuration_version_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_configuration_version_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}

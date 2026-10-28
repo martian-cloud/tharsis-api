@@ -123,7 +123,7 @@ type GroupsResult struct {
 	Groups   []models.Group
 }
 
-var groupFieldList = append(metadataFieldList, "name", "description", "parent_id", "created_by", "runner_tags", "drift_detection_enabled", "provider_mirror_enabled", "output_visibility")
+var groupFieldList = append(metadataAndCreatedByFieldList, "name", "description", "parent_id", "runner_tags", "drift_detection_enabled", "provider_mirror_enabled", "output_visibility")
 
 type groups struct {
 	dbClient *Client
@@ -294,6 +294,11 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(group.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	var runnerTags []byte
 	if group.RunnerTags != nil {
 		decoded, err := json.Marshal(group.RunnerTags)
@@ -334,7 +339,10 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 			"name":                    group.Name,
 			"description":             nullableString(group.Description),
 			"parent_id":               nullableString(group.ParentID),
-			"created_by":              group.CreatedBy,
+			"created_by":              group.CreatedBy.Subject,
+			"created_by_actor_type":   createdByActorType,
+			"created_by_actor_id":     createdByActorID,
+			"created_by_actor_trn":    createdByActorTRN,
 			"runner_tags":             runnerTags,
 			"drift_detection_enabled": group.EnableDriftDetection,
 			"provider_mirror_enabled": group.EnableProviderMirror,
@@ -994,6 +1002,9 @@ type groupRow struct {
 	description          sql.NullString
 	parentID             sql.NullString
 	createdBy            sql.NullString
+	createdByActorType   sql.NullString
+	createdByActorID     sql.NullString
+	createdByActorTRN    sql.NullString
 	runnerTags           []string
 	driftDetection       *bool
 	providerMirror       *bool
@@ -1007,10 +1018,13 @@ func (r *groupRow) targets() []interface{} {
 		&r.createdAt,
 		&r.updatedAt,
 		&r.version,
+		&r.createdBy,
+		&r.createdByActorType,
+		&r.createdByActorID,
+		&r.createdByActorTRN,
 		&r.name,
 		&r.description,
 		&r.parentID,
-		&r.createdBy,
 		&r.runnerTags,
 		&r.driftDetection,
 		&r.providerMirror,
@@ -1024,6 +1038,8 @@ func (r *groupRow) valid() bool {
 }
 
 func (r *groupRow) toModel(fullPath string) *models.Group {
+	createdByActor := scanActor(r.createdBy, r.createdByActorType, r.createdByActorID, r.createdByActorTRN)
+
 	return &models.Group{
 		Metadata: models.ResourceMetadata{
 			ID:                   r.id.String,
@@ -1036,7 +1052,7 @@ func (r *groupRow) toModel(fullPath string) *models.Group {
 		Description:          r.description.String,
 		ParentID:             r.parentID.String,
 		FullPath:             fullPath,
-		CreatedBy:            r.createdBy.String,
+		CreatedBy:            createdByActor,
 		RunnerTags:           r.runnerTags,
 		EnableDriftDetection: r.driftDetection,
 		EnableProviderMirror: r.providerMirror,

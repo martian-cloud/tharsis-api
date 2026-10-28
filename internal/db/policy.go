@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -81,7 +82,7 @@ type policies struct {
 	dbClient *Client
 }
 
-var policyFieldList = append(metadataFieldList,
+var policyFieldList = append(metadataAndCreatedByFieldList,
 	"group_id",
 	"name",
 	"description",
@@ -89,7 +90,6 @@ var policyFieldList = append(metadataFieldList,
 	"kind_data",
 	"scope",
 	"required_approvals",
-	"created_by",
 )
 
 // NewPolicies returns an instance of the Policies interface
@@ -214,6 +214,11 @@ func (m *policies) CreatePolicy(ctx context.Context, policy *models.Policy) (*mo
 	ctx, span := tracer.Start(ctx, "db.CreatePolicy")
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(policy.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	scopeJSON, err := json.Marshal(policy.Scope)
@@ -241,18 +246,21 @@ func (m *policies) CreatePolicy(ctx context.Context, policy *models.Policy) (*mo
 		With("policies",
 			dialect.Insert("policies").
 				Rows(goqu.Record{
-					"id":                 newResourceID(),
-					"version":            initialResourceVersion,
-					"created_at":         timestamp,
-					"updated_at":         timestamp,
-					"group_id":           policy.GroupID,
-					"name":               policy.Name,
-					"description":        policy.Description,
-					"kind":               policy.Kind,
-					"kind_data":          kindDataJSON,
-					"scope":              scopeJSON,
-					"required_approvals": policy.RequiredApprovals,
-					"created_by":         policy.CreatedBy,
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"group_id":              policy.GroupID,
+					"name":                  policy.Name,
+					"description":           policy.Description,
+					"kind":                  policy.Kind,
+					"kind_data":             kindDataJSON,
+					"scope":                 scopeJSON,
+					"required_approvals":    policy.RequiredApprovals,
+					"created_by":            policy.CreatedBy.Subject,
+					"created_by_actor_type": createdByActorType,
+					"created_by_actor_id":   createdByActorID,
+					"created_by_actor_trn":  createdByActorTRN,
 				}).Returning("*"),
 		).Select(m.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"policies.group_id": goqu.I("namespaces.group_id")})))
@@ -583,6 +591,7 @@ func marshalPolicyKindData(policy *models.Policy) ([]byte, error) {
 }
 
 func scanPolicy(row scanner) (*models.Policy, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	policy := &models.Policy{}
 
 	var scopeJSON, kindDataJSON []byte
@@ -593,6 +602,10 @@ func scanPolicy(row scanner) (*models.Policy, error) {
 		&policy.Metadata.CreationTimestamp,
 		&policy.Metadata.LastUpdatedTimestamp,
 		&policy.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&policy.GroupID,
 		&policy.Name,
 		&policy.Description,
@@ -600,13 +613,15 @@ func scanPolicy(row scanner) (*models.Policy, error) {
 		&kindDataJSON,
 		&scopeJSON,
 		&policy.RequiredApprovals,
-		&policy.CreatedBy,
 		&groupPath,
 	}
 
 	if err := row.Scan(fields...); err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	policy.CreatedBy = parsedActor
 
 	if len(kindDataJSON) > 0 {
 		switch policy.Kind {

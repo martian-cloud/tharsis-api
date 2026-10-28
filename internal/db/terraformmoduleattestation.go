@@ -86,7 +86,7 @@ type terraformModuleAttestations struct {
 	dbClient *Client
 }
 
-var moduleAttestationFieldList = append(metadataFieldList, "module_id", "description", "data", "data_sha_sum", "schema_type", "predicate_type", "digests", "created_by")
+var moduleAttestationFieldList = append(metadataAndCreatedByFieldList, "module_id", "description", "data", "data_sha_sum", "schema_type", "predicate_type", "digests")
 
 // NewTerraformModuleAttestations returns an instance of the TerraformModuleAttestations interface
 func NewTerraformModuleAttestations(dbClient *Client) TerraformModuleAttestations {
@@ -220,6 +220,11 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(moduleAttestation.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	digests, err := json.Marshal(moduleAttestation.Digests)
@@ -232,18 +237,21 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 		With("terraform_module_attestations",
 			dialect.Insert("terraform_module_attestations").
 				Rows(goqu.Record{
-					"id":             newResourceID(),
-					"version":        initialResourceVersion,
-					"created_at":     timestamp,
-					"updated_at":     timestamp,
-					"module_id":      moduleAttestation.ModuleID,
-					"description":    nullableString(moduleAttestation.Description),
-					"data":           moduleAttestation.Data,
-					"data_sha_sum":   moduleAttestation.DataSHASum,
-					"schema_type":    moduleAttestation.SchemaType,
-					"predicate_type": moduleAttestation.PredicateType,
-					"digests":        digests,
-					"created_by":     moduleAttestation.CreatedBy,
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"module_id":             moduleAttestation.ModuleID,
+					"description":           nullableString(moduleAttestation.Description),
+					"data":                  moduleAttestation.Data,
+					"data_sha_sum":          moduleAttestation.DataSHASum,
+					"schema_type":           moduleAttestation.SchemaType,
+					"predicate_type":        moduleAttestation.PredicateType,
+					"digests":               digests,
+					"created_by":            moduleAttestation.CreatedBy.Subject,
+					"created_by_actor_type": createdByActorType,
+					"created_by_actor_id":   createdByActorID,
+					"created_by_actor_trn":  createdByActorTRN,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_attestations.module_id")))).
@@ -389,6 +397,7 @@ func (t *terraformModuleAttestations) getSelectFields() []interface{} {
 }
 
 func scanTerraformModuleAttestation(row scanner) (*models.TerraformModuleAttestation, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var description sql.NullString
 	var moduleName, moduleSystem, groupPath string
 	moduleAttestation := &models.TerraformModuleAttestation{
@@ -400,6 +409,10 @@ func scanTerraformModuleAttestation(row scanner) (*models.TerraformModuleAttesta
 		&moduleAttestation.Metadata.CreationTimestamp,
 		&moduleAttestation.Metadata.LastUpdatedTimestamp,
 		&moduleAttestation.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&moduleAttestation.ModuleID,
 		&description,
 		&moduleAttestation.Data,
@@ -407,7 +420,6 @@ func scanTerraformModuleAttestation(row scanner) (*models.TerraformModuleAttesta
 		&moduleAttestation.SchemaType,
 		&moduleAttestation.PredicateType,
 		&moduleAttestation.Digests,
-		&moduleAttestation.CreatedBy,
 		&moduleName,
 		&moduleSystem,
 		&groupPath,
@@ -417,6 +429,9 @@ func scanTerraformModuleAttestation(row scanner) (*models.TerraformModuleAttesta
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	moduleAttestation.CreatedBy = parsedActor
 
 	if description.Valid {
 		moduleAttestation.Description = description.String

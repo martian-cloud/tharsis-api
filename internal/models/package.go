@@ -40,7 +40,7 @@ type Package struct {
 	Description *string
 	GroupID     string
 	RootGroupID string
-	CreatedBy   string
+	CreatedBy   Actor
 	Kind        PackageKind
 	Visibility  PackageVisibility
 	Metadata    ResourceMetadata

@@ -72,7 +72,7 @@ func TestRunGateApprovals_CreateRunGateApproval(t *testing.T) {
 			approval, err := testClient.client.RunGateApprovals.CreateRunGateApproval(ctx, &models.RunGateApproval{
 				RunGateID:    test.runGateID,
 				UserID:       test.userID,
-				CreatedBy:    "db-integration-tests",
+				CreatedBy:    models.Actor{Subject: "db-integration-tests"},
 				Decision:     models.RunGateDecisionApprove,
 				CoveredRules: []string{"policy-1"},
 			})
@@ -110,7 +110,7 @@ func TestRunGateApprovals_UpdateRunGateApproval(t *testing.T) {
 	createdApproval, err := testClient.client.RunGateApprovals.CreateRunGateApproval(ctx, &models.RunGateApproval{
 		RunGateID: gate.Metadata.ID,
 		UserID:    &user.Metadata.ID,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		Decision:  models.RunGateDecisionApprove,
 	})
 	require.Nil(t, err)
@@ -174,7 +174,7 @@ func TestRunGateApprovals_GetRunGateApprovalByID(t *testing.T) {
 	createdApproval, err := testClient.client.RunGateApprovals.CreateRunGateApproval(ctx, &models.RunGateApproval{
 		RunGateID: gate.Metadata.ID,
 		UserID:    &user.Metadata.ID,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		Decision:  models.RunGateDecisionApprove,
 	})
 	require.NoError(t, err)
@@ -238,7 +238,7 @@ func TestRunGateApprovals_GetRunGateApprovalByTRN(t *testing.T) {
 	createdApproval, err := testClient.client.RunGateApprovals.CreateRunGateApproval(ctx, &models.RunGateApproval{
 		RunGateID: gate.Metadata.ID,
 		UserID:    &user.Metadata.ID,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		Decision:  models.RunGateDecisionApprove,
 	})
 	require.NoError(t, err)
@@ -309,7 +309,7 @@ func TestRunGateApprovals_GetRunGateApprovalsByGateID(t *testing.T) {
 	_, err = testClient.client.RunGateApprovals.CreateRunGateApproval(ctx, &models.RunGateApproval{
 		RunGateID: gate.Metadata.ID,
 		UserID:    &user1.Metadata.ID,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		Decision:  models.RunGateDecisionApprove,
 	})
 	require.NoError(t, err)
@@ -317,7 +317,7 @@ func TestRunGateApprovals_GetRunGateApprovalsByGateID(t *testing.T) {
 	_, err = testClient.client.RunGateApprovals.CreateRunGateApproval(ctx, &models.RunGateApproval{
 		RunGateID: gate.Metadata.ID,
 		UserID:    &user2.Metadata.ID,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		Decision:  models.RunGateDecisionReject,
 	})
 	require.NoError(t, err)
@@ -325,7 +325,7 @@ func TestRunGateApprovals_GetRunGateApprovalsByGateID(t *testing.T) {
 	_, err = testClient.client.RunGateApprovals.CreateRunGateApproval(ctx, &models.RunGateApproval{
 		RunGateID: otherGate.Metadata.ID,
 		UserID:    &user1.Metadata.ID,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		Decision:  models.RunGateDecisionApprove,
 	})
 	require.NoError(t, err)

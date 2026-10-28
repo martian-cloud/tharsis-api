@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<be18bf2686c0525cc920309bdd672a1f>>
+ * @generated SignedSource<<1731c0a6032f770b8f2ee003a82b450b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,9 @@ export type PackageSearchListItemFragment_package$data = {
   readonly id: string;
   readonly kind: PackageKind;
   readonly latestVersion: {
-    readonly createdBy: string;
+    readonly createdByActor: {
+      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    } | null | undefined;
     readonly metadata: {
       readonly createdAt: any;
     };
@@ -91,8 +93,17 @@ const node: ReaderFragment = {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "createdBy",
+          "concreteType": null,
+          "kind": "LinkedField",
+          "name": "createdByActor",
+          "plural": false,
+          "selections": [
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActorDisplayFragment_actor"
+            }
+          ],
           "storageKey": null
         },
         {
@@ -121,6 +132,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "a6be42a790be706a231c40b7f48bcd46";
+(node as any).hash = "fce0dea61b85a9f994376a211ff45d64";
 
 export default node;

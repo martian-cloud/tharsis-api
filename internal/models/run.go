@@ -450,8 +450,9 @@ type Apply struct {
 	LatestJobID  *string
 	ID           string
 	Status       ApplyStatus
-	TriggeredBy  string
-	Comment      string
+	// TriggeredBy is nil until the apply is started.
+	TriggeredBy *Actor
+	Comment     string
 	// ManagedIdentityIDs are the managed identities the apply job may create credentials for: those
 	// assigned to the workspace when the apply passed its apply-stage access rules. Set when auto-apply
 	// is enabled (including at run creation) or the apply is approved, and cleared when auto-apply is
@@ -706,7 +707,7 @@ type RunAnnotation struct {
 type Run struct {
 	ConfigurationVersionID  *string
 	ForceCancelAvailableAt  *time.Time
-	ForceCanceledBy         *string
+	ForceCanceledBy         *Actor // Set only when the run was force-canceled
 	ModuleVersion           *string
 	ModuleSource            *string
 	TargetAddresses         []string
@@ -715,7 +716,7 @@ type Run struct {
 	Apply                   *Apply
 	TaskStages              []*RunTaskStage
 	ModuleDigest            []byte // This is only set for modules stored in the Tharsis module registry
-	CreatedBy               string
+	CreatedBy               Actor
 	WorkspaceID             string
 	VariablesObjectStoreKey *string
 	Status                  RunStatus
@@ -929,7 +930,7 @@ func (r *Run) Copy() *Run {
 	cp := &Run{
 		ConfigurationVersionID: r.ConfigurationVersionID,
 		ForceCancelAvailableAt: r.ForceCancelAvailableAt,
-		ForceCanceledBy:        r.ForceCanceledBy,
+		ForceCanceledBy:        ptrActorCopy(r.ForceCanceledBy),
 		ModuleVersion:          r.ModuleVersion,
 		ModuleSource:           r.ModuleSource,
 		TargetAddresses:        slices.Clone(r.TargetAddresses),
@@ -1055,7 +1056,7 @@ func (r *Run) ShallowCompare(other *Run) bool {
 		ptrStringEqual(r.ConfigurationVersionID, other.ConfigurationVersionID) &&
 		ptrStringEqual(r.ModuleSource, other.ModuleSource) &&
 		ptrStringEqual(r.ModuleVersion, other.ModuleVersion) &&
-		ptrStringEqual(r.ForceCanceledBy, other.ForceCanceledBy) &&
+		ptrActorEqual(r.ForceCanceledBy, other.ForceCanceledBy) &&
 		ptrTimeEqual(r.ForceCancelAvailableAt, other.ForceCancelAvailableAt) &&
 		slices.Equal(r.TargetAddresses, other.TargetAddresses) &&
 		slices.Equal(r.ModuleDigest, other.ModuleDigest) &&
@@ -1126,7 +1127,7 @@ func (n *Apply) Copy() RunNode {
 		LatestJobID:        n.LatestJobID,
 		ID:                 n.ID,
 		Status:             n.Status,
-		TriggeredBy:        n.TriggeredBy,
+		TriggeredBy:        ptrActorCopy(n.TriggeredBy),
 		Comment:            n.Comment,
 		ManagedIdentityIDs: slices.Clone(n.ManagedIdentityIDs),
 	}
@@ -1145,7 +1146,7 @@ func (n *Apply) ShallowCompare(other RunNode) bool {
 		return false
 	}
 	return n.Status == o.Status &&
-		n.TriggeredBy == o.TriggeredBy &&
+		ptrActorEqual(n.TriggeredBy, o.TriggeredBy) &&
 		n.Comment == o.Comment &&
 		ptrStringEqual(n.LatestJobID, o.LatestJobID) &&
 		ptrStringEqual(n.ErrorMessage, o.ErrorMessage) &&
@@ -1160,6 +1161,23 @@ func ptrStringEqual(a, b *string) bool {
 		return false
 	}
 	return *a == *b
+}
+
+func ptrActorEqual(a, b *Actor) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func ptrActorCopy(a *Actor) *Actor {
+	if a == nil {
+		return nil
+	}
+	return new(*a)
 }
 
 func ptrTimeEqual(a, b *time.Time) bool {

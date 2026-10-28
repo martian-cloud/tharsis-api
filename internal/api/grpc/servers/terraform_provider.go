@@ -435,12 +435,13 @@ func (s *TerraformProviderServer) DeleteTerraformProviderPlatform(ctx context.Co
 // toPBTerraformProvider converts from TerraformProvider model to ProtoBuf model.
 func toPBTerraformProvider(p *models.TerraformProvider) *pb.TerraformProvider {
 	return &pb.TerraformProvider{
-		Metadata:      toPBMetadata(&p.Metadata, types.TerraformProviderModelType),
-		CreatedBy:     p.CreatedBy,
-		GroupId:       gid.ToGlobalID(types.GroupModelType, p.GroupID),
-		Name:          p.Name,
-		Private:       p.Private,
-		RepositoryUrl: p.RepositoryURL,
+		Metadata:       toPBMetadata(&p.Metadata, types.TerraformProviderModelType),
+		CreatedBy:      p.CreatedBy.Subject,
+		CreatedByActor: toPBActor(p.CreatedBy),
+		GroupId:        gid.ToGlobalID(types.GroupModelType, p.GroupID),
+		Name:           p.Name,
+		Private:        p.Private,
+		RepositoryUrl:  p.RepositoryURL,
 	}
 }
 
@@ -452,7 +453,8 @@ func toPBTerraformProviderVersion(v *models.TerraformProviderVersion) *pb.Terraf
 
 	return &pb.TerraformProviderVersion{
 		Metadata:           toPBMetadata(&v.Metadata, types.TerraformProviderVersionModelType),
-		CreatedBy:          v.CreatedBy,
+		CreatedBy:          v.CreatedBy.Subject,
+		CreatedByActor:     toPBActor(v.CreatedBy),
 		GpgAsciiArmor:      v.GPGASCIIArmor,
 		GpgKeyId:           gpgKeyID,
 		Latest:             v.Latest,
@@ -470,7 +472,8 @@ func toPBTerraformProviderPlatform(p *models.TerraformProviderPlatform) *pb.Terr
 		Metadata:          toPBMetadata(&p.Metadata, types.TerraformProviderPlatformModelType),
 		Architecture:      p.Architecture,
 		BinaryUploaded:    p.BinaryUploaded,
-		CreatedBy:         p.CreatedBy,
+		CreatedBy:         p.CreatedBy.Subject,
+		CreatedByActor:    toPBActor(p.CreatedBy),
 		Filename:          p.Filename,
 		OperatingSystem:   p.OperatingSystem,
 		ProviderVersionId: gid.ToGlobalID(types.TerraformProviderVersionModelType, p.ProviderVersionID),

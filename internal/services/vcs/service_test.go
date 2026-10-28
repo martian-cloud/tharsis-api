@@ -284,6 +284,83 @@ func TestGetVCSProviders(t *testing.T) {
 	}
 }
 
+// TestGetVCSProvidersByIDs_FiltersInaccessible verifies that providers the caller cannot view are
+// left out of the result instead of failing the whole batch.
+func TestGetVCSProvidersByIDs_FiltersInaccessible(t *testing.T) {
+	visible := models.VCSProvider{
+		Metadata: models.ResourceMetadata{ID: uuid.NewString(), TRN: trn.TypeVCSProvider.Build("group-a/provider-1")},
+	}
+	hidden := models.VCSProvider{
+		Metadata: models.ResourceMetadata{ID: uuid.NewString(), TRN: trn.TypeVCSProvider.Build("group-b/provider-2")},
+	}
+
+	tests := []struct {
+		name string
+		// The batched check covering every group first, then, only if it is denied, one per
+		// distinct group path in order of first appearance.
+		accessResults []error
+		expectResult  []models.VCSProvider
+		expectErrCode errors.CodeType
+	}{
+		{
+			name:          "a single check covers every group when all are visible",
+			accessResults: []error{nil},
+			expectResult:  []models.VCSProvider{visible, hidden},
+		},
+		{
+			name: "providers the caller cannot view are left out",
+			accessResults: []error{
+				errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+				nil,
+				errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+			},
+			expectResult: []models.VCSProvider{visible},
+		},
+		{
+			name: "a namespace the caller cannot see is treated as denied",
+			accessResults: []error{
+				errors.New("not found", errors.WithErrorCode(errors.ENotFound)),
+				nil,
+				errors.New("not found", errors.WithErrorCode(errors.ENotFound)),
+			},
+			expectResult: []models.VCSProvider{visible},
+		},
+		{
+			name:          "an error other than access denied fails the request",
+			accessResults: []error{errors.New("db down", errors.WithErrorCode(errors.EInternal))},
+			expectErrCode: errors.EInternal,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			for _, accessErr := range test.accessResults {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, mock.Anything, mock.Anything).
+					Return(accessErr).Once()
+			}
+
+			mockVCSProviders := db.NewMockVCSProviders(t)
+			mockVCSProviders.On("GetProviders", mock.Anything, mock.Anything).
+				Return(&db.VCSProvidersResult{VCSProviders: []models.VCSProvider{visible, hidden}}, nil)
+
+			logger, _ := logger.NewForTest()
+			service := newService(logger, &db.Client{VCSProviders: mockVCSProviders}, nil, nil, nil, nil, nil, nil, nil, "", 0)
+
+			providers, err := service.GetVCSProvidersByIDs(auth.WithCaller(context.Background(), mockCaller),
+				[]string{visible.Metadata.ID, hidden.Metadata.ID})
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectResult, providers)
+		})
+	}
+}
+
 func TestGetVCSProvidersByIDs(t *testing.T) {
 	sampleProvider := models.VCSProvider{
 		Metadata: models.ResourceMetadata{
@@ -544,7 +621,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthState:         ptr.String(sampleOAuthState.String()),
 				Type:               models.GitLabProviderType,
 				URL:                sampleProviderURL,
-				CreatedBy:          "system",
+				CreatedBy:          mockCallerActor().WithSubject("system"),
 				AutoCreateWebhooks: false,
 			},
 			expectedProvider: &models.VCSProvider{
@@ -560,7 +637,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthState:         ptr.String(sampleOAuthState.String()),
 				Type:               models.GitLabProviderType,
 				URL:                sampleProviderURL,
-				CreatedBy:          "sample@sample-email",
+				CreatedBy:          mockCallerActor().WithSubject("sample@sample-email"),
 				AutoCreateWebhooks: false,
 			},
 			limit:           5,
@@ -586,7 +663,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
 				URL:                sampleProviderURL,
-				CreatedBy:          "system",
+				CreatedBy:          mockCallerActor().WithSubject("system"),
 				Type:               models.GitHubProviderType,
 				AutoCreateWebhooks: false,
 			},
@@ -610,7 +687,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthState:         ptr.String(sampleOAuthState.String()),
 				Type:               models.GitHubProviderType,
 				URL:                sampleProviderURL,
-				CreatedBy:          "system",
+				CreatedBy:          mockCallerActor().WithSubject("system"),
 				AutoCreateWebhooks: false,
 			},
 			limit:           5,
@@ -673,7 +750,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthState:         ptr.String(sampleOAuthState.String()),
 				Type:               models.GitLabProviderType,
 				URL:                sampleProviderURL,
-				CreatedBy:          "system",
+				CreatedBy:          mockCallerActor().WithSubject("system"),
 				AutoCreateWebhooks: false,
 			},
 			expectedProvider: &models.VCSProvider{
@@ -689,7 +766,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthState:         ptr.String(sampleOAuthState.String()),
 				Type:               models.GitLabProviderType,
 				URL:                sampleProviderURL,
-				CreatedBy:          "sample@sample-email",
+				CreatedBy:          mockCallerActor().WithSubject("sample@sample-email"),
 				AutoCreateWebhooks: false,
 			},
 			limit:             5,
@@ -805,7 +882,7 @@ func TestUpdateVCSProvider(t *testing.T) {
 					OAuthState:         ptr.String("sample-state"),
 					Type:               models.GitHubProviderType,
 					URL:                sampleProviderURL,
-					CreatedBy:          "sample@sample-email",
+					CreatedBy:          models.Actor{Subject: "sample@sample-email"},
 					AutoCreateWebhooks: true,
 				},
 			},
@@ -1298,7 +1375,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				ProviderID:      "provider-id",
 				RepositoryPath:  "owner/repository",
 				Branch:          "main",
-				CreatedBy:       "some@some-email",
+				CreatedBy:       models.Actor{Subject: "some@some-email"},
 				TokenNonce:      "some-token-nonce",
 				ModuleDirectory: ptr.String("hidden/../path"), // Should be cleaned.
 				GlobPatterns:    []string{"/**/directory/*"},
@@ -1312,7 +1389,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				ProviderID:      "provider-id",
 				RepositoryPath:  "owner/repository",
 				Branch:          "main",
-				CreatedBy:       "some@some-email",
+				CreatedBy:       models.Actor{Subject: "some@some-email"},
 				WebhookID:       "webhook-id", // Only present if Tharsis configures Git provider.
 				TokenNonce:      "some-token-nonce",
 				ModuleDirectory: ptr.String("path"), // Should be cleaned.
@@ -1329,7 +1406,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 					ProviderID:      "provider-id",
 					RepositoryPath:  "owner/repository",
 					Branch:          "main",
-					CreatedBy:       "some@some-email",
+					CreatedBy:       models.Actor{Subject: "some@some-email"},
 					WebhookID:       "webhook-id", // Only present if Tharsis configures Git provider.
 					TokenNonce:      "some-token-nonce",
 					ModuleDirectory: ptr.String("path"), // Should be cleaned.
@@ -1376,7 +1453,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				ProviderID:     "provider-id",
 				RepositoryPath: "owner/repository",
 				Branch:         "main", // Default branch.
-				CreatedBy:      "some@some-email",
+				CreatedBy:      models.Actor{Subject: "some@some-email"},
 				TokenNonce:     "some-token-nonce",
 				TagRegex:       &sampleTagRegex,
 				// Other fields should remain unchanged.
@@ -1390,7 +1467,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 					ProviderID:     "provider-id",
 					RepositoryPath: "owner/repository",
 					Branch:         "main",
-					CreatedBy:      "some@some-email",
+					CreatedBy:      models.Actor{Subject: "some@some-email"},
 					TokenNonce:     "some-token-nonce",
 					TagRegex:       &sampleTagRegex,
 				},
@@ -1490,7 +1567,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			mockWorkspaceVCSProviderLinks.Test(t)
 			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
-			mockCaller.On("GetSubject").Return("testsubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("testsubject"))
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(nil)
 			ctx := auth.WithCaller(context.Background(), &mockCaller)
 
@@ -3060,4 +3137,9 @@ func TestRepositoryDecompressorRejectsExpansion(t *testing.T) {
 		err = newRepositoryDecompressor(repositorySizeLimit).Decompress(t.TempDir(), archive, true, 0o000)
 		assert.ErrorContains(t, err, "larger than limit")
 	})
+}
+
+// mockCallerActor returns the actor reported by the system caller these tests use.
+func mockCallerActor() models.Actor {
+	return models.SystemActor()
 }

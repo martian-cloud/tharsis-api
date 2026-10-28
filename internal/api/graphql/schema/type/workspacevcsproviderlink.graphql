@@ -26,7 +26,8 @@ type CreateVCSRunPayload {
 type WorkspaceVCSProviderLink implements Node {
   id: ID!
   metadata: ResourceMetadata!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   workspace: Workspace!
   vcsProvider: VCSProvider!
   repositoryPath: String!

@@ -19,7 +19,7 @@ import (
 // CreateAssessmentRunInput is the input for creating an assessment run. The remaining run
 // configuration is derived from the workspace's current state in Prepare.
 type CreateAssessmentRunInput struct {
-	Subject                 string
+	CreatedBy               models.Actor
 	WorkspaceID             string
 	LatestAssessmentVersion *int
 
@@ -82,7 +82,7 @@ func (c *CreateAssessmentRun) Prepare(ctx context.Context) error {
 	c.variablesRetainFn = variablesRetainFn
 
 	c.createInput = &corerun.CreateRunInput{
-		Subject:                 c.in.Subject,
+		CreatedBy:               c.in.CreatedBy,
 		WorkspaceID:             c.in.WorkspaceID,
 		ConfigurationVersionID:  source.ConfigurationVersionID,
 		ModuleSource:            source.ModuleSource,

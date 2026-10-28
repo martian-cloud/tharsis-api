@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<adf9eeabc0bae5d51b56fe1c0125e6a8>>
+ * @generated SignedSource<<628b56406105fbb932e185f78523b525>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -31,7 +31,9 @@ export type PolicyDetailsFragment_policy$data = {
     readonly id: string;
     readonly username: string;
   }>;
-  readonly createdBy: string;
+  readonly createdByActor: {
+    readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+  } | null | undefined;
   readonly description: string;
   readonly groupPath: string;
   readonly id: string;
@@ -127,8 +129,17 @@ return {
     {
       "alias": null,
       "args": null,
-      "kind": "ScalarField",
-      "name": "createdBy",
+      "concreteType": null,
+      "kind": "LinkedField",
+      "name": "createdByActor",
+      "plural": false,
+      "selections": [
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "ActorDisplayFragment_actor"
+        }
+      ],
       "storageKey": null
     },
     {
@@ -312,6 +323,6 @@ return {
 };
 })();
 
-(node as any).hash = "7b347cabad5ae07b1d5c4c509aa1b5c1";
+(node as any).hash = "d84fca594027702b47704dd67ed417b0";
 
 export default node;

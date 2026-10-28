@@ -18,7 +18,7 @@ import (
 // source run for derived runs), and the command passes the final variables to
 // corerun.Create, so this struct does not say how the variables were produced.
 type NewRunInput struct {
-	Subject                string
+	CreatedBy              models.Actor
 	WorkspaceID            string
 	TerraformVersion       string
 	ConfigurationVersionID *string
@@ -87,7 +87,7 @@ func (c *CreateRun) Prepare(ctx context.Context) error {
 	c.variablesRetainFn = variablesRetainFn
 
 	c.createInput = &corerun.CreateRunInput{
-		Subject:                 c.in.Subject,
+		CreatedBy:               c.in.CreatedBy,
 		WorkspaceID:             c.in.WorkspaceID,
 		TerraformVersion:        c.in.TerraformVersion,
 		ConfigurationVersionID:  c.in.ConfigurationVersionID,

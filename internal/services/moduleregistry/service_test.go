@@ -649,7 +649,7 @@ func TestCreateModule(t *testing.T) {
 				GroupID:     groupID,
 				RootGroupID: groupID,
 				Private:     true,
-				CreatedBy:   "mockSubject",
+				CreatedBy:   mockCallerActor().WithSubject("mockSubject"),
 			},
 			limit:                 5,
 			injectModulesPerGroup: 5,
@@ -672,7 +672,7 @@ func TestCreateModule(t *testing.T) {
 				GroupID:     groupID,
 				RootGroupID: "root-group",
 				Private:     true,
-				CreatedBy:   "mockSubject",
+				CreatedBy:   mockCallerActor().WithSubject("mockSubject"),
 			},
 			limit:                 5,
 			injectModulesPerGroup: 5,
@@ -705,7 +705,7 @@ func TestCreateModule(t *testing.T) {
 				GroupID:     groupID,
 				RootGroupID: groupID,
 				Private:     true,
-				CreatedBy:   "mockSubject",
+				CreatedBy:   mockCallerActor().WithSubject("mockSubject"),
 			},
 			limit:                 5,
 			injectModulesPerGroup: 6,
@@ -722,7 +722,7 @@ func TestCreateModule(t *testing.T) {
 			mockCaller.Test(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateTerraformModulePermission, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 			mockTransactions := db.NewMockTransactions(t)
 			mockModules := db.NewMockTerraformModules(t)
@@ -1618,7 +1618,7 @@ func TestCreateModuleVersion(t *testing.T) {
 			mockCaller.Test(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTerraformModulePermission, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
@@ -1675,7 +1675,7 @@ func TestCreateModuleVersion(t *testing.T) {
 					SemanticVersion: test.expectCreatedModuleVersion.SemanticVersion,
 					Latest:          test.expectCreatedModuleVersion.Latest,
 					SHASum:          test.expectCreatedModuleVersion.SHASum,
-					CreatedBy:       "mockSubject",
+					CreatedBy:       mockCallerActor().WithSubject("mockSubject"),
 					Status:          models.TerraformModuleVersionStatusPending,
 				}).
 					Return(test.expectCreatedModuleVersion, nil)
@@ -2406,7 +2406,7 @@ func TestCreateModuleAttestation(t *testing.T) {
 				AttestationData: validAttestationData,
 			},
 			expectCreatedModuleAttestation: &models.TerraformModuleAttestation{
-				CreatedBy:     "mockSubject",
+				CreatedBy:     mockCallerActor().WithSubject("mockSubject"),
 				ModuleID:      moduleID,
 				Description:   "test",
 				SchemaType:    "https://in-toto.io/Statement/v0.1",
@@ -2443,7 +2443,7 @@ func TestCreateModuleAttestation(t *testing.T) {
 				AttestationData: validAttestationData,
 			},
 			expectCreatedModuleAttestation: &models.TerraformModuleAttestation{
-				CreatedBy:     "mockSubject",
+				CreatedBy:     mockCallerActor().WithSubject("mockSubject"),
 				ModuleID:      moduleID,
 				Description:   "test",
 				SchemaType:    "https://in-toto.io/Statement/v0.1",
@@ -2468,7 +2468,7 @@ func TestCreateModuleAttestation(t *testing.T) {
 			mockCaller.Test(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTerraformModulePermission, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 			mockModules := db.NewMockTerraformModules(t)
 			mockModuleAttestations := db.NewMockTerraformModuleAttestations(t)
@@ -3119,4 +3119,9 @@ func TestCheckModulePackageLimits(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
 	})
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

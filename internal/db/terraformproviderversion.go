@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -99,7 +100,7 @@ type terraformProviderVersions struct {
 	dbClient *Client
 }
 
-var providerVersionFieldList = append(metadataFieldList, "provider_id", "provider_sem_version", "gpg_key_id", "gpg_ascii_armor", "protocols", "sha_sums_uploaded", "sha_sums_sig_uploaded", "readme_uploaded", "latest", "created_by", "readme_object_store_key", "shasums_object_store_key", "shasums_signature_object_store_key")
+var providerVersionFieldList = append(metadataAndCreatedByFieldList, "provider_id", "provider_sem_version", "gpg_key_id", "gpg_ascii_armor", "protocols", "sha_sums_uploaded", "sha_sums_sig_uploaded", "readme_uploaded", "latest", "readme_object_store_key", "shasums_object_store_key", "shasums_signature_object_store_key")
 
 // NewTerraformProviderVersions returns an instance of the TerraformProviderVersions interface
 func NewTerraformProviderVersions(dbClient *Client) TerraformProviderVersions {
@@ -231,6 +232,11 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(providerVersion.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	protocolsJSON, err := json.Marshal(providerVersion.Protocols)
@@ -255,7 +261,10 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 					"sha_sums_uploaded":                  providerVersion.SHASumsUploaded,
 					"sha_sums_sig_uploaded":              providerVersion.SHASumsSignatureUploaded,
 					"readme_uploaded":                    providerVersion.ReadmeUploaded,
-					"created_by":                         providerVersion.CreatedBy,
+					"created_by":                         providerVersion.CreatedBy.Subject,
+					"created_by_actor_type":              createdByActorType,
+					"created_by_actor_id":                createdByActorID,
+					"created_by_actor_trn":               createdByActorTRN,
 					"latest":                             providerVersion.Latest,
 					"readme_object_store_key":            providerVersion.ReadmeObjectStoreKey,
 					"shasums_object_store_key":           providerVersion.SHASumsObjectStoreKey,
@@ -465,6 +474,7 @@ func (t *terraformProviderVersions) getSelectFields() []interface{} {
 }
 
 func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var groupPath, providerName string
 	var gpgKeyID *int64 // Scan as *int64 from PostgreSQL BIGINT
 	var readmeKey, shasumsKey, shasumsSigKey *string
@@ -475,6 +485,10 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 		&providerVersion.Metadata.CreationTimestamp,
 		&providerVersion.Metadata.LastUpdatedTimestamp,
 		&providerVersion.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&providerVersion.ProviderID,
 		&providerVersion.SemanticVersion,
 		&gpgKeyID, // Scan into *int64
@@ -484,7 +498,6 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 		&providerVersion.SHASumsSignatureUploaded,
 		&providerVersion.ReadmeUploaded,
 		&providerVersion.Latest,
-		&providerVersion.CreatedBy,
 		&readmeKey,
 		&shasumsKey,
 		&shasumsSigKey,
@@ -496,6 +509,9 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	providerVersion.CreatedBy = parsedActor
 
 	// Cast *int64 to *uint64 for the model
 	if gpgKeyID != nil {

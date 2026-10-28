@@ -117,7 +117,7 @@ func TestCreate_HappyPath_NonSpeculative(t *testing.T) {
 	env.stubCreatePersistence(ctx)
 
 	run, err := env.create(ctx, &CreateRunInput{
-		Subject:     "user@example.com",
+		CreatedBy:   models.Actor{Subject: "user@example.com"},
 		WorkspaceID: "ws-1",
 	})
 	require.NoError(t, err)
@@ -185,7 +185,7 @@ func TestCreate_AttachesPostPlanStageWhenPolicyApplies(t *testing.T) {
 	env.limitChecker.On("CheckLimit", ctx, limits.ResourceLimitRunsPerWorkspacePerTimePeriod, mock.Anything).Return(nil)
 	env.activityEvts.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
-	_, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	_, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 	require.NoError(t, err)
 
 	require.NotNil(t, capturedRun)
@@ -271,7 +271,7 @@ func TestCreate_AttachesAllFourStagesWhenPoliciesApply(t *testing.T) {
 	env.limitChecker.On("CheckLimit", ctx, limits.ResourceLimitRunsPerWorkspacePerTimePeriod, mock.Anything).Return(nil)
 	env.activityEvts.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
-	_, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	_, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 	require.NoError(t, err)
 
 	require.NotNil(t, capturedRun)
@@ -333,7 +333,7 @@ func TestCreate_SpeculativeRunSkipsApplyPhaseStages(t *testing.T) {
 	moduleSource := "registry/group/module"
 	speculative := true
 	_, err := env.create(ctx, &CreateRunInput{
-		Subject:      "u",
+		CreatedBy:    models.Actor{Subject: "u"},
 		WorkspaceID:  "ws-1",
 		ModuleSource: &moduleSource,
 		Speculative:  &speculative,
@@ -372,7 +372,7 @@ func TestCreate_OPAKindWithNilOPADataFailsRunCreation(t *testing.T) {
 		},
 	}}, nil).Maybe()
 
-	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 
 	require.Error(t, err)
 	assert.Nil(t, run)
@@ -408,7 +408,7 @@ func TestCreate_UnsupportedKindFailsRunCreation(t *testing.T) {
 		},
 	}}, nil).Maybe()
 
-	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 
 	require.Error(t, err)
 	assert.Nil(t, run)
@@ -462,7 +462,7 @@ func TestCreate_UnsupportedKindAtAnUnrelatedStageDoesNotFailRunCreation(t *testi
 	moduleSource := "registry/group/module"
 	speculative := true
 	_, err := env.create(ctx, &CreateRunInput{
-		Subject:      "u",
+		CreatedBy:    models.Actor{Subject: "u"},
 		WorkspaceID:  "ws-1",
 		ModuleSource: &moduleSource,
 		Speculative:  &speculative,
@@ -496,7 +496,7 @@ func TestCreate_ModuleAttestationKindWithNilDataFailsRunCreation(t *testing.T) {
 		},
 	}}, nil).Maybe()
 
-	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 
 	require.Error(t, err)
 	assert.Nil(t, run)
@@ -558,7 +558,7 @@ func TestCreate_StageWithBothKindsProducesTwoChecksWithDistinctPaths(t *testing.
 	env.limitChecker.On("CheckLimit", ctx, limits.ResourceLimitRunsPerWorkspacePerTimePeriod, mock.Anything).Return(nil)
 	env.activityEvts.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
-	_, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	_, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 	require.NoError(t, err)
 
 	require.NotNil(t, capturedRun)
@@ -606,7 +606,7 @@ func TestCreate_NoStageNodeWhenNoPolicies(t *testing.T) {
 	env.groups.On("GetGroups", ctx, mock.Anything).Return(&db.GroupsResult{Groups: []models.Group{}}, nil).Maybe()
 	env.policies.On("GetPolicies", ctx, mock.Anything).Return(&db.PoliciesResult{Policies: []*models.Policy{}}, nil).Maybe()
 
-	_, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	_, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 	require.NoError(t, err)
 
 	require.NotNil(t, capturedRun)
@@ -635,7 +635,7 @@ func TestCreate_SkipActivityEvent(t *testing.T) {
 	env.policies.On("GetPolicies", ctx, mock.Anything).Return(&db.PoliciesResult{Policies: []*models.Policy{}}, nil).Maybe()
 
 	run, err := env.create(ctx, &CreateRunInput{
-		Subject:           "system",
+		CreatedBy:         models.Actor{Subject: "system"},
 		WorkspaceID:       "ws-1",
 		SkipActivityEvent: true,
 	})
@@ -654,7 +654,7 @@ func TestCreate_Speculative_HasNoApplyNode(t *testing.T) {
 	env.stubCreatePersistence(ctx)
 
 	run, err := env.create(ctx, &CreateRunInput{
-		Subject:      "user@example.com",
+		CreatedBy:    models.Actor{Subject: "user@example.com"},
 		WorkspaceID:  "ws-1",
 		ModuleSource: ptr.String("registry.example.com/ns/name/aws"),
 		Speculative:  ptr.Bool(true),
@@ -714,7 +714,7 @@ func TestCreate_SpeculativeUsesSpeculativeEnforcementLevel(t *testing.T) {
 	env.activityEvts.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 	_, err := env.create(ctx, &CreateRunInput{
-		Subject:      "user@example.com",
+		CreatedBy:    models.Actor{Subject: "user@example.com"},
 		WorkspaceID:  "ws-1",
 		ModuleSource: ptr.String("registry.example.com/ns/name/aws"),
 		Speculative:  ptr.Bool(true),
@@ -743,7 +743,7 @@ func TestCreate_DestroyOnPreventDestroyWorkspace_Forbidden(t *testing.T) {
 		Return(&models.Workspace{FullPath: "group/ws", TerraformVersion: "1.5.0", PreventDestroyPlan: true}, nil)
 
 	run, err := env.create(ctx, &CreateRunInput{
-		Subject:     "user@example.com",
+		CreatedBy:   models.Actor{Subject: "user@example.com"},
 		WorkspaceID: "ws-1",
 		IsDestroy:   true,
 	})
@@ -757,7 +757,7 @@ func TestCreate_WorkspaceNotFound(t *testing.T) {
 	env := newCreateTestEnv(t)
 	env.workspaces.On("GetWorkspaceByID", ctx, "ws-1").Return(nil, nil)
 
-	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 	require.Error(t, err)
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 	assert.Nil(t, run)
@@ -774,7 +774,7 @@ func TestCreate_ManagedIdentityRuleDenied(t *testing.T) {
 	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, mock.Anything).
 		Return(nil, errors.New("rule violation", errors.WithErrorCode(errors.EForbidden)))
 
-	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 	require.Error(t, err)
 	assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
 	assert.Nil(t, run)
@@ -798,7 +798,7 @@ func TestCreate_ManualApplyRunSkipsApplyStageRules(t *testing.T) {
 	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, matchRunStage(models.JobPlanType)).Return([]string{"mi-1"}, nil).Once()
 	env.stubCreatePersistence(ctx)
 
-	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 	require.NoError(t, err)
 	// The plan may use the identities that passed; the apply records its own when started.
 	assert.Equal(t, []string{"mi-1"}, run.Plan.ManagedIdentityIDs)
@@ -818,7 +818,7 @@ func TestCreate_AutoApplyRunEnforcesApplyStageRules(t *testing.T) {
 	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, matchRunStage(models.JobApplyType)).Return([]string{"mi-1"}, nil).Once()
 	env.stubCreatePersistence(ctx)
 
-	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1", AutoApply: true})
+	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1", AutoApply: true})
 	require.NoError(t, err)
 	assert.True(t, run.AutoApply)
 	// The apply is authorized now, so it records its identities at creation too.
@@ -841,7 +841,7 @@ func TestCreate_AutoApplyRunApplyStageRuleDenied(t *testing.T) {
 	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, matchRunStage(models.JobApplyType)).
 		Return(nil, errors.New("rule violation", errors.WithErrorCode(errors.EForbidden))).Once()
 
-	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1", AutoApply: true})
+	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1", AutoApply: true})
 	require.Error(t, err)
 	assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
 	assert.Nil(t, run)
@@ -868,7 +868,7 @@ func TestCreate_RunLimitExceeded(t *testing.T) {
 	env.limitChecker.On("CheckLimit", ctx, limits.ResourceLimitRunsPerWorkspacePerTimePeriod, mock.Anything).
 		Return(errors.New("limit exceeded", errors.WithErrorCode(errors.EInvalid)))
 
-	run, err := env.create(ctx, &CreateRunInput{Subject: "u", WorkspaceID: "ws-1"})
+	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"})
 	require.Error(t, err)
 	assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
 	assert.Nil(t, run)

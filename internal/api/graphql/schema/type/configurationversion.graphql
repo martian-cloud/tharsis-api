@@ -4,7 +4,8 @@ type ConfigurationVersion implements Node {
   status: String!
   speculative: Boolean!
   workspaceId: String!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   vcsEvent: VCSEvent
 }
 

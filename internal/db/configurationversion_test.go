@@ -29,7 +29,7 @@ func TestConfigurationVersions_CreateConfigurationVersion(t *testing.T) {
 		Name:        "test-group-config-version",
 		Description: "test group for config version",
 		FullPath:    "test-group-config-version",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -37,7 +37,7 @@ func TestConfigurationVersions_CreateConfigurationVersion(t *testing.T) {
 		Name:           "test-workspace-config-version",
 		Description:    "test workspace for config version",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestConfigurationVersions_CreateConfigurationVersion(t *testing.T) {
 			configVersion: models.ConfigurationVersion{
 				WorkspaceID: workspace.Metadata.ID,
 				Status:      models.ConfigurationPending,
-				CreatedBy:   "db-integration-tests",
+				CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 				Speculative: false,
 			},
 		},
@@ -88,7 +88,7 @@ func TestConfigurationVersions_UpdateConfigurationVersion(t *testing.T) {
 		Name:        "test-group-config-version-update",
 		Description: "test group for config version update",
 		FullPath:    "test-group-config-version-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -96,7 +96,7 @@ func TestConfigurationVersions_UpdateConfigurationVersion(t *testing.T) {
 		Name:           "test-workspace-config-version-update",
 		Description:    "test workspace for config version update",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestConfigurationVersions_UpdateConfigurationVersion(t *testing.T) {
 	createdConfigVersion, err := testClient.client.ConfigurationVersions.CreateConfigurationVersion(ctx, models.ConfigurationVersion{
 		WorkspaceID: workspace.Metadata.ID,
 		Status:      models.ConfigurationPending,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Speculative: false,
 	})
 	require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestConfigurationVersions_GetConfigurationVersionByID(t *testing.T) {
 		Name:        "test-group-config-version-get-by-id",
 		Description: "test group for config version get by id",
 		FullPath:    "test-group-config-version-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -177,14 +177,14 @@ func TestConfigurationVersions_GetConfigurationVersionByID(t *testing.T) {
 		Name:           "test-workspace-config-version-get-by-id",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a configuration version for testing
 	createdConfigVersion, err := testClient.client.ConfigurationVersions.CreateConfigurationVersion(ctx, models.ConfigurationVersion{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Status:      models.ConfigurationUploaded,
 	})
 	require.NoError(t, err)
@@ -242,7 +242,7 @@ func TestConfigurationVersions_GetConfigurationVersions(t *testing.T) {
 		Name:        "test-group-config-versions-list",
 		Description: "test group for config versions list",
 		FullPath:    "test-group-config-versions-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -250,7 +250,7 @@ func TestConfigurationVersions_GetConfigurationVersions(t *testing.T) {
 		Name:           "test-workspace-config-versions-list",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -258,12 +258,12 @@ func TestConfigurationVersions_GetConfigurationVersions(t *testing.T) {
 	configVersions := []models.ConfigurationVersion{
 		{
 			WorkspaceID: workspace.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			Status:      models.ConfigurationUploaded,
 		},
 		{
 			WorkspaceID: workspace.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			Status:      models.ConfigurationPending,
 		},
 	}
@@ -332,7 +332,7 @@ func TestConfigurationVersions_GetConfigurationVersionsWithPaginationAndSorting(
 		Name:        "test-group-config-versions-pagination",
 		Description: "test group for config versions pagination",
 		FullPath:    "test-group-config-versions-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -340,7 +340,7 @@ func TestConfigurationVersions_GetConfigurationVersionsWithPaginationAndSorting(
 		Name:           "test-workspace-config-versions-pagination",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -348,7 +348,7 @@ func TestConfigurationVersions_GetConfigurationVersionsWithPaginationAndSorting(
 	for i := 0; i < resourceCount; i++ {
 		_, err := testClient.client.ConfigurationVersions.CreateConfigurationVersion(ctx, models.ConfigurationVersion{
 			WorkspaceID: workspace.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			Status:      models.ConfigurationUploaded,
 		})
 		require.NoError(t, err)
@@ -390,7 +390,7 @@ func TestConfigurationVersions_GetConfigurationVersionByTRN(t *testing.T) {
 		Name:        "test-group-config-version-get-by-trn",
 		Description: "test group for config version get by trn",
 		FullPath:    "test-group-config-version-get-by-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -398,14 +398,14 @@ func TestConfigurationVersions_GetConfigurationVersionByTRN(t *testing.T) {
 		Name:           "test-workspace-config-version-get-by-trn",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a configuration version for testing
 	createdConfigVersion, err := testClient.client.ConfigurationVersions.CreateConfigurationVersion(ctx, models.ConfigurationVersion{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Status:      models.ConfigurationUploaded,
 	})
 	require.NoError(t, err)

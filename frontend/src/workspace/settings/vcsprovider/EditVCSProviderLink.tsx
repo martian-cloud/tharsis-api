@@ -32,6 +32,9 @@ function EditVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
                     createdAt
                 }
                 createdBy
+                createdByActor {
+                    ...ActorDisplayFragment_actor
+                }
                 repositoryPath
                 autoSpeculativePlan
                 webhookDisabled

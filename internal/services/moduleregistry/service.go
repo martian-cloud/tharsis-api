@@ -546,7 +546,7 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 		SchemaType:    statement.Type,
 		PredicateType: statement.PredicateType,
 		Digests:       digests,
-		CreatedBy:     caller.GetSubject(),
+		CreatedBy:     caller.GetActor(),
 	}
 
 	if err = attestationToCreate.Validate(); err != nil {
@@ -815,7 +815,7 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 		Private:       input.Private,
 		RepositoryURL: input.RepositoryURL,
 		Labels:        input.Labels,
-		CreatedBy:     caller.GetSubject(),
+		CreatedBy:     caller.GetActor(),
 	}
 
 	if vErr := moduleToCreate.Validate(); vErr != nil {
@@ -1223,7 +1223,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 		Latest:          isLatest,
 		SHASum:          input.SHASum,
 		Status:          models.TerraformModuleVersionStatusPending,
-		CreatedBy:       caller.GetSubject(),
+		CreatedBy:       caller.GetActor(),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create module version", errors.WithSpan(span))

@@ -1,19 +1,20 @@
 import { Typography } from '@mui/material';
 import Box from '@mui/material/Box';
-import Gravatar from '../../common/Gravatar';
+import ActorDisplay from '../../common/ActorDisplay';
 import Timestamp from '../../common/Timestamp';
+import { ActorDisplayFragment_actor$key } from '../../common/__generated__/ActorDisplayFragment_actor.graphql';
 
 interface Props {
     stage: 'Plan' | 'Post-Plan' | 'Pre-Plan' | 'Pre-Apply' | 'Post-Apply' | 'Apply';
     triggeredAt?: string | null;
-    triggeredBy?: string | null;
+    triggeredByActor?: ActorDisplayFragment_actor$key | null;
 }
 
 // RunDetailsStageHeader is the always-visible header row on the plan/apply stage pages,
 // naming who triggered the stage and when. Before the stage is triggered (an apply
 // awaiting approval) it renders a muted placeholder instead, so the page skeleton
 // stays the same across states.
-function RunDetailsStageHeader({ stage, triggeredAt, triggeredBy }: Props) {
+function RunDetailsStageHeader({ stage, triggeredAt, triggeredByActor }: Props) {
     return (
         <Box
             sx={{
@@ -25,12 +26,11 @@ function RunDetailsStageHeader({ stage, triggeredAt, triggeredBy }: Props) {
                 justifyContent: { xs: 'flex-start', md: 'space-between' },
                 gap: { xs: 1 },
             }}>
-            {triggeredBy ? <Typography component="div">
+            {triggeredByActor ? <Typography component="div">
                 {stage} triggered{' '}
                 {triggeredAt && <Timestamp component="span" timestamp={triggeredAt} />}
                 {' '}by{' '}
-                <Gravatar sx={{ display: 'inline-block', verticalAlign: 'middle' }} width={20} height={20} email={triggeredBy} />
-                {' '}{triggeredBy}
+                <ActorDisplay fragmentRef={triggeredByActor} variant="inline" size={20} />
             </Typography> : <Typography component="div" color="textSecondary">
                 {stage} has not been triggered
             </Typography>}

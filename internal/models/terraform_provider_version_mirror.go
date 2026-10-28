@@ -11,7 +11,7 @@ var _ Model = (*TerraformProviderVersionMirror)(nil)
 // TerraformProviderVersionMirror represents a version of a Terraform provider
 // that's mirrored using the Provider Network Mirror Protocol.
 type TerraformProviderVersionMirror struct {
-	CreatedBy         string
+	CreatedBy         Actor
 	Type              string
 	SemanticVersion   string
 	RegistryNamespace string

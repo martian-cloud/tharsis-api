@@ -35,7 +35,7 @@ var (
 // WorkspaceVCSProviderLink represents a link for a
 // version control system provider to a workspace.
 type WorkspaceVCSProviderLink struct {
-	CreatedBy           string
+	CreatedBy           Actor
 	WorkspaceID         string
 	ProviderID          string
 	TokenNonce          string

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<aad530c9e358425a3ae702a47e9fab52>>
+ * @generated SignedSource<<191050f00a6f9eb919872fa29c9c5d15>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,7 +11,9 @@
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type GPGKeyListItemFragment_key$data = {
-  readonly createdBy: string;
+  readonly createdByActor: {
+    readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+  } | null | undefined;
   readonly fingerprint: string;
   readonly gpgKeyId: string;
   readonly groupPath: string;
@@ -82,8 +84,17 @@ const node: ReaderFragment = {
     {
       "alias": null,
       "args": null,
-      "kind": "ScalarField",
-      "name": "createdBy",
+      "concreteType": null,
+      "kind": "LinkedField",
+      "name": "createdByActor",
+      "plural": false,
+      "selections": [
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "ActorDisplayFragment_actor"
+        }
+      ],
       "storageKey": null
     },
     {
@@ -98,6 +109,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "dad95116312da6813b4a03b6bbb6885b";
+(node as any).hash = "dcaa499d74ae1dcd95b1e478331b5fc0";
 
 export default node;

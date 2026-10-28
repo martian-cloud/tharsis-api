@@ -13,7 +13,8 @@ type DisableMaintenanceModePayload {
 type MaintenanceMode {
   id: ID!
   metadata: ResourceMetadata!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
 }
 
 input EnableMaintenanceModeInput {

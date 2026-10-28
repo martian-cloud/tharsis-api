@@ -110,7 +110,7 @@ type workspaces struct {
 }
 
 var workspaceFieldList = append(
-	metadataFieldList,
+	metadataAndCreatedByFieldList,
 	"name",
 	"group_id",
 	"description",
@@ -119,7 +119,6 @@ var workspaceFieldList = append(
 	"dirty_state",
 	"locked",
 	"max_job_duration",
-	"created_by",
 	"terraform_version",
 	"prevent_destroy_plan",
 	"runner_tags",
@@ -392,9 +391,13 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(workspace.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	var runnerTags []byte
 	var labelsJSON []byte
-	var err error
 	if workspace.RunnerTags != nil {
 		runnerTags, err = json.Marshal(workspace.RunnerTags)
 		if err != nil {
@@ -443,7 +446,10 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"dirty_state":              workspace.DirtyState,
 			"locked":                   workspace.Locked,
 			"max_job_duration":         workspace.MaxJobDuration,
-			"created_by":               workspace.CreatedBy,
+			"created_by":               workspace.CreatedBy.Subject,
+			"created_by_actor_type":    createdByActorType,
+			"created_by_actor_id":      createdByActorID,
+			"created_by_actor_trn":     createdByActorTRN,
 			"terraform_version":        workspace.TerraformVersion,
 			"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 			"runner_tags":              runnerTags,
@@ -744,6 +750,9 @@ type workspaceRow struct {
 	locked                sql.NullBool
 	maxJobDuration        *int32
 	createdBy             sql.NullString
+	createdByActorType    sql.NullString
+	createdByActorID      sql.NullString
+	createdByActorTRN     sql.NullString
 	terraformVersion      sql.NullString
 	preventDestroyPlan    sql.NullBool
 	runnerTags            []string
@@ -760,6 +769,10 @@ func (r *workspaceRow) targets() []interface{} {
 		&r.createdAt,
 		&r.updatedAt,
 		&r.version,
+		&r.createdBy,
+		&r.createdByActorType,
+		&r.createdByActorID,
+		&r.createdByActorTRN,
 		&r.name,
 		&r.groupID,
 		&r.description,
@@ -768,7 +781,6 @@ func (r *workspaceRow) targets() []interface{} {
 		&r.dirtyState,
 		&r.locked,
 		&r.maxJobDuration,
-		&r.createdBy,
 		&r.terraformVersion,
 		&r.preventDestroyPlan,
 		&r.runnerTags,
@@ -780,6 +792,8 @@ func (r *workspaceRow) targets() []interface{} {
 }
 
 func (r *workspaceRow) toModel(fullPath string) (*models.Workspace, error) {
+	createdByActor := scanActor(r.createdBy, r.createdByActorType, r.createdByActorID, r.createdByActorTRN)
+
 	ws := &models.Workspace{
 		Metadata: models.ResourceMetadata{
 			ID:                   r.id.String,
@@ -797,7 +811,7 @@ func (r *workspaceRow) toModel(fullPath string) (*models.Workspace, error) {
 		DirtyState:            r.dirtyState.Bool,
 		Locked:                r.locked.Bool,
 		MaxJobDuration:        r.maxJobDuration,
-		CreatedBy:             r.createdBy.String,
+		CreatedBy:             createdByActor,
 		TerraformVersion:      r.terraformVersion.String,
 		PreventDestroyPlan:    r.preventDestroyPlan.Bool,
 		RunnerTags:            r.runnerTags,

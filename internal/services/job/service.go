@@ -270,15 +270,21 @@ func (s *service) GetJobsByIDs(ctx context.Context, idList []string) ([]models.J
 		return nil, errors.Wrap(err, "failed to get jobs", errors.WithSpan(span))
 	}
 
-	// Verify user has access to all returned jobs
+	// Jobs the caller cannot view are left out rather than failing the whole request, so one
+	// inaccessible ID in a batch does not hide the rest. Callers that need a specific job treat
+	// a missing one as not found.
+	jobs := []models.Job{}
 	for _, job := range resp.Jobs {
 		err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
-		if err != nil {
+		if code := errors.ErrorCode(err); err != nil && code != errors.EForbidden && code != errors.ENotFound {
 			return nil, err
+		}
+		if err == nil {
+			jobs = append(jobs, job)
 		}
 	}
 
-	return resp.Jobs, nil
+	return jobs, nil
 }
 
 func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsResult, error) {

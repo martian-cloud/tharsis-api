@@ -32,11 +32,13 @@ func (r *ApplyResolver) ErrorMessage() *string {
 
 // TriggeredBy resolver
 func (r *ApplyResolver) TriggeredBy() *string {
-	apply := r.run.Apply
-	if apply.TriggeredBy == "" {
-		return nil
-	}
-	return &apply.TriggeredBy
+	return models.ActorSubjectPtr(r.run.Apply.TriggeredBy)
+}
+
+// TriggeredByActor resolver returns the structured identity behind triggeredBy, or null when
+// none was recorded.
+func (r *ApplyResolver) TriggeredByActor() *ActorResolver {
+	return newOptionalActorResolver(r.run.Apply.TriggeredBy)
 }
 
 // Metadata resolver

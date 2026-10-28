@@ -56,7 +56,7 @@ func TestCreateDestroyRun_Prepare(t *testing.T) {
 			return nil, "vars-key", nil
 		},
 		in: &CreateDestroyRunInput{
-			Subject:     "u",
+			CreatedBy:   models.Actor{Subject: "u"},
 			WorkspaceID: "ws-1",
 			AutoApply:   true,
 			Annotations: []*models.RunAnnotation{{Key: "team", Value: "platform"}},
@@ -79,7 +79,7 @@ func TestCreateDestroyRun_Prepare(t *testing.T) {
 
 func TestCreateDestroyRun_Execute(t *testing.T) {
 	ctx := context.Background()
-	input := &corerun.CreateRunInput{Subject: "u", WorkspaceID: "ws-1", IsDestroy: true}
+	input := &corerun.CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1", IsDestroy: true}
 
 	var gotInput *corerun.CreateRunInput
 	cmd := &CreateDestroyRun{

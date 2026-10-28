@@ -6,6 +6,7 @@ import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import { useFragment, useLazyLoadQuery, useMutation } from 'react-relay/hooks';
 import { useNavigate, useParams } from 'react-router-dom';
+import ActorDisplay from '../../common/ActorDisplay';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import TRNButton from '../../common/TRNButton';
@@ -62,7 +63,9 @@ function FederatedRegistryDetails({ fragmentRef }: Props) {
                     id
                     hostname
                     audience
-                    createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     group {
                         fullPath
                     }
@@ -212,7 +215,7 @@ function FederatedRegistryDetails({ fragmentRef }: Props) {
                         <Collapse in={showMore} timeout="auto" unmountOnExit>
                             <Box sx={{ mt: 2 }}>
                                 <Typography variant="body2">
-                                    Created <Timestamp component="span" timestamp={federatedRegistry.metadata?.createdAt} /> by {federatedRegistry.createdBy}
+                                    Created <Timestamp component="span" timestamp={federatedRegistry.metadata?.createdAt} /> by <ActorDisplay fragmentRef={federatedRegistry.createdByActor} variant="text" />
                                 </Typography>
                             </Box>
                         </Collapse>

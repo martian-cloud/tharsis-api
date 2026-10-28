@@ -30,7 +30,7 @@ type RunGateApproval struct {
 	RunGateID        string
 	UserID           *string
 	ServiceAccountID *string
-	CreatedBy        string
+	CreatedBy        Actor
 	Decision         RunGateDecision
 	Comment          *string
 	CoveredRules     []string
@@ -83,15 +83,20 @@ func (a *RunGateApproval) Validate() error {
 
 // principalKey returns a stable key identifying the principal that made the decision, namespaced by
 // principal kind so a user and a service account that share an ID string never collide. Validate
-// enforces exactly one of UserID/ServiceAccountID; the CreatedBy fallback only guards a malformed
-// row so de-duplication in RunGate.Satisfied still treats it as a single approver.
+// enforces exactly one of UserID/ServiceAccountID; the remaining fallbacks cover a row whose
+// principal was deleted (the foreign keys are ON DELETE SET NULL) or is malformed, so de-duplication
+// in RunGate.Satisfied still treats it as a single approver. A typed CreatedBy is preferred over its
+// Subject because it identifies the principal by ID; approvals recorded before typed actors were
+// introduced fall back to the Subject.
 func (a *RunGateApproval) principalKey() string {
 	switch {
 	case a.UserID != nil:
 		return "user:" + *a.UserID
 	case a.ServiceAccountID != nil:
 		return "sa:" + *a.ServiceAccountID
+	case a.CreatedBy.HasType():
+		return "actor:" + a.CreatedBy.String()
 	default:
-		return "createdBy:" + a.CreatedBy
+		return "createdBy:" + a.CreatedBy.Subject
 	}
 }

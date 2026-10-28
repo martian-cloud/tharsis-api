@@ -238,7 +238,13 @@ func (r *TerraformModuleVersionResolver) Attestations(ctx context.Context, args 
 
 // CreatedBy resolver
 func (r *TerraformModuleVersionResolver) CreatedBy() string {
-	return r.moduleVersion.CreatedBy
+	return r.moduleVersion.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *TerraformModuleVersionResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.moduleVersion.CreatedBy)
 }
 
 func terraformModuleVersionQuery(ctx context.Context, args *TerraformModuleVersionQueryArgs) (*TerraformModuleVersionResolver, error) {

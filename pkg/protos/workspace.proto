@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.workspace;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 import "namespace.proto";
 import "pagination.proto";
@@ -125,10 +126,15 @@ message SetWorkspaceRoleBindingRequest {
 // WorkspaceRoleBinding confers a Role on a workspace: the role's permissions become available to the
 // workspace's job caller at the workspace's DIRECT PARENT namespace.
 message WorkspaceRoleBinding {
-  metadata.ResourceMetadata metadata     = 1;
-  string                    workspace_id = 2;
-  string                    role_id      = 3;
-  string                    created_by   = 4;
+  metadata.ResourceMetadata metadata         = 1;
+  string                    workspace_id     = 2;
+  string                    role_id          = 3;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by       = 4 [deprecated = true];
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor               created_by_actor = 5;
 }
 
 // SubscribeToWorkspaceEventsRequest is the input for subscribing to workspace events.
@@ -143,12 +149,17 @@ message Workspace {
   string                    description              = 3;
   string                    group_id                 = 4;
   string                    full_path                = 5;
-  string                    created_by               = 6;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by               = 6 [deprecated = true];
   bool                      locked                   = 7;
   bool                      dirty_state              = 8;
   string                    current_job_id           = 9;
   string                    current_state_version_id = 10;
   map<string, string>       labels                   = 11;
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor created_by_actor = 12;
 }
 
 // GetWorkspacesResponse is the paginated list of Workspaces.

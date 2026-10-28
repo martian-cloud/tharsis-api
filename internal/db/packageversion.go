@@ -88,7 +88,7 @@ type packageVersions struct {
 }
 
 var packageVersionFieldList = append(
-	metadataFieldList,
+	metadataAndCreatedByFieldList,
 	"package_id",
 	"semantic_version",
 	"sha_sum",
@@ -98,7 +98,6 @@ var packageVersionFieldList = append(
 	"upload_started_at",
 	"size",
 	"latest",
-	"created_by",
 )
 
 // NewPackageVersions returns an instance of the PackageVersions interface
@@ -227,23 +226,31 @@ func (p *packageVersions) CreatePackageVersion(ctx context.Context, packageVersi
 	ctx, span := tracer.Start(ctx, "db.CreatePackageVersion")
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(packageVersion.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	record := goqu.Record{
-		"id":                newResourceID(),
-		"version":           initialResourceVersion,
-		"created_at":        timestamp,
-		"updated_at":        timestamp,
-		"package_id":        packageVersion.PackageID,
-		"semantic_version":  packageVersion.SemanticVersion,
-		"sha_sum":           packageVersion.SHASum,
-		"status":            packageVersion.Status,
-		"error":             packageVersion.Error,
-		"object_store_key":  packageVersion.ObjectStoreKey,
-		"upload_started_at": packageVersion.UploadStartedTimestamp,
-		"size":              packageVersion.Size,
-		"created_by":        packageVersion.CreatedBy,
-		"latest":            packageVersion.Latest,
+		"id":                    newResourceID(),
+		"version":               initialResourceVersion,
+		"created_at":            timestamp,
+		"updated_at":            timestamp,
+		"package_id":            packageVersion.PackageID,
+		"semantic_version":      packageVersion.SemanticVersion,
+		"sha_sum":               packageVersion.SHASum,
+		"status":                packageVersion.Status,
+		"error":                 packageVersion.Error,
+		"object_store_key":      packageVersion.ObjectStoreKey,
+		"upload_started_at":     packageVersion.UploadStartedTimestamp,
+		"size":                  packageVersion.Size,
+		"created_by":            packageVersion.CreatedBy.Subject,
+		"created_by_actor_type": createdByActorType,
+		"created_by_actor_id":   createdByActorID,
+		"created_by_actor_trn":  createdByActorTRN,
+		"latest":                packageVersion.Latest,
 	}
 
 	sql, args, err := toSQLWithTag("packageversion.CreatePackageVersion", dialect.From("package_versions").
@@ -408,6 +415,7 @@ func (p *packageVersions) getSelectFields() []interface{} {
 }
 
 func scanPackageVersion(row scanner) (*models.PackageVersion, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	packageVersion := &models.PackageVersion{}
 
 	var errorMessage sql.NullString
@@ -420,6 +428,10 @@ func scanPackageVersion(row scanner) (*models.PackageVersion, error) {
 		&packageVersion.Metadata.CreationTimestamp,
 		&packageVersion.Metadata.LastUpdatedTimestamp,
 		&packageVersion.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&packageVersion.PackageID,
 		&packageVersion.SemanticVersion,
 		&packageVersion.SHASum,
@@ -429,7 +441,6 @@ func scanPackageVersion(row scanner) (*models.PackageVersion, error) {
 		&uploadStartedAt,
 		&packageVersion.Size,
 		&packageVersion.Latest,
-		&packageVersion.CreatedBy,
 		&groupPath,
 		&packageName,
 	}
@@ -438,6 +449,9 @@ func scanPackageVersion(row scanner) (*models.PackageVersion, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	packageVersion.CreatedBy = parsedActor
 
 	if errorMessage.Valid {
 		packageVersion.Error = &errorMessage.String

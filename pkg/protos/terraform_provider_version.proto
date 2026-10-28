@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.terraform_provider_version;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 import "pagination.proto";
 
@@ -49,7 +50,9 @@ message DeleteTerraformProviderVersionRequest {
 // TerraformProviderVersion represents a version of a Terraform provider.
 message TerraformProviderVersion {
   metadata.ResourceMetadata metadata              = 1;
-  string                    created_by            = 2;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by            = 2 [deprecated = true];
   optional string           gpg_ascii_armor       = 3;
   optional uint64           gpg_key_id            = 4;
   bool                      latest                = 5;
@@ -59,6 +62,9 @@ message TerraformProviderVersion {
   string                    semantic_version      = 9;
   bool                      sha_sums_sig_uploaded = 10;
   bool                      sha_sums_uploaded     = 11;
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor created_by_actor = 12;
 }
 
 // GetTerraformProviderVersionsResponse is the paginated list of TerraformProviderVersions.

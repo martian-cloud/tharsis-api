@@ -634,7 +634,7 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, errors.Wrap(wErr, "failed to validate workspace model", errors.WithSpan(span))
 	}
 
-	workspace.CreatedBy = caller.GetSubject()
+	workspace.CreatedBy = caller.GetActor()
 
 	if d := workspace.MaxJobDuration; d != nil {
 		if vErr := validateMaxJobDuration(*d); vErr != nil {
@@ -1288,7 +1288,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	}()
 
 	// Update the CreatedBy field since a state version could be created manually.
-	stateVersion.CreatedBy = caller.GetSubject()
+	stateVersion.CreatedBy = caller.GetActor()
 
 	createdStateVersion, err := s.dbClient.StateVersions.CreateStateVersion(txContext, stateVersion)
 	if err != nil {
@@ -1790,7 +1790,7 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 		WorkspaceID: options.WorkspaceID,
 		Speculative: options.Speculative,
 		Status:      models.ConfigurationPending,
-		CreatedBy:   caller.GetSubject(),
+		CreatedBy:   caller.GetActor(),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create configuration version", errors.WithSpan(span))
@@ -2550,7 +2550,7 @@ func (s *service) createOrUpdateWorkspaceRoleBinding(
 		created, cErr := s.dbClient.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(txContext, &models.WorkspaceRoleBinding{
 			WorkspaceID: workspace.Metadata.ID,
 			RoleID:      roleID,
-			CreatedBy:   caller.GetSubject(),
+			CreatedBy:   caller.GetActor(),
 		})
 		if cErr != nil {
 			return nil, errors.Wrap(cErr, "failed to create workspace role binding")

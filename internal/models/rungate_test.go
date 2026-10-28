@@ -183,7 +183,7 @@ func TestRunGate_Validate(t *testing.T) {
 			name: "valid overridden gate",
 			gate: valid(func(g *RunGate) {
 				g.Status = RunGateOverridden
-				g.OverriddenBy = ptr.String("admin@example.com")
+				g.OverriddenBy = &Actor{Subject: "admin@example.com"}
 				g.OverrideComment = ptr.String("bypassed for incident response")
 			}),
 		},
@@ -208,7 +208,7 @@ func TestRunGate_Validate(t *testing.T) {
 			name: "overriddenBy set on a non-overridden gate is invalid",
 			gate: valid(func(g *RunGate) {
 				g.Status = RunGateApproved
-				g.OverriddenBy = ptr.String("admin@example.com")
+				g.OverriddenBy = &Actor{Subject: "admin@example.com"}
 			}),
 			expectErrorCode: errors.EInvalid,
 		},
@@ -223,7 +223,7 @@ func TestRunGate_Validate(t *testing.T) {
 			name: "override comment too long is invalid",
 			gate: valid(func(g *RunGate) {
 				g.Status = RunGateOverridden
-				g.OverriddenBy = ptr.String("admin@example.com")
+				g.OverriddenBy = &Actor{Subject: "admin@example.com"}
 				long := make([]byte, maxOverrideCommentLength+1)
 				for i := range long {
 					long[i] = 'a'

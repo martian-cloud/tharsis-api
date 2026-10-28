@@ -117,7 +117,9 @@ function RunDetailsApplyStage(props: Props) {
                 }
                 status
                 errorMessage
-                triggeredBy
+                triggeredByActor {
+                    ...ActorDisplayFragment_actor
+                }
                 currentJob {
                   id
                   status
@@ -360,7 +362,7 @@ function RunDetailsApplyStage(props: Props) {
             {apply.currentJob?.cancelRequested && apply.status !== 'canceled' && <ForceCancelRunAlert fragmentRef={data} />}
             {apply.currentJob && <NoRunnerAlert fragmentRef={apply.currentJob} sx={{ mb: 2 }} />}
             {apply.currentJob && <OutdatedProtocolAlert fragmentRef={apply.currentJob} />}
-            <RunDetailsStageHeader stage="Apply" triggeredAt={apply.metadata.createdAt as string} triggeredBy={apply.triggeredBy} />
+            <RunDetailsStageHeader stage="Apply" triggeredAt={apply.metadata.createdAt as string} triggeredByActor={apply.triggeredByActor} />
             <RunDetailsStageStatusCard
                 icon={<StatusIcon sx={{ width: 32, height: 32, mr: 2 }} />}
                 title={`Apply ${applyStatusType.label}`}

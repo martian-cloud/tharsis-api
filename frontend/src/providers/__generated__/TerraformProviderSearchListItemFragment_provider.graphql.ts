@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9ae70c8a409b5da8ec9fc27a98ed59a8>>
+ * @generated SignedSource<<ff2ec3e46320a05074d7df76ca7f959b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -13,7 +13,9 @@ import { FragmentRefs } from "relay-runtime";
 export type TerraformProviderSearchListItemFragment_provider$data = {
   readonly id: string;
   readonly latestVersion: {
-    readonly createdBy: string;
+    readonly createdByActor: {
+      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    } | null | undefined;
     readonly metadata: {
       readonly createdAt: any;
     };
@@ -81,8 +83,17 @@ const node: ReaderFragment = {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "createdBy",
+          "concreteType": null,
+          "kind": "LinkedField",
+          "name": "createdByActor",
+          "plural": false,
+          "selections": [
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActorDisplayFragment_actor"
+            }
+          ],
           "storageKey": null
         },
         {
@@ -111,6 +122,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "26ea3a4f2864ab6574ec38f91abbff8a";
+(node as any).hash = "a38a73652cf75e65b947737f7bef31fe";
 
 export default node;

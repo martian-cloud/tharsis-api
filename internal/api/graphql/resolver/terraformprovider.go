@@ -148,7 +148,13 @@ func (r *TerraformProviderResolver) Private() bool {
 
 // CreatedBy resolver
 func (r *TerraformProviderResolver) CreatedBy() string {
-	return r.provider.CreatedBy
+	return r.provider.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *TerraformProviderResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.provider.CreatedBy)
 }
 
 // GroupPath resolver

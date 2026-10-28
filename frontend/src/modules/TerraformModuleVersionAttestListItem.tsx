@@ -1,8 +1,8 @@
-import { Box, Button, Stack, Tooltip, Typography } from "@mui/material"
+import { Box, Button, Stack, Typography } from "@mui/material"
 import DeleteIcon from '@mui/icons-material/CloseOutlined';
 import { useFragment } from "react-relay"
 import graphql from 'babel-plugin-relay/macro'
-import Gravatar from '../common/Gravatar'
+import ActorDisplay from '../common/ActorDisplay'
 import { ResponsiveRow } from '../common/ResponsiveTable'
 import Timestamp from '../common/Timestamp'
 import { TerraformModuleVersionAttestListItemFragment_module$key } from "./__generated__/TerraformModuleVersionAttestListItemFragment_module.graphql"
@@ -26,7 +26,9 @@ function TerraformModuleVersionAttestListItem({ fragmentRef, onOpenDataDialog, o
             metadata {
                 createdAt
             }
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
         }
     `, fragmentRef);
 
@@ -34,11 +36,7 @@ function TerraformModuleVersionAttestListItem({ fragmentRef, onOpenDataDialog, o
         <Box display="flex" alignItems="center" gap={0.5}>
             <Timestamp variant="body2" timestamp={data.metadata.createdAt as string} />
             <Typography variant="body2">by</Typography>
-            <Tooltip title={data.createdBy}>
-                <Box display="flex">
-                    <Gravatar width={20} height={20} email={data.createdBy} />
-                </Box>
-            </Tooltip>
+            <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={20} />
         </Box>
     );
 

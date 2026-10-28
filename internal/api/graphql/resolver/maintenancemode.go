@@ -25,7 +25,13 @@ func (r *MaintenanceModeResolver) Metadata() *MetadataResolver {
 
 // CreatedBy resolver
 func (r *MaintenanceModeResolver) CreatedBy() string {
-	return r.maintenanceMode.CreatedBy
+	return r.maintenanceMode.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *MaintenanceModeResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.maintenanceMode.CreatedBy)
 }
 
 func maintenanceModeQuery(ctx context.Context) (*MaintenanceModeResolver, error) {

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/commands"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -279,10 +278,10 @@ func (a *AssessmentScheduler) startWorkspaceAssessment(ctx context.Context, work
 	}
 
 	// Create the assessment run by invoking the command directly; the command processor
-	// owns its own transaction. Assessments are system-initiated, so the run's subject is
-	// the system caller and no caller is required on the context.
+	// owns its own transaction. Assessments are system-initiated, so the run's creator is
+	// the system actor and no caller is required on the context.
 	cmd := a.cmdFactory.NewCreateAssessmentRun(&commands.CreateAssessmentRunInput{
-		Subject:                 auth.System,
+		CreatedBy:               models.SystemActor(),
 		WorkspaceID:             workspace.Metadata.ID,
 		LatestAssessmentVersion: latestAssessmentVersion,
 		// Scheduler-triggered assessments run automatically and frequently, so suppress

@@ -411,14 +411,21 @@ func (x *DeleteRoleRequest) GetVersion() int64 {
 
 // Role defines a role within Tharsis.
 type Role struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	CreatedBy     string                 `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	Permissions   []string               `protobuf:"bytes,5,rep,name=permissions,proto3" json:"permissions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Name        string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in role.proto.
+	CreatedBy   string   `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	Permissions []string `protobuf:"bytes,5,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,6,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Role) Reset() {
@@ -472,6 +479,7 @@ func (x *Role) GetDescription() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in role.proto.
 func (x *Role) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -482,6 +490,13 @@ func (x *Role) GetCreatedBy() string {
 func (x *Role) GetPermissions() []string {
 	if x != nil {
 		return x.Permissions
+	}
+	return nil
+}
+
+func (x *Role) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
 	}
 	return nil
 }
@@ -544,7 +559,7 @@ var File_role_proto protoreflect.FileDescriptor
 const file_role_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"role.proto\x12\x1dmartiancloud.tharsis.api.role\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\"$\n" +
+	"role.proto\x12\x1dmartiancloud.tharsis.api.role\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\"$\n" +
 	"\x12GetRoleByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x90\x02\n" +
 	"\x0fGetRolesRequest\x12j\n" +
@@ -572,14 +587,15 @@ const file_role_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01B\n" +
 	"\n" +
-	"\b_version\"\xce\x01\n" +
+	"\b_version\"\xa3\x02\n" +
 	"\x04Role\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1d\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12!\n" +
 	"\n" +
-	"created_by\x18\x04 \x01(\tR\tcreatedBy\x12 \n" +
-	"\vpermissions\x18\x05 \x03(\tR\vpermissions\"\x99\x01\n" +
+	"created_by\x18\x04 \x01(\tB\x02\x18\x01R\tcreatedBy\x12 \n" +
+	"\vpermissions\x18\x05 \x03(\tR\vpermissions\x12O\n" +
+	"\x10created_by_actor\x18\x06 \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\"\x99\x01\n" +
 	"\x10GetRolesResponse\x129\n" +
 	"\x05roles\x18\x01 \x03(\v2#.martiancloud.tharsis.api.role.RoleR\x05roles\x12J\n" +
 	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo*Y\n" +
@@ -625,32 +641,34 @@ var file_role_proto_goTypes = []any{
 	(*GetRolesResponse)(nil),                // 8: martiancloud.tharsis.api.role.GetRolesResponse
 	(*PaginationOptions)(nil),               // 9: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*ResourceMetadata)(nil),                // 10: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                        // 11: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),                   // 12: google.protobuf.Empty
+	(*Actor)(nil),                           // 11: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                        // 12: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),                   // 13: google.protobuf.Empty
 }
 var file_role_proto_depIdxs = []int32{
 	9,  // 0: martiancloud.tharsis.api.role.GetRolesRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.role.GetRolesRequest.sort:type_name -> martiancloud.tharsis.api.role.RoleSortableField
 	10, // 2: martiancloud.tharsis.api.role.Role.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	7,  // 3: martiancloud.tharsis.api.role.GetRolesResponse.roles:type_name -> martiancloud.tharsis.api.role.Role
-	11, // 4: martiancloud.tharsis.api.role.GetRolesResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	1,  // 5: martiancloud.tharsis.api.role.Roles.GetRoleByID:input_type -> martiancloud.tharsis.api.role.GetRoleByIDRequest
-	2,  // 6: martiancloud.tharsis.api.role.Roles.GetRoles:input_type -> martiancloud.tharsis.api.role.GetRolesRequest
-	12, // 7: martiancloud.tharsis.api.role.Roles.GetAvailablePermissions:input_type -> google.protobuf.Empty
-	4,  // 8: martiancloud.tharsis.api.role.Roles.CreateRole:input_type -> martiancloud.tharsis.api.role.CreateRoleRequest
-	5,  // 9: martiancloud.tharsis.api.role.Roles.UpdateRole:input_type -> martiancloud.tharsis.api.role.UpdateRoleRequest
-	6,  // 10: martiancloud.tharsis.api.role.Roles.DeleteRole:input_type -> martiancloud.tharsis.api.role.DeleteRoleRequest
-	7,  // 11: martiancloud.tharsis.api.role.Roles.GetRoleByID:output_type -> martiancloud.tharsis.api.role.Role
-	8,  // 12: martiancloud.tharsis.api.role.Roles.GetRoles:output_type -> martiancloud.tharsis.api.role.GetRolesResponse
-	3,  // 13: martiancloud.tharsis.api.role.Roles.GetAvailablePermissions:output_type -> martiancloud.tharsis.api.role.GetAvailablePermissionsResponse
-	7,  // 14: martiancloud.tharsis.api.role.Roles.CreateRole:output_type -> martiancloud.tharsis.api.role.Role
-	7,  // 15: martiancloud.tharsis.api.role.Roles.UpdateRole:output_type -> martiancloud.tharsis.api.role.Role
-	12, // 16: martiancloud.tharsis.api.role.Roles.DeleteRole:output_type -> google.protobuf.Empty
-	11, // [11:17] is the sub-list for method output_type
-	5,  // [5:11] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	11, // 3: martiancloud.tharsis.api.role.Role.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	7,  // 4: martiancloud.tharsis.api.role.GetRolesResponse.roles:type_name -> martiancloud.tharsis.api.role.Role
+	12, // 5: martiancloud.tharsis.api.role.GetRolesResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	1,  // 6: martiancloud.tharsis.api.role.Roles.GetRoleByID:input_type -> martiancloud.tharsis.api.role.GetRoleByIDRequest
+	2,  // 7: martiancloud.tharsis.api.role.Roles.GetRoles:input_type -> martiancloud.tharsis.api.role.GetRolesRequest
+	13, // 8: martiancloud.tharsis.api.role.Roles.GetAvailablePermissions:input_type -> google.protobuf.Empty
+	4,  // 9: martiancloud.tharsis.api.role.Roles.CreateRole:input_type -> martiancloud.tharsis.api.role.CreateRoleRequest
+	5,  // 10: martiancloud.tharsis.api.role.Roles.UpdateRole:input_type -> martiancloud.tharsis.api.role.UpdateRoleRequest
+	6,  // 11: martiancloud.tharsis.api.role.Roles.DeleteRole:input_type -> martiancloud.tharsis.api.role.DeleteRoleRequest
+	7,  // 12: martiancloud.tharsis.api.role.Roles.GetRoleByID:output_type -> martiancloud.tharsis.api.role.Role
+	8,  // 13: martiancloud.tharsis.api.role.Roles.GetRoles:output_type -> martiancloud.tharsis.api.role.GetRolesResponse
+	3,  // 14: martiancloud.tharsis.api.role.Roles.GetAvailablePermissions:output_type -> martiancloud.tharsis.api.role.GetAvailablePermissionsResponse
+	7,  // 15: martiancloud.tharsis.api.role.Roles.CreateRole:output_type -> martiancloud.tharsis.api.role.Role
+	7,  // 16: martiancloud.tharsis.api.role.Roles.UpdateRole:output_type -> martiancloud.tharsis.api.role.Role
+	13, // 17: martiancloud.tharsis.api.role.Roles.DeleteRole:output_type -> google.protobuf.Empty
+	12, // [12:18] is the sub-list for method output_type
+	6,  // [6:12] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_role_proto_init() }
@@ -658,6 +676,7 @@ func file_role_proto_init() {
 	if File_role_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_role_proto_msgTypes[1].OneofWrappers = []any{}

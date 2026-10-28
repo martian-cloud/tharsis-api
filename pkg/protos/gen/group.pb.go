@@ -482,15 +482,22 @@ func (x *MigrateGroupRequest) GetNewParentId() string {
 
 // Group defines a container that houses resources within Tharsis.
 type Group struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	FullPath      string                 `protobuf:"bytes,4,opt,name=full_path,json=fullPath,proto3" json:"full_path,omitempty"`
-	CreatedBy     string                 `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	ParentId      string                 `protobuf:"bytes,6,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Name        string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	FullPath    string                 `protobuf:"bytes,4,opt,name=full_path,json=fullPath,proto3" json:"full_path,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in group.proto.
+	CreatedBy string `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	ParentId  string `protobuf:"bytes,6,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// groups created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,7,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Group) Reset() {
@@ -551,6 +558,7 @@ func (x *Group) GetFullPath() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in group.proto.
 func (x *Group) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -563,6 +571,13 @@ func (x *Group) GetParentId() string {
 		return x.ParentId
 	}
 	return ""
+}
+
+func (x *Group) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
 }
 
 // GetGroupsResponse is the paginated list of Groups.
@@ -622,7 +637,7 @@ var File_group_proto protoreflect.FileDescriptor
 
 const file_group_proto_rawDesc = "" +
 	"\n" +
-	"\vgroup.proto\x12\x1emartiancloud.tharsis.api.group\x1a\x0emetadata.proto\x1a\x0fnamespace.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\"%\n" +
+	"\vgroup.proto\x12\x1emartiancloud.tharsis.api.group\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x0fnamespace.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\"%\n" +
 	"\x13GetGroupByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xc3\x02\n" +
 	"\x10GetGroupsRequest\x12j\n" +
@@ -670,15 +685,16 @@ const file_group_proto_rawDesc = "" +
 	"\x13MigrateGroupRequest\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12'\n" +
 	"\rnew_parent_id\x18\x02 \x01(\tH\x00R\vnewParentId\x88\x01\x01B\x10\n" +
-	"\x0e_new_parent_id\"\xe7\x01\n" +
+	"\x0e_new_parent_id\"\xbc\x02\n" +
 	"\x05Group\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1b\n" +
-	"\tfull_path\x18\x04 \x01(\tR\bfullPath\x12\x1d\n" +
+	"\tfull_path\x18\x04 \x01(\tR\bfullPath\x12!\n" +
 	"\n" +
-	"created_by\x18\x05 \x01(\tR\tcreatedBy\x12\x1b\n" +
-	"\tparent_id\x18\x06 \x01(\tR\bparentId\"\x9e\x01\n" +
+	"created_by\x18\x05 \x01(\tB\x02\x18\x01R\tcreatedBy\x12\x1b\n" +
+	"\tparent_id\x18\x06 \x01(\tR\bparentId\x12O\n" +
+	"\x10created_by_actor\x18\a \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\"\x9e\x01\n" +
 	"\x11GetGroupsResponse\x12=\n" +
 	"\x06groups\x18\x01 \x03(\v2%.martiancloud.tharsis.api.group.GroupR\x06groups\x12J\n" +
 	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo*\x8f\x01\n" +
@@ -725,8 +741,9 @@ var file_group_proto_goTypes = []any{
 	(*NamespaceDriftDetectionEnabledInput)(nil), // 10: martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
 	(*NamespaceProviderMirrorEnabledInput)(nil), // 11: martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
 	(*ResourceMetadata)(nil),                    // 12: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                            // 13: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),                       // 14: google.protobuf.Empty
+	(*Actor)(nil),                               // 13: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                            // 14: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),                       // 15: google.protobuf.Empty
 }
 var file_group_proto_depIdxs = []int32{
 	9,  // 0: martiancloud.tharsis.api.group.GetGroupsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
@@ -736,25 +753,26 @@ var file_group_proto_depIdxs = []int32{
 	10, // 4: martiancloud.tharsis.api.group.UpdateGroupRequest.drift_detection_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
 	11, // 5: martiancloud.tharsis.api.group.UpdateGroupRequest.provider_mirror_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
 	12, // 6: martiancloud.tharsis.api.group.Group.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	7,  // 7: martiancloud.tharsis.api.group.GetGroupsResponse.groups:type_name -> martiancloud.tharsis.api.group.Group
-	13, // 8: martiancloud.tharsis.api.group.GetGroupsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	1,  // 9: martiancloud.tharsis.api.group.Groups.GetGroupByID:input_type -> martiancloud.tharsis.api.group.GetGroupByIDRequest
-	2,  // 10: martiancloud.tharsis.api.group.Groups.GetGroups:input_type -> martiancloud.tharsis.api.group.GetGroupsRequest
-	3,  // 11: martiancloud.tharsis.api.group.Groups.CreateGroup:input_type -> martiancloud.tharsis.api.group.CreateGroupRequest
-	4,  // 12: martiancloud.tharsis.api.group.Groups.UpdateGroup:input_type -> martiancloud.tharsis.api.group.UpdateGroupRequest
-	5,  // 13: martiancloud.tharsis.api.group.Groups.DeleteGroup:input_type -> martiancloud.tharsis.api.group.DeleteGroupRequest
-	6,  // 14: martiancloud.tharsis.api.group.Groups.MigrateGroup:input_type -> martiancloud.tharsis.api.group.MigrateGroupRequest
-	7,  // 15: martiancloud.tharsis.api.group.Groups.GetGroupByID:output_type -> martiancloud.tharsis.api.group.Group
-	8,  // 16: martiancloud.tharsis.api.group.Groups.GetGroups:output_type -> martiancloud.tharsis.api.group.GetGroupsResponse
-	7,  // 17: martiancloud.tharsis.api.group.Groups.CreateGroup:output_type -> martiancloud.tharsis.api.group.Group
-	7,  // 18: martiancloud.tharsis.api.group.Groups.UpdateGroup:output_type -> martiancloud.tharsis.api.group.Group
-	14, // 19: martiancloud.tharsis.api.group.Groups.DeleteGroup:output_type -> google.protobuf.Empty
-	7,  // 20: martiancloud.tharsis.api.group.Groups.MigrateGroup:output_type -> martiancloud.tharsis.api.group.Group
-	15, // [15:21] is the sub-list for method output_type
-	9,  // [9:15] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	13, // 7: martiancloud.tharsis.api.group.Group.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	7,  // 8: martiancloud.tharsis.api.group.GetGroupsResponse.groups:type_name -> martiancloud.tharsis.api.group.Group
+	14, // 9: martiancloud.tharsis.api.group.GetGroupsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	1,  // 10: martiancloud.tharsis.api.group.Groups.GetGroupByID:input_type -> martiancloud.tharsis.api.group.GetGroupByIDRequest
+	2,  // 11: martiancloud.tharsis.api.group.Groups.GetGroups:input_type -> martiancloud.tharsis.api.group.GetGroupsRequest
+	3,  // 12: martiancloud.tharsis.api.group.Groups.CreateGroup:input_type -> martiancloud.tharsis.api.group.CreateGroupRequest
+	4,  // 13: martiancloud.tharsis.api.group.Groups.UpdateGroup:input_type -> martiancloud.tharsis.api.group.UpdateGroupRequest
+	5,  // 14: martiancloud.tharsis.api.group.Groups.DeleteGroup:input_type -> martiancloud.tharsis.api.group.DeleteGroupRequest
+	6,  // 15: martiancloud.tharsis.api.group.Groups.MigrateGroup:input_type -> martiancloud.tharsis.api.group.MigrateGroupRequest
+	7,  // 16: martiancloud.tharsis.api.group.Groups.GetGroupByID:output_type -> martiancloud.tharsis.api.group.Group
+	8,  // 17: martiancloud.tharsis.api.group.Groups.GetGroups:output_type -> martiancloud.tharsis.api.group.GetGroupsResponse
+	7,  // 18: martiancloud.tharsis.api.group.Groups.CreateGroup:output_type -> martiancloud.tharsis.api.group.Group
+	7,  // 19: martiancloud.tharsis.api.group.Groups.UpdateGroup:output_type -> martiancloud.tharsis.api.group.Group
+	15, // 20: martiancloud.tharsis.api.group.Groups.DeleteGroup:output_type -> google.protobuf.Empty
+	7,  // 21: martiancloud.tharsis.api.group.Groups.MigrateGroup:output_type -> martiancloud.tharsis.api.group.Group
+	16, // [16:22] is the sub-list for method output_type
+	10, // [10:16] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_group_proto_init() }
@@ -762,6 +780,7 @@ func file_group_proto_init() {
 	if File_group_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_namespace_proto_init()
 	file_pagination_proto_init()

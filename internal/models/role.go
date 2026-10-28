@@ -16,7 +16,7 @@ var _ Model = (*Role)(nil)
 type Role struct {
 	Name        string
 	Description string
-	CreatedBy   string
+	CreatedBy   Actor
 	permissions []Permission
 	Metadata    ResourceMetadata
 	// SortOrder is a fixed display position used to order default roles ahead of custom roles

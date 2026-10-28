@@ -753,13 +753,20 @@ func (x *SetWorkspaceRoleBindingRequest) GetRoleId() string {
 // WorkspaceRoleBinding confers a Role on a workspace: the role's permissions become available to the
 // workspace's job caller at the workspace's DIRECT PARENT namespace.
 type WorkspaceRoleBinding struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	RoleId        string                 `protobuf:"bytes,3,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
-	CreatedBy     string                 `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	WorkspaceId string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	RoleId      string                 `protobuf:"bytes,3,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in workspace.proto.
+	CreatedBy string `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,5,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *WorkspaceRoleBinding) Reset() {
@@ -813,11 +820,19 @@ func (x *WorkspaceRoleBinding) GetRoleId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in workspace.proto.
 func (x *WorkspaceRoleBinding) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
 	}
 	return ""
+}
+
+func (x *WorkspaceRoleBinding) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
 }
 
 // SubscribeToWorkspaceEventsRequest is the input for subscribing to workspace events.
@@ -867,20 +882,27 @@ func (x *SubscribeToWorkspaceEventsRequest) GetWorkspaceId() string {
 
 // Workspace defines a container for Terraform state and configuration.
 type Workspace struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	Metadata              *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Name                  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description           string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	GroupId               string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	FullPath              string                 `protobuf:"bytes,5,opt,name=full_path,json=fullPath,proto3" json:"full_path,omitempty"`
-	CreatedBy             string                 `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	Locked                bool                   `protobuf:"varint,7,opt,name=locked,proto3" json:"locked,omitempty"`
-	DirtyState            bool                   `protobuf:"varint,8,opt,name=dirty_state,json=dirtyState,proto3" json:"dirty_state,omitempty"`
-	CurrentJobId          string                 `protobuf:"bytes,9,opt,name=current_job_id,json=currentJobId,proto3" json:"current_job_id,omitempty"`
-	CurrentStateVersionId string                 `protobuf:"bytes,10,opt,name=current_state_version_id,json=currentStateVersionId,proto3" json:"current_state_version_id,omitempty"`
-	Labels                map[string]string      `protobuf:"bytes,11,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Name        string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	GroupId     string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	FullPath    string                 `protobuf:"bytes,5,opt,name=full_path,json=fullPath,proto3" json:"full_path,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in workspace.proto.
+	CreatedBy             string            `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	Locked                bool              `protobuf:"varint,7,opt,name=locked,proto3" json:"locked,omitempty"`
+	DirtyState            bool              `protobuf:"varint,8,opt,name=dirty_state,json=dirtyState,proto3" json:"dirty_state,omitempty"`
+	CurrentJobId          string            `protobuf:"bytes,9,opt,name=current_job_id,json=currentJobId,proto3" json:"current_job_id,omitempty"`
+	CurrentStateVersionId string            `protobuf:"bytes,10,opt,name=current_state_version_id,json=currentStateVersionId,proto3" json:"current_state_version_id,omitempty"`
+	Labels                map[string]string `protobuf:"bytes,11,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,12,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Workspace) Reset() {
@@ -948,6 +970,7 @@ func (x *Workspace) GetFullPath() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in workspace.proto.
 func (x *Workspace) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -986,6 +1009,13 @@ func (x *Workspace) GetCurrentStateVersionId() string {
 func (x *Workspace) GetLabels() map[string]string {
 	if x != nil {
 		return x.Labels
+	}
+	return nil
+}
+
+func (x *Workspace) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
 	}
 	return nil
 }
@@ -1100,7 +1130,7 @@ var File_workspace_proto protoreflect.FileDescriptor
 
 const file_workspace_proto_rawDesc = "" +
 	"\n" +
-	"\x0fworkspace.proto\x12\"martiancloud.tharsis.api.workspace\x1a\x0emetadata.proto\x1a\x0fnamespace.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\")\n" +
+	"\x0fworkspace.proto\x12\"martiancloud.tharsis.api.workspace\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x0fnamespace.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\")\n" +
 	"\x17GetWorkspaceByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xa4\x05\n" +
 	"\x14GetWorkspacesRequest\x12j\n" +
@@ -1186,30 +1216,32 @@ const file_workspace_proto_rawDesc = "" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1c\n" +
 	"\arole_id\x18\x02 \x01(\tH\x00R\x06roleId\x88\x01\x01B\n" +
 	"\n" +
-	"\b_role_id\"\xc2\x01\n" +
+	"\b_role_id\"\x97\x02\n" +
 	"\x14WorkspaceRoleBinding\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x17\n" +
-	"\arole_id\x18\x03 \x01(\tR\x06roleId\x12\x1d\n" +
+	"\arole_id\x18\x03 \x01(\tR\x06roleId\x12!\n" +
 	"\n" +
-	"created_by\x18\x04 \x01(\tR\tcreatedBy\"F\n" +
+	"created_by\x18\x04 \x01(\tB\x02\x18\x01R\tcreatedBy\x12O\n" +
+	"\x10created_by_actor\x18\x05 \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\"F\n" +
 	"!SubscribeToWorkspaceEventsRequest\x12!\n" +
-	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"\x8f\x04\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"\xe4\x04\n" +
 	"\tWorkspace\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x19\n" +
 	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12\x1b\n" +
-	"\tfull_path\x18\x05 \x01(\tR\bfullPath\x12\x1d\n" +
+	"\tfull_path\x18\x05 \x01(\tR\bfullPath\x12!\n" +
 	"\n" +
-	"created_by\x18\x06 \x01(\tR\tcreatedBy\x12\x16\n" +
+	"created_by\x18\x06 \x01(\tB\x02\x18\x01R\tcreatedBy\x12\x16\n" +
 	"\x06locked\x18\a \x01(\bR\x06locked\x12\x1f\n" +
 	"\vdirty_state\x18\b \x01(\bR\n" +
 	"dirtyState\x12$\n" +
 	"\x0ecurrent_job_id\x18\t \x01(\tR\fcurrentJobId\x127\n" +
 	"\x18current_state_version_id\x18\n" +
 	" \x01(\tR\x15currentStateVersionId\x12Q\n" +
-	"\x06labels\x18\v \x03(\v29.martiancloud.tharsis.api.workspace.Workspace.LabelsEntryR\x06labels\x1a9\n" +
+	"\x06labels\x18\v \x03(\v29.martiancloud.tharsis.api.workspace.Workspace.LabelsEntryR\x06labels\x12O\n" +
+	"\x10created_by_actor\x18\f \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb2\x01\n" +
@@ -1280,8 +1312,9 @@ var file_workspace_proto_goTypes = []any{
 	(*NamespaceDriftDetectionEnabledInput)(nil),         // 22: martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
 	(*NamespaceProviderMirrorEnabledInput)(nil),         // 23: martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
 	(*ResourceMetadata)(nil),                            // 24: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                                    // 25: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),                               // 26: google.protobuf.Empty
+	(*Actor)(nil),                                       // 25: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                                    // 26: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),                               // 27: google.protobuf.Empty
 }
 var file_workspace_proto_depIdxs = []int32{
 	20, // 0: martiancloud.tharsis.api.workspace.GetWorkspacesRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
@@ -1296,38 +1329,40 @@ var file_workspace_proto_depIdxs = []int32{
 	18, // 9: martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.labels:type_name -> martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.LabelsEntry
 	23, // 10: martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.provider_mirror_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
 	24, // 11: martiancloud.tharsis.api.workspace.WorkspaceRoleBinding.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	24, // 12: martiancloud.tharsis.api.workspace.Workspace.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	19, // 13: martiancloud.tharsis.api.workspace.Workspace.labels:type_name -> martiancloud.tharsis.api.workspace.Workspace.LabelsEntry
-	13, // 14: martiancloud.tharsis.api.workspace.GetWorkspacesResponse.workspaces:type_name -> martiancloud.tharsis.api.workspace.Workspace
-	25, // 15: martiancloud.tharsis.api.workspace.GetWorkspacesResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	13, // 16: martiancloud.tharsis.api.workspace.WorkspaceEvent.workspace:type_name -> martiancloud.tharsis.api.workspace.Workspace
-	1,  // 17: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceByID:input_type -> martiancloud.tharsis.api.workspace.GetWorkspaceByIDRequest
-	2,  // 18: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaces:input_type -> martiancloud.tharsis.api.workspace.GetWorkspacesRequest
-	3,  // 19: martiancloud.tharsis.api.workspace.Workspaces.CreateWorkspace:input_type -> martiancloud.tharsis.api.workspace.CreateWorkspaceRequest
-	4,  // 20: martiancloud.tharsis.api.workspace.Workspaces.UpdateWorkspace:input_type -> martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest
-	5,  // 21: martiancloud.tharsis.api.workspace.Workspaces.DeleteWorkspace:input_type -> martiancloud.tharsis.api.workspace.DeleteWorkspaceRequest
-	6,  // 22: martiancloud.tharsis.api.workspace.Workspaces.LockWorkspace:input_type -> martiancloud.tharsis.api.workspace.LockWorkspaceRequest
-	7,  // 23: martiancloud.tharsis.api.workspace.Workspaces.UnlockWorkspace:input_type -> martiancloud.tharsis.api.workspace.UnlockWorkspaceRequest
-	8,  // 24: martiancloud.tharsis.api.workspace.Workspaces.MigrateWorkspace:input_type -> martiancloud.tharsis.api.workspace.MigrateWorkspaceRequest
-	9,  // 25: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceRoleBindingByWorkspaceID:input_type -> martiancloud.tharsis.api.workspace.GetWorkspaceRoleBindingByWorkspaceIDRequest
-	10, // 26: martiancloud.tharsis.api.workspace.Workspaces.SetWorkspaceRoleBinding:input_type -> martiancloud.tharsis.api.workspace.SetWorkspaceRoleBindingRequest
-	12, // 27: martiancloud.tharsis.api.workspace.Workspaces.SubscribeToWorkspaceEvents:input_type -> martiancloud.tharsis.api.workspace.SubscribeToWorkspaceEventsRequest
-	13, // 28: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceByID:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	14, // 29: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaces:output_type -> martiancloud.tharsis.api.workspace.GetWorkspacesResponse
-	13, // 30: martiancloud.tharsis.api.workspace.Workspaces.CreateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	13, // 31: martiancloud.tharsis.api.workspace.Workspaces.UpdateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	26, // 32: martiancloud.tharsis.api.workspace.Workspaces.DeleteWorkspace:output_type -> google.protobuf.Empty
-	13, // 33: martiancloud.tharsis.api.workspace.Workspaces.LockWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	13, // 34: martiancloud.tharsis.api.workspace.Workspaces.UnlockWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	13, // 35: martiancloud.tharsis.api.workspace.Workspaces.MigrateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	11, // 36: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceRoleBindingByWorkspaceID:output_type -> martiancloud.tharsis.api.workspace.WorkspaceRoleBinding
-	11, // 37: martiancloud.tharsis.api.workspace.Workspaces.SetWorkspaceRoleBinding:output_type -> martiancloud.tharsis.api.workspace.WorkspaceRoleBinding
-	15, // 38: martiancloud.tharsis.api.workspace.Workspaces.SubscribeToWorkspaceEvents:output_type -> martiancloud.tharsis.api.workspace.WorkspaceEvent
-	28, // [28:39] is the sub-list for method output_type
-	17, // [17:28] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	25, // 12: martiancloud.tharsis.api.workspace.WorkspaceRoleBinding.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	24, // 13: martiancloud.tharsis.api.workspace.Workspace.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	19, // 14: martiancloud.tharsis.api.workspace.Workspace.labels:type_name -> martiancloud.tharsis.api.workspace.Workspace.LabelsEntry
+	25, // 15: martiancloud.tharsis.api.workspace.Workspace.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	13, // 16: martiancloud.tharsis.api.workspace.GetWorkspacesResponse.workspaces:type_name -> martiancloud.tharsis.api.workspace.Workspace
+	26, // 17: martiancloud.tharsis.api.workspace.GetWorkspacesResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	13, // 18: martiancloud.tharsis.api.workspace.WorkspaceEvent.workspace:type_name -> martiancloud.tharsis.api.workspace.Workspace
+	1,  // 19: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceByID:input_type -> martiancloud.tharsis.api.workspace.GetWorkspaceByIDRequest
+	2,  // 20: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaces:input_type -> martiancloud.tharsis.api.workspace.GetWorkspacesRequest
+	3,  // 21: martiancloud.tharsis.api.workspace.Workspaces.CreateWorkspace:input_type -> martiancloud.tharsis.api.workspace.CreateWorkspaceRequest
+	4,  // 22: martiancloud.tharsis.api.workspace.Workspaces.UpdateWorkspace:input_type -> martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest
+	5,  // 23: martiancloud.tharsis.api.workspace.Workspaces.DeleteWorkspace:input_type -> martiancloud.tharsis.api.workspace.DeleteWorkspaceRequest
+	6,  // 24: martiancloud.tharsis.api.workspace.Workspaces.LockWorkspace:input_type -> martiancloud.tharsis.api.workspace.LockWorkspaceRequest
+	7,  // 25: martiancloud.tharsis.api.workspace.Workspaces.UnlockWorkspace:input_type -> martiancloud.tharsis.api.workspace.UnlockWorkspaceRequest
+	8,  // 26: martiancloud.tharsis.api.workspace.Workspaces.MigrateWorkspace:input_type -> martiancloud.tharsis.api.workspace.MigrateWorkspaceRequest
+	9,  // 27: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceRoleBindingByWorkspaceID:input_type -> martiancloud.tharsis.api.workspace.GetWorkspaceRoleBindingByWorkspaceIDRequest
+	10, // 28: martiancloud.tharsis.api.workspace.Workspaces.SetWorkspaceRoleBinding:input_type -> martiancloud.tharsis.api.workspace.SetWorkspaceRoleBindingRequest
+	12, // 29: martiancloud.tharsis.api.workspace.Workspaces.SubscribeToWorkspaceEvents:input_type -> martiancloud.tharsis.api.workspace.SubscribeToWorkspaceEventsRequest
+	13, // 30: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceByID:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	14, // 31: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaces:output_type -> martiancloud.tharsis.api.workspace.GetWorkspacesResponse
+	13, // 32: martiancloud.tharsis.api.workspace.Workspaces.CreateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	13, // 33: martiancloud.tharsis.api.workspace.Workspaces.UpdateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	27, // 34: martiancloud.tharsis.api.workspace.Workspaces.DeleteWorkspace:output_type -> google.protobuf.Empty
+	13, // 35: martiancloud.tharsis.api.workspace.Workspaces.LockWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	13, // 36: martiancloud.tharsis.api.workspace.Workspaces.UnlockWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	13, // 37: martiancloud.tharsis.api.workspace.Workspaces.MigrateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	11, // 38: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceRoleBindingByWorkspaceID:output_type -> martiancloud.tharsis.api.workspace.WorkspaceRoleBinding
+	11, // 39: martiancloud.tharsis.api.workspace.Workspaces.SetWorkspaceRoleBinding:output_type -> martiancloud.tharsis.api.workspace.WorkspaceRoleBinding
+	15, // 40: martiancloud.tharsis.api.workspace.Workspaces.SubscribeToWorkspaceEvents:output_type -> martiancloud.tharsis.api.workspace.WorkspaceEvent
+	30, // [30:41] is the sub-list for method output_type
+	19, // [19:30] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_workspace_proto_init() }
@@ -1335,6 +1370,7 @@ func file_workspace_proto_init() {
 	if File_workspace_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_namespace_proto_init()
 	file_pagination_proto_init()

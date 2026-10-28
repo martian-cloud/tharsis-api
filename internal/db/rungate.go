@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -99,13 +100,13 @@ type runGates struct {
 }
 
 var runGateFieldList = append(metadataFieldList,
+	"overridden_by", "overridden_by_actor_type", "overridden_by_actor_id", "overridden_by_actor_trn",
 	"run_id",
 	"workspace_id",
 	"policy_check_id",
 	"type",
 	"approval_rules",
 	"status",
-	"overridden_by",
 	"override_comment",
 )
 
@@ -417,6 +418,11 @@ func (m *runGates) UpdateRunGate(ctx context.Context, gate *models.RunGate) (*mo
 	ctx, span := tracer.Start(ctx, "db.UpdateRunGate")
 	defer span.End()
 
+	overriddenBy, overriddenByActorType, overriddenByActorID, overriddenByActorTRN, err := optionalActorColumns(gate.OverriddenBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get overridden by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("rungate.UpdateRunGate", dialect.From("run_gates").
@@ -429,8 +435,11 @@ func (m *runGates) UpdateRunGate(ctx context.Context, gate *models.RunGate) (*mo
 					"status":     gate.Status,
 					// Written on every update, not just the override path. Callers update a gate they
 					// read fresh from the DB, so an already-recorded override round-trips unchanged.
-					"overridden_by":    gate.OverriddenBy,
-					"override_comment": gate.OverrideComment,
+					"overridden_by":            overriddenBy,
+					"overridden_by_actor_type": overriddenByActorType,
+					"overridden_by_actor_id":   overriddenByActorID,
+					"overridden_by_actor_trn":  overriddenByActorTRN,
+					"override_comment":         gate.OverrideComment,
 				}).
 				Where(goqu.Ex{"id": gate.Metadata.ID, "version": gate.Metadata.Version}).
 				Returning("*"),
@@ -519,19 +528,23 @@ func scanRunGate(row scanner) (*models.RunGate, error) {
 
 	var approvalRules []byte
 	var workspacePath string
+	var overriddenBy, overriddenByActorType, overriddenByActorID, overriddenByActorTRN sql.NullString
 
 	fields := []interface{}{
 		&gate.Metadata.ID,
 		&gate.Metadata.CreationTimestamp,
 		&gate.Metadata.LastUpdatedTimestamp,
 		&gate.Metadata.Version,
+		&overriddenBy,
+		&overriddenByActorType,
+		&overriddenByActorID,
+		&overriddenByActorTRN,
 		&gate.RunID,
 		&gate.WorkspaceID,
 		&gate.PolicyCheckID,
 		&gate.Type,
 		&approvalRules,
 		&gate.Status,
-		&gate.OverriddenBy,
 		&gate.OverrideComment,
 		&workspacePath,
 	}
@@ -539,6 +552,8 @@ func scanRunGate(row scanner) (*models.RunGate, error) {
 	if err := row.Scan(fields...); err != nil {
 		return nil, err
 	}
+
+	gate.OverriddenBy = scanOptionalActor(overriddenBy, overriddenByActorType, overriddenByActorID, overriddenByActorTRN)
 
 	if len(approvalRules) > 0 {
 		if err := json.Unmarshal(approvalRules, &gate.ApprovalRules); err != nil {

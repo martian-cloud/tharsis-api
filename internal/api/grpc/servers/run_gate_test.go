@@ -56,7 +56,7 @@ func TestToPBRunGate_Override(t *testing.T) {
 	by, comment := "admin@example.com", "hotfix"
 	gate := &models.RunGate{
 		Status:          models.RunGateOverridden,
-		OverriddenBy:    &by,
+		OverriddenBy:    new(models.NewUserActor(testActorID).WithSubject(by)),
 		OverrideComment: &comment,
 		Metadata:        models.ResourceMetadata{ID: "gate-1", CreationTimestamp: &now, LastUpdatedTimestamp: &now},
 	}
@@ -65,6 +65,9 @@ func TestToPBRunGate_Override(t *testing.T) {
 
 	require.NotNil(t, pbGate.OverriddenBy)
 	assert.Equal(t, by, *pbGate.OverriddenBy)
+	require.NotNil(t, pbGate.OverriddenByActor)
+	require.NotNil(t, pbGate.OverriddenByActor.GetUser())
+	assert.Equal(t, gid.ToGlobalID(types.UserModelType, testActorID), pbGate.OverriddenByActor.GetUser().GetPrincipalId())
 	assert.Equal(t, comment, pbGate.OverrideComment)
 }
 

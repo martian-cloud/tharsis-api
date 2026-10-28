@@ -103,7 +103,8 @@ type ManagedIdentity implements Node {
   description: String!
   group: Group!
   data: String!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   aliasSourceId: String
   aliasSource: ManagedIdentity
   isAlias: Boolean!

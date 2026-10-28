@@ -4,7 +4,7 @@ import graphql from 'babel-plugin-relay/macro';
 import { Suspense, useState } from 'react';
 import { useLazyLoadQuery } from 'react-relay/hooks';
 import { useParams } from 'react-router-dom';
-import Gravatar from '../../../common/Gravatar';
+import ActorDisplay from '../../../common/ActorDisplay';
 import { JobIcon } from '../../../common/Icons';
 import NamespaceBreadcrumbs from '../../../namespace/NamespaceBreadcrumbs';
 import Timestamp from '../../../common/Timestamp';
@@ -44,7 +44,9 @@ const jobDetailsQuery = graphql`
                 }
                 run {
                     id
-                    createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     status
                     hasAdvisoryFailures
                     workspace {
@@ -100,7 +102,7 @@ function JobDetailsContent({ jobId }: { jobId: string }) {
 
     const workspacePath = job.workspace?.fullPath ?? '';
     const onToggleSidebar = () => setSidebarOpen(prev => !prev);
-    const createdBy = job.run?.createdBy;
+    const createdByActor = job.run?.createdByActor;
 
     return (
         <Box>
@@ -146,10 +148,9 @@ function JobDetailsContent({ jobId }: { jobId: string }) {
                             <Typography variant="body2" component="div" color="textSecondary">
                                 Triggered{' '}
                                 <Timestamp variant="body2" component="span" color="textSecondary" timestamp={job.metadata.createdAt} />
-                                {createdBy && <>
+                                {createdByActor && <>
                                     {' '}by{' '}
-                                    <Gravatar sx={{ display: 'inline-block', verticalAlign: 'middle', mr: 0.5 }} width={18} height={18} email={createdBy} />
-                                    {createdBy}
+                                    <ActorDisplay fragmentRef={createdByActor} variant="inline" size={18} />
                                 </>}
                             </Typography>
                         </Box>

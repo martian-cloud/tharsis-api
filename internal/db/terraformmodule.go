@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -115,7 +116,7 @@ type terraformModules struct {
 	dbClient *Client
 }
 
-var moduleFieldList = append(metadataFieldList, "group_id", "root_group_id", "name", "system", "private", "repo_url", "created_by", "labels")
+var moduleFieldList = append(metadataAndCreatedByFieldList, "group_id", "root_group_id", "name", "system", "private", "repo_url", "labels")
 
 // NewTerraformModules returns an instance of the TerraformModules interface
 func NewTerraformModules(dbClient *Client) TerraformModules {
@@ -265,6 +266,11 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(module.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	labelsJSON, labelsErr := json.Marshal(module.Labels)
@@ -277,18 +283,21 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 		With("terraform_modules",
 			dialect.Insert("terraform_modules").
 				Rows(goqu.Record{
-					"id":            newResourceID(),
-					"version":       initialResourceVersion,
-					"created_at":    timestamp,
-					"updated_at":    timestamp,
-					"group_id":      module.GroupID,
-					"root_group_id": module.RootGroupID,
-					"name":          module.Name,
-					"system":        module.System,
-					"private":       module.Private,
-					"repo_url":      module.RepositoryURL,
-					"created_by":    module.CreatedBy,
-					"labels":        labelsJSON,
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"group_id":              module.GroupID,
+					"root_group_id":         module.RootGroupID,
+					"name":                  module.Name,
+					"system":                module.System,
+					"private":               module.Private,
+					"repo_url":              module.RepositoryURL,
+					"created_by":            module.CreatedBy.Subject,
+					"created_by_actor_type": createdByActorType,
+					"created_by_actor_id":   createdByActorID,
+					"created_by_actor_trn":  createdByActorTRN,
+					"labels":                labelsJSON,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})))
@@ -433,6 +442,7 @@ func (t *terraformModules) getSelectFields() []interface{} {
 }
 
 func scanTerraformModule(row scanner) (*models.TerraformModule, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var groupPath string
 	var labelsJSON []byte
 	module := &models.TerraformModule{}
@@ -442,13 +452,16 @@ func scanTerraformModule(row scanner) (*models.TerraformModule, error) {
 		&module.Metadata.CreationTimestamp,
 		&module.Metadata.LastUpdatedTimestamp,
 		&module.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&module.GroupID,
 		&module.RootGroupID,
 		&module.Name,
 		&module.System,
 		&module.Private,
 		&module.RepositoryURL,
-		&module.CreatedBy,
 		&labelsJSON,
 		&groupPath,
 	}
@@ -457,6 +470,9 @@ func scanTerraformModule(row scanner) (*models.TerraformModule, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	module.CreatedBy = parsedActor
 
 	if len(labelsJSON) > 0 {
 		if err := json.Unmarshal(labelsJSON, &module.Labels); err != nil {

@@ -26,7 +26,13 @@ func (r *WorkspaceVCSProviderLinkResolver) ID() graphql.ID {
 
 // CreatedBy resolver
 func (r *WorkspaceVCSProviderLinkResolver) CreatedBy() string {
-	return r.workspaceVCSProviderLink.CreatedBy
+	return r.workspaceVCSProviderLink.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *WorkspaceVCSProviderLinkResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.workspaceVCSProviderLink.CreatedBy)
 }
 
 // Workspace resolver

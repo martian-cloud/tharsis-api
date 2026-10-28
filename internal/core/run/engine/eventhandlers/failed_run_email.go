@@ -3,7 +3,6 @@ package eventhandlers
 import (
 	"context"
 	"regexp"
-	"strings"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -73,16 +72,17 @@ func (h *FailedRunEmailHandler) sendFailureEmail(ctx context.Context, run *model
 		return errors.New("workspace %s not found for run %s", run.WorkspaceID, run.Metadata.ID)
 	}
 
-	// If the run was created by a user, resolve the created-by email to a user ID so
-	// the creator is included as a participant (notification matching is by user ID).
+	// If the run was created by a user, resolve them to a user ID so the creator is
+	// included as a participant (notification matching is by user ID). The actor
+	// backfill typed every user subject, so a user actor is never untyped.
 	participantIDs := []string{}
-	if strings.Contains(run.CreatedBy, "@") {
-		user, uErr := h.dbClient.Users.GetUserByEmail(ctx, run.CreatedBy)
+	if run.CreatedBy.Type == models.ActorTypeUser {
+		user, uErr := h.dbClient.Users.GetUserByID(ctx, run.CreatedBy.ID)
 		switch {
 		case uErr != nil:
 			// A failure to resolve the creator shouldn't suppress notifications to
 			// every other subscriber; log it and continue without the creator.
-			h.logger.WithContextFields(ctx).Errorf("failed to get user by email %s for run %s; continuing without the creator as a participant: %v", run.CreatedBy, run.Metadata.ID, uErr)
+			h.logger.WithContextFields(ctx).Errorf("failed to get user %s for run %s; continuing without the creator as a participant: %v", run.CreatedBy.ID, run.Metadata.ID, uErr)
 		case user != nil:
 			participantIDs = append(participantIDs, user.Metadata.ID)
 		}
@@ -129,7 +129,7 @@ func (h *FailedRunEmailHandler) sendFailureEmail(ctx context.Context, run *model
 			Title:         cases.Title(language.English, cases.Compact).String(subject),
 			ModuleSource:  run.ModuleSource,
 			ModuleVersion: run.ModuleVersion,
-			CreatedBy:     run.CreatedBy,
+			CreatedBy:     run.CreatedBy.Subject,
 			ErrorMessage:  errorMessage,
 			RunID:         run.GetGlobalID(),
 			RunStage:      stage,

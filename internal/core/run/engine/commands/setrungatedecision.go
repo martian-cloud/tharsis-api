@@ -105,7 +105,7 @@ func (c *SetRunGateDecision) executeDecision(ctx context.Context, gate *models.R
 	}
 
 	// Resolve the caller's principal FK for the approval row (nullable so a later deletion is
-	// tolerated); CreatedBy always carries the subject string.
+	// tolerated); CreatedBy separately records the caller's typed actor.
 	var userID, serviceAccountID *string
 	if err = auth.HandleCaller(
 		ctx,
@@ -158,7 +158,7 @@ func (c *SetRunGateDecision) executeDecision(ctx context.Context, gate *models.R
 			RunGateID:        gate.Metadata.ID,
 			UserID:           userID,
 			ServiceAccountID: serviceAccountID,
-			CreatedBy:        c.in.Caller.GetSubject(),
+			CreatedBy:        c.in.Caller.GetActor(),
 			Decision:         modelDecision,
 			Comment:          c.in.Comment,
 			CoveredRules:     coveredRules,
@@ -220,8 +220,7 @@ func (c *SetRunGateDecision) executeOverride(ctx context.Context, gate *models.R
 
 	// Record who bypassed the approvals and why. Unlike approve/reject, an override writes no
 	// approval row, so the gate itself is the only durable trace of the decision.
-	subject := c.in.Caller.GetSubject()
-	gate.OverriddenBy = &subject
+	gate.OverriddenBy = new(c.in.Caller.GetActor())
 	gate.OverrideComment = c.in.Comment
 	gate.Status = models.RunGateOverridden
 

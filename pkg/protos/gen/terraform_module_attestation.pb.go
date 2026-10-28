@@ -349,18 +349,25 @@ func (x *DeleteTerraformModuleAttestationRequest) GetId() string {
 
 // TerraformModuleAttestation represents an attestation for a Terraform module.
 type TerraformModuleAttestation struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	CreatedBy     string                 `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	Data          string                 `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	DataShaSum    string                 `protobuf:"bytes,4,opt,name=data_sha_sum,json=dataShaSum,proto3" json:"data_sha_sum,omitempty"`
-	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	Digests       []string               `protobuf:"bytes,6,rep,name=digests,proto3" json:"digests,omitempty"`
-	ModuleId      string                 `protobuf:"bytes,7,opt,name=module_id,json=moduleId,proto3" json:"module_id,omitempty"`
-	PredicateType string                 `protobuf:"bytes,8,opt,name=predicate_type,json=predicateType,proto3" json:"predicate_type,omitempty"`
-	SchemaType    string                 `protobuf:"bytes,9,opt,name=schema_type,json=schemaType,proto3" json:"schema_type,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in terraform_module_attestation.proto.
+	CreatedBy     string   `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	Data          string   `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	DataShaSum    string   `protobuf:"bytes,4,opt,name=data_sha_sum,json=dataShaSum,proto3" json:"data_sha_sum,omitempty"`
+	Description   string   `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Digests       []string `protobuf:"bytes,6,rep,name=digests,proto3" json:"digests,omitempty"`
+	ModuleId      string   `protobuf:"bytes,7,opt,name=module_id,json=moduleId,proto3" json:"module_id,omitempty"`
+	PredicateType string   `protobuf:"bytes,8,opt,name=predicate_type,json=predicateType,proto3" json:"predicate_type,omitempty"`
+	SchemaType    string   `protobuf:"bytes,9,opt,name=schema_type,json=schemaType,proto3" json:"schema_type,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,10,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *TerraformModuleAttestation) Reset() {
@@ -400,6 +407,7 @@ func (x *TerraformModuleAttestation) GetMetadata() *ResourceMetadata {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in terraform_module_attestation.proto.
 func (x *TerraformModuleAttestation) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -454,6 +462,13 @@ func (x *TerraformModuleAttestation) GetSchemaType() string {
 		return x.SchemaType
 	}
 	return ""
+}
+
+func (x *TerraformModuleAttestation) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
 }
 
 // GetTerraformModuleAttestationsResponse is the paginated list of TerraformModuleAttestations.
@@ -513,7 +528,7 @@ var File_terraform_module_attestation_proto protoreflect.FileDescriptor
 
 const file_terraform_module_attestation_proto_rawDesc = "" +
 	"\n" +
-	"\"terraform_module_attestation.proto\x125martiancloud.tharsis.api.terraform_module_attestation\x1a\x0emetadata.proto\x1a\x10pagination.proto\":\n" +
+	"\"terraform_module_attestation.proto\x125martiancloud.tharsis.api.terraform_module_attestation\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x10pagination.proto\":\n" +
 	"(GetTerraformModuleAttestationByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xf1\x02\n" +
 	"%GetTerraformModuleAttestationsRequest\x12j\n" +
@@ -533,11 +548,11 @@ const file_terraform_module_attestation_proto_rawDesc = "" +
 	"\vdescription\x18\x02 \x01(\tH\x00R\vdescription\x88\x01\x01B\x0e\n" +
 	"\f_description\"9\n" +
 	"'DeleteTerraformModuleAttestationRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xe3\x02\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xb8\x03\n" +
 	"\x1aTerraformModuleAttestation\x12O\n" +
-	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x1d\n" +
+	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12!\n" +
 	"\n" +
-	"created_by\x18\x02 \x01(\tR\tcreatedBy\x12\x12\n" +
+	"created_by\x18\x02 \x01(\tB\x02\x18\x01R\tcreatedBy\x12\x12\n" +
 	"\x04data\x18\x03 \x01(\tR\x04data\x12 \n" +
 	"\fdata_sha_sum\x18\x04 \x01(\tR\n" +
 	"dataShaSum\x12 \n" +
@@ -546,7 +561,9 @@ const file_terraform_module_attestation_proto_rawDesc = "" +
 	"\tmodule_id\x18\a \x01(\tR\bmoduleId\x12%\n" +
 	"\x0epredicate_type\x18\b \x01(\tR\rpredicateType\x12\x1f\n" +
 	"\vschema_type\x18\t \x01(\tR\n" +
-	"schemaType\"\xeb\x01\n" +
+	"schemaType\x12O\n" +
+	"\x10created_by_actor\x18\n" +
+	" \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\"\xeb\x01\n" +
 	"&GetTerraformModuleAttestationsResponse\x12u\n" +
 	"\fattestations\x18\x01 \x03(\v2Q.martiancloud.tharsis.api.terraform_module_attestation.TerraformModuleAttestationR\fattestations\x12J\n" +
 	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo*y\n" +
@@ -581,19 +598,21 @@ var file_terraform_module_attestation_proto_goTypes = []any{
 	(*GetTerraformModuleAttestationsResponse)(nil),   // 7: martiancloud.tharsis.api.terraform_module_attestation.GetTerraformModuleAttestationsResponse
 	(*PaginationOptions)(nil),                        // 8: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*ResourceMetadata)(nil),                         // 9: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                                 // 10: martiancloud.tharsis.api.pagination.PageInfo
+	(*Actor)(nil),                                    // 10: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                                 // 11: martiancloud.tharsis.api.pagination.PageInfo
 }
 var file_terraform_module_attestation_proto_depIdxs = []int32{
 	8,  // 0: martiancloud.tharsis.api.terraform_module_attestation.GetTerraformModuleAttestationsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.terraform_module_attestation.GetTerraformModuleAttestationsRequest.sort:type_name -> martiancloud.tharsis.api.terraform_module_attestation.TerraformModuleAttestationSortableField
 	9,  // 2: martiancloud.tharsis.api.terraform_module_attestation.TerraformModuleAttestation.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	6,  // 3: martiancloud.tharsis.api.terraform_module_attestation.GetTerraformModuleAttestationsResponse.attestations:type_name -> martiancloud.tharsis.api.terraform_module_attestation.TerraformModuleAttestation
-	10, // 4: martiancloud.tharsis.api.terraform_module_attestation.GetTerraformModuleAttestationsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	5,  // [5:5] is the sub-list for method output_type
-	5,  // [5:5] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	10, // 3: martiancloud.tharsis.api.terraform_module_attestation.TerraformModuleAttestation.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	6,  // 4: martiancloud.tharsis.api.terraform_module_attestation.GetTerraformModuleAttestationsResponse.attestations:type_name -> martiancloud.tharsis.api.terraform_module_attestation.TerraformModuleAttestation
+	11, // 5: martiancloud.tharsis.api.terraform_module_attestation.GetTerraformModuleAttestationsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	6,  // [6:6] is the sub-list for method output_type
+	6,  // [6:6] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_terraform_module_attestation_proto_init() }
@@ -601,6 +620,7 @@ func file_terraform_module_attestation_proto_init() {
 	if File_terraform_module_attestation_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_terraform_module_attestation_proto_msgTypes[1].OneofWrappers = []any{}

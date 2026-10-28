@@ -409,7 +409,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 		return nil, errors.Wrap(err, "failed to validate a group model", errors.WithSpan(span))
 	}
 
-	input.CreatedBy = caller.GetSubject()
+	input.CreatedBy = caller.GetActor()
 
 	// Auto-default output visibility for new root groups
 	if input.ParentID == "" && input.OutputVisibility == nil {

@@ -646,7 +646,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 		Name:            input.Name,
 		Description:     input.Description,
 		GroupID:         &input.GroupID,
-		CreatedBy:       caller.GetSubject(),
+		CreatedBy:       caller.GetActor(),
 		Tags:            input.Tags,
 		RunUntaggedJobs: input.RunUntaggedJobs,
 		JobLimit:        input.JobLimit,

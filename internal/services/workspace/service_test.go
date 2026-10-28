@@ -158,7 +158,7 @@ func TestCreateWorkspace(t *testing.T) {
 
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateWorkspacePermission, mock.Anything).Return(test.authError)
 
-			mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 			mockTransactions := db.NewMockTransactions(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
@@ -2341,7 +2341,7 @@ func TestCreateStateVersion(t *testing.T) {
 				},
 				WorkspaceID: workspaceID,
 				RunID:       &runID,
-				CreatedBy:   subject,
+				CreatedBy:   models.Actor{Subject: subject},
 			},
 			limit:                 4,
 			injectSVsPerWorkspace: 4,
@@ -2350,7 +2350,7 @@ func TestCreateStateVersion(t *testing.T) {
 					CreationTimestamp: &currentTime,
 					ID:                stateVersionID,
 				},
-				CreatedBy:   subject,
+				CreatedBy:   models.Actor{Subject: subject},
 				WorkspaceID: workspaceID,
 				RunID:       &runID,
 			},
@@ -2451,7 +2451,7 @@ func TestCreateStateVersion(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateStateVersionPermission, mock.Anything, mock.Anything).
 				Return(test.workspacePermissionError).Maybe()
 
-			mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 			mockTransactions := db.NewMockTransactions(t)
 			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil).Maybe()
@@ -2656,7 +2656,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 					ID:                configurationVersionID,
 				},
 				WorkspaceID: workspaceID,
-				CreatedBy:   subject,
+				CreatedBy:   mockCallerActor().WithSubject(subject),
 			},
 			limit:                 4,
 			injectSVsPerWorkspace: 4,
@@ -2665,7 +2665,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 					CreationTimestamp: &currentTime,
 					ID:                configurationVersionID,
 				},
-				CreatedBy:   subject,
+				CreatedBy:   mockCallerActor().WithSubject(subject),
 				WorkspaceID: workspaceID,
 			},
 		},
@@ -2682,7 +2682,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateConfigurationVersionPermission, mock.Anything).
 				Return(test.workspacePermissionError)
 
-			mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 			mockTransactions := db.NewMockTransactions(t)
 			mockTransactions.On("BeginTx", mock.Anything).Return(auth.WithCaller(ctx, &mockCaller), nil).Maybe()
@@ -2693,7 +2693,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 			mockConfigurationVersions.On("CreateConfigurationVersion", mock.Anything, models.ConfigurationVersion{
 				Status:      status,
 				WorkspaceID: test.toCreate.WorkspaceID,
-				CreatedBy:   subject,
+				CreatedBy:   mockCallerActor().WithSubject(subject),
 				Speculative: isSpeculative,
 			}).
 				Return(test.injectCreated, test.createError).Maybe()
@@ -4317,4 +4317,9 @@ func TestGetWorkspaceRoleBindingsByWorkspaceIDs(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
 	})
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

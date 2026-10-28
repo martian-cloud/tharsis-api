@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c75bf7734559f30a5a9f13327334acdf>>
+ * @generated SignedSource<<78b6a0b4a6064298563a26d529218467>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -101,11 +101,87 @@ v8 = [
     "value": "UPDATED_AT_ASC"
   }
 ],
-v9 = {
+v9 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+],
+v10 = {
   "alias": null,
   "args": null,
-  "kind": "ScalarField",
-  "name": "createdBy",
+  "concreteType": null,
+  "kind": "LinkedField",
+  "name": "createdByActor",
+  "plural": false,
+  "selections": [
+    (v6/*: any*/),
+    {
+      "kind": "TypeDiscriminator",
+      "abstractKey": "__isActor"
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "type",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "principalId",
+      "storageKey": null
+    },
+    {
+      "kind": "InlineFragment",
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": "User",
+          "kind": "LinkedField",
+          "name": "user",
+          "plural": false,
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "email",
+              "storageKey": null
+            },
+            (v7/*: any*/)
+          ],
+          "storageKey": null
+        }
+      ],
+      "type": "UserActor",
+      "abstractKey": null
+    },
+    {
+      "kind": "InlineFragment",
+      "selections": (v9/*: any*/),
+      "type": "ServiceAccountActor",
+      "abstractKey": null
+    },
+    {
+      "kind": "InlineFragment",
+      "selections": (v9/*: any*/),
+      "type": "VCSProviderActor",
+      "abstractKey": null
+    },
+    {
+      "kind": "InlineFragment",
+      "selections": (v9/*: any*/),
+      "type": "JobActor",
+      "abstractKey": null
+    }
+  ],
   "storageKey": null
 };
 return {
@@ -191,7 +267,7 @@ return {
                         "plural": false,
                         "selections": [
                           (v7/*: any*/),
-                          (v9/*: any*/),
+                          (v10/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -226,7 +302,7 @@ return {
                             "plural": false,
                             "selections": [
                               (v7/*: any*/),
-                              (v9/*: any*/)
+                              (v10/*: any*/)
                             ],
                             "storageKey": null
                           },
@@ -307,12 +383,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "239f5dcaac5dc1e715118dc488d4d409",
+    "cacheID": "62672ad3e59f8864383c145cee16f8e1",
     "id": null,
     "metadata": {},
     "name": "StateVersionListPaginationQuery",
     "operationKind": "query",
-    "text": "query StateVersionListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...StateVersionListFragment_stateVersions\n    id\n  }\n}\n\nfragment StateVersionListFragment_stateVersions on Workspace {\n  stateVersions(after: $after, before: $before, first: $first, last: $last, sort: UPDATED_AT_ASC) {\n    edges {\n      node {\n        id\n        ...StateVersionListItemFragment_stateVersion\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n  id\n}\n\nfragment StateVersionListItemFragment_stateVersion on StateVersion {\n  id\n  createdBy\n  metadata {\n    createdAt\n    trn\n  }\n  run {\n    id\n    createdBy\n  }\n}\n"
+    "text": "query StateVersionListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...StateVersionListFragment_stateVersions\n    id\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment StateVersionListFragment_stateVersions on Workspace {\n  stateVersions(after: $after, before: $before, first: $first, last: $last, sort: UPDATED_AT_ASC) {\n    edges {\n      node {\n        id\n        ...StateVersionListItemFragment_stateVersion\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n  id\n}\n\nfragment StateVersionListItemFragment_stateVersion on StateVersion {\n  id\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  metadata {\n    createdAt\n    trn\n  }\n  run {\n    id\n    createdByActor {\n      __typename\n      ...ActorDisplayFragment_actor\n    }\n  }\n}\n"
   }
 };
 })();

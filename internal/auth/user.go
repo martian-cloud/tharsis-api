@@ -66,6 +66,11 @@ func (u *UserCaller) GetNamespacePermissions(ctx context.Context, namespacePath 
 	return perms, nil
 }
 
+// GetActor returns the actor for this caller
+func (u *UserCaller) GetActor() models.Actor {
+	return models.NewUserActor(u.User.Metadata.ID).WithSubject(u.GetSubject())
+}
+
 // IsAdminModeActivated returns true if the caller is an admin with admin mode currently active.
 func (u *UserCaller) IsAdminModeActivated(ctx context.Context) bool {
 	// If user is not an admin we can short circuit and return false

@@ -44,6 +44,9 @@ function NewServiceAccount(props: Props) {
                     resourcePath
                     groupPath
                     createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     clientCredentialsEnabled
                     clientSecretExpiresAt
                     oidcTrustPolicies {

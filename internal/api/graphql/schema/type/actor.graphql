@@ -1,0 +1,118 @@
+enum ActorType {
+  USER
+  SERVICE_ACCOUNT
+  JOB
+  VCS_PROVIDER
+  SYSTEM
+  SCIM
+}
+
+"""
+Actor identifies the principal that performed an action. A field that holds an
+Actor is null when no actor was recorded, or when the recorded identifier is in
+no format an actor type can be inferred from; the deprecated string field
+beside it still carries the original identifier.
+
+Each actor type is its own implementing type, so a query selects what to show
+for each one with an inline fragment, and a principal is looked up only for the
+actor types whose principal field the query selects. Service accounts, VCS
+providers and jobs carry a snapshot of their TRN taken with the action, which is
+enough to display them without a lookup; a user carries no TRN snapshot and is displayed from
+its user field.
+"""
+interface Actor {
+  type: ActorType!
+  """
+  Global ID of the referenced record. Null for SYSTEM and SCIM, which have no
+  backing record. It is not named id because an actor is not itself a record:
+  it shares this ID with its principal.
+  """
+  principalId: String
+}
+
+"""
+UserActor is an action performed by a user.
+"""
+type UserActor implements Actor {
+  type: ActorType!
+  principalId: String
+  """
+  The user. Null when the user has been deleted or the caller is not permitted
+  to view it.
+  """
+  user: User
+}
+
+"""
+ServiceAccountActor is an action performed by a service account.
+"""
+type ServiceAccountActor implements Actor {
+  type: ActorType!
+  principalId: String
+  """
+  The service account's TRN when the action was recorded, for display. It is
+  not updated when the service account is renamed or moved; use principalId or
+  serviceAccount to reference the service account itself.
+  """
+  trnSnapshot: String
+  """
+  The service account. Null when it has been deleted or the caller is not
+  permitted to view it.
+  """
+  serviceAccount: ServiceAccount
+}
+
+"""
+VCSProviderActor is an action performed by a VCS provider through a workspace
+link.
+"""
+type VCSProviderActor implements Actor {
+  type: ActorType!
+  principalId: String
+  """
+  The VCS provider's TRN when the action was recorded, for display. It is not
+  updated when the provider is renamed or moved; use principalId or
+  vcsProvider to reference the provider itself.
+  """
+  trnSnapshot: String
+  """
+  The VCS provider. Null when it has been deleted or the caller is not
+  permitted to view it.
+  """
+  vcsProvider: VCSProvider
+}
+
+"""
+JobActor is an action performed by a job running in a workspace.
+"""
+type JobActor implements Actor {
+  type: ActorType!
+  principalId: String
+  """
+  The job's TRN when the action was recorded, for display. It names the job's
+  workspace path and is not updated when the workspace is moved; use
+  principalId or job to reference the job itself.
+  """
+  trnSnapshot: String
+  """
+  The job. Null when it has been deleted or the caller is not permitted to view
+  it.
+  """
+  job: Job
+}
+
+"""
+SystemActor is an internal system action. It has no backing record.
+"""
+type SystemActor implements Actor {
+  type: ActorType!
+  principalId: String
+}
+
+"""
+SCIMActor is a SCIM provisioning action. It has no backing record.
+"""
+type SCIMActor implements Actor {
+  type: ActorType!
+  principalId: String
+}

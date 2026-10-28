@@ -33,7 +33,13 @@ func (r *WorkspaceRoleBindingResolver) Metadata() *MetadataResolver {
 
 // CreatedBy resolver
 func (r *WorkspaceRoleBindingResolver) CreatedBy() string {
-	return r.workspaceRoleBinding.CreatedBy
+	return r.workspaceRoleBinding.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *WorkspaceRoleBindingResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.workspaceRoleBinding.CreatedBy)
 }
 
 // Workspace resolver

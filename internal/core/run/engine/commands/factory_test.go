@@ -62,7 +62,7 @@ func TestFactory_NewRun(t *testing.T) {
 
 func TestFactory_NewCreateDestroyRun(t *testing.T) {
 	f := newTestFactory()
-	in := &CreateDestroyRunInput{Subject: "subject-1", WorkspaceID: "ws-1"}
+	in := &CreateDestroyRunInput{CreatedBy: models.Actor{Subject: "subject-1"}, WorkspaceID: "ws-1"}
 
 	cmd := f.NewCreateDestroyRun(in)
 
@@ -73,7 +73,7 @@ func TestFactory_NewCreateDestroyRun(t *testing.T) {
 
 func TestFactory_NewCreateReconcileRun(t *testing.T) {
 	f := newTestFactory()
-	in := &CreateReconcileRunInput{Subject: "subject-1", WorkspaceID: "ws-1"}
+	in := &CreateReconcileRunInput{CreatedBy: models.Actor{Subject: "subject-1"}, WorkspaceID: "ws-1"}
 
 	cmd := f.NewCreateReconcileRun(in)
 
@@ -84,7 +84,7 @@ func TestFactory_NewCreateReconcileRun(t *testing.T) {
 func TestFactory_NewCreateAssessmentRun(t *testing.T) {
 	f := newTestFactory()
 	version := 7
-	in := &CreateAssessmentRunInput{Subject: "subject-1", WorkspaceID: "ws-1", LatestAssessmentVersion: &version}
+	in := &CreateAssessmentRunInput{CreatedBy: models.Actor{Subject: "subject-1"}, WorkspaceID: "ws-1", LatestAssessmentVersion: &version}
 
 	cmd := f.NewCreateAssessmentRun(in)
 

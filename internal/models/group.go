@@ -16,7 +16,7 @@ type Group struct {
 	Description          string
 	ParentID             string
 	FullPath             string
-	CreatedBy            string
+	CreatedBy            Actor
 	Metadata             ResourceMetadata
 	RunnerTags           []string
 	EnableDriftDetection *bool

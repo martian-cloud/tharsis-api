@@ -1,12 +1,11 @@
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import { Alert, AlertTitle, Box, Button, Chip, Paper, TextField, Tooltip, Typography, useTheme } from '@mui/material';
+import { Alert, AlertTitle, Box, Button, Chip, Paper, TextField, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import { useMemo, useState } from 'react';
 import { useLazyLoadQuery, useMutation } from 'react-relay/hooks';
 import { useNavigate, useParams } from 'react-router-dom';
 import NamespaceBreadcrumbs from '../NamespaceBreadcrumbs';
-import Gravatar from '../../common/Gravatar';
+import ActorDisplay from '../../common/ActorDisplay';
 import Timestamp from '../../common/Timestamp';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import TRNButton from '../../common/TRNButton';
@@ -37,7 +36,9 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
                         trn
                     }
                     version
-                    createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     providerAddress
                     groupPath
                     platformMirrors {
@@ -161,15 +162,9 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
                         <Typography variant="body2" color="textSecondary">
                             Cached <Timestamp component="span" timestamp={mirror.metadata?.createdAt} /> by
                         </Typography>
-                        {mirror.createdBy.startsWith('trn:') ? (
-                            <Tooltip title={mirror.createdBy}>
-                                <SmartToyIcon sx={{ ml: 0.5, width: 20, height: 20, color: 'text.secondary' }} />
-                            </Tooltip>
-                        ) : (
-                            <Tooltip title={mirror.createdBy}>
-                                <Box><Gravatar width={20} height={20} sx={{ ml: 0.5 }} email={mirror.createdBy} /></Box>
-                            </Tooltip>
-                        )}
+                        <Box sx={{ display: 'flex', ml: 0.5 }}>
+                            <ActorDisplay fragmentRef={mirror.createdByActor} variant="avatar" size={20} />
+                        </Box>
                     </Box>
                 </Box>
                 <Box display="flex" gap={1} sx={{ flexShrink: 0 }}>

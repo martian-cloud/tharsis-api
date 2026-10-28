@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import Drawer from '../common/Drawer';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from 'react-relay/hooks';
-import Gravatar from '../common/Gravatar';
+import ActorDisplay from '../common/ActorDisplay';
 import Timestamp from '../common/Timestamp';
 import Link from '../routes/Link';
 import LabelList from '../workspace/labels/LabelList';
@@ -39,7 +39,9 @@ function TerraformModuleVersionDetailsSidebar(props: Props) {
     {
         id
         version
-        createdBy
+        createdByActor {
+            ...ActorDisplayFragment_actor
+        }
         latest
         shaSum
         metadata {
@@ -101,11 +103,7 @@ function TerraformModuleVersionDetailsSidebar(props: Props) {
                         <Typography sx={{ marginRight: 1 }}>
                             <Timestamp component="span" timestamp={data.metadata.createdAt} /> by
                         </Typography>
-                        <Tooltip title={data.createdBy}>
-                            <Box>
-                                <Gravatar width={20} height={20} email={data.createdBy} />
-                            </Box>
-                        </Tooltip>
+                        <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={20} />
                     </Box>
                 </Section>}
                 <Section>

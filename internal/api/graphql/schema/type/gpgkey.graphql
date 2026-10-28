@@ -35,7 +35,8 @@ type GPGKey implements Node {
   fingerprint: String!
   asciiArmor: String!
   group: Group!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   groupPath: String!
   resourcePath: String!
 }

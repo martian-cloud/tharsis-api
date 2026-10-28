@@ -1,5 +1,5 @@
 import DownloadIcon from '@mui/icons-material/Download';
-import { Alert, Box, Button, Stack, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import { useCallback, useContext, useRef } from 'react';
@@ -11,7 +11,7 @@ import ArchiveFileBrowser from '../../archive/ArchiveFileBrowser';
 import { ArchiveTooLargeError, MAX_DOWNLOAD_BYTES } from '../../archive/tarball';
 import cfg from '../../common/config';
 import downloadFile from '../../common/filedownload';
-import Gravatar from '../../common/Gravatar';
+import ActorDisplay from '../../common/ActorDisplay';
 import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
@@ -65,7 +65,9 @@ function ConfigurationVersionDetails({ fragmentRef }: Props) {
                 ... on ConfigurationVersion {
                     id
                     status
-                    createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     metadata {
                         createdAt
                         trn
@@ -97,7 +99,6 @@ function ConfigurationVersionDetails({ fragmentRef }: Props) {
         return <Box>Not Found</Box>;
     }
 
-    const createdBy = queryData.node.createdBy ?? '';
     const status = queryData.node.status ?? '';
     const filesAvailable = status === 'uploaded';
 
@@ -121,11 +122,7 @@ function ConfigurationVersionDetails({ fragmentRef }: Props) {
                     <Typography component="div">Configuration version created</Typography>
                     <Timestamp timestamp={queryData.node.metadata?.createdAt as string} />
                     <Typography component="div">by</Typography>
-                    <Tooltip title={createdBy}>
-                        <Box>
-                            <Gravatar width={20} height={20} email={createdBy} />
-                        </Box>
-                    </Tooltip>
+                    <ActorDisplay fragmentRef={queryData.node.createdByActor} variant="avatar" size={20} />
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                     <TRNButton trn={queryData.node.metadata?.trn ?? ''} size="small" />

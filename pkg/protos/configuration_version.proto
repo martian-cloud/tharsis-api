@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.configuration_version;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 
 // ConfigurationVersions implements all functionality related to Tharsis Configuration Versions.
@@ -31,6 +32,11 @@ message ConfigurationVersion {
   string                    status       = 2;
   bool                      speculative  = 3;
   string                    workspace_id = 4;
-  string                    created_by   = 5;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by   = 5 [deprecated = true];
   optional string           vcs_event_id = 6;
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor created_by_actor = 7;
 }

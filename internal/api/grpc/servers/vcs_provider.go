@@ -396,7 +396,8 @@ func toPBVCSProvider(v *models.VCSProvider) *pb.VCSProvider {
 		GroupId:            gid.ToGlobalID(types.GroupModelType, v.GroupID),
 		Type:               string(v.Type),
 		Url:                v.URL.String(),
-		CreatedBy:          v.CreatedBy,
+		CreatedBy:          v.CreatedBy.Subject,
+		CreatedByActor:     toPBActor(v.CreatedBy),
 		AutoCreateWebhooks: v.AutoCreateWebhooks,
 	}
 }
@@ -405,7 +406,8 @@ func toPBVCSProvider(v *models.VCSProvider) *pb.VCSProvider {
 func toPBWorkspaceVCSProviderLink(w *models.WorkspaceVCSProviderLink) *pb.WorkspaceVCSProviderLink {
 	return &pb.WorkspaceVCSProviderLink{
 		Metadata:            toPBMetadata(&w.Metadata, types.WorkspaceVCSProviderLinkModelType),
-		CreatedBy:           w.CreatedBy,
+		CreatedBy:           w.CreatedBy.Subject,
+		CreatedByActor:      toPBActor(w.CreatedBy),
 		WorkspaceId:         gid.ToGlobalID(types.WorkspaceModelType, w.WorkspaceID),
 		VcsProviderId:       gid.ToGlobalID(types.VCSProviderModelType, w.ProviderID),
 		RepositoryPath:      w.RepositoryPath,
