@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8aca5cfab3c9eb76c5ac87cf83b6c62a>>
+ * @generated SignedSource<<0cd0508f6c49c880f168e032079416aa>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -44,28 +44,22 @@ export type RunTaskStagePolicyCheckPanelFragment_check$data = {
     readonly approvals: ReadonlyArray<{
       readonly comment: string;
       readonly coveredRules: ReadonlyArray<string>;
-      readonly createdBy: string;
+      readonly createdByActor: {
+        readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+      } | null | undefined;
       readonly decision: RunGateDecision;
       readonly id: string;
       readonly metadata: {
         readonly createdAt: any;
       };
-      readonly serviceAccount: {
-        readonly id: string;
-        readonly name: string;
-        readonly resourcePath: string;
-      } | null | undefined;
-      readonly user: {
-        readonly email: string;
-        readonly id: string;
-        readonly username: string;
-      } | null | undefined;
     }>;
     readonly id: string;
     readonly metadata: {
       readonly updatedAt: any;
     };
-    readonly overriddenBy: string | null | undefined;
+    readonly overriddenByActor: {
+      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    } | null | undefined;
     readonly overrideComment: string;
     readonly status: RunGateStatus;
   } | null | undefined;
@@ -92,13 +86,13 @@ v1 = {
   "name": "id",
   "storageKey": null
 },
-v2 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "name",
-  "storageKey": null
-};
+v2 = [
+  {
+    "args": null,
+    "kind": "FragmentSpread",
+    "name": "ActorDisplayFragment_actor"
+  }
+];
 return {
   "argumentDefinitions": [],
   "kind": "Fragment",
@@ -239,8 +233,11 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "overriddenBy",
+          "concreteType": null,
+          "kind": "LinkedField",
+          "name": "overriddenByActor",
+          "plural": false,
+          "selections": (v2/*: any*/),
           "storageKey": null
         },
         {
@@ -276,7 +273,13 @@ return {
           "name": "approvalRules",
           "plural": true,
           "selections": [
-            (v2/*: any*/),
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "name",
+              "storageKey": null
+            },
             {
               "alias": null,
               "args": null,
@@ -313,8 +316,11 @@ return {
             {
               "alias": null,
               "args": null,
-              "kind": "ScalarField",
-              "name": "createdBy",
+              "concreteType": null,
+              "kind": "LinkedField",
+              "name": "createdByActor",
+              "plural": false,
+              "selections": (v2/*: any*/),
               "storageKey": null
             },
             {
@@ -341,52 +347,6 @@ return {
                 }
               ],
               "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "concreteType": "User",
-              "kind": "LinkedField",
-              "name": "user",
-              "plural": false,
-              "selections": [
-                (v1/*: any*/),
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "username",
-                  "storageKey": null
-                },
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "email",
-                  "storageKey": null
-                }
-              ],
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "concreteType": "ServiceAccount",
-              "kind": "LinkedField",
-              "name": "serviceAccount",
-              "plural": false,
-              "selections": [
-                (v1/*: any*/),
-                (v2/*: any*/),
-                {
-                  "alias": null,
-                  "args": null,
-                  "kind": "ScalarField",
-                  "name": "resourcePath",
-                  "storageKey": null
-                }
-              ],
-              "storageKey": null
             }
           ],
           "storageKey": null
@@ -400,6 +360,6 @@ return {
 };
 })();
 
-(node as any).hash = "9b0e25b37219b74402399f89d6b9003c";
+(node as any).hash = "3fac36b3f4793257c60679a012c2da53";
 
 export default node;

@@ -90,7 +90,8 @@ type TerraformModuleVersion implements Node {
   diagnostics: String!
   shaSum: String!
   latest: Boolean!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   submodules: [String!]!
   examples: [String!]!
   configurationDetails(path: String!): TerraformModuleConfigurationDetails

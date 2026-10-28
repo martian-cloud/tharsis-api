@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.terraform_provider;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 import "pagination.proto";
 import "google/protobuf/empty.proto";
@@ -85,11 +86,16 @@ message DeleteTerraformProviderRequest {
 // TerraformProvider defines a Terraform Provider within Tharsis.
 message TerraformProvider {
   metadata.ResourceMetadata metadata       = 1;
-  string                    created_by     = 2;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by     = 2 [deprecated = true];
   string                    group_id       = 3;
   string                    name           = 4;
   bool                      private        = 5;
   string                    repository_url = 6;
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor created_by_actor = 7;
 }
 
 // GetTerraformProvidersResponse is the paginated list of Terraform Providers.

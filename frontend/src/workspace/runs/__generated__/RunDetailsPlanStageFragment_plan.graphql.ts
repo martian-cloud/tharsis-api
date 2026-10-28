@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<36676019c8df4a68271377df9bd631de>>
+ * @generated SignedSource<<47b1c17d6621a616b06e8d7e19a3a1c1>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,7 +18,9 @@ export type RunDetailsPlanStageFragment_plan$data = {
   readonly apply: {
     readonly status: ApplyStatus;
   } | null | undefined;
-  readonly createdBy: string;
+  readonly createdByActor: {
+    readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+  } | null | undefined;
   readonly id: string;
   readonly plan: {
     readonly checkResults: ReadonlyArray<{
@@ -87,8 +89,17 @@ return {
     {
       "alias": null,
       "args": null,
-      "kind": "ScalarField",
-      "name": "createdBy",
+      "concreteType": null,
+      "kind": "LinkedField",
+      "name": "createdByActor",
+      "plural": false,
+      "selections": [
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "ActorDisplayFragment_actor"
+        }
+      ],
       "storageKey": null
     },
     {
@@ -308,6 +319,6 @@ return {
 };
 })();
 
-(node as any).hash = "f109c5a1dd786181194f0acb843f32f3";
+(node as any).hash = "a2d7e82ee903d15e90e35cfb90f3bb4d";
 
 export default node;

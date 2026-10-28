@@ -31,7 +31,7 @@ func TestVCSProviders_CreateVCSProvider(t *testing.T) {
 		Name:        "test-group-vcs-provider",
 		Description: "test group for vcs provider",
 		FullPath:    "test-group-vcs-provider",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -50,7 +50,7 @@ func TestVCSProviders_CreateVCSProvider(t *testing.T) {
 				URL:         url.URL{Scheme: "https", Host: "github.com"},
 				Type:        models.GitHubProviderType,
 				GroupID:     group.Metadata.ID,
-				CreatedBy:   "db-integration-tests",
+				CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			},
 		},
 	}
@@ -83,7 +83,7 @@ func TestVCSProviders_UpdateVCSProvider(t *testing.T) {
 		Name:        "test-group-vcs-provider-update",
 		Description: "test group for vcs provider update",
 		FullPath:    "test-group-vcs-provider-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -94,7 +94,7 @@ func TestVCSProviders_UpdateVCSProvider(t *testing.T) {
 		URL:         url.URL{Scheme: "https", Host: "github.com"},
 		Type:        models.GitHubProviderType,
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -148,7 +148,7 @@ func TestVCSProviders_DeleteVCSProvider(t *testing.T) {
 		Name:        "test-group-vcs-provider-delete",
 		Description: "test group for vcs provider delete",
 		FullPath:    "test-group-vcs-provider-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -159,7 +159,7 @@ func TestVCSProviders_DeleteVCSProvider(t *testing.T) {
 		URL:         url.URL{Scheme: "https", Host: "github.com"},
 		Type:        models.GitHubProviderType,
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -207,7 +207,7 @@ func TestVCSProviders_GetVCSProviderByID(t *testing.T) {
 		Name:        "test-group-vcs-provider",
 		Description: "test group for vcs provider",
 		FullPath:    "test-group-vcs-provider",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -219,7 +219,7 @@ func TestVCSProviders_GetVCSProviderByID(t *testing.T) {
 		URL:         *testURL,
 		Type:        models.GitHubProviderType,
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -276,7 +276,7 @@ func TestVCSProviders_GetVCSProviders(t *testing.T) {
 		Name:        "test-group-vcs-providers",
 		Description: "test group for vcs providers",
 		FullPath:    "test-group-vcs-providers",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -290,7 +290,7 @@ func TestVCSProviders_GetVCSProviders(t *testing.T) {
 			URL:         *githubURL,
 			Type:        models.GitHubProviderType,
 			GroupID:     group.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			Name:        "test-provider-2",
@@ -298,7 +298,7 @@ func TestVCSProviders_GetVCSProviders(t *testing.T) {
 			URL:         *gitlabURL,
 			Type:        models.GitLabProviderType,
 			GroupID:     group.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -376,7 +376,7 @@ func TestVCSProviders_GetVCSProvidersWithPaginationAndSorting(t *testing.T) {
 		Name:        "test-group-vcs-pagination",
 		Description: "test group for vcs pagination",
 		FullPath:    "test-group-vcs-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -389,7 +389,7 @@ func TestVCSProviders_GetVCSProvidersWithPaginationAndSorting(t *testing.T) {
 			URL:         *testURL,
 			Type:        models.GitHubProviderType,
 			GroupID:     group.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -434,7 +434,7 @@ func TestVCSProviders_GetVCSProviderByOAuthState(t *testing.T) {
 		Name:        "test-group-vcs-provider-oauth",
 		Description: "test group for vcs provider oauth",
 		FullPath:    "test-group-vcs-provider-oauth",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -447,7 +447,7 @@ func TestVCSProviders_GetVCSProviderByOAuthState(t *testing.T) {
 		Type:        models.GitHubProviderType,
 		GroupID:     group.Metadata.ID,
 		OAuthState:  &oauthState,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -504,7 +504,7 @@ func TestVCSProviders_GetVCSProviderByTRN(t *testing.T) {
 		Name:        "test-group-vcs-trn",
 		Description: "test group for vcs trn",
 		FullPath:    "test-group-vcs-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -516,7 +516,7 @@ func TestVCSProviders_GetVCSProviderByTRN(t *testing.T) {
 		URL:         *testURL,
 		Type:        models.GitHubProviderType,
 		GroupID:     group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

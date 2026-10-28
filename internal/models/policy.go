@@ -230,7 +230,7 @@ type Policy struct {
 	AllowedUserIDs           []string
 	AllowedServiceAccountIDs []string
 	AllowedTeamIDs           []string
-	CreatedBy                string
+	CreatedBy                Actor
 	Metadata                 ResourceMetadata
 }
 

@@ -8,6 +8,7 @@ import { ReactNode, useState } from 'react';
 import { useFragment, useLazyLoadQuery, useMutation } from 'react-relay/hooks';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ConnectionHandler } from 'relay-runtime';
+import ActorDisplay from '../../common/ActorDisplay';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import Gravatar from '../../common/Gravatar';
 import Pill from '../../common/Pill';
@@ -156,7 +157,9 @@ function PolicyDetails({ ownerId, ownerPath, currentGroupPath }: Props) {
             name
             description
             kind
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             requiredApprovals
             opaData {
                 packageSource
@@ -348,7 +351,7 @@ function PolicyDetails({ ownerId, ownerPath, currentGroupPath }: Props) {
                 <FieldGrid>
                     <Field label="Policy Type" value={KIND_LABELS[policy.kind] ?? policy.kind} />
                     <Field label="Run Stage" value={kindData?.stage ? (STAGE_LABELS[kindData.stage] ?? kindData.stage) : '—'} mono />
-                    <Field label="Created By" value={policy.createdBy} />
+                    <Field label="Created By" value={<ActorDisplay fragmentRef={policy.createdByActor} variant="text" />} />
                 </FieldGrid>
 
                 <SectionHeader>Enforcement Level</SectionHeader>

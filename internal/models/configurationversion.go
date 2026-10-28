@@ -22,7 +22,7 @@ type ConfigurationVersion struct {
 	VCSEventID     *string
 	Status         ConfigurationStatus
 	WorkspaceID    string
-	CreatedBy      string
+	CreatedBy      Actor
 	ObjectStoreKey string
 	Metadata       ResourceMetadata
 	Speculative    bool

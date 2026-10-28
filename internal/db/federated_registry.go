@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -80,7 +81,7 @@ type federatedRegistries struct {
 	dbClient *Client
 }
 
-var federatedRegistryFieldList = append(metadataFieldList, "hostname", "group_id", "audience", "created_by")
+var federatedRegistryFieldList = append(metadataAndCreatedByFieldList, "hostname", "group_id", "audience")
 
 // NewFederatedRegistries returns an instance of the FederatedRegistries interface
 func NewFederatedRegistries(dbClient *Client) FederatedRegistries {
@@ -196,6 +197,11 @@ func (p *federatedRegistries) CreateFederatedRegistry(ctx context.Context, input
 	ctx, span := tracer.Start(ctx, "db.CreateFederatedRegistry")
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(input.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("federated_registry.CreateFederatedRegistry", dialect.From("federated_registries").
@@ -203,14 +209,17 @@ func (p *federatedRegistries) CreateFederatedRegistry(ctx context.Context, input
 		With("federated_registries",
 			dialect.Insert("federated_registries").
 				Rows(goqu.Record{
-					"id":         newResourceID(),
-					"version":    initialResourceVersion,
-					"created_at": timestamp,
-					"updated_at": timestamp,
-					"hostname":   input.Hostname,
-					"group_id":   input.GroupID,
-					"audience":   input.Audience,
-					"created_by": input.CreatedBy,
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"hostname":              input.Hostname,
+					"group_id":              input.GroupID,
+					"audience":              input.Audience,
+					"created_by":            input.CreatedBy.Subject,
+					"created_by_actor_type": createdByActorType,
+					"created_by_actor_id":   createdByActorID,
+					"created_by_actor_trn":  createdByActorTRN,
 				}).Returning("*"),
 		).Select(p.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})))
@@ -360,6 +369,7 @@ func (p *federatedRegistries) getSelectFields() []interface{} {
 }
 
 func scanFederatedRegistry(row scanner) (*models.FederatedRegistry, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var groupPath string
 	federatedRegistry := &models.FederatedRegistry{}
 
@@ -368,10 +378,13 @@ func scanFederatedRegistry(row scanner) (*models.FederatedRegistry, error) {
 		&federatedRegistry.Metadata.CreationTimestamp,
 		&federatedRegistry.Metadata.LastUpdatedTimestamp,
 		&federatedRegistry.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&federatedRegistry.Hostname,
 		&federatedRegistry.GroupID,
 		&federatedRegistry.Audience,
-		&federatedRegistry.CreatedBy,
 		&groupPath,
 	}
 
@@ -379,6 +392,9 @@ func scanFederatedRegistry(row scanner) (*models.FederatedRegistry, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	federatedRegistry.CreatedBy = parsedActor
 
 	federatedRegistry.Metadata.TRN = trn.TypeFederatedRegistry.Build(groupPath, federatedRegistry.Hostname)
 

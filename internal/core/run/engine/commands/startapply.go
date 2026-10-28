@@ -18,7 +18,7 @@ import (
 // Execute phases.
 type StartApplyInput struct {
 	RunID       string
-	TriggeredBy string
+	TriggeredBy models.Actor
 	Comment     string
 }
 
@@ -123,7 +123,7 @@ func (c *StartApply) Execute(ctx context.Context, input *types.ExecuteInput) err
 		return errors.New("the apply phase has already been started for this run", errors.WithErrorCode(errors.EConflict))
 	}
 
-	applyNode.TriggeredBy = c.in.TriggeredBy
+	applyNode.TriggeredBy = new(c.in.TriggeredBy)
 	applyNode.Comment = c.in.Comment
 	applyNode.ManagedIdentityIDs = c.managedIdentityIDs
 

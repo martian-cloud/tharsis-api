@@ -64,7 +64,7 @@ func TestCreatePackage(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockCaller.On("RequirePermission", mock.Anything, models.CreatePackagePermission, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 			mockGroups := db.NewMockGroups(t)
 			mockPackages := db.NewMockPackages(t)
@@ -156,7 +156,7 @@ func TestCreatePackageVersion(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePackagePermission, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 			mockPackages := db.NewMockPackages(t)
 			mockPackageVersions := db.NewMockPackageVersions(t)
@@ -986,4 +986,9 @@ func TestDownloadPackageVersion(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, wantURL, got)
 	})
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

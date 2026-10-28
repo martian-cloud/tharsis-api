@@ -31,7 +31,7 @@ func TestTerraformModules_CreateModule(t *testing.T) {
 		Name:        "test-group-module",
 		Description: "test group for module",
 		FullPath:    "test-group-module",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -66,7 +66,7 @@ func TestTerraformModules_CreateModule(t *testing.T) {
 				GroupID:     test.groupID,
 				RootGroupID: group.Metadata.ID,
 				System:      test.system,
-				CreatedBy:   "db-integration-tests",
+				CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			})
 
 			if test.expectErrorCode != "" {
@@ -95,7 +95,7 @@ func TestTerraformModules_UpdateModule(t *testing.T) {
 		Name:        "test-group-module-update",
 		Description: "test group for module update",
 		FullPath:    "test-group-module-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -105,7 +105,7 @@ func TestTerraformModules_UpdateModule(t *testing.T) {
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -173,7 +173,7 @@ func TestTerraformModules_DeleteModule(t *testing.T) {
 		Name:        "test-group-module-delete",
 		Description: "test group for module delete",
 		FullPath:    "test-group-module-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -182,7 +182,7 @@ func TestTerraformModules_DeleteModule(t *testing.T) {
 		Name:        "test-module-delete",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -247,7 +247,7 @@ func TestTerraformModules_GetModuleByID(t *testing.T) {
 		Name:        "test-group-module-get-by-id",
 		Description: "test group for module get by id",
 		FullPath:    "test-group-module-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -257,7 +257,7 @@ func TestTerraformModules_GetModuleByID(t *testing.T) {
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -314,7 +314,7 @@ func TestTerraformModules_GetModules(t *testing.T) {
 		Name:        "test-group-modules-list",
 		Description: "test group for modules list",
 		FullPath:    "test-group-modules-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -325,14 +325,14 @@ func TestTerraformModules_GetModules(t *testing.T) {
 			System:      "aws",
 			GroupID:     group.Metadata.ID,
 			RootGroupID: group.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			Name:        "test-module-2",
 			System:      "gcp",
 			GroupID:     group.Metadata.ID,
 			RootGroupID: group.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -431,7 +431,7 @@ func TestTerraformModules_GetModulesWithPaginationAndSorting(t *testing.T) {
 		Name:        "test-group-modules-pagination",
 		Description: "test group for modules pagination",
 		FullPath:    "test-group-modules-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -442,7 +442,7 @@ func TestTerraformModules_GetModulesWithPaginationAndSorting(t *testing.T) {
 			System:      "aws",
 			GroupID:     group.Metadata.ID,
 			RootGroupID: group.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -490,7 +490,7 @@ func TestTerraformModules_GetModuleByTRN(t *testing.T) {
 		Name:        "test-group-module-get-by-trn",
 		Description: "test group for module get by trn",
 		FullPath:    "test-group-module-get-by-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -500,7 +500,7 @@ func TestTerraformModules_GetModuleByTRN(t *testing.T) {
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

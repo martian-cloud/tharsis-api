@@ -10,7 +10,7 @@ var _ Model = (*TerraformProvider)(nil)
 
 // TerraformProvider represents a terraform provider
 type TerraformProvider struct {
-	CreatedBy     string
+	CreatedBy     Actor
 	Name          string
 	GroupID       string
 	RootGroupID   string

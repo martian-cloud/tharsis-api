@@ -1,8 +1,8 @@
-import { Box, Tooltip, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment, useLazyLoadQuery } from 'react-relay';
 import { useParams } from 'react-router-dom';
-import Gravatar from '../../common/Gravatar';
+import ActorDisplay from '../../common/ActorDisplay';
 import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
@@ -32,13 +32,17 @@ function StateVersionDetails(props: Props) {
             node(id: $id) {
                 ... on StateVersion {
                     id
-                    createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     metadata {
                         createdAt
                         trn
                     }
                     run {
-                        createdBy
+                        createdByActor {
+                            ...ActorDisplayFragment_actor
+                        }
                     }
                     ...StateVersionFileFragment_stateVersion
                 }
@@ -46,7 +50,7 @@ function StateVersionDetails(props: Props) {
         }
     `, { id: stateVersionId }, { fetchPolicy: 'store-and-network' })
 
-    const createdBy = queryData.node?.run ? queryData.node.run.createdBy : (queryData.node?.createdBy || '')
+    const createdByActor = queryData.node?.run ? queryData.node.run.createdByActor : queryData.node?.createdByActor
 
     return queryData.node ? (
         <Box>
@@ -61,11 +65,9 @@ function StateVersionDetails(props: Props) {
                 <Typography component="div" sx={{ paddingRight: '6px' }}>State version created{' '}
                     <Timestamp timestamp={queryData.node?.metadata?.createdAt as string} />
                     {' '}by
-                    <Tooltip title={createdBy}>
-                        <Box sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 1 }}>
-                            <Gravatar width={20} height={20} email={createdBy} />
-                        </Box>
-                    </Tooltip>
+                    <Box sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 1 }}>
+                        <ActorDisplay fragmentRef={createdByActor} variant="avatar" size={20} />
+                    </Box>
                 </Typography>
                 <TRNButton trn={queryData.node?.metadata?.trn || ''} size="small" />
             </Box>

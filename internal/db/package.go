@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -114,13 +115,12 @@ type packages struct {
 	dbClient *Client
 }
 
-var packageFieldList = append(metadataFieldList,
+var packageFieldList = append(metadataAndCreatedByFieldList,
 	"name",
 	"description",
 	"group_id",
 	"kind",
 	"visibility",
-	"created_by",
 	"root_group_id",
 	"allow_mutable_versions",
 )
@@ -297,6 +297,11 @@ func (p *packages) CreatePackage(ctx context.Context, pkg *models.Package) (*mod
 	ctx, span := tracer.Start(ctx, "db.CreatePackage")
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(pkg.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("pkg.CreatePackage", dialect.From("packages").
@@ -314,7 +319,10 @@ func (p *packages) CreatePackage(ctx context.Context, pkg *models.Package) (*mod
 					"root_group_id":          pkg.RootGroupID,
 					"kind":                   pkg.Kind,
 					"visibility":             pkg.Visibility,
-					"created_by":             pkg.CreatedBy,
+					"created_by":             pkg.CreatedBy.Subject,
+					"created_by_actor_type":  createdByActorType,
+					"created_by_actor_id":    createdByActorID,
+					"created_by_actor_trn":   createdByActorTRN,
 					"allow_mutable_versions": pkg.AllowMutableVersions,
 				}).Returning("*"),
 		).Select(p.getSelectFields()...).
@@ -456,6 +464,7 @@ func (p *packages) getSelectFields() []interface{} {
 }
 
 func scanPackage(row scanner) (*models.Package, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var groupPath string
 	pkg := &models.Package{}
 
@@ -464,12 +473,15 @@ func scanPackage(row scanner) (*models.Package, error) {
 		&pkg.Metadata.CreationTimestamp,
 		&pkg.Metadata.LastUpdatedTimestamp,
 		&pkg.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&pkg.Name,
 		&pkg.Description,
 		&pkg.GroupID,
 		&pkg.Kind,
 		&pkg.Visibility,
-		&pkg.CreatedBy,
 		&pkg.RootGroupID,
 		&pkg.AllowMutableVersions,
 		&groupPath,
@@ -479,6 +491,9 @@ func scanPackage(row scanner) (*models.Package, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	pkg.CreatedBy = parsedActor
 
 	pkg.Metadata.TRN = trn.TypePackage.Build(groupPath, pkg.Name)
 

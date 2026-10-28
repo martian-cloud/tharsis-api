@@ -23,7 +23,7 @@ func TestStateVersionOutputs_CreateStateVersionOutput(t *testing.T) {
 		Name:        "test-group-state-version-output",
 		Description: "test group for state version output",
 		FullPath:    "test-group-state-version-output",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -31,14 +31,14 @@ func TestStateVersionOutputs_CreateStateVersionOutput(t *testing.T) {
 		Name:           "test-workspace-state-version-output",
 		Description:    "test workspace for state version output",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
 
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Status:      models.RunPending,
 	})
 	require.NoError(t, err)
@@ -47,7 +47,7 @@ func TestStateVersionOutputs_CreateStateVersionOutput(t *testing.T) {
 	stateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
 		RunID:       &run.Metadata.ID,
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -98,7 +98,7 @@ func TestStateVersionOutputs_GetStateVersionOutputByID(t *testing.T) {
 		Name:        "test-group-state-output-get-by-id",
 		Description: "test group for state output get by id",
 		FullPath:    "test-group-state-output-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -106,7 +106,7 @@ func TestStateVersionOutputs_GetStateVersionOutputByID(t *testing.T) {
 	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:           "test-workspace-state-output-get-by-id",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -114,7 +114,7 @@ func TestStateVersionOutputs_GetStateVersionOutputByID(t *testing.T) {
 	// Create a state version for testing
 	stateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -180,7 +180,7 @@ func TestStateVersionOutputs_GetStateVersionOutputByTRN(t *testing.T) {
 		Name:        "test-group-state-output-get-by-trn",
 		Description: "test group for state output get by trn",
 		FullPath:    "test-group-state-output-get-by-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -188,7 +188,7 @@ func TestStateVersionOutputs_GetStateVersionOutputByTRN(t *testing.T) {
 	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:           "test-workspace-state-output-get-by-trn",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -196,7 +196,7 @@ func TestStateVersionOutputs_GetStateVersionOutputByTRN(t *testing.T) {
 	// Create a state version for testing
 	stateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -262,7 +262,7 @@ func TestStateVersionOutputs_GetStateVersionOutputs(t *testing.T) {
 		Name:        "test-group-state-outputs-list",
 		Description: "test group for state outputs list",
 		FullPath:    "test-group-state-outputs-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -270,7 +270,7 @@ func TestStateVersionOutputs_GetStateVersionOutputs(t *testing.T) {
 	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:           "test-workspace-state-outputs-list",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -278,7 +278,7 @@ func TestStateVersionOutputs_GetStateVersionOutputs(t *testing.T) {
 	// Create a state version for testing
 	stateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

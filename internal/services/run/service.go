@@ -515,7 +515,7 @@ func (s *service) CreateAssessmentRunForWorkspace(ctx context.Context, options *
 	// workspace's latest applied run in its Prepare phase, then upserts the
 	// assessment record and creates the run in a single transaction.
 	cmd := s.cmdFactory.NewCreateAssessmentRun(&commands.CreateAssessmentRunInput{
-		Subject:                 caller.GetSubject(),
+		CreatedBy:               caller.GetActor(),
 		WorkspaceID:             options.WorkspaceID,
 		LatestAssessmentVersion: options.LatestAssessmentVersion,
 	})
@@ -545,7 +545,7 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 	}
 
 	cmd := s.cmdFactory.NewCreateDestroyRun(&commands.CreateDestroyRunInput{
-		Subject:     caller.GetSubject(),
+		CreatedBy:   caller.GetActor(),
 		WorkspaceID: options.WorkspaceID,
 		AutoApply:   options.AutoApply,
 		Annotations: options.Annotations,
@@ -576,7 +576,7 @@ func (s *service) CreateReconcileRunForWorkspace(ctx context.Context, options *C
 	}
 
 	cmd := s.cmdFactory.NewCreateReconcileRun(&commands.CreateReconcileRunInput{
-		Subject:     caller.GetSubject(),
+		CreatedBy:   caller.GetActor(),
 		WorkspaceID: options.WorkspaceID,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
@@ -613,7 +613,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	// workspace's inherited variables), normalizes the module version, and
 	// resolves the module source — all before the transaction is opened.
 	cmd := s.cmdFactory.NewRun(&commands.NewRunInput{
-		Subject:                  caller.GetSubject(),
+		CreatedBy:                caller.GetActor(),
 		WorkspaceID:              options.WorkspaceID,
 		ConfigurationVersionID:   options.ConfigurationVersionID,
 		Comment:                  options.Comment,
@@ -693,7 +693,7 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 
 	cmd := s.cmdFactory.NewStartApply(&commands.StartApplyInput{
 		RunID:       runID,
-		TriggeredBy: caller.GetSubject(),
+		TriggeredBy: caller.GetActor(),
 		Comment:     commentStr,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
@@ -744,7 +744,7 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 
 	cmd := s.cmdFactory.NewCancelRun(&commands.CancelRunInput{
 		RunID:      options.RunID,
-		CanceledBy: caller.GetSubject(),
+		CanceledBy: caller.GetActor(),
 		Force:      options.Force,
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {

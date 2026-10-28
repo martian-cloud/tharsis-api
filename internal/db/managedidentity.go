@@ -150,8 +150,8 @@ type managedIdentities struct {
 }
 
 var (
-	managedIdentityFieldList = append(metadataFieldList,
-		"name", "description", "type", "group_id", "data", "created_by", "alias_source_id")
+	managedIdentityFieldList = append(metadataAndCreatedByFieldList,
+		"name", "description", "type", "group_id", "data", "alias_source_id")
 	managedIdentityRuleFieldList = append(metadataFieldList,
 		"run_stage", "managed_identity_id", "type", "module_attestation_policies", "verify_state_lineage")
 )
@@ -889,6 +889,11 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(managedIdentity.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 	createdID := newResourceID()
 
@@ -908,17 +913,20 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 	sql, args, err := toSQLWithTag("managedidentity.CreateManagedIdentity", dialect.Insert("managed_identities").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":              createdID,
-			"version":         initialResourceVersion,
-			"created_at":      timestamp,
-			"updated_at":      timestamp,
-			"name":            managedIdentity.Name,
-			"description":     managedIdentity.Description,
-			"type":            managedIdentity.Type,
-			"group_id":        managedIdentity.GroupID,
-			"data":            managedIdentity.Data,
-			"created_by":      managedIdentity.CreatedBy,
-			"alias_source_id": managedIdentity.AliasSourceID,
+			"id":                    createdID,
+			"version":               initialResourceVersion,
+			"created_at":            timestamp,
+			"updated_at":            timestamp,
+			"name":                  managedIdentity.Name,
+			"description":           managedIdentity.Description,
+			"type":                  managedIdentity.Type,
+			"group_id":              managedIdentity.GroupID,
+			"data":                  managedIdentity.Data,
+			"created_by":            managedIdentity.CreatedBy.Subject,
+			"created_by_actor_type": createdByActorType,
+			"created_by_actor_id":   createdByActorID,
+			"created_by_actor_trn":  createdByActorTRN,
+			"alias_source_id":       managedIdentity.AliasSourceID,
 		}))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -1247,6 +1255,7 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedTeamIDs(ctx conte
 }
 
 func scanManagedIdentity(row scanner, withAliasFields bool) (*models.ManagedIdentity, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var (
 		aliasSourceDescription sql.NullString
 		aliasSourceType        sql.NullString
@@ -1261,12 +1270,15 @@ func scanManagedIdentity(row scanner, withAliasFields bool) (*models.ManagedIden
 		&managedIdentity.Metadata.CreationTimestamp,
 		&managedIdentity.Metadata.LastUpdatedTimestamp,
 		&managedIdentity.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&managedIdentity.Name,
 		&managedIdentity.Description,
 		&managedIdentity.Type,
 		&managedIdentity.GroupID,
 		&managedIdentity.Data,
-		&managedIdentity.CreatedBy,
 		&managedIdentity.AliasSourceID,
 		&namespacePath,
 	}
@@ -1281,6 +1293,9 @@ func scanManagedIdentity(row scanner, withAliasFields bool) (*models.ManagedIden
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	managedIdentity.CreatedBy = parsedActor
 
 	if aliasSourceDescription.Valid {
 		managedIdentity.Description = aliasSourceDescription.String

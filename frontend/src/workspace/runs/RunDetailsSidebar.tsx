@@ -6,10 +6,10 @@ import graphql from 'babel-plugin-relay/macro';
 import React, { useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { Link as LinkRouter } from 'react-router-dom';
+import ActorDisplay from '../../common/ActorDisplay';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import Drawer from '../../common/Drawer';
 import { MutationError } from '../../common/error';
-import Gravatar from '../../common/Gravatar';
 import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
 import Link from '../../routes/Link';
@@ -41,7 +41,9 @@ function RunDetailsSidebar(props: Props) {
     {
         id
         status
-        createdBy
+        createdByActor {
+            ...ActorDisplayFragment_actor
+        }
         isDestroy
         assessment
         autoApply
@@ -227,11 +229,7 @@ function RunDetailsSidebar(props: Props) {
                     <Typography sx={{ marginBottom: 1 }}>Created</Typography>
                     <Box display="flex" alignItems="center">
                         <Timestamp variant="subtitle1" sx={{ marginRight: 1 }} timestamp={data.metadata.createdAt} />
-                        <Tooltip title={data.createdBy}>
-                            <Box>
-                                <Gravatar width={20} height={20} email={data.createdBy} />
-                            </Box>
-                        </Tooltip>
+                        <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={20} />
                     </Box>
                 </Box>
                 {data.configurationVersion && <Box marginBottom={3}>

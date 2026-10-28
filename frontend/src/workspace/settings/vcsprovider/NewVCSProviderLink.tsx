@@ -28,6 +28,9 @@ export const NewMutation: GraphQLTaggedNode =
                             createdAt
                         }
                         createdBy
+                        createdByActor {
+                            ...ActorDisplayFragment_actor
+                        }
                         repositoryPath
                         branch
                         moduleDirectory

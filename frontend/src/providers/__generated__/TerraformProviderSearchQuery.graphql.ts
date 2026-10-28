@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7020a4b98ceae75d9b708c0dcdd76ebe>>
+ * @generated SignedSource<<70485b40187764a0a3407db2232c347a>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -89,7 +89,23 @@ v6 = {
   "kind": "ScalarField",
   "name": "id",
   "storageKey": null
-};
+},
+v7 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "__typename",
+  "storageKey": null
+},
+v8 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+];
 return {
   "fragment": {
     "argumentDefinitions": [
@@ -195,8 +211,75 @@ return {
                       {
                         "alias": null,
                         "args": null,
-                        "kind": "ScalarField",
-                        "name": "createdBy",
+                        "concreteType": null,
+                        "kind": "LinkedField",
+                        "name": "createdByActor",
+                        "plural": false,
+                        "selections": [
+                          (v7/*: any*/),
+                          {
+                            "kind": "TypeDiscriminator",
+                            "abstractKey": "__isActor"
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "type",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "principalId",
+                            "storageKey": null
+                          },
+                          {
+                            "kind": "InlineFragment",
+                            "selections": [
+                              {
+                                "alias": null,
+                                "args": null,
+                                "concreteType": "User",
+                                "kind": "LinkedField",
+                                "name": "user",
+                                "plural": false,
+                                "selections": [
+                                  {
+                                    "alias": null,
+                                    "args": null,
+                                    "kind": "ScalarField",
+                                    "name": "email",
+                                    "storageKey": null
+                                  },
+                                  (v6/*: any*/)
+                                ],
+                                "storageKey": null
+                              }
+                            ],
+                            "type": "UserActor",
+                            "abstractKey": null
+                          },
+                          {
+                            "kind": "InlineFragment",
+                            "selections": (v8/*: any*/),
+                            "type": "ServiceAccountActor",
+                            "abstractKey": null
+                          },
+                          {
+                            "kind": "InlineFragment",
+                            "selections": (v8/*: any*/),
+                            "type": "VCSProviderActor",
+                            "abstractKey": null
+                          },
+                          {
+                            "kind": "InlineFragment",
+                            "selections": (v8/*: any*/),
+                            "type": "JobActor",
+                            "abstractKey": null
+                          }
+                        ],
                         "storageKey": null
                       },
                       {
@@ -221,13 +304,7 @@ return {
                     ],
                     "storageKey": null
                   },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "__typename",
-                    "storageKey": null
-                  }
+                  (v7/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -298,12 +375,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "87a6120dbfbb889164e8de2aba150308",
+    "cacheID": "42a16f1dac34f7572dfb3c177e473a09",
     "id": null,
     "metadata": {},
     "name": "TerraformProviderSearchQuery",
     "operationKind": "query",
-    "text": "query TerraformProviderSearchQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $search: String\n) {\n  ...TerraformProviderSearchFragment_providers\n}\n\nfragment TerraformProviderSearchFragment_providers on Query {\n  terraformProviders(after: $after, before: $before, first: $first, last: $last, search: $search, sort: NAME_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...TerraformProviderSearchListItemFragment_provider\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment TerraformProviderSearchListItemFragment_provider on TerraformProvider {\n  id\n  name\n  registryNamespace\n  private\n  latestVersion {\n    version\n    createdBy\n    metadata {\n      createdAt\n    }\n    id\n  }\n}\n"
+    "text": "query TerraformProviderSearchQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $search: String\n) {\n  ...TerraformProviderSearchFragment_providers\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment TerraformProviderSearchFragment_providers on Query {\n  terraformProviders(after: $after, before: $before, first: $first, last: $last, search: $search, sort: NAME_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...TerraformProviderSearchListItemFragment_provider\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment TerraformProviderSearchListItemFragment_provider on TerraformProvider {\n  id\n  name\n  registryNamespace\n  private\n  latestVersion {\n    version\n    createdByActor {\n      __typename\n      ...ActorDisplayFragment_actor\n    }\n    metadata {\n      createdAt\n    }\n    id\n  }\n}\n"
   }
 };
 })();

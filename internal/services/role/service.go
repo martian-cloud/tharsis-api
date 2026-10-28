@@ -184,7 +184,7 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 	toCreate := &models.Role{
 		Name:        input.Name,
 		Description: input.Description,
-		CreatedBy:   caller.GetSubject(),
+		CreatedBy:   caller.GetActor(),
 	}
 
 	toCreate.SetPermissions(input.Permissions)

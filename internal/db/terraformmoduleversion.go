@@ -97,7 +97,7 @@ type terraformModuleVersions struct {
 }
 
 var moduleVersionFieldList = append(
-	metadataFieldList,
+	metadataAndCreatedByFieldList,
 	"module_id",
 	"semantic_version",
 	"sha_sum",
@@ -108,7 +108,6 @@ var moduleVersionFieldList = append(
 	"submodules",
 	"examples",
 	"latest",
-	"created_by",
 	"package_object_store_key",
 )
 
@@ -246,6 +245,11 @@ func (t *terraformModuleVersions) CreateModuleVersion(ctx context.Context, modul
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(moduleVersion.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	submodules, err := json.Marshal(moduleVersion.Submodules)
@@ -272,7 +276,10 @@ func (t *terraformModuleVersions) CreateModuleVersion(ctx context.Context, modul
 		"upload_started_at":        moduleVersion.UploadStartedTimestamp,
 		"submodules":               submodules,
 		"examples":                 examples,
-		"created_by":               moduleVersion.CreatedBy,
+		"created_by":               moduleVersion.CreatedBy.Subject,
+		"created_by_actor_type":    createdByActorType,
+		"created_by_actor_id":      createdByActorID,
+		"created_by_actor_trn":     createdByActorTRN,
 		"latest":                   moduleVersion.Latest,
 		"package_object_store_key": moduleVersion.PackageObjectStoreKey,
 	}
@@ -509,6 +516,7 @@ func (t *terraformModuleVersions) getSelectFields() []interface{} {
 }
 
 func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	moduleVersion := &models.TerraformModuleVersion{}
 
 	moduleVersion.Submodules = []string{}
@@ -525,6 +533,10 @@ func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, er
 		&moduleVersion.Metadata.CreationTimestamp,
 		&moduleVersion.Metadata.LastUpdatedTimestamp,
 		&moduleVersion.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&moduleVersion.ModuleID,
 		&moduleVersion.SemanticVersion,
 		&moduleVersion.SHASum,
@@ -535,7 +547,6 @@ func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, er
 		&moduleVersion.Submodules,
 		&moduleVersion.Examples,
 		&moduleVersion.Latest,
-		&moduleVersion.CreatedBy,
 		&packageKey,
 		&groupPath,
 		&moduleName,
@@ -546,6 +557,9 @@ func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, er
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	moduleVersion.CreatedBy = parsedActor
 
 	if errorMessage.Valid {
 		moduleVersion.Error = errorMessage.String

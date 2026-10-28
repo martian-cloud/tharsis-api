@@ -55,7 +55,7 @@ type Workspace struct {
 	Description           string
 	CurrentApplyRunID     *string
 	CurrentStateVersionID string
-	CreatedBy             string
+	CreatedBy             Actor
 	TerraformVersion      string
 	Metadata              ResourceMetadata
 	DirtyState            bool

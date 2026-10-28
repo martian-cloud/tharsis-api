@@ -13,7 +13,7 @@ var _ Model = (*TerraformModule)(nil)
 
 // TerraformModule represents a terraform module
 type TerraformModule struct {
-	CreatedBy     string
+	CreatedBy     Actor
 	Name          string // the module name
 	System        string // the name of the remote system the module is intended to target
 	GroupID       string

@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.actor;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+// Actor identifies the principal that performed an action. Exactly one case of
+// the oneof is set, and it names the kind of principal.
+//
+// A resource created before actors were introduced has no Actor at all, and an
+// Actor with no case set is a kind of principal added after the client was
+// generated. Clients should fall back to the resource's created_by string in
+// both cases.
+//
+// Resolving principal_id is optional: the case alone, together with
+// trn_snapshot where present, is enough to render a principal without any
+// further calls. A record that no longer exists, or that the caller is not
+// permitted to see, is simply unavailable -- absence does not specifically
+// mean the record was deleted.
+message Actor {
+  oneof actor {
+    UserActor           user            = 1;
+    ServiceAccountActor service_account = 2;
+    JobActor            job             = 3;
+    VCSProviderActor    vcs_provider    = 4;
+    SystemActor         system          = 5;
+    SCIMActor           scim            = 6;
+  }
+}
+
+// UserActor is an action performed by a user. It carries no TRN snapshot,
+// because a user's TRN names its username, which identifies a person.
+message UserActor {
+  // principal_id is the global ID of the user.
+  string principal_id = 1;
+}
+
+// ServiceAccountActor is an action performed by a service account.
+message ServiceAccountActor {
+  // principal_id is the global ID of the service account.
+  string principal_id = 1;
+  // trn_snapshot is the service account's TRN when the action was recorded,
+  // for display. It is not updated when the service account is renamed or
+  // moved; use principal_id to reference the service account itself.
+  optional string trn_snapshot = 2;
+}
+
+// JobActor is an action performed by a job running in a workspace.
+message JobActor {
+  // principal_id is the global ID of the job.
+  string principal_id = 1;
+  // trn_snapshot is the job's TRN when the action was recorded, for display.
+  // It names the job's workspace path, and it is not updated when the
+  // workspace is moved; use principal_id to reference the job itself.
+  optional string trn_snapshot = 2;
+}
+
+// VCSProviderActor is an action performed by a VCS provider through a
+// workspace link.
+message VCSProviderActor {
+  // principal_id is the global ID of the VCS provider.
+  string principal_id = 1;
+  // trn_snapshot is the VCS provider's TRN when the action was recorded, for
+  // display. It is not updated when the provider is renamed or moved; use
+  // principal_id to reference the provider itself.
+  optional string trn_snapshot = 2;
+}
+
+// SystemActor is an internal system action. It has no backing record.
+message SystemActor {}
+
+// SCIMActor is a SCIM provisioning action. It has no backing record.
+message SCIMActor {}

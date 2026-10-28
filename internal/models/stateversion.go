@@ -11,7 +11,7 @@ var _ Model = (*StateVersion)(nil)
 type StateVersion struct {
 	WorkspaceID    string
 	RunID          *string
-	CreatedBy      string
+	CreatedBy      Actor
 	ObjectStoreKey string
 	// JSONObjectStoreKey locates the "terraform show -json" rendering of this state version
 	JSONObjectStoreKey *string

@@ -148,7 +148,13 @@ func (r *RoleResolver) Metadata() *MetadataResolver {
 
 // CreatedBy resolver
 func (r *RoleResolver) CreatedBy() string {
-	return r.role.CreatedBy
+	return r.role.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *RoleResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.role.CreatedBy)
 }
 
 // Permissions resolver

@@ -23,7 +23,7 @@ import (
 
 func TestCreateReconcileRun_Execute(t *testing.T) {
 	ctx := context.Background()
-	input := &corerun.CreateRunInput{Subject: "u", WorkspaceID: "ws-1"}
+	input := &corerun.CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"}
 
 	var gotInput *corerun.CreateRunInput
 	cmd := &CreateReconcileRun{
@@ -73,7 +73,7 @@ func TestCreateReconcileRun_Prepare(t *testing.T) {
 		uploadRunVariables: func(_ context.Context, _ string, _ []runvariables.Variable) (db.RetainObjectRefFunc, string, error) {
 			return nil, "vars-key", nil
 		},
-		in: &CreateReconcileRunInput{Subject: "u", WorkspaceID: "ws-1"},
+		in: &CreateReconcileRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"},
 	}
 
 	require.NoError(t, cmd.Prepare(ctx))

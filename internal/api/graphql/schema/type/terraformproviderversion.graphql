@@ -44,7 +44,8 @@ type TerraformProviderVersion implements Node {
   readme: String! @complexity(value: 1)
   platforms: [TerraformProviderPlatform!]!
   latest: Boolean!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
 }
 
 input CreateTerraformProviderVersionInput {

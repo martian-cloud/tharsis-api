@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/doug-martin/goqu/v9"
@@ -26,7 +27,7 @@ type scimTokens struct {
 	dbClient *Client
 }
 
-var scimTokensFieldList = append(metadataFieldList, "created_by", "nonce")
+var scimTokensFieldList = append(metadataAndCreatedByFieldList, "nonce")
 
 // NewSCIMTokens returns an instance of the SCIMTokens interface.
 func NewSCIMTokens(dbClient *Client) SCIMTokens {
@@ -78,17 +79,25 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(token.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("scim_tokens.CreateToken", dialect.Insert("scim_tokens").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":         newResourceID(),
-			"version":    initialResourceVersion,
-			"created_at": timestamp,
-			"updated_at": timestamp,
-			"created_by": token.CreatedBy,
-			"nonce":      token.Nonce,
+			"id":                    newResourceID(),
+			"version":               initialResourceVersion,
+			"created_at":            timestamp,
+			"updated_at":            timestamp,
+			"created_by":            token.CreatedBy.Subject,
+			"created_by_actor_type": createdByActorType,
+			"created_by_actor_id":   createdByActorID,
+			"created_by_actor_trn":  createdByActorTRN,
+			"nonce":                 token.Nonce,
 		}).
 		Returning(scimTokensFieldList...))
 	if err != nil {
@@ -171,6 +180,7 @@ func (s *scimTokens) getSelectFields() []interface{} {
 }
 
 func scanSCIMToken(row scanner) (*models.SCIMToken, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	token := &models.SCIMToken{}
 
 	fields := []interface{}{
@@ -178,7 +188,10 @@ func scanSCIMToken(row scanner) (*models.SCIMToken, error) {
 		&token.Metadata.CreationTimestamp,
 		&token.Metadata.LastUpdatedTimestamp,
 		&token.Metadata.Version,
-		&token.CreatedBy,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&token.Nonce,
 	}
 
@@ -186,6 +199,9 @@ func scanSCIMToken(row scanner) (*models.SCIMToken, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	token.CreatedBy = parsedActor
 
 	token.Metadata.TRN = trn.TypeSCIMToken.Build(token.GetGlobalID())
 

@@ -48,7 +48,8 @@ type StateVersion implements Node {
   inventory: StateVersionInventory! @complexity(value: 5)
   data: String!
   jsonData: String @complexity(value: 5)
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
 }
 
 input CreateStateVersionInput {

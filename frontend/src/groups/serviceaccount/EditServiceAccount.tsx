@@ -44,6 +44,9 @@ function EditServiceAccount(props: Props) {
                 description
                 resourcePath
                 createdBy
+                createdByActor {
+                    ...ActorDisplayFragment_actor
+                }
                 clientCredentialsEnabled
                 clientSecretExpiresAt
                 oidcTrustPolicies {
@@ -67,6 +70,9 @@ function EditServiceAccount(props: Props) {
                     description
                     resourcePath
                     createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     clientCredentialsEnabled
                     clientSecretExpiresAt
                     oidcTrustPolicies {

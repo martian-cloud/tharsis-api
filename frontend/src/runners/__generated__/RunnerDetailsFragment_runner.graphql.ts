@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7865e6adbd2f0e5c73decdf3ed189a44>>
+ * @generated SignedSource<<4b5704dc3e89f94a37d425eaec0393c8>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,7 +15,9 @@ export type RunnerDetailsFragment_runner$data = {
   readonly assignedServiceAccounts: {
     readonly totalCount: number;
   };
-  readonly createdBy: string;
+  readonly createdByActor: {
+    readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+  } | null | undefined;
   readonly description: string;
   readonly disabled: boolean;
   readonly id: string;
@@ -88,8 +90,17 @@ const node: ReaderFragment = {
     {
       "alias": null,
       "args": null,
-      "kind": "ScalarField",
-      "name": "createdBy",
+      "concreteType": null,
+      "kind": "LinkedField",
+      "name": "createdByActor",
+      "plural": false,
+      "selections": [
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "ActorDisplayFragment_actor"
+        }
+      ],
       "storageKey": null
     },
     {
@@ -230,6 +241,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "05d4770d66c352d5ba66c3da43e24b6a";
+(node as any).hash = "b5d618bd30e3721023fd1e133a3a0865";
 
 export default node;

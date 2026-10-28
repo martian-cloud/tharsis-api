@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -29,11 +30,10 @@ type runGateApprovals struct {
 	dbClient *Client
 }
 
-var runGateApprovalFieldList = append(metadataFieldList,
+var runGateApprovalFieldList = append(metadataAndCreatedByFieldList,
 	"run_gate_id",
 	"user_id",
 	"service_account_id",
-	"created_by",
 	"decision",
 	"comment",
 	"covered_rules",
@@ -101,6 +101,11 @@ func (m *runGateApprovals) CreateRunGateApproval(ctx context.Context, approval *
 	ctx, span := tracer.Start(ctx, "db.CreateRunGateApproval")
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(approval.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	coveredRules, err := json.Marshal(approval.CoveredRules)
@@ -111,17 +116,20 @@ func (m *runGateApprovals) CreateRunGateApproval(ctx context.Context, approval *
 	sql, args, err := toSQLWithTag("rungateapproval.CreateRunGateApproval", dialect.Insert("run_gate_approvals").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":                 newResourceID(),
-			"version":            initialResourceVersion,
-			"created_at":         timestamp,
-			"updated_at":         timestamp,
-			"run_gate_id":        approval.RunGateID,
-			"user_id":            approval.UserID,
-			"service_account_id": approval.ServiceAccountID,
-			"created_by":         approval.CreatedBy,
-			"decision":           approval.Decision,
-			"comment":            approval.Comment,
-			"covered_rules":      coveredRules,
+			"id":                    newResourceID(),
+			"version":               initialResourceVersion,
+			"created_at":            timestamp,
+			"updated_at":            timestamp,
+			"run_gate_id":           approval.RunGateID,
+			"user_id":               approval.UserID,
+			"service_account_id":    approval.ServiceAccountID,
+			"created_by":            approval.CreatedBy.Subject,
+			"created_by_actor_type": createdByActorType,
+			"created_by_actor_id":   createdByActorID,
+			"created_by_actor_trn":  createdByActorTRN,
+			"decision":              approval.Decision,
+			"comment":               approval.Comment,
+			"covered_rules":         coveredRules,
 		}).Returning(m.getSelectFields()...))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -215,6 +223,7 @@ func (m *runGateApprovals) getSelectFields() []interface{} {
 }
 
 func scanRunGateApproval(row scanner) (*models.RunGateApproval, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	approval := &models.RunGateApproval{}
 
 	var coveredRules []byte
@@ -224,10 +233,13 @@ func scanRunGateApproval(row scanner) (*models.RunGateApproval, error) {
 		&approval.Metadata.CreationTimestamp,
 		&approval.Metadata.LastUpdatedTimestamp,
 		&approval.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&approval.RunGateID,
 		&approval.UserID,
 		&approval.ServiceAccountID,
-		&approval.CreatedBy,
 		&approval.Decision,
 		&approval.Comment,
 		&coveredRules,
@@ -236,6 +248,9 @@ func scanRunGateApproval(row scanner) (*models.RunGateApproval, error) {
 	if err := row.Scan(fields...); err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	approval.CreatedBy = parsedActor
 
 	if len(coveredRules) > 0 {
 		if err := json.Unmarshal(coveredRules, &approval.CoveredRules); err != nil {

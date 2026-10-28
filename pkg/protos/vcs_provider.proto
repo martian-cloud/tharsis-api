@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.vcs_provider;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 import "pagination.proto";
 import "google/protobuf/empty.proto";
@@ -150,14 +151,21 @@ message VCSProvider {
   string                    group_id             = 4;
   string                    type                 = 5;
   string                    url                  = 6;
-  string                    created_by           = 7;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by           = 7 [deprecated = true];
   bool                      auto_create_webhooks = 8;
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor created_by_actor = 9;
 }
 
 // WorkspaceVCSProviderLink defines a link between a workspace and a VCS provider.
 message WorkspaceVCSProviderLink {
   metadata.ResourceMetadata metadata              = 1;
-  string                    created_by            = 2;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by            = 2 [deprecated = true];
   string                    workspace_id          = 3;
   string                    vcs_provider_id       = 4;
   string                    repository_path       = 5;
@@ -168,6 +176,9 @@ message WorkspaceVCSProviderLink {
   repeated string           glob_patterns         = 10;
   bool                      auto_speculative_plan = 11;
   bool                      webhook_disabled      = 12;
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor created_by_actor = 13;
 }
 
 // GetVCSProvidersResponse is the paginated list of VCS Providers.

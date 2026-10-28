@@ -29,7 +29,7 @@ func TestVariables_CreateVariable(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-namespace",
 		FullPath:  "test-namespace",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -103,7 +103,7 @@ func TestVariables_UpdateVariable(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-namespace-update",
 		FullPath:  "test-namespace-update",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -179,7 +179,7 @@ func TestVariables_DeleteVariable(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-namespace-delete",
 		FullPath:  "test-namespace-delete",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -253,7 +253,7 @@ func TestVariables_GetVariableByID(t *testing.T) {
 		Name:        "test-group-variable-get-by-id",
 		Description: "test group for variable get by id",
 		FullPath:    "test-group-variable-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -319,7 +319,7 @@ func TestVariables_GetVariables(t *testing.T) {
 		Name:        "test-group-variables-list",
 		Description: "test group for variables list",
 		FullPath:    "test-group-variables-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -416,7 +416,7 @@ func TestVariables_GetVariablesWithPaginationAndSorting(t *testing.T) {
 		Name:        "test-group-variables-pagination",
 		Description: "test group for variables pagination",
 		FullPath:    "test-group-variables-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -473,7 +473,7 @@ func TestVariables_GetVariableByTRN(t *testing.T) {
 		Name:        "test-group-variable-get-by-trn",
 		Description: "test group for variable get by trn",
 		FullPath:    "test-group-variable-get-by-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -539,7 +539,7 @@ func TestVariables_CreateVariables(t *testing.T) {
 		Name:        "test-group-variables-bulk-create",
 		Description: "test group for variables bulk create",
 		FullPath:    "test-group-variables-bulk-create",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

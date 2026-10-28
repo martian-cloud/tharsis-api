@@ -3,6 +3,7 @@ import { ArrowDropUp } from '@mui/icons-material';
 import { default as ArrowDropDown, default as ArrowDropDownIcon } from '@mui/icons-material/ArrowDropDown';
 import { LoadingButton } from '@mui/lab';
 import { Avatar, Alert, Box, Button, ButtonGroup, Collapse, Dialog, DialogActions, DialogTitle, DialogContent, Divider, Menu, MenuItem, Link, Paper, Stack, styled, Typography } from '@mui/material'
+import ActorDisplay from '../../common/ActorDisplay';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import Timestamp from '../../common/Timestamp';
@@ -105,7 +106,9 @@ function VCSProviderDetails(props: Props) {
                 ... on VCSProvider {
                     id
                     name
-                    createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     description
                     type
                     url
@@ -319,7 +322,7 @@ function VCSProviderDetails(props: Props) {
                             <Collapse in={showMore} timeout="auto" unmountOnExit>
                                 <Box marginTop={2}>
                                     <Typography variant="body2">
-                                        Created <Timestamp timestamp={vcsProvider.metadata.createdAt as string} /> by {vcsProvider.createdBy}
+                                        Created <Timestamp timestamp={vcsProvider.metadata.createdAt as string} /> by <ActorDisplay fragmentRef={vcsProvider.createdByActor} variant="text" />
                                     </Typography>
                                 </Box>
                             </Collapse>

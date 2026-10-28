@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<fecaf3ec7a9fb6451b3dad44e7356cbc>>
+ * @generated SignedSource<<448382ce87e6848d1241a48ea2e62486>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -99,6 +99,15 @@ v8 = [
     "kind": "Literal",
     "name": "sort",
     "value": "CREATED_AT_DESC"
+  }
+],
+v9 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
   }
 ];
 return {
@@ -212,8 +221,75 @@ return {
                           {
                             "alias": null,
                             "args": null,
-                            "kind": "ScalarField",
-                            "name": "createdBy",
+                            "concreteType": null,
+                            "kind": "LinkedField",
+                            "name": "createdByActor",
+                            "plural": false,
+                            "selections": [
+                              (v6/*: any*/),
+                              {
+                                "kind": "TypeDiscriminator",
+                                "abstractKey": "__isActor"
+                              },
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "type",
+                                "storageKey": null
+                              },
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "principalId",
+                                "storageKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": [
+                                  {
+                                    "alias": null,
+                                    "args": null,
+                                    "concreteType": "User",
+                                    "kind": "LinkedField",
+                                    "name": "user",
+                                    "plural": false,
+                                    "selections": [
+                                      {
+                                        "alias": null,
+                                        "args": null,
+                                        "kind": "ScalarField",
+                                        "name": "email",
+                                        "storageKey": null
+                                      },
+                                      (v7/*: any*/)
+                                    ],
+                                    "storageKey": null
+                                  }
+                                ],
+                                "type": "UserActor",
+                                "abstractKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": (v9/*: any*/),
+                                "type": "ServiceAccountActor",
+                                "abstractKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": (v9/*: any*/),
+                                "type": "VCSProviderActor",
+                                "abstractKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": (v9/*: any*/),
+                                "type": "JobActor",
+                                "abstractKey": null
+                              }
+                            ],
                             "storageKey": null
                           },
                           {
@@ -307,12 +383,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "65a91bc82bb7f0cb3722a8f253bb9355",
+    "cacheID": "bc01f6ef166ae44433e83190e9429aa7",
     "id": null,
     "metadata": {},
     "name": "PackageVersionListPaginationQuery",
     "operationKind": "query",
-    "text": "query PackageVersionListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...PackageVersionListFragment_package\n    id\n  }\n}\n\nfragment PackageVersionListFragment_package on Package {\n  id\n  versions(after: $after, before: $before, first: $first, last: $last, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...PackageVersionListItemFragment_version\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment PackageVersionListItemFragment_version on PackageVersion {\n  metadata {\n    createdAt\n  }\n  id\n  version\n  createdBy\n  latest\n  status\n}\n"
+    "text": "query PackageVersionListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...PackageVersionListFragment_package\n    id\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment PackageVersionListFragment_package on Package {\n  id\n  versions(after: $after, before: $before, first: $first, last: $last, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...PackageVersionListItemFragment_version\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment PackageVersionListItemFragment_version on PackageVersion {\n  metadata {\n    createdAt\n  }\n  id\n  version\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  latest\n  status\n}\n"
   }
 };
 })();

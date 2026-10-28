@@ -379,7 +379,7 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 		RootGroupID:   rootGroupID,
 		Private:       input.Private,
 		RepositoryURL: input.RepositoryURL,
-		CreatedBy:     caller.GetSubject(),
+		CreatedBy:     caller.GetActor(),
 	}
 
 	if vErr := providerToCreate.Validate(); vErr != nil {
@@ -783,7 +783,7 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		SemanticVersion: semVersion.String(),
 		Protocols:       input.Protocols,
 		Latest:          isLatest,
-		CreatedBy:       caller.GetSubject(),
+		CreatedBy:       caller.GetActor(),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create provider version", errors.WithSpan(span))
@@ -1108,7 +1108,7 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 		SHASum:            input.SHASum,
 		Filename:          input.Filename,
 		BinaryUploaded:    false,
-		CreatedBy:         caller.GetSubject(),
+		CreatedBy:         caller.GetActor(),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create terraform provider platform", errors.WithSpan(span))

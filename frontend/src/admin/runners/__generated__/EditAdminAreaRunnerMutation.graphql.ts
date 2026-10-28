@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<0ec7541a1f785a01fdd8426de65e69a1>>
+ * @generated SignedSource<<4fde3095dfac19b84b5a2a4e8692dfad>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -62,6 +62,13 @@ v1 = [
 v2 = {
   "alias": null,
   "args": null,
+  "kind": "ScalarField",
+  "name": "type",
+  "storageKey": null
+},
+v3 = {
+  "alias": null,
+  "args": null,
   "concreteType": "Problem",
   "kind": "LinkedField",
   "name": "problems",
@@ -81,16 +88,26 @@ v2 = {
       "name": "field",
       "storageKey": null
     },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "type",
-      "storageKey": null
-    }
+    (v2/*: any*/)
   ],
   "storageKey": null
-};
+},
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "id",
+  "storageKey": null
+},
+v5 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+];
 return {
   "fragment": {
     "argumentDefinitions": (v0/*: any*/),
@@ -122,7 +139,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v3/*: any*/)
         ],
         "storageKey": null
       }
@@ -177,13 +194,7 @@ return {
                 ],
                 "storageKey": null
               },
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "id",
-                "storageKey": null
-              },
+              (v4/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -201,8 +212,75 @@ return {
               {
                 "alias": null,
                 "args": null,
-                "kind": "ScalarField",
-                "name": "createdBy",
+                "concreteType": null,
+                "kind": "LinkedField",
+                "name": "createdByActor",
+                "plural": false,
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "__typename",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "TypeDiscriminator",
+                    "abstractKey": "__isActor"
+                  },
+                  (v2/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "principalId",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "User",
+                        "kind": "LinkedField",
+                        "name": "user",
+                        "plural": false,
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "email",
+                            "storageKey": null
+                          },
+                          (v4/*: any*/)
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "UserActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v5/*: any*/),
+                    "type": "ServiceAccountActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v5/*: any*/),
+                    "type": "VCSProviderActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v5/*: any*/),
+                    "type": "JobActor",
+                    "abstractKey": null
+                  }
+                ],
                 "storageKey": null
               },
               {
@@ -215,19 +293,19 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v3/*: any*/)
         ],
         "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "2e882cedfc2dfbb0f37d5036e48294e4",
+    "cacheID": "c08e61763ff721d8687233abe3f542db",
     "id": null,
     "metadata": {},
     "name": "EditAdminAreaRunnerMutation",
     "operationKind": "mutation",
-    "text": "mutation EditAdminAreaRunnerMutation(\n  $input: UpdateRunnerInput!\n) {\n  updateRunner(input: $input) {\n    runner {\n      ...RunnerListItemFragment_runner\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment RunnerListItemFragment_runner on Runner {\n  metadata {\n    createdAt\n    updatedAt\n  }\n  id\n  name\n  disabled\n  createdBy\n  groupPath\n}\n"
+    "text": "mutation EditAdminAreaRunnerMutation(\n  $input: UpdateRunnerInput!\n) {\n  updateRunner(input: $input) {\n    runner {\n      ...RunnerListItemFragment_runner\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment RunnerListItemFragment_runner on Runner {\n  metadata {\n    createdAt\n    updatedAt\n  }\n  id\n  name\n  disabled\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  groupPath\n}\n"
   }
 };
 })();

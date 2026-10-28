@@ -157,7 +157,13 @@ func (r *GPGKeyResolver) Group(ctx context.Context) (*GroupResolver, error) {
 
 // CreatedBy resolver
 func (r *GPGKeyResolver) CreatedBy() string {
-	return r.gpgKey.CreatedBy
+	return r.gpgKey.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *GPGKeyResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.gpgKey.CreatedBy)
 }
 
 // GroupPath resolver

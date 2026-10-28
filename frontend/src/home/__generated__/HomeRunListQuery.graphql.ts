@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<80fb7ca3cae0e76d96cf6baed106d79b>>
+ * @generated SignedSource<<335291067bccb04ec2bfaa5c5ae70bbc>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -66,11 +66,27 @@ v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "status",
+  "name": "__typename",
   "storageKey": null
 },
 v5 = [
-  (v4/*: any*/),
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+],
+v6 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "status",
+  "storageKey": null
+},
+v7 = [
+  (v6/*: any*/),
   (v3/*: any*/)
 ];
 return {
@@ -129,8 +145,75 @@ return {
                   {
                     "alias": null,
                     "args": null,
-                    "kind": "ScalarField",
-                    "name": "createdBy",
+                    "concreteType": null,
+                    "kind": "LinkedField",
+                    "name": "createdByActor",
+                    "plural": false,
+                    "selections": [
+                      (v4/*: any*/),
+                      {
+                        "kind": "TypeDiscriminator",
+                        "abstractKey": "__isActor"
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "type",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "principalId",
+                        "storageKey": null
+                      },
+                      {
+                        "kind": "InlineFragment",
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "concreteType": "User",
+                            "kind": "LinkedField",
+                            "name": "user",
+                            "plural": false,
+                            "selections": [
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "email",
+                                "storageKey": null
+                              },
+                              (v3/*: any*/)
+                            ],
+                            "storageKey": null
+                          }
+                        ],
+                        "type": "UserActor",
+                        "abstractKey": null
+                      },
+                      {
+                        "kind": "InlineFragment",
+                        "selections": (v5/*: any*/),
+                        "type": "ServiceAccountActor",
+                        "abstractKey": null
+                      },
+                      {
+                        "kind": "InlineFragment",
+                        "selections": (v5/*: any*/),
+                        "type": "VCSProviderActor",
+                        "abstractKey": null
+                      },
+                      {
+                        "kind": "InlineFragment",
+                        "selections": (v5/*: any*/),
+                        "type": "JobActor",
+                        "abstractKey": null
+                      }
+                    ],
                     "storageKey": null
                   },
                   {
@@ -177,7 +260,7 @@ return {
                     ],
                     "storageKey": null
                   },
-                  (v4/*: any*/),
+                  (v6/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -192,7 +275,7 @@ return {
                     "kind": "LinkedField",
                     "name": "plan",
                     "plural": false,
-                    "selections": (v5/*: any*/),
+                    "selections": (v7/*: any*/),
                     "storageKey": null
                   },
                   {
@@ -210,7 +293,7 @@ return {
                         "name": "stageName",
                         "storageKey": null
                       },
-                      (v4/*: any*/)
+                      (v6/*: any*/)
                     ],
                     "storageKey": null
                   },
@@ -221,7 +304,7 @@ return {
                     "kind": "LinkedField",
                     "name": "apply",
                     "plural": false,
-                    "selections": (v5/*: any*/),
+                    "selections": (v7/*: any*/),
                     "storageKey": null
                   },
                   {
@@ -256,13 +339,7 @@ return {
                     ],
                     "storageKey": null
                   },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "__typename",
-                    "storageKey": null
-                  }
+                  (v4/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -319,12 +396,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "9228b5cc333dd40f8c335d47d22a5b71",
+    "cacheID": "37e53f9ee034bfb2f2f7b65e0e78981f",
     "id": null,
     "metadata": {},
     "name": "HomeRunListQuery",
     "operationKind": "query",
-    "text": "query HomeRunListQuery(\n  $first: Int!\n  $after: String\n) {\n  ...HomeRunListFragment_runs\n}\n\nfragment HomeRunListFragment_runs on Query {\n  runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: false) {\n    edges {\n      node {\n        id\n        ...HomeRunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  isDestroy\n  metadata {\n    createdAt\n  }\n  workspace {\n    fullPath\n    id\n  }\n  ...RunStageIconsFragment_run\n  ...RunAnnotationsFragment_run\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
+    "text": "query HomeRunListQuery(\n  $first: Int!\n  $after: String\n) {\n  ...HomeRunListFragment_runs\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment HomeRunListFragment_runs on Query {\n  runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: false) {\n    edges {\n      node {\n        id\n        ...HomeRunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  isDestroy\n  metadata {\n    createdAt\n  }\n  workspace {\n    fullPath\n    id\n  }\n  ...RunStageIconsFragment_run\n  ...RunAnnotationsFragment_run\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
   }
 };
 })();

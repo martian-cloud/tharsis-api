@@ -22,7 +22,7 @@ func createTestGroupForCleanupPolicy(ctx context.Context, t *testing.T, testClie
 		Name:        name,
 		Description: "test group for cleanup policy",
 		FullPath:    name,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 	return group
@@ -36,7 +36,7 @@ func createTestWorkspaceForCleanupPolicy(ctx context.Context, t *testing.T, test
 		Name:           name,
 		GroupID:        groupID,
 		Description:    "test workspace for cleanup policy",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)

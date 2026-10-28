@@ -17,7 +17,7 @@ type FederatedRegistry struct {
 	Hostname  string
 	GroupID   string
 	Audience  string
-	CreatedBy string
+	CreatedBy Actor
 }
 
 // GetID returns the ID of the FederatedRegistry resource

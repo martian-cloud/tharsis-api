@@ -362,7 +362,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 	}()
 
 	toCreate := &models.TerraformProviderVersionMirror{
-		CreatedBy:         caller.GetSubject(),
+		CreatedBy:         caller.GetActor(),
 		Type:              prov.Type,
 		RegistryNamespace: prov.Namespace,
 		RegistryHostname:  prov.Hostname,

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<1866f3253378808a22bbc56586920e38>>
+ * @generated SignedSource<<05135fd225a0b7ab39e2ecfa561cf360>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -93,7 +93,16 @@ v3 = {
   "kind": "ScalarField",
   "name": "id",
   "storageKey": null
-};
+},
+v4 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+];
 return {
   "fragment": {
     "argumentDefinitions": (v0/*: any*/),
@@ -187,8 +196,75 @@ return {
                           {
                             "alias": null,
                             "args": null,
-                            "kind": "ScalarField",
-                            "name": "createdBy",
+                            "concreteType": null,
+                            "kind": "LinkedField",
+                            "name": "createdByActor",
+                            "plural": false,
+                            "selections": [
+                              (v1/*: any*/),
+                              {
+                                "kind": "TypeDiscriminator",
+                                "abstractKey": "__isActor"
+                              },
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "type",
+                                "storageKey": null
+                              },
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "principalId",
+                                "storageKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": [
+                                  {
+                                    "alias": null,
+                                    "args": null,
+                                    "concreteType": "User",
+                                    "kind": "LinkedField",
+                                    "name": "user",
+                                    "plural": false,
+                                    "selections": [
+                                      {
+                                        "alias": null,
+                                        "args": null,
+                                        "kind": "ScalarField",
+                                        "name": "email",
+                                        "storageKey": null
+                                      },
+                                      (v3/*: any*/)
+                                    ],
+                                    "storageKey": null
+                                  }
+                                ],
+                                "type": "UserActor",
+                                "abstractKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": (v4/*: any*/),
+                                "type": "ServiceAccountActor",
+                                "abstractKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": (v4/*: any*/),
+                                "type": "VCSProviderActor",
+                                "abstractKey": null
+                              },
+                              {
+                                "kind": "InlineFragment",
+                                "selections": (v4/*: any*/),
+                                "type": "JobActor",
+                                "abstractKey": null
+                              }
+                            ],
                             "storageKey": null
                           },
                           {
@@ -309,12 +385,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "5e80b5a87c8e440486d2540af6fa7c82",
+    "cacheID": "87f8b93d899e7d4e2f3e44be33328d68",
     "id": null,
     "metadata": {},
     "name": "TerraformModuleVersionListPaginationQuery",
     "operationKind": "query",
-    "text": "query TerraformModuleVersionListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $moduleId: String!\n) {\n  ...TerraformModuleVersionListFragment_versions\n}\n\nfragment TerraformModuleVersionListFragment_versions on Query {\n  node(id: $moduleId) {\n    __typename\n    ... on TerraformModule {\n      versions(after: $after, before: $before, first: $first, last: $last, sort: CREATED_AT_DESC) {\n        edges {\n          node {\n            id\n            ...TerraformModuleVersionListItemFragment_version\n            __typename\n          }\n          cursor\n        }\n        pageInfo {\n          endCursor\n          hasNextPage\n          hasPreviousPage\n          startCursor\n        }\n      }\n    }\n    id\n  }\n}\n\nfragment TerraformModuleVersionListItemFragment_version on TerraformModuleVersion {\n  metadata {\n    createdAt\n  }\n  id\n  version\n  createdBy\n  latest\n  module {\n    name\n    registryNamespace\n    system\n    id\n  }\n}\n"
+    "text": "query TerraformModuleVersionListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $moduleId: String!\n) {\n  ...TerraformModuleVersionListFragment_versions\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment TerraformModuleVersionListFragment_versions on Query {\n  node(id: $moduleId) {\n    __typename\n    ... on TerraformModule {\n      versions(after: $after, before: $before, first: $first, last: $last, sort: CREATED_AT_DESC) {\n        edges {\n          node {\n            id\n            ...TerraformModuleVersionListItemFragment_version\n            __typename\n          }\n          cursor\n        }\n        pageInfo {\n          endCursor\n          hasNextPage\n          hasPreviousPage\n          startCursor\n        }\n      }\n    }\n    id\n  }\n}\n\nfragment TerraformModuleVersionListItemFragment_version on TerraformModuleVersion {\n  metadata {\n    createdAt\n  }\n  id\n  version\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  latest\n  module {\n    name\n    registryNamespace\n    system\n    id\n  }\n}\n"
   }
 };
 })();

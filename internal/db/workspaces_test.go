@@ -34,7 +34,7 @@ func TestWorkspaces_CreateWorkspace(t *testing.T) {
 		Name:        "test-group-workspace",
 		Description: "test group for workspace",
 		FullPath:    "test-group-workspace",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -81,7 +81,7 @@ func TestWorkspaces_CreateWorkspace(t *testing.T) {
 				Name:           test.workspaceName,
 				GroupID:        test.groupID,
 				Description:    test.description,
-				CreatedBy:      "db-integration-tests",
+				CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 				MaxJobDuration: ptr.Int32(1),
 			})
 
@@ -111,7 +111,7 @@ func TestWorkspaces_UpdateWorkspace(t *testing.T) {
 		Name:        "test-group-workspace-update",
 		Description: "test group for workspace update",
 		FullPath:    "test-group-workspace-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -120,7 +120,7 @@ func TestWorkspaces_UpdateWorkspace(t *testing.T) {
 		Name:           "test-workspace-update",
 		GroupID:        group.Metadata.ID,
 		Description:    "original description",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.Nil(t, err)
@@ -189,7 +189,7 @@ func TestWorkspaces_UpdateWorkspaceWithLabels(t *testing.T) {
 		Name:        "test-group-workspace-update-labels",
 		Description: "test group for workspace update with labels",
 		FullPath:    "test-group-workspace-update-labels",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -198,7 +198,7 @@ func TestWorkspaces_UpdateWorkspaceWithLabels(t *testing.T) {
 		Name:           "test-workspace-update-labels",
 		GroupID:        group.Metadata.ID,
 		Description:    "workspace for label update testing",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 		Labels: map[string]string{
 			"environment": "development",
@@ -282,7 +282,7 @@ func TestWorkspaces_DeleteWorkspace(t *testing.T) {
 		Name:        "test-group-workspace-delete",
 		Description: "test group for workspace delete",
 		FullPath:    "test-group-workspace-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -291,7 +291,7 @@ func TestWorkspaces_DeleteWorkspace(t *testing.T) {
 		Name:           "test-workspace-delete",
 		GroupID:        group.Metadata.ID,
 		Description:    "workspace to delete",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.Nil(t, err)
@@ -357,7 +357,7 @@ func TestWorkspaces_GetWorkspaceByID(t *testing.T) {
 		Name:        "test-group-workspace-get-by-id",
 		Description: "test group for workspace get by id",
 		FullPath:    "test-group-workspace-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -366,7 +366,7 @@ func TestWorkspaces_GetWorkspaceByID(t *testing.T) {
 		Name:           "test-workspace-get-by-id",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -485,7 +485,7 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 		Name:        "test-group-workspaces-list",
 		Description: "test group for workspaces list",
 		FullPath:    "test-group-workspaces-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -495,13 +495,13 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 			Name:           "test-workspace-list-1",
 			GroupID:        group.Metadata.ID,
 			MaxJobDuration: ptr.Int32(1),
-			CreatedBy:      "db-integration-tests",
+			CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			Name:           "test-workspace-list-2",
 			GroupID:        group.Metadata.ID,
 			MaxJobDuration: ptr.Int32(1),
-			CreatedBy:      "db-integration-tests",
+			CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -517,7 +517,7 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 		Name:        "test-group-workspaces-list-b",
 		Description: "second group for workspace list tests",
 		FullPath:    "test-group-workspaces-list-b",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -525,7 +525,7 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 		Name:           "test-workspace-list-b",
 		GroupID:        groupB.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 	_ = wsInGroupB
@@ -690,7 +690,7 @@ func TestWorkspaces_GetWorkspacesWithPaginationAndSorting(t *testing.T) {
 		Name:        "test-group-workspaces-pagination",
 		Description: "test group for workspaces pagination",
 		FullPath:    "test-group-workspaces-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -700,7 +700,7 @@ func TestWorkspaces_GetWorkspacesWithPaginationAndSorting(t *testing.T) {
 			Name:           fmt.Sprintf("test-workspace-pagination-%d", i),
 			GroupID:        group.Metadata.ID,
 			MaxJobDuration: ptr.Int32(1),
-			CreatedBy:      "db-integration-tests",
+			CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -743,7 +743,7 @@ func TestWorkspaces_GetWorkspaceByTRN(t *testing.T) {
 		Name:        "test-group-workspace-trn",
 		Description: "test group for workspace trn",
 		FullPath:    "test-group-workspace-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -752,7 +752,7 @@ func TestWorkspaces_GetWorkspaceByTRN(t *testing.T) {
 		Name:           "test-workspace-trn",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -809,7 +809,7 @@ func TestWorkspaces_GetWorkspacesWithLabelFiltering(t *testing.T) {
 		Name:        "test-group-label-filtering",
 		Description: "test group for label filtering",
 		FullPath:    "test-group-label-filtering",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -818,7 +818,7 @@ func TestWorkspaces_GetWorkspacesWithLabelFiltering(t *testing.T) {
 		Name:           "workspace-prod",
 		GroupID:        group.Metadata.ID,
 		Description:    "production workspace",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 		Labels: map[string]string{
 			"environment": "production",
@@ -831,7 +831,7 @@ func TestWorkspaces_GetWorkspacesWithLabelFiltering(t *testing.T) {
 		Name:           "workspace-dev",
 		GroupID:        group.Metadata.ID,
 		Description:    "development workspace",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 		Labels: map[string]string{
 			"environment": "development",
@@ -844,7 +844,7 @@ func TestWorkspaces_GetWorkspacesWithLabelFiltering(t *testing.T) {
 		Name:           "workspace-no-labels",
 		GroupID:        group.Metadata.ID,
 		Description:    "workspace without labels",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.Nil(t, err)
@@ -932,7 +932,7 @@ func TestWorkspaces_CreateWorkspaceWithLabels(t *testing.T) {
 		Name:        "test-group-create-labels",
 		Description: "test group for creating workspace with labels",
 		FullPath:    "test-group-create-labels",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -978,7 +978,7 @@ func TestWorkspaces_CreateWorkspaceWithLabels(t *testing.T) {
 				Name:           test.workspaceName,
 				GroupID:        group.Metadata.ID,
 				Description:    "test workspace with labels",
-				CreatedBy:      "db-integration-tests",
+				CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 				MaxJobDuration: ptr.Int32(1),
 				Labels:         test.labels,
 			})
@@ -1053,7 +1053,7 @@ func TestWorkspaces_MigrateWorkspace(t *testing.T) {
 			Name:      name,
 			ParentID:  parentID,
 			FullPath:  fullPath,
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -1074,7 +1074,7 @@ func TestWorkspaces_MigrateWorkspace(t *testing.T) {
 			GroupID:        groups[fullPath[:i]].Metadata.ID,
 			FullPath:       fullPath,
 			MaxJobDuration: &maxJobDuration,
-			CreatedBy:      "db-integration-tests",
+			CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -1129,7 +1129,7 @@ func TestWorkspaces_MigrateWorkspace(t *testing.T) {
 			GroupID:   groups[test.principalPath].Metadata.ID,
 			Type:      models.ManagedIdentityAWSFederated,
 			Data:      []byte("test-identity-data"),
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -1161,7 +1161,7 @@ func TestWorkspaces_MigrateWorkspace(t *testing.T) {
 
 	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name:      "test-role",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -1170,7 +1170,7 @@ func TestWorkspaces_MigrateWorkspace(t *testing.T) {
 		serviceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
 			Name:      fmt.Sprintf("test-sa-%d", i),
 			GroupID:   groups[test.principalPath].Metadata.ID,
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -1226,7 +1226,7 @@ func TestWorkspaces_MigrateWorkspace(t *testing.T) {
 			GroupID:   groups[test.principalPath].Metadata.ID,
 			Type:      models.GitLabProviderType,
 			URL:       url.URL{Scheme: "https", Host: "gitlab.example.com"},
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -1236,7 +1236,7 @@ func TestWorkspaces_MigrateWorkspace(t *testing.T) {
 			TokenNonce:     uuid.New().String(),
 			RepositoryPath: "test-org/test-repo",
 			Branch:         "main",
-			CreatedBy:      "db-integration-tests",
+			CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 

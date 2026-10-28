@@ -35,7 +35,7 @@ func TestActivityEvents_CreateActivityEvent(t *testing.T) {
 		Name:        "test-group-create-activity-event",
 		Description: "test group for create activity event",
 		FullPath:    "test-group-create-activity-event",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -109,7 +109,7 @@ func TestActivityEvents_WorkspaceRoleBindingTarget(t *testing.T) {
 		Name:        "test-group-wrb-activity-event",
 		Description: "test group for workspace role binding activity event",
 		FullPath:    "test-group-wrb-activity-event",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -117,7 +117,7 @@ func TestActivityEvents_WorkspaceRoleBindingTarget(t *testing.T) {
 	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:             "test-workspace-wrb-activity-event",
 		GroupID:          group.Metadata.ID,
-		CreatedBy:        "db-integration-tests",
+		CreatedBy:        models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration:   &duration,
 		TerraformVersion: "1.5.0",
 	})
@@ -129,7 +129,7 @@ func TestActivityEvents_WorkspaceRoleBindingTarget(t *testing.T) {
 	binding, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 		WorkspaceID: workspace.Metadata.ID,
 		RoleID:      role.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -192,7 +192,7 @@ func TestActivityEvents_CreateActivityEvent_ForeignKeyViolationMessages(t *testi
 		Name:        "test-group-fk-violation-messages",
 		Description: "test group for FK violation message coverage",
 		FullPath:    "test-group-fk-violation-messages",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -261,7 +261,7 @@ func TestActivityEvents_GetActivityEvents(t *testing.T) {
 		Name:        "test-group-activity-events-list",
 		Description: "test group for activity events list",
 		FullPath:    "test-group-activity-events-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -418,7 +418,7 @@ func TestActivityEvents_GetActivityEventsWithPaginationAndSorting(t *testing.T) 
 		Name:        "test-group-activity-events-pagination",
 		Description: "test group for activity events pagination",
 		FullPath:    "test-group-activity-events-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

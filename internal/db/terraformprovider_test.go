@@ -31,7 +31,7 @@ func TestTerraformProviders_CreateProvider(t *testing.T) {
 		Name:        "test-group-provider",
 		Description: "test group for provider",
 		FullPath:    "test-group-provider",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -62,7 +62,7 @@ func TestTerraformProviders_CreateProvider(t *testing.T) {
 				Name:        test.providerName,
 				GroupID:     test.groupID,
 				RootGroupID: group.Metadata.ID,
-				CreatedBy:   "db-integration-tests",
+				CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			})
 
 			if test.expectErrorCode != "" {
@@ -90,7 +90,7 @@ func TestTerraformProviders_UpdateProvider(t *testing.T) {
 		Name:        "test-group-provider-update",
 		Description: "test group for provider update",
 		FullPath:    "test-group-provider-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -99,7 +99,7 @@ func TestTerraformProviders_UpdateProvider(t *testing.T) {
 		Name:        "test-provider-update",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -167,7 +167,7 @@ func TestTerraformProviders_DeleteProvider(t *testing.T) {
 		Name:        "test-group-provider-delete",
 		Description: "test group for provider delete",
 		FullPath:    "test-group-provider-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -176,7 +176,7 @@ func TestTerraformProviders_DeleteProvider(t *testing.T) {
 		Name:        "test-provider-delete",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -241,7 +241,7 @@ func TestTerraformProviders_GetProviderByID(t *testing.T) {
 		Name:        "test-group-provider-get-by-id",
 		Description: "test group for provider get by id",
 		FullPath:    "test-group-provider-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -251,7 +251,7 @@ func TestTerraformProviders_GetProviderByID(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -308,7 +308,7 @@ func TestTerraformProviders_GetProviders(t *testing.T) {
 		Name:        "test-group-providers-list",
 		Description: "test group for providers list",
 		FullPath:    "test-group-providers-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -319,14 +319,14 @@ func TestTerraformProviders_GetProviders(t *testing.T) {
 			GroupID:     group.Metadata.ID,
 			RootGroupID: group.Metadata.ID,
 			Private:     false,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			Name:        "test-provider-list-2",
 			GroupID:     group.Metadata.ID,
 			RootGroupID: group.Metadata.ID,
 			Private:     true,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -421,7 +421,7 @@ func TestTerraformProviders_GetProvidersWithPaginationAndSorting(t *testing.T) {
 		Name:        "test-group-providers-pagination",
 		Description: "test group for providers pagination",
 		FullPath:    "test-group-providers-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -432,7 +432,7 @@ func TestTerraformProviders_GetProvidersWithPaginationAndSorting(t *testing.T) {
 			GroupID:     group.Metadata.ID,
 			RootGroupID: group.Metadata.ID,
 			Private:     false,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -477,7 +477,7 @@ func TestTerraformProviders_GetProviderByTRN(t *testing.T) {
 		Name:        "test-group-provider-trn",
 		Description: "test group for provider trn",
 		FullPath:    "test-group-provider-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -487,7 +487,7 @@ func TestTerraformProviders_GetProviderByTRN(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

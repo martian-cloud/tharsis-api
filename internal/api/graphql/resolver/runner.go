@@ -239,7 +239,13 @@ func (r *RunnerResolver) AssignedServiceAccounts(ctx context.Context, args *Conn
 
 // CreatedBy resolver
 func (r *RunnerResolver) CreatedBy() string {
-	return r.runner.CreatedBy
+	return r.runner.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *RunnerResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.runner.CreatedBy)
 }
 
 func sharedRunnersQuery(ctx context.Context, args *ConnectionQueryArgs) (*RunnerConnectionResolver, error) {

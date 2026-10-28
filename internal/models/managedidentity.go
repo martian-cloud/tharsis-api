@@ -111,7 +111,7 @@ type ManagedIdentity struct {
 	Name          string
 	Description   string
 	GroupID       string
-	CreatedBy     string
+	CreatedBy     Actor
 	AliasSourceID *string
 	Metadata      ResourceMetadata
 	Data          []byte

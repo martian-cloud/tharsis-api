@@ -54,7 +54,13 @@ func (r *ConfigurationVersionResolver) Metadata() *MetadataResolver {
 
 // CreatedBy resolver
 func (r *ConfigurationVersionResolver) CreatedBy() string {
-	return r.configurationVersion.CreatedBy
+	return r.configurationVersion.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *ConfigurationVersionResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.configurationVersion.CreatedBy)
 }
 
 // VCSEvent resolver

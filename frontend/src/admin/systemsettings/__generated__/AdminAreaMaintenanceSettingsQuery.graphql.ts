@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ff6289e5f2dea9e48879087f6d32520d>>
+ * @generated SignedSource<<e54abf2bd67efde849c4377f72cddabe>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,10 +9,13 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
+import { FragmentRefs } from "relay-runtime";
 export type AdminAreaMaintenanceSettingsQuery$variables = Record<PropertyKey, never>;
 export type AdminAreaMaintenanceSettingsQuery$data = {
   readonly maintenanceMode: {
-    readonly createdBy: string;
+    readonly createdByActor: {
+      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    } | null | undefined;
     readonly id: string;
     readonly metadata: {
       readonly createdAt: any;
@@ -25,48 +28,37 @@ export type AdminAreaMaintenanceSettingsQuery = {
 };
 
 const node: ConcreteRequest = (function(){
-var v0 = [
+var v0 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "id",
+  "storageKey": null
+},
+v1 = {
+  "alias": null,
+  "args": null,
+  "concreteType": "ResourceMetadata",
+  "kind": "LinkedField",
+  "name": "metadata",
+  "plural": false,
+  "selections": [
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "createdAt",
+      "storageKey": null
+    }
+  ],
+  "storageKey": null
+},
+v2 = [
   {
     "alias": null,
     "args": null,
-    "concreteType": "MaintenanceMode",
-    "kind": "LinkedField",
-    "name": "maintenanceMode",
-    "plural": false,
-    "selections": [
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "id",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "createdBy",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "concreteType": "ResourceMetadata",
-        "kind": "LinkedField",
-        "name": "metadata",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "createdAt",
-            "storageKey": null
-          }
-        ],
-        "storageKey": null
-      }
-    ],
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
     "storageKey": null
   }
 ];
@@ -76,7 +68,37 @@ return {
     "kind": "Fragment",
     "metadata": null,
     "name": "AdminAreaMaintenanceSettingsQuery",
-    "selections": (v0/*: any*/),
+    "selections": [
+      {
+        "alias": null,
+        "args": null,
+        "concreteType": "MaintenanceMode",
+        "kind": "LinkedField",
+        "name": "maintenanceMode",
+        "plural": false,
+        "selections": [
+          (v0/*: any*/),
+          {
+            "alias": null,
+            "args": null,
+            "concreteType": null,
+            "kind": "LinkedField",
+            "name": "createdByActor",
+            "plural": false,
+            "selections": [
+              {
+                "args": null,
+                "kind": "FragmentSpread",
+                "name": "ActorDisplayFragment_actor"
+              }
+            ],
+            "storageKey": null
+          },
+          (v1/*: any*/)
+        ],
+        "storageKey": null
+      }
+    ],
     "type": "Query",
     "abstractKey": null
   },
@@ -85,19 +107,113 @@ return {
     "argumentDefinitions": [],
     "kind": "Operation",
     "name": "AdminAreaMaintenanceSettingsQuery",
-    "selections": (v0/*: any*/)
+    "selections": [
+      {
+        "alias": null,
+        "args": null,
+        "concreteType": "MaintenanceMode",
+        "kind": "LinkedField",
+        "name": "maintenanceMode",
+        "plural": false,
+        "selections": [
+          (v0/*: any*/),
+          {
+            "alias": null,
+            "args": null,
+            "concreteType": null,
+            "kind": "LinkedField",
+            "name": "createdByActor",
+            "plural": false,
+            "selections": [
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "__typename",
+                "storageKey": null
+              },
+              {
+                "kind": "TypeDiscriminator",
+                "abstractKey": "__isActor"
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "type",
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "principalId",
+                "storageKey": null
+              },
+              {
+                "kind": "InlineFragment",
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "User",
+                    "kind": "LinkedField",
+                    "name": "user",
+                    "plural": false,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "email",
+                        "storageKey": null
+                      },
+                      (v0/*: any*/)
+                    ],
+                    "storageKey": null
+                  }
+                ],
+                "type": "UserActor",
+                "abstractKey": null
+              },
+              {
+                "kind": "InlineFragment",
+                "selections": (v2/*: any*/),
+                "type": "ServiceAccountActor",
+                "abstractKey": null
+              },
+              {
+                "kind": "InlineFragment",
+                "selections": (v2/*: any*/),
+                "type": "VCSProviderActor",
+                "abstractKey": null
+              },
+              {
+                "kind": "InlineFragment",
+                "selections": (v2/*: any*/),
+                "type": "JobActor",
+                "abstractKey": null
+              }
+            ],
+            "storageKey": null
+          },
+          (v1/*: any*/)
+        ],
+        "storageKey": null
+      }
+    ]
   },
   "params": {
-    "cacheID": "a84303f2454744785ab5bdc4713d3e29",
+    "cacheID": "752e8634ec9c53a2a83e2990dbbd417f",
     "id": null,
     "metadata": {},
     "name": "AdminAreaMaintenanceSettingsQuery",
     "operationKind": "query",
-    "text": "query AdminAreaMaintenanceSettingsQuery {\n  maintenanceMode {\n    id\n    createdBy\n    metadata {\n      createdAt\n    }\n  }\n}\n"
+    "text": "query AdminAreaMaintenanceSettingsQuery {\n  maintenanceMode {\n    id\n    createdByActor {\n      __typename\n      ...ActorDisplayFragment_actor\n    }\n    metadata {\n      createdAt\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "862c49c3b7185805288e5975eb70f2b2";
+(node as any).hash = "69374e6a58505cb819ff8b3116c02088";
 
 export default node;

@@ -149,7 +149,13 @@ func (r *TerraformModuleAttestationResolver) Description() string {
 
 // CreatedBy resolver
 func (r *TerraformModuleAttestationResolver) CreatedBy() string {
-	return r.moduleAttestation.CreatedBy
+	return r.moduleAttestation.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *TerraformModuleAttestationResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.moduleAttestation.CreatedBy)
 }
 
 // Module resolver

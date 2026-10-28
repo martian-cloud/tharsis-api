@@ -591,19 +591,26 @@ func (x *UnassignServiceAccountFromRunnerRequest) GetServiceAccountId() string {
 
 // Runner defines a runner within Tharsis.
 type Runner struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Metadata        *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Name            string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description     string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	GroupId         *string                `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3,oneof" json:"group_id,omitempty"`
-	Type            string                 `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
-	CreatedBy       string                 `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	Disabled        bool                   `protobuf:"varint,7,opt,name=disabled,proto3" json:"disabled,omitempty"`
-	RunUntaggedJobs bool                   `protobuf:"varint,8,opt,name=run_untagged_jobs,json=runUntaggedJobs,proto3" json:"run_untagged_jobs,omitempty"`
-	Tags            []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`
-	JobLimit        int32                  `protobuf:"varint,10,opt,name=job_limit,json=jobLimit,proto3" json:"job_limit,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Name        string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	GroupId     *string                `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3,oneof" json:"group_id,omitempty"`
+	Type        string                 `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in runner.proto.
+	CreatedBy       string   `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	Disabled        bool     `protobuf:"varint,7,opt,name=disabled,proto3" json:"disabled,omitempty"`
+	RunUntaggedJobs bool     `protobuf:"varint,8,opt,name=run_untagged_jobs,json=runUntaggedJobs,proto3" json:"run_untagged_jobs,omitempty"`
+	Tags            []string `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`
+	JobLimit        int32    `protobuf:"varint,10,opt,name=job_limit,json=jobLimit,proto3" json:"job_limit,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,11,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Runner) Reset() {
@@ -671,6 +678,7 @@ func (x *Runner) GetType() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in runner.proto.
 func (x *Runner) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -704,6 +712,13 @@ func (x *Runner) GetJobLimit() int32 {
 		return x.JobLimit
 	}
 	return 0
+}
+
+func (x *Runner) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
 }
 
 // GetRunnersResponse is the paginated list of Runners.
@@ -763,7 +778,7 @@ var File_runner_proto protoreflect.FileDescriptor
 
 const file_runner_proto_rawDesc = "" +
 	"\n" +
-	"\frunner.proto\x12\x1fmartiancloud.tharsis.api.runner\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x14runner_session.proto\"&\n" +
+	"\frunner.proto\x12\x1fmartiancloud.tharsis.api.runner\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x14runner_session.proto\"&\n" +
 	"\x14GetRunnerByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xbd\x03\n" +
 	"\x11GetRunnersRequest\x12j\n" +
@@ -811,20 +826,21 @@ const file_runner_proto_rawDesc = "" +
 	"\x12service_account_id\x18\x02 \x01(\tR\x10serviceAccountId\"t\n" +
 	"'UnassignServiceAccountFromRunnerRequest\x12\x1b\n" +
 	"\trunner_id\x18\x01 \x01(\tR\brunnerId\x12,\n" +
-	"\x12service_account_id\x18\x02 \x01(\tR\x10serviceAccountId\"\xe8\x02\n" +
+	"\x12service_account_id\x18\x02 \x01(\tR\x10serviceAccountId\"\xbd\x03\n" +
 	"\x06Runner\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1e\n" +
 	"\bgroup_id\x18\x04 \x01(\tH\x00R\agroupId\x88\x01\x01\x12\x12\n" +
-	"\x04type\x18\x05 \x01(\tR\x04type\x12\x1d\n" +
+	"\x04type\x18\x05 \x01(\tR\x04type\x12!\n" +
 	"\n" +
-	"created_by\x18\x06 \x01(\tR\tcreatedBy\x12\x1a\n" +
+	"created_by\x18\x06 \x01(\tB\x02\x18\x01R\tcreatedBy\x12\x1a\n" +
 	"\bdisabled\x18\a \x01(\bR\bdisabled\x12*\n" +
 	"\x11run_untagged_jobs\x18\b \x01(\bR\x0frunUntaggedJobs\x12\x12\n" +
 	"\x04tags\x18\t \x03(\tR\x04tags\x12\x1b\n" +
 	"\tjob_limit\x18\n" +
-	" \x01(\x05R\bjobLimitB\v\n" +
+	" \x01(\x05R\bjobLimit\x12O\n" +
+	"\x10created_by_actor\x18\v \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActorB\v\n" +
 	"\t_group_id\"\xa3\x01\n" +
 	"\x12GetRunnersResponse\x12A\n" +
 	"\arunners\x18\x01 \x03(\v2'.martiancloud.tharsis.api.runner.RunnerR\arunners\x12J\n" +
@@ -884,60 +900,62 @@ var file_runner_proto_goTypes = []any{
 	(*GetRunnersResponse)(nil),                      // 10: martiancloud.tharsis.api.runner.GetRunnersResponse
 	(*PaginationOptions)(nil),                       // 11: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*ResourceMetadata)(nil),                        // 12: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                                // 13: martiancloud.tharsis.api.pagination.PageInfo
-	(*CreateRunnerSessionRequest)(nil),              // 14: martiancloud.tharsis.api.runner_session.CreateRunnerSessionRequest
-	(*GetRunnerSessionsRequest)(nil),                // 15: martiancloud.tharsis.api.runner_session.GetRunnerSessionsRequest
-	(*GetRunnerSessionByIDRequest)(nil),             // 16: martiancloud.tharsis.api.runner_session.GetRunnerSessionByIDRequest
-	(*SendRunnerSessionHeartbeatRequest)(nil),       // 17: martiancloud.tharsis.api.runner_session.SendRunnerSessionHeartbeatRequest
-	(*CreateRunnerSessionErrorRequest)(nil),         // 18: martiancloud.tharsis.api.runner_session.CreateRunnerSessionErrorRequest
-	(*SubscribeToRunnerSessionsRequest)(nil),        // 19: martiancloud.tharsis.api.runner_session.SubscribeToRunnerSessionsRequest
-	(*SubscribeToRunnerSessionErrorLogRequest)(nil), // 20: martiancloud.tharsis.api.runner_session.SubscribeToRunnerSessionErrorLogRequest
-	(*emptypb.Empty)(nil),                           // 21: google.protobuf.Empty
-	(*RunnerSession)(nil),                           // 22: martiancloud.tharsis.api.runner_session.RunnerSession
-	(*GetRunnerSessionsResponse)(nil),               // 23: martiancloud.tharsis.api.runner_session.GetRunnerSessionsResponse
-	(*RunnerSessionEvent)(nil),                      // 24: martiancloud.tharsis.api.runner_session.RunnerSessionEvent
-	(*RunnerSessionErrorLogEvent)(nil),              // 25: martiancloud.tharsis.api.runner_session.RunnerSessionErrorLogEvent
+	(*Actor)(nil),                                   // 13: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                                // 14: martiancloud.tharsis.api.pagination.PageInfo
+	(*CreateRunnerSessionRequest)(nil),              // 15: martiancloud.tharsis.api.runner_session.CreateRunnerSessionRequest
+	(*GetRunnerSessionsRequest)(nil),                // 16: martiancloud.tharsis.api.runner_session.GetRunnerSessionsRequest
+	(*GetRunnerSessionByIDRequest)(nil),             // 17: martiancloud.tharsis.api.runner_session.GetRunnerSessionByIDRequest
+	(*SendRunnerSessionHeartbeatRequest)(nil),       // 18: martiancloud.tharsis.api.runner_session.SendRunnerSessionHeartbeatRequest
+	(*CreateRunnerSessionErrorRequest)(nil),         // 19: martiancloud.tharsis.api.runner_session.CreateRunnerSessionErrorRequest
+	(*SubscribeToRunnerSessionsRequest)(nil),        // 20: martiancloud.tharsis.api.runner_session.SubscribeToRunnerSessionsRequest
+	(*SubscribeToRunnerSessionErrorLogRequest)(nil), // 21: martiancloud.tharsis.api.runner_session.SubscribeToRunnerSessionErrorLogRequest
+	(*emptypb.Empty)(nil),                           // 22: google.protobuf.Empty
+	(*RunnerSession)(nil),                           // 23: martiancloud.tharsis.api.runner_session.RunnerSession
+	(*GetRunnerSessionsResponse)(nil),               // 24: martiancloud.tharsis.api.runner_session.GetRunnerSessionsResponse
+	(*RunnerSessionEvent)(nil),                      // 25: martiancloud.tharsis.api.runner_session.RunnerSessionEvent
+	(*RunnerSessionErrorLogEvent)(nil),              // 26: martiancloud.tharsis.api.runner_session.RunnerSessionErrorLogEvent
 }
 var file_runner_proto_depIdxs = []int32{
 	11, // 0: martiancloud.tharsis.api.runner.GetRunnersRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.runner.GetRunnersRequest.sort:type_name -> martiancloud.tharsis.api.runner.RunnerSortableField
 	1,  // 2: martiancloud.tharsis.api.runner.GetRunnersRequest.runner_type:type_name -> martiancloud.tharsis.api.runner.RunnerType
 	12, // 3: martiancloud.tharsis.api.runner.Runner.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	9,  // 4: martiancloud.tharsis.api.runner.GetRunnersResponse.runners:type_name -> martiancloud.tharsis.api.runner.Runner
-	13, // 5: martiancloud.tharsis.api.runner.GetRunnersResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	2,  // 6: martiancloud.tharsis.api.runner.Runners.GetRunnerByID:input_type -> martiancloud.tharsis.api.runner.GetRunnerByIDRequest
-	3,  // 7: martiancloud.tharsis.api.runner.Runners.GetRunners:input_type -> martiancloud.tharsis.api.runner.GetRunnersRequest
-	4,  // 8: martiancloud.tharsis.api.runner.Runners.CreateRunner:input_type -> martiancloud.tharsis.api.runner.CreateRunnerRequest
-	5,  // 9: martiancloud.tharsis.api.runner.Runners.UpdateRunner:input_type -> martiancloud.tharsis.api.runner.UpdateRunnerRequest
-	6,  // 10: martiancloud.tharsis.api.runner.Runners.DeleteRunner:input_type -> martiancloud.tharsis.api.runner.DeleteRunnerRequest
-	7,  // 11: martiancloud.tharsis.api.runner.Runners.AssignServiceAccountToRunner:input_type -> martiancloud.tharsis.api.runner.AssignServiceAccountToRunnerRequest
-	8,  // 12: martiancloud.tharsis.api.runner.Runners.UnassignServiceAccountFromRunner:input_type -> martiancloud.tharsis.api.runner.UnassignServiceAccountFromRunnerRequest
-	14, // 13: martiancloud.tharsis.api.runner.Runners.CreateRunnerSession:input_type -> martiancloud.tharsis.api.runner_session.CreateRunnerSessionRequest
-	15, // 14: martiancloud.tharsis.api.runner.Runners.GetRunnerSessions:input_type -> martiancloud.tharsis.api.runner_session.GetRunnerSessionsRequest
-	16, // 15: martiancloud.tharsis.api.runner.Runners.GetRunnerSessionByID:input_type -> martiancloud.tharsis.api.runner_session.GetRunnerSessionByIDRequest
-	17, // 16: martiancloud.tharsis.api.runner.Runners.SendRunnerSessionHeartbeat:input_type -> martiancloud.tharsis.api.runner_session.SendRunnerSessionHeartbeatRequest
-	18, // 17: martiancloud.tharsis.api.runner.Runners.CreateRunnerSessionError:input_type -> martiancloud.tharsis.api.runner_session.CreateRunnerSessionErrorRequest
-	19, // 18: martiancloud.tharsis.api.runner.Runners.SubscribeToRunnerSessions:input_type -> martiancloud.tharsis.api.runner_session.SubscribeToRunnerSessionsRequest
-	20, // 19: martiancloud.tharsis.api.runner.Runners.SubscribeToRunnerSessionErrorLog:input_type -> martiancloud.tharsis.api.runner_session.SubscribeToRunnerSessionErrorLogRequest
-	9,  // 20: martiancloud.tharsis.api.runner.Runners.GetRunnerByID:output_type -> martiancloud.tharsis.api.runner.Runner
-	10, // 21: martiancloud.tharsis.api.runner.Runners.GetRunners:output_type -> martiancloud.tharsis.api.runner.GetRunnersResponse
-	9,  // 22: martiancloud.tharsis.api.runner.Runners.CreateRunner:output_type -> martiancloud.tharsis.api.runner.Runner
-	9,  // 23: martiancloud.tharsis.api.runner.Runners.UpdateRunner:output_type -> martiancloud.tharsis.api.runner.Runner
-	21, // 24: martiancloud.tharsis.api.runner.Runners.DeleteRunner:output_type -> google.protobuf.Empty
-	21, // 25: martiancloud.tharsis.api.runner.Runners.AssignServiceAccountToRunner:output_type -> google.protobuf.Empty
-	21, // 26: martiancloud.tharsis.api.runner.Runners.UnassignServiceAccountFromRunner:output_type -> google.protobuf.Empty
-	22, // 27: martiancloud.tharsis.api.runner.Runners.CreateRunnerSession:output_type -> martiancloud.tharsis.api.runner_session.RunnerSession
-	23, // 28: martiancloud.tharsis.api.runner.Runners.GetRunnerSessions:output_type -> martiancloud.tharsis.api.runner_session.GetRunnerSessionsResponse
-	22, // 29: martiancloud.tharsis.api.runner.Runners.GetRunnerSessionByID:output_type -> martiancloud.tharsis.api.runner_session.RunnerSession
-	21, // 30: martiancloud.tharsis.api.runner.Runners.SendRunnerSessionHeartbeat:output_type -> google.protobuf.Empty
-	21, // 31: martiancloud.tharsis.api.runner.Runners.CreateRunnerSessionError:output_type -> google.protobuf.Empty
-	24, // 32: martiancloud.tharsis.api.runner.Runners.SubscribeToRunnerSessions:output_type -> martiancloud.tharsis.api.runner_session.RunnerSessionEvent
-	25, // 33: martiancloud.tharsis.api.runner.Runners.SubscribeToRunnerSessionErrorLog:output_type -> martiancloud.tharsis.api.runner_session.RunnerSessionErrorLogEvent
-	20, // [20:34] is the sub-list for method output_type
-	6,  // [6:20] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	13, // 4: martiancloud.tharsis.api.runner.Runner.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	9,  // 5: martiancloud.tharsis.api.runner.GetRunnersResponse.runners:type_name -> martiancloud.tharsis.api.runner.Runner
+	14, // 6: martiancloud.tharsis.api.runner.GetRunnersResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	2,  // 7: martiancloud.tharsis.api.runner.Runners.GetRunnerByID:input_type -> martiancloud.tharsis.api.runner.GetRunnerByIDRequest
+	3,  // 8: martiancloud.tharsis.api.runner.Runners.GetRunners:input_type -> martiancloud.tharsis.api.runner.GetRunnersRequest
+	4,  // 9: martiancloud.tharsis.api.runner.Runners.CreateRunner:input_type -> martiancloud.tharsis.api.runner.CreateRunnerRequest
+	5,  // 10: martiancloud.tharsis.api.runner.Runners.UpdateRunner:input_type -> martiancloud.tharsis.api.runner.UpdateRunnerRequest
+	6,  // 11: martiancloud.tharsis.api.runner.Runners.DeleteRunner:input_type -> martiancloud.tharsis.api.runner.DeleteRunnerRequest
+	7,  // 12: martiancloud.tharsis.api.runner.Runners.AssignServiceAccountToRunner:input_type -> martiancloud.tharsis.api.runner.AssignServiceAccountToRunnerRequest
+	8,  // 13: martiancloud.tharsis.api.runner.Runners.UnassignServiceAccountFromRunner:input_type -> martiancloud.tharsis.api.runner.UnassignServiceAccountFromRunnerRequest
+	15, // 14: martiancloud.tharsis.api.runner.Runners.CreateRunnerSession:input_type -> martiancloud.tharsis.api.runner_session.CreateRunnerSessionRequest
+	16, // 15: martiancloud.tharsis.api.runner.Runners.GetRunnerSessions:input_type -> martiancloud.tharsis.api.runner_session.GetRunnerSessionsRequest
+	17, // 16: martiancloud.tharsis.api.runner.Runners.GetRunnerSessionByID:input_type -> martiancloud.tharsis.api.runner_session.GetRunnerSessionByIDRequest
+	18, // 17: martiancloud.tharsis.api.runner.Runners.SendRunnerSessionHeartbeat:input_type -> martiancloud.tharsis.api.runner_session.SendRunnerSessionHeartbeatRequest
+	19, // 18: martiancloud.tharsis.api.runner.Runners.CreateRunnerSessionError:input_type -> martiancloud.tharsis.api.runner_session.CreateRunnerSessionErrorRequest
+	20, // 19: martiancloud.tharsis.api.runner.Runners.SubscribeToRunnerSessions:input_type -> martiancloud.tharsis.api.runner_session.SubscribeToRunnerSessionsRequest
+	21, // 20: martiancloud.tharsis.api.runner.Runners.SubscribeToRunnerSessionErrorLog:input_type -> martiancloud.tharsis.api.runner_session.SubscribeToRunnerSessionErrorLogRequest
+	9,  // 21: martiancloud.tharsis.api.runner.Runners.GetRunnerByID:output_type -> martiancloud.tharsis.api.runner.Runner
+	10, // 22: martiancloud.tharsis.api.runner.Runners.GetRunners:output_type -> martiancloud.tharsis.api.runner.GetRunnersResponse
+	9,  // 23: martiancloud.tharsis.api.runner.Runners.CreateRunner:output_type -> martiancloud.tharsis.api.runner.Runner
+	9,  // 24: martiancloud.tharsis.api.runner.Runners.UpdateRunner:output_type -> martiancloud.tharsis.api.runner.Runner
+	22, // 25: martiancloud.tharsis.api.runner.Runners.DeleteRunner:output_type -> google.protobuf.Empty
+	22, // 26: martiancloud.tharsis.api.runner.Runners.AssignServiceAccountToRunner:output_type -> google.protobuf.Empty
+	22, // 27: martiancloud.tharsis.api.runner.Runners.UnassignServiceAccountFromRunner:output_type -> google.protobuf.Empty
+	23, // 28: martiancloud.tharsis.api.runner.Runners.CreateRunnerSession:output_type -> martiancloud.tharsis.api.runner_session.RunnerSession
+	24, // 29: martiancloud.tharsis.api.runner.Runners.GetRunnerSessions:output_type -> martiancloud.tharsis.api.runner_session.GetRunnerSessionsResponse
+	23, // 30: martiancloud.tharsis.api.runner.Runners.GetRunnerSessionByID:output_type -> martiancloud.tharsis.api.runner_session.RunnerSession
+	22, // 31: martiancloud.tharsis.api.runner.Runners.SendRunnerSessionHeartbeat:output_type -> google.protobuf.Empty
+	22, // 32: martiancloud.tharsis.api.runner.Runners.CreateRunnerSessionError:output_type -> google.protobuf.Empty
+	25, // 33: martiancloud.tharsis.api.runner.Runners.SubscribeToRunnerSessions:output_type -> martiancloud.tharsis.api.runner_session.RunnerSessionEvent
+	26, // 34: martiancloud.tharsis.api.runner.Runners.SubscribeToRunnerSessionErrorLog:output_type -> martiancloud.tharsis.api.runner_session.RunnerSessionErrorLogEvent
+	21, // [21:35] is the sub-list for method output_type
+	7,  // [7:21] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_runner_proto_init() }
@@ -945,6 +963,7 @@ func file_runner_proto_init() {
 	if File_runner_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_runner_session_proto_init()

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6891d9ac6bfaa68951fd1630c7f44fde>>
+ * @generated SignedSource<<6c61cf585027a07f08d9ed6acd89f630>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -82,17 +82,101 @@ v6 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "createdBy",
+  "name": "email",
   "storageKey": null
 },
-v7 = {
+v7 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+],
+v8 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "__typename",
+    "storageKey": null
+  },
+  {
+    "kind": "TypeDiscriminator",
+    "abstractKey": "__isActor"
+  },
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "type",
+    "storageKey": null
+  },
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "principalId",
+    "storageKey": null
+  },
+  {
+    "kind": "InlineFragment",
+    "selections": [
+      {
+        "alias": null,
+        "args": null,
+        "concreteType": "User",
+        "kind": "LinkedField",
+        "name": "user",
+        "plural": false,
+        "selections": [
+          (v6/*: any*/),
+          (v3/*: any*/)
+        ],
+        "storageKey": null
+      }
+    ],
+    "type": "UserActor",
+    "abstractKey": null
+  },
+  {
+    "kind": "InlineFragment",
+    "selections": (v7/*: any*/),
+    "type": "ServiceAccountActor",
+    "abstractKey": null
+  },
+  {
+    "kind": "InlineFragment",
+    "selections": (v7/*: any*/),
+    "type": "VCSProviderActor",
+    "abstractKey": null
+  },
+  {
+    "kind": "InlineFragment",
+    "selections": (v7/*: any*/),
+    "type": "JobActor",
+    "abstractKey": null
+  }
+],
+v9 = {
+  "alias": null,
+  "args": null,
+  "concreteType": null,
+  "kind": "LinkedField",
+  "name": "createdByActor",
+  "plural": false,
+  "selections": (v8/*: any*/),
+  "storageKey": null
+},
+v10 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "status",
   "storageKey": null
 },
-v8 = {
+v11 = {
   "alias": null,
   "args": null,
   "concreteType": "Workspace",
@@ -111,7 +195,7 @@ v8 = {
   ],
   "storageKey": null
 },
-v9 = {
+v12 = {
   "alias": null,
   "args": null,
   "concreteType": "ResourceMetadata",
@@ -123,35 +207,35 @@ v9 = {
   ],
   "storageKey": null
 },
-v10 = {
+v13 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "cancelRequested",
   "storageKey": null
 },
-v11 = {
+v14 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "runningAt",
   "storageKey": null
 },
-v12 = {
+v15 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "finishedAt",
   "storageKey": null
 },
-v13 = {
+v16 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "runnerAvailabilityStatus",
   "storageKey": null
 },
-v14 = {
+v17 = {
   "alias": null,
   "args": null,
   "concreteType": "Job",
@@ -166,9 +250,9 @@ v14 = {
       "name": "runnerPath",
       "storageKey": null
     },
-    (v10/*: any*/),
+    (v13/*: any*/),
     (v3/*: any*/),
-    (v7/*: any*/),
+    (v10/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -191,13 +275,13 @@ v14 = {
           "name": "pendingAt",
           "storageKey": null
         },
-        (v11/*: any*/),
-        (v12/*: any*/)
+        (v14/*: any*/),
+        (v15/*: any*/)
       ],
       "storageKey": null
     },
-    (v13/*: any*/),
-    (v8/*: any*/),
+    (v16/*: any*/),
+    (v11/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -307,14 +391,14 @@ v14 = {
   ],
   "storageKey": null
 },
-v15 = {
+v18 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "errorMessage",
   "storageKey": null
 },
-v16 = {
+v19 = {
   "alias": null,
   "args": [
     {
@@ -338,14 +422,14 @@ v16 = {
   ],
   "storageKey": "jobs(first:0)"
 },
-v17 = {
+v20 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "name",
   "storageKey": null
 },
-v18 = {
+v21 = {
   "alias": null,
   "args": null,
   "concreteType": "TerraformCheckResult",
@@ -353,8 +437,8 @@ v18 = {
   "name": "checkResults",
   "plural": true,
   "selections": [
-    (v17/*: any*/),
-    (v7/*: any*/),
+    (v20/*: any*/),
+    (v10/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -370,7 +454,7 @@ v18 = {
           "name": "address",
           "storageKey": null
         },
-        (v7/*: any*/),
+        (v10/*: any*/),
         {
           "alias": null,
           "args": null,
@@ -384,30 +468,16 @@ v18 = {
   ],
   "storageKey": null
 },
-v19 = {
+v22 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "stageName",
   "storageKey": null
 },
-v20 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "username",
-  "storageKey": null
-},
-v21 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "email",
-  "storageKey": null
-},
-v22 = [
+v23 = [
   (v3/*: any*/),
-  (v17/*: any*/),
+  (v20/*: any*/),
   {
     "alias": null,
     "args": null,
@@ -416,21 +486,21 @@ v22 = [
     "storageKey": null
   }
 ],
-v23 = {
+v24 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "messages",
   "storageKey": null
 },
-v24 = {
+v25 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "key",
   "storageKey": null
 },
-v25 = {
+v26 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -542,8 +612,8 @@ return {
                 ],
                 "storageKey": null
               },
-              (v6/*: any*/),
-              (v7/*: any*/),
+              (v9/*: any*/),
+              (v10/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -558,7 +628,7 @@ return {
                 "name": "hasAdvisoryFailures",
                 "storageKey": null
               },
-              (v8/*: any*/),
+              (v11/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -567,19 +637,22 @@ return {
                 "name": "apply",
                 "plural": false,
                 "selections": [
-                  (v7/*: any*/),
+                  (v10/*: any*/),
                   (v3/*: any*/),
-                  (v9/*: any*/),
-                  (v14/*: any*/),
-                  (v15/*: any*/),
+                  (v12/*: any*/),
+                  (v17/*: any*/),
+                  (v18/*: any*/),
                   {
                     "alias": null,
                     "args": null,
-                    "kind": "ScalarField",
-                    "name": "triggeredBy",
+                    "concreteType": null,
+                    "kind": "LinkedField",
+                    "name": "triggeredByActor",
+                    "plural": false,
+                    "selections": (v8/*: any*/),
                     "storageKey": null
                   },
-                  (v16/*: any*/)
+                  (v19/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -591,11 +664,11 @@ return {
                 "name": "plan",
                 "plural": false,
                 "selections": [
-                  (v7/*: any*/),
+                  (v10/*: any*/),
                   (v3/*: any*/),
-                  (v9/*: any*/),
-                  (v14/*: any*/),
-                  (v15/*: any*/),
+                  (v12/*: any*/),
+                  (v17/*: any*/),
+                  (v18/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -610,8 +683,8 @@ return {
                     "name": "diffSize",
                     "storageKey": null
                   },
-                  (v18/*: any*/),
-                  (v16/*: any*/),
+                  (v21/*: any*/),
+                  (v19/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -690,8 +763,8 @@ return {
                 "name": "taskStages",
                 "plural": true,
                 "selections": [
-                  (v19/*: any*/),
-                  (v7/*: any*/),
+                  (v22/*: any*/),
+                  (v10/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -700,8 +773,8 @@ return {
                     "name": "policyChecks",
                     "plural": true,
                     "selections": [
-                      (v7/*: any*/),
-                      (v19/*: any*/),
+                      (v10/*: any*/),
+                      (v22/*: any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -710,10 +783,10 @@ return {
                         "name": "currentJob",
                         "plural": false,
                         "selections": [
-                          (v10/*: any*/),
-                          (v3/*: any*/),
                           (v13/*: any*/),
-                          (v8/*: any*/),
+                          (v3/*: any*/),
+                          (v16/*: any*/),
+                          (v11/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -722,8 +795,8 @@ return {
                             "name": "timestamps",
                             "plural": false,
                             "selections": [
-                              (v11/*: any*/),
-                              (v12/*: any*/)
+                              (v14/*: any*/),
+                              (v15/*: any*/)
                             ],
                             "storageKey": null
                           }
@@ -753,7 +826,7 @@ return {
                             "name": "approvalRules",
                             "plural": true,
                             "selections": [
-                              (v17/*: any*/),
+                              (v20/*: any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -770,8 +843,14 @@ return {
                                 "plural": true,
                                 "selections": [
                                   (v3/*: any*/),
-                                  (v20/*: any*/),
-                                  (v21/*: any*/)
+                                  {
+                                    "alias": null,
+                                    "args": null,
+                                    "kind": "ScalarField",
+                                    "name": "username",
+                                    "storageKey": null
+                                  },
+                                  (v6/*: any*/)
                                 ],
                                 "storageKey": null
                               },
@@ -782,7 +861,7 @@ return {
                                 "kind": "LinkedField",
                                 "name": "allowedServiceAccounts",
                                 "plural": true,
-                                "selections": (v22/*: any*/),
+                                "selections": (v23/*: any*/),
                                 "storageKey": null
                               },
                               {
@@ -794,7 +873,7 @@ return {
                                 "plural": true,
                                 "selections": [
                                   (v3/*: any*/),
-                                  (v17/*: any*/)
+                                  (v20/*: any*/)
                                 ],
                                 "storageKey": null
                               }
@@ -817,7 +896,7 @@ return {
                                 "name": "decision",
                                 "storageKey": null
                               },
-                              (v6/*: any*/),
+                              (v9/*: any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -834,8 +913,7 @@ return {
                                 "plural": false,
                                 "selections": [
                                   (v3/*: any*/),
-                                  (v21/*: any*/),
-                                  (v20/*: any*/)
+                                  (v6/*: any*/)
                                 ],
                                 "storageKey": null
                               },
@@ -846,7 +924,7 @@ return {
                                 "kind": "LinkedField",
                                 "name": "serviceAccount",
                                 "plural": false,
-                                "selections": (v22/*: any*/),
+                                "selections": (v23/*: any*/),
                                 "storageKey": null
                               },
                               {
@@ -856,17 +934,20 @@ return {
                                 "name": "comment",
                                 "storageKey": null
                               },
-                              (v9/*: any*/)
+                              (v12/*: any*/)
                             ],
                             "storageKey": null
                           },
                           (v3/*: any*/),
-                          (v7/*: any*/),
+                          (v10/*: any*/),
                           {
                             "alias": null,
                             "args": null,
-                            "kind": "ScalarField",
-                            "name": "overriddenBy",
+                            "concreteType": null,
+                            "kind": "LinkedField",
+                            "name": "overriddenByActor",
+                            "plural": false,
+                            "selections": (v8/*: any*/),
                             "storageKey": null
                           },
                           {
@@ -906,8 +987,8 @@ return {
                         "plural": true,
                         "selections": [
                           (v3/*: any*/),
-                          (v7/*: any*/),
-                          (v17/*: any*/),
+                          (v10/*: any*/),
+                          (v20/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -979,7 +1060,7 @@ return {
                             "name": "enforcementLevel",
                             "storageKey": null
                           },
-                          (v23/*: any*/),
+                          (v24/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -1027,7 +1108,7 @@ return {
                         "name": "nodePath",
                         "storageKey": null
                       },
-                      (v16/*: any*/),
+                      (v19/*: any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -1036,7 +1117,7 @@ return {
                         "name": "messagesSummary",
                         "plural": false,
                         "selections": [
-                          (v23/*: any*/),
+                          (v24/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -1061,8 +1142,8 @@ return {
                 "name": "annotations",
                 "plural": true,
                 "selections": [
-                  (v24/*: any*/),
                   (v25/*: any*/),
+                  (v26/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -1114,7 +1195,7 @@ return {
                 "name": "variables",
                 "plural": true,
                 "selections": [
-                  (v24/*: any*/),
+                  (v25/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -1136,7 +1217,7 @@ return {
                     "name": "includedInTfConfig",
                     "storageKey": null
                   },
-                  (v25/*: any*/),
+                  (v26/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -1177,7 +1258,7 @@ return {
                     "name": "inventory",
                     "plural": false,
                     "selections": [
-                      (v18/*: any*/)
+                      (v21/*: any*/)
                     ],
                     "storageKey": null
                   },
@@ -1194,12 +1275,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "400b9095572d24e62bf7ece45499d37a",
+    "cacheID": "14959649dfcedf2650ab6b21fdf1c469",
     "id": null,
     "metadata": {},
     "name": "WorkspaceDetailsRunSubscription",
     "operationKind": "subscription",
-    "text": "subscription WorkspaceDetailsRunSubscription(\n  $input: RunSubscriptionInput!\n) {\n  workspaceRunEvents(input: $input) {\n    action\n    run {\n      id\n      assessment\n      ...RunListItemFragment_run\n      ...RunDetailsSidebarFragment_details\n      ...RunDetailsPlanStageFragment_plan\n      ...RunDetailsRunTaskStageFragment_taskStage\n      ...RunDetailsApplyStageFragment_apply\n    }\n  }\n}\n\nfragment CheckResultsPanelFragment_checkResult on TerraformCheckResult {\n  name\n  status\n  objects {\n    address\n    status\n    failureMessages\n  }\n}\n\nfragment ForceCancelRunAlertFragment_run on Run {\n  forceCancelAvailableAt\n  ...ForceCancelRunButtonFragment_run\n}\n\nfragment ForceCancelRunButtonFragment_run on Run {\n  id\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment JobResourceUsageMetricsFragment_job on Job {\n  resourceUsageMetrics {\n    peakMemoryBytes\n    totalCpuTimeMs\n    totalNetworkReceivedBytes\n    totalNetworkSentBytes\n    totalDiskReadBytes\n    totalDiskWriteBytes\n  }\n  resourceUsageLimits {\n    memoryBytes\n    networkReceivedBytes\n    networkSentBytes\n    diskReadBytes\n    diskWriteBytes\n  }\n}\n\nfragment ModuleSourceLinkFragment_run on Run {\n  moduleSource\n  moduleVersion\n}\n\nfragment NoRunnerAlertFragment_job on Job {\n  runnerAvailabilityStatus\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment OutdatedProtocolAlertFragment_job on Job {\n  outdatedJobProtocolVersion\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunDetailsApplyStageFragment_apply on Run {\n  id\n  status\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    ...RunDetailsPlanSummaryFragment_plan\n    id\n  }\n  apply {\n    metadata {\n      createdAt\n    }\n    status\n    errorMessage\n    triggeredBy\n    currentJob {\n      id\n      status\n      cancelRequested\n      timestamps {\n        queuedAt\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...NoRunnerAlertFragment_job\n      ...OutdatedProtocolAlertFragment_job\n      ...JobResourceUsageMetricsFragment_job\n    }\n    jobs(first: 0) {\n      totalCount\n    }\n    id\n  }\n  ...RunVariablesFragment_variables\n  ...ForceCancelRunAlertFragment_run\n  stateVersion {\n    inventory {\n      checkResults {\n        ...CheckResultsPanelFragment_checkResult\n      }\n    }\n    ...StateVersionFileFragment_stateVersion\n    id\n  }\n}\n\nfragment RunDetailsPlanStageFragment_plan on Run {\n  id\n  status\n  createdBy\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    id\n    metadata {\n      createdAt\n    }\n    status\n    errorMessage\n    hasChanges\n    diffSize\n    checkResults {\n      ...CheckResultsPanelFragment_checkResult\n    }\n    currentJob {\n      id\n      status\n      cancelRequested\n      timestamps {\n        queuedAt\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...NoRunnerAlertFragment_job\n      ...OutdatedProtocolAlertFragment_job\n      ...JobResourceUsageMetricsFragment_job\n    }\n    jobs(first: 0) {\n      totalCount\n    }\n    ...RunDetailsPlanSummaryFragment_plan\n  }\n  apply {\n    status\n    id\n  }\n  ...RunVariablesFragment_variables\n  ...ForceCancelRunAlertFragment_run\n}\n\nfragment RunDetailsPlanSummaryFragment_plan on Plan {\n  summary {\n    resourceAdditions\n    resourceChanges\n    resourceDestructions\n    resourceImports\n    resourceDrift\n    outputAdditions\n    outputChanges\n    outputDestructions\n  }\n}\n\nfragment RunDetailsRunTaskStageFragment_taskStage on Run {\n  id\n  createdBy\n  metadata {\n    createdAt\n  }\n  ...ForceCancelRunAlertFragment_run\n  taskStages {\n    stageName\n    status\n    ...RunTaskStageStatusPanelFragment_taskStage\n    policyChecks {\n      checkType\n      status\n      currentJob {\n        cancelRequested\n        ...NoRunnerAlertFragment_job\n        id\n      }\n      runGate {\n        approvalRules {\n          name\n        }\n        ...RunTaskStagePolicyCheckPolicyCardFragment_gate\n        id\n      }\n      policies {\n        id\n        status\n        ...RunTaskStagePolicyCheckPolicyCardFragment_policy\n      }\n      ...RunTaskStagePolicyCheckPanelFragment_check\n    }\n  }\n}\n\nfragment RunDetailsSidebarFragment_details on Run {\n  id\n  status\n  createdBy\n  isDestroy\n  assessment\n  autoApply\n  hasAdvisoryFailures\n  moduleSource\n  moduleVersion\n  ...ModuleSourceLinkFragment_run\n  annotations {\n    key\n  }\n  ...RunAnnotationsFragment_run\n  workspace {\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    trn\n  }\n  configurationVersion {\n    id\n  }\n  plan {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n  taskStages {\n    stageName\n    status\n    policyChecks {\n      status\n      stageName\n    }\n  }\n  apply {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  hasAdvisoryFailures\n  workspace {\n    fullPath\n    id\n  }\n  apply {\n    status\n    id\n  }\n  ...RunStageIconsFragment_run\n  ...RunAnnotationsFragment_run\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment RunTaskStagePolicyApproversBoxFragment_gate on RunGate {\n  approvalRules {\n    name\n    requiredApprovals\n    allowedUsers {\n      id\n      username\n      email\n    }\n    allowedServiceAccounts {\n      id\n      name\n      resourcePath\n    }\n    allowedTeams {\n      id\n      name\n    }\n  }\n  approvals {\n    id\n    decision\n    createdBy\n    coveredRules\n    user {\n      id\n      email\n    }\n    serviceAccount {\n      id\n      name\n      resourcePath\n    }\n  }\n}\n\nfragment RunTaskStagePolicyCheckPanelFragment_check on PolicyCheck {\n  checkType\n  status\n  nodePath\n  currentJob {\n    id\n    timestamps {\n      runningAt\n      finishedAt\n    }\n  }\n  jobs(first: 0) {\n    totalCount\n  }\n  policies {\n    id\n    status\n    enforcementLevel\n  }\n  messagesSummary {\n    messages\n    truncated\n  }\n  runGate {\n    id\n    status\n    overriddenBy\n    overrideComment\n    metadata {\n      updatedAt\n    }\n    approvalRules {\n      name\n      requiredApprovals\n    }\n    approvals {\n      id\n      decision\n      comment\n      createdBy\n      coveredRules\n      metadata {\n        createdAt\n      }\n      user {\n        id\n        username\n        email\n      }\n      serviceAccount {\n        id\n        name\n        resourcePath\n      }\n    }\n  }\n}\n\nfragment RunTaskStagePolicyCheckPolicyCardFragment_gate on RunGate {\n  ...RunTaskStagePolicyApproversBoxFragment_gate\n}\n\nfragment RunTaskStagePolicyCheckPolicyCardFragment_policy on PolicyCheckPolicy {\n  id\n  name\n  description\n  opaData {\n    packageSource\n    packageVersionConstraint\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    verifyStateLineage\n  }\n  enforcementLevel\n  status\n  messages\n  provenance {\n    policyTrn\n  }\n  policy {\n    id\n    groupPath\n  }\n}\n\nfragment RunTaskStageStatusPanelFragment_taskStage on RunTaskStage {\n  stageName\n  status\n  policyChecks {\n    currentJob {\n      cancelRequested\n      id\n    }\n  }\n}\n\nfragment RunVariableListItemFragment_variable on RunVariable {\n  key\n  category\n  value\n  namespacePath\n  sensitive\n  versionId\n  includedInTfConfig\n}\n\nfragment RunVariablesFragment_variables on Run {\n  variables {\n    key\n    category\n    namespacePath\n    includedInTfConfig\n    ...RunVariableListItemFragment_variable\n  }\n}\n\nfragment StateVersionFileFragment_stateVersion on StateVersion {\n  id\n}\n"
+    "text": "subscription WorkspaceDetailsRunSubscription(\n  $input: RunSubscriptionInput!\n) {\n  workspaceRunEvents(input: $input) {\n    action\n    run {\n      id\n      assessment\n      ...RunListItemFragment_run\n      ...RunDetailsSidebarFragment_details\n      ...RunDetailsPlanStageFragment_plan\n      ...RunDetailsRunTaskStageFragment_taskStage\n      ...RunDetailsApplyStageFragment_apply\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment CheckResultsPanelFragment_checkResult on TerraformCheckResult {\n  name\n  status\n  objects {\n    address\n    status\n    failureMessages\n  }\n}\n\nfragment ForceCancelRunAlertFragment_run on Run {\n  forceCancelAvailableAt\n  ...ForceCancelRunButtonFragment_run\n}\n\nfragment ForceCancelRunButtonFragment_run on Run {\n  id\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment JobResourceUsageMetricsFragment_job on Job {\n  resourceUsageMetrics {\n    peakMemoryBytes\n    totalCpuTimeMs\n    totalNetworkReceivedBytes\n    totalNetworkSentBytes\n    totalDiskReadBytes\n    totalDiskWriteBytes\n  }\n  resourceUsageLimits {\n    memoryBytes\n    networkReceivedBytes\n    networkSentBytes\n    diskReadBytes\n    diskWriteBytes\n  }\n}\n\nfragment ModuleSourceLinkFragment_run on Run {\n  moduleSource\n  moduleVersion\n}\n\nfragment NoRunnerAlertFragment_job on Job {\n  runnerAvailabilityStatus\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment OutdatedProtocolAlertFragment_job on Job {\n  outdatedJobProtocolVersion\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunDetailsApplyStageFragment_apply on Run {\n  id\n  status\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    ...RunDetailsPlanSummaryFragment_plan\n    id\n  }\n  apply {\n    metadata {\n      createdAt\n    }\n    status\n    errorMessage\n    triggeredByActor {\n      __typename\n      ...ActorDisplayFragment_actor\n    }\n    currentJob {\n      id\n      status\n      cancelRequested\n      timestamps {\n        queuedAt\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...NoRunnerAlertFragment_job\n      ...OutdatedProtocolAlertFragment_job\n      ...JobResourceUsageMetricsFragment_job\n    }\n    jobs(first: 0) {\n      totalCount\n    }\n    id\n  }\n  ...RunVariablesFragment_variables\n  ...ForceCancelRunAlertFragment_run\n  stateVersion {\n    inventory {\n      checkResults {\n        ...CheckResultsPanelFragment_checkResult\n      }\n    }\n    ...StateVersionFileFragment_stateVersion\n    id\n  }\n}\n\nfragment RunDetailsPlanStageFragment_plan on Run {\n  id\n  status\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    id\n    metadata {\n      createdAt\n    }\n    status\n    errorMessage\n    hasChanges\n    diffSize\n    checkResults {\n      ...CheckResultsPanelFragment_checkResult\n    }\n    currentJob {\n      id\n      status\n      cancelRequested\n      timestamps {\n        queuedAt\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...NoRunnerAlertFragment_job\n      ...OutdatedProtocolAlertFragment_job\n      ...JobResourceUsageMetricsFragment_job\n    }\n    jobs(first: 0) {\n      totalCount\n    }\n    ...RunDetailsPlanSummaryFragment_plan\n  }\n  apply {\n    status\n    id\n  }\n  ...RunVariablesFragment_variables\n  ...ForceCancelRunAlertFragment_run\n}\n\nfragment RunDetailsPlanSummaryFragment_plan on Plan {\n  summary {\n    resourceAdditions\n    resourceChanges\n    resourceDestructions\n    resourceImports\n    resourceDrift\n    outputAdditions\n    outputChanges\n    outputDestructions\n  }\n}\n\nfragment RunDetailsRunTaskStageFragment_taskStage on Run {\n  id\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  metadata {\n    createdAt\n  }\n  ...ForceCancelRunAlertFragment_run\n  taskStages {\n    stageName\n    status\n    ...RunTaskStageStatusPanelFragment_taskStage\n    policyChecks {\n      checkType\n      status\n      currentJob {\n        cancelRequested\n        ...NoRunnerAlertFragment_job\n        id\n      }\n      runGate {\n        approvalRules {\n          name\n        }\n        ...RunTaskStagePolicyCheckPolicyCardFragment_gate\n        id\n      }\n      policies {\n        id\n        status\n        ...RunTaskStagePolicyCheckPolicyCardFragment_policy\n      }\n      ...RunTaskStagePolicyCheckPanelFragment_check\n    }\n  }\n}\n\nfragment RunDetailsSidebarFragment_details on Run {\n  id\n  status\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  isDestroy\n  assessment\n  autoApply\n  hasAdvisoryFailures\n  moduleSource\n  moduleVersion\n  ...ModuleSourceLinkFragment_run\n  annotations {\n    key\n  }\n  ...RunAnnotationsFragment_run\n  workspace {\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    trn\n  }\n  configurationVersion {\n    id\n  }\n  plan {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n  taskStages {\n    stageName\n    status\n    policyChecks {\n      status\n      stageName\n    }\n  }\n  apply {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  status\n  isDestroy\n  assessment\n  hasAdvisoryFailures\n  workspace {\n    fullPath\n    id\n  }\n  apply {\n    status\n    id\n  }\n  ...RunStageIconsFragment_run\n  ...RunAnnotationsFragment_run\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment RunTaskStagePolicyApproversBoxFragment_gate on RunGate {\n  approvalRules {\n    name\n    requiredApprovals\n    allowedUsers {\n      id\n      username\n      email\n    }\n    allowedServiceAccounts {\n      id\n      name\n      resourcePath\n    }\n    allowedTeams {\n      id\n      name\n    }\n  }\n  approvals {\n    id\n    decision\n    createdByActor {\n      __typename\n      ...ActorDisplayFragment_actor\n    }\n    coveredRules\n    user {\n      id\n      email\n    }\n    serviceAccount {\n      id\n      name\n      resourcePath\n    }\n  }\n}\n\nfragment RunTaskStagePolicyCheckPanelFragment_check on PolicyCheck {\n  checkType\n  status\n  nodePath\n  currentJob {\n    id\n    timestamps {\n      runningAt\n      finishedAt\n    }\n  }\n  jobs(first: 0) {\n    totalCount\n  }\n  policies {\n    id\n    status\n    enforcementLevel\n  }\n  messagesSummary {\n    messages\n    truncated\n  }\n  runGate {\n    id\n    status\n    overriddenByActor {\n      __typename\n      ...ActorDisplayFragment_actor\n    }\n    overrideComment\n    metadata {\n      updatedAt\n    }\n    approvalRules {\n      name\n      requiredApprovals\n    }\n    approvals {\n      id\n      decision\n      comment\n      createdByActor {\n        __typename\n        ...ActorDisplayFragment_actor\n      }\n      coveredRules\n      metadata {\n        createdAt\n      }\n    }\n  }\n}\n\nfragment RunTaskStagePolicyCheckPolicyCardFragment_gate on RunGate {\n  ...RunTaskStagePolicyApproversBoxFragment_gate\n}\n\nfragment RunTaskStagePolicyCheckPolicyCardFragment_policy on PolicyCheckPolicy {\n  id\n  name\n  description\n  opaData {\n    packageSource\n    packageVersionConstraint\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    verifyStateLineage\n  }\n  enforcementLevel\n  status\n  messages\n  provenance {\n    policyTrn\n  }\n  policy {\n    id\n    groupPath\n  }\n}\n\nfragment RunTaskStageStatusPanelFragment_taskStage on RunTaskStage {\n  stageName\n  status\n  policyChecks {\n    currentJob {\n      cancelRequested\n      id\n    }\n  }\n}\n\nfragment RunVariableListItemFragment_variable on RunVariable {\n  key\n  category\n  value\n  namespacePath\n  sensitive\n  versionId\n  includedInTfConfig\n}\n\nfragment RunVariablesFragment_variables on Run {\n  variables {\n    key\n    category\n    namespacePath\n    includedInTfConfig\n    ...RunVariableListItemFragment_variable\n  }\n}\n\nfragment StateVersionFileFragment_stateVersion on StateVersion {\n  id\n}\n"
   }
 };
 })();

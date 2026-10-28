@@ -155,7 +155,13 @@ func (r *PackageVersionResolver) Latest() bool {
 
 // CreatedBy resolver
 func (r *PackageVersionResolver) CreatedBy() string {
-	return r.pkgVersion.CreatedBy
+	return r.pkgVersion.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *PackageVersionResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.pkgVersion.CreatedBy)
 }
 
 // Metadata resolver

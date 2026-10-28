@@ -241,7 +241,13 @@ func (r *RunResolver) Workspace(ctx context.Context) (*WorkspaceResolver, error)
 
 // CreatedBy resolver
 func (r *RunResolver) CreatedBy() string {
-	return r.run.CreatedBy
+	return r.run.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *RunResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.run.CreatedBy)
 }
 
 // Metadata resolver
@@ -632,7 +638,13 @@ func (r *RunResolver) ModuleDigest() *string {
 
 // ForceCanceledBy resolver
 func (r *RunResolver) ForceCanceledBy() *string {
-	return r.run.ForceCanceledBy
+	return models.ActorSubjectPtr(r.run.ForceCanceledBy)
+}
+
+// ForceCanceledByActor resolver returns the structured identity behind forceCanceledBy, or null when
+// none was recorded.
+func (r *RunResolver) ForceCanceledByActor() *ActorResolver {
+	return newOptionalActorResolver(r.run.ForceCanceledBy)
 }
 
 // ForceCanceled resolver

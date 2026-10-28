@@ -29,7 +29,7 @@ func TestVCSEvents_CreateVCSEvent(t *testing.T) {
 		Name:        "test-group-vcs-event",
 		Description: "test group for vcs event",
 		FullPath:    "test-group-vcs-event",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -37,7 +37,7 @@ func TestVCSEvents_CreateVCSEvent(t *testing.T) {
 		Name:           "test-workspace-vcs-event",
 		Description:    "test workspace for vcs event",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -93,7 +93,7 @@ func TestVCSEvents_UpdateVCSEvent(t *testing.T) {
 		Name:        "test-group-vcs-event-update",
 		Description: "test group for vcs event update",
 		FullPath:    "test-group-vcs-event-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -101,7 +101,7 @@ func TestVCSEvents_UpdateVCSEvent(t *testing.T) {
 		Name:           "test-workspace-vcs-event-update",
 		Description:    "test workspace for vcs event update",
 		GroupID:        group.Metadata.ID,
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -177,7 +177,7 @@ func TestVCSEvents_GetEventByID(t *testing.T) {
 		Name:           "test-workspace-vcs-event-get-by-id",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -249,7 +249,7 @@ func TestVCSEvents_GetEvents(t *testing.T) {
 		Name:           "test-workspace-vcs-events-list",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -338,7 +338,7 @@ func TestVCSEvents_GetEventsWithPaginationAndSorting(t *testing.T) {
 		Name:           "test-workspace-vcs-events-pagination",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -397,7 +397,7 @@ func TestVCSEvents_GetEventByTRN(t *testing.T) {
 		Name:           "test-workspace-vcs-event-get-by-trn",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

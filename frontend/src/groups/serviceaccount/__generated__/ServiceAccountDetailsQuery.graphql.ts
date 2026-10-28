@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7a6bfaa1ff7373c42c4a6d4bf6c2fd14>>
+ * @generated SignedSource<<bfaae234348dba8d374494976075c094>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,6 +9,7 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
+import { FragmentRefs } from "relay-runtime";
 export type BoundClaimsType = "GLOB" | "STRING" | "%future added value";
 export type ServiceAccountDetailsQuery$variables = {
   id: string;
@@ -18,6 +19,9 @@ export type ServiceAccountDetailsQuery$data = {
     readonly clientCredentialsEnabled: boolean;
     readonly clientSecretExpiresAt: any | null | undefined;
     readonly createdBy: string;
+    readonly createdByActor: {
+      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    } | null | undefined;
     readonly description: string;
     readonly id: string;
     readonly metadata: {
@@ -49,141 +53,137 @@ var v0 = [
     "name": "id"
   }
 ],
-v1 = {
+v1 = [
+  {
+    "kind": "Variable",
+    "name": "id",
+    "variableName": "id"
+  }
+],
+v2 = {
+  "alias": null,
+  "args": null,
+  "concreteType": "ResourceMetadata",
+  "kind": "LinkedField",
+  "name": "metadata",
+  "plural": false,
+  "selections": [
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "createdAt",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "trn",
+      "storageKey": null
+    }
+  ],
+  "storageKey": null
+},
+v3 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "id",
+  "storageKey": null
+},
+v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "name",
   "storageKey": null
 },
-v2 = [
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "description",
+  "storageKey": null
+},
+v6 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "resourcePath",
+  "storageKey": null
+},
+v7 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "createdBy",
+  "storageKey": null
+},
+v8 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "clientCredentialsEnabled",
+  "storageKey": null
+},
+v9 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "clientSecretExpiresAt",
+  "storageKey": null
+},
+v10 = {
+  "alias": null,
+  "args": null,
+  "concreteType": "OIDCTrustPolicy",
+  "kind": "LinkedField",
+  "name": "oidcTrustPolicies",
+  "plural": true,
+  "selections": [
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "issuer",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "boundClaimsType",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "concreteType": "JWTClaim",
+      "kind": "LinkedField",
+      "name": "boundClaims",
+      "plural": true,
+      "selections": [
+        (v4/*: any*/),
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "value",
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
+    }
+  ],
+  "storageKey": null
+},
+v11 = [
   {
     "alias": null,
-    "args": [
-      {
-        "kind": "Variable",
-        "name": "id",
-        "variableName": "id"
-      }
-    ],
-    "concreteType": "ServiceAccount",
-    "kind": "LinkedField",
-    "name": "serviceAccount",
-    "plural": false,
-    "selections": [
-      {
-        "alias": null,
-        "args": null,
-        "concreteType": "ResourceMetadata",
-        "kind": "LinkedField",
-        "name": "metadata",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "createdAt",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "trn",
-            "storageKey": null
-          }
-        ],
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "id",
-        "storageKey": null
-      },
-      (v1/*: any*/),
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "description",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "resourcePath",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "createdBy",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "clientCredentialsEnabled",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "clientSecretExpiresAt",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "concreteType": "OIDCTrustPolicy",
-        "kind": "LinkedField",
-        "name": "oidcTrustPolicies",
-        "plural": true,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "issuer",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "boundClaimsType",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "concreteType": "JWTClaim",
-            "kind": "LinkedField",
-            "name": "boundClaims",
-            "plural": true,
-            "selections": [
-              (v1/*: any*/),
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "value",
-                "storageKey": null
-              }
-            ],
-            "storageKey": null
-          }
-        ],
-        "storageKey": null
-      }
-    ],
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
     "storageKey": null
   }
 ];
@@ -193,7 +193,44 @@ return {
     "kind": "Fragment",
     "metadata": null,
     "name": "ServiceAccountDetailsQuery",
-    "selections": (v2/*: any*/),
+    "selections": [
+      {
+        "alias": null,
+        "args": (v1/*: any*/),
+        "concreteType": "ServiceAccount",
+        "kind": "LinkedField",
+        "name": "serviceAccount",
+        "plural": false,
+        "selections": [
+          (v2/*: any*/),
+          (v3/*: any*/),
+          (v4/*: any*/),
+          (v5/*: any*/),
+          (v6/*: any*/),
+          (v7/*: any*/),
+          {
+            "alias": null,
+            "args": null,
+            "concreteType": null,
+            "kind": "LinkedField",
+            "name": "createdByActor",
+            "plural": false,
+            "selections": [
+              {
+                "args": null,
+                "kind": "FragmentSpread",
+                "name": "ActorDisplayFragment_actor"
+              }
+            ],
+            "storageKey": null
+          },
+          (v8/*: any*/),
+          (v9/*: any*/),
+          (v10/*: any*/)
+        ],
+        "storageKey": null
+      }
+    ],
     "type": "Query",
     "abstractKey": null
   },
@@ -202,19 +239,120 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
     "name": "ServiceAccountDetailsQuery",
-    "selections": (v2/*: any*/)
+    "selections": [
+      {
+        "alias": null,
+        "args": (v1/*: any*/),
+        "concreteType": "ServiceAccount",
+        "kind": "LinkedField",
+        "name": "serviceAccount",
+        "plural": false,
+        "selections": [
+          (v2/*: any*/),
+          (v3/*: any*/),
+          (v4/*: any*/),
+          (v5/*: any*/),
+          (v6/*: any*/),
+          (v7/*: any*/),
+          {
+            "alias": null,
+            "args": null,
+            "concreteType": null,
+            "kind": "LinkedField",
+            "name": "createdByActor",
+            "plural": false,
+            "selections": [
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "__typename",
+                "storageKey": null
+              },
+              {
+                "kind": "TypeDiscriminator",
+                "abstractKey": "__isActor"
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "type",
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "principalId",
+                "storageKey": null
+              },
+              {
+                "kind": "InlineFragment",
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "User",
+                    "kind": "LinkedField",
+                    "name": "user",
+                    "plural": false,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "email",
+                        "storageKey": null
+                      },
+                      (v3/*: any*/)
+                    ],
+                    "storageKey": null
+                  }
+                ],
+                "type": "UserActor",
+                "abstractKey": null
+              },
+              {
+                "kind": "InlineFragment",
+                "selections": (v11/*: any*/),
+                "type": "ServiceAccountActor",
+                "abstractKey": null
+              },
+              {
+                "kind": "InlineFragment",
+                "selections": (v11/*: any*/),
+                "type": "VCSProviderActor",
+                "abstractKey": null
+              },
+              {
+                "kind": "InlineFragment",
+                "selections": (v11/*: any*/),
+                "type": "JobActor",
+                "abstractKey": null
+              }
+            ],
+            "storageKey": null
+          },
+          (v8/*: any*/),
+          (v9/*: any*/),
+          (v10/*: any*/)
+        ],
+        "storageKey": null
+      }
+    ]
   },
   "params": {
-    "cacheID": "1d72781063c2d6ded9a67eee379e1567",
+    "cacheID": "5c6eed31241cb7dc2200051e9160cf5a",
     "id": null,
     "metadata": {},
     "name": "ServiceAccountDetailsQuery",
     "operationKind": "query",
-    "text": "query ServiceAccountDetailsQuery(\n  $id: String!\n) {\n  serviceAccount(id: $id) {\n    metadata {\n      createdAt\n      trn\n    }\n    id\n    name\n    description\n    resourcePath\n    createdBy\n    clientCredentialsEnabled\n    clientSecretExpiresAt\n    oidcTrustPolicies {\n      issuer\n      boundClaimsType\n      boundClaims {\n        name\n        value\n      }\n    }\n  }\n}\n"
+    "text": "query ServiceAccountDetailsQuery(\n  $id: String!\n) {\n  serviceAccount(id: $id) {\n    metadata {\n      createdAt\n      trn\n    }\n    id\n    name\n    description\n    resourcePath\n    createdBy\n    createdByActor {\n      __typename\n      ...ActorDisplayFragment_actor\n    }\n    clientCredentialsEnabled\n    clientSecretExpiresAt\n    oidcTrustPolicies {\n      issuer\n      boundClaimsType\n      boundClaims {\n        name\n        value\n      }\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "c891a6fdce90b01c0b5fc37184fb4356";
+(node as any).hash = "ea6367ec9961cb58e4c4bf064ab8f62d";
 
 export default node;

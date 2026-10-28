@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<64215b15110c07372b4c4cbe05a51180>>
+ * @generated SignedSource<<39566797e0421631b001372b4e8a45f9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -32,7 +32,9 @@ export type RunTaskStagePolicyApproversBoxFragment_gate$data = {
   }>;
   readonly approvals: ReadonlyArray<{
     readonly coveredRules: ReadonlyArray<string>;
-    readonly createdBy: string;
+    readonly createdByActor: {
+      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    } | null | undefined;
     readonly decision: RunGateDecision;
     readonly id: string;
     readonly serviceAccount: {
@@ -172,8 +174,17 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "createdBy",
+          "concreteType": null,
+          "kind": "LinkedField",
+          "name": "createdByActor",
+          "plural": false,
+          "selections": [
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActorDisplayFragment_actor"
+            }
+          ],
           "storageKey": null
         },
         {
@@ -215,6 +226,6 @@ return {
 };
 })();
 
-(node as any).hash = "654e91a998fb4a6c1c764df9abad83c6";
+(node as any).hash = "a3377b082f8e240837a19c7357d2a75b";
 
 export default node;

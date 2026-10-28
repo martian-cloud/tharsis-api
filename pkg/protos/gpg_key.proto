@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.gpg_key;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 import "pagination.proto";
 import "google/protobuf/empty.proto";
@@ -60,7 +61,12 @@ message GPGKey {
   string                    ascii_armor = 3;
   string                    gpg_key_id  = 4;
   string                    fingerprint = 5;
-  string                    created_by  = 6;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by  = 6 [deprecated = true];
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor created_by_actor = 7;
 }
 
 // GetGPGKeysResponse is the paginated list of GPG Keys.

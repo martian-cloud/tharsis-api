@@ -251,11 +251,17 @@ type RunGate struct {
 	ApprovalRules []*RunGateApprovalRule `protobuf:"bytes,5,rep,name=approval_rules,json=approvalRules,proto3" json:"approval_rules,omitempty"`
 	RunId         string                 `protobuf:"bytes,6,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	// overridden_by is the subject that bypassed the gate; set only when status is OVERRIDDEN.
+	// Deprecated in favour of overridden_by_actor.
+	//
+	// Deprecated: Marked as deprecated in run_gate.proto.
 	OverriddenBy *string `protobuf:"bytes,7,opt,name=overridden_by,json=overriddenBy,proto3,oneof" json:"overridden_by,omitempty"`
 	// override_comment is the reason given for the override; empty when none was supplied.
 	OverrideComment string `protobuf:"bytes,8,opt,name=override_comment,json=overrideComment,proto3" json:"override_comment,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// overridden_by_actor is the structured identity of the principal that bypassed the gate.
+	// Absent when the gate was not overridden, or was overridden before actors were introduced.
+	OverriddenByActor *Actor `protobuf:"bytes,9,opt,name=overridden_by_actor,json=overriddenByActor,proto3" json:"overridden_by_actor,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *RunGate) Reset() {
@@ -330,6 +336,7 @@ func (x *RunGate) GetRunId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in run_gate.proto.
 func (x *RunGate) GetOverriddenBy() string {
 	if x != nil && x.OverriddenBy != nil {
 		return *x.OverriddenBy
@@ -342,6 +349,13 @@ func (x *RunGate) GetOverrideComment() string {
 		return x.OverrideComment
 	}
 	return ""
+}
+
+func (x *RunGate) GetOverriddenByActor() *Actor {
+	if x != nil {
+		return x.OverriddenByActor
+	}
+	return nil
 }
 
 // ApproveRunGateRequest is the input for recording a decision on a run gate.
@@ -462,20 +476,21 @@ var File_run_gate_proto protoreflect.FileDescriptor
 
 const file_run_gate_proto_rawDesc = "" +
 	"\n" +
-	"\x0erun_gate.proto\x12!martiancloud.tharsis.api.run_gate\x1a\x0emetadata.proto\"v\n" +
+	"\x0erun_gate.proto\x12!martiancloud.tharsis.api.run_gate\x1a\vactor.proto\x1a\x0emetadata.proto\"v\n" +
 	"\x13RunGateApprovalRule\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12-\n" +
 	"\x12required_approvals\x18\x02 \x01(\x05R\x11requiredApprovals\x12\x1c\n" +
-	"\tapprovals\x18\x03 \x01(\x05R\tapprovals\"\xed\x03\n" +
+	"\tapprovals\x18\x03 \x01(\x05R\tapprovals\"\xc8\x04\n" +
 	"\aRunGate\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12&\n" +
 	"\x0fpolicy_check_id\x18\x02 \x01(\tR\rpolicyCheckId\x12B\n" +
 	"\x04type\x18\x03 \x01(\x0e2..martiancloud.tharsis.api.run_gate.RunGateTypeR\x04type\x12H\n" +
 	"\x06status\x18\x04 \x01(\x0e20.martiancloud.tharsis.api.run_gate.RunGateStatusR\x06status\x12]\n" +
 	"\x0eapproval_rules\x18\x05 \x03(\v26.martiancloud.tharsis.api.run_gate.RunGateApprovalRuleR\rapprovalRules\x12\x15\n" +
-	"\x06run_id\x18\x06 \x01(\tR\x05runId\x12(\n" +
-	"\roverridden_by\x18\a \x01(\tH\x00R\foverriddenBy\x88\x01\x01\x12)\n" +
-	"\x10override_comment\x18\b \x01(\tR\x0foverrideCommentB\x10\n" +
+	"\x06run_id\x18\x06 \x01(\tR\x05runId\x12,\n" +
+	"\roverridden_by\x18\a \x01(\tB\x02\x18\x01H\x00R\foverriddenBy\x88\x01\x01\x12)\n" +
+	"\x10override_comment\x18\b \x01(\tR\x0foverrideComment\x12U\n" +
+	"\x13overridden_by_actor\x18\t \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x11overriddenByActorB\x10\n" +
 	"\x0e_overridden_by\"\xab\x01\n" +
 	"\x15ApproveRunGateRequest\x12\x17\n" +
 	"\agate_id\x18\x01 \x01(\tR\x06gateId\x12\x1d\n" +
@@ -529,22 +544,24 @@ var file_run_gate_proto_goTypes = []any{
 	(*ApproveRunGateRequest)(nil),  // 5: martiancloud.tharsis.api.run_gate.ApproveRunGateRequest
 	(*OverrideRunGateRequest)(nil), // 6: martiancloud.tharsis.api.run_gate.OverrideRunGateRequest
 	(*ResourceMetadata)(nil),       // 7: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*Actor)(nil),                  // 8: martiancloud.tharsis.api.actor.Actor
 }
 var file_run_gate_proto_depIdxs = []int32{
 	7, // 0: martiancloud.tharsis.api.run_gate.RunGate.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
 	0, // 1: martiancloud.tharsis.api.run_gate.RunGate.type:type_name -> martiancloud.tharsis.api.run_gate.RunGateType
 	1, // 2: martiancloud.tharsis.api.run_gate.RunGate.status:type_name -> martiancloud.tharsis.api.run_gate.RunGateStatus
 	3, // 3: martiancloud.tharsis.api.run_gate.RunGate.approval_rules:type_name -> martiancloud.tharsis.api.run_gate.RunGateApprovalRule
-	2, // 4: martiancloud.tharsis.api.run_gate.ApproveRunGateRequest.decision:type_name -> martiancloud.tharsis.api.run_gate.RunGateDecision
-	5, // 5: martiancloud.tharsis.api.run_gate.RunGates.ApproveRunGate:input_type -> martiancloud.tharsis.api.run_gate.ApproveRunGateRequest
-	6, // 6: martiancloud.tharsis.api.run_gate.RunGates.OverrideRunGate:input_type -> martiancloud.tharsis.api.run_gate.OverrideRunGateRequest
-	4, // 7: martiancloud.tharsis.api.run_gate.RunGates.ApproveRunGate:output_type -> martiancloud.tharsis.api.run_gate.RunGate
-	4, // 8: martiancloud.tharsis.api.run_gate.RunGates.OverrideRunGate:output_type -> martiancloud.tharsis.api.run_gate.RunGate
-	7, // [7:9] is the sub-list for method output_type
-	5, // [5:7] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	8, // 4: martiancloud.tharsis.api.run_gate.RunGate.overridden_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	2, // 5: martiancloud.tharsis.api.run_gate.ApproveRunGateRequest.decision:type_name -> martiancloud.tharsis.api.run_gate.RunGateDecision
+	5, // 6: martiancloud.tharsis.api.run_gate.RunGates.ApproveRunGate:input_type -> martiancloud.tharsis.api.run_gate.ApproveRunGateRequest
+	6, // 7: martiancloud.tharsis.api.run_gate.RunGates.OverrideRunGate:input_type -> martiancloud.tharsis.api.run_gate.OverrideRunGateRequest
+	4, // 8: martiancloud.tharsis.api.run_gate.RunGates.ApproveRunGate:output_type -> martiancloud.tharsis.api.run_gate.RunGate
+	4, // 9: martiancloud.tharsis.api.run_gate.RunGates.OverrideRunGate:output_type -> martiancloud.tharsis.api.run_gate.RunGate
+	8, // [8:10] is the sub-list for method output_type
+	6, // [6:8] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_run_gate_proto_init() }
@@ -552,6 +569,7 @@ func file_run_gate_proto_init() {
 	if File_run_gate_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_run_gate_proto_msgTypes[1].OneofWrappers = []any{}
 	file_run_gate_proto_msgTypes[2].OneofWrappers = []any{}

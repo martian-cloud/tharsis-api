@@ -200,17 +200,25 @@ type Apply struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Metadata *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	// Deprecated: Marked as deprecated in apply.proto.
-	DeprecatedStatus string      `protobuf:"bytes,2,opt,name=deprecated_status,json=deprecatedStatus,proto3" json:"deprecated_status,omitempty"`
-	TriggeredBy      string      `protobuf:"bytes,3,opt,name=triggered_by,json=triggeredBy,proto3" json:"triggered_by,omitempty"`
-	ErrorMessage     *string     `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
-	LatestJobId      *string     `protobuf:"bytes,5,opt,name=latest_job_id,json=latestJobId,proto3,oneof" json:"latest_job_id,omitempty"`
-	Status           ApplyStatus `protobuf:"varint,6,opt,name=status,proto3,enum=martiancloud.tharsis.api.apply.ApplyStatus" json:"status,omitempty"`
+	DeprecatedStatus string `protobuf:"bytes,2,opt,name=deprecated_status,json=deprecatedStatus,proto3" json:"deprecated_status,omitempty"`
+	// triggered_by is the free-form identifier of the principal that triggered the
+	// apply. Deprecated in favour of triggered_by_actor.
+	//
+	// Deprecated: Marked as deprecated in apply.proto.
+	TriggeredBy  string      `protobuf:"bytes,3,opt,name=triggered_by,json=triggeredBy,proto3" json:"triggered_by,omitempty"`
+	ErrorMessage *string     `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3,oneof" json:"error_message,omitempty"`
+	LatestJobId  *string     `protobuf:"bytes,5,opt,name=latest_job_id,json=latestJobId,proto3,oneof" json:"latest_job_id,omitempty"`
+	Status       ApplyStatus `protobuf:"varint,6,opt,name=status,proto3,enum=martiancloud.tharsis.api.apply.ApplyStatus" json:"status,omitempty"`
 	// Global IDs of the managed identities the apply job may create credentials for. Set when
 	// auto-apply is enabled (including at run creation) or when the apply is approved; empty
 	// otherwise.
 	ManagedIdentityIds []string `protobuf:"bytes,7,rep,name=managed_identity_ids,json=managedIdentityIds,proto3" json:"managed_identity_ids,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// triggered_by_actor is the structured identity of the principal that
+	// triggered the apply. Absent for applies triggered before actors were
+	// introduced.
+	TriggeredByActor *Actor `protobuf:"bytes,8,opt,name=triggered_by_actor,json=triggeredByActor,proto3" json:"triggered_by_actor,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Apply) Reset() {
@@ -258,6 +266,7 @@ func (x *Apply) GetDeprecatedStatus() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in apply.proto.
 func (x *Apply) GetTriggeredBy() string {
 	if x != nil {
 		return x.TriggeredBy
@@ -293,11 +302,18 @@ func (x *Apply) GetManagedIdentityIds() []string {
 	return nil
 }
 
+func (x *Apply) GetTriggeredByActor() *Actor {
+	if x != nil {
+		return x.TriggeredByActor
+	}
+	return nil
+}
+
 var File_apply_proto protoreflect.FileDescriptor
 
 const file_apply_proto_rawDesc = "" +
 	"\n" +
-	"\vapply.proto\x12\x1emartiancloud.tharsis.api.apply\x1a\x0emetadata.proto\"%\n" +
+	"\vapply.proto\x12\x1emartiancloud.tharsis.api.apply\x1a\vactor.proto\x1a\x0emetadata.proto\"%\n" +
 	"\x13GetApplyByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x91\x01\n" +
 	"\x12UpdateApplyRequest\x12\x0e\n" +
@@ -306,15 +322,16 @@ const file_apply_proto_rawDesc = "" +
 	"\rerror_message\x18\x04 \x01(\tH\x01R\ferrorMessage\x88\x01\x01B\n" +
 	"\n" +
 	"\b_versionB\x10\n" +
-	"\x0e_error_messageJ\x04\b\x03\x10\x04\"\x9a\x03\n" +
+	"\x0e_error_messageJ\x04\b\x03\x10\x04\"\xf3\x03\n" +
 	"\x05Apply\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12/\n" +
-	"\x11deprecated_status\x18\x02 \x01(\tB\x02\x18\x01R\x10deprecatedStatus\x12!\n" +
-	"\ftriggered_by\x18\x03 \x01(\tR\vtriggeredBy\x12(\n" +
+	"\x11deprecated_status\x18\x02 \x01(\tB\x02\x18\x01R\x10deprecatedStatus\x12%\n" +
+	"\ftriggered_by\x18\x03 \x01(\tB\x02\x18\x01R\vtriggeredBy\x12(\n" +
 	"\rerror_message\x18\x04 \x01(\tH\x00R\ferrorMessage\x88\x01\x01\x12'\n" +
 	"\rlatest_job_id\x18\x05 \x01(\tH\x01R\vlatestJobId\x88\x01\x01\x12C\n" +
 	"\x06status\x18\x06 \x01(\x0e2+.martiancloud.tharsis.api.apply.ApplyStatusR\x06status\x120\n" +
-	"\x14managed_identity_ids\x18\a \x03(\tR\x12managedIdentityIdsB\x10\n" +
+	"\x14managed_identity_ids\x18\a \x03(\tR\x12managedIdentityIds\x12S\n" +
+	"\x12triggered_by_actor\x18\b \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x10triggeredByActorB\x10\n" +
 	"\x0e_error_messageB\x10\n" +
 	"\x0e_latest_job_id*\x87\x01\n" +
 	"\vApplyStatus\x12\x0f\n" +
@@ -349,15 +366,17 @@ var file_apply_proto_goTypes = []any{
 	(*UpdateApplyRequest)(nil),  // 2: martiancloud.tharsis.api.apply.UpdateApplyRequest
 	(*Apply)(nil),               // 3: martiancloud.tharsis.api.apply.Apply
 	(*ResourceMetadata)(nil),    // 4: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*Actor)(nil),               // 5: martiancloud.tharsis.api.actor.Actor
 }
 var file_apply_proto_depIdxs = []int32{
 	4, // 0: martiancloud.tharsis.api.apply.Apply.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
 	0, // 1: martiancloud.tharsis.api.apply.Apply.status:type_name -> martiancloud.tharsis.api.apply.ApplyStatus
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	5, // 2: martiancloud.tharsis.api.apply.Apply.triggered_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_apply_proto_init() }
@@ -365,6 +384,7 @@ func file_apply_proto_init() {
 	if File_apply_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_apply_proto_msgTypes[1].OneofWrappers = []any{}
 	file_apply_proto_msgTypes[2].OneofWrappers = []any{}

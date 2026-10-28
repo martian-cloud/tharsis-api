@@ -184,7 +184,13 @@ func (r *TerraformModuleResolver) Private() bool {
 
 // CreatedBy resolver
 func (r *TerraformModuleResolver) CreatedBy() string {
-	return r.module.CreatedBy
+	return r.module.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *TerraformModuleResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.module.CreatedBy)
 }
 
 // GroupPath resolver

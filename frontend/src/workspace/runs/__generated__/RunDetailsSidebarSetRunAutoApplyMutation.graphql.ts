@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a93c1022e42ab4341b97ab593b42f1e7>>
+ * @generated SignedSource<<73b15cd059dfe005e25481c2171b7958>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -54,6 +54,13 @@ v1 = [
 v2 = {
   "alias": null,
   "args": null,
+  "kind": "ScalarField",
+  "name": "type",
+  "storageKey": null
+},
+v3 = {
+  "alias": null,
+  "args": null,
   "concreteType": "Problem",
   "kind": "LinkedField",
   "name": "problems",
@@ -73,39 +80,42 @@ v2 = {
       "name": "field",
       "storageKey": null
     },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "type",
-      "storageKey": null
-    }
+    (v2/*: any*/)
   ],
-  "storageKey": null
-},
-v3 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "id",
   "storageKey": null
 },
 v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "status",
+  "name": "id",
   "storageKey": null
 },
 v5 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "createdAt",
+  "name": "status",
   "storageKey": null
 },
 v6 = [
-  (v4/*: any*/),
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+],
+v7 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "createdAt",
+  "storageKey": null
+},
+v8 = [
+  (v5/*: any*/),
   {
     "alias": null,
     "args": null,
@@ -114,7 +124,7 @@ v6 = [
     "name": "metadata",
     "plural": false,
     "selections": [
-      (v5/*: any*/)
+      (v7/*: any*/)
     ],
     "storageKey": null
   },
@@ -140,13 +150,13 @@ v6 = [
         "name": "cancelRequested",
         "storageKey": null
       },
-      (v3/*: any*/)
+      (v4/*: any*/)
     ],
     "storageKey": null
   },
-  (v3/*: any*/)
+  (v4/*: any*/)
 ],
-v7 = {
+v9 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -184,7 +194,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v3/*: any*/)
         ],
         "storageKey": null
       }
@@ -214,13 +224,80 @@ return {
             "name": "run",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
               (v4/*: any*/),
+              (v5/*: any*/),
               {
                 "alias": null,
                 "args": null,
-                "kind": "ScalarField",
-                "name": "createdBy",
+                "concreteType": null,
+                "kind": "LinkedField",
+                "name": "createdByActor",
+                "plural": false,
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "__typename",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "TypeDiscriminator",
+                    "abstractKey": "__isActor"
+                  },
+                  (v2/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "principalId",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "User",
+                        "kind": "LinkedField",
+                        "name": "user",
+                        "plural": false,
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "email",
+                            "storageKey": null
+                          },
+                          (v4/*: any*/)
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "UserActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v6/*: any*/),
+                    "type": "ServiceAccountActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v6/*: any*/),
+                    "type": "VCSProviderActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v6/*: any*/),
+                    "type": "JobActor",
+                    "abstractKey": null
+                  }
+                ],
                 "storageKey": null
               },
               {
@@ -312,7 +389,7 @@ return {
                     "name": "fullPath",
                     "storageKey": null
                   },
-                  (v3/*: any*/)
+                  (v4/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -324,7 +401,7 @@ return {
                 "name": "metadata",
                 "plural": false,
                 "selections": [
-                  (v5/*: any*/),
+                  (v7/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -343,7 +420,7 @@ return {
                 "name": "configurationVersion",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/)
+                  (v4/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -354,7 +431,7 @@ return {
                 "kind": "LinkedField",
                 "name": "plan",
                 "plural": false,
-                "selections": (v6/*: any*/),
+                "selections": (v8/*: any*/),
                 "storageKey": null
               },
               {
@@ -365,8 +442,8 @@ return {
                 "name": "taskStages",
                 "plural": true,
                 "selections": [
-                  (v7/*: any*/),
-                  (v4/*: any*/),
+                  (v9/*: any*/),
+                  (v5/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -375,8 +452,8 @@ return {
                     "name": "policyChecks",
                     "plural": true,
                     "selections": [
-                      (v4/*: any*/),
-                      (v7/*: any*/)
+                      (v5/*: any*/),
+                      (v9/*: any*/)
                     ],
                     "storageKey": null
                   }
@@ -390,25 +467,25 @@ return {
                 "kind": "LinkedField",
                 "name": "apply",
                 "plural": false,
-                "selections": (v6/*: any*/),
+                "selections": (v8/*: any*/),
                 "storageKey": null
               }
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v3/*: any*/)
         ],
         "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "eddad9592dcb1c6c6c21f955037cd002",
+    "cacheID": "b006c569d150bb528e2cb0bfae1e9f73",
     "id": null,
     "metadata": {},
     "name": "RunDetailsSidebarSetRunAutoApplyMutation",
     "operationKind": "mutation",
-    "text": "mutation RunDetailsSidebarSetRunAutoApplyMutation(\n  $input: SetRunAutoApplyInput!\n) {\n  setRunAutoApply(input: $input) {\n    run {\n      ...RunDetailsSidebarFragment_details\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment ModuleSourceLinkFragment_run on Run {\n  moduleSource\n  moduleVersion\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunDetailsSidebarFragment_details on Run {\n  id\n  status\n  createdBy\n  isDestroy\n  assessment\n  autoApply\n  hasAdvisoryFailures\n  moduleSource\n  moduleVersion\n  ...ModuleSourceLinkFragment_run\n  annotations {\n    key\n  }\n  ...RunAnnotationsFragment_run\n  workspace {\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    trn\n  }\n  configurationVersion {\n    id\n  }\n  plan {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n  taskStages {\n    stageName\n    status\n    policyChecks {\n      status\n      stageName\n    }\n  }\n  apply {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n}\n"
+    "text": "mutation RunDetailsSidebarSetRunAutoApplyMutation(\n  $input: SetRunAutoApplyInput!\n) {\n  setRunAutoApply(input: $input) {\n    run {\n      ...RunDetailsSidebarFragment_details\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment ModuleSourceLinkFragment_run on Run {\n  moduleSource\n  moduleVersion\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunDetailsSidebarFragment_details on Run {\n  id\n  status\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  isDestroy\n  assessment\n  autoApply\n  hasAdvisoryFailures\n  moduleSource\n  moduleVersion\n  ...ModuleSourceLinkFragment_run\n  annotations {\n    key\n  }\n  ...RunAnnotationsFragment_run\n  workspace {\n    fullPath\n    id\n  }\n  metadata {\n    createdAt\n    trn\n  }\n  configurationVersion {\n    id\n  }\n  plan {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n  taskStages {\n    stageName\n    status\n    policyChecks {\n      status\n      stageName\n    }\n  }\n  apply {\n    status\n    metadata {\n      createdAt\n    }\n    currentJob {\n      runnerPath\n      cancelRequested\n      id\n    }\n    id\n  }\n}\n"
   }
 };
 })();

@@ -70,7 +70,9 @@ function RunDetailsPlanStage(props: Props) {
         {
             id
             status
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             workspace {
                 fullPath
             }
@@ -394,7 +396,7 @@ function RunDetailsPlanStage(props: Props) {
             {data.plan.currentJob?.cancelRequested && data.plan.status !== 'canceled' && <ForceCancelRunAlert fragmentRef={data} />}
             {data.plan.currentJob && <NoRunnerAlert fragmentRef={data.plan.currentJob} sx={{ mb: 2 }} />}
             {data.plan.currentJob && <OutdatedProtocolAlert fragmentRef={data.plan.currentJob} />}
-            <RunDetailsStageHeader stage="Plan" triggeredAt={data.plan.metadata.createdAt as string} triggeredBy={data.createdBy} />
+            <RunDetailsStageHeader stage="Plan" triggeredAt={data.plan.metadata.createdAt as string} triggeredByActor={data.createdByActor} />
             <RunDetailsStageStatusCard
                 icon={<StatusIcon sx={{ width: 32, height: 32, mr: 2 }} />}
                 title={`Plan ${planStatusType.label}`}

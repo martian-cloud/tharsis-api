@@ -210,7 +210,7 @@ func TestFailedRunEmailHandler_HandleRunChanges_SendsEmailPerFailedRun(t *testin
 		Run: &models.Run{
 			Metadata:    models.ResourceMetadata{ID: "run-1"},
 			WorkspaceID: "ws-1",
-			CreatedBy:   "system",
+			CreatedBy:   models.SystemActor(),
 			Apply:       &models.Apply{},
 			Plan:        models.Plan{ErrorMessage: ptr.String("boom")},
 		},
@@ -252,4 +252,92 @@ func TestFailedRunEmailHandler_HandleRunChanges_NoUsersToNotifySkipsSend(t *test
 
 	require.NoError(t, handler.HandleRunChanges(context.Background(), changes))
 
+}
+
+// TestFailedRunEmailHandler_CreatorParticipant covers how the run's creator is
+// resolved into a notification participant. A user actor is resolved by ID, and
+// failing to resolve it must not fail the handler.
+func TestFailedRunEmailHandler_CreatorParticipant(t *testing.T) {
+	const creatorUserID = "4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a"
+
+	tests := []struct {
+		name                string
+		createdBy           models.Actor
+		setupUsers          func(*db.MockUsers)
+		expectParticipantID string
+	}{
+		{
+			name:      "a user actor is resolved by id",
+			createdBy: models.NewUserActor(creatorUserID).WithSubject("user@example.com"),
+			setupUsers: func(m *db.MockUsers) {
+				m.On("GetUserByID", mock.Anything, creatorUserID).
+					Return(&models.User{Metadata: models.ResourceMetadata{ID: creatorUserID}}, nil)
+			},
+			expectParticipantID: creatorUserID,
+		},
+		{
+			name:      "a deleted user actor adds no participant and does not fail",
+			createdBy: models.NewUserActor(creatorUserID).WithSubject("user@example.com"),
+			setupUsers: func(m *db.MockUsers) {
+				m.On("GetUserByID", mock.Anything, creatorUserID).Return(nil, nil)
+			},
+		},
+		{
+			name:      "a non user actor needs no lookup",
+			createdBy: models.SystemActor(),
+		},
+		{
+			name:      "an untyped actor needs no lookup",
+			createdBy: models.Actor{Subject: "trn:stack:unknown"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logr, _ := logger.NewForTest()
+			mockWS := db.NewMockWorkspaces(t)
+			mockWS.On("GetWorkspaceByID", mock.Anything, "ws-1").
+				Return(&models.Workspace{FullPath: "group/ws"}, nil)
+
+			mockUsers := db.NewMockUsers(t)
+			if test.setupUsers != nil {
+				test.setupUsers(mockUsers)
+			}
+
+			emailClient := email.NewMockEnqueuer(t)
+			emailClient.On("EnqueueEmail", mock.Anything, mock.Anything).Return(nil).Maybe()
+
+			var gotParticipants []string
+			notifMgr := namespace.NewMockNotificationManager(t)
+			notifMgr.On("GetUsersToNotify", mock.Anything, mock.MatchedBy(
+				func(in *namespace.GetUsersToNotifyInput) bool {
+					gotParticipants = in.ParticipantUserIDs
+					return true
+				})).Return([]string{"user-1"}, nil)
+
+			handler := NewFailedRunEmailHandler(logr,
+				&db.Client{Workspaces: mockWS, Users: mockUsers}, emailClient, notifMgr)
+
+			changes := []types.RunChange{{
+				Run: &models.Run{
+					Metadata:    models.ResourceMetadata{ID: "run-1"},
+					WorkspaceID: "ws-1",
+					CreatedBy:   test.createdBy,
+					Apply:       &models.Apply{},
+					Plan:        models.Plan{ErrorMessage: ptr.String("boom")},
+				},
+				NodeStatusChanges: []statemachine.NodeStatusChange{
+					statemachine.PlanStatusChange{NewStatus: models.PlanErrored},
+				},
+			}}
+
+			require.NoError(t, handler.HandleRunChanges(context.Background(), changes))
+
+			if test.expectParticipantID == "" {
+				assert.Empty(t, gotParticipants)
+				return
+			}
+			assert.Equal(t, []string{test.expectParticipantID}, gotParticipants)
+		})
+	}
 }

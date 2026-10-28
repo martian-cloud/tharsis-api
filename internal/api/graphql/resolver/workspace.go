@@ -460,7 +460,13 @@ func (r *WorkspaceResolver) MaxJobDuration() int32 {
 
 // CreatedBy resolver
 func (r *WorkspaceResolver) CreatedBy() string {
-	return r.workspace.CreatedBy
+	return r.workspace.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *WorkspaceResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.workspace.CreatedBy)
 }
 
 // TerraformVersion resolver

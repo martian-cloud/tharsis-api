@@ -171,6 +171,122 @@ type ActivityEventUpdateWorkspacePayload {
   labelChanges: LabelChangePayload
 }
 
+"""
+Actor identifies the principal that performed an action. A field that holds an
+Actor is null when no actor was recorded, or when the recorded identifier is in
+no format an actor type can be inferred from; the deprecated string field
+beside it still carries the original identifier.
+
+Each actor type is its own implementing type, so a query selects what to show
+for each one with an inline fragment, and a principal is looked up only for the
+actor types whose principal field the query selects. Service accounts, VCS
+providers and jobs carry a snapshot of their TRN taken with the action, which is
+enough to display them without a lookup; a user carries no TRN snapshot and is displayed from
+its user field.
+"""
+interface Actor {
+  """
+  Global ID of the referenced record. Null for SYSTEM and SCIM, which have no
+  backing record. It is not named id because an actor is not itself a record:
+  it shares this ID with its principal.
+  """
+  principalId: String
+  type: ActorType!
+}
+
+enum ActorType {
+  JOB
+  SCIM
+  SERVICE_ACCOUNT
+  SYSTEM
+  USER
+  VCS_PROVIDER
+}
+
+"""JobActor is an action performed by a job running in a workspace."""
+type JobActor implements Actor {
+  principalId: String
+
+  """
+  The job. Null when it has been deleted or the caller is not permitted to view
+  it.
+  """
+  job: Job
+
+  """
+  The job's TRN when the action was recorded, for display. It names the job's
+  workspace path and is not updated when the workspace is moved; use
+  principalId or job to reference the job itself.
+  """
+  trnSnapshot: String
+  type: ActorType!
+}
+
+"""SCIMActor is a SCIM provisioning action. It has no backing record."""
+type SCIMActor implements Actor {
+  principalId: String
+  type: ActorType!
+}
+
+"""ServiceAccountActor is an action performed by a service account."""
+type ServiceAccountActor implements Actor {
+  principalId: String
+
+  """
+  The service account's TRN when the action was recorded, for display. It is
+  not updated when the service account is renamed or moved; use principalId or
+  serviceAccount to reference the service account itself.
+  """
+  trnSnapshot: String
+
+  """
+  The service account. Null when it has been deleted or the caller is not
+  permitted to view it.
+  """
+  serviceAccount: ServiceAccount
+  type: ActorType!
+}
+
+"""SystemActor is an internal system action. It has no backing record."""
+type SystemActor implements Actor {
+  principalId: String
+  type: ActorType!
+}
+
+"""UserActor is an action performed by a user."""
+type UserActor implements Actor {
+  principalId: String
+  type: ActorType!
+
+  """
+  The user. Null when the user has been deleted or the caller is not permitted
+  to view it.
+  """
+  user: User
+}
+
+"""
+VCSProviderActor is an action performed by a VCS provider through a workspace
+link.
+"""
+type VCSProviderActor implements Actor {
+  principalId: String
+
+  """
+  The VCS provider's TRN when the action was recorded, for display. It is not
+  updated when the provider is renamed or moved; use principalId or
+  vcsProvider to reference the provider itself.
+  """
+  trnSnapshot: String
+  type: ActorType!
+
+  """
+  The VCS provider. Null when it has been deleted or the caller is not
+  permitted to view it.
+  """
+  vcsProvider: VCSProvider
+}
+
 input AddUserToTeamInput {
   clientMutationId: String
   isMaintainer: Boolean!
@@ -388,7 +504,8 @@ input AgentTraceInput {
 
 type Announcement implements Node {
   active: Boolean!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   dismissible: Boolean!
   endTime: Time
   expired: Boolean!
@@ -432,7 +549,8 @@ type Apply {
   jobs(after: String, before: String, first: Int, last: Int, sort: JobSort): JobConnection!
   metadata: ResourceMetadata! @deprecated(reason: "use run metadata instead")
   status: ApplyStatus!
-  triggeredBy: String
+  triggeredBy: String @deprecated(reason: "Use triggeredByActor instead.")
+  triggeredByActor: Actor
 }
 
 input ApplyRunInput {
@@ -636,7 +754,8 @@ type Config {
 }
 
 type ConfigurationVersion implements Node {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   id: ID!
   metadata: ResourceMetadata!
   speculative: Boolean!
@@ -1667,7 +1786,8 @@ type EnableMaintenanceModePayload {
 
 type FederatedRegistry implements Node {
   audience: String!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   group: Group!
   hostname: String!
   id: ID!
@@ -1710,7 +1830,8 @@ type FederatedRegistryTrustPolicy {
 
 type GPGKey implements Node {
   asciiArmor: String!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   fingerprint: String!
   gpgKeyId: String!
   group: Group!
@@ -1744,7 +1865,8 @@ type GlobalUserPreferences {
 
 type Group implements Namespace & Node {
   activityEvents(actions: [ActivityEventAction!], after: String, before: String, first: Int, includeNested: Boolean, last: Int, serviceAccountId: String, serviceAccountPath: String, sort: ActivityEventSort, targetTypes: [ActivityEventTargetType!], timeRangeEnd: Time, timeRangeStart: Time, userId: String, username: String): ActivityEventConnection!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   descendentGroups(after: String, before: String, first: Int, last: Int, sort: GroupSort): GroupConnection!
   description: String!
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
@@ -1983,7 +2105,8 @@ type MCPServerConfig {
 }
 
 type MaintenanceMode {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   id: ID!
   metadata: ResourceMetadata!
 }
@@ -1993,7 +2116,8 @@ type ManagedIdentity implements Node {
   aliasSource: ManagedIdentity
   aliasSourceId: String
   aliases(after: String, before: String, first: Int, last: Int, sort: ManagedIdentitySort): ManagedIdentityConnection!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   data: String!
   description: String!
   group: Group!
@@ -2546,7 +2670,8 @@ input OverrideRunGateInput {
 
 type Package implements Node {
   allowMutableVersions: Boolean!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   description: String!
   group: Group!
   groupPath: String!
@@ -2590,7 +2715,8 @@ enum PackageSort {
 }
 
 type PackageVersion implements Node {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   error: String
   id: ID!
   latest: Boolean!
@@ -2739,7 +2865,8 @@ type Policy implements Node {
   allowedServiceAccounts: [ServiceAccount!]!
   allowedTeams: [Team!]!
   allowedUsers: [User!]!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   description: String!
   group: Group!
   groupPath: String!
@@ -3027,7 +3154,8 @@ type RevokeUserSessionPayload {
 }
 
 type Role implements Node {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   description: String!
   id: ID!
   metadata: ResourceMetadata!
@@ -3060,10 +3188,12 @@ type Run implements Node {
   autoApply: Boolean!
   comment: String!
   configurationVersion: ConfigurationVersion
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   forceCancelAvailableAt: Time
   forceCanceled: Boolean!
-  forceCanceledBy: String
+  forceCanceledBy: String @deprecated(reason: "Use forceCanceledByActor instead.")
+  forceCanceledByActor: Actor
   hasAdvisoryFailures: Boolean!
   id: ID!
   isDestroy: Boolean!
@@ -3146,7 +3276,8 @@ type RunGate implements Node {
   approvals: [RunGateApproval!]!
   id: ID!
   metadata: ResourceMetadata!
-  overriddenBy: String
+  overriddenBy: String @deprecated(reason: "Use overriddenByActor instead.")
+  overriddenByActor: Actor
   overrideComment: String!
   policyCheck: PolicyCheck!
   run: Run!
@@ -3157,7 +3288,8 @@ type RunGate implements Node {
 type RunGateApproval implements Node {
   comment: String!
   coveredRules: [String!]!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   decision: RunGateDecision!
   id: ID!
   metadata: ResourceMetadata!
@@ -3312,7 +3444,8 @@ type RunVariableSensitiveValue {
 
 type Runner implements Node {
   assignedServiceAccounts(after: String, before: String, first: Int, last: Int): ServiceAccountConnection!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   description: String!
   disabled: Boolean!
   group: Group!
@@ -3434,7 +3567,8 @@ enum RunnerType {
 }
 
 type SCIMToken implements Node {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   id: ID!
   metadata: ResourceMetadata!
 }
@@ -3459,7 +3593,8 @@ type ServiceAccount implements Node {
   activityEvents(actions: [ActivityEventAction!], after: String, before: String, first: Int, last: Int, namespacePath: String, sort: ActivityEventSort, targetTypes: [ActivityEventTargetType!], timeRangeEnd: Time, timeRangeStart: Time): ActivityEventConnection!
   clientCredentialsEnabled: Boolean!
   clientSecretExpiresAt: Time
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   description: String!
   group: Group!
   groupPath: String!
@@ -3575,7 +3710,8 @@ enum SpeculativeRunEnforcementLevel {
 }
 
 type StateVersion implements Node {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   data: String!
   id: ID!
   inventory: StateVersionInventory!
@@ -3726,7 +3862,8 @@ enum TerraformCheckResultStatus {
 
 type TerraformModule implements Node {
   attestations(after: String, before: String, digest: String, first: Int, last: Int, sort: TerraformModuleAttestationSort): TerraformModuleAttestationConnection!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   group: Group!
   groupPath: String!
   id: ID!
@@ -3744,7 +3881,8 @@ type TerraformModule implements Node {
 }
 
 type TerraformModuleAttestation implements Node {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   data: String!
   description: String!
   digests: [String!]!
@@ -3889,7 +4027,8 @@ enum TerraformModuleSort {
 type TerraformModuleVersion implements Node {
   attestations(after: String, before: String, first: Int, last: Int, sort: TerraformModuleAttestationSort): TerraformModuleAttestationConnection!
   configurationDetails(path: String!): TerraformModuleConfigurationDetails
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   diagnostics: String!
   error: String!
   examples: [String!]!
@@ -3922,7 +4061,8 @@ enum TerraformModuleVersionSort {
 }
 
 type TerraformProvider implements Node {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   group: Group!
   groupPath: String!
   id: ID!
@@ -3999,7 +4139,8 @@ enum TerraformProviderSort {
 }
 
 type TerraformProviderVersion implements Node {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   gpgAsciiArmor: String
   gpgKeyId: String
   id: ID!
@@ -4027,7 +4168,8 @@ type TerraformProviderVersionEdge {
 }
 
 type TerraformProviderVersionMirror implements Node {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   group: Group!
   groupPath: String!
   id: ID!
@@ -4559,7 +4701,8 @@ enum VCSEventSort {
 
 type VCSProvider implements Node {
   autoCreateWebhooks: Boolean!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   description: String!
   group: Group!
   groupPath: String!
@@ -4613,7 +4756,8 @@ type Workspace implements Namespace & Node {
   assessment: WorkspaceAssessment
   assignedManagedIdentities: [ManagedIdentity!]!
   assignedPolicies: [Policy!]!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   currentApplyRun: Run
   currentJob: Job @deprecated(reason: "The workspace no longer tracks a current job after the run refactor; this is always null. Use currentApplyRun instead.")
   currentStateVersion: StateVersion
@@ -4700,7 +4844,8 @@ A WorkspaceRoleBinding confers a Role on a workspace: the role's permissions bec
 the workspace's job caller at the workspace's DIRECT PARENT namespace. See setWorkspaceRoleBinding.
 """
 type WorkspaceRoleBinding implements Node {
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   id: ID!
   metadata: ResourceMetadata!
   role: Role!
@@ -4722,7 +4867,8 @@ input WorkspaceSubscriptionInput {
 type WorkspaceVCSProviderLink implements Node {
   autoSpeculativePlan: Boolean!
   branch: String!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor
   globPatterns: [String!]!
   id: ID!
   metadata: ResourceMetadata!

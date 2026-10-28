@@ -267,7 +267,8 @@ input RunAnnotationInput {
 type Run implements Node {
   id: ID!
   metadata: ResourceMetadata!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   status: RunStatus!
   isDestroy: Boolean!
   workspace: Workspace!
@@ -281,7 +282,8 @@ type Run implements Node {
   moduleSource: String
   moduleVersion: String
   moduleDigest: String
-  forceCanceledBy: String
+  forceCanceledBy: String @deprecated(reason: "Use forceCanceledByActor instead.")
+  forceCanceledByActor: Actor @complexity(value: 0)
   forceCanceled: Boolean!
   forceCancelAvailableAt: Time
   comment: String!

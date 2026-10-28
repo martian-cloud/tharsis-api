@@ -277,7 +277,13 @@ func (r *StateVersionResolver) JSONData(ctx context.Context) (*string, error) {
 
 // CreatedBy resolver.
 func (r *StateVersionResolver) CreatedBy() string {
-	return r.stateVersion.CreatedBy
+	return r.stateVersion.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *StateVersionResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.stateVersion.CreatedBy)
 }
 
 /* State Version Mutation Resolvers */

@@ -210,10 +210,11 @@ func toPBStateVersion(sv *models.StateVersion) *pb.StateVersion {
 	}
 
 	return &pb.StateVersion{
-		Metadata:    toPBMetadata(&sv.Metadata, types.StateVersionModelType),
-		WorkspaceId: gid.ToGlobalID(types.WorkspaceModelType, sv.WorkspaceID),
-		RunId:       runID,
-		CreatedBy:   sv.CreatedBy,
+		Metadata:       toPBMetadata(&sv.Metadata, types.StateVersionModelType),
+		WorkspaceId:    gid.ToGlobalID(types.WorkspaceModelType, sv.WorkspaceID),
+		RunId:          runID,
+		CreatedBy:      sv.CreatedBy.Subject,
+		CreatedByActor: toPBActor(sv.CreatedBy),
 	}
 }
 

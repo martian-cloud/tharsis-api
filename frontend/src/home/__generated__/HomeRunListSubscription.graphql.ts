@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<19976bb3532b71f65e14a805ee84e423>>
+ * @generated SignedSource<<079e92296c6f6c53fb8cf6291b5dcf48>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -63,15 +63,24 @@ v3 = {
   "name": "id",
   "storageKey": null
 },
-v4 = {
+v4 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+],
+v5 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "status",
   "storageKey": null
 },
-v5 = [
-  (v4/*: any*/),
+v6 = [
+  (v5/*: any*/),
   (v3/*: any*/)
 ];
 return {
@@ -141,8 +150,81 @@ return {
               {
                 "alias": null,
                 "args": null,
-                "kind": "ScalarField",
-                "name": "createdBy",
+                "concreteType": null,
+                "kind": "LinkedField",
+                "name": "createdByActor",
+                "plural": false,
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "__typename",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "TypeDiscriminator",
+                    "abstractKey": "__isActor"
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "type",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "principalId",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "User",
+                        "kind": "LinkedField",
+                        "name": "user",
+                        "plural": false,
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "email",
+                            "storageKey": null
+                          },
+                          (v3/*: any*/)
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "UserActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v4/*: any*/),
+                    "type": "ServiceAccountActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v4/*: any*/),
+                    "type": "VCSProviderActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v4/*: any*/),
+                    "type": "JobActor",
+                    "abstractKey": null
+                  }
+                ],
                 "storageKey": null
               },
               {
@@ -189,7 +271,7 @@ return {
                 ],
                 "storageKey": null
               },
-              (v4/*: any*/),
+              (v5/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -204,7 +286,7 @@ return {
                 "kind": "LinkedField",
                 "name": "plan",
                 "plural": false,
-                "selections": (v5/*: any*/),
+                "selections": (v6/*: any*/),
                 "storageKey": null
               },
               {
@@ -222,7 +304,7 @@ return {
                     "name": "stageName",
                     "storageKey": null
                   },
-                  (v4/*: any*/)
+                  (v5/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -233,7 +315,7 @@ return {
                 "kind": "LinkedField",
                 "name": "apply",
                 "plural": false,
-                "selections": (v5/*: any*/),
+                "selections": (v6/*: any*/),
                 "storageKey": null
               },
               {
@@ -277,12 +359,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "03dcddb8ce9806485bae277907e37678",
+    "cacheID": "0ec838a002fdfaf50fd08fb77939e840",
     "id": null,
     "metadata": {},
     "name": "HomeRunListSubscription",
     "operationKind": "subscription",
-    "text": "subscription HomeRunListSubscription(\n  $input: RunSubscriptionInput!\n) {\n  workspaceRunEvents(input: $input) {\n    action\n    run {\n      id\n      ...HomeRunListItemFragment_run\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  isDestroy\n  metadata {\n    createdAt\n  }\n  workspace {\n    fullPath\n    id\n  }\n  ...RunStageIconsFragment_run\n  ...RunAnnotationsFragment_run\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
+    "text": "subscription HomeRunListSubscription(\n  $input: RunSubscriptionInput!\n) {\n  workspaceRunEvents(input: $input) {\n    action\n    run {\n      id\n      ...HomeRunListItemFragment_run\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  isDestroy\n  metadata {\n    createdAt\n  }\n  workspace {\n    fullPath\n    id\n  }\n  ...RunStageIconsFragment_run\n  ...RunAnnotationsFragment_run\n}\n\nfragment RunAnnotationsFragment_run on Run {\n  annotations {\n    key\n    value\n    link\n  }\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
   }
 };
 })();

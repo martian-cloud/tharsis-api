@@ -28,7 +28,7 @@ import (
 // the module and variables beforehand: ModuleVersion, ModuleDigest, and ModuleRegistrySource come
 // from ResolveModule, and Variables are the FINAL, already-resolved run variables.
 type CreateRunInput struct {
-	Subject                string
+	CreatedBy              models.Actor
 	WorkspaceID            string
 	TerraformVersion       string
 	ConfigurationVersionID *string
@@ -202,7 +202,7 @@ func Create(
 		ConfigurationVersionID:  input.ConfigurationVersionID,
 		IsDestroy:               input.IsDestroy,
 		Status:                  models.RunPending,
-		CreatedBy:               input.Subject,
+		CreatedBy:               input.CreatedBy,
 		AutoApply:               input.AutoApply,
 		ModuleSource:            input.ModuleSource,
 		ModuleVersion:           input.ModuleVersion,

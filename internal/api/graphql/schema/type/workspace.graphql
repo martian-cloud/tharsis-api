@@ -97,7 +97,8 @@ type WorkspaceRoleBinding implements Node {
   metadata: ResourceMetadata!
   workspace: Workspace!
   role: Role!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
 }
 
 type SetWorkspaceRoleBindingPayload {
@@ -161,7 +162,8 @@ type Workspace implements Node, Namespace {
     )
   currentApplyRun: Run
   maxJobDuration: Int!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   terraformVersion: String!
   activityEvents(
     after: String

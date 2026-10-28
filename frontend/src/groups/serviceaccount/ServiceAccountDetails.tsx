@@ -72,6 +72,9 @@ function ServiceAccountDetails(props: Props) {
                 description
                 resourcePath
                 createdBy
+                createdByActor {
+                    ...ActorDisplayFragment_actor
+                }
                 clientCredentialsEnabled
                 clientSecretExpiresAt
                 oidcTrustPolicies {

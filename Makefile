@@ -138,15 +138,21 @@ run-tharsis-docker:
 	docker run -it -p 8000:8000 -p 9090:9090 -v ~/.aws:/root/.aws --env-file .env.docker tharsis/tharsis
 
 # Database targets
+# db-upgrade runs pg_upgrade in a named volume: Docker Desktop bind mounts report root ownership, so the old server refuses to start there
 .PHONY: db-upgrade
 db-upgrade: ## upgrade existing Postgres data in testdata/postgres to 18 (no-op if already upgraded)
 	@mkdir -p testdata/postgres
 	@old=$$(docker run --rm -v $(shell pwd)/testdata/postgres:/var/lib/postgresql alpine sh -c 'cd /var/lib/postgresql; v=$$(cat PG_VERSION 2>/dev/null); if [ -n "$$v" ] && [ "$$v" != 18 ]; then find 18 -delete 2>/dev/null; mkdir -p $$v/data; find . -mindepth 1 -maxdepth 1 ! -name $$v -exec mv {} $$v/data/ \; ; fi; for f in */data/PG_VERSION; do [ -f "$$f" ] && [ ! -f 18/docker/PG_VERSION ] && echo "$${f%%/*}"; done; true'); \
 	if [ -n "$$old" ]; then \
 		echo "Upgrading Postgres $$old data to 18..."; \
-		docker run --rm -e POSTGRES_INITDB_ARGS=--no-data-checksums -v $(shell pwd)/testdata/postgres:/var/lib/postgresql tianon/postgres-upgrade:$$old-to-18 --link \
-			|| { docker run --rm -v $(shell pwd)/testdata/postgres:/var/lib/postgresql alpine find /var/lib/postgresql/18 -delete; exit 1; }; \
-		docker run --rm -v $(shell pwd)/testdata/postgres:/var/lib/postgresql alpine sh -c 'echo "host all all all scram-sha-256" >> /var/lib/postgresql/18/docker/pg_hba.conf'; \
+		docker volume rm -f $(DB_NAME)-pgupgrade >/dev/null; \
+		docker run --rm -e POSTGRES_INITDB_ARGS=--no-data-checksums -v $(DB_NAME)-pgupgrade:/var/lib/postgresql \
+			-v $(shell pwd)/testdata/postgres:/src --entrypoint sh tianon/postgres-upgrade:$$old-to-18 -c \
+			"cp -a /src/$$old /var/lib/postgresql/ && docker-upgrade pg_upgrade --link \
+			&& echo 'host all all all scram-sha-256' >> /var/lib/postgresql/18/docker/pg_hba.conf \
+			&& rm -rf /src/18 && cp -a /var/lib/postgresql/18 /src/18" \
+			|| { docker run --rm -v $(shell pwd)/testdata/postgres:/src alpine rm -rf /src/18; docker volume rm -f $(DB_NAME)-pgupgrade >/dev/null; exit 1; }; \
+		docker volume rm -f $(DB_NAME)-pgupgrade >/dev/null; \
 	fi
 
 .PHONY: db-start

@@ -8,6 +8,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
 // ServiceAccountCaller represents a service account subject
@@ -56,6 +57,11 @@ func (s *ServiceAccountCaller) GetNamespacePermissions(ctx context.Context, name
 	}
 
 	return perms, nil
+}
+
+// GetActor returns the actor for this caller
+func (s *ServiceAccountCaller) GetActor() models.Actor {
+	return models.NewServiceAccountActor(s.ServiceAccountID).WithTRN(trn.TypeServiceAccount.Build(s.ServiceAccountPath)).WithSubject(s.GetSubject())
 }
 
 // IsAdminModeActivated returns true if the caller is an admin

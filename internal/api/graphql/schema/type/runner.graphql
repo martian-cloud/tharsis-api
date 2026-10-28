@@ -55,7 +55,8 @@ type Runner implements Node {
   name: String!
   description: String!
   group: Group!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   type: RunnerType!
   disabled: Boolean!
   sessions(

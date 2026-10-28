@@ -245,7 +245,8 @@ func toPBServiceAccount(sa *models.ServiceAccount) *pb.ServiceAccount {
 		Name:                     sa.Name,
 		Description:              sa.Description,
 		GroupId:                  gid.ToGlobalID(types.GroupModelType, sa.GroupID),
-		CreatedBy:                sa.CreatedBy,
+		CreatedBy:                sa.CreatedBy.Subject,
+		CreatedByActor:           toPBActor(sa.CreatedBy),
 		OidcTrustPolicies:        toPBOIDCTrustPolicies(sa.OIDCTrustPolicies),
 		ClientCredentialsEnabled: sa.ClientCredentialsEnabled(),
 	}

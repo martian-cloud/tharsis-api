@@ -37,7 +37,8 @@ type TerraformProviderVersionMirror implements Node {
   registryNamespace: String!
   registryHostname: String!
   platformMirrors: [TerraformProviderPlatformMirror!]!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   groupPath: String!
   providerAddress: String!
 }

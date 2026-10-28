@@ -57,7 +57,7 @@ func TestCreatePolicy(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 			mockGroups := db.NewMockGroups(t)
 			mockPolicies := db.NewMockPolicies(t)
@@ -146,7 +146,7 @@ func TestCreatePolicy_StageGate(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 			mockGroups := db.NewMockGroups(t)
 			mockGroups.On("GetGroupByID", mock.Anything, groupID).
@@ -284,7 +284,7 @@ JDtumfHKBfqi9VTde0OZeGGRgJfw9qI3Ogea6hXLZMKtsXNpXtDGOgWbiQ==
 
 			mockCaller := auth.NewMockCaller(t)
 			mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 			mockGroups := db.NewMockGroups(t)
 			mockGroups.On("GetGroupByID", mock.Anything, groupID).
@@ -368,7 +368,7 @@ func TestCreatePolicy_PostApplyAdvisoryOnly(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 			mockGroups := db.NewMockGroups(t)
 			mockGroups.On("GetGroupByID", mock.Anything, groupID).
@@ -475,7 +475,7 @@ func TestPolicy_ServiceAccountAccessForGroup_MultipleApprovers(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 			mockGroups := db.NewMockGroups(t)
 			mockGroups.On("GetGroupByID", mock.Anything, groupID).
@@ -650,7 +650,7 @@ func TestPolicy_ServiceAccountAccessForGroup(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 			mockGroups := db.NewMockGroups(t)
 			mockGroups.On("GetGroupByID", mock.Anything, groupID).
@@ -711,7 +711,7 @@ func TestPolicy_ServiceAccountAccessForGroup(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 			mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 			existing := &models.Policy{
 				Metadata: models.ResourceMetadata{ID: policyID},
@@ -778,7 +778,7 @@ func TestPolicy_NoApproverServiceAccountsSkipsLookup(t *testing.T) {
 
 	mockCaller := auth.NewMockCaller(t)
 	mockCaller.On("RequirePermission", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+	mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 	mockGroups := db.NewMockGroups(t)
 	mockGroups.On("GetGroupByID", mock.Anything, groupID).
@@ -1832,4 +1832,9 @@ func TestValidateScopeRules(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

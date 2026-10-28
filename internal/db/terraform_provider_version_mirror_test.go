@@ -30,7 +30,7 @@ func TestTerraformProviderVersionMirrors_CreateVersionMirror(t *testing.T) {
 		Name:        "test-group-provider-version-mirror",
 		Description: "test group for provider version mirror",
 		FullPath:    "test-group-provider-version-mirror",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -49,7 +49,7 @@ func TestTerraformProviderVersionMirrors_CreateVersionMirror(t *testing.T) {
 				RegistryNamespace: "hashicorp",
 				Type:              "aws",
 				SemanticVersion:   "5.0.0",
-				CreatedBy:         "db-integration-tests",
+				CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 			},
 		},
 	}
@@ -82,7 +82,7 @@ func TestTerraformProviderVersionMirrors_DeleteVersionMirror(t *testing.T) {
 		Name:        "test-group-provider-version-mirror-delete",
 		Description: "test group for provider version mirror delete",
 		FullPath:    "test-group-provider-version-mirror-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -93,7 +93,7 @@ func TestTerraformProviderVersionMirrors_DeleteVersionMirror(t *testing.T) {
 		RegistryNamespace: "hashicorp",
 		Type:              "aws",
 		SemanticVersion:   "5.0.0",
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -141,7 +141,7 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrorByID(t *testing.T) {
 		Name:        "test-group-version-mirror",
 		Description: "test group for version mirror",
 		FullPath:    "test-group-version-mirror",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -152,7 +152,7 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrorByID(t *testing.T) {
 		RegistryHostname:  "registry.terraform.io",
 		RegistryNamespace: "hashicorp",
 		GroupID:           group.Metadata.ID,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -209,7 +209,7 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrors(t *testing.T) {
 		Name:        "test-group-version-mirrors",
 		Description: "test group for version mirrors",
 		FullPath:    "test-group-version-mirrors",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -221,7 +221,7 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrors(t *testing.T) {
 			RegistryHostname:  "registry.terraform.io",
 			RegistryNamespace: "hashicorp",
 			GroupID:           group.Metadata.ID,
-			CreatedBy:         "db-integration-tests",
+			CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			SemanticVersion:   "1.1.0",
@@ -229,7 +229,7 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrors(t *testing.T) {
 			RegistryHostname:  "registry.terraform.io",
 			RegistryNamespace: "hashicorp",
 			GroupID:           group.Metadata.ID,
-			CreatedBy:         "db-integration-tests",
+			CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -370,7 +370,7 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrorsWithPaginationAndSorti
 		Name:        "test-group-version-pagination",
 		Description: "test group for version pagination",
 		FullPath:    "test-group-version-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -382,7 +382,7 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrorsWithPaginationAndSorti
 			RegistryHostname:  "registry.terraform.io",
 			RegistryNamespace: "hashicorp",
 			GroupID:           group.Metadata.ID,
-			CreatedBy:         "db-integration-tests",
+			CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -425,7 +425,7 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrorByTRN(t *testing.T) {
 		Name:        "test-group-version-trn",
 		Description: "test group for version trn",
 		FullPath:    "test-group-version-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -436,7 +436,7 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrorByTRN(t *testing.T) {
 		RegistryHostname:  "registry.terraform.io",
 		RegistryNamespace: "hashicorp",
 		GroupID:           group.Metadata.ID,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

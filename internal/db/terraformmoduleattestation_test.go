@@ -31,7 +31,7 @@ func TestTerraformModuleAttestations_CreateTerraformModuleAttestation(t *testing
 		Name:        "test-group-module-attestation",
 		Description: "test group for module attestation",
 		FullPath:    "test-group-module-attestation",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -41,7 +41,7 @@ func TestTerraformModuleAttestations_CreateTerraformModuleAttestation(t *testing
 		System:      "terraform",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Private:     false,
 	})
 	require.NoError(t, err)
@@ -62,7 +62,7 @@ func TestTerraformModuleAttestations_CreateTerraformModuleAttestation(t *testing
 				PredicateType: "https://slsa.dev/provenance/v0.2",
 				Data:          `{"test": "data"}`,
 				DataSHASum:    []byte("test-sha-sum"),
-				CreatedBy:     "db-integration-tests",
+				CreatedBy:     models.Actor{Subject: "db-integration-tests"},
 				Digests:       []string{"sha256:abc123"},
 			},
 		},
@@ -96,7 +96,7 @@ func TestTerraformModuleAttestations_UpdateTerraformModuleAttestation(t *testing
 		Name:        "test-group-module-attestation-update",
 		Description: "test group for module attestation update",
 		FullPath:    "test-group-module-attestation-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -106,7 +106,7 @@ func TestTerraformModuleAttestations_UpdateTerraformModuleAttestation(t *testing
 		System:      "terraform",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		Private:     false,
 	})
 	require.NoError(t, err)
@@ -119,7 +119,7 @@ func TestTerraformModuleAttestations_UpdateTerraformModuleAttestation(t *testing
 		PredicateType: "https://slsa.dev/provenance/v0.2",
 		Data:          `{"test": "data"}`,
 		DataSHASum:    []byte("test-sha-sum"),
-		CreatedBy:     "db-integration-tests",
+		CreatedBy:     models.Actor{Subject: "db-integration-tests"},
 		Digests:       []string{"sha256:abc123"},
 	})
 	require.NoError(t, err)
@@ -173,7 +173,7 @@ func TestTerraformModuleAttestations_GetModuleAttestationByID(t *testing.T) {
 		Name:        "test-group-module-attestation-get-by-id",
 		Description: "test group for module attestation get by id",
 		FullPath:    "test-group-module-attestation-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -182,7 +182,7 @@ func TestTerraformModuleAttestations_GetModuleAttestationByID(t *testing.T) {
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -195,7 +195,7 @@ func TestTerraformModuleAttestations_GetModuleAttestationByID(t *testing.T) {
 		Data:          `{"test": "data"}`,
 		DataSHASum:    []byte("test-sha-sum"),
 		Digests:       []string{"sha256:test"},
-		CreatedBy:     "db-integration-tests",
+		CreatedBy:     models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -252,7 +252,7 @@ func TestTerraformModuleAttestations_GetModuleAttestations(t *testing.T) {
 		Name:        "test-group-module-attestations-list",
 		Description: "test group for module attestations list",
 		FullPath:    "test-group-module-attestations-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -261,7 +261,7 @@ func TestTerraformModuleAttestations_GetModuleAttestations(t *testing.T) {
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -275,7 +275,7 @@ func TestTerraformModuleAttestations_GetModuleAttestations(t *testing.T) {
 			Data:          `{"test": "data"}`,
 			DataSHASum:    []byte("test-sha-sum-1"),
 			Digests:       []string{"sha256:test1"},
-			CreatedBy:     "db-integration-tests",
+			CreatedBy:     models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			ModuleID:      terraformModule.Metadata.ID,
@@ -285,7 +285,7 @@ func TestTerraformModuleAttestations_GetModuleAttestations(t *testing.T) {
 			Data:          `{"test": "data"}`,
 			DataSHASum:    []byte("test-sha-sum-2"),
 			Digests:       []string{"sha256:test2"},
-			CreatedBy:     "db-integration-tests",
+			CreatedBy:     models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -380,7 +380,7 @@ func TestTerraformModuleAttestations_GetModuleAttestationsWithPaginationAndSorti
 		Name:        "test-group-module-attestations-pagination",
 		Description: "test group for module attestations pagination",
 		FullPath:    "test-group-module-attestations-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -389,7 +389,7 @@ func TestTerraformModuleAttestations_GetModuleAttestationsWithPaginationAndSorti
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -403,7 +403,7 @@ func TestTerraformModuleAttestations_GetModuleAttestationsWithPaginationAndSorti
 			Data:          `{"test": "data"}`,
 			DataSHASum:    []byte(fmt.Sprintf("test-sha-sum-%d", i)),
 			Digests:       []string{fmt.Sprintf("sha256:test%d", i)},
-			CreatedBy:     "db-integration-tests",
+			CreatedBy:     models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -446,7 +446,7 @@ func TestTerraformModuleAttestations_GetModuleAttestationByTRN(t *testing.T) {
 		Name:        "test-group-module-attestation-get-by-trn",
 		Description: "test group for module attestation get by trn",
 		FullPath:    "test-group-module-attestation-get-by-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -455,7 +455,7 @@ func TestTerraformModuleAttestations_GetModuleAttestationByTRN(t *testing.T) {
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -468,7 +468,7 @@ func TestTerraformModuleAttestations_GetModuleAttestationByTRN(t *testing.T) {
 		Data:          `{"test": "data"}`,
 		DataSHASum:    []byte("test-sha-sum"),
 		Digests:       []string{"sha256:test"},
-		CreatedBy:     "db-integration-tests",
+		CreatedBy:     models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

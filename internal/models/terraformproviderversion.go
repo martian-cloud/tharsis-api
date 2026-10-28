@@ -13,7 +13,7 @@ var _ Model = (*TerraformProviderVersion)(nil)
 type TerraformProviderVersion struct {
 	GPGASCIIArmor                  *string
 	GPGKeyID                       *uint64
-	CreatedBy                      string
+	CreatedBy                      Actor
 	ProviderID                     string
 	SemanticVersion                string
 	ReadmeObjectStoreKey           *string

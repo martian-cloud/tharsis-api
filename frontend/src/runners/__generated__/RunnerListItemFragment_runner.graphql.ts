@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<0f3295185d126ad957f95e902e624a70>>
+ * @generated SignedSource<<6835f8442fdca258a07daffff06dadcc>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,7 +11,9 @@
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type RunnerListItemFragment_runner$data = {
-  readonly createdBy: string;
+  readonly createdByActor: {
+    readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+  } | null | undefined;
   readonly disabled: boolean;
   readonly groupPath: string;
   readonly id: string;
@@ -82,8 +84,17 @@ const node: ReaderFragment = {
     {
       "alias": null,
       "args": null,
-      "kind": "ScalarField",
-      "name": "createdBy",
+      "concreteType": null,
+      "kind": "LinkedField",
+      "name": "createdByActor",
+      "plural": false,
+      "selections": [
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "ActorDisplayFragment_actor"
+        }
+      ],
       "storageKey": null
     },
     {
@@ -98,6 +109,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "38f1bb36691c48e6d5a53bf27e719f07";
+(node as any).hash = "9620274dc340e4ddcef76ee651c500d0";
 
 export default node;

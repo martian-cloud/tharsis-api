@@ -27,7 +27,7 @@ func TestPolicies_CreatePolicy(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-policy",
 		FullPath:  "test-group-policy",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -89,7 +89,7 @@ func TestPolicies_CreatePolicy(t *testing.T) {
 				},
 				RequiredApprovals: 1,
 				AllowedUserIDs:    test.allowedUserIDs,
-				CreatedBy:         "db-integration-tests",
+				CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 			})
 
 			if test.expectErrorCode != "" {
@@ -123,7 +123,7 @@ func TestPolicies_CreateModuleAttestationPolicy(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-attestation",
 		FullPath:  "test-group-attestation",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -140,7 +140,7 @@ func TestPolicies_CreateModuleAttestationPolicy(t *testing.T) {
 			SpeculativeRunEnforcementLevel: models.PolicyEnforcementHardMandatory,
 			Stage:                          models.RunTaskStageNamePrePlan,
 		},
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 	require.NotNil(t, created)
@@ -183,7 +183,7 @@ func TestPolicies_UpdatePolicy(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-policy-update",
 		FullPath:  "test-group-policy-update",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -204,7 +204,7 @@ func TestPolicies_UpdatePolicy(t *testing.T) {
 			Stage:                          models.RunTaskStageNamePostPlan,
 		},
 		RequiredApprovals: 1,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -266,7 +266,7 @@ func TestPolicies_UpdatePolicy_RejectsDuplicateApprovers(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-policy-update-dedupe",
 		FullPath:  "test-group-policy-update-dedupe",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -287,7 +287,7 @@ func TestPolicies_UpdatePolicy_RejectsDuplicateApprovers(t *testing.T) {
 			Stage:                          models.RunTaskStageNamePostPlan,
 		},
 		RequiredApprovals: 1,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -317,7 +317,7 @@ func TestPolicies_DeletePolicy(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-policy-delete",
 		FullPath:  "test-group-policy-delete",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -332,7 +332,7 @@ func TestPolicies_DeletePolicy(t *testing.T) {
 			Stage:                          models.RunTaskStageNamePostPlan,
 		},
 		RequiredApprovals: 1,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -388,7 +388,7 @@ func TestPolicies_GetPolicyByID(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-policy-get-by-id",
 		FullPath:  "test-group-policy-get-by-id",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -403,7 +403,7 @@ func TestPolicies_GetPolicyByID(t *testing.T) {
 			Stage:                          models.RunTaskStageNamePostPlan,
 		},
 		RequiredApprovals: 1,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -458,7 +458,7 @@ func TestPolicies_GetPolicyByTRN(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-policy-trn",
 		FullPath:  "test-group-policy-trn",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -473,7 +473,7 @@ func TestPolicies_GetPolicyByTRN(t *testing.T) {
 			Stage:                          models.RunTaskStageNamePostPlan,
 		},
 		RequiredApprovals: 1,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -528,14 +528,14 @@ func TestPolicies_GetPolicies(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-policy-list",
 		FullPath:  "test-group-policy-list",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	otherGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-policy-list-other",
 		FullPath:  "test-group-policy-list-other",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -550,7 +550,7 @@ func TestPolicies_GetPolicies(t *testing.T) {
 			Stage:                          models.RunTaskStageNamePostPlan,
 		},
 		RequiredApprovals: 1,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -565,7 +565,7 @@ func TestPolicies_GetPolicies(t *testing.T) {
 			Stage:                          models.RunTaskStageNamePrePlan,
 		},
 		RequiredApprovals: 1,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -637,7 +637,7 @@ func TestPolicies_GetPoliciesWithPaginationAndSorting(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-policy-pagination",
 		FullPath:  "test-group-policy-pagination",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -654,7 +654,7 @@ func TestPolicies_GetPoliciesWithPaginationAndSorting(t *testing.T) {
 				Stage:                          models.RunTaskStageNamePostPlan,
 			},
 			RequiredApprovals: 1,
-			CreatedBy:         "db-integration-tests",
+			CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}

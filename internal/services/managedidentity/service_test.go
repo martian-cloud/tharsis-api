@@ -824,7 +824,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 		Description: "this is a managed identity being created",
 		GroupID:     "some-group-id",
 		Data:        []byte("some-data"),
-		CreatedBy:   mockSubject,
+		CreatedBy:   mockCallerActor().WithSubject(mockSubject),
 		Type:        models.ManagedIdentityAWSFederated,
 	}
 
@@ -873,7 +873,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
-				CreatedBy:     mockSubject,
+				CreatedBy:     mockCallerActor().WithSubject(mockSubject),
 			},
 			existingManagedIdentity: sampleManagedIdentity,
 			aliasGroup:              sampleAliasGroup,
@@ -889,7 +889,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				Name:          sampleAliasName,
 				Description:   sampleManagedIdentity.Description,
 				GroupID:       sampleAliasGroup.Metadata.ID,
-				CreatedBy:     mockSubject,
+				CreatedBy:     mockCallerActor().WithSubject(mockSubject),
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
 				Data:          sampleManagedIdentity.Data,
 			},
@@ -965,7 +965,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
 				Name:          "some/invalid/name",
-				CreatedBy:     mockSubject,
+				CreatedBy:     mockCallerActor().WithSubject(mockSubject),
 			},
 			existingManagedIdentity: sampleManagedIdentity,
 			aliasGroup:              sampleAliasGroup,
@@ -1007,7 +1007,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
-				CreatedBy:     mockSubject,
+				CreatedBy:     mockCallerActor().WithSubject(mockSubject),
 			},
 			existingManagedIdentity: sampleManagedIdentity,
 			aliasGroup:              sampleAliasGroup,
@@ -1023,7 +1023,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				Name:          sampleAliasName,
 				Description:   sampleManagedIdentity.Description,
 				GroupID:       sampleAliasGroup.Metadata.ID,
-				CreatedBy:     mockSubject,
+				CreatedBy:     mockCallerActor().WithSubject(mockSubject),
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
 				Data:          sampleManagedIdentity.Data,
 			},
@@ -1045,7 +1045,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
-				CreatedBy:     mockSubject,
+				CreatedBy:     mockCallerActor().WithSubject(mockSubject),
 			},
 			existingManagedIdentity: sampleManagedIdentity,
 			aliasGroup:              sampleAliasGroup,
@@ -1061,7 +1061,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				Name:          sampleAliasName,
 				Description:   sampleManagedIdentity.Description,
 				GroupID:       sampleAliasGroup.Metadata.ID,
-				CreatedBy:     mockSubject,
+				CreatedBy:     mockCallerActor().WithSubject(mockSubject),
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
 				Data:          sampleManagedIdentity.Data,
 			},
@@ -1092,7 +1092,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			mockGroups.On("GetGroupByID", mock.Anything, sampleGroup.Metadata.ID).Return(test.sourceIdentityGroup, nil).Maybe()
 
 			if (test.expectErrorCode == "") || test.exceedsLimit {
-				mockCaller.On("GetSubject").Return("mockSubject")
+				mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject"))
 
 				mockManagedIdentities.On("CreateManagedIdentity", mock.Anything, test.createInput).Return(test.expectCreatedAlias, nil)
 
@@ -1321,7 +1321,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 		Description: "this is a managed identity being created",
 		GroupID:     "some-group-id",
 		Data:        []byte("some-data"),
-		CreatedBy:   mockSubject,
+		CreatedBy:   mockCallerActor().WithSubject(mockSubject),
 		Type:        models.ManagedIdentityAWSFederated,
 	}
 
@@ -1336,7 +1336,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 		Name:        "a-managed-identity",
 		Description: "this is a managed identity being created",
 		GroupID:     "some-group-id",
-		CreatedBy:   mockSubject,
+		CreatedBy:   mockCallerActor().WithSubject(mockSubject),
 		Type:        models.ManagedIdentityAWSFederated,
 		Data:        []byte{},
 	}
@@ -1569,7 +1569,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
 
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("mockSubject")).Maybe()
 
 			// Called inside transaction to check resource limits.
 			if test.limit > 0 {
@@ -3199,4 +3199,9 @@ func TestMoveManagedIdentity(t *testing.T) {
 			}
 		})
 	}
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

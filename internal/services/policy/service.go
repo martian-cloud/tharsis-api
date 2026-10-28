@@ -411,7 +411,7 @@ func (s *service) CreatePolicy(ctx context.Context, input *CreatePolicyInput) (*
 		AllowedUserIDs:           input.AllowedUserIDs,
 		AllowedServiceAccountIDs: input.AllowedServiceAccountIDs,
 		AllowedTeamIDs:           input.AllowedTeamIDs,
-		CreatedBy:                caller.GetSubject(),
+		CreatedBy:                caller.GetActor(),
 	}
 	if vErr := toCreate.Validate(); vErr != nil {
 		return nil, errors.Wrap(vErr, "failed to validate policy", errors.WithSpan(span))

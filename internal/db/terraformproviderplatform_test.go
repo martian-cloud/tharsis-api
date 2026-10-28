@@ -29,7 +29,7 @@ func TestTerraformProviderPlatforms_CreateProviderPlatform(t *testing.T) {
 		Name:        "test-group-provider-platform-create",
 		Description: "test group for provider platform create",
 		FullPath:    "test-group-provider-platform-create",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -39,7 +39,7 @@ func TestTerraformProviderPlatforms_CreateProviderPlatform(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -47,7 +47,7 @@ func TestTerraformProviderPlatforms_CreateProviderPlatform(t *testing.T) {
 	providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -64,7 +64,7 @@ func TestTerraformProviderPlatforms_CreateProviderPlatform(t *testing.T) {
 				OperatingSystem:   "linux",
 				Architecture:      "amd64",
 				ProviderVersionID: providerVersion.Metadata.ID,
-				CreatedBy:         "db-integration-tests",
+				CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 			},
 		},
 	}
@@ -95,7 +95,7 @@ func TestTerraformProviderPlatforms_UpdateProviderPlatform(t *testing.T) {
 		Name:        "test-group-provider-platform-update",
 		Description: "test group for provider platform update",
 		FullPath:    "test-group-provider-platform-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -105,7 +105,7 @@ func TestTerraformProviderPlatforms_UpdateProviderPlatform(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -113,7 +113,7 @@ func TestTerraformProviderPlatforms_UpdateProviderPlatform(t *testing.T) {
 	providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -122,7 +122,7 @@ func TestTerraformProviderPlatforms_UpdateProviderPlatform(t *testing.T) {
 		OperatingSystem:   "linux",
 		Architecture:      "amd64",
 		ProviderVersionID: providerVersion.Metadata.ID,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -171,7 +171,7 @@ func TestTerraformProviderPlatforms_DeleteProviderPlatform(t *testing.T) {
 		Name:        "test-group-provider-platform-delete",
 		Description: "test group for provider platform delete",
 		FullPath:    "test-group-provider-platform-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -181,7 +181,7 @@ func TestTerraformProviderPlatforms_DeleteProviderPlatform(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -189,7 +189,7 @@ func TestTerraformProviderPlatforms_DeleteProviderPlatform(t *testing.T) {
 	providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -198,7 +198,7 @@ func TestTerraformProviderPlatforms_DeleteProviderPlatform(t *testing.T) {
 		OperatingSystem:   "linux",
 		Architecture:      "amd64",
 		ProviderVersionID: providerVersion.Metadata.ID,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -243,7 +243,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformByID(t *testing.T) {
 		Name:        "test-group-provider-platform-get-by-id",
 		Description: "test group for provider platform get by id",
 		FullPath:    "test-group-provider-platform-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -253,7 +253,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformByID(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -261,7 +261,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformByID(t *testing.T) {
 	providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -270,7 +270,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformByID(t *testing.T) {
 		OperatingSystem:   "linux",
 		Architecture:      "amd64",
 		ProviderVersionID: providerVersion.Metadata.ID,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -327,7 +327,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatforms(t *testing.T) {
 		Name:        "test-group-provider-platforms-list",
 		Description: "test group for provider platforms list",
 		FullPath:    "test-group-provider-platforms-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -337,7 +337,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatforms(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -345,7 +345,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatforms(t *testing.T) {
 	providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -355,13 +355,13 @@ func TestTerraformProviderPlatforms_GetProviderPlatforms(t *testing.T) {
 			OperatingSystem:   "linux",
 			Architecture:      "amd64",
 			ProviderVersionID: providerVersion.Metadata.ID,
-			CreatedBy:         "db-integration-tests",
+			CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			OperatingSystem:   "windows",
 			Architecture:      "amd64",
 			ProviderVersionID: providerVersion.Metadata.ID,
-			CreatedBy:         "db-integration-tests",
+			CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -438,7 +438,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformsWithPaginationAndSorting
 		Name:        "test-group-provider-platforms-pagination",
 		Description: "test group for provider platforms pagination",
 		FullPath:    "test-group-provider-platforms-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -448,7 +448,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformsWithPaginationAndSorting
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -456,7 +456,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformsWithPaginationAndSorting
 	providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -466,7 +466,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformsWithPaginationAndSorting
 			OperatingSystem:   fmt.Sprintf("linux-%d", i),
 			Architecture:      "amd64",
 			ProviderVersionID: providerVersion.Metadata.ID,
-			CreatedBy:         "db-integration-tests",
+			CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -507,7 +507,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformByTRN(t *testing.T) {
 		Name:        "test-group-provider-platform-trn",
 		Description: "test group for provider platform trn",
 		FullPath:    "test-group-provider-platform-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -517,7 +517,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformByTRN(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		Private:     false,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -525,7 +525,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformByTRN(t *testing.T) {
 	providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
 		SemanticVersion: "1.0.0",
 		ProviderID:      provider.Metadata.ID,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -534,7 +534,7 @@ func TestTerraformProviderPlatforms_GetProviderPlatformByTRN(t *testing.T) {
 		OperatingSystem:   "linux",
 		Architecture:      "amd64",
 		ProviderVersionID: providerVersion.Metadata.ID,
-		CreatedBy:         "db-integration-tests",
+		CreatedBy:         models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

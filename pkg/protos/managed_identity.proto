@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.managed_identity;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 import "pagination.proto";
 import "google/protobuf/empty.proto";
@@ -212,8 +213,13 @@ message ManagedIdentity {
   string                    group_id        = 4;
   string                    type            = 5;
   string                    data            = 6;
-  string                    created_by      = 7;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by      = 7 [deprecated = true];
   optional string           alias_source_id = 8;
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor created_by_actor = 9;
 }
 
 // ManagedIdentityAccessRule defines an access rule for a managed identity.

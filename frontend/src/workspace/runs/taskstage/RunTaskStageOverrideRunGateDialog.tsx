@@ -27,6 +27,9 @@ function RunTaskStageOverrideRunGateDialog({ gateId, onClose, onError }: Props) 
                     # Selected so the panel's "approvals bypassed" banner appears from the store
                     # without a refetch.
                     overriddenBy
+                    overriddenByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     overrideComment
                     metadata {
                         updatedAt

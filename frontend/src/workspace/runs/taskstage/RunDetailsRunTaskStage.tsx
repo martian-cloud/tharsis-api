@@ -26,7 +26,9 @@ function RunDetailsRunTaskStage(props: Props) {
         fragment RunDetailsRunTaskStageFragment_taskStage on Run
         {
             id
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             metadata {
                 createdAt
             }
@@ -114,7 +116,7 @@ function RunDetailsRunTaskStage(props: Props) {
             <RunDetailsStageHeader
                 stage={stageLabel(taskStage.stageName)}
                 triggeredAt={data.metadata.createdAt as string}
-                triggeredBy={data.createdBy}
+                triggeredByActor={data.createdByActor}
             />
 
             <RunTaskStageStatusPanel runId={data.id} fragmentRef={taskStage} onError={props.onError} />

@@ -1,7 +1,7 @@
-import { Box, Tooltip, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from 'react-relay/hooks';
-import Gravatar from '../common/Gravatar';
+import ActorDisplay from '../common/ActorDisplay';
 import { ResponsiveRow } from '../common/ResponsiveTable';
 import Timestamp from '../common/Timestamp';
 import Link from '../routes/Link';
@@ -24,7 +24,9 @@ function RunnerListItem({ fragmentRef, inherited }: Props) {
             id
             name
             disabled
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             groupPath
         }
     `, fragmentRef);
@@ -42,11 +44,7 @@ function RunnerListItem({ fragmentRef, inherited }: Props) {
         <Box display="flex" alignItems="center" gap={0.5}>
             <Timestamp variant="body2" timestamp={data.metadata.createdAt} />
             <Typography variant="body2">by</Typography>
-            <Tooltip title={data.createdBy}>
-                <Box display="flex">
-                    <Gravatar width={20} height={20} email={data.createdBy} />
-                </Box>
-            </Tooltip>
+            <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={20} />
         </Box>
     );
 

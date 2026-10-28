@@ -314,7 +314,7 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		GPGKeyID:    primaryKey.KeyId,
 		Fingerprint: fmt.Sprintf("%016X", primaryKey.Fingerprint),
 		ASCIIArmor:  input.ASCIIArmor,
-		CreatedBy:   caller.GetSubject(),
+		CreatedBy:   caller.GetActor(),
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Requested creation of a gpg key.",

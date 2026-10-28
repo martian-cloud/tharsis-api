@@ -28,7 +28,7 @@ func TestTerraformModuleVersions_CreateModuleVersion(t *testing.T) {
 		Name:        "test-group-module-version",
 		Description: "test group for module version",
 		FullPath:    "test-group-module-version",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -37,7 +37,7 @@ func TestTerraformModuleVersions_CreateModuleVersion(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		System:      "aws",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -73,7 +73,7 @@ func TestTerraformModuleVersions_CreateModuleVersion(t *testing.T) {
 				SemanticVersion: test.version,
 				ModuleID:        test.moduleID,
 				SHASum:          []byte("test-sha-sum"),
-				CreatedBy:       "db-integration-tests",
+				CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 			})
 
 			if test.expectErrorCode != "" {
@@ -100,7 +100,7 @@ func TestTerraformModuleVersions_UpdateModuleVersion(t *testing.T) {
 		Name:        "test-group-module-version-update",
 		Description: "test group for module version update",
 		FullPath:    "test-group-module-version-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -109,7 +109,7 @@ func TestTerraformModuleVersions_UpdateModuleVersion(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		System:      "aws",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -117,7 +117,7 @@ func TestTerraformModuleVersions_UpdateModuleVersion(t *testing.T) {
 		SemanticVersion: "1.0.0",
 		ModuleID:        module.Metadata.ID,
 		SHASum:          []byte("test-sha-sum"),
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -177,7 +177,7 @@ func TestTerraformModuleVersions_DeleteModuleVersion(t *testing.T) {
 		Name:        "test-group-module-version-delete",
 		Description: "test group for module version delete",
 		FullPath:    "test-group-module-version-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -186,7 +186,7 @@ func TestTerraformModuleVersions_DeleteModuleVersion(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		System:      "aws",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -194,7 +194,7 @@ func TestTerraformModuleVersions_DeleteModuleVersion(t *testing.T) {
 		SemanticVersion: "1.0.0",
 		ModuleID:        module.Metadata.ID,
 		SHASum:          []byte("test-sha-sum"),
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -251,7 +251,7 @@ func TestTerraformModuleVersions_GetModuleVersionByID(t *testing.T) {
 		Name:        "test-group-module-version-get-by-id",
 		Description: "test group for module version get by id",
 		FullPath:    "test-group-module-version-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -260,7 +260,7 @@ func TestTerraformModuleVersions_GetModuleVersionByID(t *testing.T) {
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -269,7 +269,7 @@ func TestTerraformModuleVersions_GetModuleVersionByID(t *testing.T) {
 		SemanticVersion: "1.0.0",
 		SHASum:          []byte("test-sha-sum"),
 		Status:          models.TerraformModuleVersionStatusUploaded,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -325,7 +325,7 @@ func TestTerraformModuleVersions_GetModuleVersions(t *testing.T) {
 		Name:        "test-group-module-versions-list",
 		Description: "test group for module versions list",
 		FullPath:    "test-group-module-versions-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -334,7 +334,7 @@ func TestTerraformModuleVersions_GetModuleVersions(t *testing.T) {
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -344,14 +344,14 @@ func TestTerraformModuleVersions_GetModuleVersions(t *testing.T) {
 			SemanticVersion: "1.0.0",
 			SHASum:          []byte("test-sha-sum"),
 			Status:          models.TerraformModuleVersionStatusUploaded,
-			CreatedBy:       "db-integration-tests",
+			CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			ModuleID:        terraformModule.Metadata.ID,
 			SemanticVersion: "1.1.0",
 			SHASum:          []byte("test-sha-sum"),
 			Status:          models.TerraformModuleVersionStatusPending,
-			CreatedBy:       "db-integration-tests",
+			CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -436,7 +436,7 @@ func TestTerraformModuleVersions_GetModuleVersionsWithPaginationAndSorting(t *te
 		Name:        "test-group-module-versions-pagination",
 		Description: "test group for module versions pagination",
 		FullPath:    "test-group-module-versions-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -445,7 +445,7 @@ func TestTerraformModuleVersions_GetModuleVersionsWithPaginationAndSorting(t *te
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -456,7 +456,7 @@ func TestTerraformModuleVersions_GetModuleVersionsWithPaginationAndSorting(t *te
 			SemanticVersion: fmt.Sprintf("1.%d.0", i),
 			SHASum:          []byte(fmt.Sprintf("test-sha-sum-%d", i)),
 			Status:          models.TerraformModuleVersionStatusUploaded,
-			CreatedBy:       "db-integration-tests",
+			CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -498,7 +498,7 @@ func TestTerraformModuleVersions_GetModuleVersionByTRN(t *testing.T) {
 		Name:        "test-group-module-version-get-by-trn",
 		Description: "test group for module version get by trn",
 		FullPath:    "test-group-module-version-get-by-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -507,7 +507,7 @@ func TestTerraformModuleVersions_GetModuleVersionByTRN(t *testing.T) {
 		System:      "aws",
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -516,7 +516,7 @@ func TestTerraformModuleVersions_GetModuleVersionByTRN(t *testing.T) {
 		SemanticVersion: "1.0.0",
 		SHASum:          []byte("test-sha-sum"),
 		Status:          models.TerraformModuleVersionStatusUploaded,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -571,7 +571,7 @@ func TestTerraformModuleVersions_DeleteModuleVersionBatch(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-delete-module-versions",
 		FullPath:  "test-group-delete-module-versions",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -580,7 +580,7 @@ func TestTerraformModuleVersions_DeleteModuleVersionBatch(t *testing.T) {
 		GroupID:     group.Metadata.ID,
 		RootGroupID: group.Metadata.ID,
 		System:      "aws",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -592,7 +592,7 @@ func TestTerraformModuleVersions_DeleteModuleVersionBatch(t *testing.T) {
 			SemanticVersion: fmt.Sprintf("%d.0.0", versionSeq),
 			ModuleID:        module.Metadata.ID,
 			SHASum:          []byte(fmt.Sprintf("sha-%d", versionSeq)),
-			CreatedBy:       "db-integration-tests",
+			CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 		return v

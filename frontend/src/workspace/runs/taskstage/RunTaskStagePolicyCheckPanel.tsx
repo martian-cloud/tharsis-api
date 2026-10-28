@@ -11,6 +11,7 @@ import moment from 'moment';
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { useSearchParams } from 'react-router-dom';
+import ActorDisplay from '../../../common/ActorDisplay';
 import Pill, { resolvePaletteColor } from '../../../common/Pill';
 import Timestamp from '../../../common/Timestamp';
 import { MutationError } from '../../../common/error';
@@ -21,7 +22,7 @@ import RunTaskStageOverrideProgressBox from './RunTaskStageOverrideProgressBox';
 import RunTaskStageOverrideRunButton from './RunTaskStageOverrideRunButton';
 import RunTaskStagePolicyCheckPreviousJobsMenu from './RunTaskStagePolicyCheckPreviousJobsMenu';
 import RunTaskStagePolicyErrorsBox from './RunTaskStagePolicyErrorsBox';
-import RunTaskStagePrincipalAvatar, { PRINCIPAL_AVATAR_SIZE } from './RunTaskStagePrincipalAvatar';
+import { PRINCIPAL_AVATAR_SIZE } from './RunTaskStagePrincipalAvatar';
 import RunTaskStageRetryPolicyCheckButton from './RunTaskStageRetryPolicyCheckButton';
 import RunTaskStageRunGateDecisionButtons from './RunTaskStageRunGateDecisionButtons';
 import RunTaskStageSectionLabel from './RunTaskStageSectionLabel';
@@ -98,7 +99,9 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
                 status
                 # Set only when the gate was overridden rather than approved. updatedAt doubles as the
                 # time it was cleared — both approved and overridden are terminal for a gate.
-                overriddenBy
+                overriddenByActor {
+                    ...ActorDisplayFragment_actor
+                }
                 overrideComment
                 metadata {
                     updatedAt
@@ -111,20 +114,12 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
                     id
                     decision
                     comment
-                    createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     coveredRules
                     metadata {
                         createdAt
-                    }
-                    user {
-                        id
-                        username
-                        email
-                    }
-                    serviceAccount {
-                        id
-                        name
-                        resourcePath
                     }
                 }
             }
@@ -190,9 +185,11 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
     const pendingGate = gate?.status === 'PENDING' ? gate : undefined;
 
     // A gate whose required approvals were bypassed outright. Distinct from one that reached
-    // APPROVED by collecting them — that one leaves overriddenBy null and shows up under Reviews
-    // instead. Both leave the check OVERRIDDEN, so the gate is the only thing that tells them apart.
-    const overriddenGate = gate?.status === 'OVERRIDDEN' && gate.overriddenBy ? gate : undefined;
+    // APPROVED by collecting them, which shows up under Reviews instead. Both leave the check
+    // OVERRIDDEN, so the gate's status is the only thing that tells them apart. overriddenByActor is
+    // not part of the test: it is null for an override whose actor could not be typed, and that gate
+    // was still bypassed.
+    const overriddenGate = gate?.status === 'OVERRIDDEN' ? gate : undefined;
 
     // Only a gate that carried approval rules had approvals to bypass. A rule-less gate is the one
     // nobody was eligible to approve — its failed policies declared no approvers — so an override is the
@@ -290,7 +287,7 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
                             {bypassedApprovals ? 'Approvals bypassed' : 'Policy overridden'}
                         </Typography>
                         <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                            Overridden by {overriddenGate.overriddenBy}
+                            Overridden by <ActorDisplay fragmentRef={overriddenGate.overriddenByActor} variant="inline" size={20} />
                             {' · '}
                             <Timestamp timestamp={overriddenGate.metadata.updatedAt as string} />
                         </Typography>
@@ -317,18 +314,19 @@ function RunTaskStagePolicyCheckPanel({ runId, fragmentRef, onError }: Props) {
                 <Divided>
                     <RunTaskStageSectionLabel>Reviews</RunTaskStageSectionLabel>
                     {decisions.map(approval => {
-                        const label = approval.user?.email ?? approval.serviceAccount?.resourcePath ?? approval.createdBy;
                         const approvedDecision = approval.decision === 'APPROVE';
                         return (
                             <Box key={approval.id} sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start' }}>
-                                <RunTaskStagePrincipalAvatar
-                                    kind={approval.user ? 'user' : 'serviceAccount'}
+                                <ActorDisplay
+                                    fragmentRef={approval.createdByActor}
+                                    variant="avatar"
                                     size={PRINCIPAL_AVATAR_SIZE}
-                                    label={label}
                                 />
                                 <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                                        <Typography variant="subtitle2" component="span">{label}</Typography>
+                                        <Typography variant="subtitle2" component="span">
+                                            <ActorDisplay fragmentRef={approval.createdByActor} variant="text" />
+                                        </Typography>
                                         <Box
                                             sx={{
                                                 display: 'inline-flex',

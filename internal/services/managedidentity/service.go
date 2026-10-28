@@ -582,7 +582,7 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 		GroupID:       newGroup.Metadata.ID,
 		AliasSourceID: &aliasSourceIdentity.Metadata.ID,
 		Name:          input.Name,
-		CreatedBy:     caller.GetSubject(),
+		CreatedBy:     caller.GetActor(),
 	}
 
 	if err = toCreate.Validate(); err != nil {
@@ -763,7 +763,7 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 		Name:        input.Name,
 		Description: input.Description,
 		GroupID:     input.GroupID,
-		CreatedBy:   caller.GetSubject(),
+		CreatedBy:   caller.GetActor(),
 		Data:        []byte{}, // Required or identity will fail to create.
 	}
 

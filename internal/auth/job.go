@@ -51,6 +51,11 @@ func (j *JobCaller) GetSubject() string {
 	return j.JobTRN
 }
 
+// GetActor returns the actor for this caller
+func (j *JobCaller) GetActor() models.Actor {
+	return models.NewJobActor(j.Job.Metadata.ID).WithTRN(j.JobTRN).WithSubject(j.GetSubject())
+}
+
 // IsAdminModeActivated returns true if the caller is an admin
 func (j *JobCaller) IsAdminModeActivated(_ context.Context) bool {
 	return false

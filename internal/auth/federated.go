@@ -125,6 +125,14 @@ func (f *FederatedRegistryCaller) GetSubject() string {
 	return f.subject
 }
 
+// GetActor returns the actor for this caller. A federated registry caller is
+// read-only (RequirePermission always denies), so it is never recorded as the
+// creator of a resource and has no actor type; the actor carries only its
+// subject.
+func (f *FederatedRegistryCaller) GetActor() models.Actor {
+	return models.Actor{Subject: f.GetSubject()}
+}
+
 // IsAdminModeActivated returns true if the caller is an admin
 func (f *FederatedRegistryCaller) IsAdminModeActivated(_ context.Context) bool {
 	return false

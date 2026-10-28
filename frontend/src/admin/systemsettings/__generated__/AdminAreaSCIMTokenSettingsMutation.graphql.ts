@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<17cf2fa321822fd8245ea6f42a2344dc>>
+ * @generated SignedSource<<ec01c474be57a029819fbd40aaa5d8ff>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,6 +9,7 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
+import { FragmentRefs } from "relay-runtime";
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type CreateSCIMTokenInput = {
   clientMutationId?: string | null | undefined;
@@ -25,7 +26,9 @@ export type AdminAreaSCIMTokenSettingsMutation$data = {
       readonly type: ProblemType;
     }>;
     readonly scimToken: {
-      readonly createdBy: string;
+      readonly createdByActor: {
+        readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+      } | null | undefined;
       readonly metadata: {
         readonly createdAt: any;
       };
@@ -63,13 +66,6 @@ v2 = {
 v3 = {
   "alias": null,
   "args": null,
-  "kind": "ScalarField",
-  "name": "createdBy",
-  "storageKey": null
-},
-v4 = {
-  "alias": null,
-  "args": null,
   "concreteType": "ResourceMetadata",
   "kind": "LinkedField",
   "name": "metadata",
@@ -83,6 +79,13 @@ v4 = {
       "storageKey": null
     }
   ],
+  "storageKey": null
+},
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "type",
   "storageKey": null
 },
 v5 = {
@@ -107,16 +110,26 @@ v5 = {
       "name": "field",
       "storageKey": null
     },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "type",
-      "storageKey": null
-    }
+    (v4/*: any*/)
   ],
   "storageKey": null
-};
+},
+v6 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "id",
+  "storageKey": null
+},
+v7 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+];
 return {
   "fragment": {
     "argumentDefinitions": (v0/*: any*/),
@@ -141,8 +154,23 @@ return {
             "name": "scimToken",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
-              (v4/*: any*/)
+              {
+                "alias": null,
+                "args": null,
+                "concreteType": null,
+                "kind": "LinkedField",
+                "name": "createdByActor",
+                "plural": false,
+                "selections": [
+                  {
+                    "args": null,
+                    "kind": "FragmentSpread",
+                    "name": "ActorDisplayFragment_actor"
+                  }
+                ],
+                "storageKey": null
+              },
+              (v3/*: any*/)
             ],
             "storageKey": null
           },
@@ -177,15 +205,82 @@ return {
             "name": "scimToken",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
-              (v4/*: any*/),
               {
                 "alias": null,
                 "args": null,
-                "kind": "ScalarField",
-                "name": "id",
+                "concreteType": null,
+                "kind": "LinkedField",
+                "name": "createdByActor",
+                "plural": false,
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "__typename",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "TypeDiscriminator",
+                    "abstractKey": "__isActor"
+                  },
+                  (v4/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "principalId",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "User",
+                        "kind": "LinkedField",
+                        "name": "user",
+                        "plural": false,
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "email",
+                            "storageKey": null
+                          },
+                          (v6/*: any*/)
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "UserActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v7/*: any*/),
+                    "type": "ServiceAccountActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v7/*: any*/),
+                    "type": "VCSProviderActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v7/*: any*/),
+                    "type": "JobActor",
+                    "abstractKey": null
+                  }
+                ],
                 "storageKey": null
-              }
+              },
+              (v3/*: any*/),
+              (v6/*: any*/)
             ],
             "storageKey": null
           },
@@ -196,16 +291,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "90087eefa44938905418de22d29e1d2f",
+    "cacheID": "d34dabb9e08cc81483ea045561321838",
     "id": null,
     "metadata": {},
     "name": "AdminAreaSCIMTokenSettingsMutation",
     "operationKind": "mutation",
-    "text": "mutation AdminAreaSCIMTokenSettingsMutation(\n  $input: CreateSCIMTokenInput!\n) {\n  createSCIMToken(input: $input) {\n    tokenText\n    scimToken {\n      createdBy\n      metadata {\n        createdAt\n      }\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
+    "text": "mutation AdminAreaSCIMTokenSettingsMutation(\n  $input: CreateSCIMTokenInput!\n) {\n  createSCIMToken(input: $input) {\n    tokenText\n    scimToken {\n      createdByActor {\n        __typename\n        ...ActorDisplayFragment_actor\n      }\n      metadata {\n        createdAt\n      }\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "159e71115a71a4e830e03eb895c8bb51";
+(node as any).hash = "530ab7aa30293c8757bd48a9643b385a";
 
 export default node;

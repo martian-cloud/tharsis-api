@@ -216,7 +216,13 @@ func (r *TerraformProviderVersionResolver) Platforms(ctx context.Context) ([]*Te
 
 // CreatedBy resolver
 func (r *TerraformProviderVersionResolver) CreatedBy() string {
-	return r.providerVersion.CreatedBy
+	return r.providerVersion.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *TerraformProviderVersionResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.providerVersion.CreatedBy)
 }
 
 func terraformProviderVersionQuery(ctx context.Context, args *TerraformProviderVersionQueryArgs) (*TerraformProviderVersionResolver, error) {

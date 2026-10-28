@@ -264,7 +264,13 @@ func (r *PolicyResolver) AllowedTeams(ctx context.Context) ([]*TeamResolver, err
 
 // CreatedBy resolver
 func (r *PolicyResolver) CreatedBy() string {
-	return r.policy.CreatedBy
+	return r.policy.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *PolicyResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.policy.CreatedBy)
 }
 
 /* Connection resolvers */

@@ -23,7 +23,7 @@ const (
 
 // TerraformModuleVersion represents a terraform module version
 type TerraformModuleVersion struct {
-	CreatedBy              string
+	CreatedBy              Actor
 	ModuleID               string
 	SemanticVersion        string
 	PackageObjectStoreKey  *string

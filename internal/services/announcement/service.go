@@ -182,7 +182,7 @@ func (s *service) CreateAnnouncement(ctx context.Context, input *CreateAnnouncem
 		EndTime:     input.EndTime,
 		Type:        input.Type,
 		Dismissible: input.Dismissible,
-		CreatedBy:   caller.GetSubject(),
+		CreatedBy:   caller.GetActor(),
 	}
 
 	if err = toCreate.Validate(); err != nil {

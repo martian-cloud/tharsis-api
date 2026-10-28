@@ -19,7 +19,7 @@ type WorkspaceRoleBinding struct {
 	Metadata    ResourceMetadata
 	WorkspaceID string
 	RoleID      string
-	CreatedBy   string
+	CreatedBy   Actor
 }
 
 // GetID returns the Metadata ID.

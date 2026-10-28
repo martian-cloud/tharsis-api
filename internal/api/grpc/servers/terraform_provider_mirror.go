@@ -287,7 +287,8 @@ func toPBTerraformProviderVersionMirror(m *models.TerraformProviderVersionMirror
 
 	return &pb.TerraformProviderVersionMirror{
 		Metadata:          toPBMetadata(&m.Metadata, types.TerraformProviderVersionMirrorModelType),
-		CreatedBy:         m.CreatedBy,
+		CreatedBy:         m.CreatedBy.Subject,
+		CreatedByActor:    toPBActor(m.CreatedBy),
 		Type:              m.Type,
 		SemanticVersion:   m.SemanticVersion,
 		RegistryNamespace: m.RegistryNamespace,

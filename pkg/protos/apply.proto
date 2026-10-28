@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.apply;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 
 // ApplyStatus defines the status of an Apply.
@@ -37,7 +38,9 @@ message UpdateApplyRequest {
 message Apply {
   metadata.ResourceMetadata metadata          = 1;
   string                    deprecated_status = 2 [deprecated = true];
-  string                    triggered_by      = 3;
+  // triggered_by is the free-form identifier of the principal that triggered the
+  // apply. Deprecated in favour of triggered_by_actor.
+  string                    triggered_by      = 3 [deprecated = true];
   optional string           error_message     = 4;
   optional string           latest_job_id     = 5;
   ApplyStatus               status            = 6;
@@ -45,4 +48,8 @@ message Apply {
   // auto-apply is enabled (including at run creation) or when the apply is approved; empty
   // otherwise.
   repeated string           managed_identity_ids = 7;
+  // triggered_by_actor is the structured identity of the principal that
+  // triggered the apply. Absent for applies triggered before actors were
+  // introduced.
+  actor.Actor               triggered_by_actor = 8;
 }

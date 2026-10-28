@@ -149,6 +149,9 @@ function EditPolicy({ ownerPath, groupPath }: Props) {
                         speculativeRunEnforcementLevel
                     }
                     createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     requiredApprovals
                     scope {
                         type

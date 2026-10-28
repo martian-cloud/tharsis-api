@@ -506,14 +506,15 @@ func (s *TerraformModuleServer) DeleteTerraformModuleAttestation(ctx context.Con
 // toPBTerraformModule converts from TerraformModule model to ProtoBuf model.
 func toPBTerraformModule(m *models.TerraformModule) *pb.TerraformModule {
 	return &pb.TerraformModule{
-		Metadata:      toPBMetadata(&m.Metadata, types.TerraformModuleModelType),
-		Name:          m.Name,
-		System:        m.System,
-		GroupId:       gid.ToGlobalID(types.GroupModelType, m.GroupID),
-		RepositoryUrl: m.RepositoryURL,
-		Private:       m.Private,
-		CreatedBy:     m.CreatedBy,
-		Labels:        m.Labels,
+		Metadata:       toPBMetadata(&m.Metadata, types.TerraformModuleModelType),
+		Name:           m.Name,
+		System:         m.System,
+		GroupId:        gid.ToGlobalID(types.GroupModelType, m.GroupID),
+		RepositoryUrl:  m.RepositoryURL,
+		Private:        m.Private,
+		CreatedBy:      m.CreatedBy.Subject,
+		CreatedByActor: toPBActor(m.CreatedBy),
+		Labels:         m.Labels,
 	}
 }
 
@@ -527,20 +528,22 @@ func toPBTerraformModuleVersion(v *models.TerraformModuleVersion) *pb.TerraformM
 		ShaSum:          v.GetSHASumHex(),
 		Submodules:      v.Submodules,
 		Latest:          v.Latest,
-		CreatedBy:       v.CreatedBy,
+		CreatedBy:       v.CreatedBy.Subject,
+		CreatedByActor:  toPBActor(v.CreatedBy),
 	}
 }
 
 // toPBTerraformModuleAttestation converts from TerraformModuleAttestation model to ProtoBuf model.
 func toPBTerraformModuleAttestation(a *models.TerraformModuleAttestation) *pb.TerraformModuleAttestation {
 	return &pb.TerraformModuleAttestation{
-		Metadata:      toPBMetadata(&a.Metadata, types.TerraformModuleAttestationModelType),
-		ModuleId:      gid.ToGlobalID(types.TerraformModuleModelType, a.ModuleID),
-		Description:   a.Description,
-		Data:          a.Data,
-		SchemaType:    a.SchemaType,
-		PredicateType: a.PredicateType,
-		Digests:       a.Digests,
-		CreatedBy:     a.CreatedBy,
+		Metadata:       toPBMetadata(&a.Metadata, types.TerraformModuleAttestationModelType),
+		ModuleId:       gid.ToGlobalID(types.TerraformModuleModelType, a.ModuleID),
+		Description:    a.Description,
+		Data:           a.Data,
+		SchemaType:     a.SchemaType,
+		PredicateType:  a.PredicateType,
+		Digests:        a.Digests,
+		CreatedBy:      a.CreatedBy.Subject,
+		CreatedByActor: toPBActor(a.CreatedBy),
 	}
 }

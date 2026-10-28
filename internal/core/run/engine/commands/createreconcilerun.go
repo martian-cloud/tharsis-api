@@ -16,7 +16,7 @@ import (
 // CreateReconcileRunInput is the input for creating a reconcile run. The remaining run
 // configuration is derived from the workspace's current state in Prepare.
 type CreateReconcileRunInput struct {
-	Subject     string
+	CreatedBy   models.Actor
 	WorkspaceID string
 }
 
@@ -68,7 +68,7 @@ func (c *CreateReconcileRun) Prepare(ctx context.Context) error {
 	c.variablesRetainFn = variablesRetainFn
 
 	c.createInput = &corerun.CreateRunInput{
-		Subject:                 c.in.Subject,
+		CreatedBy:               c.in.CreatedBy,
 		WorkspaceID:             c.in.WorkspaceID,
 		ConfigurationVersionID:  source.ConfigurationVersionID,
 		ModuleSource:            source.ModuleSource,

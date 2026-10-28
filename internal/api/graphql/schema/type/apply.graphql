@@ -23,7 +23,8 @@ type Apply {
     last: Int
     sort: JobSort
   ): JobConnection!
-  triggeredBy: String
+  triggeredBy: String @deprecated(reason: "Use triggeredByActor instead.")
+  triggeredByActor: Actor @complexity(value: 0)
   comment: String!
   errorMessage: String
 }

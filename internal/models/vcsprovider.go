@@ -24,7 +24,7 @@ const (
 // VCSProvider represents a version control system provider.
 type VCSProvider struct {
 	OAuthAccessTokenExpiresAt *time.Time
-	CreatedBy                 string
+	CreatedBy                 Actor
 	URL                       url.URL
 	Name                      string
 	Description               string

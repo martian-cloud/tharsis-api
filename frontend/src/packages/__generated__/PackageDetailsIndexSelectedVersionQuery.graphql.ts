@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ef62c31162e8257cc23bfd1cc2ddb04a>>
+ * @generated SignedSource<<3de8549182865d523d372ec804db2b08>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -36,6 +36,29 @@ v1 = [
     "kind": "Variable",
     "name": "id",
     "variableName": "id"
+  }
+],
+v2 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "__typename",
+  "storageKey": null
+},
+v3 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "id",
+  "storageKey": null
+},
+v4 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
   }
 ];
 return {
@@ -86,20 +109,8 @@ return {
         "name": "node",
         "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "__typename",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "id",
-            "storageKey": null
-          },
+          (v2/*: any*/),
+          (v3/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -134,8 +145,75 @@ return {
               {
                 "alias": null,
                 "args": null,
-                "kind": "ScalarField",
-                "name": "createdBy",
+                "concreteType": null,
+                "kind": "LinkedField",
+                "name": "createdByActor",
+                "plural": false,
+                "selections": [
+                  (v2/*: any*/),
+                  {
+                    "kind": "TypeDiscriminator",
+                    "abstractKey": "__isActor"
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "type",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "principalId",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "User",
+                        "kind": "LinkedField",
+                        "name": "user",
+                        "plural": false,
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "email",
+                            "storageKey": null
+                          },
+                          (v3/*: any*/)
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "UserActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v4/*: any*/),
+                    "type": "ServiceAccountActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v4/*: any*/),
+                    "type": "VCSProviderActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v4/*: any*/),
+                    "type": "JobActor",
+                    "abstractKey": null
+                  }
+                ],
                 "storageKey": null
               },
               {
@@ -180,12 +258,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "0b5ed896b4ccfb407ff6396205ec4b63",
+    "cacheID": "5471cd6776899ad52014b67e175b1800",
     "id": null,
     "metadata": {},
     "name": "PackageDetailsIndexSelectedVersionQuery",
     "operationKind": "query",
-    "text": "query PackageDetailsIndexSelectedVersionQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on PackageVersion {\n      ...PackageDetailsIndexFragment_version\n    }\n    id\n  }\n}\n\nfragment PackageDetailsIndexFragment_version on PackageVersion {\n  id\n  version\n  status\n  error\n  latest\n  ...PackageDetailsSidebarFragment_version\n}\n\nfragment PackageDetailsSidebarFragment_version on PackageVersion {\n  version\n  latest\n  createdBy\n  shaSum\n  size\n  metadata {\n    createdAt\n  }\n}\n"
+    "text": "query PackageDetailsIndexSelectedVersionQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on PackageVersion {\n      ...PackageDetailsIndexFragment_version\n    }\n    id\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment PackageDetailsIndexFragment_version on PackageVersion {\n  id\n  version\n  status\n  error\n  latest\n  ...PackageDetailsSidebarFragment_version\n}\n\nfragment PackageDetailsSidebarFragment_version on PackageVersion {\n  version\n  latest\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  shaSum\n  size\n  metadata {\n    createdAt\n  }\n}\n"
   }
 };
 })();

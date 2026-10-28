@@ -37,7 +37,8 @@ type DeleteTerraformModuleAttestationPayload {
 type TerraformModuleAttestation implements Node {
   id: ID!
   metadata: ResourceMetadata!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   description: String!
   module: TerraformModule!
   schemaType: String!

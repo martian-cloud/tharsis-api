@@ -10,6 +10,7 @@ import graphql from 'babel-plugin-relay/macro';
 import { useState } from "react";
 import { useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import { useSnackbar } from "notistack";
+import ActorDisplay from "../../common/ActorDisplay";
 import { MutationError } from "../../common/error";
 import Timestamp from "../../common/Timestamp";
 import { AdminAreaMaintenanceSettingsQuery } from "./__generated__/AdminAreaMaintenanceSettingsQuery.graphql";
@@ -24,7 +25,9 @@ function AdminAreaMaintenanceSettings() {
         query AdminAreaMaintenanceSettingsQuery {
             maintenanceMode {
                 id
-                createdBy
+                createdByActor {
+                    ...ActorDisplayFragment_actor
+                }
                 metadata {
                     createdAt
                 }
@@ -40,7 +43,9 @@ function AdminAreaMaintenanceSettings() {
             enableMaintenanceMode(input: $input) {
                 maintenanceMode {
                     id
-                    createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     metadata {
                         createdAt
                     }
@@ -157,7 +162,7 @@ function AdminAreaMaintenanceSettings() {
 
                 {currentMaintenanceMode && (
                     <Typography variant="body2" color="textSecondary" component="span" sx={{ mt: 1, display: 'block' }}>
-                        Enabled by {currentMaintenanceMode.createdBy} on{' '}
+                        Enabled by <ActorDisplay fragmentRef={currentMaintenanceMode.createdByActor} variant="text" /> on{' '}
                         <Timestamp timestamp={currentMaintenanceMode.metadata.createdAt} format="absolute" />
                     </Typography>
                 )}

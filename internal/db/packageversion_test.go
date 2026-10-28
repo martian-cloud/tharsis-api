@@ -25,7 +25,7 @@ func createTestPackageForVersion(ctx context.Context, t *testing.T, testClient *
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      groupName,
 		FullPath:  groupName,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -35,7 +35,7 @@ func createTestPackageForVersion(ctx context.Context, t *testing.T, testClient *
 		RootGroupID: group.Metadata.ID,
 		Kind:        models.PackageKindOPAPolicy,
 		Visibility:  models.PackageVisibilityPrivate,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -76,7 +76,7 @@ func TestPackageVersions_CreatePackageVersion(t *testing.T) {
 				PackageID:       test.packageID,
 				SemanticVersion: test.semanticVersion,
 				Status:          models.PackageVersionStatusPending,
-				CreatedBy:       "db-integration-tests",
+				CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 				SHASum:          []byte("test-sha-sum"),
 			})
 
@@ -107,7 +107,7 @@ func TestPackageVersions_CreatePackageVersion_DuplicateSemanticVersion(t *testin
 		PackageID:       pkg.Metadata.ID,
 		SemanticVersion: "1.0.0",
 		Status:          models.PackageVersionStatusPending,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		SHASum:          []byte("test-sha-sum"),
 	})
 	require.NoError(t, err)
@@ -116,7 +116,7 @@ func TestPackageVersions_CreatePackageVersion_DuplicateSemanticVersion(t *testin
 		PackageID:       pkg.Metadata.ID,
 		SemanticVersion: "1.0.0",
 		Status:          models.PackageVersionStatusPending,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		SHASum:          []byte("test-sha-sum"),
 	})
 	assert.Equal(t, errors.EConflict, errors.ErrorCode(err))
@@ -133,7 +133,7 @@ func TestPackageVersions_UpdatePackageVersion(t *testing.T) {
 		PackageID:       pkg.Metadata.ID,
 		SemanticVersion: "1.0.0",
 		Status:          models.PackageVersionStatusPending,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		SHASum:          []byte("test-sha-sum"),
 	})
 	require.Nil(t, err)
@@ -192,7 +192,7 @@ func TestPackageVersions_DeletePackageVersion(t *testing.T) {
 		PackageID:       pkg.Metadata.ID,
 		SemanticVersion: "1.0.0",
 		Status:          models.PackageVersionStatusPending,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		SHASum:          []byte("test-sha-sum"),
 	})
 	require.Nil(t, err)
@@ -252,7 +252,7 @@ func TestPackageVersions_GetPackageVersionByID(t *testing.T) {
 		PackageID:       pkg.Metadata.ID,
 		SemanticVersion: "1.0.0",
 		Status:          models.PackageVersionStatusPending,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		SHASum:          []byte("test-sha-sum"),
 	})
 	require.NoError(t, err)
@@ -311,7 +311,7 @@ func TestPackageVersions_GetPackageVersionByTRN(t *testing.T) {
 		PackageID:       pkg.Metadata.ID,
 		SemanticVersion: "1.0.0",
 		Status:          models.PackageVersionStatusPending,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		SHASum:          []byte("test-sha-sum"),
 	})
 	require.NoError(t, err)
@@ -372,7 +372,7 @@ func TestPackageVersions_GetPackageVersions(t *testing.T) {
 		SemanticVersion: "1.0.0",
 		Status:          models.PackageVersionStatusUploaded,
 		Latest:          true,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		SHASum:          []byte("test-sha-sum"),
 	})
 	require.NoError(t, err)
@@ -381,7 +381,7 @@ func TestPackageVersions_GetPackageVersions(t *testing.T) {
 		PackageID:       otherPkg.Metadata.ID,
 		SemanticVersion: "2.0.0",
 		Status:          models.PackageVersionStatusPending,
-		CreatedBy:       "db-integration-tests",
+		CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 		SHASum:          []byte("test-sha-sum"),
 	})
 	require.NoError(t, err)
@@ -473,7 +473,7 @@ func TestPackageVersions_GetPackageVersionsWithPaginationAndSorting(t *testing.T
 			PackageID:       pkg.Metadata.ID,
 			SemanticVersion: fmt.Sprintf("1.0.%d", i),
 			Status:          models.PackageVersionStatusPending,
-			CreatedBy:       "db-integration-tests",
+			CreatedBy:       models.Actor{Subject: "db-integration-tests"},
 			SHASum:          []byte("test-sha-sum"),
 		})
 		require.NoError(t, err)

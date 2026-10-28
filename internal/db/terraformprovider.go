@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -90,7 +91,7 @@ type terraformProviders struct {
 	dbClient *Client
 }
 
-var providerFieldList = append(metadataFieldList, "group_id", "root_group_id", "name", "private", "repo_url", "created_by")
+var providerFieldList = append(metadataAndCreatedByFieldList, "group_id", "root_group_id", "name", "private", "repo_url")
 
 // NewTerraformProviders returns an instance of the TerraformProviders interface
 func NewTerraformProviders(dbClient *Client) TerraformProviders {
@@ -245,6 +246,11 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(provider.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("terraformprovider.CreateProvider", dialect.From("terraform_providers").
@@ -252,16 +258,19 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 		With("terraform_providers",
 			dialect.Insert("terraform_providers").
 				Rows(goqu.Record{
-					"id":            newResourceID(),
-					"version":       initialResourceVersion,
-					"created_at":    timestamp,
-					"updated_at":    timestamp,
-					"group_id":      provider.GroupID,
-					"root_group_id": provider.RootGroupID,
-					"name":          provider.Name,
-					"private":       provider.Private,
-					"repo_url":      provider.RepositoryURL,
-					"created_by":    provider.CreatedBy,
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"group_id":              provider.GroupID,
+					"root_group_id":         provider.RootGroupID,
+					"name":                  provider.Name,
+					"private":               provider.Private,
+					"repo_url":              provider.RepositoryURL,
+					"created_by":            provider.CreatedBy.Subject,
+					"created_by_actor_type": createdByActorType,
+					"created_by_actor_id":   createdByActorID,
+					"created_by_actor_trn":  createdByActorTRN,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})))
@@ -395,6 +404,7 @@ func (t *terraformProviders) getSelectFields() []interface{} {
 }
 
 func scanTerraformProvider(row scanner) (*models.TerraformProvider, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var groupPath string
 	provider := &models.TerraformProvider{}
 
@@ -403,12 +413,15 @@ func scanTerraformProvider(row scanner) (*models.TerraformProvider, error) {
 		&provider.Metadata.CreationTimestamp,
 		&provider.Metadata.LastUpdatedTimestamp,
 		&provider.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&provider.GroupID,
 		&provider.RootGroupID,
 		&provider.Name,
 		&provider.Private,
 		&provider.RepositoryURL,
-		&provider.CreatedBy,
 		&groupPath,
 	}
 
@@ -416,6 +429,9 @@ func scanTerraformProvider(row scanner) (*models.TerraformProvider, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	provider.CreatedBy = parsedActor
 
 	provider.Metadata.TRN = trn.TypeTerraformProvider.Build(groupPath, provider.Name)
 

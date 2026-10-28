@@ -65,7 +65,7 @@ func (s *service) EnableMaintenanceMode(ctx context.Context) (*models.Maintenanc
 	}
 
 	toCreate := &models.MaintenanceMode{
-		CreatedBy: caller.GetSubject(),
+		CreatedBy: caller.GetActor(),
 	}
 
 	created, err := s.dbClient.MaintenanceModes.CreateMaintenanceMode(ctx, toCreate)

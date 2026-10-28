@@ -64,11 +64,12 @@ func (s *ConfigurationVersionServer) CreateConfigurationVersion(ctx context.Cont
 // toPBConfigurationVersion converts from ConfigurationVersion model to ProtoBuf model.
 func toPBConfigurationVersion(c *models.ConfigurationVersion) *pb.ConfigurationVersion {
 	resp := &pb.ConfigurationVersion{
-		Metadata:    toPBMetadata(&c.Metadata, types.ConfigurationVersionModelType),
-		Status:      string(c.Status),
-		Speculative: c.Speculative,
-		WorkspaceId: gid.ToGlobalID(types.WorkspaceModelType, c.WorkspaceID),
-		CreatedBy:   c.CreatedBy,
+		Metadata:       toPBMetadata(&c.Metadata, types.ConfigurationVersionModelType),
+		Status:         string(c.Status),
+		Speculative:    c.Speculative,
+		WorkspaceId:    gid.ToGlobalID(types.WorkspaceModelType, c.WorkspaceID),
+		CreatedBy:      c.CreatedBy.Subject,
+		CreatedByActor: toPBActor(c.CreatedBy),
 	}
 
 	if c.VCSEventID != nil {

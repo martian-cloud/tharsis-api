@@ -320,17 +320,24 @@ func (x *DeleteTerraformProviderVersionMirrorRequest) GetForce() bool {
 
 // TerraformProviderVersionMirror represents a mirrored provider version.
 type TerraformProviderVersionMirror struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Metadata          *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	CreatedBy         string                 `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	Type              string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
-	SemanticVersion   string                 `protobuf:"bytes,4,opt,name=semantic_version,json=semanticVersion,proto3" json:"semantic_version,omitempty"`
-	RegistryNamespace string                 `protobuf:"bytes,5,opt,name=registry_namespace,json=registryNamespace,proto3" json:"registry_namespace,omitempty"`
-	RegistryHostname  string                 `protobuf:"bytes,6,opt,name=registry_hostname,json=registryHostname,proto3" json:"registry_hostname,omitempty"`
-	Digests           map[string]string      `protobuf:"bytes,7,rep,name=digests,proto3" json:"digests,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	GroupId           string                 `protobuf:"bytes,8,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in terraform_provider_version_mirror.proto.
+	CreatedBy         string            `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	Type              string            `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	SemanticVersion   string            `protobuf:"bytes,4,opt,name=semantic_version,json=semanticVersion,proto3" json:"semantic_version,omitempty"`
+	RegistryNamespace string            `protobuf:"bytes,5,opt,name=registry_namespace,json=registryNamespace,proto3" json:"registry_namespace,omitempty"`
+	RegistryHostname  string            `protobuf:"bytes,6,opt,name=registry_hostname,json=registryHostname,proto3" json:"registry_hostname,omitempty"`
+	Digests           map[string]string `protobuf:"bytes,7,rep,name=digests,proto3" json:"digests,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	GroupId           string            `protobuf:"bytes,8,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,9,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *TerraformProviderVersionMirror) Reset() {
@@ -370,6 +377,7 @@ func (x *TerraformProviderVersionMirror) GetMetadata() *ResourceMetadata {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in terraform_provider_version_mirror.proto.
 func (x *TerraformProviderVersionMirror) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -417,6 +425,13 @@ func (x *TerraformProviderVersionMirror) GetGroupId() string {
 		return x.GroupId
 	}
 	return ""
+}
+
+func (x *TerraformProviderVersionMirror) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
 }
 
 // GetTerraformProviderVersionMirrorsResponse is the response for GetTerraformProviderVersionMirrors.
@@ -590,7 +605,7 @@ var File_terraform_provider_version_mirror_proto protoreflect.FileDescriptor
 
 const file_terraform_provider_version_mirror_proto_rawDesc = "" +
 	"\n" +
-	"'terraform_provider_version_mirror.proto\x12:martiancloud.tharsis.api.terraform_provider_version_mirror\x1a\x0emetadata.proto\x1a\x10pagination.proto\">\n" +
+	"'terraform_provider_version_mirror.proto\x12:martiancloud.tharsis.api.terraform_provider_version_mirror\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x10pagination.proto\">\n" +
 	",GetTerraformProviderVersionMirrorByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xe1\x02\n" +
 	")GetTerraformProviderVersionMirrorsRequest\x12j\n" +
@@ -610,17 +625,18 @@ const file_terraform_provider_version_mirror_proto_rawDesc = "" +
 	"\x0f_registry_token\"S\n" +
 	"+DeleteTerraformProviderVersionMirrorRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
-	"\x05force\x18\x02 \x01(\bR\x05force\"\x86\x04\n" +
+	"\x05force\x18\x02 \x01(\bR\x05force\"\xdb\x04\n" +
 	"\x1eTerraformProviderVersionMirror\x12O\n" +
-	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x1d\n" +
+	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12!\n" +
 	"\n" +
-	"created_by\x18\x02 \x01(\tR\tcreatedBy\x12\x12\n" +
+	"created_by\x18\x02 \x01(\tB\x02\x18\x01R\tcreatedBy\x12\x12\n" +
 	"\x04type\x18\x03 \x01(\tR\x04type\x12)\n" +
 	"\x10semantic_version\x18\x04 \x01(\tR\x0fsemanticVersion\x12-\n" +
 	"\x12registry_namespace\x18\x05 \x01(\tR\x11registryNamespace\x12+\n" +
 	"\x11registry_hostname\x18\x06 \x01(\tR\x10registryHostname\x12\x81\x01\n" +
 	"\adigests\x18\a \x03(\v2g.martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.DigestsEntryR\adigests\x12\x19\n" +
-	"\bgroup_id\x18\b \x01(\tR\agroupId\x1a:\n" +
+	"\bgroup_id\x18\b \x01(\tR\agroupId\x12O\n" +
+	"\x10created_by_actor\x18\t \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\x1a:\n" +
 	"\fDigestsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfe\x01\n" +
@@ -668,20 +684,22 @@ var file_terraform_provider_version_mirror_proto_goTypes = []any{
 	nil,                       // 9: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.DigestsEntry
 	(*PaginationOptions)(nil), // 10: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*ResourceMetadata)(nil),  // 11: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),          // 12: martiancloud.tharsis.api.pagination.PageInfo
+	(*Actor)(nil),             // 12: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),          // 13: martiancloud.tharsis.api.pagination.PageInfo
 }
 var file_terraform_provider_version_mirror_proto_depIdxs = []int32{
 	10, // 0: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsRequest.sort:type_name -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirrorSortableField
 	11, // 2: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
 	9,  // 3: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.digests:type_name -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.DigestsEntry
-	12, // 4: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	5,  // 5: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse.version_mirrors:type_name -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror
-	6,  // [6:6] is the sub-list for method output_type
-	6,  // [6:6] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	12, // 4: martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	13, // 5: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	5,  // 6: martiancloud.tharsis.api.terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse.version_mirrors:type_name -> martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirror
+	7,  // [7:7] is the sub-list for method output_type
+	7,  // [7:7] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_terraform_provider_version_mirror_proto_init() }
@@ -689,6 +707,7 @@ func file_terraform_provider_version_mirror_proto_init() {
 	if File_terraform_provider_version_mirror_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_terraform_provider_version_mirror_proto_msgTypes[1].OneofWrappers = []any{}

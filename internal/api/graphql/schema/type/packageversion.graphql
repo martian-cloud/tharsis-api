@@ -39,7 +39,8 @@ type PackageVersion implements Node {
   shaSum: String!
   size: Int!
   latest: Boolean!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
 }
 
 input CreatePackageVersionInput {

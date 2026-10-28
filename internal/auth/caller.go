@@ -185,6 +185,11 @@ func (s *SystemCaller) GetSubject() string {
 	return System
 }
 
+// GetActor returns the actor for this caller
+func (s *SystemCaller) GetActor() models.Actor {
+	return models.SystemActor()
+}
+
 // IsAdminModeActivated returns true if the caller is an admin
 func (s *SystemCaller) IsAdminModeActivated(_ context.Context) bool {
 	// System caller is always an admin
@@ -228,6 +233,8 @@ func (s *SystemCaller) GetNamespacePermissions(_ context.Context, _ string) ([]*
 // Caller represents a subject performing an API request
 type Caller interface {
 	GetSubject() string
+	// GetActor returns the identity of this caller
+	GetActor() models.Actor
 	IsAdminModeActivated(ctx context.Context) bool
 	// GetRootNamespaceMemberships returns the caller's deduplicated, top-most member namespaces. It is
 	// only meaningful when IsAdminModeActivated returns false; admin/system callers have

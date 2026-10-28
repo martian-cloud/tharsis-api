@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<4d74598fac2f1fe3ad6ff8f2d0a93d96>>
+ * @generated SignedSource<<117411c3c4eee430d34ee0c0cc5c681f>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -35,7 +35,9 @@ export type RunDetailsSidebarFragment_details$data = {
   readonly configurationVersion: {
     readonly id: string;
   } | null | undefined;
-  readonly createdBy: string;
+  readonly createdByActor: {
+    readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+  } | null | undefined;
   readonly hasAdvisoryFailures: boolean;
   readonly id: string;
   readonly isDestroy: boolean;
@@ -155,8 +157,17 @@ return {
     {
       "alias": null,
       "args": null,
-      "kind": "ScalarField",
-      "name": "createdBy",
+      "concreteType": null,
+      "kind": "LinkedField",
+      "name": "createdByActor",
+      "plural": false,
+      "selections": [
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "ActorDisplayFragment_actor"
+        }
+      ],
       "storageKey": null
     },
     {
@@ -330,6 +341,6 @@ return {
 };
 })();
 
-(node as any).hash = "21e863452be2ba49f02781eb1add01dd";
+(node as any).hash = "1b6477cb58b0fe034e6bab56eda0f2ee";
 
 export default node;

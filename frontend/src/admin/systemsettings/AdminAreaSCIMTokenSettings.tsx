@@ -18,6 +18,7 @@ import {
 import graphql from 'babel-plugin-relay/macro';
 import { useState } from 'react';
 import { useLazyLoadQuery, useMutation } from 'react-relay/hooks';
+import ActorDisplay from '../../common/ActorDisplay';
 import CopyButton from '../../common/CopyButton';
 import { MutationError } from '../../common/error';
 import NoResults from '../../common/NoResults';
@@ -28,7 +29,9 @@ import { AdminAreaSCIMTokenSettingsQuery } from './__generated__/AdminAreaSCIMTo
 const query = graphql`
     query AdminAreaSCIMTokenSettingsQuery {
         scimToken {
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             metadata {
                 createdAt
             }
@@ -54,7 +57,9 @@ function AdminAreaSCIMTokenSettings() {
             createSCIMToken(input: $input) {
                 tokenText
                 scimToken {
-                    createdBy
+                    createdByActor {
+                        ...ActorDisplayFragment_actor
+                    }
                     metadata {
                         createdAt
                     }
@@ -135,7 +140,7 @@ function AdminAreaSCIMTokenSettings() {
             {scimToken ? (
                 <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
                     <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
-                        Created by: <strong>{scimToken.createdBy}</strong>
+                        Created by: <strong><ActorDisplay fragmentRef={scimToken.createdByActor} variant="text" /></strong>
                     </Typography>
                     <Typography variant="body2">
                         Created at: <Timestamp timestamp={scimToken.metadata.createdAt} format="absolute" />

@@ -316,7 +316,13 @@ func (r *ManagedIdentityResolver) ReferencingPolicies(ctx context.Context) ([]*P
 
 // CreatedBy resolver
 func (r *ManagedIdentityResolver) CreatedBy() string {
-	return r.managedIdentity.CreatedBy
+	return r.managedIdentity.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *ManagedIdentityResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.managedIdentity.CreatedBy)
 }
 
 // AliasSourceID resolver

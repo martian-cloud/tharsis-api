@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -79,7 +80,7 @@ type terraformProviderPlatforms struct {
 	dbClient *Client
 }
 
-var providerPlatformFieldList = append(metadataFieldList, "provider_version_id", "os", "arch", "sha_sum", "filename", "binary_uploaded", "created_by", "binary_object_store_key")
+var providerPlatformFieldList = append(metadataAndCreatedByFieldList, "provider_version_id", "os", "arch", "sha_sum", "filename", "binary_uploaded", "binary_object_store_key")
 
 // NewTerraformProviderPlatforms returns an instance of the TerraformProviderPlatforms interface
 func NewTerraformProviderPlatforms(dbClient *Client) TerraformProviderPlatforms {
@@ -212,6 +213,11 @@ func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context,
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(providerPlatform.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("terraformproviderplatform.CreateProviderPlatform", dialect.From("terraform_provider_platforms").
@@ -229,7 +235,10 @@ func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context,
 					"sha_sum":                 providerPlatform.SHASum,
 					"filename":                providerPlatform.Filename,
 					"binary_uploaded":         providerPlatform.BinaryUploaded,
-					"created_by":              providerPlatform.CreatedBy,
+					"created_by":              providerPlatform.CreatedBy.Subject,
+					"created_by_actor_type":   createdByActorType,
+					"created_by_actor_id":     createdByActorID,
+					"created_by_actor_trn":    createdByActorTRN,
 					"binary_object_store_key": providerPlatform.BinaryObjectStoreKey,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
@@ -380,6 +389,7 @@ func (t *terraformProviderPlatforms) getSelectFields() []interface{} {
 }
 
 func scanTerraformProviderPlatform(row scanner) (*models.TerraformProviderPlatform, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var groupPath, providerName, providerSemVersion string
 	var binaryKey *string
 	providerPlatform := &models.TerraformProviderPlatform{}
@@ -389,13 +399,16 @@ func scanTerraformProviderPlatform(row scanner) (*models.TerraformProviderPlatfo
 		&providerPlatform.Metadata.CreationTimestamp,
 		&providerPlatform.Metadata.LastUpdatedTimestamp,
 		&providerPlatform.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&providerPlatform.ProviderVersionID,
 		&providerPlatform.OperatingSystem,
 		&providerPlatform.Architecture,
 		&providerPlatform.SHASum,
 		&providerPlatform.Filename,
 		&providerPlatform.BinaryUploaded,
-		&providerPlatform.CreatedBy,
 		&binaryKey,
 		&groupPath,
 		&providerName,
@@ -406,6 +419,9 @@ func scanTerraformProviderPlatform(row scanner) (*models.TerraformProviderPlatfo
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	providerPlatform.CreatedBy = parsedActor
 
 	providerPlatform.BinaryObjectStoreKey = binaryKey
 

@@ -2262,3 +2262,64 @@ func TestMarkJobsCleanedUp(t *testing.T) {
 		})
 	}
 }
+
+// TestGetJobsByIDs verifies that jobs the caller cannot view are left out of the result instead of
+// failing the whole batch.
+func TestGetJobsByIDs(t *testing.T) {
+	visible := models.Job{Metadata: models.ResourceMetadata{ID: "job-1"}, WorkspaceID: "workspace-1"}
+	hidden := models.Job{Metadata: models.ResourceMetadata{ID: "job-2"}, WorkspaceID: "workspace-2"}
+
+	tests := []struct {
+		name            string
+		accessResults   []error // one per job, in order
+		expectResult    []models.Job
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:          "all jobs are visible",
+			accessResults: []error{nil, nil},
+			expectResult:  []models.Job{visible, hidden},
+		},
+		{
+			name:          "jobs the caller cannot view are left out",
+			accessResults: []error{nil, errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))},
+			expectResult:  []models.Job{visible},
+		},
+		{
+			name:          "a workspace the caller cannot see is treated as denied",
+			accessResults: []error{errors.New("not found", errors.WithErrorCode(errors.ENotFound)), nil},
+			expectResult:  []models.Job{hidden},
+		},
+		{
+			name:            "an error other than access denied fails the request",
+			accessResults:   []error{errors.New("db down", errors.WithErrorCode(errors.EInternal))},
+			expectErrorCode: errors.EInternal,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockCaller := auth.NewMockCaller(t)
+			for _, accessErr := range test.accessResults {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewJobPermission, mock.Anything, mock.Anything).
+					Return(accessErr).Once()
+			}
+
+			mockJobs := db.NewMockJobs(t)
+			mockJobs.On("GetJobs", mock.Anything, mock.Anything).
+				Return(&db.JobsResult{Jobs: []models.Job{visible, hidden}}, nil)
+
+			service := &service{dbClient: &db.Client{Jobs: mockJobs}}
+
+			jobs, err := service.GetJobsByIDs(auth.WithCaller(t.Context(), mockCaller), []string{"job-1", "job-2"})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectResult, jobs)
+		})
+	}
+}

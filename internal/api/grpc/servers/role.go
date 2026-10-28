@@ -203,10 +203,11 @@ func toPBRole(r *models.Role) *pb.Role {
 	}
 
 	return &pb.Role{
-		Metadata:    toPBMetadata(&r.Metadata, types.RoleModelType),
-		Name:        r.Name,
-		Description: r.Description,
-		CreatedBy:   r.CreatedBy,
-		Permissions: pbPermissions,
+		Metadata:       toPBMetadata(&r.Metadata, types.RoleModelType),
+		Name:           r.Name,
+		Description:    r.Description,
+		CreatedBy:      r.CreatedBy.Subject,
+		CreatedByActor: toPBActor(r.CreatedBy),
+		Permissions:    pbPermissions,
 	}
 }

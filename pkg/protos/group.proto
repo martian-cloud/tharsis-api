@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.group;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 import "namespace.proto";
 import "pagination.proto";
@@ -88,8 +89,13 @@ message Group {
   string                    name        = 2;
   string                    description = 3;
   string                    full_path   = 4;
-  string                    created_by  = 5;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by  = 5 [deprecated = true];
   string                    parent_id   = 6;
+  // created_by_actor is the structured identity of the creator. Absent for
+  // groups created before actors were introduced.
+  actor.Actor               created_by_actor = 7;
 }
 
 // GetGroupsResponse is the paginated list of Groups.

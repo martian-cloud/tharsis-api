@@ -21,7 +21,7 @@ func TestGetNamespace(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-get-namespace-group",
 		FullPath:  "test-get-namespace-group",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -30,7 +30,7 @@ func TestGetNamespace(t *testing.T) {
 		FullPath:       "test-get-namespace-group/test-get-namespace-workspace",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -70,13 +70,13 @@ func TestGetNamespaceByGroupID(t *testing.T) {
 
 	groupA, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-get-namespace-by-group-id-a",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	groupB, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-get-namespace-by-group-id-b",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -145,7 +145,7 @@ func TestGetNamespaceByWorkspaceID(t *testing.T) {
 
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-get-namespace-by-workspace-id",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -153,7 +153,7 @@ func TestGetNamespaceByWorkspaceID(t *testing.T) {
 		Name:           "test-get-namespace-by-workspace-id-ws",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -213,14 +213,14 @@ func TestGetNamespaceByPath(t *testing.T) {
 
 	parentGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-get-namespace-by-path-parent",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	childGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-get-namespace-by-path-child",
 		ParentID:  parentGroup.Metadata.ID,
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -228,7 +228,7 @@ func TestGetNamespaceByPath(t *testing.T) {
 		Name:           "test-get-namespace-by-path-ws",
 		GroupID:        childGroup.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -300,22 +300,22 @@ func TestGetNamespaces(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	parent, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "list-parent", CreatedBy: "db-integration-tests"})
+	parent, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "list-parent", CreatedBy: models.Actor{Subject: "db-integration-tests"}})
 	require.NoError(t, err)
-	child, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "child-group", ParentID: parent.Metadata.ID, CreatedBy: "db-integration-tests"})
+	child, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "child-group", ParentID: parent.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"}})
 	require.NoError(t, err)
 	_, err = testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
 		Name:           "child-workspace",
 		GroupID:        parent.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 	// A grandchild, which a direct-children listing must leave out
-	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "grandchild-group", ParentID: child.Metadata.ID, CreatedBy: "db-integration-tests"})
+	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "grandchild-group", ParentID: child.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"}})
 	require.NoError(t, err)
 	// A second top-level group, so top-level listings have more than one row
-	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "other-top", CreatedBy: "db-integration-tests"})
+	_, err = testClient.client.Groups.CreateGroup(ctx, &models.Group{Name: "other-top", CreatedBy: models.Actor{Subject: "db-integration-tests"}})
 	require.NoError(t, err)
 
 	list := func(input *GetNamespacesInput) []string {

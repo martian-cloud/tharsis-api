@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b5372f7c2ace394acf481c353fd5ab0a>>
+ * @generated SignedSource<<c5260d5aeee139dee8df298cb90f72a4>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -55,6 +55,13 @@ v1 = [
 v2 = {
   "alias": null,
   "args": null,
+  "kind": "ScalarField",
+  "name": "type",
+  "storageKey": null
+},
+v3 = {
+  "alias": null,
+  "args": null,
   "concreteType": "Problem",
   "kind": "LinkedField",
   "name": "problems",
@@ -74,31 +81,34 @@ v2 = {
       "name": "field",
       "storageKey": null
     },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "type",
-      "storageKey": null
-    }
+    (v2/*: any*/)
   ],
-  "storageKey": null
-},
-v3 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "id",
   "storageKey": null
 },
 v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "status",
+  "name": "id",
   "storageKey": null
 },
 v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "status",
+  "storageKey": null
+},
+v6 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+],
+v7 = {
   "alias": null,
   "args": null,
   "concreteType": "Workspace",
@@ -113,7 +123,7 @@ v5 = {
       "name": "fullPath",
       "storageKey": null
     },
-    (v3/*: any*/)
+    (v4/*: any*/)
   ],
   "storageKey": null
 };
@@ -148,7 +158,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v3/*: any*/)
         ],
         "storageKey": null
       }
@@ -178,16 +188,83 @@ return {
             "name": "run",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
               (v4/*: any*/),
+              (v5/*: any*/),
               {
                 "alias": null,
                 "args": null,
-                "kind": "ScalarField",
-                "name": "createdBy",
+                "concreteType": null,
+                "kind": "LinkedField",
+                "name": "createdByActor",
+                "plural": false,
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "__typename",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "TypeDiscriminator",
+                    "abstractKey": "__isActor"
+                  },
+                  (v2/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "principalId",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "User",
+                        "kind": "LinkedField",
+                        "name": "user",
+                        "plural": false,
+                        "selections": [
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "email",
+                            "storageKey": null
+                          },
+                          (v4/*: any*/)
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "UserActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v6/*: any*/),
+                    "type": "ServiceAccountActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v6/*: any*/),
+                    "type": "VCSProviderActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v6/*: any*/),
+                    "type": "JobActor",
+                    "abstractKey": null
+                  }
+                ],
                 "storageKey": null
               },
-              (v5/*: any*/),
+              (v7/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -196,7 +273,7 @@ return {
                 "name": "plan",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
+                  (v4/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -215,7 +292,7 @@ return {
                     ],
                     "storageKey": null
                   },
-                  (v4/*: any*/),
+                  (v5/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -252,7 +329,7 @@ return {
                         "name": "name",
                         "storageKey": null
                       },
-                      (v4/*: any*/),
+                      (v5/*: any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -268,7 +345,7 @@ return {
                             "name": "address",
                             "storageKey": null
                           },
-                          (v4/*: any*/),
+                          (v5/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -290,8 +367,8 @@ return {
                     "name": "currentJob",
                     "plural": false,
                     "selections": [
-                      (v3/*: any*/),
                       (v4/*: any*/),
+                      (v5/*: any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -345,7 +422,7 @@ return {
                         "name": "runnerAvailabilityStatus",
                         "storageKey": null
                       },
-                      (v5/*: any*/),
+                      (v7/*: any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -557,8 +634,8 @@ return {
                 "name": "apply",
                 "plural": false,
                 "selections": [
-                  (v4/*: any*/),
-                  (v3/*: any*/)
+                  (v5/*: any*/),
+                  (v4/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -632,19 +709,19 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v3/*: any*/)
         ],
         "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "d547b8f92856de726e0e6146dcf5a70d",
+    "cacheID": "7a007f2531e2efadc2f5a347e164e600",
     "id": null,
     "metadata": {},
     "name": "RunDetailsPlanStageCancelRunMutation",
     "operationKind": "mutation",
-    "text": "mutation RunDetailsPlanStageCancelRunMutation(\n  $input: CancelRunInput!\n) {\n  cancelRun(input: $input) {\n    run {\n      ...RunDetailsPlanStageFragment_plan\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment CheckResultsPanelFragment_checkResult on TerraformCheckResult {\n  name\n  status\n  objects {\n    address\n    status\n    failureMessages\n  }\n}\n\nfragment ForceCancelRunAlertFragment_run on Run {\n  forceCancelAvailableAt\n  ...ForceCancelRunButtonFragment_run\n}\n\nfragment ForceCancelRunButtonFragment_run on Run {\n  id\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment JobResourceUsageMetricsFragment_job on Job {\n  resourceUsageMetrics {\n    peakMemoryBytes\n    totalCpuTimeMs\n    totalNetworkReceivedBytes\n    totalNetworkSentBytes\n    totalDiskReadBytes\n    totalDiskWriteBytes\n  }\n  resourceUsageLimits {\n    memoryBytes\n    networkReceivedBytes\n    networkSentBytes\n    diskReadBytes\n    diskWriteBytes\n  }\n}\n\nfragment NoRunnerAlertFragment_job on Job {\n  runnerAvailabilityStatus\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment OutdatedProtocolAlertFragment_job on Job {\n  outdatedJobProtocolVersion\n}\n\nfragment RunDetailsPlanStageFragment_plan on Run {\n  id\n  status\n  createdBy\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    id\n    metadata {\n      createdAt\n    }\n    status\n    errorMessage\n    hasChanges\n    diffSize\n    checkResults {\n      ...CheckResultsPanelFragment_checkResult\n    }\n    currentJob {\n      id\n      status\n      cancelRequested\n      timestamps {\n        queuedAt\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...NoRunnerAlertFragment_job\n      ...OutdatedProtocolAlertFragment_job\n      ...JobResourceUsageMetricsFragment_job\n    }\n    jobs(first: 0) {\n      totalCount\n    }\n    ...RunDetailsPlanSummaryFragment_plan\n  }\n  apply {\n    status\n    id\n  }\n  ...RunVariablesFragment_variables\n  ...ForceCancelRunAlertFragment_run\n}\n\nfragment RunDetailsPlanSummaryFragment_plan on Plan {\n  summary {\n    resourceAdditions\n    resourceChanges\n    resourceDestructions\n    resourceImports\n    resourceDrift\n    outputAdditions\n    outputChanges\n    outputDestructions\n  }\n}\n\nfragment RunVariableListItemFragment_variable on RunVariable {\n  key\n  category\n  value\n  namespacePath\n  sensitive\n  versionId\n  includedInTfConfig\n}\n\nfragment RunVariablesFragment_variables on Run {\n  variables {\n    key\n    category\n    namespacePath\n    includedInTfConfig\n    ...RunVariableListItemFragment_variable\n  }\n}\n"
+    "text": "mutation RunDetailsPlanStageCancelRunMutation(\n  $input: CancelRunInput!\n) {\n  cancelRun(input: $input) {\n    run {\n      ...RunDetailsPlanStageFragment_plan\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment CheckResultsPanelFragment_checkResult on TerraformCheckResult {\n  name\n  status\n  objects {\n    address\n    status\n    failureMessages\n  }\n}\n\nfragment ForceCancelRunAlertFragment_run on Run {\n  forceCancelAvailableAt\n  ...ForceCancelRunButtonFragment_run\n}\n\nfragment ForceCancelRunButtonFragment_run on Run {\n  id\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment JobResourceUsageMetricsFragment_job on Job {\n  resourceUsageMetrics {\n    peakMemoryBytes\n    totalCpuTimeMs\n    totalNetworkReceivedBytes\n    totalNetworkSentBytes\n    totalDiskReadBytes\n    totalDiskWriteBytes\n  }\n  resourceUsageLimits {\n    memoryBytes\n    networkReceivedBytes\n    networkSentBytes\n    diskReadBytes\n    diskWriteBytes\n  }\n}\n\nfragment NoRunnerAlertFragment_job on Job {\n  runnerAvailabilityStatus\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment OutdatedProtocolAlertFragment_job on Job {\n  outdatedJobProtocolVersion\n}\n\nfragment RunDetailsPlanStageFragment_plan on Run {\n  id\n  status\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    id\n    metadata {\n      createdAt\n    }\n    status\n    errorMessage\n    hasChanges\n    diffSize\n    checkResults {\n      ...CheckResultsPanelFragment_checkResult\n    }\n    currentJob {\n      id\n      status\n      cancelRequested\n      timestamps {\n        queuedAt\n        pendingAt\n        runningAt\n        finishedAt\n      }\n      ...NoRunnerAlertFragment_job\n      ...OutdatedProtocolAlertFragment_job\n      ...JobResourceUsageMetricsFragment_job\n    }\n    jobs(first: 0) {\n      totalCount\n    }\n    ...RunDetailsPlanSummaryFragment_plan\n  }\n  apply {\n    status\n    id\n  }\n  ...RunVariablesFragment_variables\n  ...ForceCancelRunAlertFragment_run\n}\n\nfragment RunDetailsPlanSummaryFragment_plan on Plan {\n  summary {\n    resourceAdditions\n    resourceChanges\n    resourceDestructions\n    resourceImports\n    resourceDrift\n    outputAdditions\n    outputChanges\n    outputDestructions\n  }\n}\n\nfragment RunVariableListItemFragment_variable on RunVariable {\n  key\n  category\n  value\n  namespacePath\n  sensitive\n  versionId\n  includedInTfConfig\n}\n\nfragment RunVariablesFragment_variables on Run {\n  variables {\n    key\n    category\n    namespacePath\n    includedInTfConfig\n    ...RunVariableListItemFragment_variable\n  }\n}\n"
   }
 };
 })();

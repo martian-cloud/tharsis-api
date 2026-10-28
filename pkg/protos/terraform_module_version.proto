@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.terraform_module_version;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 import "pagination.proto";
 import "google/protobuf/timestamp.proto";
@@ -47,7 +48,9 @@ message DeleteTerraformModuleVersionRequest {
 // TerraformModuleVersion represents a version of a Terraform module.
 message TerraformModuleVersion {
   metadata.ResourceMetadata          metadata                 = 1;
-  string                             created_by               = 2;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                             created_by               = 2 [deprecated = true];
   string                             diagnostics              = 3;
   string                             error                    = 4;
   bool                               latest                   = 5;
@@ -57,6 +60,9 @@ message TerraformModuleVersion {
   string                             status                   = 9;
   repeated string                    submodules               = 10;
   optional google.protobuf.Timestamp upload_started_timestamp = 11;
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor created_by_actor = 12;
 }
 
 // GetTerraformModuleVersionBySourceRequest is the input for retrieving a TerraformModuleVersion by its registry source address.

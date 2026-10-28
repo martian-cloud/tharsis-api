@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d69488f9994d26450df14c33e78bdcfe>>
+ * @generated SignedSource<<a3facac37db50a96be5c8ac4440da5d3>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,7 +14,9 @@ export type RunTaskStageName = "POST_APPLY" | "POST_PLAN" | "PRE_APPLY" | "PRE_P
 export type RunTaskStageStatus = "AWAITING_OVERRIDE" | "CANCELED" | "COMPLETED" | "CREATED" | "ERRORED" | "PENDING" | "RUNNING" | "SKIPPED" | "%future added value";
 import { FragmentRefs } from "relay-runtime";
 export type RunDetailsRunTaskStageFragment_taskStage$data = {
-  readonly createdBy: string;
+  readonly createdByActor: {
+    readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+  } | null | undefined;
   readonly id: string;
   readonly metadata: {
     readonly createdAt: any;
@@ -77,8 +79,17 @@ return {
     {
       "alias": null,
       "args": null,
-      "kind": "ScalarField",
-      "name": "createdBy",
+      "concreteType": null,
+      "kind": "LinkedField",
+      "name": "createdByActor",
+      "plural": false,
+      "selections": [
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "ActorDisplayFragment_actor"
+        }
+      ],
       "storageKey": null
     },
     {
@@ -233,6 +244,6 @@ return {
 };
 })();
 
-(node as any).hash = "1a13fd247a69eda594936aea5a8c1280";
+(node as any).hash = "de575c32ff7de1cb87508632f8800f1d";
 
 export default node;

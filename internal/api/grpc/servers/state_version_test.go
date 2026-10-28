@@ -57,7 +57,7 @@ func TestGetRunStateVersion(t *testing.T) {
 				},
 				WorkspaceID: workspaceID,
 				RunID:       &runID,
-				CreatedBy:   "job",
+				CreatedBy:   models.Actor{Subject: "job"},
 			},
 		})
 

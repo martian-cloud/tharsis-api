@@ -48,7 +48,8 @@ type Group implements Node, Namespace {
   name: String!
   description: String!
   fullPath: String!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   parent: Group
   "Whether the group contains any subgroups or workspaces"
   hasChildren: Boolean!

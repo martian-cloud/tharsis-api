@@ -652,17 +652,24 @@ func (x *OIDCTrustPolicy) GetBoundClaims() map[string]string {
 
 // ServiceAccount defines a service account within Tharsis.
 type ServiceAccount struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	Metadata                 *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Name                     string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description              string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	GroupId                  string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Name        string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	GroupId     string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in service_account.proto.
 	CreatedBy                string                 `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	OidcTrustPolicies        []*OIDCTrustPolicy     `protobuf:"bytes,6,rep,name=oidc_trust_policies,json=oidcTrustPolicies,proto3" json:"oidc_trust_policies,omitempty"`
 	ClientCredentialsEnabled bool                   `protobuf:"varint,7,opt,name=client_credentials_enabled,json=clientCredentialsEnabled,proto3" json:"client_credentials_enabled,omitempty"`
 	ClientSecretExpiresAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=client_secret_expires_at,json=clientSecretExpiresAt,proto3,oneof" json:"client_secret_expires_at,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,9,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ServiceAccount) Reset() {
@@ -723,6 +730,7 @@ func (x *ServiceAccount) GetGroupId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in service_account.proto.
 func (x *ServiceAccount) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -747,6 +755,13 @@ func (x *ServiceAccount) GetClientCredentialsEnabled() bool {
 func (x *ServiceAccount) GetClientSecretExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ClientSecretExpiresAt
+	}
+	return nil
+}
+
+func (x *ServiceAccount) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
 	}
 	return nil
 }
@@ -914,7 +929,7 @@ var File_service_account_proto protoreflect.FileDescriptor
 
 const file_service_account_proto_rawDesc = "" +
 	"\n" +
-	"\x15service_account.proto\x12(martiancloud.tharsis.api.service_account\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\".\n" +
+	"\x15service_account.proto\x12(martiancloud.tharsis.api.service_account\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\".\n" +
 	"\x1cGetServiceAccountByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xb3\x03\n" +
 	"\x19GetServiceAccountsRequest\x12j\n" +
@@ -966,17 +981,18 @@ const file_service_account_proto_rawDesc = "" +
 	"\fbound_claims\x18\x03 \x03(\v2J.martiancloud.tharsis.api.service_account.OIDCTrustPolicy.BoundClaimsEntryR\vboundClaims\x1a>\n" +
 	"\x10BoundClaimsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf1\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc6\x04\n" +
 	"\x0eServiceAccount\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x19\n" +
-	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12\x1d\n" +
+	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12!\n" +
 	"\n" +
-	"created_by\x18\x05 \x01(\tR\tcreatedBy\x12i\n" +
+	"created_by\x18\x05 \x01(\tB\x02\x18\x01R\tcreatedBy\x12i\n" +
 	"\x13oidc_trust_policies\x18\x06 \x03(\v29.martiancloud.tharsis.api.service_account.OIDCTrustPolicyR\x11oidcTrustPolicies\x12<\n" +
 	"\x1aclient_credentials_enabled\x18\a \x01(\bR\x18clientCredentialsEnabled\x12X\n" +
-	"\x18client_secret_expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x15clientSecretExpiresAt\x88\x01\x01B\x1b\n" +
+	"\x18client_secret_expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x15clientSecretExpiresAt\x88\x01\x01\x12O\n" +
+	"\x10created_by_actor\x18\t \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActorB\x1b\n" +
 	"\x19_client_secret_expires_at\"\xb7\x01\n" +
 	"\x16ServiceAccountResponse\x12a\n" +
 	"\x0fservice_account\x18\x01 \x01(\v28.martiancloud.tharsis.api.service_account.ServiceAccountR\x0eserviceAccount\x12(\n" +
@@ -1042,8 +1058,9 @@ var file_service_account_proto_goTypes = []any{
 	(*PaginationOptions)(nil),                   // 15: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*timestamppb.Timestamp)(nil),               // 16: google.protobuf.Timestamp
 	(*ResourceMetadata)(nil),                    // 17: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                            // 18: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),                       // 19: google.protobuf.Empty
+	(*Actor)(nil),                               // 18: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                            // 19: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),                       // 20: google.protobuf.Empty
 }
 var file_service_account_proto_depIdxs = []int32{
 	15, // 0: martiancloud.tharsis.api.service_account.GetServiceAccountsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
@@ -1057,28 +1074,29 @@ var file_service_account_proto_depIdxs = []int32{
 	17, // 8: martiancloud.tharsis.api.service_account.ServiceAccount.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
 	9,  // 9: martiancloud.tharsis.api.service_account.ServiceAccount.oidc_trust_policies:type_name -> martiancloud.tharsis.api.service_account.OIDCTrustPolicy
 	16, // 10: martiancloud.tharsis.api.service_account.ServiceAccount.client_secret_expires_at:type_name -> google.protobuf.Timestamp
-	10, // 11: martiancloud.tharsis.api.service_account.ServiceAccountResponse.service_account:type_name -> martiancloud.tharsis.api.service_account.ServiceAccount
-	10, // 12: martiancloud.tharsis.api.service_account.GetServiceAccountsResponse.service_accounts:type_name -> martiancloud.tharsis.api.service_account.ServiceAccount
-	18, // 13: martiancloud.tharsis.api.service_account.GetServiceAccountsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	2,  // 14: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccountByID:input_type -> martiancloud.tharsis.api.service_account.GetServiceAccountByIDRequest
-	3,  // 15: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccounts:input_type -> martiancloud.tharsis.api.service_account.GetServiceAccountsRequest
-	4,  // 16: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateServiceAccount:input_type -> martiancloud.tharsis.api.service_account.CreateServiceAccountRequest
-	5,  // 17: martiancloud.tharsis.api.service_account.ServiceAccounts.UpdateServiceAccount:input_type -> martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest
-	6,  // 18: martiancloud.tharsis.api.service_account.ServiceAccounts.DeleteServiceAccount:input_type -> martiancloud.tharsis.api.service_account.DeleteServiceAccountRequest
-	7,  // 19: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateOIDCToken:input_type -> martiancloud.tharsis.api.service_account.CreateOIDCTokenRequest
-	8,  // 20: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateClientCredentialsToken:input_type -> martiancloud.tharsis.api.service_account.CreateClientCredentialsTokenRequest
-	10, // 21: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccountByID:output_type -> martiancloud.tharsis.api.service_account.ServiceAccount
-	13, // 22: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccounts:output_type -> martiancloud.tharsis.api.service_account.GetServiceAccountsResponse
-	11, // 23: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateServiceAccount:output_type -> martiancloud.tharsis.api.service_account.ServiceAccountResponse
-	11, // 24: martiancloud.tharsis.api.service_account.ServiceAccounts.UpdateServiceAccount:output_type -> martiancloud.tharsis.api.service_account.ServiceAccountResponse
-	19, // 25: martiancloud.tharsis.api.service_account.ServiceAccounts.DeleteServiceAccount:output_type -> google.protobuf.Empty
-	12, // 26: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateOIDCToken:output_type -> martiancloud.tharsis.api.service_account.CreateTokenResponse
-	12, // 27: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateClientCredentialsToken:output_type -> martiancloud.tharsis.api.service_account.CreateTokenResponse
-	21, // [21:28] is the sub-list for method output_type
-	14, // [14:21] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	18, // 11: martiancloud.tharsis.api.service_account.ServiceAccount.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	10, // 12: martiancloud.tharsis.api.service_account.ServiceAccountResponse.service_account:type_name -> martiancloud.tharsis.api.service_account.ServiceAccount
+	10, // 13: martiancloud.tharsis.api.service_account.GetServiceAccountsResponse.service_accounts:type_name -> martiancloud.tharsis.api.service_account.ServiceAccount
+	19, // 14: martiancloud.tharsis.api.service_account.GetServiceAccountsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	2,  // 15: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccountByID:input_type -> martiancloud.tharsis.api.service_account.GetServiceAccountByIDRequest
+	3,  // 16: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccounts:input_type -> martiancloud.tharsis.api.service_account.GetServiceAccountsRequest
+	4,  // 17: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateServiceAccount:input_type -> martiancloud.tharsis.api.service_account.CreateServiceAccountRequest
+	5,  // 18: martiancloud.tharsis.api.service_account.ServiceAccounts.UpdateServiceAccount:input_type -> martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest
+	6,  // 19: martiancloud.tharsis.api.service_account.ServiceAccounts.DeleteServiceAccount:input_type -> martiancloud.tharsis.api.service_account.DeleteServiceAccountRequest
+	7,  // 20: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateOIDCToken:input_type -> martiancloud.tharsis.api.service_account.CreateOIDCTokenRequest
+	8,  // 21: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateClientCredentialsToken:input_type -> martiancloud.tharsis.api.service_account.CreateClientCredentialsTokenRequest
+	10, // 22: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccountByID:output_type -> martiancloud.tharsis.api.service_account.ServiceAccount
+	13, // 23: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccounts:output_type -> martiancloud.tharsis.api.service_account.GetServiceAccountsResponse
+	11, // 24: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateServiceAccount:output_type -> martiancloud.tharsis.api.service_account.ServiceAccountResponse
+	11, // 25: martiancloud.tharsis.api.service_account.ServiceAccounts.UpdateServiceAccount:output_type -> martiancloud.tharsis.api.service_account.ServiceAccountResponse
+	20, // 26: martiancloud.tharsis.api.service_account.ServiceAccounts.DeleteServiceAccount:output_type -> google.protobuf.Empty
+	12, // 27: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateOIDCToken:output_type -> martiancloud.tharsis.api.service_account.CreateTokenResponse
+	12, // 28: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateClientCredentialsToken:output_type -> martiancloud.tharsis.api.service_account.CreateTokenResponse
+	22, // [22:29] is the sub-list for method output_type
+	15, // [15:22] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_service_account_proto_init() }
@@ -1086,6 +1104,7 @@ func file_service_account_proto_init() {
 	if File_service_account_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_service_account_proto_msgTypes[1].OneofWrappers = []any{}

@@ -147,7 +147,13 @@ func (r *AnnouncementResolver) EndTime() *graphql.Time {
 
 // CreatedBy resolver
 func (r *AnnouncementResolver) CreatedBy() string {
-	return r.announcement.CreatedBy
+	return r.announcement.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *AnnouncementResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.announcement.CreatedBy)
 }
 
 // Type resolver

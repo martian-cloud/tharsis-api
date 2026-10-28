@@ -252,11 +252,12 @@ func toPBGroup(g *models.Group) *pb.Group {
 	}
 
 	return &pb.Group{
-		Metadata:    toPBMetadata(&g.Metadata, types.GroupModelType),
-		Name:        g.Name,
-		Description: g.Description,
-		FullPath:    g.FullPath,
-		CreatedBy:   g.CreatedBy,
-		ParentId:    parentID,
+		Metadata:       toPBMetadata(&g.Metadata, types.GroupModelType),
+		Name:           g.Name,
+		Description:    g.Description,
+		FullPath:       g.FullPath,
+		CreatedBy:      g.CreatedBy.Subject,
+		CreatedByActor: toPBActor(g.CreatedBy),
+		ParentId:       parentID,
 	}
 }

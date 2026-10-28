@@ -22,7 +22,7 @@ const forceCancelWait = 15 * time.Second
 // Execute phases.
 type CancelRunInput struct {
 	RunID      string
-	CanceledBy string
+	CanceledBy models.Actor
 	Force      bool
 }
 
@@ -98,7 +98,7 @@ func (c *CancelRun) Execute(ctx context.Context, input *types.ExecuteInput) erro
 	// available after a delay; a force request marks the run as force-canceled.
 	if c.in.Force {
 		run.ForceCanceled = true
-		run.ForceCanceledBy = &c.in.CanceledBy
+		run.ForceCanceledBy = new(c.in.CanceledBy)
 	} else if run.ForceCancelAvailableAt == nil {
 		forceCancelAt := time.Now().UTC().Add(forceCancelWait)
 		run.ForceCancelAvailableAt = &forceCancelAt

@@ -39,6 +39,11 @@ func (v *VCSWorkspaceLinkCaller) GetSubject() string {
 	return v.Provider.GetResourcePath()
 }
 
+// GetActor returns the actor for this caller.
+func (v *VCSWorkspaceLinkCaller) GetActor() models.Actor {
+	return models.NewVCSProviderActor(v.Provider.Metadata.ID).WithTRN(v.Provider.Metadata.TRN).WithSubject(v.GetSubject())
+}
+
 // IsAdminModeActivated returns true if the caller is an admin.
 func (v *VCSWorkspaceLinkCaller) IsAdminModeActivated(_ context.Context) bool {
 	return false

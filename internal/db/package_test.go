@@ -23,14 +23,14 @@ func TestPackages_GetPackages_RootNamespaceMembershipsFilter(t *testing.T) {
 	rootA, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "pkg-root-a",
 		FullPath:  "pkg-root-a",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	rootB, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "pkg-root-b",
 		FullPath:  "pkg-root-b",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -55,7 +55,7 @@ func TestPackages_GetPackages_RootNamespaceMembershipsFilter(t *testing.T) {
 			RootGroupID: s.groupID, // each test package is created directly in a root group
 			Kind:        models.PackageKindOPAPolicy,
 			Visibility:  s.visibility,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, cErr)
 	}
@@ -125,18 +125,18 @@ func TestPackages_GetPackages_RootGroupVisibilityAcrossSubtree(t *testing.T) {
 	defer testClient.close(ctx)
 
 	root, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "pkg-deep-root", CreatedBy: "db-integration-tests",
+		Name: "pkg-deep-root", CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Two sibling subgroups under the same root. CreateGroup derives their full paths from the parent.
 	groupX, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "x", ParentID: root.Metadata.ID, CreatedBy: "db-integration-tests",
+		Name: "x", ParentID: root.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	groupY, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "y", ParentID: root.Metadata.ID, CreatedBy: "db-integration-tests",
+		Name: "y", ParentID: root.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -158,7 +158,7 @@ func TestPackages_GetPackages_RootGroupVisibilityAcrossSubtree(t *testing.T) {
 			RootGroupID: root.Metadata.ID, // every package's root is the shared root group
 			Kind:        models.PackageKindOPAPolicy,
 			Visibility:  s.visibility,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, cErr)
 	}
@@ -194,19 +194,19 @@ func TestPackages_GetPackages_NamespacePathsFilter(t *testing.T) {
 	defer testClient.close(ctx)
 
 	root, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "pkg-scope-root", CreatedBy: "db-integration-tests",
+		Name: "pkg-scope-root", CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	child, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "child", ParentID: root.Metadata.ID, CreatedBy: "db-integration-tests",
+		Name: "child", ParentID: root.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// An unrelated root group with a global package, to confirm the inherited listing does not
 	// surface packages owned outside the target group's ancestry.
 	other, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "pkg-scope-other", CreatedBy: "db-integration-tests",
+		Name: "pkg-scope-other", CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -217,7 +217,7 @@ func TestPackages_GetPackages_NamespacePathsFilter(t *testing.T) {
 			RootGroupID: rootGroupID,
 			Kind:        models.PackageKindOPAPolicy,
 			Visibility:  v,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, cErr)
 	}
@@ -257,31 +257,31 @@ func TestPackages_GetPackages_VisibleToGroupFilter(t *testing.T) {
 	defer testClient.close(ctx)
 
 	root, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "pkg-vis-root", CreatedBy: "db-integration-tests",
+		Name: "pkg-vis-root", CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// The group under test.
 	child, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "child", ParentID: root.Metadata.ID, CreatedBy: "db-integration-tests",
+		Name: "child", ParentID: root.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// A descendant of the group under test, to prove visibility does not flow upwards.
 	grandchild, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "grandchild", ParentID: child.Metadata.ID, CreatedBy: "db-integration-tests",
+		Name: "grandchild", ParentID: child.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// A sibling subtree sharing the same root group.
 	sibling, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "sibling", ParentID: root.Metadata.ID, CreatedBy: "db-integration-tests",
+		Name: "sibling", ParentID: root.Metadata.ID, CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// An unrelated root group, so root_group visibility can be told apart from global.
 	other, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "pkg-vis-other", CreatedBy: "db-integration-tests",
+		Name: "pkg-vis-other", CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -292,7 +292,7 @@ func TestPackages_GetPackages_VisibleToGroupFilter(t *testing.T) {
 			RootGroupID: rootGroupID,
 			Kind:        models.PackageKindOPAPolicy,
 			Visibility:  v,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, cErr)
 	}

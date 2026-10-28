@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -81,7 +82,7 @@ type announcements struct {
 	dbClient *Client
 }
 
-var announcementsFieldList = append(metadataFieldList, "message", "start_time", "end_time", "created_by", "type", "dismissible")
+var announcementsFieldList = append(metadataAndCreatedByFieldList, "message", "start_time", "end_time", "type", "dismissible")
 
 // NewAnnouncements returns an instance of the Announcements interface
 func NewAnnouncements(dbClient *Client) Announcements {
@@ -183,6 +184,11 @@ func (a *announcements) CreateAnnouncement(ctx context.Context, announcement *mo
 	ctx, span := tracer.Start(ctx, "db.CreateAnnouncement")
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(announcement.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := toSQLWithTag("announcement.CreateAnnouncement", dialect.From("announcements").
@@ -190,16 +196,19 @@ func (a *announcements) CreateAnnouncement(ctx context.Context, announcement *mo
 		With("announcements",
 			dialect.Insert("announcements").Rows(
 				goqu.Record{
-					"id":          newResourceID(),
-					"version":     initialResourceVersion,
-					"created_at":  timestamp,
-					"updated_at":  timestamp,
-					"message":     announcement.Message,
-					"start_time":  announcement.StartTime,
-					"end_time":    announcement.EndTime,
-					"created_by":  announcement.CreatedBy,
-					"type":        announcement.Type,
-					"dismissible": announcement.Dismissible,
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"message":               announcement.Message,
+					"start_time":            announcement.StartTime,
+					"end_time":              announcement.EndTime,
+					"created_by":            announcement.CreatedBy.Subject,
+					"created_by_actor_type": createdByActorType,
+					"created_by_actor_id":   createdByActorID,
+					"created_by_actor_trn":  createdByActorTRN,
+					"type":                  announcement.Type,
+					"dismissible":           announcement.Dismissible,
 				}).Returning("*"),
 		).Select(a.getSelectFields()...))
 	if err != nil {
@@ -318,6 +327,7 @@ func (*announcements) getSelectFields() []interface{} {
 }
 
 func scanAnnouncement(row scanner) (*models.Announcement, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	announcement := &models.Announcement{}
 
 	fields := []interface{}{
@@ -325,10 +335,13 @@ func scanAnnouncement(row scanner) (*models.Announcement, error) {
 		&announcement.Metadata.CreationTimestamp,
 		&announcement.Metadata.LastUpdatedTimestamp,
 		&announcement.Metadata.Version,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&announcement.Message,
 		&announcement.StartTime,
 		&announcement.EndTime,
-		&announcement.CreatedBy,
 		&announcement.Type,
 		&announcement.Dismissible,
 	}
@@ -337,6 +350,9 @@ func scanAnnouncement(row scanner) (*models.Announcement, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	announcement.CreatedBy = parsedActor
 
 	announcement.Metadata.TRN = trn.TypeAnnouncement.Build(announcement.GetGlobalID())
 

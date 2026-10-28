@@ -1,10 +1,11 @@
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { Box, Collapse, Tooltip, Typography, useTheme } from '@mui/material';
+import { Box, Collapse, Typography, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import { useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
+import ActorDisplay from '../../../common/ActorDisplay';
 import Pill from '../../../common/Pill';
 import Link from '../../../routes/Link';
 import { RunTaskStagePolicyApproversBoxFragment_gate$data, RunTaskStagePolicyApproversBoxFragment_gate$key } from './__generated__/RunTaskStagePolicyApproversBoxFragment_gate.graphql';
@@ -90,7 +91,9 @@ function RunTaskStagePolicyApproversBox({ gateRef, policyId }: Props) {
             approvals {
                 id
                 decision
-                createdBy
+                createdByActor {
+                    ...ActorDisplayFragment_actor
+                }
                 coveredRules
                 user {
                     id
@@ -158,20 +161,15 @@ function RunTaskStagePolicyApproversBox({ gateRef, policyId }: Props) {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     {approved.length > 0 && (
                         <Box sx={{ display: 'flex' }}>
-                            {approved.map((approval) => {
-                                const label = approval.user?.email ?? approval.serviceAccount?.resourcePath ?? approval.createdBy;
-                                return (
-                                    <Tooltip key={approval.id} title={label}>
-                                        <Box sx={{ ml: 1, boxShadow: `0 0 0 2px ${theme.palette.background.paper}`, borderRadius: '50%' }}>
-                                            <RunTaskStagePrincipalAvatar
-                                                kind={approval.user ? 'user' : 'serviceAccount'}
-                                                size={PRINCIPAL_AVATAR_SIZE}
-                                                label={label}
-                                            />
-                                        </Box>
-                                    </Tooltip>
-                                );
-                            })}
+                            {approved.map((approval) => (
+                                <Box key={approval.id} sx={{ ml: 1, boxShadow: `0 0 0 2px ${theme.palette.background.paper}`, borderRadius: '50%' }}>
+                                    <ActorDisplay
+                                        fragmentRef={approval.createdByActor}
+                                        variant="avatar"
+                                        size={PRINCIPAL_AVATAR_SIZE}
+                                    />
+                                </Box>
+                            ))}
                         </Box>
                     )}
                     <ExpandMoreIcon

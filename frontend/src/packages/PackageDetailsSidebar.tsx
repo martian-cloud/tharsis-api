@@ -1,9 +1,9 @@
-import { Box, Paper, Tooltip, Typography, useTheme } from '@mui/material';
+import { Box, Paper, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { ReactNode } from 'react';
 import { useFragment } from 'react-relay/hooks';
+import ActorDisplay from '../common/ActorDisplay';
 import CopyButton from '../common/CopyButton';
-import Gravatar from '../common/Gravatar';
 import Timestamp from '../common/Timestamp';
 import Link from '../routes/Link';
 import { PackageDetailsSidebarFragment_package$key } from './__generated__/PackageDetailsSidebarFragment_package.graphql';
@@ -104,7 +104,9 @@ function PackageDetailsSidebar(props: Props) {
           {
               version
               latest
-              createdBy
+              createdByActor {
+                  ...ActorDisplayFragment_actor
+              }
               shaSum
               size
               metadata {
@@ -132,13 +134,8 @@ function PackageDetailsSidebar(props: Props) {
                 <Row
                     label="Published by"
                     value={
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
-                            <Tooltip title={latest.createdBy}>
-                                <Box sx={{ display: 'flex' }}>
-                                    <Gravatar width={20} height={20} email={latest.createdBy} />
-                                </Box>
-                            </Tooltip>
-                            <Box component="span" sx={{ minWidth: 0, wordBreak: 'break-word' }}>{latest.createdBy}</Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                            <ActorDisplay fragmentRef={latest.createdByActor} variant="inline" size={20} />
                         </Box>
                     }
                 />

@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -89,8 +90,7 @@ type terraformProviderVersionMirrors struct {
 }
 
 var terraformProviderVersionMirrorFieldList = append(
-	metadataFieldList,
-	"created_by",
+	metadataAndCreatedByFieldList,
 	"type",
 	"semantic_version",
 	"registry_namespace",
@@ -244,6 +244,11 @@ func (t *terraformProviderVersionMirrors) CreateVersionMirror(ctx context.Contex
 	ctx, span := tracer.Start(ctx, "db.CreateVersionMirror")
 	defer span.End()
 
+	createdByActorType, createdByActorID, createdByActorTRN, err := actorColumns(versionMirror.CreatedBy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get created by actor columns", errors.WithSpan(span))
+	}
+
 	timestamp := currentTime()
 
 	digests, err := json.Marshal(versionMirror.Digests)
@@ -256,17 +261,20 @@ func (t *terraformProviderVersionMirrors) CreateVersionMirror(ctx context.Contex
 		With("terraform_provider_version_mirrors",
 			dialect.Insert("terraform_provider_version_mirrors").
 				Rows(goqu.Record{
-					"id":                 newResourceID(),
-					"version":            initialResourceVersion,
-					"created_at":         timestamp,
-					"updated_at":         timestamp,
-					"created_by":         versionMirror.CreatedBy,
-					"type":               versionMirror.Type,
-					"semantic_version":   versionMirror.SemanticVersion,
-					"registry_namespace": versionMirror.RegistryNamespace,
-					"registry_hostname":  versionMirror.RegistryHostname,
-					"digests":            digests,
-					"group_id":           versionMirror.GroupID,
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"created_by":            versionMirror.CreatedBy.Subject,
+					"created_by_actor_type": createdByActorType,
+					"created_by_actor_id":   createdByActorID,
+					"created_by_actor_trn":  createdByActorTRN,
+					"type":                  versionMirror.Type,
+					"semantic_version":      versionMirror.SemanticVersion,
+					"registry_namespace":    versionMirror.RegistryNamespace,
+					"registry_hostname":     versionMirror.RegistryHostname,
+					"digests":               digests,
+					"group_id":              versionMirror.GroupID,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_provider_version_mirrors.group_id": goqu.I("namespaces.group_id")})))
@@ -357,6 +365,7 @@ func (*terraformProviderVersionMirrors) getSelectFields() []interface{} {
 }
 
 func scanVersionMirror(row scanner) (*models.TerraformProviderVersionMirror, error) {
+	var createdBy, createdByActorType, createdByActorID, createdByActorTRN sql.NullString
 	var namespacePath string
 	versionMirror := &models.TerraformProviderVersionMirror{}
 
@@ -365,7 +374,10 @@ func scanVersionMirror(row scanner) (*models.TerraformProviderVersionMirror, err
 		&versionMirror.Metadata.CreationTimestamp,
 		&versionMirror.Metadata.LastUpdatedTimestamp,
 		&versionMirror.Metadata.Version,
-		&versionMirror.CreatedBy,
+		&createdBy,
+		&createdByActorType,
+		&createdByActorID,
+		&createdByActorTRN,
 		&versionMirror.Type,
 		&versionMirror.SemanticVersion,
 		&versionMirror.RegistryNamespace,
@@ -379,6 +391,9 @@ func scanVersionMirror(row scanner) (*models.TerraformProviderVersionMirror, err
 	if err != nil {
 		return nil, err
 	}
+
+	parsedActor := scanActor(createdBy, createdByActorType, createdByActorID, createdByActorTRN)
+	versionMirror.CreatedBy = parsedActor
 
 	versionMirror.Metadata.TRN = trn.TypeTerraformProviderVersionMirror.Build(
 		namespacePath,

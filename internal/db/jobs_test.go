@@ -36,7 +36,7 @@ func TestJobs_CreateJob(t *testing.T) {
 		Name:        "test-group-job",
 		Description: "test group for job",
 		FullPath:    "test-group-job",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -44,7 +44,7 @@ func TestJobs_CreateJob(t *testing.T) {
 		Name:           "test-workspace-job",
 		GroupID:        group.Metadata.ID,
 		Description:    "test workspace for job",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.Nil(t, err)
@@ -52,7 +52,7 @@ func TestJobs_CreateJob(t *testing.T) {
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
 		Status:      models.RunPending,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -114,7 +114,7 @@ func TestJobs_UpdateJob(t *testing.T) {
 		Name:        "test-group-job-update",
 		Description: "test group for job update",
 		FullPath:    "test-group-job-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -122,7 +122,7 @@ func TestJobs_UpdateJob(t *testing.T) {
 		Name:           "test-workspace-job-update",
 		GroupID:        group.Metadata.ID,
 		Description:    "test workspace for job update",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.Nil(t, err)
@@ -130,7 +130,7 @@ func TestJobs_UpdateJob(t *testing.T) {
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
 		Status:      models.RunPending,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -194,7 +194,7 @@ func TestJobs_UpdateJob_ResourceUsageMetrics(t *testing.T) {
 		Name:        "test-group-job-metrics",
 		Description: "test group for job resource metrics",
 		FullPath:    "test-group-job-metrics",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -202,14 +202,14 @@ func TestJobs_UpdateJob_ResourceUsageMetrics(t *testing.T) {
 		Name:           "test-workspace-job-metrics",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
 		Status:      models.RunPending,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -326,7 +326,7 @@ func TestJobs_GetJobByID(t *testing.T) {
 		Name:        "test-group-job-get-by-id",
 		Description: "test group for job get by id",
 		FullPath:    "test-group-job-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -335,14 +335,14 @@ func TestJobs_GetJobByID(t *testing.T) {
 		Name:           "test-workspace-job-get-by-id",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a run for the job
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -407,7 +407,7 @@ func TestJobs_GetJobs(t *testing.T) {
 		Name:        "test-group-jobs-list",
 		Description: "test group for jobs list",
 		FullPath:    "test-group-jobs-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -416,14 +416,14 @@ func TestJobs_GetJobs(t *testing.T) {
 		Name:           "test-workspace-jobs-list",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a run for the jobs
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -532,7 +532,7 @@ func TestJobs_GetJobs_TagFilter(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-jobs-tag-filter",
 		FullPath:  "test-group-jobs-tag-filter",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -540,13 +540,13 @@ func TestJobs_GetJobs_TagFilter(t *testing.T) {
 		Name:           "test-workspace-jobs-tag-filter",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -661,7 +661,7 @@ func TestJobs_GetJobsWithPaginationAndSorting(t *testing.T) {
 		Name:        "test-group-jobs-pagination",
 		Description: "test group for jobs pagination",
 		FullPath:    "test-group-jobs-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -670,14 +670,14 @@ func TestJobs_GetJobsWithPaginationAndSorting(t *testing.T) {
 		Name:           "test-workspace-jobs-pagination",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a run for the jobs
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -729,7 +729,7 @@ func TestJobs_GetJobByTRN(t *testing.T) {
 		Name:        "test-group-job-trn",
 		Description: "test group for job trn",
 		FullPath:    "test-group-job-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -738,14 +738,14 @@ func TestJobs_GetJobByTRN(t *testing.T) {
 		Name:           "test-workspace-job-trn",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a run for the job
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -810,7 +810,7 @@ func TestJobs_GetLatestJobByType(t *testing.T) {
 		Name:        "test-group-job-latest",
 		Description: "test group for job latest",
 		FullPath:    "test-group-job-latest",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -819,14 +819,14 @@ func TestJobs_GetLatestJobByType(t *testing.T) {
 		Name:           "test-workspace-job-latest",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	// Create a run for the jobs
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -897,7 +897,7 @@ func TestJobs_ClaimJobsForCleanup(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-job-cleanup",
 		FullPath:  "test-group-job-cleanup",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -905,14 +905,14 @@ func TestJobs_ClaimJobsForCleanup(t *testing.T) {
 		Name:           "test-workspace-job-cleanup",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
 		Status:      models.RunPending,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -1027,7 +1027,7 @@ func TestJobs_MarkJobsCleanedUp(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-job-mark-clean",
 		FullPath:  "test-group-job-mark-clean",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -1035,14 +1035,14 @@ func TestJobs_MarkJobsCleanedUp(t *testing.T) {
 		Name:           "test-workspace-job-mark-clean",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
 	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
 		Status:      models.RunPending,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

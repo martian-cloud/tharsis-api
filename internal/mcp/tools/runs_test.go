@@ -36,7 +36,7 @@ func TestGetRunHandler(t *testing.T) {
 			runModel: &models.Run{
 				Metadata:         models.ResourceMetadata{ID: gid.FromGlobalID(runID)},
 				Status:           models.RunApplied,
-				CreatedBy:        "user@example.com",
+				CreatedBy:        models.Actor{Subject: "user@example.com"},
 				TerraformVersion: "1.5.0",
 				Plan:             models.Plan{HasChanges: true},
 			},
@@ -74,7 +74,7 @@ func TestGetRunHandler(t *testing.T) {
 				Status:                 models.RunCanceled,
 				ModuleSource:           ptr.String("registry.terraform.io/hashicorp/aws"),
 				ModuleVersion:          ptr.String("5.0.0"),
-				ForceCanceledBy:        ptr.String("admin@example.com"),
+				ForceCanceledBy:        &models.Actor{Subject: "admin@example.com"},
 				ForceCanceled:          true,
 				ForceCancelAvailableAt: &now,
 				TargetAddresses:        []string{"aws_instance.example"},

@@ -2487,8 +2487,8 @@ func TestRunCreationAuthorization(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(test.authError)
-			// Some run-creation methods stamp the run with the caller's subject.
-			mockCaller.On("GetSubject").Return("user@example.com").Maybe()
+			// Some run-creation methods stamp the run with the caller's actor.
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("user@example.com")).Maybe()
 
 			testLogger, _ := logger.NewForTest()
 			mockProcessor := engine.NewMockCmdProcessor(t)
@@ -2652,6 +2652,7 @@ func TestRunMutationAuthorization(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(test.authError)
 			// Some run-mutation methods stamp the command with the caller's subject.
 			mockCaller.On("GetSubject").Return("user@example.com").Maybe()
+			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("user@example.com")).Maybe()
 
 			testLogger, _ := logger.NewForTest()
 			mockProcessor := engine.NewMockCmdProcessor(t)
@@ -3666,4 +3667,9 @@ func TestService_GetRunGatesAwaitingDecision(t *testing.T) {
 			assert.NotNil(t, result)
 		})
 	}
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

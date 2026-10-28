@@ -394,7 +394,8 @@ func toPBWorkspace(w *models.Workspace) *pb.Workspace {
 		Description:           w.Description,
 		GroupId:               gid.ToGlobalID(types.GroupModelType, w.GroupID),
 		FullPath:              w.FullPath,
-		CreatedBy:             w.CreatedBy,
+		CreatedBy:             w.CreatedBy.Subject,
+		CreatedByActor:        toPBActor(w.CreatedBy),
 		Locked:                w.Locked,
 		DirtyState:            w.DirtyState,
 		CurrentStateVersionId: currentStateVersionID,
@@ -404,9 +405,10 @@ func toPBWorkspace(w *models.Workspace) *pb.Workspace {
 
 func toPBWorkspaceRoleBinding(b *models.WorkspaceRoleBinding) *pb.WorkspaceRoleBinding {
 	return &pb.WorkspaceRoleBinding{
-		Metadata:    toPBMetadata(&b.Metadata, types.WorkspaceRoleBindingModelType),
-		WorkspaceId: gid.ToGlobalID(types.WorkspaceModelType, b.WorkspaceID),
-		RoleId:      gid.ToGlobalID(types.RoleModelType, b.RoleID),
-		CreatedBy:   b.CreatedBy,
+		Metadata:       toPBMetadata(&b.Metadata, types.WorkspaceRoleBindingModelType),
+		WorkspaceId:    gid.ToGlobalID(types.WorkspaceModelType, b.WorkspaceID),
+		RoleId:         gid.ToGlobalID(types.RoleModelType, b.RoleID),
+		CreatedBy:      b.CreatedBy.Subject,
+		CreatedByActor: toPBActor(b.CreatedBy),
 	}
 }

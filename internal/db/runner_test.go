@@ -29,7 +29,7 @@ func TestRunners_CreateRunner(t *testing.T) {
 		Name:        "test-group-runner",
 		Description: "test group for runner",
 		FullPath:    "test-group-runner",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -63,7 +63,7 @@ func TestRunners_CreateRunner(t *testing.T) {
 				Name:      test.runnerName,
 				GroupID:   &test.groupID,
 				Type:      test.runnerType,
-				CreatedBy: "db-integration-tests",
+				CreatedBy: models.Actor{Subject: "db-integration-tests"},
 			})
 
 			if test.expectErrorCode != "" {
@@ -92,7 +92,7 @@ func TestRunners_UpdateRunner(t *testing.T) {
 		Name:        "test-group-runner-update",
 		Description: "test group for runner update",
 		FullPath:    "test-group-runner-update",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -101,7 +101,7 @@ func TestRunners_UpdateRunner(t *testing.T) {
 		GroupID:     &group.Metadata.ID,
 		Type:        models.GroupRunnerType,
 		Description: "original description",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -158,7 +158,7 @@ func TestRunners_DeleteRunner(t *testing.T) {
 		Name:        "test-group-runner-delete",
 		Description: "test group for runner delete",
 		FullPath:    "test-group-runner-delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -167,7 +167,7 @@ func TestRunners_DeleteRunner(t *testing.T) {
 		GroupID:     &group.Metadata.ID,
 		Type:        models.GroupRunnerType,
 		Description: "runner to delete",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.Nil(t, err)
 
@@ -225,7 +225,7 @@ func TestRunners_GetRunnerByID(t *testing.T) {
 		Name:        "test-group-runner-get-by-id",
 		Description: "test group for runner get by id",
 		FullPath:    "test-group-runner-get-by-id",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -235,7 +235,7 @@ func TestRunners_GetRunnerByID(t *testing.T) {
 		Description: "test runner for get by id",
 		GroupID:     &group.Metadata.ID,
 		Type:        models.SharedRunnerType,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -292,7 +292,7 @@ func TestRunners_GetRunners(t *testing.T) {
 		Name:        "test-group-runners-list",
 		Description: "test group for runners list",
 		FullPath:    "test-group-runners-list",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -303,14 +303,14 @@ func TestRunners_GetRunners(t *testing.T) {
 			Description: "test runner 1",
 			GroupID:     &group.Metadata.ID,
 			Type:        models.SharedRunnerType,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			Name:        "test-runner-2",
 			Description: "test runner 2",
 			GroupID:     &group.Metadata.ID,
 			Type:        models.GroupRunnerType,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -403,7 +403,7 @@ func TestRunners_GetRunners_TagFilter(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-runners-tag-filter",
 		FullPath:  "test-group-runners-tag-filter",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -415,14 +415,14 @@ func TestRunners_GetRunners_TagFilter(t *testing.T) {
 			GroupID:   &group.Metadata.ID,
 			Type:      models.GroupRunnerType,
 			Tags:      []string{"linux", "arm64"},
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		},
 		{
 			Name:      "test-runner-tags-2",
 			GroupID:   &group.Metadata.ID,
 			Type:      models.GroupRunnerType,
 			Tags:      []string{"linux"},
-			CreatedBy: "db-integration-tests",
+			CreatedBy: models.Actor{Subject: "db-integration-tests"},
 		},
 	}
 
@@ -510,7 +510,7 @@ func TestRunners_GetRunnersWithPaginationAndSorting(t *testing.T) {
 		Name:        "test-group-runners-pagination",
 		Description: "test group for runners pagination",
 		FullPath:    "test-group-runners-pagination",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -521,7 +521,7 @@ func TestRunners_GetRunnersWithPaginationAndSorting(t *testing.T) {
 			Description: fmt.Sprintf("test runner %d", i),
 			GroupID:     &group.Metadata.ID,
 			Type:        models.SharedRunnerType,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}
@@ -563,7 +563,7 @@ func TestRunners_GetRunnerByTRN(t *testing.T) {
 		Name:        "test-group-runner-get-by-trn",
 		Description: "test group for runner get by trn",
 		FullPath:    "test-group-runner-get-by-trn",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -573,7 +573,7 @@ func TestRunners_GetRunnerByTRN(t *testing.T) {
 		Description: "test runner for get by trn",
 		GroupID:     &group.Metadata.ID,
 		Type:        models.SharedRunnerType,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

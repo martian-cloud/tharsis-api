@@ -581,7 +581,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 		Type:              providerType,
 		SemanticVersion:   semanticVersion,
 		GroupID:           groupID,
-		CreatedBy:         mockSubject,
+		CreatedBy:         mockCallerActor().WithSubject(mockSubject),
 		Digests: provider.Checksums{
 			"terraform-provider-aws_5.2.0_freebsd_amd64.zip": parseChecksumString(t, "0e48449e9f29b64663e7ff641a3ba1da434608460c33a20bdb45efeb1e067d4a"),
 			"terraform-provider-aws_5.2.0_windows_386.zip":   parseChecksumString(t, "0ec657a1e586087368cc3051ccb8bdf67e8763e50eece76b8dc4695f8d349ebb"),
@@ -741,7 +741,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 			}
 
 			if test.expectCreated != nil {
-				mockCaller.On("GetSubject").Return(mockSubject)
+				mockCaller.On("GetActor").Return(mockCallerActor().WithSubject(mockSubject))
 
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -1806,4 +1806,9 @@ func parseChecksumString(t *testing.T, checksum string) []byte {
 	require.Nil(t, err)
 
 	return parsed
+}
+
+// mockCallerActor returns a valid user actor for mock caller GetActor stubs.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }

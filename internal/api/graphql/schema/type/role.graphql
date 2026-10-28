@@ -37,7 +37,8 @@ type DeleteRolePayload {
 type Role implements Node {
   id: ID!
   metadata: ResourceMetadata!
-  createdBy: String!
+  createdBy: String! @deprecated(reason: "Use createdByActor instead.")
+  createdByActor: Actor @complexity(value: 0)
   name: String!
   description: String!
   permissions: [String!]!

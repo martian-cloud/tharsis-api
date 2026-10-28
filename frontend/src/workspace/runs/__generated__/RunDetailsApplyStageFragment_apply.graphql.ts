@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6330b5e9f0e01dd65a5d6b4d05e8776b>>
+ * @generated SignedSource<<69b57cace874ab54ed610c9a4c976787>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -36,7 +36,9 @@ export type RunDetailsApplyStageFragment_apply$data = {
       readonly createdAt: any;
     };
     readonly status: ApplyStatus;
-    readonly triggeredBy: string | null | undefined;
+    readonly triggeredByActor: {
+      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    } | null | undefined;
   } | null | undefined;
   readonly id: string;
   readonly plan: {
@@ -158,8 +160,17 @@ return {
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "triggeredBy",
+          "concreteType": null,
+          "kind": "LinkedField",
+          "name": "triggeredByActor",
+          "plural": false,
+          "selections": [
+            {
+              "args": null,
+              "kind": "FragmentSpread",
+              "name": "ActorDisplayFragment_actor"
+            }
+          ],
           "storageKey": null
         },
         {
@@ -322,6 +333,6 @@ return {
 };
 })();
 
-(node as any).hash = "284ed700d24ce63ac1f580021d65afd6";
+(node as any).hash = "936822d21612160b63898cbcf6b664ca";
 
 export default node;

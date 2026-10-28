@@ -31,6 +31,11 @@ func (s *SCIMCaller) GetSubject() string {
 	return "scim"
 }
 
+// GetActor returns the actor for this caller.
+func (s *SCIMCaller) GetActor() models.Actor {
+	return models.SCIMActor()
+}
+
 // GetIDPIssuerURL returns the IDP issuer URL
 func (s *SCIMCaller) GetIDPIssuerURL() string {
 	return s.idpIssuerURL

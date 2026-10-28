@@ -307,6 +307,7 @@ func TestCreateRole(t *testing.T) {
 			name: "successfully create a role",
 			caller: &auth.UserCaller{
 				User: &models.User{
+					Metadata:            models.ResourceMetadata{ID: testRoleCreatorUserID},
 					Admin:               true,
 					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 					Email:               "user@email",
@@ -322,7 +323,7 @@ func TestCreateRole(t *testing.T) {
 			expectRole: &models.Role{
 				Name:        "role",
 				Description: "Some new role.",
-				CreatedBy:   "user@email",
+				CreatedBy:   mockCallerActor().WithSubject("user@email"),
 			},
 		},
 		{
@@ -746,4 +747,13 @@ func TestDeleteRole(t *testing.T) {
 			}
 		})
 	}
+}
+
+// testRoleCreatorUserID is the ID of the user that the create-role test's caller
+// reports. It must be a valid UUID so the recorded actor is well formed.
+const testRoleCreatorUserID = "9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d"
+
+// mockCallerActor returns the actor reported by the create-role test's caller.
+func mockCallerActor() models.Actor {
+	return models.NewUserActor(testRoleCreatorUserID)
 }

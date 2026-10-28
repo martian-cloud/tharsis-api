@@ -24,6 +24,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
+// testGroupCreatorUserID is the ID of the user the mock caller reports as the
+// creator in tests that exercise a create path.
+const testGroupCreatorUserID = "8a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d"
+
 type mockDBClient struct {
 	*db.Client
 	MockTransactions   *db.MockTransactions
@@ -437,7 +441,7 @@ func TestCreateNestedGroup(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateGroupPermission, mock.Anything).Return(test.authError)
 
 			if test.authError == nil {
-				mockCaller.On("GetSubject").Return("testsubject")
+				mockCaller.On("GetActor").Return(models.NewUserActor(testGroupCreatorUserID).WithSubject("testsubject"))
 
 				mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
 
@@ -475,6 +479,9 @@ func TestCreateNestedGroup(t *testing.T) {
 				t.Fatal(err)
 			} else {
 				assert.Equal(t, &test.input, group)
+				// The creator is recorded as the caller's typed actor, carrying the
+				// caller's subject for the legacy created_by column.
+				assert.Equal(t, models.NewUserActor(testGroupCreatorUserID).WithSubject("testsubject"), group.CreatedBy)
 			}
 		})
 	}

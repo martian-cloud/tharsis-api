@@ -1,9 +1,9 @@
 import DeleteIcon from '@mui/icons-material/Delete';
-import { Box, IconButton, ListItem, ListItemIcon, Tooltip, Typography, useTheme } from '@mui/material';
+import { Box, IconButton, ListItem, ListItemIcon, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { KeyVariant as KeyIcon } from 'mdi-material-ui';
 import { useFragment } from "react-relay/hooks";
-import Gravatar from '../../common/Gravatar';
+import ActorDisplay from '../../common/ActorDisplay';
 import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
 import { GPGKeyListItemFragment_key$key } from './__generated__/GPGKeyListItemFragment_key.graphql';
@@ -26,7 +26,9 @@ function GPGKeyListItem({ fragmentRef, inherited, onDelete }: Props) {
             id
             gpgKeyId
         	fingerprint
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             groupPath
         }
     `, fragmentRef);
@@ -62,11 +64,7 @@ function GPGKeyListItem({ fragmentRef, inherited, onDelete }: Props) {
                     <Typography variant="caption" color="textSecondary" sx={{ mr: 0.5 }}>
                         Added <Timestamp component="span" timestamp={data.metadata.createdAt} /> by
                     </Typography>
-                    <Tooltip title={data.createdBy}>
-                        <Box sx={{ display: 'flex' }}>
-                            <Gravatar width={16} height={16} email={data.createdBy} />
-                        </Box>
-                    </Tooltip>
+                    <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={16} />
                 </Box>
                 {inherited && <Typography color="textSecondary" variant="caption">Inherited from group <strong>{data.groupPath}</strong></Typography>}
             </Box>

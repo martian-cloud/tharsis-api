@@ -254,7 +254,7 @@ func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) (*Cr
 
 	input := &models.SCIMToken{
 		Nonce:     jwtID,
-		CreatedBy: caller.GetSubject(),
+		CreatedBy: caller.GetActor(),
 	}
 
 	createdToken, err := s.dbClient.SCIMTokens.CreateToken(txContext, input)

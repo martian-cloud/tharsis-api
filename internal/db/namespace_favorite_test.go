@@ -285,7 +285,7 @@ func TestGetNamespaceFavorites_RootNamespaceMembershipsFilter(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name:      "test-group-fav-membership",
 		FullPath:  "test-group-fav-membership",
-		CreatedBy: "db-integration-tests",
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -293,7 +293,7 @@ func TestGetNamespaceFavorites_RootNamespaceMembershipsFilter(t *testing.T) {
 		Name:           "test-workspace-fav-membership",
 		GroupID:        group.Metadata.ID,
 		MaxJobDuration: ptr.Int32(1),
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 

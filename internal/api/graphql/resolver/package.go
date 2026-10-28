@@ -175,7 +175,13 @@ func (r *PackageResolver) AllowMutableVersions() bool {
 
 // CreatedBy resolver
 func (r *PackageResolver) CreatedBy() string {
-	return r.pkg.CreatedBy
+	return r.pkg.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *PackageResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.pkg.CreatedBy)
 }
 
 // GroupPath resolver

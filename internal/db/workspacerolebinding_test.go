@@ -28,7 +28,7 @@ func createTestGroupForBinding(ctx context.Context, t *testing.T, testClient *te
 		Name:        name,
 		Description: "test group for workspace role binding",
 		FullPath:    name,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 	return group
@@ -41,7 +41,7 @@ func createTestWorkspaceForBinding(ctx context.Context, t *testing.T, testClient
 		Name:           name,
 		GroupID:        groupID,
 		Description:    "test workspace for role binding",
-		CreatedBy:      "db-integration-tests",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func createTestRoleForBinding(ctx context.Context, t *testing.T, testClient *tes
 	role := &models.Role{
 		Name:        name,
 		Description: "test role for workspace role binding",
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	}
 	role.SetPermissions(perms)
 
@@ -75,7 +75,7 @@ func TestWorkspaceRoleBindings_CreateWorkspaceRoleBinding(t *testing.T) {
 	_, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 		WorkspaceID: boundWorkspace.Metadata.ID,
 		RoleID:      role.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -119,7 +119,7 @@ func TestWorkspaceRoleBindings_CreateWorkspaceRoleBinding(t *testing.T) {
 			binding, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 				WorkspaceID: test.workspaceID,
 				RoleID:      test.roleID,
-				CreatedBy:   "db-integration-tests",
+				CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 			})
 
 			if test.expectErrorCode != "" {
@@ -132,7 +132,7 @@ func TestWorkspaceRoleBindings_CreateWorkspaceRoleBinding(t *testing.T) {
 
 			assert.Equal(t, test.workspaceID, binding.WorkspaceID)
 			assert.Equal(t, test.roleID, binding.RoleID)
-			assert.Equal(t, "db-integration-tests", binding.CreatedBy)
+			assert.Equal(t, "db-integration-tests", binding.CreatedBy.Subject)
 			assert.NotEmpty(t, binding.Metadata.ID)
 		})
 	}
@@ -150,7 +150,7 @@ func TestWorkspaceRoleBindings_GetWorkspaceRoleBindingByID(t *testing.T) {
 	created, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 		WorkspaceID: workspace.Metadata.ID,
 		RoleID:      role.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -211,7 +211,7 @@ func TestWorkspaceRoleBindings_GetWorkspaceRoleBindingByTRN(t *testing.T) {
 	created, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 		WorkspaceID: workspace.Metadata.ID,
 		RoleID:      role.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -276,7 +276,7 @@ func TestWorkspaceRoleBindings_GetWorkspaceRoleBindingByWorkspaceID(t *testing.T
 	created, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 		WorkspaceID: workspace.Metadata.ID,
 		RoleID:      role.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -326,7 +326,7 @@ func TestWorkspaceRoleBindings_UpdateWorkspaceRoleBinding(t *testing.T) {
 	created, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 		WorkspaceID: workspace.Metadata.ID,
 		RoleID:      role.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -385,7 +385,7 @@ func TestWorkspaceRoleBindings_DeleteWorkspaceRoleBinding(t *testing.T) {
 	created, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 		WorkspaceID: workspace.Metadata.ID,
 		RoleID:      role.Metadata.ID,
-		CreatedBy:   "db-integration-tests",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
 
@@ -449,7 +449,7 @@ func TestWorkspaceRoleBindings_ForeignKeys(t *testing.T) {
 		binding, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 			WorkspaceID: ws.Metadata.ID,
 			RoleID:      role.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -469,7 +469,7 @@ func TestWorkspaceRoleBindings_ForeignKeys(t *testing.T) {
 		_, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 			WorkspaceID: ws.Metadata.ID,
 			RoleID:      boundRole.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -500,7 +500,7 @@ func TestWorkspaceRoleBindings_GetWorkspaceRoleBindings(t *testing.T) {
 		created, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 			WorkspaceID: ws,
 			RoleID:      r,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 
@@ -574,7 +574,7 @@ func TestWorkspaceRoleBindings_GetWorkspaceRoleBindingsWithPaginationAndSorting(
 		_, err := testClient.client.WorkspaceRoleBindings.CreateWorkspaceRoleBinding(ctx, &models.WorkspaceRoleBinding{
 			WorkspaceID: ws.Metadata.ID,
 			RoleID:      role.Metadata.ID,
-			CreatedBy:   "db-integration-tests",
+			CreatedBy:   models.Actor{Subject: "db-integration-tests"},
 		})
 		require.NoError(t, err)
 	}

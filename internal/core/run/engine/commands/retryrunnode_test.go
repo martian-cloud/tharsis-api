@@ -75,7 +75,7 @@ func TestRetryRunNode_Prepare(t *testing.T) {
 func TestRetryRunNode_Execute(t *testing.T) {
 	ctx := auth.WithCaller(context.Background(), auth.NewServiceAccountCaller("sa-1", "sa/path", nil, nil, nil))
 	errMsg := "boom"
-	forceCanceledBy := "user-1"
+	forceCanceledBy := &models.Actor{Subject: "user-1"}
 	now := time.Now().UTC()
 
 	// evaluatedPolicies is the per-policy state the evaluator leaves behind on a check that reported a
@@ -156,7 +156,7 @@ func TestRetryRunNode_Execute(t *testing.T) {
 				Plan:                   models.Plan{ID: "plan-1", Status: models.PlanErrored, ErrorMessage: &errMsg},
 				Apply:                  &models.Apply{ID: "apply-1", Status: models.ApplySkipped},
 				ForceCanceled:          true,
-				ForceCanceledBy:        &forceCanceledBy,
+				ForceCanceledBy:        forceCanceledBy,
 				ForceCancelAvailableAt: &now,
 			},
 			nodePath: "plan",

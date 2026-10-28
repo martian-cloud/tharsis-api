@@ -50,7 +50,7 @@ type ServiceAccount struct {
 	Name                        string
 	Description                 string
 	GroupID                     string
-	CreatedBy                   string
+	CreatedBy                   Actor
 	OIDCTrustPolicies           []OIDCTrustPolicy
 	ClientSecretHash            *string
 }

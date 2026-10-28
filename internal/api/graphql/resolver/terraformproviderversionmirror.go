@@ -142,7 +142,13 @@ func (r *TerraformProviderVersionMirrorResolver) Metadata() *MetadataResolver {
 
 // CreatedBy resolver
 func (r *TerraformProviderVersionMirrorResolver) CreatedBy() string {
-	return r.versionMirror.CreatedBy
+	return r.versionMirror.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *TerraformProviderVersionMirrorResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.versionMirror.CreatedBy)
 }
 
 // GroupPath resolver

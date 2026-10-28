@@ -1,8 +1,7 @@
 import { Typography } from '@mui/material'
-import Tooltip from '@mui/material/Tooltip'
 import Box from '@mui/material/Box'
 import Link from '../../routes/Link'
-import Gravatar from '../../common/Gravatar'
+import ActorDisplay from '../../common/ActorDisplay'
 import { ResponsiveRow } from '../../common/ResponsiveTable'
 import Timestamp from '../../common/Timestamp'
 import { useFragment } from 'react-relay/hooks'
@@ -20,18 +19,22 @@ function StateVersionListItem(props: Props) {
     const data = useFragment<StateVersionListItemFragment_stateVersion$key>(graphql`
         fragment StateVersionListItemFragment_stateVersion on StateVersion {
             id
-            createdBy
+            createdByActor {
+                ...ActorDisplayFragment_actor
+            }
             metadata {
                 createdAt
                 trn
             }
             run {
                 id
-                createdBy
+                createdByActor {
+                    ...ActorDisplayFragment_actor
+                }
             }
         } `, stateVersionKey)
 
-    const stateVersionValue = data.run ? data.run.createdBy : data.createdBy
+    const stateVersionActor = data.run ? data.run.createdByActor : data.createdByActor
 
     return (
         <ResponsiveRow cells={[
@@ -40,11 +43,9 @@ function StateVersionListItem(props: Props) {
             { label: 'Created At', content: <Timestamp variant="body2" timestamp={data.metadata.createdAt} /> },
             {
                 label: 'Created By', content: (
-                    <Tooltip title={stateVersionValue}>
-                        <Box sx={{ display: 'flex', width: 'fit-content' }}>
-                            <Gravatar width={24} height={24} email={stateVersionValue} />
-                        </Box>
-                    </Tooltip>
+                    <Box sx={{ display: 'flex', width: 'fit-content' }}>
+                        <ActorDisplay fragmentRef={stateVersionActor} variant="avatar" size={24} />
+                    </Box>
                 )
             },
         ]} />

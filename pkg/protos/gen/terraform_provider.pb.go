@@ -374,15 +374,22 @@ func (x *DeleteTerraformProviderRequest) GetId() string {
 
 // TerraformProvider defines a Terraform Provider within Tharsis.
 type TerraformProvider struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	CreatedBy     string                 `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	GroupId       string                 `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
-	Private       bool                   `protobuf:"varint,5,opt,name=private,proto3" json:"private,omitempty"`
-	RepositoryUrl string                 `protobuf:"bytes,6,opt,name=repository_url,json=repositoryUrl,proto3" json:"repository_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	// created_by is the free-form identifier of the creator captured at creation
+	// time. Deprecated in favour of created_by_actor.
+	//
+	// Deprecated: Marked as deprecated in terraform_provider.proto.
+	CreatedBy     string `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	GroupId       string `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	Name          string `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	Private       bool   `protobuf:"varint,5,opt,name=private,proto3" json:"private,omitempty"`
+	RepositoryUrl string `protobuf:"bytes,6,opt,name=repository_url,json=repositoryUrl,proto3" json:"repository_url,omitempty"`
+	// created_by_actor is the structured identity of the creator. Absent for
+	// resources created before actors were introduced.
+	CreatedByActor *Actor `protobuf:"bytes,7,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *TerraformProvider) Reset() {
@@ -422,6 +429,7 @@ func (x *TerraformProvider) GetMetadata() *ResourceMetadata {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in terraform_provider.proto.
 func (x *TerraformProvider) GetCreatedBy() string {
 	if x != nil {
 		return x.CreatedBy
@@ -455,6 +463,13 @@ func (x *TerraformProvider) GetRepositoryUrl() string {
 		return x.RepositoryUrl
 	}
 	return ""
+}
+
+func (x *TerraformProvider) GetCreatedByActor() *Actor {
+	if x != nil {
+		return x.CreatedByActor
+	}
+	return nil
 }
 
 // GetTerraformProvidersResponse is the paginated list of Terraform Providers.
@@ -514,7 +529,7 @@ var File_terraform_provider_proto protoreflect.FileDescriptor
 
 const file_terraform_provider_proto_rawDesc = "" +
 	"\n" +
-	"\x18terraform_provider.proto\x12+martiancloud.tharsis.api.terraform_provider\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a terraform_provider_version.proto\x1a!terraform_provider_platform.proto\"1\n" +
+	"\x18terraform_provider.proto\x12+martiancloud.tharsis.api.terraform_provider\x1a\vactor.proto\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a terraform_provider_version.proto\x1a!terraform_provider_platform.proto\"1\n" +
 	"\x1fGetTerraformProviderByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xe5\x02\n" +
 	"\x1cGetTerraformProvidersRequest\x12j\n" +
@@ -542,15 +557,16 @@ const file_terraform_provider_proto_rawDesc = "" +
 	"\n" +
 	"\b_version\"0\n" +
 	"\x1eDeleteTerraformProviderRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xf3\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xc8\x02\n" +
 	"\x11TerraformProvider\x12O\n" +
-	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x1d\n" +
+	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12!\n" +
 	"\n" +
-	"created_by\x18\x02 \x01(\tR\tcreatedBy\x12\x19\n" +
+	"created_by\x18\x02 \x01(\tB\x02\x18\x01R\tcreatedBy\x12\x19\n" +
 	"\bgroup_id\x18\x03 \x01(\tR\agroupId\x12\x12\n" +
 	"\x04name\x18\x04 \x01(\tR\x04name\x12\x18\n" +
 	"\aprivate\x18\x05 \x01(\bR\aprivate\x12%\n" +
-	"\x0erepository_url\x18\x06 \x01(\tR\rrepositoryUrl\"\xc9\x01\n" +
+	"\x0erepository_url\x18\x06 \x01(\tR\rrepositoryUrl\x12O\n" +
+	"\x10created_by_actor\x18\a \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\"\xc9\x01\n" +
 	"\x1dGetTerraformProvidersResponse\x12\\\n" +
 	"\tproviders\x18\x01 \x03(\v2>.martiancloud.tharsis.api.terraform_provider.TerraformProviderR\tproviders\x12J\n" +
 	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo*f\n" +
@@ -599,58 +615,60 @@ var file_terraform_provider_proto_goTypes = []any{
 	(*GetTerraformProvidersResponse)(nil),           // 7: martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersResponse
 	(*PaginationOptions)(nil),                       // 8: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*ResourceMetadata)(nil),                        // 9: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                                // 10: martiancloud.tharsis.api.pagination.PageInfo
-	(*GetTerraformProviderVersionByIDRequest)(nil),  // 11: martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionByIDRequest
-	(*GetTerraformProviderVersionsRequest)(nil),     // 12: martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionsRequest
-	(*CreateTerraformProviderVersionRequest)(nil),   // 13: martiancloud.tharsis.api.terraform_provider_version.CreateTerraformProviderVersionRequest
-	(*DeleteTerraformProviderVersionRequest)(nil),   // 14: martiancloud.tharsis.api.terraform_provider_version.DeleteTerraformProviderVersionRequest
-	(*GetTerraformProviderPlatformByIDRequest)(nil), // 15: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformByIDRequest
-	(*GetTerraformProviderPlatformsRequest)(nil),    // 16: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsRequest
-	(*CreateTerraformProviderPlatformRequest)(nil),  // 17: martiancloud.tharsis.api.terraform_provider_platform.CreateTerraformProviderPlatformRequest
-	(*DeleteTerraformProviderPlatformRequest)(nil),  // 18: martiancloud.tharsis.api.terraform_provider_platform.DeleteTerraformProviderPlatformRequest
-	(*emptypb.Empty)(nil),                           // 19: google.protobuf.Empty
-	(*TerraformProviderVersion)(nil),                // 20: martiancloud.tharsis.api.terraform_provider_version.TerraformProviderVersion
-	(*GetTerraformProviderVersionsResponse)(nil),    // 21: martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionsResponse
-	(*TerraformProviderPlatform)(nil),               // 22: martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform
-	(*GetTerraformProviderPlatformsResponse)(nil),   // 23: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsResponse
+	(*Actor)(nil),                                   // 10: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                                // 11: martiancloud.tharsis.api.pagination.PageInfo
+	(*GetTerraformProviderVersionByIDRequest)(nil),  // 12: martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionByIDRequest
+	(*GetTerraformProviderVersionsRequest)(nil),     // 13: martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionsRequest
+	(*CreateTerraformProviderVersionRequest)(nil),   // 14: martiancloud.tharsis.api.terraform_provider_version.CreateTerraformProviderVersionRequest
+	(*DeleteTerraformProviderVersionRequest)(nil),   // 15: martiancloud.tharsis.api.terraform_provider_version.DeleteTerraformProviderVersionRequest
+	(*GetTerraformProviderPlatformByIDRequest)(nil), // 16: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformByIDRequest
+	(*GetTerraformProviderPlatformsRequest)(nil),    // 17: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsRequest
+	(*CreateTerraformProviderPlatformRequest)(nil),  // 18: martiancloud.tharsis.api.terraform_provider_platform.CreateTerraformProviderPlatformRequest
+	(*DeleteTerraformProviderPlatformRequest)(nil),  // 19: martiancloud.tharsis.api.terraform_provider_platform.DeleteTerraformProviderPlatformRequest
+	(*emptypb.Empty)(nil),                           // 20: google.protobuf.Empty
+	(*TerraformProviderVersion)(nil),                // 21: martiancloud.tharsis.api.terraform_provider_version.TerraformProviderVersion
+	(*GetTerraformProviderVersionsResponse)(nil),    // 22: martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionsResponse
+	(*TerraformProviderPlatform)(nil),               // 23: martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform
+	(*GetTerraformProviderPlatformsResponse)(nil),   // 24: martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsResponse
 }
 var file_terraform_provider_proto_depIdxs = []int32{
 	8,  // 0: martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersRequest.sort:type_name -> martiancloud.tharsis.api.terraform_provider.TerraformProviderSortableField
 	9,  // 2: martiancloud.tharsis.api.terraform_provider.TerraformProvider.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	6,  // 3: martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersResponse.providers:type_name -> martiancloud.tharsis.api.terraform_provider.TerraformProvider
-	10, // 4: martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	1,  // 5: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderByID:input_type -> martiancloud.tharsis.api.terraform_provider.GetTerraformProviderByIDRequest
-	2,  // 6: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviders:input_type -> martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersRequest
-	3,  // 7: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProvider:input_type -> martiancloud.tharsis.api.terraform_provider.CreateTerraformProviderRequest
-	4,  // 8: martiancloud.tharsis.api.terraform_provider.TerraformProviders.UpdateTerraformProvider:input_type -> martiancloud.tharsis.api.terraform_provider.UpdateTerraformProviderRequest
-	5,  // 9: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProvider:input_type -> martiancloud.tharsis.api.terraform_provider.DeleteTerraformProviderRequest
-	11, // 10: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderVersionByID:input_type -> martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionByIDRequest
-	12, // 11: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderVersions:input_type -> martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionsRequest
-	13, // 12: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProviderVersion:input_type -> martiancloud.tharsis.api.terraform_provider_version.CreateTerraformProviderVersionRequest
-	14, // 13: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProviderVersion:input_type -> martiancloud.tharsis.api.terraform_provider_version.DeleteTerraformProviderVersionRequest
-	15, // 14: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderPlatformByID:input_type -> martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformByIDRequest
-	16, // 15: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderPlatforms:input_type -> martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsRequest
-	17, // 16: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProviderPlatform:input_type -> martiancloud.tharsis.api.terraform_provider_platform.CreateTerraformProviderPlatformRequest
-	18, // 17: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProviderPlatform:input_type -> martiancloud.tharsis.api.terraform_provider_platform.DeleteTerraformProviderPlatformRequest
-	6,  // 18: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderByID:output_type -> martiancloud.tharsis.api.terraform_provider.TerraformProvider
-	7,  // 19: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviders:output_type -> martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersResponse
-	6,  // 20: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProvider:output_type -> martiancloud.tharsis.api.terraform_provider.TerraformProvider
-	6,  // 21: martiancloud.tharsis.api.terraform_provider.TerraformProviders.UpdateTerraformProvider:output_type -> martiancloud.tharsis.api.terraform_provider.TerraformProvider
-	19, // 22: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProvider:output_type -> google.protobuf.Empty
-	20, // 23: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderVersionByID:output_type -> martiancloud.tharsis.api.terraform_provider_version.TerraformProviderVersion
-	21, // 24: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderVersions:output_type -> martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionsResponse
-	20, // 25: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProviderVersion:output_type -> martiancloud.tharsis.api.terraform_provider_version.TerraformProviderVersion
-	19, // 26: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProviderVersion:output_type -> google.protobuf.Empty
-	22, // 27: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderPlatformByID:output_type -> martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform
-	23, // 28: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderPlatforms:output_type -> martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsResponse
-	22, // 29: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProviderPlatform:output_type -> martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform
-	19, // 30: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProviderPlatform:output_type -> google.protobuf.Empty
-	18, // [18:31] is the sub-list for method output_type
-	5,  // [5:18] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	10, // 3: martiancloud.tharsis.api.terraform_provider.TerraformProvider.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	6,  // 4: martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersResponse.providers:type_name -> martiancloud.tharsis.api.terraform_provider.TerraformProvider
+	11, // 5: martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	1,  // 6: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderByID:input_type -> martiancloud.tharsis.api.terraform_provider.GetTerraformProviderByIDRequest
+	2,  // 7: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviders:input_type -> martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersRequest
+	3,  // 8: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProvider:input_type -> martiancloud.tharsis.api.terraform_provider.CreateTerraformProviderRequest
+	4,  // 9: martiancloud.tharsis.api.terraform_provider.TerraformProviders.UpdateTerraformProvider:input_type -> martiancloud.tharsis.api.terraform_provider.UpdateTerraformProviderRequest
+	5,  // 10: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProvider:input_type -> martiancloud.tharsis.api.terraform_provider.DeleteTerraformProviderRequest
+	12, // 11: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderVersionByID:input_type -> martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionByIDRequest
+	13, // 12: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderVersions:input_type -> martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionsRequest
+	14, // 13: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProviderVersion:input_type -> martiancloud.tharsis.api.terraform_provider_version.CreateTerraformProviderVersionRequest
+	15, // 14: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProviderVersion:input_type -> martiancloud.tharsis.api.terraform_provider_version.DeleteTerraformProviderVersionRequest
+	16, // 15: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderPlatformByID:input_type -> martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformByIDRequest
+	17, // 16: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderPlatforms:input_type -> martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsRequest
+	18, // 17: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProviderPlatform:input_type -> martiancloud.tharsis.api.terraform_provider_platform.CreateTerraformProviderPlatformRequest
+	19, // 18: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProviderPlatform:input_type -> martiancloud.tharsis.api.terraform_provider_platform.DeleteTerraformProviderPlatformRequest
+	6,  // 19: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderByID:output_type -> martiancloud.tharsis.api.terraform_provider.TerraformProvider
+	7,  // 20: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviders:output_type -> martiancloud.tharsis.api.terraform_provider.GetTerraformProvidersResponse
+	6,  // 21: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProvider:output_type -> martiancloud.tharsis.api.terraform_provider.TerraformProvider
+	6,  // 22: martiancloud.tharsis.api.terraform_provider.TerraformProviders.UpdateTerraformProvider:output_type -> martiancloud.tharsis.api.terraform_provider.TerraformProvider
+	20, // 23: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProvider:output_type -> google.protobuf.Empty
+	21, // 24: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderVersionByID:output_type -> martiancloud.tharsis.api.terraform_provider_version.TerraformProviderVersion
+	22, // 25: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderVersions:output_type -> martiancloud.tharsis.api.terraform_provider_version.GetTerraformProviderVersionsResponse
+	21, // 26: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProviderVersion:output_type -> martiancloud.tharsis.api.terraform_provider_version.TerraformProviderVersion
+	20, // 27: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProviderVersion:output_type -> google.protobuf.Empty
+	23, // 28: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderPlatformByID:output_type -> martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform
+	24, // 29: martiancloud.tharsis.api.terraform_provider.TerraformProviders.GetTerraformProviderPlatforms:output_type -> martiancloud.tharsis.api.terraform_provider_platform.GetTerraformProviderPlatformsResponse
+	23, // 30: martiancloud.tharsis.api.terraform_provider.TerraformProviders.CreateTerraformProviderPlatform:output_type -> martiancloud.tharsis.api.terraform_provider_platform.TerraformProviderPlatform
+	20, // 31: martiancloud.tharsis.api.terraform_provider.TerraformProviders.DeleteTerraformProviderPlatform:output_type -> google.protobuf.Empty
+	19, // [19:32] is the sub-list for method output_type
+	6,  // [6:19] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_terraform_provider_proto_init() }
@@ -658,6 +676,7 @@ func file_terraform_provider_proto_init() {
 	if File_terraform_provider_proto != nil {
 		return
 	}
+	file_actor_proto_init()
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_terraform_provider_version_proto_init()

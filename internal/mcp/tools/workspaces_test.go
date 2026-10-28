@@ -36,7 +36,7 @@ func TestGetWorkspaceHandler(t *testing.T) {
 				Description:      "Test workspace",
 				GroupID:          "group-123",
 				TerraformVersion: "1.5.0",
-				CreatedBy:        "user@example.com",
+				CreatedBy:        models.Actor{Subject: "user@example.com"},
 				DirtyState:       false,
 				Locked:           false,
 			},

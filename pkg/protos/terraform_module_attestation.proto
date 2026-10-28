@@ -4,6 +4,7 @@ package martiancloud.tharsis.api.terraform_module_attestation;
 
 option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
 
+import "actor.proto";
 import "metadata.proto";
 import "pagination.proto";
 
@@ -49,7 +50,9 @@ message DeleteTerraformModuleAttestationRequest {
 // TerraformModuleAttestation represents an attestation for a Terraform module.
 message TerraformModuleAttestation {
   metadata.ResourceMetadata metadata       = 1;
-  string                    created_by     = 2;
+  // created_by is the free-form identifier of the creator captured at creation
+  // time. Deprecated in favour of created_by_actor.
+  string                    created_by     = 2 [deprecated = true];
   string                    data           = 3;
   string                    data_sha_sum   = 4;
   string                    description    = 5;
@@ -57,6 +60,9 @@ message TerraformModuleAttestation {
   string                    module_id      = 7;
   string                    predicate_type = 8;
   string                    schema_type    = 9;
+  // created_by_actor is the structured identity of the creator. Absent for
+  // resources created before actors were introduced.
+  actor.Actor created_by_actor = 10;
 }
 
 // GetTerraformModuleAttestationsResponse is the paginated list of TerraformModuleAttestations.

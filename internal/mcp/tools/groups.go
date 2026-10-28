@@ -61,7 +61,7 @@ func GetGroup(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getGroupInput, getG
 				FullPath:    g.FullPath,
 				Description: g.Description,
 				ParentID:    gid.ToGlobalID(types.GroupModelType, g.ParentID),
-				CreatedBy:   g.CreatedBy,
+				CreatedBy:   g.CreatedBy.Subject,
 				RunnerTags:  g.RunnerTags,
 			},
 		}, nil
@@ -122,7 +122,7 @@ func GetManagedIdentity(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getManage
 				Description:       mi.Description,
 				Type:              string(mi.Type),
 				GroupID:           gid.ToGlobalID(types.GroupModelType, mi.GroupID),
-				CreatedBy:         mi.CreatedBy,
+				CreatedBy:         mi.CreatedBy.Subject,
 				IsAlias:           mi.AliasSourceID != nil,
 			},
 		}, nil
@@ -198,7 +198,7 @@ func GetServiceAccount(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getService
 				Name:                     sa.Name,
 				Description:              sa.Description,
 				GroupID:                  gid.ToGlobalID(types.GroupModelType, sa.GroupID),
-				CreatedBy:                sa.CreatedBy,
+				CreatedBy:                sa.CreatedBy.Subject,
 				ClientCredentialsEnabled: sa.ClientCredentialsEnabled(),
 				OIDCTrustPolicies:        policies,
 			},

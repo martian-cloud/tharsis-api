@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8250c2ae9583c12f5cc67552a4519bd0>>
+ * @generated SignedSource<<7bd834a17042ce6cd541e243994d4695>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -151,17 +151,33 @@ v8 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
+  "name": "email",
+  "storageKey": null
+},
+v9 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "trnSnapshot",
+    "storageKey": null
+  }
+],
+v10 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
   "name": "stage",
   "storageKey": null
 },
-v9 = {
+v11 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "enforcementLevel",
   "storageKey": null
 },
-v10 = {
+v12 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -257,8 +273,69 @@ return {
               {
                 "alias": null,
                 "args": null,
-                "kind": "ScalarField",
-                "name": "createdBy",
+                "concreteType": null,
+                "kind": "LinkedField",
+                "name": "createdByActor",
+                "plural": false,
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "__typename",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "TypeDiscriminator",
+                    "abstractKey": "__isActor"
+                  },
+                  (v5/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "principalId",
+                    "storageKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "User",
+                        "kind": "LinkedField",
+                        "name": "user",
+                        "plural": false,
+                        "selections": [
+                          (v8/*: any*/),
+                          (v3/*: any*/)
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "type": "UserActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v9/*: any*/),
+                    "type": "ServiceAccountActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v9/*: any*/),
+                    "type": "VCSProviderActor",
+                    "abstractKey": null
+                  },
+                  {
+                    "kind": "InlineFragment",
+                    "selections": (v9/*: any*/),
+                    "type": "JobActor",
+                    "abstractKey": null
+                  }
+                ],
                 "storageKey": null
               },
               {
@@ -297,9 +374,9 @@ return {
                     "name": "packageDigest",
                     "storageKey": null
                   },
-                  (v8/*: any*/),
-                  (v9/*: any*/),
-                  (v10/*: any*/)
+                  (v10/*: any*/),
+                  (v11/*: any*/),
+                  (v12/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -332,9 +409,9 @@ return {
                     "name": "verifyStateLineage",
                     "storageKey": null
                   },
-                  (v8/*: any*/),
-                  (v9/*: any*/),
-                  (v10/*: any*/)
+                  (v10/*: any*/),
+                  (v11/*: any*/),
+                  (v12/*: any*/)
                 ],
                 "storageKey": null
               },
@@ -373,13 +450,7 @@ return {
                 "plural": true,
                 "selections": [
                   (v3/*: any*/),
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "email",
-                    "storageKey": null
-                  },
+                  (v8/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -454,12 +525,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "9ae655ea5b350d19193af20a1b4d92c4",
+    "cacheID": "d3f1ee4d182b4dc7deabf90db34a822f",
     "id": null,
     "metadata": {},
     "name": "NewPolicyCreateMutation",
     "operationKind": "mutation",
-    "text": "mutation NewPolicyCreateMutation(\n  $input: CreatePolicyInput!\n) {\n  createPolicy(input: $input) {\n    policy {\n      id\n      groupPath\n      ...PolicyDetailsFragment_policy\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment PolicyDetailsFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    packageDigest\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    verifyStateLineage\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  scope {\n    type\n    action\n    pattern\n  }\n  groupPath\n  allowedUsers {\n    id\n    email\n    username\n  }\n  allowedTeams {\n    id\n    name\n  }\n  allowedServiceAccounts {\n    id\n    name\n    resourcePath\n  }\n}\n"
+    "text": "mutation NewPolicyCreateMutation(\n  $input: CreatePolicyInput!\n) {\n  createPolicy(input: $input) {\n    policy {\n      id\n      groupPath\n      ...PolicyDetailsFragment_policy\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment PolicyDetailsFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    packageDigest\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    verifyStateLineage\n    stage\n    enforcementLevel\n    speculativeRunEnforcementLevel\n  }\n  scope {\n    type\n    action\n    pattern\n  }\n  groupPath\n  allowedUsers {\n    id\n    email\n    username\n  }\n  allowedTeams {\n    id\n    name\n  }\n  allowedServiceAccounts {\n    id\n    name\n    resourcePath\n  }\n}\n"
   }
 };
 })();

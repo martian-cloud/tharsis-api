@@ -25,7 +25,13 @@ func (r *SCIMTokenResolver) Metadata() *MetadataResolver {
 
 // CreatedBy resolver
 func (r *SCIMTokenResolver) CreatedBy() string {
-	return r.token.CreatedBy
+	return r.token.CreatedBy.Subject
+}
+
+// CreatedByActor resolver returns the structured identity behind createdBy, or null when
+// none was recorded.
+func (r *SCIMTokenResolver) CreatedByActor() *ActorResolver {
+	return newActorResolver(r.token.CreatedBy)
 }
 
 // CreateSCIMTokenInput contains the input for creating a SCIM token
