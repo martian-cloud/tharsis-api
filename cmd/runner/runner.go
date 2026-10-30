@@ -81,9 +81,15 @@ func main() {
 		return
 	}
 
-	credHelperPath := os.Getenv("THARSIS_CREDENTIAL_HELPER_CMD_PATH")
-	if credHelperPath == "" {
-		logger.Errorf("THARSIS_CREDENTIAL_HELPER_CMD_PATH environment variable is required")
+	// Determine how to authenticate to the Tharsis API. Everything above is required regardless
+	// of the method, so those checks run first.
+	//
+	// Logged as-is rather than with a context prefix: every error from here names the variable at
+	// fault, which is how the other environment checks in this file report, and it keeps the
+	// pre-existing credential helper message byte-identical for deployments that match on it.
+	oidcTokenSource, err := newOIDCTokenSource(os.Getenv)
+	if err != nil {
+		logger.Error(err)
 		return
 	}
 
@@ -112,13 +118,12 @@ func main() {
 	slogger := logger.Slog()
 
 	tokenResolver, err := NewTokenResolver(ctx, &TokenResolverInput{
-		BaseURL:              baseURL,
-		ServiceAccountID:     serviceAccountID,
-		CredentialHelperPath: credHelperPath,
-		CredentialHelperArgs: strings.Split(os.Getenv("THARSIS_CREDENTIAL_HELPER_CMD_ARGS"), " "),
-		Logger:               slogger,
-		UserAgent:            userAgent,
-		TLSSkipVerify:        tlsSkipVerify,
+		BaseURL:          baseURL,
+		ServiceAccountID: serviceAccountID,
+		OIDCTokenSource:  oidcTokenSource,
+		Logger:           slogger,
+		UserAgent:        userAgent,
+		TLSSkipVerify:    tlsSkipVerify,
 	})
 	if err != nil {
 		logger.Errorf("failed to create token resolver: %v", err)
