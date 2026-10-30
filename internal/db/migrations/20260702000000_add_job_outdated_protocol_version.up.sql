@@ -1,1 +1,0 @@
-ALTER TABLE jobs ADD COLUMN IF NOT EXISTS outdated_job_protocol_version BOOLEAN NOT NULL DEFAULT FALSE;

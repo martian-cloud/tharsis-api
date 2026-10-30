@@ -53,12 +53,21 @@ lint: ## run linting on Go and UI code
 		STALE=$$({ git diff --name-only --diff-filter=A origin/main HEAD -- internal/db/migrations/ 2>/dev/null; \
 			git ls-files --others --exclude-standard internal/db/migrations/ 2>/dev/null; } \
 			| grep -oE '[0-9]{14}' | sort -u \
-			| awk -v max="$$MAIN_MAX" '$$0+0 <= max+0'); \
+			| awk -v max="$$MAIN_MAX" '$$0+0 < max+0'); \
 		if [ -n "$$STALE" ]; then \
 			printf 'ERROR: Migration timestamp(s) predate latest in main (%s): %s\n' "$$MAIN_MAX" "$$STALE"; \
 			echo "Regenerate with: migrate create -ext sql -dir internal/db/migrations <name>"; \
 			exit 1; \
 		fi; \
+	fi
+	@echo "Checking for duplicate migration versions..."
+	@DUPES=$$(ls internal/db/migrations/ | grep -E '\.sql$$' \
+		| sed -E 's/^([0-9]{14})_(.*)\.(up|down)\.sql$$/\1 \2/' | sort -u \
+		| awk '{print $$1}' | uniq -d); \
+	if [ -n "$$DUPES" ]; then \
+		printf 'ERROR: Migration version(s) used by more than one migration: %s\n' "$$DUPES"; \
+		echo "Regenerate with: migrate create -ext sql -dir internal/db/migrations <name>"; \
+		exit 1; \
 	fi
 	@echo "Linting UI code..."
 	@cd frontend && npm run lint

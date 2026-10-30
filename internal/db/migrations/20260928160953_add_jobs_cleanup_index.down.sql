@@ -1,1 +1,0 @@
-DROP INDEX CONCURRENTLY IF EXISTS index_jobs_on_cleanup;

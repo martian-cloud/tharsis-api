@@ -55,11 +55,10 @@ import (
 //
 // Subject is transitional. Removing it requires, in order:
 //
-//  1. Backfilling created_by_actor_type/created_by_actor_id for historical rows. The migration
-//     20261014190001_backfill_actor_columns maps each subject to the principal
-//     it names now, and gives a subject that names no current principal the
-//     type its format implies with UnmappedActorID; see that migration for the
-//     cases it can attribute imperfectly.
+//  1. Backfilling created_by_actor_type/created_by_actor_id for historical rows. Done: the
+//     backfill migration (since folded into the consolidated init migration) mapped each
+//     subject to the principal it named, and gave a subject that named no current
+//     principal the type its format implies with UnmappedActorID.
 //  2. Migrating every consumer that reads createdBy: the web UI, the Go SDK, the
 //     Terraform provider, the CLI, the gRPC converters, and the MCP tool structs
 //     (whose JSON schema descriptions currently say "Email address of the user
@@ -72,7 +71,7 @@ import (
 //
 // Until step 4, an email address remains in created_by for any row a user
 // created. An erasure request therefore needs created_by rewritten for that
-// principal across every table listed in the migration; created_by_actor_id is
+// principal across every table with a created_by_actor_id column, which is
 // the column that makes finding those rows practical.
 type ActorType string
 
