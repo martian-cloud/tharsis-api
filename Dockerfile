@@ -2,7 +2,7 @@
 
 # Build stages fan out from builder-base so that targeting one image compiles only that image's
 # binary.
-FROM golang:1.26.7-alpine@sha256:bf9573d7c1d2b09992e4f893ea1ef30842854846bdb8ae390468f95ea6b09062 AS builder-base
+FROM golang:1.26.10-alpine@sha256:a2012b4a1d1f9f7e9f44e0d39b805a901e856b1dd80b4e6ee4338db547050308 AS builder-base
 
 # The frontend toolchain lives in build-tharsis, the only stage that needs it.
 RUN apk upgrade --no-cache && \
@@ -22,7 +22,7 @@ COPY . .
 
 # Download the credential helper in its own stage, independent of the source tree, so editing code
 # does not re-fetch it and the images that do not ship it never fetch it at all.
-FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS credhelper
+FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS credhelper
 RUN apk add --no-cache curl && \
     curl --fail --silent --show-error -L \
     --output /iamoidccredhelper \
@@ -58,9 +58,10 @@ USER 65532:65532
 EXPOSE 8000
 CMD ["./apiserver"]
 
-FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS runner
+FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS runner
 RUN apk upgrade --no-cache && \
     apk add --no-cache \
+    "ca-certificates>=20261020-r0" \
     git \
     curl \
     python3 \
@@ -83,9 +84,10 @@ USER tharsis
 HEALTHCHECK NONE
 CMD ["./runner"]
 
-FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS job-executor
+FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS job-executor
 RUN apk upgrade --no-cache && \
     apk add --no-cache \
+    "ca-certificates>=20261020-r0" \
     git \
     curl \
     python3 \

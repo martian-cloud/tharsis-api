@@ -1,6 +1,6 @@
 module gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api
 
-go 1.26.2
+go 1.26.10
 
 require (
 	code.dny.dev/ssrf v0.3.0
