@@ -21,6 +21,7 @@ services:
     environment:
       - THARSIS_ADMIN_USER_EMAIL=martian@tharsis.local
       - THARSIS_ADMIN_USER_PASSWORD=martian
+      - THARSIS_USER_CREDENTIAL_LOGIN_ENABLED=true
       - THARSIS_USER_SESSION_ACCESS_TOKEN_EXPIRATION_MINUTES=60
       - THARSIS_DB_USERNAME=postgres
       - THARSIS_DB_NAME=tharsis

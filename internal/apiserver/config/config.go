@@ -167,6 +167,9 @@ type Config struct {
 	// AdminUserPassword is optional and will set the password for the user specified in the AdminUserEmail config field
 	AdminUserPassword string `yaml:"admin_user_password" env:"ADMIN_USER_PASSWORD" sensitive:"true"`
 
+	// UserCredentialLoginEnabled allows username and password login and must be true when no identity provider is configured.
+	UserCredentialLoginEnabled bool `yaml:"user_credential_login_enabled" env:"USER_CREDENTIAL_LOGIN_ENABLED"`
+
 	// Otel
 	OtelTraceType          string `yaml:"otel_trace_type" env:"OTEL_TRACE_TYPE" sensitive:"true"`
 	OtelTraceCollectorHost string `yaml:"otel_trace_host" env:"OTEL_TRACE_HOST" sensitive:"true"`
@@ -259,6 +262,12 @@ func (c Config) Validate() error {
 		validation.Field(&c.TharsisAPIURL, validation.Required),
 		validation.Field(&c.TharsisUIURL, validation.Required),
 		validation.Field(&c.JWSProviderPluginType, validation.Required),
+		validation.Field(&c.UserCredentialLoginEnabled, validation.By(func(any) error {
+			if !c.UserCredentialLoginEnabled && len(c.OauthProviders) == 0 {
+				return errors.New("must be true when no identity provider is configured")
+			}
+			return nil
+		})),
 	)
 }
 

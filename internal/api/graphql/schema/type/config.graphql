@@ -16,6 +16,7 @@ type Config {
   terraformCliVersionConstraint: String!
   workspaceAssessmentIntervalHours: Int!
   workspaceAssessmentRunLimit: Int!
+  userCredentialLoginEnabled: Boolean!
   userSessionAccessTokenExpirationMinutes: Int!
   userSessionRefreshTokenExpirationMinutes: Int!
   userSessionMaxSessionsPerUser: Int!

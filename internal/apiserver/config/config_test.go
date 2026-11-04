@@ -47,3 +47,42 @@ func TestLoadOauthConfigFromEnvironment_InvalidAllowAdminBootstrap(t *testing.T)
 	_, err := loadOauthConfigFromEnvironment()
 	assert.ErrorContains(t, err, envOidcProviderConfigPrefix+"0_ALLOW_ADMIN_BOOTSTRAP")
 }
+
+func TestConfigValidate_UserCredentialLogin(t *testing.T) {
+	valid := Config{
+		ServerPort:            "8000",
+		GRPCServerPort:        "50051",
+		ObjectStorePluginType: "aws_s3",
+		TharsisAPIURL:         "https://api.example.com",
+		TharsisUIURL:          "https://example.com",
+		JWSProviderPluginType: "memory",
+	}
+	idp := []IdpConfig{{IssuerURL: "https://idp.example.com"}}
+
+	tests := []struct {
+		name      string
+		enabled   bool
+		providers []IdpConfig
+		wantErr   bool
+	}{
+		{name: "disabled without identity providers", wantErr: true},
+		{name: "enabled without identity providers", enabled: true},
+		{name: "disabled with identity providers", providers: idp},
+		{name: "enabled with identity providers", enabled: true, providers: idp},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := valid
+			cfg.UserCredentialLoginEnabled = test.enabled
+			cfg.OauthProviders = test.providers
+
+			err := cfg.Validate()
+			if test.wantErr {
+				assert.ErrorContains(t, err, "UserCredentialLoginEnabled")
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
