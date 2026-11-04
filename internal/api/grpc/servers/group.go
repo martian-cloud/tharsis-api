@@ -171,14 +171,20 @@ func (s *GroupServer) UpdateGroup(ctx context.Context, req *pb.UpdateGroupReques
 	}
 
 	if req.DriftDetectionEnabled != nil {
-		if !req.DriftDetectionEnabled.GetInherit() {
+		if req.DriftDetectionEnabled.GetInherit() {
+			// Clear the group's own setting so it inherits from its parent again.
+			gotGroup.EnableDriftDetection = nil
+		} else {
 			enabled := req.DriftDetectionEnabled.GetEnabled()
 			gotGroup.EnableDriftDetection = &enabled
 		}
 	}
 
 	if req.ProviderMirrorEnabled != nil {
-		if !req.ProviderMirrorEnabled.GetInherit() {
+		if req.ProviderMirrorEnabled.GetInherit() {
+			// Clear the group's own setting so it inherits from its parent again.
+			gotGroup.EnableProviderMirror = nil
+		} else {
 			enabled := req.ProviderMirrorEnabled.GetEnabled()
 			gotGroup.EnableProviderMirror = &enabled
 		}

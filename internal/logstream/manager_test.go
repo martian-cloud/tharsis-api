@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"hash/crc32"
 	"io"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -947,9 +948,48 @@ func TestReadLogsEdgeCases(t *testing.T) {
 
 		_, err := manager.ReadLogs(ctx, logStream, -1, 10)
 		require.Error(t, err)
+		assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
 
 		_, err = manager.ReadLogs(ctx, logStream, 0, -1)
 		require.Error(t, err)
+		assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+
+		_, err = manager.ReadLogs(ctx, logStream, math.MinInt, 10)
+		require.Error(t, err)
+		assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+	})
+
+	t.Run("a read at the largest offset is empty without querying chunks", func(t *testing.T) {
+		ctx := context.Background()
+		mockStore := NewMockStore(t)
+		logStream := &models.LogStream{Metadata: models.ResourceMetadata{ID: streamID}, Size: 10}
+
+		logr, _ := logger.NewForTest()
+		// db.Client{} has no LogStreamChunks: a chunk query would nil-panic.
+		manager := New(mockStore, &db.Client{}, nil, logr, 0)
+
+		logs, err := manager.ReadLogs(ctx, logStream, math.MaxInt, 10)
+		require.NoError(t, err)
+		assert.Empty(t, readAllString(t, logs))
+	})
+
+	t.Run("a range that would overflow is clamped to the largest offset", func(t *testing.T) {
+		ctx := context.Background()
+
+		mockLC := db.NewMockLogStreamChunks(t)
+		mockStore := NewMockStore(t)
+
+		logStream := &models.LogStream{Metadata: models.ResourceMetadata{ID: streamID}, Size: 10}
+		mockLC.On("GetOverlappingChunks", mock.Anything, streamID, math.MaxInt-5, math.MaxInt).Return([]models.LogStreamChunk{}, nil)
+		mockStore.On("ReadRange", mock.Anything, consolidatedObjectKey(streamID), math.MaxInt-5, 5).
+			Return(nil, errors.New("not found", errors.WithErrorCode(errors.ENotFound)))
+
+		logr, _ := logger.NewForTest()
+		manager := New(mockStore, &db.Client{LogStreamChunks: mockLC}, nil, logr, 0)
+
+		logs, err := manager.ReadLogs(ctx, logStream, math.MaxInt-5, 10)
+		require.NoError(t, err)
+		assert.Empty(t, readAllString(t, logs))
 	})
 
 	t.Run("a read limit larger than the max patch size is rejected", func(t *testing.T) {

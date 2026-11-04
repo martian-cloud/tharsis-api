@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -2385,6 +2386,71 @@ func TestCreateRunInputValidate(t *testing.T) {
 			expectError:     "module version is not a valid semver version or constraint expression",
 			expectErrorCode: errors.EInvalid,
 		},
+		{
+			name:  "configuration version only",
+			input: CreateRunInput{ConfigurationVersionID: ptr.String("cv-1")},
+		},
+		{
+			name:  "module source only",
+			input: CreateRunInput{ModuleSource: ptr.String("test-source")},
+		},
+		{
+			name:            "neither configuration version nor module source",
+			input:           CreateRunInput{},
+			expectError:     "must supply either configuration version ID or module source",
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "both configuration version and module source",
+			input: CreateRunInput{
+				ConfigurationVersionID: ptr.String("cv-1"),
+				ModuleSource:           ptr.String("test-source"),
+			},
+			expectError:     "must supply configuration version ID or module source but not both",
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "configuration version with module version",
+			input: CreateRunInput{
+				ConfigurationVersionID: ptr.String("cv-1"),
+				ModuleVersion:          ptr.String("1.0.0"),
+			},
+			expectError:     "must supply configuration version ID or module version but not both",
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "module prereleases with module source",
+			input: CreateRunInput{
+				ModuleSource:             ptr.String("test-source"),
+				IncludeModulePrereleases: true,
+			},
+		},
+		{
+			name: "module prereleases without module source",
+			input: CreateRunInput{
+				ConfigurationVersionID:   ptr.String("cv-1"),
+				IncludeModulePrereleases: true,
+			},
+			expectError:     "includeModulePrereleases is not allowed without module source",
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "refresh only",
+			input: CreateRunInput{
+				ConfigurationVersionID: ptr.String("cv-1"),
+				RefreshOnly:            true,
+			},
+		},
+		{
+			name: "refresh only with destroy",
+			input: CreateRunInput{
+				ConfigurationVersionID: ptr.String("cv-1"),
+				RefreshOnly:            true,
+				IsDestroy:              true,
+			},
+			expectError:     "refresh_only is not allowed with destroy",
+			expectErrorCode: errors.EInvalid,
+		},
 	}
 
 	for _, test := range tests {
@@ -3672,4 +3738,38 @@ func TestService_GetRunGatesAwaitingDecision(t *testing.T) {
 // mockCallerActor returns a valid user actor for mock caller GetActor stubs.
 func mockCallerActor() models.Actor {
 	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
+}
+
+// isSegmentPrefix reports whether every "/"-separated segment of prefix matches the
+// leading segments of path, i.e. path is prefix itself or nested under it.
+func isSegmentPrefix(path, prefix string) bool {
+	pathParts := strings.Split(path, "/")
+	prefixParts := strings.Split(prefix, "/")
+	return len(prefixParts) <= len(pathParts) && slices.Equal(pathParts[:len(prefixParts)], prefixParts)
+}
+
+func FuzzCallerHasRootNamespaceAccess(f *testing.F) {
+	f.Add("a/b/ws", "a", "")
+	f.Add("a/b", "a/b", "")
+	f.Add("a/bc/ws", "a/b", "")
+	f.Add("a/bc", "a/b", "x")
+	f.Add("ab/ws", "a", "")
+	f.Add("a", "a/b", "")
+	f.Add("", "", "")
+	f.Add("/ws", "", "")
+	f.Add("a//ws", "a/", "")
+	f.Add("x/ws", "a", "x")
+
+	f.Fuzz(func(t *testing.T, workspacePath, root1, root2 string) {
+		memberships := []models.MembershipNamespace{{Path: root1}, {Path: root2}}
+
+		hasAccess := callerHasRootNamespaceAccess(workspacePath, memberships)
+
+		// Access must be granted on whole path segments only: "a/bc" is not under "a/b".
+		expected := isSegmentPrefix(workspacePath, root1) || isSegmentPrefix(workspacePath, root2)
+		assert.Equal(t, expected, hasAccess)
+
+		// No memberships never grants access.
+		assert.False(t, callerHasRootNamespaceAccess(workspacePath, nil))
+	})
 }

@@ -79,6 +79,51 @@ func TestFederatedRegistryValidate(t *testing.T) {
 			errMsg:    "invalid hostname format",
 		},
 		{
+			name: "hostname with scheme",
+			registry: FederatedRegistry{
+				Hostname: "https://registry.example.com",
+				Audience: "tharsis-registry",
+			},
+			expectErr: true,
+			errMsg:    "must be a host with an optional port only",
+		},
+		{
+			name: "hostname with path",
+			registry: FederatedRegistry{
+				Hostname: "registry.example.com/path",
+				Audience: "tharsis-registry",
+			},
+			expectErr: true,
+			errMsg:    "must be a host with an optional port only",
+		},
+		{
+			name: "hostname with user info",
+			registry: FederatedRegistry{
+				Hostname: "user@registry.example.com",
+				Audience: "tharsis-registry",
+			},
+			expectErr: true,
+			errMsg:    "must be a host with an optional port only",
+		},
+		{
+			name: "hostname with query",
+			registry: FederatedRegistry{
+				Hostname: "registry.example.com?q",
+				Audience: "tharsis-registry",
+			},
+			expectErr: true,
+			errMsg:    "must be a host with an optional port only",
+		},
+		{
+			name: "hostname with fragment",
+			registry: FederatedRegistry{
+				Hostname: "registry.example.com#f",
+				Audience: "tharsis-registry",
+			},
+			expectErr: true,
+			errMsg:    "must be a host with an optional port only",
+		},
+		{
 			name: "empty audience",
 			registry: FederatedRegistry{
 				Hostname: "registry.example.com",

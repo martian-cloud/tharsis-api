@@ -225,6 +225,7 @@ func BuildRouter(
 		serviceCatalog.WorkspaceService,
 		cfg.TharsisAPIURL,
 		tfeBasePath+tfeVersionPath,
+		cfg.StateVersionMaxUploadSize,
 	))
 	AddRoutes(tfeVersionRouter, tfecontrollers.NewRunController(
 		logger,
@@ -253,6 +254,7 @@ func BuildRouter(
 		serviceCatalog.VariableService,
 		cfg.TharsisAPIURL,
 		tfeBasePath+tfeVersionPath,
+		cfg.StateVersionMaxUploadSize,
 	))
 
 	/* V1 Router */
@@ -293,6 +295,7 @@ func BuildRouter(
 			respWriter,
 			requireAuthenticatedCallerMiddleware,
 			serviceCatalog.RunService,
+			cfg.PlanMaxUploadSize,
 		))
 		AddRoutes(r, controllers.NewJobController(
 			logger,

@@ -234,7 +234,7 @@ func (p *CleanupPolicy) Validate() error {
 
 		return p.RunPolicyData.validate()
 	default:
-		return errors.New("unsupported cleanup policy kind %q", p.Kind)
+		return errors.New("unsupported cleanup policy kind %q", p.Kind, errors.WithErrorCode(errors.EInvalid))
 	}
 }
 

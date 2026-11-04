@@ -12,6 +12,9 @@ import (
 
 var _ Model = (*User)(nil)
 
+// maxPasswordBytes is the longest password bcrypt can hash.
+const maxPasswordBytes = 72
+
 // User represents a human user account
 type User struct {
 	Username       string
@@ -85,6 +88,11 @@ func (u *User) VerifyPassword(password string) bool {
 func (u *User) SetPassword(password string) error {
 	if password == "" {
 		return errors.New("password cannot be empty", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	// bcrypt only supports passwords up to 72 bytes.
+	if len(password) > maxPasswordBytes {
+		return errors.New("password cannot be longer than %d bytes", maxPasswordBytes, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

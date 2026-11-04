@@ -10,6 +10,7 @@ import (
 	"hash"
 	"hash/crc32"
 	"io"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -634,6 +635,8 @@ func (m *manager) openLogsReader(ctx context.Context, logStream *models.LogStrea
 	if startOffset < 0 || limit < 0 {
 		return nil, errors.New("limit and offset cannot be negative", errors.WithErrorCode(errors.EInvalid))
 	}
+	// Clamp the range so startOffset+limit can't overflow; no stream holds data that far out.
+	limit = min(limit, math.MaxInt-startOffset)
 	if limit == 0 {
 		return io.NopCloser(bytes.NewReader(nil)), nil
 	}

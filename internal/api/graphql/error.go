@@ -2,6 +2,8 @@
 package graphql
 
 import (
+	stderrors "errors"
+
 	grapherrors "github.com/graph-gophers/graphql-go/errors"
 	graphqlgo "github.com/graph-gophers/graphql-go/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -88,6 +90,26 @@ func addErrorCode(qe *graphqlgo.QueryError) *graphqlgo.QueryError {
 		} else {
 			qe.Err = errors.Wrap(qe.Err, "invalid query", errors.WithErrorCode(errors.EInvalid))
 		}
+	} else if isRequestError(qe) {
+		qe.Err = errors.New("%s", qe.Message, errors.WithErrorCode(errors.EInvalid))
 	}
 	return qe
+}
+
+// isRequestError reports whether graphql-go raised the error about the request itself rather than
+// while resolving it: an empty document, an unknown or ambiguous operation name, a subscription
+// sent over HTTP, or an argument it could not coerce. Such errors carry no validation rule, no
+// path and no resolver error. Errors from resolving a field carry a path, and panics and context
+// errors are excluded by their underlying error.
+func isRequestError(qe *graphqlgo.QueryError) bool {
+	if qe.Path != nil || qe.ResolverError != nil {
+		return false
+	}
+	if qe.Err == nil {
+		return true
+	}
+	var tharsisErr *errors.TharsisError
+	return !stderrors.As(qe.Err, &tharsisErr) &&
+		!errors.IsContextCanceledError(qe.Err) &&
+		!errors.IsDeadlineExceededError(qe.Err)
 }

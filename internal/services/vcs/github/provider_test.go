@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -190,7 +191,7 @@ func TestBuildOAuthAuthorizationURL(t *testing.T) {
 }
 
 func TestBuildRepositoryURL(t *testing.T) {
-	repositoryPath := "/owner/repository"
+	repositoryPath := "owner/repository"
 
 	testCases := []struct {
 		name        string
@@ -203,7 +204,7 @@ func TestBuildRepositoryURL(t *testing.T) {
 				ProviderURL:    defaultURL,
 				RepositoryPath: repositoryPath,
 			},
-			expectedURL: "https://github.com" + repositoryPath, // "api." prefix should be stripped.
+			expectedURL: "https://github.com" + "/" + repositoryPath, // "api." prefix should be stripped.
 		},
 		{
 			name: "repository URL with custom API URL",
@@ -211,7 +212,7 @@ func TestBuildRepositoryURL(t *testing.T) {
 				ProviderURL:    customProviderURL,
 				RepositoryPath: repositoryPath,
 			},
-			expectedURL: customProviderURL.String() + repositoryPath,
+			expectedURL: customProviderURL.String() + "/" + repositoryPath,
 		},
 	}
 
@@ -1072,4 +1073,96 @@ func TestDeleteWebhook(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateRef(t *testing.T) {
+	testCases := []struct {
+		name        string
+		ref         string
+		expectError bool
+	}{
+		{name: "branch", ref: "main"},
+		{name: "branch with slash", ref: "feature/branch"},
+		{name: "tag", ref: "v1.2.3"},
+		{name: "commit", ref: "0123456789abcdef0123456789abcdef01234567"},
+		{name: "empty", ref: "", expectError: true},
+		{name: "parent segment", ref: "feature/../main", expectError: true},
+		{name: "query", ref: "main?x=y", expectError: true},
+		{name: "fragment", ref: "main#x", expectError: true},
+		{name: "percent encoding", ref: "main%2e", expectError: true},
+		{name: "backslash", ref: `main\x`, expectError: true},
+		{name: "whitespace", ref: "main branch", expectError: true},
+		{name: "control character", ref: "main\nx", expectError: true},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateRef(test.ref)
+			if test.expectError {
+				assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+// TestRefsAreNotEscaped checks refs containing a slash reach GitHub unescaped and invalid refs
+// never reach it.
+func TestRefsAreNotEscaped(t *testing.T) {
+	ctx := context.Background()
+
+	var requested []string
+	client := newTestClient(func(r *http.Request) *http.Response {
+		requested = append(requested, r.URL.EscapedPath())
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBufferString("{}")),
+			Status:     "200",
+			Header:     make(http.Header),
+		}
+	})
+
+	logger, _ := logger.NewForTest()
+	provider, err := New(ctx, logger, client, "")
+	assert.Nil(t, err)
+
+	_, err = provider.GetDiff(ctx, &types.GetDiffInput{
+		ProviderURL: defaultURL, AccessToken: "an-access-token", RepositoryPath: "owner/repository", Ref: "feature/x",
+	})
+	assert.Nil(t, err)
+
+	_, err = provider.GetDiffs(ctx, &types.GetDiffsInput{
+		ProviderURL: defaultURL, AccessToken: "an-access-token", RepositoryPath: "owner/repository",
+		BaseRef: "release/1", HeadRef: "feature/x",
+	})
+	assert.Nil(t, err)
+
+	_, err = provider.GetArchive(ctx, &types.GetArchiveInput{
+		ProviderURL: defaultURL, AccessToken: "an-access-token", RepositoryPath: "owner/repository", Ref: "feature/x",
+	})
+	assert.Nil(t, err)
+
+	assert.Equal(t, []string{
+		"/repos/owner/repository/commits/feature/x",
+		"/repos/owner/repository/compare/release/1...feature/x",
+		"/repos/owner/repository/tarball/feature/x",
+	}, requested)
+
+	requested = nil
+	_, err = provider.GetDiff(ctx, &types.GetDiffInput{
+		ProviderURL: defaultURL, AccessToken: "an-access-token", RepositoryPath: "owner/repository", Ref: "../x",
+	})
+	assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+	_, err = provider.GetDiffs(ctx, &types.GetDiffsInput{
+		ProviderURL: defaultURL, AccessToken: "an-access-token", RepositoryPath: "owner/repository",
+		BaseRef: "main", HeadRef: "x?y",
+	})
+	assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+	// url.JoinPath cleans "..", so without the check this ref would climb out of the tarball segment.
+	_, err = provider.GetArchive(ctx, &types.GetArchiveInput{
+		ProviderURL: defaultURL, AccessToken: "an-access-token", RepositoryPath: "owner/repository", Ref: "../../../user",
+	})
+	assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+	assert.Empty(t, requested)
 }

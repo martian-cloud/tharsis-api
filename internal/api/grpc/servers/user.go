@@ -3,6 +3,7 @@ package servers
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -155,7 +156,13 @@ func toPBUser(u *models.User) *pb.User {
 func (s *UserServer) ActivateAdminMode(ctx context.Context, req *pb.ActivateAdminModeRequest) (*pb.User, error) {
 	input := &user.ActivateAdminModeInput{}
 	if req.DurationMinutes != nil {
-		duration := time.Duration(req.GetDurationMinutes()) * time.Minute
+		minutes := time.Duration(req.GetDurationMinutes())
+		// Reject values whose conversion would overflow, which could otherwise wrap to a
+		// small duration the service accepts.
+		if minutes > math.MaxInt64/time.Minute || minutes < math.MinInt64/time.Minute {
+			return nil, errors.New("duration_minutes is out of range", errors.WithErrorCode(errors.EInvalid))
+		}
+		duration := minutes * time.Minute
 		input.Duration = &duration
 	}
 

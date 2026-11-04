@@ -217,11 +217,13 @@ func (s *TerraformProviderServer) GetTerraformProviderVersions(ctx context.Conte
 	}
 
 	input := &providerregistry.GetProviderVersionsInput{
-		Sort:              &sort,
-		PaginationOptions: paginationOpts,
-		ProviderID:        providerID,
-		SemanticVersion:   req.SemanticVersion,
-		Latest:            req.Latest,
+		Sort:                     &sort,
+		PaginationOptions:        paginationOpts,
+		ProviderID:               providerID,
+		SemanticVersion:          req.SemanticVersion,
+		Latest:                   req.Latest,
+		SHASumsUploaded:          req.ShaSumsUploaded,
+		SHASumsSignatureUploaded: req.ShaSumsSigUploaded,
 	}
 
 	result, err := s.serviceCatalog.TerraformProviderRegistryService.GetProviderVersions(ctx, input)
@@ -332,6 +334,8 @@ func (s *TerraformProviderServer) GetTerraformProviderPlatforms(ctx context.Cont
 		Sort:              &sort,
 		PaginationOptions: paginationOpts,
 		BinaryUploaded:    req.BinaryUploaded,
+		OperatingSystem:   req.OperatingSystem,
+		Architecture:      req.Architecture,
 	}
 
 	if req.ProviderVersionId != nil {

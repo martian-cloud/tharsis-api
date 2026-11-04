@@ -1099,6 +1099,10 @@ func parseSCIMGroupMemberID(operation *Operation) (string, error) {
 		return "", fmt.Errorf("unexpected value type: expected slice, got %T", operation.Value)
 	}
 
+	if len(valueSlice) == 0 {
+		return "", fmt.Errorf("unexpected value: expected at least one member")
+	}
+
 	// Get the first element from the slice and make sure its a map.
 	firstElement, ok := valueSlice[0].(map[string]interface{})
 	if !ok {

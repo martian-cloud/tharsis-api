@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -135,7 +136,10 @@ func createGenericOIDCLoginError(serviceAccountID string, token jwt.Token) error
 }
 
 func extractClaimsFromToken(token jwt.Token) (string, error) {
-	claims := token.PrivateClaims()
+	// PrivateClaims returns the token's own map, so copy it before adding the registered claims.
+	privateClaims := token.PrivateClaims()
+	claims := make(map[string]any, len(privateClaims)+7)
+	maps.Copy(claims, privateClaims)
 	if iss := token.Issuer(); iss != "" {
 		claims["iss"] = iss
 	}

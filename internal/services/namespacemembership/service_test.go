@@ -1019,3 +1019,57 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 		})
 	}
 }
+
+func TestGetTargetTypeID(t *testing.T) {
+	testCases := []struct {
+		name            string
+		namespace       models.MembershipNamespace
+		expectType      models.ActivityEventTargetType
+		expectID        string
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:       "group namespace",
+			namespace:  models.MembershipNamespace{GroupID: ptr.String("group-1")},
+			expectType: models.TargetGroup,
+			expectID:   "group-1",
+		},
+		{
+			name:       "workspace namespace",
+			namespace:  models.MembershipNamespace{WorkspaceID: ptr.String("workspace-1")},
+			expectType: models.TargetWorkspace,
+			expectID:   "workspace-1",
+		},
+		{
+			name:       "empty group ID falls back to the workspace",
+			namespace:  models.MembershipNamespace{GroupID: ptr.String(""), WorkspaceID: ptr.String("workspace-1")},
+			expectType: models.TargetWorkspace,
+			expectID:   "workspace-1",
+		},
+		{
+			name:            "neither group nor workspace",
+			namespace:       models.MembershipNamespace{},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:            "empty group ID and no workspace",
+			namespace:       models.MembershipNamespace{GroupID: ptr.String("")},
+			expectErrorCode: errors.EInternal,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			targetType, targetID, err := getTargetTypeID(&models.NamespaceMembership{Namespace: test.namespace})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectType, targetType)
+			assert.Equal(t, test.expectID, targetID)
+		})
+	}
+}

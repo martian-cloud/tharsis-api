@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -155,6 +158,10 @@ func (p *Provider) BuildOAuthAuthorizationURL(input *types.BuildOAuthAuthorizati
 
 // BuildRepositoryURL returns the repository URL associated with the provider.
 func (p *Provider) BuildRepositoryURL(input *types.BuildRepositoryURLInput) (string, error) {
+	if _, err := models.NormalizeRepositoryPath(input.RepositoryPath); err != nil {
+		return "", err
+	}
+
 	input.ProviderURL.Host = p.stripAPIPrefix(input.ProviderURL.Host)
 	return url.JoinPath(input.ProviderURL.String(), input.RepositoryPath)
 }
@@ -193,6 +200,10 @@ func (p *Provider) TestConnection(ctx context.Context, input *types.TestConnecti
 // GetProject retrieves information about a project or repository.
 // https://docs.github.com/en/rest/repos/repos#get-a-repository
 func (p *Provider) GetProject(ctx context.Context, input *types.GetProjectInput) (*types.GetProjectPayload, error) {
+	if _, err := models.NormalizeRepositoryPath(input.RepositoryPath); err != nil {
+		return nil, err
+	}
+
 	// Build the request URL.
 	path := strings.Join([]string{
 		"repos",
@@ -244,6 +255,13 @@ func (p *Provider) GetProject(ctx context.Context, input *types.GetProjectInput)
 // GetDiff gets the diff for a single ref (branch, tag, commit, etc.).
 // https://docs.github.com/en/rest/commits/commits#get-a-commit
 func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*types.GetDiffsPayload, error) {
+	if _, err := models.NormalizeRepositoryPath(input.RepositoryPath); err != nil {
+		return nil, err
+	}
+	if err := validateRef(input.Ref); err != nil {
+		return nil, err
+	}
+
 	path := strings.Join([]string{
 		"repos",
 		input.RepositoryPath,
@@ -294,6 +312,16 @@ func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*typ
 // GetDiffs retrieves diffs for two different refs (branches, commits, etc.)
 // https://docs.github.com/en/rest/commits/commits#compare-two-commits
 func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*types.GetDiffsPayload, error) {
+	if _, err := models.NormalizeRepositoryPath(input.RepositoryPath); err != nil {
+		return nil, err
+	}
+	if err := validateRef(input.BaseRef); err != nil {
+		return nil, err
+	}
+	if err := validateRef(input.HeadRef); err != nil {
+		return nil, err
+	}
+
 	path := strings.Join([]string{
 		"repos",
 		input.RepositoryPath,
@@ -344,6 +372,13 @@ func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*t
 // GetArchive downloads the entire repository archive for a branch or tag.
 // https://docs.github.com/en/rest/repos/contents#download-a-repository-archive-tar
 func (p *Provider) GetArchive(ctx context.Context, input *types.GetArchiveInput) (*http.Response, error) {
+	if _, err := models.NormalizeRepositoryPath(input.RepositoryPath); err != nil {
+		return nil, err
+	}
+	if err := validateRef(input.Ref); err != nil {
+		return nil, err
+	}
+
 	path := strings.Join([]string{
 		"repos",
 		input.RepositoryPath,
@@ -444,6 +479,10 @@ func (p *Provider) CreateAccessToken(ctx context.Context, input *types.CreateAcc
 // Returns the webhook ID from the response.
 // https://docs.github.com/en/rest/webhooks/repos#create-a-repository-webhook
 func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhookInput) (*types.WebhookPayload, error) {
+	if _, err := models.NormalizeRepositoryPath(input.RepositoryPath); err != nil {
+		return nil, err
+	}
+
 	// Build the request URL.
 	path := strings.Join([]string{
 		"repos",
@@ -524,6 +563,10 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 // DeleteWebhook deletes a webhook at the specified provider.
 // https://docs.github.com/en/rest/webhooks/repos#delete-a-repository-webhook
 func (p *Provider) DeleteWebhook(ctx context.Context, input *types.DeleteWebhookInput) error {
+	if _, err := models.NormalizeRepositoryPath(input.RepositoryPath); err != nil {
+		return err
+	}
+
 	// Build the request URL
 	path := strings.Join([]string{
 		"repos",
@@ -579,4 +622,16 @@ func (p *Provider) createChangesMap(diffResp *getDiffsResponse) map[string]struc
 	}
 
 	return changesMap
+}
+
+// validateRef verifies a ref (branch, tag or commit) before it's joined into an API URL. Slashes are
+// allowed since refs like "feature/x" are common, but the ref must not be able to climb out of the API
+// path ("..") or alter the URL (query, fragment, percent-encoding, backslashes, whitespace).
+func validateRef(ref string) error {
+	if ref == "" || slices.Contains(strings.Split(ref, "/"), "..") || strings.ContainsFunc(ref, func(r rune) bool {
+		return strings.ContainsRune(`?#%\`, r) || unicode.IsSpace(r) || unicode.IsControl(r)
+	}) {
+		return errors.New("invalid ref %q", ref, errors.WithErrorCode(errors.EInvalid))
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package scim
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -1484,4 +1485,50 @@ func TestSCIMMutationsRequireSCIMCaller(t *testing.T) {
 
 	err = service.DeleteSCIMGroup(ctx, &DeleteSCIMResourceInput{ID: resourceUUID})
 	assert.Equal(t, errors.EForbidden, errors.ErrorCode(err), "DeleteSCIMGroup")
+}
+
+func FuzzIsSCIMGroupMemberUpdateRequired(f *testing.F) {
+	f.Add("add", `[{"value":"user-1"}]`, "user-1")
+	f.Add("remove", `[{"value":"user-1"}]`, "user-1")
+	f.Add("remove", `null`, "user-1")
+	f.Add("replace", `[]`, "")
+	f.Add("add", `[1]`, "")
+	f.Add("add", `[{"value":5}]`, "")
+	f.Add("add", `"user-1"`, "")
+
+	f.Fuzz(func(t *testing.T, op, valueJSON, memberID string) {
+		// The operation value arrives as decoded JSON from a SCIM PATCH request body.
+		var value any
+		if err := json.Unmarshal([]byte(valueJSON), &value); err != nil {
+			t.Skip()
+		}
+
+		operation := &Operation{OP: OP(op), Value: value}
+		members := []models.TeamMember{{UserID: memberID}}
+
+		// Must never panic on arbitrary input.
+		required, err := isSCIMGroupMemberUpdateRequired(operation, members)
+		if err != nil {
+			assert.False(t, required)
+		}
+	})
+}
+
+func FuzzParseSCIMGroupMemberID(f *testing.F) {
+	f.Add(`[{"value":"user-1"}]`)
+	f.Add(`[]`)
+	f.Add(`[null]`)
+	f.Add(`{}`)
+
+	f.Fuzz(func(t *testing.T, valueJSON string) {
+		var value any
+		if err := json.Unmarshal([]byte(valueJSON), &value); err != nil {
+			t.Skip()
+		}
+
+		userID, err := parseSCIMGroupMemberID(&Operation{Value: value})
+		if err != nil {
+			assert.Empty(t, userID)
+		}
+	})
 }

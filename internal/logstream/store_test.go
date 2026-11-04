@@ -3,7 +3,9 @@ package logstream
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -273,6 +275,35 @@ func TestReadRangeNegativeArgs(t *testing.T) {
 		_, err := logStore.ReadRange(ctx, "logstreams/stream-1/c0.txt", 0, -1)
 		require.Error(t, err)
 		assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+		mockObjectStore.AssertNotCalled(t, "GetObjectStream", mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+func TestReadRangeOverflow(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("a range past the largest offset is clamped instead of overflowing", func(t *testing.T) {
+		mockObjectStore := objectstore.MockObjectStore{}
+		wantRange := fmt.Sprintf("bytes=%d-%d", math.MaxInt-5, math.MaxInt-1)
+		mockObjectStore.On("GetObjectStream", mock.Anything, "k", &objectstore.DownloadOptions{ContentRange: &wantRange}).
+			Return(&objectstore.GetObjectStreamOutput{Body: io.NopCloser(strings.NewReader(""))}, nil)
+		logStore := NewLogStore(&mockObjectStore, nil)
+
+		reader, err := logStore.ReadRange(ctx, "k", math.MaxInt-5, 100)
+		require.NoError(t, err)
+		require.NoError(t, reader.Close())
+		mockObjectStore.AssertExpectations(t)
+	})
+
+	t.Run("a read at the largest offset is empty without touching the object store", func(t *testing.T) {
+		mockObjectStore := objectstore.MockObjectStore{}
+		logStore := NewLogStore(&mockObjectStore, nil)
+
+		reader, err := logStore.ReadRange(ctx, "k", math.MaxInt, 100)
+		require.NoError(t, err)
+		data, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		assert.Empty(t, data)
 		mockObjectStore.AssertNotCalled(t, "GetObjectStream", mock.Anything, mock.Anything, mock.Anything)
 	})
 }

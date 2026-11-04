@@ -40,6 +40,13 @@ func TharsisWorkspaceToWorkspace(workspace *models.Workspace) *Workspace {
 		resp.CurrentStateVersion = &gotfe.StateVersion{ID: gid.ToGlobalID(types.StateVersionModelType, workspace.CurrentStateVersionID)}
 	}
 
+	// The current run is the run holding the workspace slot. The Terraform CLI counts a waiting run's
+	// queue position by walking the workspace's runs from the waiting run back to this one; without it,
+	// the CLI counts every older run that hasn't finished.
+	if workspace.CurrentApplyRunID != nil && *workspace.CurrentApplyRunID != "" {
+		resp.CurrentRun = &gotfe.Run{ID: gid.ToGlobalID(types.RunModelType, *workspace.CurrentApplyRunID)}
+	}
+
 	return resp
 }
 

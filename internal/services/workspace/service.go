@@ -1023,17 +1023,20 @@ func (s *service) GetStateVersionInventory(ctx context.Context, stateVersion *mo
 			resource.Module = "root"
 		}
 
+		// The state is uploaded by clients and its provider addresses aren't validated on upload, so a
+		// malformed one is invalid input rather than an internal error. The code lets the message reach
+		// the caller instead of being masked as an internal error.
 		startIndex := strings.Index(r.ProviderConfig, "[\"")
 		if startIndex == -1 {
 			return nil, errors.New(
 				"invalid provider config encountered when parsing state version resources %s", r.ProviderConfig,
-				errors.WithSpan(span))
+				errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 		endIndex := strings.LastIndex(r.ProviderConfig, "\"]")
-		if endIndex == -1 {
+		if endIndex < startIndex+2 {
 			return nil, errors.New(
 				"invalid provider config encountered when parsing state version resources %s", r.ProviderConfig,
-				errors.WithSpan(span))
+				errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 
 		resource.Provider = r.ProviderConfig[startIndex+2 : endIndex]
@@ -1151,7 +1154,8 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	// We need to decode the base64 encoded string
 	decoded, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decoded base64-encoded state version", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to decoded base64-encoded state version",
+			errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Decode and validate the state, and pre-compute which outputs to persist,
@@ -1161,10 +1165,10 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	// connection.
 	var state stateV4
 	if err = json.Unmarshal(decoded, &state); err != nil {
-		return nil, errors.New("failed to unmarshal decoded data: %s", err, errors.WithSpan(span))
+		return nil, errors.New("failed to unmarshal decoded data: %s", err, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 	if state.Version != version4 {
-		return nil, errors.New("expected stateVersionV4, got %d", state.Version, errors.WithSpan(span))
+		return nil, errors.New("expected stateVersionV4, got %d", state.Version, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// jsonData is the optional "terraform show -json" rendering of the same state, base64 encoded like

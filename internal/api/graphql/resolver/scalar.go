@@ -3,6 +3,7 @@ package resolver
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 )
 
@@ -27,6 +28,13 @@ func (i *Int64) UnmarshalGraphQL(input interface{}) error {
 		*i = Int64(input)
 		return nil
 	case float64:
+		// JSON variables decode to float64. Converting a fractional, non-finite or out of range
+		// float would silently truncate it (or produce an implementation-defined value), so only
+		// a whole number within the int64 range is accepted. -2^63 is representable exactly;
+		// 2^63 (float64(math.MaxInt64) rounds up to it) is not in range.
+		if input != math.Trunc(input) || input < math.MinInt64 || input >= math.MaxInt64 {
+			return fmt.Errorf("value for Int64 must be a whole number within the 64-bit integer range: %v", input)
+		}
 		*i = Int64(input)
 		return nil
 	case string:

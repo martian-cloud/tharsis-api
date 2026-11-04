@@ -8,9 +8,12 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/hashicorp/go-version"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/terraform"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -31,6 +34,22 @@ type TerraformCLIVersionsInput struct {
 	Version      string
 	OS           string
 	Architecture string
+}
+
+// validate checks the fields that make up the binary's object key and download URL: the version must be
+// a semantic version and the OS and architecture plain platform names (e.g. linux, amd64), so none of
+// them can add a path segment.
+func (t *TerraformCLIVersionsInput) validate() error {
+	if _, err := version.NewSemver(t.Version); err != nil {
+		return errors.New("invalid Terraform CLI version %q", t.Version, errors.WithErrorCode(errors.EInvalid))
+	}
+	if !models.IsValidPlatformComponent(t.OS) {
+		return errors.New("invalid Terraform CLI operating system %q", t.OS, errors.WithErrorCode(errors.EInvalid))
+	}
+	if !models.IsValidPlatformComponent(t.Architecture) {
+		return errors.New("invalid Terraform CLI architecture %q", t.Architecture, errors.WithErrorCode(errors.EInvalid))
+	}
+	return nil
 }
 
 // TerraformCLIVersions is an alias to terraform.CLIVersions. The type and the version-fetching
@@ -95,6 +114,10 @@ func (s *service) CreateTerraformCLIDownloadURL(ctx context.Context, input *Terr
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
 		return "", err
+	}
+
+	if err := input.validate(); err != nil {
+		return "", errors.Wrap(err, "invalid Terraform CLI download input", errors.WithSpan(span))
 	}
 
 	exists, err := s.cliStore.DoesTerraformCLIBinaryExist(ctx, input.Version, input.OS, input.Architecture)

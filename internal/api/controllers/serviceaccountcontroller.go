@@ -49,7 +49,7 @@ func (c *serviceAccountController) Login(w http.ResponseWriter, r *http.Request)
 
 	var req ServiceAccountLoginOptions
 	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
-		c.respWriter.RespondWithError(r.Context(), w, err)
+		c.respWriter.RespondWithError(r.Context(), w, errors.Wrap(err, "failed to parse request body", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
@@ -81,16 +81,17 @@ func (c *serviceAccountController) Login(w http.ResponseWriter, r *http.Request)
 func (c *serviceAccountController) ClientCredentialsToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	// Token request parameters must be in the form body (RFC 6749 section 3.2), never the query string.
 	r.ParseForm()
 
-	grantType := r.Form.Get("grant_type")
+	grantType := r.PostForm.Get("grant_type")
 	if grantType != "client_credentials" {
 		c.respWriter.RespondWithError(ctx, w, errors.New("unsupported grant_type, only client_credentials is supported", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
-	clientID := r.Form.Get("client_id")
-	clientSecret := r.Form.Get("client_secret")
+	clientID := r.PostForm.Get("client_id")
+	clientSecret := r.PostForm.Get("client_secret")
 
 	response, err := c.saService.CreateClientCredentialsToken(ctx, &serviceaccount.CreateClientCredentialsTokenInput{
 		ClientID:     clientID,

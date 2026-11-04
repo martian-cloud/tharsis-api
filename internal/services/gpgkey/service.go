@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/aws/smithy-go/ptr"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
@@ -290,14 +291,32 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		return nil, err
 	}
 
+	// Only the first armor block is read, so reject any others rather than silently ignoring them.
+	if strings.Count(input.ASCIIArmor, "-----BEGIN ") > 1 {
+		return nil, errors.New("ascii armor must contain exactly one %s", openpgp.PublicKeyType, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	block, err := armor.Decode(strings.NewReader(input.ASCIIArmor))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read ascii key armor", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	if block.Type != openpgp.PublicKeyType {
+		return nil, errors.New("invalid ascii armor type, expected %s", openpgp.PublicKeyType, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
 	// Read key to get GPG key ID and fingerprint
-	entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(input.ASCIIArmor))
+	entityList, err := openpgp.ReadKeyRing(block.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read ascii key armor", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	if len(entityList) != 1 {
 		return nil, errors.New("invalid number of public keys found, expected 1 but found %d", len(entityList), errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	if hasPrivateKey(entityList[0]) {
+		return nil, errors.New("ascii armor must not contain private key material", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
@@ -308,12 +327,20 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		return nil, errors.New("group ID does not exist: %s", input.GroupID, errors.WithSpan(span))
 	}
 
+	// Store the parsed key re-armored rather than the raw input. The decoder ignores some text in the
+	// input (e.g. around the block or after the checksum line), and the stored armor is served to
+	// clients that verify provider signatures, so it must hold exactly the key that was fingerprinted.
+	asciiArmor, err := armorPublicKey(entityList[0])
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to armor GPG public key", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
 	primaryKey := entityList[0].PrimaryKey
 	toCreate := &models.GPGKey{
 		GroupID:     input.GroupID,
 		GPGKeyID:    primaryKey.KeyId,
 		Fingerprint: fmt.Sprintf("%016X", primaryKey.Fingerprint),
-		ASCIIArmor:  input.ASCIIArmor,
+		ASCIIArmor:  asciiArmor,
 		CreatedBy:   caller.GetActor(),
 	}
 
@@ -371,4 +398,33 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 	}
 
 	return createdKey, nil
+}
+
+// hasPrivateKey returns true if the entity's primary key or any of its subkeys includes private key material.
+func hasPrivateKey(entity *openpgp.Entity) bool {
+	if entity.PrivateKey != nil {
+		return true
+	}
+	for _, subkey := range entity.Subkeys {
+		if subkey.PrivateKey != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// armorPublicKey returns the entity's public key, user IDs, subkeys and signatures as a public key armor block.
+func armorPublicKey(entity *openpgp.Entity) (string, error) {
+	var buf strings.Builder
+	w, err := armor.Encode(&buf, openpgp.PublicKeyType, nil)
+	if err != nil {
+		return "", err
+	}
+	if err = entity.Serialize(w); err != nil {
+		return "", err
+	}
+	if err = w.Close(); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }

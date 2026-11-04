@@ -79,6 +79,11 @@ func (s *service) UpdateResourceLimit(ctx context.Context, input *UpdateResource
 		return nil, errors.New("only admins with admin mode activated can update resource limits", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
 	}
 
+	// Limits are compared against counts and sizes, so a negative value has no meaning.
+	if input.Value < 0 {
+		return nil, errors.New("resource limit value cannot be negative", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
 	// Validate the limit name/key.
 	foundLimit, err := s.dbClient.ResourceLimits.GetResourceLimit(ctx, string(input.Name))
 	if err != nil {

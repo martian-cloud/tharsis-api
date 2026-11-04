@@ -2,7 +2,6 @@ package models
 
 import (
 	"net/url"
-	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
@@ -67,14 +66,8 @@ func validateHostname(hostname string) error {
 		return errors.New("hostname cannot exceed 64 characters", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	// Use url.Parse to validate the hostname
-	// First, add a scheme if not present to make url.Parse work correctly
-	urlToCheck := hostname
-	if !strings.Contains(urlToCheck, "://") {
-		urlToCheck = "https://" + urlToCheck
-	}
-
-	parsedURL, err := url.Parse(urlToCheck)
+	// Use url.Parse with a scheme added to validate the hostname
+	parsedURL, err := url.Parse("https://" + hostname)
 	if err != nil {
 		return errors.Wrap(err, "invalid hostname format", errors.WithErrorCode(errors.EInvalid))
 	}
@@ -82,6 +75,11 @@ func validateHostname(hostname string) error {
 	// Check for empty host
 	if parsedURL.Host == "" {
 		return errors.New("invalid hostname: host part is empty", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	// The host must be the entire input, so a scheme, user info, path, query or fragment is rejected
+	if parsedURL.Host != hostname {
+		return errors.New("invalid hostname: must be a host with an optional port only", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil

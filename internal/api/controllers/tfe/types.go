@@ -462,6 +462,12 @@ type VariableList struct {
 	Items []*Variable
 }
 
+// RunList represents a page of a workspace's runs.
+type RunList struct {
+	*gotfe.Pagination
+	Items []*Run
+}
+
 // RunQueue represents the current run queue of an organization.
 type RunQueue struct {
 	*gotfe.Pagination

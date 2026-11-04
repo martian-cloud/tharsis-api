@@ -8,12 +8,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func TestParse(t *testing.T) {
 	type testCase struct {
 		name               string
 		expectErrorMessage string
+		expectErrorCode    errors.CodeType
 		tfPlan             *tfjson.Plan
 		tfProviderSchemas  *tfjson.ProviderSchemas
 		expectDiff         *Diff
@@ -29,6 +31,149 @@ func TestParse(t *testing.T) {
 				FormatVersion: "2.0",
 			},
 			expectErrorMessage: "the plan json format is not valid: unsupported plan format version: \"2.0.0\" does not satisfy \">= 0.1, < 2.0\"",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name:               "nil plan",
+			tfProviderSchemas:  &tfjson.ProviderSchemas{FormatVersion: "1.0"},
+			expectErrorMessage: "the plan json format is not valid: plan is nil",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name:               "nil provider schemas",
+			tfPlan:             &tfjson.Plan{FormatVersion: "1.2"},
+			expectErrorMessage: "the provider schemas json is not valid: provider schema data is nil",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name:               "provider schemas with unsupported version",
+			tfPlan:             &tfjson.Plan{FormatVersion: "1.2"},
+			tfProviderSchemas:  &tfjson.ProviderSchemas{FormatVersion: "99.0"},
+			expectErrorMessage: "the provider schemas json is not valid: unsupported provider schema format version: \"99.0.0\" does not satisfy \">= 0.1, < 2.0\"",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name: "resource change without change data",
+			tfPlan: &tfjson.Plan{
+				FormatVersion:   "1.2",
+				ResourceChanges: []*tfjson.ResourceChange{{Address: "test_resource.foo", Mode: "managed", Type: "test_resource", ProviderName: "test"}},
+			},
+			tfProviderSchemas:  &tfjson.ProviderSchemas{FormatVersion: "1.0"},
+			expectErrorMessage: "plan contains a resource change without change data",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name: "null resource change",
+			tfPlan: &tfjson.Plan{
+				FormatVersion:   "1.2",
+				ResourceChanges: []*tfjson.ResourceChange{nil},
+			},
+			tfProviderSchemas:  &tfjson.ProviderSchemas{FormatVersion: "1.0"},
+			expectErrorMessage: "plan contains a resource change without change data",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name: "null resource drift",
+			tfPlan: &tfjson.Plan{
+				FormatVersion: "1.2",
+				ResourceDrift: []*tfjson.ResourceChange{nil},
+			},
+			tfProviderSchemas:  &tfjson.ProviderSchemas{FormatVersion: "1.0"},
+			expectErrorMessage: "plan contains a null resource drift entry",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name: "null output change",
+			tfPlan: &tfjson.Plan{
+				FormatVersion: "1.2",
+				OutputChanges: map[string]*tfjson.Change{"test": nil},
+			},
+			tfProviderSchemas:  &tfjson.ProviderSchemas{FormatVersion: "1.0"},
+			expectErrorMessage: "plan contains output test without change data",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name: "no-op resource change without a schema is not rendered",
+			tfPlan: &tfjson.Plan{
+				FormatVersion: "1.2",
+				ResourceChanges: []*tfjson.ResourceChange{{
+					Address: "test_resource.foo", Mode: "managed", Type: "test_resource", ProviderName: "test",
+					Change: &tfjson.Change{Actions: tfjson.Actions{tfjson.ActionNoop}},
+				}},
+			},
+			tfProviderSchemas: &tfjson.ProviderSchemas{FormatVersion: "1.0"},
+			expectDiff:        &Diff{Resources: []*ResourceDiff{}, Outputs: []*OutputDiff{}},
+		},
+		{
+			name: "moved no-op resource change without a schema is rendered, so it needs one",
+			tfPlan: &tfjson.Plan{
+				FormatVersion: "1.2",
+				ResourceChanges: []*tfjson.ResourceChange{{
+					Address: "test_resource.bar", PreviousAddress: "test_resource.foo", Mode: "managed", Type: "test_resource", ProviderName: "test",
+					Change: &tfjson.Change{Actions: tfjson.Actions{tfjson.ActionNoop}},
+				}},
+			},
+			tfProviderSchemas:  &tfjson.ProviderSchemas{FormatVersion: "1.0"},
+			expectErrorMessage: "provider schema not found for provider test",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name: "imported no-op resource change without a schema is rendered, so it needs one",
+			tfPlan: &tfjson.Plan{
+				FormatVersion: "1.2",
+				ResourceChanges: []*tfjson.ResourceChange{{
+					Address: "test_resource.foo", Mode: "managed", Type: "test_resource", ProviderName: "test",
+					Change: &tfjson.Change{Actions: tfjson.Actions{tfjson.ActionNoop}, Importing: &tfjson.Importing{ID: "foo"}},
+				}},
+			},
+			tfProviderSchemas:  &tfjson.ProviderSchemas{FormatVersion: "1.0"},
+			expectErrorMessage: "provider schema not found for provider test",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name: "resource change for a provider missing from the schemas",
+			tfPlan: &tfjson.Plan{
+				FormatVersion: "1.2",
+				ResourceChanges: []*tfjson.ResourceChange{{
+					Address: "test_resource.foo", Mode: "managed", Type: "test_resource", ProviderName: "test",
+					Change: &tfjson.Change{Actions: tfjson.Actions{tfjson.ActionCreate}},
+				}},
+			},
+			tfProviderSchemas:  &tfjson.ProviderSchemas{FormatVersion: "1.0"},
+			expectErrorMessage: "provider schema not found for provider test",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name: "resource change for a resource type missing from the provider schema",
+			tfPlan: &tfjson.Plan{
+				FormatVersion: "1.2",
+				ResourceChanges: []*tfjson.ResourceChange{{
+					Address: "test_resource.foo", Mode: "managed", Type: "test_resource", ProviderName: "test",
+					Change: &tfjson.Change{Actions: tfjson.Actions{tfjson.ActionCreate}},
+				}},
+			},
+			tfProviderSchemas: &tfjson.ProviderSchemas{
+				FormatVersion: "1.0",
+				Schemas:       map[string]*tfjson.ProviderSchema{"test": {}},
+			},
+			expectErrorMessage: "schema not found for resource test_resource.foo",
+			expectErrorCode:    errors.EInvalid,
+		},
+		{
+			name: "resource change with an unrecognized mode",
+			tfPlan: &tfjson.Plan{
+				FormatVersion: "1.2",
+				ResourceChanges: []*tfjson.ResourceChange{{
+					Address: "test_resource.foo", Mode: "bogus", Type: "test_resource", ProviderName: "test",
+					Change: &tfjson.Change{Actions: tfjson.Actions{tfjson.ActionCreate}},
+				}},
+			},
+			tfProviderSchemas: &tfjson.ProviderSchemas{
+				FormatVersion: "1.0",
+				Schemas:       map[string]*tfjson.ProviderSchema{"test": {}},
+			},
+			expectErrorMessage: "found unrecognized resource mode: bogus",
+			expectErrorCode:    errors.EInvalid,
 		},
 		{
 			name: "parse plan with valid version",
@@ -106,6 +251,7 @@ func TestParse(t *testing.T) {
 
 			if test.expectErrorMessage != "" {
 				assert.EqualError(t, err, test.expectErrorMessage)
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 

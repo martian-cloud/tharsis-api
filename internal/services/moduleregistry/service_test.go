@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	io "io"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -1991,6 +1992,81 @@ func TestGetModuleConfigurationDetails(t *testing.T) {
 			expectDetails: &ModuleConfigurationDetails{},
 		},
 		{
+			name: "path escapes the module version",
+			input: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{ID: moduleVersionID},
+				ModuleID: moduleID,
+			},
+			module: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  true,
+			},
+			path:          "../../other-module/other-version/metadata/root",
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name: "absolute path",
+			input: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{ID: moduleVersionID},
+				ModuleID: moduleID,
+			},
+			module: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  true,
+			},
+			path:          "/root",
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name: "path with a dot dot segment",
+			input: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{ID: moduleVersionID},
+				ModuleID: moduleID,
+			},
+			module: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  true,
+			},
+			path:          "modules/../root",
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name: "path with a backslash",
+			input: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{ID: moduleVersionID},
+				ModuleID: moduleID,
+			},
+			module: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  true,
+			},
+			path:          "modules\\network",
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name: "empty path",
+			input: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{ID: moduleVersionID},
+				ModuleID: moduleID,
+			},
+			module: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  true,
+			},
+			path:          "",
+			expectErrCode: errors.EInvalid,
+		},
+		{
 			name: "subject does not have access to private module",
 			input: &models.TerraformModuleVersion{
 				Metadata: models.ResourceMetadata{ID: moduleVersionID},
@@ -3124,4 +3200,159 @@ func TestCheckModulePackageLimits(t *testing.T) {
 // mockCallerActor returns a valid user actor for mock caller GetActor stubs.
 func mockCallerActor() models.Actor {
 	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
+}
+
+// fuzzTar builds an uncompressed tar stream from the given headers, each regular file filled with
+// Size zero bytes.
+func fuzzTar(f *testing.F, headers ...*tar.Header) []byte {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	for _, h := range headers {
+		require.NoError(f, tw.WriteHeader(h))
+		if h.Typeflag == tar.TypeReg {
+			_, err := tw.Write(make([]byte, h.Size))
+			require.NoError(f, err)
+		}
+	}
+	require.NoError(f, tw.Close())
+	return buf.Bytes()
+}
+
+func fuzzGzip(t testing.TB, data []byte) []byte {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	_, err := gz.Write(data)
+	require.NoError(t, err)
+	require.NoError(t, gz.Close())
+	return buf.Bytes()
+}
+
+// negativeSizeDirTar returns a tar stream holding a directory entry whose header size field is
+// base-256 encoded as negative, followed by a regular file of fileSize bytes. archive/tar accepts a
+// negative size on header-only entries such as directories.
+func negativeSizeDirTar(f *testing.F, fileSize int64) []byte {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	require.NoError(f, tw.WriteHeader(&tar.Header{Name: "d/", Typeflag: tar.TypeDir, Mode: 0o755}))
+	require.NoError(f, tw.Flush())
+	dirHeaderEnd := buf.Len()
+	require.NoError(f, tw.WriteHeader(&tar.Header{Name: "d/f", Typeflag: tar.TypeReg, Mode: 0o644, Size: fileSize}))
+	_, err := tw.Write(make([]byte, fileSize))
+	require.NoError(f, err)
+	require.NoError(f, tw.Close())
+
+	b := buf.Bytes()
+	hdr := b[dirHeaderEnd-512 : dirHeaderEnd]
+	// Size field (offset 124, 12 bytes) as base-256 two's complement -2^40.
+	for i := 124; i < 136; i++ {
+		hdr[i] = 0xff
+	}
+	hdr[130] = 0x00
+	for i := 131; i < 136; i++ {
+		hdr[i] = 0x00
+	}
+	// Recompute the header checksum (offset 148, 8 bytes, computed with the field as spaces).
+	for i := 148; i < 156; i++ {
+		hdr[i] = ' '
+	}
+	var sum int64
+	for _, c := range hdr {
+		sum += int64(c)
+	}
+	copy(hdr[148:156], fmt.Sprintf("%06o\x00 ", sum))
+	return b
+}
+
+func FuzzCheckModulePackageLimits(f *testing.F) {
+	small := fuzzTar(f,
+		&tar.Header{Name: "main.tf", Typeflag: tar.TypeReg, Mode: 0o644, Size: 10},
+		&tar.Header{Name: "modules/", Typeflag: tar.TypeDir, Mode: 0o755},
+		&tar.Header{Name: "modules/a.tf", Typeflag: tar.TypeReg, Mode: 0o644, Size: 20},
+	)
+	f.Add(small, true, int64(1024))
+	f.Add(small, true, int64(29))
+	f.Add(small, true, int64(30))
+	f.Add(fuzzGzip(f, small), false, int64(1024))
+	f.Add(fuzzTar(f), true, int64(0))
+	f.Add([]byte{}, true, int64(1024))
+	f.Add([]byte{}, false, int64(1024))
+	f.Add([]byte("not a gzip stream"), false, int64(1024))
+	f.Add([]byte("not a tar stream"), true, int64(1024))
+	// A negative directory size must not offset a regular file's size against the limit.
+	f.Add(negativeSizeDirTar(f, 100), true, int64(10))
+
+	f.Fuzz(func(t *testing.T, data []byte, wrap bool, maxExtractedSize int64) {
+		if wrap {
+			data = fuzzGzip(t, data)
+		}
+
+		pkg := bytes.NewReader(data)
+		err := checkModulePackageLimits(pkg, maxExtractedSize)
+		if err != nil {
+			code := errors.ErrorCode(err)
+			assert.True(t, code == errors.EInvalid || code == errors.ETooLarge, "unexpected error code %s: %v", code, err)
+			return
+		}
+
+		// An accepted package is rewound so the caller can unpack it from the start.
+		pos, err := pkg.Seek(0, io.SeekCurrent)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), pos)
+
+		// Re-read the archive independently: every entry's size is non-negative and the totals are
+		// within the limits.
+		gz, err := gzip.NewReader(pkg)
+		require.NoError(t, err)
+		var total int64
+		entries := 0
+		for tr := tar.NewReader(gz); ; {
+			header, err := tr.Next()
+			if err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+			entries++
+			assert.GreaterOrEqual(t, header.Size, int64(0), "entry %q has negative size", header.Name)
+			total += header.Size
+		}
+		assert.LessOrEqual(t, entries, maxModuleFiles)
+		// An archive with no entries unpacks to nothing, so it is accepted whatever the limit.
+		if entries > 0 {
+			assert.LessOrEqual(t, total, maxExtractedSize)
+		}
+	})
+}
+
+func FuzzModuleObjectKeys(f *testing.F) {
+	f.Add("root")
+	f.Add("modules/network")
+	f.Add("examples/basic")
+	f.Add("")
+	f.Add("/abs/path")
+	f.Add("../other")
+	f.Add(".")
+	f.Add("modules/../root")
+
+	module := &models.TerraformModule{Metadata: models.ResourceMetadata{ID: "8b1d3c4e-1f2a-4b3c-9d8e-7f6a5b4c3d2e"}}
+	moduleVersion := &models.TerraformModuleVersion{Metadata: models.ResourceMetadata{ID: "2e3d4c5b-6a7f-4e8d-9c3b-4a2f1e3d2c1b"}}
+	versionPrefix := fmt.Sprintf("registry/modules/%s/%s/", module.Metadata.ID, moduleVersion.Metadata.ID)
+	packageKey := modulePackageObjectKey(moduleVersion, module)
+	require.Equal(f, versionPrefix+"package.tar.gz", packageKey)
+
+	f.Fuzz(func(t *testing.T, metadataPath string) {
+		metadataKey := moduleConfigurationDetailsObjectKey(metadataPath, moduleVersion, module)
+
+		assert.Equal(t, versionPrefix+"metadata/"+metadataPath, metadataKey)
+		// No metadata path can name the module package object.
+		assert.NotEqual(t, packageKey, metadataKey)
+
+		// GetModuleConfigurationDetails only builds a key for a path that passes validation, and every
+		// such key stays under this module version's metadata prefix: the filesystem object store's
+		// cleaning leaves it unchanged.
+		if isValidModuleMetadataPath(metadataPath) {
+			assert.Equal(t, "/"+metadataKey, path.Clean("/"+metadataKey), metadataKey)
+			assert.True(t, strings.HasPrefix(metadataKey, versionPrefix+"metadata/"), metadataKey)
+			assert.NotContains(t, metadataKey, `\`)
+		}
+	})
 }

@@ -2,7 +2,9 @@ package policy
 
 import (
 	"context"
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
@@ -1834,7 +1836,138 @@ func TestValidateScopeRules(t *testing.T) {
 	}
 }
 
+func TestUpdatePolicyInputValidate(t *testing.T) {
+	validRules := []*models.ScopeRule{
+		{Type: models.ScopeRuleTypeWorkspace, Action: models.ScopeRuleActionInclude, Pattern: "acme/team/ws-1"},
+	}
+	invalidRules := []*models.ScopeRule{
+		{Type: models.ScopeRuleTypeWorkspace, Action: "nope", Pattern: "acme/team/ws-1"},
+	}
+
+	tests := []struct {
+		name            string
+		input           *UpdatePolicyInput
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:  "nothing to update",
+			input: &UpdatePolicyInput{},
+		},
+		{
+			name: "every field valid",
+			input: &UpdatePolicyInput{
+				Scope:                 &validRules,
+				OPAData:               &models.OPAPolicyData{PackageSource: "acme/pkg", Stage: models.RunTaskStageNamePrePlan},
+				ModuleAttestationData: &models.ModuleAttestationPolicyData{PublicKey: "key"},
+			},
+		},
+		{
+			name:            "invalid scope rule",
+			input:           &UpdatePolicyInput{Scope: &invalidRules},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "OPA data without a package source",
+			input:           &UpdatePolicyInput{OPAData: &models.OPAPolicyData{Stage: models.RunTaskStageNamePostPlan}},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "OPA data with an unknown stage",
+			input:           &UpdatePolicyInput{OPAData: &models.OPAPolicyData{PackageSource: "acme/pkg", Stage: "planning"}},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "OPA data without a stage",
+			input:           &UpdatePolicyInput{OPAData: &models.OPAPolicyData{PackageSource: "acme/pkg"}},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "module attestation data without a public key",
+			input:           &UpdatePolicyInput{ModuleAttestationData: &models.ModuleAttestationPolicyData{}},
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.input.Validate()
+
+			if tt.expectErrorCode != "" {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 // mockCallerActor returns a valid user actor for mock caller GetActor stubs.
 func mockCallerActor() models.Actor {
 	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
+}
+
+// fuzzScopeRuleTRNTypes is the TRN type each valid scope rule type accepts, written out independently
+// of ScopeRuleType.TRNType.
+var fuzzScopeRuleTRNTypes = map[models.ScopeRuleType]trn.Type{
+	"workspace":        trn.TypeWorkspace,
+	"group":            trn.TypeGroup,
+	"managed_identity": trn.TypeManagedIdentity,
+}
+
+// fuzzScopeRuleValid is an independent statement of what validateScopeRules accepts for one rule.
+func fuzzScopeRuleValid(r *models.ScopeRule) bool {
+	if r.Action != "include" && r.Action != "exclude" {
+		return false
+	}
+	expected, ok := fuzzScopeRuleTRNTypes[r.Type]
+	if !ok || r.Pattern == "" {
+		return false
+	}
+	if strings.HasPrefix(r.Pattern, "trn:") {
+		parsed, err := trn.ParseAny(r.Pattern)
+		return err == nil && parsed.Type() == expected
+	}
+	return true
+}
+
+func FuzzValidateScopeRules(f *testing.F) {
+	f.Add("workspace", "include", "group/ws", "group", "exclude", "group/*")
+	f.Add("managed_identity", "include", "trn:managed_identity:group/mi", "workspace", "include", "trn:workspace:group/ws")
+	f.Add("workspace", "include", "trn:group:group", "group", "include", "group")
+	f.Add("workspace", "include", "trn:workspace:", "group", "include", "group")
+	f.Add("workspace", "include", "trn:workspace:/a/", "group", "include", "group")
+	f.Add("workspace", "include", "trn:", "group", "include", "group")
+	f.Add("workspace", "include", "", "group", "include", "group")
+	f.Add("Workspace", "include", "a", "group", "include", "group")
+	f.Add("workspace", "INCLUDE", "a", "group", "include", "group")
+	f.Add("workspace", "include", "a", "bogus", "include", "group")
+
+	f.Fuzz(func(t *testing.T, type1, action1, pattern1, type2, action2, pattern2 string) {
+		rules := []*models.ScopeRule{
+			{Type: models.ScopeRuleType(type1), Action: models.ScopeRuleAction(action1), Pattern: pattern1},
+			{Type: models.ScopeRuleType(type2), Action: models.ScopeRuleAction(action2), Pattern: pattern2},
+		}
+
+		err := validateScopeRules(rules)
+
+		firstInvalid := -1
+		for i, r := range rules {
+			if !fuzzScopeRuleValid(r) {
+				firstInvalid = i
+				break
+			}
+		}
+
+		if firstInvalid == -1 {
+			assert.NoError(t, err)
+			return
+		}
+
+		if assert.Error(t, err) {
+			assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+			// Rules are checked in order, so the error names the first invalid one.
+			assert.Contains(t, err.Error(), fmt.Sprintf("scope rule %d ", firstInvalid))
+		}
+	})
 }

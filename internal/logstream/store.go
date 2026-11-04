@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -111,6 +112,8 @@ func (ls *store) ReadRange(ctx context.Context, key string, offset int, length i
 		return nil, errors.New("offset and length cannot be negative", errors.WithErrorCode(errors.EInvalid))
 	}
 
+	// Clamp the range so offset+length can't overflow; no object holds data that far out.
+	length = min(length, math.MaxInt-offset)
 	if length == 0 {
 		return io.NopCloser(bytes.NewReader(nil)), nil
 	}

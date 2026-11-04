@@ -12,7 +12,6 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/go-chi/chi/v5"
 	gotfe "github.com/hashicorp/go-tfe"
-	"github.com/hashicorp/jsonapi"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
@@ -134,12 +133,17 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 	// Read the response for re-use if variables use broken api
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		c.respWriter.RespondWithError(r.Context(), w, requestBodyError(err))
+		return
+	}
+
+	if err = unmarshalJSONAPIRequest(bytes.NewReader(body), &req); err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	if err = jsonapi.UnmarshalPayload(io.NopCloser(bytes.NewReader(body)), &req); err != nil {
-		c.respWriter.RespondWithError(r.Context(), w, err)
+	if req.Workspace == nil {
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("workspace is required", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
@@ -171,6 +175,16 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 
 	if req.AutoApply != nil {
 		options.AutoApply = *req.AutoApply
+	}
+	// A plan-only run is a speculative one. Only true is passed on, so an explicit false leaves the
+	// configuration version to decide, as an omitted one does, rather than failing the run when the
+	// configuration version is speculative.
+	if req.PlanOnly != nil && *req.PlanOnly {
+		options.Speculative = req.PlanOnly
+	}
+	// Run creation validates the version and falls back to the workspace's when it is empty.
+	if req.TerraformVersion != nil {
+		options.TerraformVersion = *req.TerraformVersion
 	}
 
 	run, err := c.runService.CreateRun(r.Context(), options)
@@ -235,8 +249,9 @@ func parseRunVariables(req gotfe.RunCreateOptions, body []byte) ([]runvariables.
 func (c *runController) ApplyRun(w http.ResponseWriter, r *http.Request) {
 	runID := gid.FromGlobalID(chi.URLParam(r, "id"))
 
+	// go-tfe sends these options as plain JSON, not JSON:API.
 	var req gotfe.RunApplyOptions
-	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
+	if err := unmarshalJSONRequest(r.Body, &req); err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
@@ -267,8 +282,9 @@ func (c *runController) DiscardRun(w http.ResponseWriter, r *http.Request) {
 func (c *runController) CancelRun(w http.ResponseWriter, r *http.Request) {
 	runID := gid.FromGlobalID(chi.URLParam(r, "id"))
 
+	// go-tfe sends these options as plain JSON, not JSON:API.
 	var req gotfe.RunCancelOptions
-	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
+	if err := unmarshalJSONRequest(r.Body, &req); err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}

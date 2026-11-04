@@ -2,13 +2,14 @@ package graphql
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
+	stderrors "errors"
 	"io"
 	"net/http"
 	"net/url"
 	"slices"
 	"strings"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 var acceptedContentTypes = []string{
@@ -20,7 +21,13 @@ func parse(r *http.Request) (request, error) {
 	// We always need to read and close the request body.
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		return request{}, errors.New("unable to read request body")
+		// Every parse failure is caused by the client's request, so none is an internal error.
+		code := errors.EInvalid
+		var maxBytesErr *http.MaxBytesError
+		if stderrors.As(err, &maxBytesErr) {
+			code = errors.ETooLarge
+		}
+		return request{}, errors.New("unable to read request body", errors.WithErrorCode(code))
 	}
 	_ = r.Body.Close()
 
@@ -33,7 +40,7 @@ func parse(r *http.Request) (request, error) {
 	case "GET":
 		return parseGet(r.URL.Query()), nil
 	default:
-		return request{}, errors.New("only POST and GET requests are supported")
+		return request{}, errors.New("only POST and GET requests are supported", errors.WithErrorCode(errors.EInvalid))
 	}
 }
 
@@ -51,7 +58,11 @@ func validateContentType(r *http.Request) error {
 		return nil
 	}
 
-	return fmt.Errorf("header Content-Type must be one of %s for POST requests", strings.Join(acceptedContentTypes, ", "))
+	return errors.New(
+		"header Content-Type must be one of %s for POST requests",
+		strings.Join(acceptedContentTypes, ", "),
+		errors.WithErrorCode(errors.EInvalid),
+	)
 }
 
 func parseGet(v url.Values) request {

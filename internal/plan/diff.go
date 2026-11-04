@@ -16,17 +16,42 @@ import (
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func (p *parser) getSchema(change *tjson.ResourceChange, schemas *tjson.ProviderSchemas) (*tjson.Schema, error) {
+	if change == nil || change.Change == nil {
+		return nil, errors.New("plan contains a resource change without change data", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	providerSchema := schemas.Schemas[change.ProviderName]
+	if providerSchema == nil {
+		return nil, errors.New("provider schema not found for provider %s", change.ProviderName, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	var schema *tjson.Schema
 	switch change.Mode {
 	case tjson.ManagedResourceMode:
-		return schemas.Schemas[change.ProviderName].ResourceSchemas[change.Type], nil
+		schema = providerSchema.ResourceSchemas[change.Type]
 	case tjson.DataResourceMode:
-		return schemas.Schemas[change.ProviderName].DataSourceSchemas[change.Type], nil
+		schema = providerSchema.DataSourceSchemas[change.Type]
 	default:
-		return nil, fmt.Errorf("found unrecognized resource mode: %s", change.Mode)
+		return nil, errors.New("found unrecognized resource mode: %s", change.Mode, errors.WithErrorCode(errors.EInvalid))
 	}
+
+	if schema == nil || schema.Block == nil {
+		return nil, errors.New("schema not found for resource %s", change.Address, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	return schema, nil
+}
+
+// isHiddenNoOp returns true for no-op changes that Parse omits from its output, i.e. those that
+// are neither moved nor imported.
+func isHiddenNoOp(change *tjson.ResourceChange) bool {
+	moved := len(change.PreviousAddress) > 0 && change.PreviousAddress != change.Address
+	return change.Change.Actions.NoOp() && !moved && change.Change.Importing == nil
 }
 
 func (p *parser) precomputeDiffs(plan *tjson.Plan, schemas *tjson.ProviderSchemas) (*rawPlanDiffs, error) {
@@ -34,6 +59,9 @@ func (p *parser) precomputeDiffs(plan *tjson.Plan, schemas *tjson.ProviderSchema
 	driftAddressMap := map[string]struct{}{}
 
 	for _, drift := range plan.ResourceDrift {
+		if drift == nil {
+			return nil, errors.New("plan contains a null resource drift entry", errors.WithErrorCode(errors.EInvalid))
+		}
 		driftAddressMap[drift.Address] = struct{}{}
 	}
 
@@ -42,6 +70,12 @@ func (p *parser) precomputeDiffs(plan *tjson.Plan, schemas *tjson.ProviderSchema
 	}
 
 	for _, change := range plan.ResourceChanges {
+		if change != nil && change.Change != nil && isHiddenNoOp(change) {
+			// These changes are never rendered, so they don't need a schema.
+			changeAddressMap[change.Address] = struct{}{}
+			continue
+		}
+
 		schema, err := p.getSchema(change, schemas)
 		if err != nil {
 			return nil, err
@@ -90,6 +124,9 @@ func (p *parser) precomputeDiffs(plan *tjson.Plan, schemas *tjson.ProviderSchema
 	}
 
 	for key, output := range plan.OutputChanges {
+		if output == nil {
+			return nil, errors.New("plan contains output %s without change data", key, errors.WithErrorCode(errors.EInvalid))
+		}
 		change, err := structured.FromJSONChange(*output, attributepath.AlwaysMatcher())
 		if err != nil {
 			return nil, err

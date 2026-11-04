@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
@@ -246,6 +248,39 @@ func TestOIDCController_Authorize_RejectsInvalidParameters(t *testing.T) {
 
 			assert.Equal(t, http.StatusBadRequest, recorder.Code)
 			assert.Empty(t, recorder.Result().Cookies())
+		})
+	}
+}
+
+func TestOIDCController_FormEndpoints_IgnoreQueryParameters(t *testing.T) {
+	login := cliAuthorizeQuery()
+	login.Set("username", "user")
+	login.Set("password", "pass")
+
+	tests := []struct {
+		name  string
+		path  string
+		body  string
+		query string
+	}{
+		{name: "token request entirely in the query", path: "/oauth/token", query: "client_id=tharsis&grant_type=password&username=u&password=p"},
+		{name: "token client id only in the query", path: "/oauth/token", body: "grant_type=password&username=u&password=p", query: "client_id=tharsis"},
+		{name: "token grant type only in the query", path: "/oauth/token", body: "client_id=tharsis&username=u&password=p", query: "grant_type=password"},
+		{name: "login request entirely in the query", path: "/oauth/login", query: login.Encode()},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// No credentials are checked: the request is rejected for missing body parameters.
+			router := chi.NewRouter()
+			newTestOIDCController(t, auth.NewMockSigningKeyManager(t), auth.NewMockUserSessionManager(t), nil).RegisterRoutes(router)
+
+			req := httptest.NewRequest(http.MethodPost, test.path+"?"+test.query, strings.NewReader(test.body))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, req)
+
+			assert.Equal(t, http.StatusBadRequest, recorder.Code)
 		})
 	}
 }
@@ -621,4 +656,74 @@ func TestOIDCController_Callback(t *testing.T) {
 			assert.Equal(t, test.expectCleared, cleared)
 		})
 	}
+}
+
+func FuzzOAuthCodeFlowParamsValidate(f *testing.F) {
+	valid := cliAuthorizeQuery()
+	f.Add(valid.Get("client_id"), valid.Get("redirect_uri"), valid.Get("response_type"), valid.Get("state"),
+		valid.Get("scope"), valid.Get("code_challenge"), valid.Get("code_challenge_method"))
+	f.Add(testClientID, "http://localhost/", "code", "s", "tharsis  openid openid", testCLIChallenge, "S256")
+	f.Add(testClientID, "http://localhost:0/login", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, "http://localhost:65536/login", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, "http://localhost.evil.com/login", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, "http://evil.com@localhost/login", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, "http://localhost@evil.com/login", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, "http://localhost/login#frag", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, "https://localhost/login", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, "http:localhost", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, "//localhost/login", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, "http://[::1]/login", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, "http://localhost\\@evil.com/", "code", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, testCLIRedirectURI, "token", "s", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, testCLIRedirectURI, "code", "", "openid tharsis", testCLIChallenge, "S256")
+	f.Add(testClientID, testCLIRedirectURI, "code", "s", "openid", testCLIChallenge, "S256")
+	f.Add(testClientID, testCLIRedirectURI, "code", "s", "openid tharsis", testCLIChallenge+"=", "S256")
+	f.Add(testClientID, testCLIRedirectURI, "code", "s", "openid tharsis", testCLIChallenge, "plain")
+	f.Add("other", testCLIRedirectURI, "code", "s", "openid tharsis", testCLIChallenge, "S256")
+
+	f.Fuzz(func(t *testing.T, clientID, redirectURI, responseType, state, scope, codeChallenge, codeChallengeMethod string) {
+		params := &oauthCodeFlowParams{
+			clientID:            clientID,
+			redirectURI:         redirectURI,
+			responseType:        responseType,
+			state:               state,
+			scope:               scope,
+			codeChallenge:       codeChallenge,
+			codeChallengeMethod: codeChallengeMethod,
+		}
+
+		// Scopes are a set, so reordering them can't change whether they match.
+		fields := strings.Fields(scope)
+		slices.Reverse(fields)
+		assert.Equal(t, scopesMatch(scope, scopesSupported), scopesMatch(strings.Join(fields, " "), scopesSupported))
+
+		if err := params.validate(testClientID); err != nil {
+			return
+		}
+
+		// Everything a valid request carries is what the rest of the flow relies on.
+		assert.Equal(t, testClientID, clientID)
+		assert.Equal(t, "code", responseType)
+		assert.Equal(t, "S256", codeChallengeMethod)
+		assert.Regexp(t, `^[A-Za-z0-9_-]{43}$`, codeChallenge)
+		assert.NotEmpty(t, state)
+		assert.LessOrEqual(t, len(state), maxOAuthStateLength)
+		assert.LessOrEqual(t, len(redirectURI), maxOAuthRedirectURILength)
+		assert.True(t, scopesMatch(scope, scopesSupported))
+
+		// The only redirect target accepted is a loopback http URL (RFC 8252).
+		u, err := url.Parse(redirectURI)
+		require.NoError(t, err)
+		assert.Equal(t, "http", u.Scheme)
+		assert.Equal(t, "localhost", u.Hostname())
+		assert.Nil(t, u.User)
+		assert.Empty(t, u.Fragment)
+		assert.Empty(t, u.Opaque)
+		assert.NotContains(t, redirectURI, "\r")
+		assert.NotContains(t, redirectURI, "\n")
+
+		// Its query is replaced when the code is returned, so it must still be a loopback URL afterwards.
+		u.RawQuery = url.Values{"code": {"c"}}.Encode()
+		assert.NoError(t, auth.ValidateOAuthRedirectURI(u.String()))
+	})
 }

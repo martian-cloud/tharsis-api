@@ -1,11 +1,15 @@
 package serviceaccount
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"strconv"
 	"testing"
 	"time"
 
@@ -1443,4 +1447,62 @@ func createJWT(t *testing.T, key jwk.Key, keyID string, issuer string, sub strin
 // mockCallerActor returns a valid user actor for mock caller GetActor stubs.
 func mockCallerActor() models.Actor {
 	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
+}
+
+func FuzzExtractClaimsFromToken(f *testing.F) {
+	f.Add([]byte(`{"iss":"https://issuer.example","sub":"subject","aud":["a","b"],"exp":1700000000,"nbf":1600000000,"iat":1600000000,"jti":"id-1","custom":{"nested":[1,true,null]}}`))
+	f.Add([]byte(`{"aud":"single"}`))
+	f.Add([]byte(`{}`))
+	f.Add([]byte(`{"exp":1e30}`))
+	f.Add([]byte(`{"exp":-1}`))
+	f.Add([]byte(`{"custom":"value"}`))
+	f.Add([]byte(`eyJhbGciOiJub25lIn0.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIn0.`))
+	f.Add([]byte(`not a token`))
+
+	f.Fuzz(func(t *testing.T, payload []byte) {
+		token, err := jwt.Parse(payload, jwt.WithVerify(false), jwt.WithValidate(false))
+		if err != nil {
+			t.Skip()
+		}
+
+		privateClaims := maps.Clone(token.PrivateClaims())
+
+		claimsJSON, err := extractClaimsFromToken(token)
+		require.NoError(t, err)
+
+		// The token itself must not be modified.
+		assert.Equal(t, privateClaims, token.PrivateClaims())
+
+		decoder := json.NewDecoder(bytes.NewReader([]byte(claimsJSON)))
+		decoder.UseNumber()
+		claims := map[string]any{}
+		require.NoError(t, decoder.Decode(&claims))
+
+		for k := range privateClaims {
+			assert.Contains(t, claims, k)
+		}
+
+		for key, expected := range map[string]string{
+			"iss": token.Issuer(),
+			"sub": token.Subject(),
+			"jti": token.JwtID(),
+		} {
+			if expected != "" {
+				assert.Equal(t, expected, claims[key])
+			}
+		}
+
+		if aud := token.Audience(); len(aud) > 0 {
+			actual, ok := claims["aud"].([]any)
+			require.True(t, ok)
+			require.Len(t, actual, len(aud))
+			for i := range aud {
+				assert.Equal(t, aud[i], actual[i])
+			}
+		}
+
+		if exp := token.Expiration(); !exp.IsZero() {
+			assert.Equal(t, json.Number(strconv.FormatInt(exp.Unix(), 10)), claims["exp"])
+		}
+	})
 }
