@@ -190,6 +190,11 @@ func (r *ConfigResolver) AsymmetricSigningKeyDecommissionPeriodDays() int32 {
 	return int32(r.cfg.AsymmetricSigningKeyDecommissionPeriodDays)
 }
 
+// UserCredentialLoginEnabled resolver
+func (r *ConfigResolver) UserCredentialLoginEnabled() bool {
+	return r.cfg.UserCredentialLoginEnabled
+}
+
 // DisableSensitiveVariableFeature resolver
 func (r *ConfigResolver) DisableSensitiveVariableFeature() bool {
 	return r.cfg.DisableSensitiveVariableFeature

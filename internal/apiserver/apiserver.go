@@ -232,7 +232,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		cfg.UserSessionMaxSessionsPerUser,
 		cfg.TharsisAPIURL,
 		cfg.TharsisUIURL,
-		len(cfg.OauthProviders) == 0,
+		cfg.UserCredentialLoginEnabled,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize user session manager: %w", err)

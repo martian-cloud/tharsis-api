@@ -90,6 +90,19 @@ func TestInsecureConfigWarnings(t *testing.T) {
 			expectedCount: 0,
 		},
 		{
+			name: "user credential login alongside an identity provider",
+			modify: func(cfg *config.Config) {
+				cfg.UserCredentialLoginEnabled = true
+				cfg.OauthProviders = []config.IdpConfig{{IssuerURL: "https://idp.example.com"}}
+			},
+			expectedCount: 1,
+		},
+		{
+			name:          "user credential login without an identity provider",
+			modify:        func(cfg *config.Config) { cfg.UserCredentialLoginEnabled = true },
+			expectedCount: 0,
+		},
+		{
 			name: "local job dispatcher",
 			modify: func(cfg *config.Config) {
 				cfg.InternalRunners = append(cfg.InternalRunners, config.RunnerConfig{Name: "local-runner", JobDispatcherType: "local"})

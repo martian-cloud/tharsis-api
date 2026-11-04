@@ -108,6 +108,7 @@ const query = graphql`
             tlsCertFile
             tlsKeyFile
             adminUserEmail
+            userCredentialLoginEnabled
             otelTraceEnabled
             otelTraceType
             otelTraceCollectorHost

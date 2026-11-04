@@ -42,6 +42,12 @@ func insecureConfigWarnings(cfg *config.Config) []string {
 			"sign a browser in to the attacker's account. Serve the API over https for production deployments.")
 	}
 
+	if cfg.UserCredentialLoginEnabled && len(cfg.OauthProviders) > 0 {
+		warnings = append(warnings, "THARSIS_USER_CREDENTIAL_LOGIN_ENABLED is set alongside identity providers: users "+
+			"with a password can sign in without SSO, bypassing the identity provider's access controls. Use it "+
+			"for non-production deployments only and leave it unset for production deployments.")
+	}
+
 	for _, idp := range cfg.OauthProviders {
 		if idp.EmailLinking {
 			warnings = append(warnings, fmt.Sprintf("Email linking is enabled for identity provider %q: a first sign-in "+
