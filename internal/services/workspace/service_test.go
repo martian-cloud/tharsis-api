@@ -1631,6 +1631,30 @@ func TestGetStateVersionInventory(t *testing.T) {
 		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
 	})
 
+	t.Run("invalid provider config", func(t *testing.T) {
+		// State is uploaded by clients, so a malformed provider address is reported as invalid input
+		// with its message, not masked as an internal error.
+		for _, providerConfig := range []string{
+			`provider.aws`,         // no opening `["`
+			`provider["]`,          // closing `"]` overlaps the opening `["`
+			`provider["aws`,        // no closing `"]`
+			`module.m.provider["]`, // as above, under a module
+		} {
+			t.Run(providerConfig, func(t *testing.T) {
+				ctx := setupCaller(t.Context(), t, nil)
+				state, _ := json.Marshal(stateV4{
+					Version:   version4,
+					Resources: []resourceStateV4{{Mode: "managed", Type: "aws_instance", Name: "a", ProviderConfig: providerConfig}},
+				})
+				svc := setupService(t, io.NopCloser(strings.NewReader(string(state))), nil)
+
+				_, err := svc.GetStateVersionInventory(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+				assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+				assert.Contains(t, err.Error(), "invalid provider config")
+			})
+		}
+	})
+
 	t.Run("resources", func(t *testing.T) {
 		buildStateJSON := func(resources []resourceStateV4) string {
 			state := stateV4{
@@ -2260,7 +2284,7 @@ func TestCreateStateVersion(t *testing.T) {
 			toCreate:        toCreate,
 			data:            []byte("something-not-decodable"),
 			dataDecodeError: errors.New("data string not decodable", errors.WithErrorCode(errors.EInvalid)),
-			expectErrorCode: errors.EInternal, // Had thought it should return EInvalid, but it returns EInternal.
+			expectErrorCode: errors.EInvalid,
 		},
 		{
 			name:     "create failed",
@@ -2298,8 +2322,8 @@ func TestCreateStateVersion(t *testing.T) {
 			},
 			limit:                 4,
 			injectSVsPerWorkspace: 4,
-			dataUnmarshalError:    errors.New("failed to unmarshal decoded data", errors.WithErrorCode(errors.EInternal)),
-			expectErrorCode:       errors.EInternal,
+			dataUnmarshalError:    errors.New("failed to unmarshal decoded data", errors.WithErrorCode(errors.EInvalid)),
+			expectErrorCode:       errors.EInvalid,
 		},
 		{
 			name:     "upload error",

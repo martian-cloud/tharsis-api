@@ -2,9 +2,10 @@ package tfe
 
 import (
 	"compress/gzip"
-	"fmt"
+	stderrors "errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -23,6 +24,8 @@ type stateController struct {
 	workspaceService  workspace.Service
 	tharsisAPIURL     string
 	tfeVersionedPath  string
+	// stateVersionMaxUploadSize caps a state rendering upload, both as sent and once decompressed.
+	stateVersionMaxUploadSize int
 }
 
 // NewStateController creates an instance of stateController
@@ -33,6 +36,7 @@ func NewStateController(
 	workspaceService workspace.Service,
 	tharsisAPIURL string,
 	tfeVersionedPath string,
+	stateVersionMaxUploadSize int,
 ) controllers.Controller {
 	return &stateController{
 		respWriter,
@@ -41,6 +45,7 @@ func NewStateController(
 		workspaceService,
 		tharsisAPIURL,
 		tfeVersionedPath,
+		stateVersionMaxUploadSize,
 	}
 }
 
@@ -98,30 +103,57 @@ func (c *stateController) DownloadStateVersion(w http.ResponseWriter, r *http.Re
 func (c *stateController) UploadStateVersionJSON(w http.ResponseWriter, r *http.Request) {
 	stateVersionID := gid.FromGlobalID(chi.URLParam(r, "stateVersionId"))
 
-	defer r.Body.Close()
+	limit := int64(c.stateVersionMaxUploadSize)
+	body := http.MaxBytesReader(w, r.Body, limit)
+	defer body.Close()
+
+	// The service reads the body itself, so read errors are recorded here: the error the service returns
+	// may not carry them.
+	reader := &readErrRecorder{reader: body}
 
 	// Accept an optionally gzipped body, as the plan JSON upload does: a state rendering is highly
-	// compressible and can be large.
-	var reader io.ReadCloser
-	var err error
-	switch r.Header.Get("Content-Encoding") {
-	case "gzip":
-		reader, err = gzip.NewReader(r.Body)
+	// compressible and can be large. The decompressed rendering is capped too, or a small body could
+	// expand without bound.
+	gzipped := strings.EqualFold(r.Header.Get("Content-Encoding"), "gzip")
+	if gzipped {
+		gzipReader, err := gzip.NewReader(body)
 		if err != nil {
-			c.respWriter.RespondWithError(r.Context(), w, fmt.Errorf("failed to create gzip reader: %w", err))
+			c.respWriter.RespondWithError(r.Context(), w, requestBodyError(err))
 			return
 		}
-		defer reader.Close()
-	default:
-		reader = r.Body
+		defer gzipReader.Close()
+		reader.reader = http.MaxBytesReader(w, gzipReader, limit)
 	}
 
-	if err = c.workspaceService.UploadStateVersionJSON(r.Context(), stateVersionID, reader); err != nil {
+	if err := c.workspaceService.UploadStateVersionJSON(r.Context(), stateVersionID, reader); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		switch {
+		case stderrors.As(err, &maxBytesErr), stderrors.As(reader.err, &maxBytesErr):
+			err = requestBodyError(maxBytesErr)
+		case reader.err != nil:
+			// A body that fails mid-read (a corrupt gzip stream past a valid header, or a truncated or
+			// reset connection) only fails once the service reads it.
+			err = requestBodyError(reader.err)
+		}
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusOK)
+}
+
+// readErrRecorder records the first error other than io.EOF that reading from reader returns.
+type readErrRecorder struct {
+	reader io.Reader
+	err    error
+}
+
+func (r *readErrRecorder) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if err != nil && !stderrors.Is(err, io.EOF) && r.err == nil {
+		r.err = err
+	}
+	return n, err
 }
 
 // DownloadStateVersionJSON streams the "terraform show -json" rendering of a state version, which TFE

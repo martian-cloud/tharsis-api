@@ -157,7 +157,12 @@ func (p *Provider) BuildOAuthAuthorizationURL(input *types.BuildOAuthAuthorizati
 
 // BuildRepositoryURL returns the repository URL associated with the provider.
 func (p *Provider) BuildRepositoryURL(input *types.BuildRepositoryURLInput) (string, error) {
-	return url.JoinPath(input.ProviderURL.String(), input.RepositoryPath)
+	repositoryPath, err := models.NormalizeRepositoryPath(input.RepositoryPath)
+	if err != nil {
+		return "", err
+	}
+
+	return url.JoinPath(input.ProviderURL.String(), repositoryPath)
 }
 
 // TestConnection simply queries for the user metadata that's
@@ -194,11 +199,16 @@ func (p *Provider) TestConnection(ctx context.Context, input *types.TestConnecti
 // GetProject retrieves information about a project or repository.
 // https://docs.gitlab.com/ee/api/projects.html#get-single-project
 func (p *Provider) GetProject(ctx context.Context, input *types.GetProjectInput) (*types.GetProjectPayload, error) {
+	repositoryPath, err := models.NormalizeRepositoryPath(input.RepositoryPath)
+	if err != nil {
+		return nil, err
+	}
+
 	// Build the request URL.
 	rawPath := strings.Join([]string{
 		apiV4Endpoint,
 		"projects",
-		url.PathEscape(input.RepositoryPath),
+		url.PathEscape(repositoryPath),
 	}, "/")
 
 	queries := input.ProviderURL.Query()
@@ -249,11 +259,16 @@ func (p *Provider) GetProject(ctx context.Context, input *types.GetProjectInput)
 // GetDiff gets the diff for a single ref (branch, tag, commit, etc.).
 // https://docs.gitlab.com/ee/api/commits.html#get-the-diff-of-a-commit
 func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*types.GetDiffsPayload, error) {
+	repositoryPath, err := models.NormalizeRepositoryPath(input.RepositoryPath)
+	if err != nil {
+		return nil, err
+	}
+
 	// Build the request URL.
 	rawPath := strings.Join([]string{
 		apiV4Endpoint,
 		"projects",
-		url.PathEscape(input.RepositoryPath),
+		url.PathEscape(repositoryPath),
 		"repository",
 		"commits",
 		url.PathEscape(input.Ref),
@@ -303,11 +318,16 @@ func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*typ
 // GetDiffs retrieves diffs for two different refs (branches, commits, etc.)
 // https://docs.gitlab.com/ee/api/repositories.html#compare-branches-tags-or-commits
 func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*types.GetDiffsPayload, error) {
+	repositoryPath, err := models.NormalizeRepositoryPath(input.RepositoryPath)
+	if err != nil {
+		return nil, err
+	}
+
 	// Build the request URL.
 	rawPath := strings.Join([]string{
 		apiV4Endpoint,
 		"projects",
-		url.PathEscape(input.RepositoryPath),
+		url.PathEscape(repositoryPath),
 		"repository",
 		"compare",
 	}, "/")
@@ -361,11 +381,16 @@ func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*t
 // GetArchive downloads the entire repository archive for a branch or tag.
 // https://docs.gitlab.com/ee/api/repositories.html#get-file-archive
 func (p *Provider) GetArchive(ctx context.Context, input *types.GetArchiveInput) (*http.Response, error) {
+	repositoryPath, err := models.NormalizeRepositoryPath(input.RepositoryPath)
+	if err != nil {
+		return nil, err
+	}
+
 	// Build the request URL.
 	rawPath := strings.Join([]string{
 		apiV4Endpoint,
 		"projects",
-		url.PathEscape(input.RepositoryPath),
+		url.PathEscape(repositoryPath),
 		"repository",
 		"archive.tar.gz", // Default is tar.gz, but incase it changes.
 	}, "/")
@@ -478,11 +503,16 @@ func (p *Provider) CreateAccessToken(ctx context.Context, input *types.CreateAcc
 // Returns the webhook ID from the response.
 // https://docs.gitlab.com/ee/api/projects.html#add-project-hook
 func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhookInput) (*types.WebhookPayload, error) {
+	repositoryPath, err := models.NormalizeRepositoryPath(input.RepositoryPath)
+	if err != nil {
+		return nil, err
+	}
+
 	// Build the request URL.
 	rawPath := strings.Join([]string{
 		apiV4Endpoint,
 		"projects",
-		url.PathEscape(input.RepositoryPath),
+		url.PathEscape(repositoryPath),
 		"hooks",
 	}, "/")
 
@@ -546,11 +576,16 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 // DeleteWebhook deletes a webhook at the specified provider.
 // https://docs.gitlab.com/ee/api/projects.html#delete-project-hook
 func (p *Provider) DeleteWebhook(ctx context.Context, input *types.DeleteWebhookInput) error {
+	repositoryPath, err := models.NormalizeRepositoryPath(input.RepositoryPath)
+	if err != nil {
+		return err
+	}
+
 	// Build the request URL
 	rawPath := strings.Join([]string{
 		apiV4Endpoint,
 		"projects",
-		url.PathEscape(input.RepositoryPath),
+		url.PathEscape(repositoryPath),
 		"hooks",
 		input.WebhookID,
 	}, "/")

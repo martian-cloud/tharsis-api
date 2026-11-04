@@ -3,10 +3,10 @@ package plan
 //go:generate go tool mockery --name Parser --inpackage --case underscore
 
 import (
-	"fmt"
 	"sort"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
 	tjson "github.com/hashicorp/terraform-json"
 )
@@ -68,11 +68,11 @@ func (p *parser) Parse(plan *tjson.Plan, schemas *tjson.ProviderSchemas) (*Diff,
 	resourceDiffs := []*ResourceDiff{}
 
 	if err := plan.Validate(); err != nil {
-		return nil, fmt.Errorf("the plan json format is not valid: %w", err)
+		return nil, errors.Wrap(err, "the plan json format is not valid", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if err := schemas.Validate(); err != nil {
-		return nil, fmt.Errorf("the provider schemas json is not valid: %w", err)
+		return nil, errors.Wrap(err, "the provider schemas json is not valid", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	rawDiffs, err := p.precomputeDiffs(plan, schemas)

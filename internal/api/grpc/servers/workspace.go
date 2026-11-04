@@ -159,6 +159,13 @@ func (s *WorkspaceServer) CreateWorkspace(ctx context.Context, req *pb.CreateWor
 		}
 	}
 
+	if req.ProviderMirrorEnabled != nil {
+		if !req.ProviderMirrorEnabled.GetInherit() {
+			enabled := req.ProviderMirrorEnabled.GetEnabled()
+			toCreate.EnableProviderMirror = &enabled
+		}
+	}
+
 	createdWorkspace, err := s.serviceCatalog.WorkspaceService.CreateWorkspace(ctx, toCreate)
 	if err != nil {
 		return nil, err
@@ -204,9 +211,22 @@ func (s *WorkspaceServer) UpdateWorkspace(ctx context.Context, req *pb.UpdateWor
 	}
 
 	if req.DriftDetectionEnabled != nil {
-		if !req.DriftDetectionEnabled.GetInherit() {
+		if req.DriftDetectionEnabled.GetInherit() {
+			// Clear the workspace's own setting so it inherits from its group again.
+			gotWorkspace.EnableDriftDetection = nil
+		} else {
 			enabled := req.DriftDetectionEnabled.GetEnabled()
 			gotWorkspace.EnableDriftDetection = &enabled
+		}
+	}
+
+	if req.ProviderMirrorEnabled != nil {
+		if req.ProviderMirrorEnabled.GetInherit() {
+			// Clear the workspace's own setting so it inherits from its group again.
+			gotWorkspace.EnableProviderMirror = nil
+		} else {
+			enabled := req.ProviderMirrorEnabled.GetEnabled()
+			gotWorkspace.EnableProviderMirror = &enabled
 		}
 	}
 

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	stderrors "errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -198,7 +199,7 @@ func (c *vcsController) DesignateEventHandler(w http.ResponseWriter, r *http.Req
 
 func (c *vcsController) gitLabHandler(r *http.Request) error {
 	var req gitLabWebhookRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeWebhookPayload(r, &req); err != nil {
 		return err
 	}
 
@@ -217,7 +218,7 @@ func (c *vcsController) gitLabHandler(r *http.Request) error {
 
 func (c *vcsController) gitHubHandler(r *http.Request) error {
 	var req gitHubWebhookRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeWebhookPayload(r, &req); err != nil {
 		return err
 	}
 
@@ -232,6 +233,19 @@ func (c *vcsController) gitHubHandler(r *http.Request) error {
 		After:            req.After,
 		Ref:              req.Ref,
 	})
+}
+
+// decodeWebhookPayload decodes the webhook request body into req.
+func decodeWebhookPayload(r *http.Request, req any) error {
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		// A body with no Content-Length is only found to be over the limit while reading it.
+		var maxBytesErr *http.MaxBytesError
+		if stderrors.As(err, &maxBytesErr) {
+			return errors.New("webhook payload exceeds maximum size of %d bytes", maxVCSWebhookBodySize, errors.WithErrorCode(errors.ETooLarge))
+		}
+		return errors.Wrap(err, "failed to decode webhook payload", errors.WithErrorCode(errors.EInvalid))
+	}
+	return nil
 }
 
 // findToken find the token from the request and returns it.

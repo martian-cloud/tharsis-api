@@ -3,6 +3,9 @@ package models
 import (
 	"path/filepath"
 	"regexp"
+	"slices"
+	"strings"
+	"unicode"
 
 	"github.com/bmatcuk/doublestar/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -30,7 +33,43 @@ var (
 		"Invalid glob pattern or regex",
 		errors.WithErrorCode(errors.EInvalid),
 	)
+
+	// errInvalidRepositoryPath indicates a repository path that could change the meaning
+	// of the provider API URLs built from it.
+	errInvalidRepositoryPath = errors.New(
+		"Invalid repository path, must be a slash-separated path such as owner/repository "+
+			"with no empty, '.' or '..' segments and no '?', '#', '%%', '\\' or whitespace characters",
+		errors.WithErrorCode(errors.EInvalid),
+	)
 )
+
+// ValidateRepositoryPath verifies a repository path, e.g. "owner/repository" or "group/subgroup/project".
+// VCS providers join it into API URLs, so it must not be able to climb out of the repository's API path
+// ("..") or alter the URL (query, fragment, percent-encoding, backslashes, whitespace).
+func ValidateRepositoryPath(repositoryPath string) error {
+	for _, segment := range strings.Split(repositoryPath, "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			return errInvalidRepositoryPath
+		}
+	}
+
+	if strings.ContainsFunc(repositoryPath, func(r rune) bool {
+		return strings.ContainsRune(`?#%\`, r) || unicode.IsSpace(r) || unicode.IsControl(r)
+	}) {
+		return errInvalidRepositoryPath
+	}
+
+	return nil
+}
+
+// NormalizeRepositoryPath drops empty segments from a repository path and then validates it with
+// ValidateRepositoryPath. Links created before repository paths were validated may contain empty segments
+// (e.g. "/owner/repository"), which are tolerated so those links keep working.
+func NormalizeRepositoryPath(repositoryPath string) (string, error) {
+	segments := slices.DeleteFunc(strings.Split(repositoryPath, "/"), func(s string) bool { return s == "" })
+	normalized := strings.Join(segments, "/")
+	return normalized, ValidateRepositoryPath(normalized)
+}
 
 // WorkspaceVCSProviderLink represents a link for a
 // version control system provider to a workspace.
@@ -72,6 +111,10 @@ func (wpl *WorkspaceVCSProviderLink) ResolveMetadata(key string) (*string, error
 
 // Validate verifies a VCS Provider link struct.
 func (wpl *WorkspaceVCSProviderLink) Validate() error {
+	if err := ValidateRepositoryPath(wpl.RepositoryPath); err != nil {
+		return err
+	}
+
 	if wpl.ModuleDirectory != nil && *wpl.ModuleDirectory != "" {
 		// The module directory is joined onto the repository checkout, so it must stay inside it:
 		// no absolute paths and no ".." segments that climb out.
@@ -88,6 +131,11 @@ func (wpl *WorkspaceVCSProviderLink) Validate() error {
 
 		if !doublestar.ValidatePattern(filepath.ToSlash(pattern)) {
 			return errInvalidPattern
+		}
+
+		// Globs are evaluated against the repository checkout, so they must not climb out of it.
+		if slices.Contains(strings.Split(filepath.ToSlash(pattern), "/"), "..") {
+			return errors.New("glob pattern must not contain '..' segments", errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 

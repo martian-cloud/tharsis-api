@@ -2,10 +2,15 @@ package tfe
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
@@ -16,6 +21,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
@@ -26,6 +32,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
 
@@ -40,6 +47,8 @@ type workspaceController struct {
 	variableService        variable.Service
 	tharsisAPIURL          string
 	tfeVersionedPath       string
+	// stateVersionMaxUploadSize caps a state version create request, whose body carries the whole state.
+	stateVersionMaxUploadSize int
 }
 
 // NewWorkspaceController creates an instance of workspaceController
@@ -54,6 +63,7 @@ func NewWorkspaceController(
 	variableService variable.Service,
 	tharsisAPIURL string,
 	tfeVersionedPath string,
+	stateVersionMaxUploadSize int,
 ) controllers.Controller {
 	return &workspaceController{
 		respWriter,
@@ -66,13 +76,24 @@ func NewWorkspaceController(
 		variableService,
 		tharsisAPIURL,
 		tfeVersionedPath,
+		stateVersionMaxUploadSize,
 	}
 }
+
+const (
+	// defaultRunsPageSize and maxRunsPageSize are TFE's page sizes for listing a workspace's runs.
+	defaultRunsPageSize = 20
+	maxRunsPageSize     = 100
+
+	// maxRunsSkipped caps how many runs a request may page past. Run pagination is cursor based, so
+	// reaching a later page means walking the cursors of every page before it.
+	maxRunsSkipped = 1000
+)
 
 // RegisterRoutes adds routes to the router.
 func (c *workspaceController) RegisterRoutes(router chi.Router) {
 	router.Get("/workspaces/{workspaceId}", c.GetWorkspaceByID)
-	router.Get("/workspaces/{workspace}/runs", c.GetWorkspaceRuns)
+	router.Get("/workspaces/{workspaceId}/runs", c.GetWorkspaceRuns)
 	router.Get("/workspaces/{workspaceId}/vars", c.GetWorkspaceVariables)
 	router.Get("/organizations/{organization}/workspaces/{workspace}", c.GetWorkspace)
 	router.Get("/workspaces/{workspaceId}/current-state-version", c.GetWorkspaceCurrentStateVersion)
@@ -157,8 +178,13 @@ func (c *workspaceController) CreateWorkspace(w http.ResponseWriter, r *http.Req
 	org := chi.URLParam(r, "organization")
 
 	var req gotfe.WorkspaceCreateOptions
-	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
+	if err := unmarshalJSONAPIRequest(r.Body, &req); err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
+		return
+	}
+
+	if req.Name == nil {
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("workspace name is required", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
@@ -200,8 +226,30 @@ func (c *workspaceController) GetWorkspaceCurrentStateVersion(w http.ResponseWri
 	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusOK)
 }
 
+// GetWorkspaceRuns lists a workspace's runs, newest first, a page at a time as go-tfe's Runs.List asks
+// for them with page[number] and page[size]. The remote backend walks these pages to report a queued
+// run's position in the workspace queue.
 func (c *workspaceController) GetWorkspaceRuns(w http.ResponseWriter, r *http.Request) {
 	workspaceID := gid.FromGlobalID(chi.URLParam(r, "workspaceId"))
+
+	pageNumber, err := parsePageParam(r, "page[number]", 1)
+	if err != nil {
+		c.respWriter.RespondWithError(r.Context(), w, err)
+		return
+	}
+	pageSize, err := parsePageParam(r, "page[size]", defaultRunsPageSize)
+	if err != nil {
+		c.respWriter.RespondWithError(r.Context(), w, err)
+		return
+	}
+	pageSize = min(pageSize, maxRunsPageSize)
+
+	skip := (pageNumber - 1) * pageSize // int is 64 bits on supported platforms
+	if skip > maxRunsSkipped {
+		c.respWriter.RespondWithError(r.Context(), w, errors.New(
+			"page[number] is too large, at most %d runs can be paged past", maxRunsSkipped, errors.WithErrorCode(errors.EInvalid)))
+		return
+	}
 
 	ws, err := c.workspaceService.GetWorkspaceByID(r.Context(), workspaceID)
 	if err != nil {
@@ -209,15 +257,70 @@ func (c *workspaceController) GetWorkspaceRuns(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	runs, err := c.runService.GetRuns(r.Context(), &run.GetRunsInput{
-		Workspace: ws,
-	})
+	// Run pagination is cursor based, so a numbered page is reached by walking the cursors of the
+	// runs before it, a page at a time to keep memory bounded.
+	sortBy := db.RunSortableFieldCreatedAtDesc
+	var after *string
+	var result *db.RunsResult
+	pastEnd := false
+	for skip > 0 && !pastEnd {
+		n := min(skip, maxRunsPageSize)
+		first := int32(n)
+		result, err = c.runService.GetRuns(r.Context(), &run.GetRunsInput{
+			Sort:              &sortBy,
+			PaginationOptions: &pagination.Options{First: &first, After: after},
+			Workspace:         ws,
+		})
+		if err != nil {
+			c.respWriter.RespondWithError(r.Context(), w, err)
+			return
+		}
+
+		if len(result.Runs) < n {
+			pastEnd = true
+			break
+		}
+
+		after, err = result.PageInfo.Cursor(result.Runs[n-1])
+		if err != nil {
+			c.respWriter.RespondWithError(r.Context(), w, err)
+			return
+		}
+		skip -= n
+	}
+
+	var pageRuns []*models.Run
+	if !pastEnd {
+		first := int32(pageSize)
+		result, err = c.runService.GetRuns(r.Context(), &run.GetRunsInput{
+			Sort:              &sortBy,
+			PaginationOptions: &pagination.Options{First: &first, After: after},
+			Workspace:         ws,
+		})
+		if err != nil {
+			c.respWriter.RespondWithError(r.Context(), w, err)
+			return
+		}
+		pageRuns = result.Runs
+	}
+
+	totalCount, err := result.PageInfo.TotalCount(r.Context())
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(r.Context(), w, runs.Runs, http.StatusOK)
+	tfeRuns := []*Run{}
+	for _, item := range pageRuns {
+		tfeRuns = append(tfeRuns, TharsisRunToRun(item))
+	}
+
+	runList := &RunList{
+		Pagination: newPagination(pageNumber, pageSize, int(totalCount)),
+		Items:      tfeRuns,
+	}
+
+	c.respWriter.RespondWithPaginatedJSONAPI(r.Context(), w, runList, http.StatusOK)
 }
 
 func (c *workspaceController) LockWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -259,8 +362,12 @@ func (c *workspaceController) UnlockWorkspace(w http.ResponseWriter, r *http.Req
 func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.Request) {
 	workspaceID := gid.FromGlobalID(chi.URLParam(r, "workspaceId"))
 
+	// The state is base64 encoded inside the JSON:API document, so the whole request is capped.
+	body := http.MaxBytesReader(w, r.Body, int64(c.stateVersionMaxUploadSize))
+	defer body.Close()
+
 	var req gotfe.StateVersionCreateOptions
-	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
+	if err := unmarshalJSONAPIRequest(body, &req); err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
@@ -280,6 +387,11 @@ func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.
 		return
 	}
 
+	if err := verifyStateVersionAttributes(&req); err != nil {
+		c.respWriter.RespondWithError(r.Context(), w, err)
+		return
+	}
+
 	options := models.StateVersion{WorkspaceID: workspaceID}
 
 	// json-state is the "terraform show -json" rendering the CLI produces alongside the state. It is
@@ -293,6 +405,77 @@ func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.
 	}
 
 	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusCreated)
+}
+
+// verifyStateVersionAttributes checks a state version create request's md5, serial and lineage against the
+// state it carries: TFE requires them to describe that state, and the Terraform CLI computes all three
+// from the state bytes it sends, so a mismatch means the state was not the one the client meant to send.
+// Each is checked only when sent.
+func verifyStateVersionAttributes(req *gotfe.StateVersionCreateOptions) error {
+	if req.MD5 == nil && req.Serial == nil && req.Lineage == nil {
+		return nil
+	}
+
+	state, err := base64.StdEncoding.DecodeString(*req.State)
+	if err != nil {
+		return errors.Wrap(err, "state is not valid base64", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	if req.MD5 != nil {
+		if sum := md5.Sum(state); !strings.EqualFold(hex.EncodeToString(sum[:]), *req.MD5) {
+			return errors.New("md5 does not match the state", errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+
+	if req.Serial == nil && req.Lineage == nil {
+		return nil
+	}
+
+	var stateFile struct {
+		Serial  *uint64 `json:"serial"`
+		Lineage *string `json:"lineage"`
+	}
+	if err := json.Unmarshal(state, &stateFile); err != nil {
+		return errors.Wrap(err, "state is not valid JSON", errors.WithErrorCode(errors.EInvalid))
+	}
+	if req.Serial != nil && (stateFile.Serial == nil || *req.Serial < 0 || uint64(*req.Serial) != *stateFile.Serial) {
+		return errors.New("serial does not match the state", errors.WithErrorCode(errors.EInvalid))
+	}
+	if req.Lineage != nil && (stateFile.Lineage == nil || *req.Lineage != *stateFile.Lineage) {
+		return errors.New("lineage does not match the state", errors.WithErrorCode(errors.EInvalid))
+	}
+	return nil
+}
+
+// parsePageParam reads a positive 32-bit page[number] or page[size] query parameter, defaulting when
+// absent. The bound keeps the page arithmetic from overflowing.
+func parsePageParam(r *http.Request, name string, defaultValue int) (int, error) {
+	raw := r.URL.Query().Get(name)
+	if raw == "" {
+		return defaultValue, nil
+	}
+	value, err := strconv.ParseInt(raw, 10, 32)
+	if err != nil || value < 1 {
+		return 0, errors.New("%s must be a positive 32-bit integer", name, errors.WithErrorCode(errors.EInvalid))
+	}
+	return int(value), nil
+}
+
+// newPagination describes page pageNumber of totalCount items split into pages of pageSize.
+func newPagination(pageNumber, pageSize, totalCount int) *gotfe.Pagination {
+	totalPages := (totalCount + pageSize - 1) / pageSize
+	p := &gotfe.Pagination{
+		CurrentPage: pageNumber,
+		TotalPages:  totalPages,
+		TotalCount:  totalCount,
+	}
+	if pageNumber > 1 {
+		p.PreviousPage = pageNumber - 1
+	}
+	if pageNumber < totalPages {
+		p.NextPage = pageNumber + 1
+	}
+	return p
 }
 
 func (c *workspaceController) DownloadConfigurationVersion(w http.ResponseWriter, r *http.Request) {
@@ -326,7 +509,7 @@ func (c *workspaceController) CreateConfigurationVersion(w http.ResponseWriter, 
 	workspaceID := gid.FromGlobalID(chi.URLParam(r, "workspaceId"))
 
 	var req gotfe.ConfigurationVersionCreateOptions
-	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
+	if err := unmarshalJSONAPIRequest(r.Body, &req); err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}

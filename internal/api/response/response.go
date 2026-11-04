@@ -140,8 +140,8 @@ func (rh *responseHelper) RespondWithPaginatedJSONAPI(ctx context.Context, w htt
 				return
 			}
 
-			// Set pagination metadata on payload
-			payload.(*jsonapi.ManyPayload).Meta = (*jsonapi.Meta)(&meta)
+			// Set pagination metadata on payload, nested under "pagination" where TFE API clients (go-tfe) read it
+			payload.(*jsonapi.ManyPayload).Meta = &jsonapi.Meta{"pagination": meta}
 		}
 
 		payload.(*jsonapi.ManyPayload).Included = []*jsonapi.Node{}

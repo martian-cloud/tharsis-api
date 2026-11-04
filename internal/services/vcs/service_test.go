@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -3142,4 +3144,192 @@ func TestRepositoryDecompressorRejectsExpansion(t *testing.T) {
 // mockCallerActor returns the actor reported by the system caller these tests use.
 func mockCallerActor() models.Actor {
 	return models.SystemActor()
+}
+
+// TestRefMatchesInvalidTagRegex verifies a link whose stored tag regex does not compile (saved before
+// validation existed) never matches a tag, rather than panicking on the nil regex.
+func TestRefMatchesInvalidTagRegex(t *testing.T) {
+	invalidRegex := "v(1"
+	link := &models.WorkspaceVCSProviderLink{TagRegex: &invalidRegex}
+
+	// A tag event never consults the provider.
+	assert.False(t, refMatches(&ProcessWebhookEventInput{Ref: "refs/tags/v1"}, models.TagEventType, link, nil))
+}
+
+// fuzzRepoPaths are the paths (relative to the repository root, slash separated) created by newFuzzRepo.
+var fuzzRepoPaths = map[string]struct{}{
+	"main.tf":                    {},
+	"modules":                    {},
+	"modules/network":            {},
+	"modules/network/network.tf": {},
+	"docs":                       {},
+	"docs/README.md":             {},
+}
+
+// newFuzzRepo creates a small repository checkout plus a sibling directory outside of it. The
+// checkout contains a symlink pointing outside of it, a symlink pointing to its own parent and an
+// in-repository symlink.
+func newFuzzRepo(f *testing.F) (string, string) {
+	base := f.TempDir()
+	repo := filepath.Join(base, "repo")
+	outside := filepath.Join(base, "outside")
+
+	require.NoError(f, os.MkdirAll(filepath.Join(repo, "modules", "network"), 0o700))
+	require.NoError(f, os.MkdirAll(filepath.Join(repo, "docs"), 0o700))
+	require.NoError(f, os.MkdirAll(outside, 0o700))
+	for _, file := range []string{"main.tf", "modules/network/network.tf", "docs/README.md"} {
+		require.NoError(f, os.WriteFile(filepath.Join(repo, filepath.FromSlash(file)), []byte("x"), 0o600))
+	}
+	require.NoError(f, os.WriteFile(filepath.Join(outside, "secret.tf"), []byte("x"), 0o600))
+
+	return repo, outside
+}
+
+func FuzzResolveModulePath(f *testing.F) {
+	repo, outside := newFuzzRepo(f)
+	require.NoError(f, os.Symlink(outside, filepath.Join(repo, "escape")))
+	require.NoError(f, os.Symlink("..", filepath.Join(repo, "up")))
+	require.NoError(f, os.Symlink("modules/network", filepath.Join(repo, "inner")))
+	require.NoError(f, os.Symlink("loop", filepath.Join(repo, "loop")))
+
+	root, err := filepath.EvalSymlinks(repo)
+	require.NoError(f, err)
+
+	f.Add("")
+	f.Add(".")
+	f.Add("modules/network")
+	f.Add("modules//network/")
+	f.Add("./modules/./network")
+	f.Add("inner")
+	f.Add("main.tf")
+	f.Add("../")
+	f.Add("..")
+	f.Add("modules/../../")
+	f.Add("../outside")
+	f.Add("../repo/modules")
+	f.Add("/etc")
+	f.Add("escape")
+	f.Add("escape/secret.tf")
+	f.Add("up")
+	f.Add("up/outside")
+	f.Add("up/repo/modules")
+	f.Add("loop")
+	f.Add("missing")
+	f.Add("modules/network\x00")
+
+	f.Fuzz(func(t *testing.T, moduleDirectory string) {
+		modulePath, err := resolveModulePath(repo, moduleDirectory)
+		if err != nil {
+			assert.Empty(t, modulePath)
+			assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+			return
+		}
+
+		// An accepted module path must be inside the (symlink-resolved) repository checkout.
+		rel, err := filepath.Rel(root, modulePath)
+		require.NoError(t, err)
+		assert.True(t, filepath.IsLocal(rel), "module directory %q resolved outside of the repository: %q", moduleDirectory, modulePath)
+
+		// The returned path is fully resolved, so following it again cannot leave the checkout.
+		resolved, err := filepath.EvalSymlinks(modulePath)
+		require.NoError(t, err)
+		assert.Equal(t, modulePath, resolved)
+	})
+}
+
+func FuzzGlobsMatch(f *testing.F) {
+	repo, _ := newFuzzRepo(f)
+
+	f.Add("**", "main.tf")
+	f.Add("*.tf", "main.tf")
+	f.Add("/*.tf", "main.tf")
+	f.Add("modules/**/*.tf", "modules/network/network.tf")
+	f.Add("modules/*", "modules/network")
+	f.Add("**/*.md", "docs/README.md")
+	f.Add("{docs,modules}/**", "docs/README.md")
+	f.Add("[", "main.tf")
+	f.Add("**", "")
+	f.Add("**", "missing.tf")
+	f.Add("*.tf", "MAIN.TF")
+	f.Add("*.tf", "./main.tf")
+	f.Add("modules/network/network.tf", "modules//network/network.tf")
+	f.Add("../../../../**", "main.tf")
+	f.Add("modules/../main.tf", "main.tf")
+	f.Add("{,.}./**", "main.tf")
+	f.Add("a..b/*.tf", "main.tf")
+
+	f.Fuzz(func(t *testing.T, glob, alteredFile string) {
+		alteredFiles := map[string]struct{}{alteredFile: {}}
+		_, inRepo := fuzzRepoPaths[alteredFile]
+
+		matches := globsMatch(repo, alteredFiles, []string{glob})
+
+		// A match always means the altered file is a real path in the checkout.
+		if matches {
+			assert.True(t, inRepo, "glob %q matched altered file %q which is not in the repository", glob, alteredFile)
+		}
+
+		// Globs with a ".." segment are never evaluated, so they never match.
+		if slices.Contains(strings.Split(glob, "/"), "..") {
+			assert.False(t, matches, "glob %q with a '..' segment matched", glob)
+		}
+
+		// "**" matches every path in the checkout and nothing else.
+		assert.Equal(t, inRepo, globsMatch(repo, alteredFiles, []string{"**"}))
+
+		// No globs or no altered files never match.
+		assert.False(t, globsMatch(repo, alteredFiles, nil))
+		assert.False(t, globsMatch(repo, map[string]struct{}{}, []string{glob}))
+	})
+}
+
+func FuzzValidateWebhookEventInput(f *testing.F) {
+	sha1 := strings.Repeat("a", 40)
+	sha256 := strings.Repeat("F", 64)
+	zero := strings.Repeat("0", 40)
+
+	f.Add(sha1, sha1, sha1)
+	f.Add("", zero, sha1)
+	f.Add(sha256, "", "")
+	f.Add("", "", "")
+	f.Add(strings.Repeat("a", 39), "", "")
+	f.Add(strings.Repeat("a", 41), "", "")
+	f.Add("", strings.Repeat("g", 40), "")
+	f.Add("", "", sha1+"\n")
+	f.Add("", "", "../../"+sha1)
+	f.Add("main", "", "")
+
+	isCommitID := func(s string) bool {
+		if len(s) != 40 && len(s) != 64 {
+			return false
+		}
+		for _, c := range s {
+			if !strings.ContainsRune("0123456789abcdefABCDEF", c) {
+				return false
+			}
+		}
+		return true
+	}
+
+	f.Fuzz(func(t *testing.T, headCommitID, before, after string) {
+		err := validateWebhookEventInput(&ProcessWebhookEventInput{
+			HeadCommitID: headCommitID,
+			Before:       before,
+			After:        after,
+		})
+
+		// Every commit ID is optional but must be a full hex hash when present.
+		valid := true
+		for _, id := range []string{headCommitID, before, after} {
+			if id != "" && !isCommitID(id) {
+				valid = false
+			}
+		}
+
+		if valid {
+			assert.NoError(t, err)
+		} else {
+			assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+		}
+	})
 }

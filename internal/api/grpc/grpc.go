@@ -48,6 +48,7 @@ func NewServer(ctx context.Context, options *ServerOptions) *Server {
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.ChainStreamInterceptor(
 			interceptors.RequestIDStream(),
+			interceptors.RecoveryStream(options.Logger),
 			interceptors.UserAgentStream(),
 			interceptors.ErrorHandlerStream(options.Logger),
 			interceptors.DrainStream(drainCtx),
@@ -57,6 +58,7 @@ func NewServer(ctx context.Context, options *ServerOptions) *Server {
 		),
 		grpc.ChainUnaryInterceptor(
 			interceptors.RequestIDUnary(),
+			interceptors.RecoveryUnary(options.Logger),
 			interceptors.UserAgentUnary(),
 			interceptors.ErrorHandlerUnary(options.Logger),
 			interceptors.AuthenticationUnary(options.Authenticator),

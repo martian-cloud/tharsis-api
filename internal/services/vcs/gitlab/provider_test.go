@@ -170,7 +170,7 @@ func TestBuildOAuthAuthorizationURL(t *testing.T) {
 }
 
 func TestBuildRepositoryURL(t *testing.T) {
-	repositoryPath := "/owner/repository"
+	repositoryPath := "owner/repository"
 
 	testCases := []struct {
 		name        string
@@ -183,7 +183,7 @@ func TestBuildRepositoryURL(t *testing.T) {
 				ProviderURL:    defaultURL,
 				RepositoryPath: repositoryPath,
 			},
-			expectedURL: defaultURL.String() + repositoryPath,
+			expectedURL: defaultURL.String() + "/" + repositoryPath,
 		},
 		{
 			name: "repository URL with custom API URL",
@@ -191,7 +191,7 @@ func TestBuildRepositoryURL(t *testing.T) {
 				ProviderURL:    customProviderURL,
 				RepositoryPath: repositoryPath,
 			},
-			expectedURL: customProviderURL.String() + repositoryPath,
+			expectedURL: customProviderURL.String() + "/" + repositoryPath,
 		},
 	}
 
@@ -1101,4 +1101,39 @@ func TestDeleteWebhook(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGetProjectLegacyRepositoryPath checks a link saved before repository paths were validated, with
+// empty segments, still queries the normalized project.
+func TestGetProjectLegacyRepositoryPath(t *testing.T) {
+	ctx := context.Background()
+
+	client := newTestClient(func(r *http.Request) *http.Response {
+		assert.Equal(t, "/api/v4/projects/group%2Fproject", r.URL.EscapedPath())
+
+		responsePayload, err := json.Marshal(&getProjectResponse{DefaultBranch: "main"})
+		assert.Nil(t, err)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBuffer(responsePayload)),
+			Status:     "200",
+			Header:     make(http.Header),
+		}
+	})
+
+	logger, _ := logger.NewForTest()
+	provider, err := New(ctx, logger, client, "")
+	assert.Nil(t, err)
+
+	payload, err := provider.GetProject(ctx, &types.GetProjectInput{
+		ProviderURL:    defaultURL,
+		AccessToken:    "an-access-token",
+		RepositoryPath: "/group//project",
+	})
+	assert.Nil(t, err)
+	assert.Equal(t, "main", payload.DefaultBranch)
+
+	url, err := provider.BuildRepositoryURL(&types.BuildRepositoryURLInput{ProviderURL: defaultURL, RepositoryPath: "/group//project"})
+	assert.Nil(t, err)
+	assert.Equal(t, defaultURL.String()+"/group/project", url)
 }

@@ -1090,6 +1090,20 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 		return nil, err
 	}
 
+	platformToCreate := &models.TerraformProviderPlatform{
+		ProviderVersionID: input.ProviderVersionID,
+		OperatingSystem:   input.OperatingSystem,
+		Architecture:      input.Architecture,
+		SHASum:            input.SHASum,
+		Filename:          input.Filename,
+		BinaryUploaded:    false,
+		CreatedBy:         caller.GetActor(),
+	}
+
+	if vErr := platformToCreate.Validate(); vErr != nil {
+		return nil, errors.Wrap(vErr, "failed to validate terraform provider platform model", errors.WithSpan(span))
+	}
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
@@ -1101,15 +1115,7 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 		}
 	}()
 
-	createdPlatform, err := s.dbClient.TerraformProviderPlatforms.CreateProviderPlatform(txContext, &models.TerraformProviderPlatform{
-		ProviderVersionID: input.ProviderVersionID,
-		OperatingSystem:   input.OperatingSystem,
-		Architecture:      input.Architecture,
-		SHASum:            input.SHASum,
-		Filename:          input.Filename,
-		BinaryUploaded:    false,
-		CreatedBy:         caller.GetActor(),
-	})
+	createdPlatform, err := s.dbClient.TerraformProviderPlatforms.CreateProviderPlatform(txContext, platformToCreate)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create terraform provider platform", errors.WithSpan(span))
 	}

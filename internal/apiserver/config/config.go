@@ -26,11 +26,13 @@ const (
 	defaultMaxGraphQLComplexity                        = 0
 	defaultRateLimitStorePluginType                    = "memory"
 	defaultAdminLogTailStorePluginType                 = "noop"
-	defaultMaxGRPCRecvMsgSize                          = 1024 * 1024 * 64  // 64 MiB
-	defaultMaxGraphQLRequestBodySize                   = 1024 * 1024 * 64  // 64 MiB
-	defaultModuleRegistryMaxUploadSize                 = 1024 * 1024 * 128 // 128 MiB
-	defaultVCSRepositorySizeLimit                      = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
-	defaultAsyncTaskTimeout                            = 180               // seconds
+	defaultMaxGRPCRecvMsgSize                          = 1024 * 1024 * 64   // 64 MiB
+	defaultMaxGraphQLRequestBodySize                   = 1024 * 1024 * 64   // 64 MiB
+	defaultModuleRegistryMaxUploadSize                 = 1024 * 1024 * 128  // 128 MiB
+	defaultPlanMaxUploadSize                           = 1024 * 1024 * 1024 // 1 GiB
+	defaultStateVersionMaxUploadSize                   = 1024 * 1024 * 1024 // 1 GiB
+	defaultVCSRepositorySizeLimit                      = 1024 * 1024 * 5    // 5 MebiBytes in bytes.
+	defaultAsyncTaskTimeout                            = 180                // seconds
 	defaultDBAutoMigrateEnabled                        = true
 	defaultOtelTraceEnabled                            = false
 	defaultHTTPRateLimit                               = 60 // in calls per second
@@ -200,6 +202,12 @@ type Config struct {
 	// Max upload size when uploading a module to the module registry
 	ModuleRegistryMaxUploadSize int `yaml:"module_registry_max_upload_size" env:"MODULE_REGISTRY_MAX_UPLOAD_SIZE"`
 
+	// Max upload size when uploading a plan (binary or JSON) for a run
+	PlanMaxUploadSize int `yaml:"plan_max_upload_size" env:"PLAN_MAX_UPLOAD_SIZE"`
+
+	// Max upload size when creating a state version or uploading its JSON rendering through the TFE API
+	StateVersionMaxUploadSize int `yaml:"state_version_max_upload_size" env:"STATE_VERSION_MAX_UPLOAD_SIZE"`
+
 	// Timeout for async background tasks
 	AsyncTaskTimeout int `yaml:"async_task_timeout" env:"ASYNC_TASK_TIMEOUT"`
 
@@ -282,6 +290,8 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		MaxGRPCRecvMsgSize:                          defaultMaxGRPCRecvMsgSize,
 		MaxGraphQLRequestBodySize:                   defaultMaxGraphQLRequestBodySize,
 		ModuleRegistryMaxUploadSize:                 defaultModuleRegistryMaxUploadSize,
+		PlanMaxUploadSize:                           defaultPlanMaxUploadSize,
+		StateVersionMaxUploadSize:                   defaultStateVersionMaxUploadSize,
 		VCSRepositorySizeLimit:                      defaultVCSRepositorySizeLimit,
 		MaxLogStreamSizeBytes:                       defaultMaxLogStreamSizeBytes,
 		AsyncTaskTimeout:                            defaultAsyncTaskTimeout,

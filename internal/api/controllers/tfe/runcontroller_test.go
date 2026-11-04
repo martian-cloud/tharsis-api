@@ -12,6 +12,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/go-chi/chi/v5"
 	gotfe "github.com/hashicorp/go-tfe"
+	"github.com/hashicorp/jsonapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -359,4 +360,213 @@ func TestCanReadRunLogs(t *testing.T) {
 			assert.Equal(t, test.expect, canReadRunLogs(auth.WithCaller(context.Background(), test.caller), run))
 		})
 	}
+}
+
+// newGoTFEClient serves the given controllers' routes and returns a go-tfe client pointed at them, so a
+// test exercises the requests go-tfe (and so the Terraform CLI) actually sends.
+func newGoTFEClient(t *testing.T, routes ...interface{ RegisterRoutes(chi.Router) }) *gotfe.Client {
+	router := chi.NewRouter()
+	for _, r := range routes {
+		r.RegisterRoutes(router)
+	}
+	apiRouter := chi.NewRouter()
+	apiRouter.Mount(gotfe.DefaultBasePath, router)
+
+	server := httptest.NewServer(apiRouter)
+	t.Cleanup(server.Close)
+
+	client, err := gotfe.NewClient(&gotfe.Config{Address: server.URL, Token: "token", RetryServerErrors: false})
+	require.NoError(t, err)
+	return client
+}
+
+// TestRunController_RunActionComments checks the comment go-tfe sends with apply and cancel reaches the
+// service. go-tfe encodes these options as plain JSON rather than JSON:API.
+func TestRunController_RunActionComments(t *testing.T) {
+	const runID = "e5f6a7b8-1c39-4c8f-9a2f-2c4d5e6f7a80"
+
+	tests := []struct {
+		name    string
+		comment *string
+	}{
+		{name: "with a comment", comment: ptr.String("ship it")},
+		{name: "without a comment"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := &models.Run{Metadata: models.ResourceMetadata{ID: runID}}
+			mockRunService := runservice.NewMockService(t)
+			mockRunService.On("ApplyRun", mock.Anything, runID, test.comment).Return(result, nil)
+			mockRunService.On("CancelRun", mock.Anything, &runservice.CancelRunInput{RunID: runID, Comment: test.comment}).
+				Return(result, nil)
+
+			testLogger, _ := logger.NewForTest()
+			client := newGoTFEClient(t, &runController{
+				respWriter:        response.NewWriter(testLogger),
+				jwtAuthMiddleware: func(next http.Handler) http.Handler { return next },
+				logger:            testLogger,
+				runService:        mockRunService,
+			})
+
+			runGID := result.GetGlobalID()
+			require.NoError(t, client.Runs.Apply(context.Background(), runGID, gotfe.RunApplyOptions{Comment: test.comment}))
+			require.NoError(t, client.Runs.Cancel(context.Background(), runGID, gotfe.RunCancelOptions{Comment: test.comment}))
+		})
+	}
+}
+
+// TestRunController_RunActionBodies covers the bodies apply and cancel accept besides go-tfe's: an empty
+// body is no options, and a body that is not a JSON object is the client's error.
+func TestRunController_RunActionBodies(t *testing.T) {
+	const runID = "e5f6a7b8-1c39-4c8f-9a2f-2c4d5e6f7a80"
+
+	tests := []struct {
+		name          string
+		body          string
+		expectCode    int
+		expectComment *string
+	}{
+		{name: "empty body", body: "", expectCode: http.StatusOK},
+		{name: "empty object", body: "{}", expectCode: http.StatusOK},
+		{name: "comment", body: `{"comment":"why"}`, expectCode: http.StatusOK, expectComment: ptr.String("why")},
+		{name: "JSON:API document is not the options", body: `{"data":{"type":"runs"}}`, expectCode: http.StatusOK},
+		{name: "not JSON", body: "comment=why", expectCode: http.StatusBadRequest},
+		{name: "wrong comment type", body: `{"comment":1}`, expectCode: http.StatusBadRequest},
+	}
+
+	for _, test := range tests {
+		for _, action := range []string{"apply", "cancel"} {
+			t.Run(action+": "+test.name, func(t *testing.T) {
+				result := &models.Run{Metadata: models.ResourceMetadata{ID: runID}}
+				mockRunService := runservice.NewMockService(t)
+				if test.expectCode == http.StatusOK {
+					if action == "apply" {
+						mockRunService.On("ApplyRun", mock.Anything, runID, test.expectComment).Return(result, nil)
+					} else {
+						mockRunService.On("CancelRun", mock.Anything, &runservice.CancelRunInput{RunID: runID, Comment: test.expectComment}).
+							Return(result, nil)
+					}
+				}
+
+				testLogger, _ := logger.NewForTest()
+				c := &runController{respWriter: response.NewWriter(testLogger), logger: testLogger, runService: mockRunService}
+				handler := c.ApplyRun
+				if action == "cancel" {
+					handler = c.CancelRun
+				}
+
+				rctx := chi.NewRouteContext()
+				rctx.URLParams.Add("id", result.GetGlobalID())
+				req := httptest.NewRequest(http.MethodPost, "/runs/x/actions/"+action, bytes.NewBufferString(test.body))
+				req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+				rec := httptest.NewRecorder()
+				handler(rec, req)
+				assert.Equal(t, test.expectCode, rec.Code, rec.Body.String())
+			})
+		}
+	}
+}
+
+// TestRunController_CreateRunPlanOnlyAndVersion checks go-tfe's plan-only and terraform-version run
+// attributes reach run creation as a speculative run and its Terraform version.
+func TestRunController_CreateRunPlanOnlyAndVersion(t *testing.T) {
+	const (
+		workspaceID = "a1b2c3d4-1c39-4c8f-9a2f-2c4d5e6f7a80"
+		runID       = "e5f6a7b8-1c39-4c8f-9a2f-2c4d5e6f7a80"
+	)
+
+	tests := []struct {
+		name              string
+		planOnly          *bool
+		terraformVersion  *string
+		expectSpeculative *bool
+		expectVersion     string
+	}{
+		{name: "neither sent"},
+		{
+			name:              "plan-only with a version",
+			planOnly:          ptr.Bool(true),
+			terraformVersion:  ptr.String("1.9.0"),
+			expectSpeculative: ptr.Bool(true),
+			expectVersion:     "1.9.0",
+		},
+		{
+			// An explicit false leaves the configuration version to decide, as an omitted one does.
+			name:     "plan-only false",
+			planOnly: ptr.Bool(false),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockRunService := runservice.NewMockService(t)
+			mockRunService.On("CreateRun", mock.Anything, mock.MatchedBy(func(input *runservice.CreateRunInput) bool {
+				return reflect.DeepEqual(test.expectSpeculative, input.Speculative) &&
+					input.TerraformVersion == test.expectVersion && input.WorkspaceID == workspaceID
+			})).Return(&models.Run{Metadata: models.ResourceMetadata{ID: runID}, WorkspaceID: workspaceID}, nil)
+
+			testLogger, _ := logger.NewForTest()
+			client := newGoTFEClient(t, &runController{
+				respWriter:        response.NewWriter(testLogger),
+				jwtAuthMiddleware: func(next http.Handler) http.Handler { return next },
+				logger:            testLogger,
+				runService:        mockRunService,
+			})
+
+			_, err := client.Runs.Create(context.Background(), gotfe.RunCreateOptions{
+				Workspace:        &gotfe.Workspace{ID: (&models.Workspace{Metadata: models.ResourceMetadata{ID: workspaceID}}).GetGlobalID()},
+				PlanOnly:         test.planOnly,
+				TerraformVersion: test.terraformVersion,
+			})
+			require.NoError(t, err)
+		})
+	}
+}
+
+func FuzzParseRunVariables(f *testing.F) {
+	f.Add([]byte(`{"data":{"type":"runs","attributes":{"variables":[{"key":"a","value":"1"}]}}}`))
+	f.Add([]byte(`{"data":{"type":"runs","attributes":{"variables":[{"Key":"a","Value":"1"}]}}}`))
+	f.Add([]byte(`{"data":{"type":"runs","attributes":{"variables":[null]}}}`))
+	f.Add([]byte(`{"data":{"type":"runs","attributes":{"variables":[{"key":""},{"Key":"b"}]}}}`))
+	f.Add([]byte(`{"data":{"type":"runs","attributes":{"variables":[{"Key":1}]}}}`))
+	f.Add([]byte(`{"data":{"type":"runs","attributes":{"variables":[{"key":"a","Key":"b","value":"x","Value":"y"}]}}}`))
+	f.Add([]byte(`{"data":{"type":"runs","attributes":{"variables":[]}}}`))
+
+	f.Fuzz(func(t *testing.T, body []byte) {
+		var req gotfe.RunCreateOptions
+		if err := jsonapi.UnmarshalPayload(bytes.NewReader(body), &req); err != nil {
+			t.Skip()
+		}
+
+		variables, err := parseRunVariables(req, body)
+		if err != nil {
+			assert.Nil(t, variables)
+			return
+		}
+
+		var keyed []string
+		for _, v := range req.Variables {
+			if v != nil && v.Key != "" {
+				keyed = append(keyed, v.Key)
+			}
+		}
+
+		for _, v := range variables {
+			assert.Equal(t, models.TerraformVariableCategory, v.Category)
+			require.NotNil(t, v.Value)
+		}
+
+		// Variables in the current shape are used as sent, and the fallback only applies when none
+		// of them had a key.
+		if len(keyed) > 0 {
+			require.Len(t, variables, len(keyed))
+			for i, key := range keyed {
+				assert.Equal(t, key, variables[i].Key)
+			}
+		} else if len(req.Variables) == 0 {
+			assert.Empty(t, variables)
+		}
+	})
 }

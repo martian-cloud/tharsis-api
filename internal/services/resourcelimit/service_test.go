@@ -92,6 +92,21 @@ func TestUpdateResourceLimit(t *testing.T) {
 			injectOldLimit:  nil,
 			expectErrorCode: errors.EInvalid,
 		},
+		{
+			name:            "admin user cannot set a negative limit value",
+			callerType:      "admin",
+			input:           &UpdateResourceLimitInput{Name: string(limits.ResourceLimitGroupTreeDepth), Value: -1},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:           "admin user can set a limit value of zero",
+			callerType:     "admin",
+			input:          &UpdateResourceLimitInput{Name: string(limits.ResourceLimitGroupTreeDepth), Value: 0},
+			willGetLimit:   true,
+			injectOldLimit: &models.ResourceLimit{Name: string(limits.ResourceLimitGroupTreeDepth), Value: 47},
+			injectNewLimit: &models.ResourceLimit{Name: string(limits.ResourceLimitGroupTreeDepth), Value: 0},
+			expectLimit:    &models.ResourceLimit{Name: string(limits.ResourceLimitGroupTreeDepth), Value: 0},
+		},
 		// There is no such thing as creating a new limit in the DB, because they are all pre-populated.
 		{
 			name:           "admin user can update an existing limit",

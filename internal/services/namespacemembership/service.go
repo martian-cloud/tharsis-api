@@ -351,7 +351,10 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		return nil, errors.Wrap(err, "failed to get role by ID", errors.WithSpan(span))
 	}
 
-	eventTargetType, eventTargetID := getTargetTypeID(namespaceMembership)
+	eventTargetType, eventTargetID, err := getTargetTypeID(namespaceMembership)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get activity event target", errors.WithSpan(span))
+	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
 		&activity.CreateActivityEventInput{
@@ -540,7 +543,10 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 		return errors.Wrap(err, "failed to delete namespace membership", errors.WithSpan(span))
 	}
 
-	eventTargetType, eventTargetID := getTargetTypeID(namespaceMembership)
+	eventTargetType, eventTargetID, err := getTargetTypeID(namespaceMembership)
+	if err != nil {
+		return errors.Wrap(err, "failed to get activity event target", errors.WithSpan(span))
+	}
 
 	if _, err = activity.CreateActivityEvent(txContext, s.dbClient,
 		&activity.CreateActivityEventInput{
@@ -717,17 +723,15 @@ func (s *service) sendMembershipChangeEmail(ctx context.Context, input *sendMemb
 	return nil
 }
 
-func getTargetTypeID(namespaceMembership *models.NamespaceMembership) (models.ActivityEventTargetType, string) {
-	var eventTargetType models.ActivityEventTargetType
-	var eventTargetID string
-	if namespaceMembership.Namespace.GroupID != nil && *namespaceMembership.Namespace.GroupID != "" {
-		eventTargetType = models.TargetGroup
-		eventTargetID = *namespaceMembership.Namespace.GroupID
-	} else {
-		eventTargetType = models.TargetWorkspace
-		eventTargetID = *namespaceMembership.Namespace.WorkspaceID
+func getTargetTypeID(namespaceMembership *models.NamespaceMembership) (models.ActivityEventTargetType, string, error) {
+	namespace := namespaceMembership.Namespace
+	if namespace.GroupID != nil && *namespace.GroupID != "" {
+		return models.TargetGroup, *namespace.GroupID, nil
 	}
-	return eventTargetType, eventTargetID
+	if namespace.WorkspaceID != nil && *namespace.WorkspaceID != "" {
+		return models.TargetWorkspace, *namespace.WorkspaceID, nil
+	}
+	return "", "", errors.New("namespace membership %s has neither a group nor a workspace", namespaceMembership.Metadata.ID)
 }
 
 func callerIsMembershipSubject(caller auth.Caller, userID *string) bool {

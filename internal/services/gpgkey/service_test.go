@@ -1,9 +1,15 @@
 package gpgkey
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -131,6 +137,8 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 		GPGKeyID:    gpgKeyID,
 	}
 
+	publicArmor, privateArmor, privateInPublicArmor := newArmoredEntity(t)
+
 	type testCase struct {
 		expectErrorCode errors.CodeType
 		input           *models.GPGKey
@@ -158,6 +166,48 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 			keyCount:        6,
 			expectOutput:    nil,
 			expectErrorCode: errors.EInvalid,
+		},
+
+		{
+			name:            "negative, private key block",
+			input:           &models.GPGKey{GroupID: "group-id-1", ASCIIArmor: privateArmor},
+			expectErrorCode: errors.EInvalid,
+		},
+
+		{
+			name:            "negative, private key material in a public key block",
+			input:           &models.GPGKey{GroupID: "group-id-1", ASCIIArmor: privateInPublicArmor},
+			expectErrorCode: errors.EInvalid,
+		},
+
+		{
+			name:            "negative, second armor block",
+			input:           &models.GPGKey{GroupID: "group-id-1", ASCIIArmor: armor + publicArmor},
+			expectErrorCode: errors.EInvalid,
+		},
+
+		{
+			name:         "positive, leading content is not stored",
+			input:        &models.GPGKey{GroupID: "group-id-1", ASCIIArmor: "junk\n" + armor},
+			limit:        5,
+			keyCount:     5,
+			expectOutput: &positiveGPGKey,
+		},
+
+		{
+			name:         "positive, trailing content is not stored",
+			input:        &models.GPGKey{GroupID: "group-id-1", ASCIIArmor: armor + "junk\n"},
+			limit:        5,
+			keyCount:     5,
+			expectOutput: &positiveGPGKey,
+		},
+
+		{
+			name:         "positive, content after the checksum line is not stored",
+			input:        &models.GPGKey{GroupID: "group-id-1", ASCIIArmor: strings.Replace(armor, "=HJT6\n", "=HJT6\njunk\n", 1)},
+			limit:        5,
+			keyCount:     5,
+			expectOutput: &positiveGPGKey,
 		},
 	}
 
@@ -187,7 +237,9 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 
 			dbClient.MockGroups.On("GetGroupByID", mock.Anything, mock.Anything).Return(group1, nil)
 
+			var stored *models.GPGKey
 			dbClient.MockGPGKeys.On("CreateGPGKey", mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) { stored = args.Get(1).(*models.GPGKey) }).
 				Return(
 					func(_ context.Context, _ *models.GPGKey) *models.GPGKey {
 						return test.expectOutput
@@ -248,6 +300,16 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 
 			assert.Equal(t, test.expectErrorCode, errors.ErrorCode(actualError))
 			assert.Equal(t, test.expectOutput, actualOutput)
+
+			if stored != nil {
+				// Only the parsed key is stored, re-armored, never content the decoder ignored.
+				assert.Equal(t, fingerprint, stored.Fingerprint)
+				assert.NotContains(t, stored.ASCIIArmor, "junk")
+				entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(stored.ASCIIArmor))
+				require.NoError(t, err)
+				require.Len(t, entityList, 1)
+				assert.Equal(t, fingerprint, fmt.Sprintf("%016X", entityList[0].PrimaryKey.Fingerprint))
+			}
 		})
 	}
 }
@@ -385,4 +447,30 @@ func TestDeleteGPGKey(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// newArmoredEntity generates a small EdDSA key and returns its armored public form, its armored private
+// form, and its private key packets mislabelled as a public key block.
+func newArmoredEntity(tb testing.TB) (string, string, string) {
+	entity, err := openpgp.NewEntity("test", "", "test@invalid.example", &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA})
+	require.NoError(tb, err)
+
+	var public, private, privateInPublic bytes.Buffer
+
+	w, err := armor.Encode(&public, openpgp.PublicKeyType, nil)
+	require.NoError(tb, err)
+	require.NoError(tb, entity.Serialize(w))
+	require.NoError(tb, w.Close())
+
+	w, err = armor.Encode(&private, openpgp.PrivateKeyType, nil)
+	require.NoError(tb, err)
+	require.NoError(tb, entity.SerializePrivate(w, nil))
+	require.NoError(tb, w.Close())
+
+	w, err = armor.Encode(&privateInPublic, openpgp.PublicKeyType, nil)
+	require.NoError(tb, err)
+	require.NoError(tb, entity.SerializePrivate(w, nil))
+	require.NoError(tb, w.Close())
+
+	return public.String(), private.String(), privateInPublic.String()
 }

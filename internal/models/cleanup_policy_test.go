@@ -142,6 +142,16 @@ func TestCleanupPolicy_ResolveMetadata(t *testing.T) {
 
 // ── CleanupPolicy.Validate ──────────────────────────────────────────
 
+func TestCleanupPolicy_Validate_UnsupportedKind(t *testing.T) {
+	groupID := "group-1"
+	for _, kind := range []CleanupRuleKind{"", "unspecified", "bogus"} {
+		t.Run(string(kind), func(t *testing.T) {
+			err := (&CleanupPolicy{GroupID: &groupID, Kind: kind}).Validate()
+			assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+		})
+	}
+}
+
 // ── validateCleanupStrategy ─────────────────────────────────────────────────────────
 
 func validateCleanupStrategy(s CleanupStrategy, keepMin, deleteAfterDays int32) error {

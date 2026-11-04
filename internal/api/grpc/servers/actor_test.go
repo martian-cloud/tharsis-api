@@ -97,6 +97,13 @@ func TestToPBActor(t *testing.T) {
 	}
 }
 
+func TestToPBOptionalActor(t *testing.T) {
+	assert.Nil(t, toPBOptionalActor(nil))
+
+	actor := models.NewUserActor(testActorID)
+	assert.True(t, proto.Equal(toPBActor(actor), toPBOptionalActor(&actor)))
+}
+
 func TestToPBGroup_CreatedByActor(t *testing.T) {
 	now := time.Now()
 	metadata := models.ResourceMetadata{

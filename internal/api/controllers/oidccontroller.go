@@ -479,11 +479,12 @@ func (c *oidcController) Callback(w http.ResponseWriter, r *http.Request) {
 func (c *oidcController) UserCredentialsLogin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	// Only read the form body: credentials must never be accepted from the query string.
 	r.ParseForm()
-	username := r.Form.Get("username")
-	password := r.Form.Get("password")
+	username := r.PostForm.Get("username")
+	password := r.PostForm.Get("password")
 
-	oauthParams := newOAuthCodeFlowParams(r.Form)
+	oauthParams := newOAuthCodeFlowParams(r.PostForm)
 
 	if err := oauthParams.validate(c.clientID); err != nil {
 		c.respWriter.RespondWithError(ctx, w, errors.Wrap(err, "invalid request parameters", errors.WithErrorCode(errors.EInvalid)))
@@ -532,10 +533,11 @@ func (c *oidcController) UserCredentialsLogin(w http.ResponseWriter, r *http.Req
 func (c *oidcController) Token(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	// Token request parameters must be in the form body (RFC 6749 section 3.2), never the query string.
 	r.ParseForm()
 
-	clientID := r.Form.Get("client_id")
-	grantType := r.Form.Get("grant_type")
+	clientID := r.PostForm.Get("client_id")
+	grantType := r.PostForm.Get("grant_type")
 
 	if clientID != c.clientID {
 		c.respWriter.RespondWithError(ctx, w, errors.New("invalid client id", errors.WithErrorCode(errors.EInvalid)))
@@ -544,8 +546,8 @@ func (c *oidcController) Token(w http.ResponseWriter, r *http.Request) {
 
 	switch grantType {
 	case "password":
-		username := r.Form.Get("username")
-		password := r.Form.Get("password")
+		username := r.PostForm.Get("username")
+		password := r.PostForm.Get("password")
 
 		createSessionResponse, err := c.userSessionManager.CreateSession(ctx, &auth.CreateSessionInput{
 			Username:  &username,
@@ -562,9 +564,9 @@ func (c *oidcController) Token(w http.ResponseWriter, r *http.Request) {
 			ExpiresIn:   createSessionResponse.ExpiresIn,
 		}, http.StatusOK)
 	case "authorization_code":
-		redirectURI := r.Form.Get("redirect_uri")
-		code := r.Form.Get("code")
-		codeVerifier := r.Form.Get("code_verifier")
+		redirectURI := r.PostForm.Get("redirect_uri")
+		code := r.PostForm.Get("code")
+		codeVerifier := r.PostForm.Get("code_verifier")
 
 		response, err := c.userSessionManager.ExchangeOAuthCodeForSessionToken(ctx, &auth.ExchangeOAuthCodeForSessionTokenInput{
 			OAuthCode:         code,

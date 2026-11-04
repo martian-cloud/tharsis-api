@@ -254,7 +254,11 @@ func (s *JobServer) MarkJobsCleanedUp(ctx context.Context, req *pb.MarkJobsClean
 	for i, id := range req.JobIds {
 		// We don't anticipate passing in TRN here so optimizing
 		// for just GID to avoid a DB call per ID.
-		jobIDs[i] = gid.FromGlobalID(id)
+		parsedGID, pErr := gid.ParseGlobalID(id)
+		if pErr != nil {
+			return nil, pErr
+		}
+		jobIDs[i] = parsedGID.ID
 	}
 
 	if err = s.serviceCatalog.JobService.MarkJobsCleanedUp(ctx, &job.MarkJobsCleanedUpInput{

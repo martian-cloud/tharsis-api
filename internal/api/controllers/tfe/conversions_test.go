@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
 
 // TestTharsisRunStatusToTFE verifies each Tharsis run status maps onto the TFE run status the API
@@ -102,6 +104,38 @@ func TestTharsisRunStatusToTFE_Exhaustive(t *testing.T) {
 			assert.NotEqual(t, RunPending, got, "status %q has no explicit mapping", status)
 		}
 	}
+}
+
+// TestTharsisWorkspaceToWorkspace_CurrentRun verifies the workspace's current-run relation is the run
+// holding the workspace slot, and that go-tfe decodes it: the Terraform CLI uses it to stop counting a
+// waiting run's queue position at the run that is currently active.
+func TestTharsisWorkspaceToWorkspace_CurrentRun(t *testing.T) {
+	newWorkspace := func(currentApplyRunID *string) *models.Workspace {
+		return &models.Workspace{
+			Metadata:          models.ResourceMetadata{ID: "11111111-1111-1111-1111-111111111111"},
+			Name:              "ws",
+			CurrentApplyRunID: currentApplyRunID,
+		}
+	}
+
+	t.Run("no run holds the workspace", func(t *testing.T) {
+		assert.Nil(t, TharsisWorkspaceToWorkspace(newWorkspace(nil)).CurrentRun)
+		assert.Nil(t, TharsisWorkspaceToWorkspace(newWorkspace(new(string))).CurrentRun)
+	})
+
+	t.Run("a run holds the workspace", func(t *testing.T) {
+		runID := "22222222-2222-2222-2222-222222222222"
+		ws := TharsisWorkspaceToWorkspace(newWorkspace(&runID))
+		require.NotNil(t, ws.CurrentRun)
+		assert.Equal(t, gid.ToGlobalID(types.RunModelType, runID), ws.CurrentRun.ID)
+
+		var buf bytes.Buffer
+		require.NoError(t, jsonapi.MarshalPayload(&buf, ws))
+		decoded := new(gotfe.Workspace)
+		require.NoError(t, jsonapi.UnmarshalPayload(&buf, decoded))
+		require.NotNil(t, decoded.CurrentRun)
+		assert.Equal(t, ws.CurrentRun.ID, decoded.CurrentRun.ID)
+	})
 }
 
 // TestTharsisRunToRun_TaskStages verifies a run's pre-plan and post-plan policy checks are surfaced
@@ -338,6 +372,135 @@ func TestTaskStage_ModuleAttestationTaskResultRoundTripToGoTFE(t *testing.T) {
 	assert.Equal(t, "attestation verified", out.TaskResults[0].Message)
 	assert.Equal(t, "Module Attestation", out.TaskResults[0].TaskName)
 	assert.Equal(t, gotfe.Mandatory, out.TaskResults[0].WorkspaceTaskEnforcementLevel)
+}
+
+// TestTharsisPolicyCheckToPolicyCheck verifies the legacy policy check tallies failures by enforcement
+// level, reports hard-failed whenever a hard-mandatory policy failed, and is overridable only when
+// soft-failed.
+func TestTharsisPolicyCheckToPolicyCheck(t *testing.T) {
+	policies := func(levels ...models.PolicyEnforcementLevel) []*models.PolicyCheckPolicy {
+		result := []*models.PolicyCheckPolicy{{Status: models.PolicyCheckPolicyPassed}, {Status: models.PolicyCheckPolicyPending}}
+		for _, level := range levels {
+			result = append(result, &models.PolicyCheckPolicy{Status: models.PolicyCheckPolicyFailed, EnforcementLevel: level})
+		}
+		return result
+	}
+
+	tests := []struct {
+		name              string
+		status            models.PolicyCheckStatus
+		policies          []*models.PolicyCheckPolicy
+		expectStatus      gotfe.PolicyStatus
+		expectResult      gotfe.PolicyResult
+		expectOverridable bool
+	}{
+		{
+			name:         "passed",
+			status:       models.PolicyCheckPassed,
+			policies:     policies(),
+			expectStatus: gotfe.PolicyPasses,
+			expectResult: gotfe.PolicyResult{Passed: 1, Result: true},
+		},
+		{
+			name:         "advisory failures still pass",
+			status:       models.PolicyCheckPassed,
+			policies:     policies(models.PolicyEnforcementAdvisory),
+			expectStatus: gotfe.PolicyPasses,
+			expectResult: gotfe.PolicyResult{Passed: 1, AdvisoryFailed: 1, TotalFailed: 1},
+		},
+		{
+			name:              "soft-failed is overridable",
+			status:            models.PolicyCheckSoftFailed,
+			policies:          policies(models.PolicyEnforcementSoftMandatory, models.PolicyEnforcementAdvisory),
+			expectStatus:      gotfe.PolicySoftFailed,
+			expectResult:      gotfe.PolicyResult{Passed: 1, SoftFailed: 1, AdvisoryFailed: 1, TotalFailed: 2},
+			expectOverridable: true,
+		},
+		{
+			name:              "a hard-mandatory failure reports hard-failed whatever the check status",
+			status:            models.PolicyCheckSoftFailed,
+			policies:          policies(models.PolicyEnforcementHardMandatory, models.PolicyEnforcementSoftMandatory),
+			expectStatus:      gotfe.PolicyHardFailed,
+			expectResult:      gotfe.PolicyResult{Passed: 1, HardFailed: 1, SoftFailed: 1, TotalFailed: 2},
+			expectOverridable: true,
+		},
+		{
+			name:         "a failure at an unknown enforcement level is not counted",
+			status:       models.PolicyCheckErrored,
+			policies:     policies("unknown"),
+			expectStatus: gotfe.PolicyErrored,
+			expectResult: gotfe.PolicyResult{Passed: 1, Result: true},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			check := &models.PolicyCheck{ID: "check-1", Status: test.status, Policies: test.policies}
+
+			pc := TharsisPolicyCheckToPolicyCheck(check)
+
+			assert.Equal(t, check.GetGlobalID(), pc.ID)
+			assert.Equal(t, test.expectStatus, pc.Status)
+			assert.Equal(t, test.expectResult, *pc.Result)
+			assert.Equal(t, test.expectOverridable, pc.Actions.IsOverridable)
+			assert.Equal(t, test.expectOverridable, pc.Permissions.CanOverride)
+		})
+	}
+}
+
+// TestTharsisStateVersionToStateVersion_noAPIURL verifies no content URLs are advertised without a
+// configured API URL, and that the run relation is set only for a state version created by a run.
+func TestTharsisStateVersionToStateVersion_noAPIURL(t *testing.T) {
+	runID := "33333333-3333-3333-3333-333333333333"
+	sv := &models.StateVersion{
+		Metadata:    models.ResourceMetadata{ID: "11111111-1111-1111-1111-111111111111"},
+		WorkspaceID: "22222222-2222-2222-2222-222222222222",
+	}
+
+	resp := TharsisStateVersionToStateVersion(sv, "", "/tfe/v2")
+	assert.Empty(t, resp.DownloadURL)
+	assert.Empty(t, resp.JSONUploadURL)
+	assert.Empty(t, resp.JSONDownloadURL)
+	assert.Nil(t, resp.Run)
+
+	sv.RunID = &runID
+	resp = TharsisStateVersionToStateVersion(sv, "", "/tfe/v2")
+	require.NotNil(t, resp.Run)
+	assert.Equal(t, gid.ToGlobalID(types.RunModelType, runID), resp.Run.ID)
+	assert.Equal(t, gid.ToGlobalID(types.WorkspaceModelType, sv.WorkspaceID), resp.Run.Workspace.ID)
+}
+
+// TestTharsisVariableToVariable verifies a variable without a value reads as empty and that only the
+// terraform category maps to terraform: every other category, known or not, is an environment variable.
+func TestTharsisVariableToVariable(t *testing.T) {
+	value := "v"
+	tests := []struct {
+		name           string
+		value          *string
+		category       models.VariableCategory
+		expectValue    string
+		expectCategory CategoryType
+	}{
+		{name: "terraform variable", value: &value, category: models.TerraformVariableCategory, expectValue: "v", expectCategory: CategoryTerraform},
+		{name: "environment variable", value: &value, category: models.EnvironmentVariableCategory, expectValue: "v", expectCategory: CategoryEnv},
+		{name: "unknown category", value: &value, category: "unknown", expectValue: "v", expectCategory: CategoryEnv},
+		{name: "no value", category: models.TerraformVariableCategory, expectCategory: CategoryTerraform},
+	}
+
+	ws := &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws-1"}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			variable := &models.Variable{Metadata: models.ResourceMetadata{ID: "var-1"}, Key: "k", Value: test.value, Category: test.category}
+
+			got := TharsisVariableToVariable(variable, ws)
+
+			assert.Equal(t, variable.GetGlobalID(), got.ID)
+			assert.Equal(t, "k", got.Key)
+			assert.Equal(t, test.expectValue, got.Value)
+			assert.Equal(t, test.expectCategory, got.Category)
+			assert.Equal(t, ws.GetGlobalID(), got.Workspace.ID)
+		})
+	}
 }
 
 // TestTharsisPolicyResultCount tallies per-policy results into the go-tfe result count.

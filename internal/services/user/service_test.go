@@ -1369,6 +1369,24 @@ func TestService_CreateUser(t *testing.T) {
 			expectError:     true,
 			expectErrorCode: errors.EInvalid,
 		},
+		{
+			name: "validation fails for password longer than 72 bytes",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata:            models.ResourceMetadata{ID: adminUserID},
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				},
+			},
+			input: &CreateUserInput{
+				Username: "newuser",
+				Email:    "newuser@test.com",
+				Password: ptr.String(strings.Repeat("p", 73)),
+				Admin:    false,
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2665,6 +2683,78 @@ func TestDeactivateAdminMode(t *testing.T) {
 				assert.NotNil(t, result)
 				assert.Nil(t, result.AdminModeExpiration)
 			}
+		})
+	}
+}
+
+func TestSetNotificationPreferenceInputValidate(t *testing.T) {
+	all := models.NotificationPreferenceScopeAll
+	custom := models.NotificationPreferenceScopeCustom
+	unknown := models.NotificationPreferenceScope("all")
+
+	tests := []struct {
+		name          string
+		input         *SetNotificationPreferenceInput
+		expectErrCode errors.CodeType
+	}{
+		{
+			name:  "global scope",
+			input: &SetNotificationPreferenceInput{Scope: &all},
+		},
+		{
+			name:  "namespace inherits",
+			input: &SetNotificationPreferenceInput{Inherit: true, NamespacePath: ptr.String("group")},
+		},
+		{
+			name: "custom scope with custom events",
+			input: &SetNotificationPreferenceInput{
+				NamespacePath: ptr.String("group"),
+				Scope:         &custom,
+				CustomEvents:  &models.NotificationPreferenceCustomEvents{},
+			},
+		},
+		{
+			name:          "inherit without a namespace path",
+			input:         &SetNotificationPreferenceInput{Inherit: true},
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name:          "inherit with a scope",
+			input:         &SetNotificationPreferenceInput{Inherit: true, NamespacePath: ptr.String("group"), Scope: &all},
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name:          "empty namespace path",
+			input:         &SetNotificationPreferenceInput{NamespacePath: ptr.String(""), Scope: &all},
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name:          "unknown scope",
+			input:         &SetNotificationPreferenceInput{Scope: &unknown},
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name:          "custom scope without custom events",
+			input:         &SetNotificationPreferenceInput{Scope: &custom},
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name:          "custom events without custom scope",
+			input:         &SetNotificationPreferenceInput{Scope: &all, CustomEvents: &models.NotificationPreferenceCustomEvents{}},
+			expectErrCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.input.Validate()
+
+			if test.expectErrCode != "" {
+				require.Error(t, err)
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
@@ -130,18 +131,6 @@ const (
 )
 
 var (
-	// errInvalidStartIndex indicates an invalid start index for pagination
-	errInvalidStartIndex = errors.New(
-		"invalid startIndex. Must be less than totalResults",
-		errors.WithErrorCode(errors.EInvalid),
-	)
-
-	// errInvalidCount indicates an invalid count for pagination.
-	errInvalidCount = errors.New(
-		"invalid count. Must be zero or greater",
-		errors.WithErrorCode(errors.EInvalid),
-	)
-
 	// errUnsupportedFilter is an error used to indicate an invalid filter.
 	errUnsupportedFilter = errors.New(
 		"supplied filter is invalid or not supported",
@@ -207,7 +196,11 @@ func (c *scimController) RegisterRoutes(router chi.Router) {
 /* User CRUD */
 
 func (c *scimController) GetUser(w http.ResponseWriter, r *http.Request) {
-	userID := gid.FromGlobalID(chi.URLParam(r, "id"))
+	userID, err := scimResourceID(r)
+	if err != nil {
+		c.respondWithSCIMError(r.Context(), w, err)
+		return
+	}
 
 	user, err := c.userService.GetUserByID(r.Context(), userID)
 	if err != nil {
@@ -268,7 +261,7 @@ func (c *scimController) GetUsers(w http.ResponseWriter, r *http.Request) {
 func (c *scimController) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req CreateSCIMUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		c.respondWithSCIMError(r.Context(), w, err)
+		c.respondWithSCIMError(r.Context(), w, errors.Wrap(err, "failed to parse request body", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
@@ -297,11 +290,15 @@ func (c *scimController) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *scimController) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	userID := gid.FromGlobalID(chi.URLParam(r, "id"))
+	userID, err := scimResourceID(r)
+	if err != nil {
+		c.respondWithSCIMError(r.Context(), w, err)
+		return
+	}
 
 	var req SCIMUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		c.respondWithSCIMError(r.Context(), w, err)
+		c.respondWithSCIMError(r.Context(), w, errors.Wrap(err, "failed to parse request body", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
@@ -321,9 +318,13 @@ func (c *scimController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *scimController) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	userID := gid.FromGlobalID(chi.URLParam(r, "id"))
+	userID, err := scimResourceID(r)
+	if err != nil {
+		c.respondWithSCIMError(r.Context(), w, err)
+		return
+	}
 
-	err := c.scimService.DeleteSCIMUser(r.Context(), &scim.DeleteSCIMResourceInput{ID: userID})
+	err = c.scimService.DeleteSCIMUser(r.Context(), &scim.DeleteSCIMResourceInput{ID: userID})
 	if err != nil {
 		c.respondWithSCIMError(r.Context(), w, err)
 		return
@@ -335,7 +336,11 @@ func (c *scimController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 /* Teams (SCIM groups) CRUD */
 
 func (c *scimController) GetGroup(w http.ResponseWriter, r *http.Request) {
-	teamID := gid.FromGlobalID(chi.URLParam(r, "id"))
+	teamID, err := scimResourceID(r)
+	if err != nil {
+		c.respondWithSCIMError(r.Context(), w, err)
+		return
+	}
 
 	team, err := c.teamService.GetTeamByID(r.Context(), teamID)
 	if err != nil {
@@ -391,7 +396,7 @@ func (c *scimController) GetGroups(w http.ResponseWriter, r *http.Request) {
 func (c *scimController) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	var req CreateSCIMGroupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		c.respWriter.RespondWithError(r.Context(), w, err)
+		c.respondWithSCIMError(r.Context(), w, errors.Wrap(err, "failed to parse request body", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
@@ -410,11 +415,15 @@ func (c *scimController) CreateGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *scimController) UpdateGroup(w http.ResponseWriter, r *http.Request) {
-	teamID := gid.FromGlobalID(chi.URLParam(r, "id"))
+	teamID, err := scimResourceID(r)
+	if err != nil {
+		c.respondWithSCIMError(r.Context(), w, err)
+		return
+	}
 
 	var req SCIMUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		c.respondWithSCIMError(r.Context(), w, err)
+		c.respondWithSCIMError(r.Context(), w, errors.Wrap(err, "failed to parse request body", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
@@ -424,7 +433,7 @@ func (c *scimController) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Returned model is not needed since SCIM never wants it.
-	_, err := c.scimService.UpdateSCIMGroup(r.Context(), input)
+	_, err = c.scimService.UpdateSCIMGroup(r.Context(), input)
 	if err != nil {
 		c.respondWithSCIMError(r.Context(), w, err)
 		return
@@ -435,9 +444,13 @@ func (c *scimController) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *scimController) DeleteGroup(w http.ResponseWriter, r *http.Request) {
-	teamID := gid.FromGlobalID(chi.URLParam(r, "id"))
+	teamID, err := scimResourceID(r)
+	if err != nil {
+		c.respondWithSCIMError(r.Context(), w, err)
+		return
+	}
 
-	err := c.scimService.DeleteSCIMGroup(r.Context(), &scim.DeleteSCIMResourceInput{ID: teamID})
+	err = c.scimService.DeleteSCIMGroup(r.Context(), &scim.DeleteSCIMResourceInput{ID: teamID})
 	if err != nil {
 		c.respondWithSCIMError(r.Context(), w, err)
 		return
@@ -527,39 +540,27 @@ func toListResponse(value interface{}, startIndex, count string) (*SCIMListRespo
 		err          error
 	)
 
-	// Convert and validate the supplied values.
-	if startIndex != "" && count != "" {
+	// Pagination per RFC 7644 section 3.4.2.4: each parameter is optional, a startIndex below 1 is
+	// interpreted as 1, a negative count as 0, and a startIndex past the end returns an empty page.
+	if startIndex != "" {
 		start, err = strconv.Atoi(startIndex)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "invalid startIndex", errors.WithErrorCode(errors.EInvalid))
 		}
-
-		// Can't return more than we have.
-		if start > valueSlice.Len() {
-			return nil, errInvalidStartIndex
-		}
-
-		// Use default (1) per SCIM if value is less than 1.
-		if start < 1 {
-			start = 1
-		}
-
-		itemsPerPage, err = strconv.Atoi(count)
-		if err != nil {
-			return nil, err
-		}
-
-		// Can't return negative number of items.
-		if itemsPerPage < 0 {
-			return nil, errInvalidCount
-		}
+		start = max(start, 1)
 	}
 
-	// Append itemsPerPage amount of values beginning from start.
-	for i := start - 1; i < valueSlice.Len() && itemsPerPage != 0; i++ {
-		if i < itemsPerPage {
-			resources = append(resources, valueSlice.Index(i).Interface())
+	if count != "" {
+		itemsPerPage, err = strconv.Atoi(count)
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid count", errors.WithErrorCode(errors.EInvalid))
 		}
+		itemsPerPage = max(itemsPerPage, 0)
+	}
+
+	// Append up to itemsPerPage values beginning from start.
+	for i := start - 1; i < valueSlice.Len() && len(resources) < itemsPerPage; i++ {
+		resources = append(resources, valueSlice.Index(i).Interface())
 	}
 
 	return &SCIMListResponse{
@@ -567,7 +568,7 @@ func toListResponse(value interface{}, startIndex, count string) (*SCIMListRespo
 		Resources:    resources,
 		TotalResults: valueSlice.Len(),
 		StartIndex:   start,
-		ItemsPerPage: itemsPerPage,
+		ItemsPerPage: len(resources), // The number of resources in this page (RFC 7644 section 3.4.2).
 	}, nil
 }
 
@@ -597,9 +598,10 @@ func parseFilter(filter string) (*Filter, error) {
 		return nil, nil
 	}
 
-	// Check for unsupported complex filters with logical operators
-	filterLower := strings.ToLower(filter)
-	if strings.Contains(filterLower, " and ") || strings.Contains(filterLower, " or ") {
+	// Check for unsupported complex filters with logical operators. Only text outside quoted values is
+	// checked, so a value such as "tom and jerry" is allowed.
+	unquoted := strings.ToLower(withoutQuotedValues(filter))
+	if strings.Contains(unquoted, " and ") || strings.Contains(unquoted, " or ") {
 		return nil, errUnsupportedFilter
 	}
 
@@ -621,7 +623,42 @@ func parseFilter(filter string) (*Filter, error) {
 	return &Filter{Name: attribute, Value: value, Op: operator}, nil
 }
 
+// withoutQuotedValues returns filter with the contents of its double-quoted values removed. A backslash
+// inside a value escapes the next character, so an escaped quote does not end the value.
+func withoutQuotedValues(filter string) string {
+	var b strings.Builder
+	inQuotes := false
+	escaped := false
+	for _, r := range filter {
+		switch {
+		case inQuotes && escaped:
+			escaped = false
+		case inQuotes && r == '\\':
+			escaped = true
+		case r == '"':
+			inQuotes = !inQuotes
+			b.WriteRune(r)
+		case !inQuotes:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 /* Helper functions */
+
+// scimResourceID returns the global ID from the {id} URL parameter. chi matches the escaped path when the
+// request path needed escaping, so the parameter is unescaped only in that case to avoid decoding twice.
+func scimResourceID(r *http.Request) (string, error) {
+	id := chi.URLParam(r, "id")
+	if r.URL.RawPath != "" {
+		var err error
+		if id, err = url.PathUnescape(id); err != nil {
+			return "", errors.Wrap(err, "invalid resource id", errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+	return gid.FromGlobalID(id), nil
+}
 
 // toSCIMOperations prepares the input for a SCIM operation.
 func toSCIMOperations(operations []SCIMOperation) []scim.Operation {

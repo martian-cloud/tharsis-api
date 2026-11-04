@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -294,10 +295,13 @@ func (f *ObjectStore) GetPresignedURL(ctx context.Context, key string) (string, 
 		return "", te.New("no subject found in context", te.WithErrorCode(te.EUnauthorized))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.apiURL+pathPrefix+key, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.apiURL, nil)
 	if err != nil {
 		return "", te.Wrap(err, "failed to create request", te.WithErrorCode(te.EInternal))
 	}
+	// Set the key as the decoded path rather than parsing it as part of a URL string, where a "?", "#" or "%"
+	// in the key would end the path or be read as an escape, so the URL would be signed for a different key.
+	req.URL.Path += pathPrefix + key
 
 	// Set expiration in query params before signing
 	query := req.URL.Query()
@@ -370,11 +374,14 @@ func (f *ObjectStore) VerifyPresignedURL(ctx context.Context, urlStr string) (st
 		return "", te.New("invalid API URL configuration", te.WithErrorCode(te.EInternal))
 	}
 
-	// Build the original request URL using API URL's scheme/host and incoming path
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL.Scheme+"://"+apiURL.Host+parsedURL.Path, nil)
+	// Build the original request URL using API URL's scheme/host and incoming path. The decoded path is set
+	// directly: re-parsing it as a URL string would read a decoded "?" or "#" as the end of the path, so the
+	// signature would cover only part of the key that is served, and a decoded "%" as a bad escape.
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL.Scheme+"://"+apiURL.Host, nil)
 	if err != nil {
 		return "", te.Wrap(err, "failed to create request", te.WithErrorCode(te.EInternal))
 	}
+	req.URL.Path = parsedURL.Path
 
 	// Include query params that were part of the original signature
 	reqQuery := req.URL.Query()
@@ -445,6 +452,13 @@ func (f *ObjectStore) deleteObject(_ context.Context, key string) error {
 func (f *ObjectStore) sanitizeKey(key string) (string, error) {
 	if key == "" {
 		return "", te.New("object key cannot be empty", te.WithErrorCode(te.EInvalid))
+	}
+
+	// Reject ".." segments outright rather than letting filepath.Clean resolve them: cleaning keeps
+	// the path under basePath, but would still let a key climb out of the folder its caller built it
+	// in (e.g. one module's metadata reading another's). S3 treats ".." as literal key bytes.
+	if slices.Contains(strings.Split(filepath.ToSlash(key), "/"), "..") {
+		return "", te.New("object key cannot contain a '..' segment", te.WithErrorCode(te.EInvalid))
 	}
 
 	fullPath := filepath.Join(f.basePath, filepath.Clean("/"+key))

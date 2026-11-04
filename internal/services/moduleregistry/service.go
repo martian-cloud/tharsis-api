@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -997,6 +999,11 @@ func (s *service) GetModuleConfigurationDetails(ctx context.Context, moduleVersi
 		}
 	}
 
+	// The path is part of the object key, so it must not be able to leave this module version's metadata.
+	if !isValidModuleMetadataPath(path) {
+		return nil, errors.New("invalid module configuration path %q", path, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
 	reader, err := s.registryStore.GetModuleConfigurationDetails(ctx, moduleVersion, module, path)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get module configuration details", errors.WithSpan(span))
@@ -1009,6 +1016,12 @@ func (s *service) GetModuleConfigurationDetails(ctx context.Context, moduleVersi
 	}
 
 	return &moduleMetadata, nil
+}
+
+// isValidModuleMetadataPath reports whether p is a clean, relative, slash-separated path with no ".."
+// segments, such as "root" or "modules/network" (the paths parseModule stores metadata under).
+func isValidModuleMetadataPath(p string) bool {
+	return p != "." && filepath.IsLocal(p) && path.Clean(p) == p && !strings.Contains(p, `\`)
 }
 
 func (s *service) GetModuleVersionByID(ctx context.Context, id string) (*models.TerraformModuleVersion, error) {
@@ -1547,6 +1560,11 @@ func checkModulePackageLimits(pkg io.ReadSeeker, maxExtractedSize int64) error {
 		entries++
 		if entries > maxModuleFiles {
 			return errors.New("module package has more than %d files", maxModuleFiles, errors.WithErrorCode(errors.ETooLarge))
+		}
+		// archive/tar accepts a negative size on header-only entries (e.g. directories), which would
+		// otherwise offset the sizes of the files that follow.
+		if header.Size < 0 {
+			return errors.New("module package entry %s has a negative size", header.Name, errors.WithErrorCode(errors.EInvalid))
 		}
 		size += header.Size
 		if size > maxExtractedSize {

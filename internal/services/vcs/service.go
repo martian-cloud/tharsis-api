@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -2177,6 +2178,13 @@ func globsMatch(repoDirectory string, alteredFiles map[string]struct{}, globs []
 	// FilepathGlob will properly clean the path before using it incase of double slashes.
 	repoDirectory += "/"
 	for _, glob := range globs {
+		// FilepathGlob cleans the joined path, so a ".." segment would walk the host filesystem
+		// outside the checkout. Globs are validated when saved, but links saved before that
+		// validation existed are not.
+		if slices.Contains(strings.Split(filepath.ToSlash(glob), "/"), "..") {
+			continue
+		}
+
 		// Only possible error returned is when pattern is malformed.
 		// Since this was validated when created, we can ignore it.
 		matches, _ := doublestar.FilepathGlob(repoDirectory + glob)
@@ -2215,8 +2223,11 @@ func refMatches(
 		}
 
 		if *link.TagRegex != "" {
-			// Regex has already been validated at the time of creation.
-			tagRegex, _ := regexp.Compile(*link.TagRegex)
+			// Regex is validated when the link is saved, but an invalid stored regex simply never matches.
+			tagRegex, err := regexp.Compile(*link.TagRegex)
+			if err != nil {
+				return false
+			}
 			return tagRegex.MatchString(ref)
 		}
 	}

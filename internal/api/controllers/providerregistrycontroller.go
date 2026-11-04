@@ -263,6 +263,12 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 
 	providerPlatform := platformsResponse.ProviderPlatforms[0]
 
+	// The protocol requires the signing key, which is recorded with the signature; a version without one is bad data.
+	if providerVersion.GPGKeyID == nil || providerVersion.GPGASCIIArmor == nil {
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("provider version %s has no signing key", providerVersion.Metadata.ID))
+		return
+	}
+
 	downloadURLs, err := c.providerRegistryService.GetProviderPlatformDownloadURLs(r.Context(), &providerPlatform)
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)

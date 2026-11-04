@@ -91,15 +91,13 @@ func TestUploadObject(t *testing.T) {
 		assert.Equal(t, []byte("second"), data)
 	})
 
-	t.Run("normalizes path traversal attempts", func(t *testing.T) {
-		// filepath.Clean normalizes "../escape.txt" to "escape.txt"
+	t.Run("rejects path traversal attempts", func(t *testing.T) {
 		err := store.UploadObject(ctx, "../escape.txt", bytes.NewReader([]byte("data")))
-		require.NoError(t, err)
+		require.Error(t, err)
+		assert.Equal(t, te.EInvalid, te.ErrorCode(err))
 
-		// File should be created at normalized path within base
-		data, err := os.ReadFile(filepath.Join(store.basePath, "escape.txt"))
-		require.NoError(t, err)
-		assert.Equal(t, []byte("data"), data)
+		_, err = os.Stat(filepath.Join(store.basePath, "escape.txt"))
+		assert.True(t, os.IsNotExist(err))
 	})
 
 	t.Run("handles read error from body", func(t *testing.T) {
@@ -267,10 +265,10 @@ func TestDoesObjectExist(t *testing.T) {
 		assert.False(t, exists)
 	})
 
-	t.Run("normalizes path traversal attempts", func(t *testing.T) {
-		// filepath.Clean normalizes "../etc/passwd" - file doesn't exist so returns false
+	t.Run("rejects path traversal attempts", func(t *testing.T) {
 		exists, err := store.DoesObjectExist(ctx, "../etc/passwd")
-		require.NoError(t, err)
+		require.Error(t, err)
+		assert.Equal(t, te.EInvalid, te.ErrorCode(err))
 		assert.False(t, exists)
 	})
 }
@@ -471,7 +469,7 @@ func TestVerifyPresignedURL(t *testing.T) {
 		}, req, unsignedPayload, awsService, "", time.Now())
 
 		parsed, _ := url.Parse(signedURI)
-		// Returns the raw key from URL, sanitizeKey normalizes it internally
+		// Returns the raw key from URL; the object operations then reject its ".." segment
 		key, err := store.VerifyPresignedURL(ctx, parsed.RequestURI())
 		require.NoError(t, err)
 		assert.Equal(t, "../etc/passwd", key)
@@ -563,6 +561,49 @@ func TestDeleteObject(t *testing.T) {
 		err := store.deleteObject(ctx, "")
 		require.Error(t, err)
 		assert.Equal(t, te.EInvalid, te.ErrorCode(err))
+	})
+}
+
+func TestSanitizeKeyRejectsDotDotSegments(t *testing.T) {
+	testLogger, _ := logger.NewForTest()
+	store, err := New(testLogger, "http://localhost:8000", map[string]string{"directory": t.TempDir()}, testGetSubject)
+	require.NoError(t, err)
+	ctx := testWithSubject(t.Context(), "user@example.com")
+
+	// Each key would stay under basePath once cleaned, but climbs out of the folder it was built in.
+	invalidKeys := []string{
+		"..",
+		"../escape.txt",
+		"a/../b",
+		"modules/m1/v1/metadata/../../../m2/v2/metadata/root",
+		"a/b/..",
+	}
+
+	for _, key := range invalidKeys {
+		t.Run(key, func(t *testing.T) {
+			assertInvalid := func(err error) {
+				t.Helper()
+				require.Error(t, err)
+				assert.Equal(t, te.EInvalid, te.ErrorCode(err))
+			}
+
+			assertInvalid(store.UploadObject(ctx, key, bytes.NewReader([]byte("data"))))
+			assertInvalid(store.DownloadObject(ctx, key, &writeAtBuffer{}, nil))
+			_, err := store.GetObjectStream(ctx, key, nil)
+			assertInvalid(err)
+			_, err = store.DoesObjectExist(ctx, key)
+			assertInvalid(err)
+			_, err = store.GetPresignedURL(ctx, key)
+			assertInvalid(err)
+			assertInvalid(store.DeleteObjects(ctx, []string{key}))
+		})
+	}
+
+	t.Run("allows dots that are not a whole segment", func(t *testing.T) {
+		for _, key := range []string{"a/..b/c", "a/b../c", "a/v1.0.0/file", ".hidden"} {
+			_, err := store.sanitizeKey(key)
+			assert.NoError(t, err, key)
+		}
 	})
 }
 
