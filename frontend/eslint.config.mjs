@@ -46,6 +46,7 @@ export default [
         Blob: 'readonly',
         TextDecoder: 'readonly',
         Worker: 'readonly',
+        WebSocket: 'readonly',
         ResizeObserver: 'readonly',
         RequestInfo: 'readonly',
         RequestInit: 'readonly',

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	graphqlgo "github.com/graph-gophers/graphql-go"
-	"gitlab.com/infor-cloud/martian-cloud/graphql-transport-ws/graphqlws"
+	"gitlab.com/infor-cloud/martian-cloud/graphql-transport-ws/v2/graphqlws"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/resolver"
@@ -20,6 +20,16 @@ import (
 const (
 	graphqlSubscriptionMaxMessageSize = 1024 * 10
 	graphqlSubscriptionWriteTimeout   = 10 * time.Second
+
+	// Keep-alive: the server pings every graphqlSubscriptionPingInterval and closes
+	// the connection if no pong arrives within graphqlSubscriptionPongWait, so dead
+	// clients are detected and their subscriptions released.
+	graphqlSubscriptionPingInterval = 30 * time.Second
+	graphqlSubscriptionPongWait     = 60 * time.Second
+
+	// Bound the connection_init handler (token validation) so a client cannot
+	// park a connection by triggering a slow/hung auth before the ack.
+	graphqlSubscriptionInitHandlerTimeout = 10 * time.Second
 )
 
 // subscriptionAuthenticator is used to authenticate graphql subscription requests. The BuildContext function will be called
@@ -114,6 +124,8 @@ func newSubscriptionHandler(
 		graphqlws.WithReadLimit(graphqlSubscriptionMaxMessageSize),
 		graphqlws.WithWriteTimeout(graphqlSubscriptionWriteTimeout),
 		graphqlws.WithConnectionTimeout(maxConnectionDuration),
+		graphqlws.WithKeepAlive(graphqlSubscriptionPingInterval, graphqlSubscriptionPongWait),
+		graphqlws.WithConnectionInitHandlerTimeout(graphqlSubscriptionInitHandlerTimeout),
 		graphqlws.WithConnectionInitHandler(func(ctx context.Context, message json.RawMessage) (context.Context, error) {
 			caller := auth.GetCaller(ctx)
 			// A caller may already be set if this connection was authenticated using a cookie based user session. If a caller is not set,
