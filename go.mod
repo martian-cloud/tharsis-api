@@ -36,6 +36,7 @@ require (
 	github.com/gomodule/redigo v1.9.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/graph-gophers/graphql-go v1.8.0
 	github.com/hashicorp/go-getter v1.8.6
@@ -74,7 +75,7 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	github.com/yuin/goldmark v1.8.6
 	github.com/zclconf/go-cty v1.16.4
-	gitlab.com/infor-cloud/martian-cloud/graphql-transport-ws v1.1.0
+	gitlab.com/infor-cloud/martian-cloud/graphql-transport-ws/v2 v2.0.1
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20230411193226-3247984d5abc
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747-eb2ce440abb8
 	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.7.0
@@ -191,7 +192,6 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.15 // indirect
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
-	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/hashicorp/aws-sdk-go-base/v2 v2.0.0-beta.72 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
