@@ -594,6 +594,8 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 					assert.Equal(t, expected.JobTRN, jobCaller.JobTRN)
 					assert.Equal(t, expected.RunID, jobCaller.RunID)
 					assert.Equal(t, expected.WorkspaceID, jobCaller.WorkspaceID)
+					// The test authenticates with useCache set, so the caller memoizes its lookups.
+					assert.NotNil(t, jobCaller.cache)
 				}
 			}
 		})

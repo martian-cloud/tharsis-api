@@ -39,7 +39,8 @@ message Apply {
   metadata.ResourceMetadata metadata          = 1;
   string                    deprecated_status = 2 [deprecated = true];
   // triggered_by is the free-form identifier of the principal that triggered the
-  // apply. Deprecated in favour of triggered_by_actor.
+  // apply. Empty until the apply has been triggered. Deprecated in favour of
+  // triggered_by_actor.
   string                    triggered_by      = 3 [deprecated = true];
   optional string           error_message     = 4;
   optional string           latest_job_id     = 5;
@@ -49,7 +50,7 @@ message Apply {
   // otherwise.
   repeated string           managed_identity_ids = 7;
   // triggered_by_actor is the structured identity of the principal that
-  // triggered the apply. Absent for applies triggered before actors were
-  // introduced.
+  // triggered the apply. Absent until the apply has been triggered, and for
+  // applies triggered before actors were introduced.
   actor.Actor               triggered_by_actor = 8;
 }

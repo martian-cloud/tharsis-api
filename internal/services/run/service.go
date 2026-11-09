@@ -712,7 +712,7 @@ func (s *service) SetRunAutoApply(ctx context.Context, runID string, autoApply b
 	ctx, span := tracer.Start(ctx, "svc.SetRunAutoApply")
 	defer span.End()
 
-	_, run, err := s.authorizeRunMutation(ctx, runID)
+	caller, run, err := s.authorizeRunMutation(ctx, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -720,6 +720,7 @@ func (s *service) SetRunAutoApply(ctx context.Context, runID string, autoApply b
 	cmd := s.cmdFactory.NewSetRunAutoApply(&commands.SetRunAutoApplyInput{
 		RunID:     runID,
 		AutoApply: autoApply,
+		Actor:     caller.GetActor(),
 	})
 	if err := s.cmdProcessor.ProcessCommand(ctx, cmd); err != nil {
 		return nil, errors.Wrap(err, "failed to set run auto-apply", errors.WithSpan(span))

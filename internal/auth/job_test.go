@@ -667,9 +667,11 @@ func TestJobCaller_RequireInheritedPermissions(t *testing.T) {
 			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:            "access denied because workspace not found",
+			// The group exists, so the denial comes from the missing workspace.
+			name:            "access denied because workspace not found for a group constraint",
+			group:           &models.Group{FullPath: "a"},
 			modelType:       types.ManagedIdentityModelType,
-			constraints:     []func(*constraints){WithGroupID(invalid)},
+			constraints:     []func(*constraints){WithGroupID("group1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
@@ -686,7 +688,7 @@ func TestJobCaller_RequireInheritedPermissions(t *testing.T) {
 			constraints: []func(*constraints){WithNamespacePath("a")},
 		},
 		{
-			name:            "access denied because workspace not found",
+			name:            "access denied because workspace not found for a namespace path constraint",
 			modelType:       types.ManagedIdentityModelType,
 			constraints:     []func(*constraints){WithNamespacePath("a")},
 			expectErrorCode: errors.ENotFound,
@@ -722,6 +724,415 @@ func TestJobCaller_RequireInheritedPermissions(t *testing.T) {
 			require.Nil(t, err)
 		})
 	}
+}
+
+func TestJobCaller_RequireAccessToInheritableResource_BoundRole(t *testing.T) {
+	jobWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{ID: "ws1"},
+		FullPath: "root/parent/ws1",
+	}
+
+	childGroup := &models.Group{
+		Metadata: models.ResourceMetadata{ID: "child-group-id"},
+		FullPath: "root/parent/child",
+	}
+
+	siblingGroup := &models.Group{
+		Metadata: models.ResourceMetadata{ID: "sibling-group-id"},
+		FullPath: "root/sibling",
+	}
+
+	deployerPerms, ok := models.DeployerRoleID.Permissions()
+	require.True(t, ok)
+
+	binding := &models.WorkspaceRoleBinding{RoleID: "role-1"}
+
+	testCases := []struct {
+		name    string
+		jobType models.JobType
+		// expectBindingLookup is set when the check must consult the bound role. The binding and
+		// role are then looked up exactly once; otherwise any lookup fails the test.
+		expectBindingLookup bool
+		binding             *models.WorkspaceRoleBinding
+		rolePerms           []models.Permission
+		modelType           types.ModelType
+		constraints         []func(*constraints)
+		expectErrorCode     errors.CodeType
+	}{
+		{
+			name:                "apply job can view a managed identity in a subgroup of the parent group via the bound role",
+			jobType:             models.JobApplyType,
+			expectBindingLookup: true,
+			binding:             binding,
+			rolePerms:           deployerPerms,
+			modelType:           types.ManagedIdentityModelType,
+			constraints:         []func(*constraints){WithGroupID(childGroup.Metadata.ID)},
+		},
+		{
+			name:                "plan job can view a managed identity in a subgroup of the parent group via the bound role",
+			jobType:             models.JobPlanType,
+			expectBindingLookup: true,
+			binding:             binding,
+			rolePerms:           deployerPerms,
+			modelType:           types.ManagedIdentityModelType,
+			constraints:         []func(*constraints){WithGroupID(childGroup.Metadata.ID)},
+		},
+		{
+			// Several subtree paths still load the bound role only once.
+			name:                "job can view resources in ancestor and descendant namespaces via the bound role",
+			jobType:             models.JobApplyType,
+			expectBindingLookup: true,
+			binding:             binding,
+			rolePerms:           deployerPerms,
+			modelType:           types.ManagedIdentityModelType,
+			constraints: []func(*constraints){
+				WithNamespacePaths([]string{"root", "root/parent", "root/parent/child", "root/parent/child/grandchild"}),
+			},
+		},
+		{
+			name:        "job can view resources in ancestor namespaces without loading the bound role",
+			jobType:     models.JobApplyType,
+			modelType:   types.ManagedIdentityModelType,
+			constraints: []func(*constraints){WithNamespacePaths([]string{"root", "root/parent"})},
+		},
+		{
+			// The workspace's own path is beneath the parent group but isn't an ancestor of the
+			// workspace, so resources there are visible only through the bound role.
+			name:                "job can view resources at its own workspace's path via the bound role",
+			jobType:             models.JobApplyType,
+			expectBindingLookup: true,
+			binding:             binding,
+			rolePerms:           deployerPerms,
+			modelType:           types.NamespaceMembershipModelType,
+			constraints:         []func(*constraints){WithNamespacePath(jobWorkspace.FullPath)},
+		},
+		{
+			name:                "job cannot view resources at its own workspace's path without a role binding",
+			jobType:             models.JobApplyType,
+			expectBindingLookup: true,
+			modelType:           types.NamespaceMembershipModelType,
+			constraints:         []func(*constraints){WithNamespacePath(jobWorkspace.FullPath)},
+			expectErrorCode:     errors.ENotFound,
+		},
+		{
+			// Modules aren't stage-scoped, so an OPA job passes that check and is denied only because
+			// its job type can't use the bound role. No binding lookup is registered, so consulting
+			// the bound role fails the test.
+			name:            "opa job cannot use the bound role to view resources in a subgroup",
+			jobType:         models.JobOPAType,
+			modelType:       types.TerraformModuleModelType,
+			constraints:     []func(*constraints){WithGroupID(childGroup.Metadata.ID)},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:                "job cannot view resources in a subgroup when the workspace has no role binding",
+			jobType:             models.JobApplyType,
+			expectBindingLookup: true,
+			modelType:           types.ManagedIdentityModelType,
+			constraints:         []func(*constraints){WithGroupID(childGroup.Metadata.ID)},
+			expectErrorCode:     errors.ENotFound,
+		},
+		{
+			name:                "job cannot view resources in a subgroup when the bound role has no viewer access to the resource type",
+			jobType:             models.JobApplyType,
+			expectBindingLookup: true,
+			binding:             binding,
+			rolePerms:           []models.Permission{models.ViewWorkspacePermission},
+			modelType:           types.ManagedIdentityModelType,
+			constraints:         []func(*constraints){WithGroupID(childGroup.Metadata.ID)},
+			expectErrorCode:     errors.ENotFound,
+		},
+		{
+			name:            "job cannot view resources in a sibling namespace of the parent group",
+			jobType:         models.JobApplyType,
+			modelType:       types.ManagedIdentityModelType,
+			constraints:     []func(*constraints){WithGroupID(siblingGroup.Metadata.ID)},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			// "root/parent-other" shares a string prefix with the parent group "root/parent" but is
+			// not beneath it.
+			name:            "job cannot view resources in a namespace whose path only shares a prefix with the parent group",
+			jobType:         models.JobApplyType,
+			modelType:       types.ManagedIdentityModelType,
+			constraints:     []func(*constraints){WithNamespacePaths([]string{"root/parent-other", "root/parentchild"})},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:                "job is denied when any of the namespace paths is outside the parent group",
+			jobType:             models.JobApplyType,
+			expectBindingLookup: true,
+			binding:             binding,
+			rolePerms:           deployerPerms,
+			modelType:           types.ManagedIdentityModelType,
+			constraints:         []func(*constraints){WithNamespacePaths([]string{"root/parent/child", "root/sibling"})},
+			expectErrorCode:     errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockGroups := db.NewMockGroups(t)
+			mockRoles := db.NewMockRoles(t)
+			mockBindings := db.NewMockWorkspaceRoleBindings(t)
+
+			caller := &JobCaller{Job: &models.Job{Type: test.jobType}, WorkspaceID: jobWorkspace.Metadata.ID}
+			ctx := WithCaller(context.Background(), caller)
+
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, jobWorkspace.Metadata.ID).Return(jobWorkspace, nil).Maybe()
+			mockGroups.On("GetGroupByID", mock.Anything, childGroup.Metadata.ID).Return(childGroup, nil).Maybe()
+			mockGroups.On("GetGroupByID", mock.Anything, siblingGroup.Metadata.ID).Return(siblingGroup, nil).Maybe()
+
+			if test.expectBindingLookup {
+				mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, jobWorkspace.Metadata.ID).
+					Return(test.binding, nil).Once()
+
+				if test.binding != nil {
+					role := &models.Role{}
+					role.SetPermissions(test.rolePerms)
+					mockRoles.On("GetRoleByID", mock.Anything, test.binding.RoleID).Return(role, nil).Once()
+				}
+			}
+
+			caller.dbClient = &db.Client{
+				Workspaces:            mockWorkspaces,
+				Groups:                mockGroups,
+				Roles:                 mockRoles,
+				WorkspaceRoleBindings: mockBindings,
+			}
+
+			err := caller.RequireAccessToInheritableResource(ctx, test.modelType, test.constraints...)
+
+			if test.expectErrorCode != "" {
+				require.Error(t, err)
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestJobCaller_RequireAccessToInheritableResource_BoundRoleErrors covers a finished job, which is
+// denied before any lookup, and database errors while loading the bound role, which must propagate
+// rather than be reported as a denial.
+func TestJobCaller_RequireAccessToInheritableResource_BoundRoleErrors(t *testing.T) {
+	jobWorkspace := &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}, FullPath: "root/parent/ws1"}
+	dbErr := errors.New("connection refused", errors.WithErrorCode(errors.EInternal))
+
+	t.Run("finished job is denied without any lookup", func(t *testing.T) {
+		job := &models.Job{Type: models.JobApplyType}
+		require.NoError(t, job.SetStatus(models.JobFinished))
+
+		// No mocks are registered, so any database call fails the test.
+		caller := &JobCaller{
+			Job:         job,
+			WorkspaceID: jobWorkspace.Metadata.ID,
+			dbClient: &db.Client{
+				Workspaces:            db.NewMockWorkspaces(t),
+				WorkspaceRoleBindings: db.NewMockWorkspaceRoleBindings(t),
+				Roles:                 db.NewMockRoles(t),
+			},
+		}
+
+		err := caller.RequireAccessToInheritableResource(context.Background(), types.ManagedIdentityModelType,
+			WithNamespacePath("root/parent/child"))
+		require.Error(t, err)
+		assert.Equal(t, errors.EUnauthorized, errors.ErrorCode(err))
+	})
+
+	tests := []struct {
+		name       string
+		setupMocks func(mockBindings *db.MockWorkspaceRoleBindings, mockRoles *db.MockRoles)
+	}{
+		{
+			name: "binding lookup error propagates",
+			setupMocks: func(mockBindings *db.MockWorkspaceRoleBindings, _ *db.MockRoles) {
+				mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, jobWorkspace.Metadata.ID).Return(nil, dbErr)
+			},
+		},
+		{
+			name: "role lookup error propagates",
+			setupMocks: func(mockBindings *db.MockWorkspaceRoleBindings, mockRoles *db.MockRoles) {
+				mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, jobWorkspace.Metadata.ID).
+					Return(&models.WorkspaceRoleBinding{RoleID: "role-1"}, nil)
+				mockRoles.On("GetRoleByID", mock.Anything, "role-1").Return(nil, dbErr)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockBindings := db.NewMockWorkspaceRoleBindings(t)
+			mockRoles := db.NewMockRoles(t)
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, jobWorkspace.Metadata.ID).Return(jobWorkspace, nil)
+			test.setupMocks(mockBindings, mockRoles)
+
+			caller := &JobCaller{
+				Job:         &models.Job{Type: models.JobApplyType},
+				WorkspaceID: jobWorkspace.Metadata.ID,
+				dbClient: &db.Client{
+					Workspaces:            mockWorkspaces,
+					WorkspaceRoleBindings: mockBindings,
+					Roles:                 mockRoles,
+				},
+			}
+
+			err := caller.RequireAccessToInheritableResource(context.Background(), types.ManagedIdentityModelType,
+				WithNamespacePath("root/parent/child"))
+			require.Error(t, err)
+			assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+		})
+	}
+}
+
+// TestJobCaller_CanViewInheritedResources_StageScopedPermission checks that a job type that
+// jobStageScopedPermissions withholds a view permission from can't view resources of that type
+// anywhere, not even in an ancestor group of its workspace, while view permissions outside the map
+// are unaffected. An OPA job never needs managed identities, so it is denied them before any lookup.
+func TestJobCaller_CanViewInheritedResources_StageScopedPermission(t *testing.T) {
+	jobWorkspace := &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}, FullPath: "root/parent/ws1"}
+
+	tests := []struct {
+		name        string
+		jobType     models.JobType
+		viewPerm    models.Permission
+		expectAllow bool
+	}{
+		{
+			name:     "opa job cannot view managed identities in an ancestor group",
+			jobType:  models.JobOPAType,
+			viewPerm: models.ViewManagedIdentityPermission,
+		},
+		{
+			name:     "opa job cannot view configuration versions in an ancestor group",
+			jobType:  models.JobOPAType,
+			viewPerm: models.ViewConfigurationVersionPermission,
+		},
+		{
+			name:        "opa job can view modules in an ancestor group",
+			jobType:     models.JobOPAType,
+			viewPerm:    models.ViewTerraformModulePermission,
+			expectAllow: true,
+		},
+		{
+			name:        "plan job can view managed identities in an ancestor group",
+			jobType:     models.JobPlanType,
+			viewPerm:    models.ViewManagedIdentityPermission,
+			expectAllow: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Ancestor paths never consult the bound role, so no binding or role mocks are needed.
+			// A denied job type is rejected before its workspace is loaded.
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			if test.expectAllow {
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, jobWorkspace.Metadata.ID).Return(jobWorkspace, nil).Once()
+			}
+
+			caller := &JobCaller{
+				Job:         &models.Job{Type: test.jobType},
+				WorkspaceID: jobWorkspace.Metadata.ID,
+				dbClient: &db.Client{
+					Workspaces:            mockWorkspaces,
+					WorkspaceRoleBindings: db.NewMockWorkspaceRoleBindings(t),
+					Roles:                 db.NewMockRoles(t),
+				},
+			}
+
+			allowed, err := caller.canViewInheritedResources(context.Background(), test.viewPerm, []string{"root", "root/parent"})
+			require.NoError(t, err)
+			assert.Equal(t, test.expectAllow, allowed)
+		})
+	}
+}
+
+// TestJobCaller_Cache checks that a caller built with useCache, as Authenticate builds one for a
+// single request, loads its workspace, each target, its role binding, and the bound role at most once
+// across several checks, including a denial that consults all of them twice.
+func TestJobCaller_Cache(t *testing.T) {
+	jobWorkspace := &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}, FullPath: "root/parent/ws1"}
+	childGroup := &models.Group{Metadata: models.ResourceMetadata{ID: "child-group-id"}, FullPath: "root/parent/child"}
+
+	t.Run("bound role and lookups are loaded once", func(t *testing.T) {
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockGroups := db.NewMockGroups(t)
+		mockBindings := db.NewMockWorkspaceRoleBindings(t)
+		mockRoles := db.NewMockRoles(t)
+
+		role := &models.Role{}
+		role.SetPermissions([]models.Permission{models.ViewManagedIdentityPermission})
+
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, jobWorkspace.Metadata.ID).Return(jobWorkspace, nil).Once()
+		mockGroups.On("GetGroupByID", mock.Anything, childGroup.Metadata.ID).Return(childGroup, nil).Once()
+		mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, jobWorkspace.Metadata.ID).
+			Return(&models.WorkspaceRoleBinding{RoleID: "role-1"}, nil).Once()
+		mockRoles.On("GetRoleByID", mock.Anything, "role-1").Return(role, nil).Once()
+
+		caller := newJobCaller(&models.Job{Type: models.JobApplyType}, "", "", jobWorkspace.Metadata.ID, &db.Client{
+			Workspaces:            mockWorkspaces,
+			Groups:                mockGroups,
+			WorkspaceRoleBindings: mockBindings,
+			Roles:                 mockRoles,
+		}, nil, true)
+		ctx := WithCaller(context.Background(), caller)
+
+		// The bound role can view but not delete the identity, so this is denied as forbidden after
+		// both requireBoundRoleAccess and viewerAccessDenial consult the target and the bound role.
+		err := caller.RequirePermission(ctx, models.DeleteManagedIdentityPermission, WithGroupID(childGroup.Metadata.ID))
+		require.Error(t, err)
+		assert.Equal(t, errors.EForbidden, errors.ErrorCode(err))
+
+		for range 2 {
+			require.NoError(t, caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, WithGroupID(childGroup.Metadata.ID)))
+		}
+	})
+
+	t.Run("a workspace without a role binding is looked up once", func(t *testing.T) {
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockBindings := db.NewMockWorkspaceRoleBindings(t)
+
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, jobWorkspace.Metadata.ID).Return(jobWorkspace, nil).Once()
+		mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, jobWorkspace.Metadata.ID).Return(nil, nil).Once()
+
+		caller := newJobCaller(&models.Job{Type: models.JobApplyType}, "", "", jobWorkspace.Metadata.ID, &db.Client{
+			Workspaces:            mockWorkspaces,
+			WorkspaceRoleBindings: mockBindings,
+			Roles:                 db.NewMockRoles(t),
+		}, nil, true)
+
+		for range 2 {
+			err := caller.RequireAccessToInheritableResource(context.Background(), types.ManagedIdentityModelType, WithNamespacePath(childGroup.FullPath))
+			require.Error(t, err)
+			assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+		}
+	})
+
+	t.Run("lookups are repeated without a cache", func(t *testing.T) {
+		mockWorkspaces := db.NewMockWorkspaces(t)
+		mockBindings := db.NewMockWorkspaceRoleBindings(t)
+
+		mockWorkspaces.On("GetWorkspaceByID", mock.Anything, jobWorkspace.Metadata.ID).Return(jobWorkspace, nil).Times(4)
+		mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, jobWorkspace.Metadata.ID).Return(nil, nil).Twice()
+
+		caller := newJobCaller(&models.Job{Type: models.JobApplyType}, "", "", jobWorkspace.Metadata.ID, &db.Client{
+			Workspaces:            mockWorkspaces,
+			WorkspaceRoleBindings: mockBindings,
+			Roles:                 db.NewMockRoles(t),
+		}, nil, false)
+
+		// Each denied check loads the workspace once to decide and once more for the error message.
+		for range 2 {
+			err := caller.RequireAccessToInheritableResource(context.Background(), types.ManagedIdentityModelType, WithNamespacePath(childGroup.FullPath))
+			require.Error(t, err)
+			assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+		}
+	})
 }
 
 func TestJobCaller_OutputVisibilityAccess(t *testing.T) {
@@ -1667,11 +2078,11 @@ func TestJobCaller_RequireBoundRoleAccess_DBErrors(t *testing.T) {
 			},
 		},
 		{
+			// The workspace is loaded before the binding, so a failure here stops before any binding lookup.
 			name: "workspace lookup error propagates",
-			setupMocks: func(mockWorkspaces *db.MockWorkspaces, mockGroups *db.MockGroups, mockBindings *db.MockWorkspaceRoleBindings, _ *db.MockRoles) {
+			setupMocks: func(mockWorkspaces *db.MockWorkspaces, mockGroups *db.MockGroups, _ *db.MockWorkspaceRoleBindings, _ *db.MockRoles) {
 				mockGroups.On("GetGroupByID", mock.Anything, parentGroup.Metadata.ID).Return(parentGroup, nil)
 				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(nil, dbErr)
-				mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, ws.Metadata.ID).Return(binding, nil)
 			},
 		},
 		{
@@ -1807,36 +2218,80 @@ func TestJobCaller_getSupersedableJobPermissionHandler(t *testing.T) {
 
 // TestJobCaller_ViewerAccessDenial covers viewerAccessDenial directly: the final denial
 // RequirePermission falls back to once neither a job-mechanics handler nor a bound role satisfied
-// the request. It must choose EForbidden when the job has at least viewer access to the constrained
-// resource, and ENotFound otherwise, and it must treat "no constraints at all" as no viewer access
-// (there being nothing to check access against).
+// the request. It must choose EForbidden when the job can at least view resources of the requested
+// permission's type at the constrained target, including through its bound role, and ENotFound
+// otherwise. It must treat "no constraints at all" as no viewer access (there being nothing to check
+// access against).
 func TestJobCaller_ViewerAccessDenial(t *testing.T) {
-	jobWorkspace := &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}, FullPath: "root/ws1"}
-	siblingWorkspaceID := "ws2"
+	jobWorkspace := &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}, FullPath: "root/parent/ws1"}
+	subtreeWorkspace := &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws2"}, FullPath: "root/parent/child/ws2"}
+	unrelatedWorkspace := &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws3"}, FullPath: "root/other/ws3"}
+	dbErr := errors.New("connection refused", errors.WithErrorCode(errors.EInternal))
+
+	// The bound role can view managed identities but not change them, so a delete is denied by both
+	// the job-mechanics handler and the bound role while the job can still view the target.
+	viewIdentityRole := []models.Permission{models.ViewManagedIdentityPermission}
 
 	tests := []struct {
-		name            string
-		checks          *constraints
+		name    string
+		jobType models.JobType
+		// perm is the denied permission; it defaults to DeleteManagedIdentityPermission.
+		perm   *models.Permission
+		checks *constraints
+		// boundRolePerms, when set, binds a role with these permissions to the job's workspace and
+		// expects exactly one binding lookup. When nil, any binding lookup fails the test.
+		boundRolePerms  []models.Permission
 		setupMocks      func(mockWorkspaces *db.MockWorkspaces, mockGroups *db.MockGroups)
 		expectErrorCode errors.CodeType
 	}{
 		{
 			name:            "no constraints at all denies with no viewer access",
 			checks:          &constraints{},
-			setupMocks:      func(_ *db.MockWorkspaces, _ *db.MockGroups) {},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "workspace constraint matching the job's own workspace has viewer access",
 			checks:          &constraints{workspaceID: &jobWorkspace.Metadata.ID},
-			setupMocks:      func(_ *db.MockWorkspaces, _ *db.MockGroups) {},
 			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name:            "workspace constraint for a different workspace has no viewer access",
-			checks:          &constraints{workspaceID: &siblingWorkspaceID},
-			setupMocks:      func(_ *db.MockWorkspaces, _ *db.MockGroups) {},
+			name:   "workspace constraint for a workspace outside the parent group has no viewer access",
+			checks: &constraints{workspaceID: &unrelatedWorkspace.Metadata.ID},
+			setupMocks: func(mockWorkspaces *db.MockWorkspaces, _ *db.MockGroups) {
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, unrelatedWorkspace.Metadata.ID).Return(unrelatedWorkspace, nil)
+			},
 			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:           "workspace constraint for a workspace the bound role can view has viewer access",
+			checks:         &constraints{workspaceID: &subtreeWorkspace.Metadata.ID},
+			boundRolePerms: viewIdentityRole,
+			setupMocks: func(mockWorkspaces *db.MockWorkspaces, _ *db.MockGroups) {
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, subtreeWorkspace.Metadata.ID).Return(subtreeWorkspace, nil)
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:   "workspace constraint for a workspace that doesn't exist has no viewer access",
+			checks: &constraints{workspaceID: strPtr("missing")},
+			setupMocks: func(mockWorkspaces *db.MockWorkspaces, _ *db.MockGroups) {
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "missing").Return(nil, nil)
+			},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:   "workspace lookup error propagates",
+			checks: &constraints{workspaceID: &unrelatedWorkspace.Metadata.ID},
+			setupMocks: func(mockWorkspaces *db.MockWorkspaces, _ *db.MockGroups) {
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, unrelatedWorkspace.Metadata.ID).Return(nil, dbErr)
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:            "namespace path constraint for the job's own workspace the bound role can view has viewer access",
+			checks:          &constraints{namespacePaths: []string{jobWorkspace.FullPath}},
+			boundRolePerms:  viewIdentityRole,
+			expectErrorCode: errors.EForbidden,
 		},
 		{
 			name:   "group constraint the job's workspace descends from has viewer access",
@@ -1855,15 +2310,62 @@ func TestJobCaller_ViewerAccessDenial(t *testing.T) {
 			expectErrorCode: errors.ENotFound,
 		},
 		{
+			name:           "group constraint for a subgroup the bound role can view has viewer access",
+			checks:         &constraints{groupID: strPtr("group-1")},
+			boundRolePerms: viewIdentityRole,
+			setupMocks: func(_ *db.MockWorkspaces, mockGroups *db.MockGroups) {
+				mockGroups.On("GetGroupByID", mock.Anything, "group-1").Return(&models.Group{FullPath: "root/parent/child"}, nil)
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:           "group constraint for a subgroup the bound role can't view has no viewer access",
+			checks:         &constraints{groupID: strPtr("group-1")},
+			boundRolePerms: []models.Permission{models.ViewWorkspacePermission},
+			setupMocks: func(_ *db.MockWorkspaces, mockGroups *db.MockGroups) {
+				mockGroups.On("GetGroupByID", mock.Anything, "group-1").Return(&models.Group{FullPath: "root/parent/child"}, nil)
+			},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:   "group constraint for a group that doesn't exist has no viewer access",
+			checks: &constraints{groupID: strPtr("group-1")},
+			setupMocks: func(_ *db.MockWorkspaces, mockGroups *db.MockGroups) {
+				mockGroups.On("GetGroupByID", mock.Anything, "group-1").Return(nil, nil)
+			},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:   "group lookup error propagates",
+			checks: &constraints{groupID: strPtr("group-1")},
+			setupMocks: func(_ *db.MockWorkspaces, mockGroups *db.MockGroups) {
+				mockGroups.On("GetGroupByID", mock.Anything, "group-1").Return(nil, dbErr)
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
 			name:            "namespace path constraint the job's workspace descends from has viewer access",
 			checks:          &constraints{namespacePaths: []string{"root"}},
-			setupMocks:      func(_ *db.MockWorkspaces, _ *db.MockGroups) {},
 			expectErrorCode: errors.EForbidden,
 		},
 		{
 			name:            "namespace path constraint the job's workspace does not descend from has no viewer access",
 			checks:          &constraints{namespacePaths: []string{"unrelated"}},
-			setupMocks:      func(_ *db.MockWorkspaces, _ *db.MockGroups) {},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "namespace path constraint for a subgroup the bound role can view has viewer access",
+			checks:          &constraints{namespacePaths: []string{"root", "root/parent/child"}},
+			boundRolePerms:  viewIdentityRole,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			// Modules aren't stage-scoped, so the OPA job is denied viewer access only because its job
+			// type can't use the bound role.
+			name:            "an OPA job can't use the bound role for viewer access, so the role isn't loaded",
+			jobType:         models.JobOPAType,
+			perm:            &models.DeleteTerraformModulePermission,
+			checks:          &constraints{namespacePaths: []string{"root/parent/child"}},
 			expectErrorCode: errors.ENotFound,
 		},
 	}
@@ -1872,17 +2374,43 @@ func TestJobCaller_ViewerAccessDenial(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockWorkspaces := db.NewMockWorkspaces(t)
 			mockGroups := db.NewMockGroups(t)
+			mockBindings := db.NewMockWorkspaceRoleBindings(t)
+			mockRoles := db.NewMockRoles(t)
 			// UnauthorizedError always loads the job's own workspace to build its message.
 			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, jobWorkspace.Metadata.ID).Return(jobWorkspace, nil).Maybe()
-			test.setupMocks(mockWorkspaces, mockGroups)
-
-			caller := &JobCaller{
-				Job:         &models.Job{Type: models.JobApplyType},
-				WorkspaceID: jobWorkspace.Metadata.ID,
-				dbClient:    &db.Client{Workspaces: mockWorkspaces, Groups: mockGroups},
+			if test.setupMocks != nil {
+				test.setupMocks(mockWorkspaces, mockGroups)
 			}
 
-			err := caller.viewerAccessDenial(context.Background(), test.checks)
+			if test.boundRolePerms != nil {
+				role := &models.Role{}
+				role.SetPermissions(test.boundRolePerms)
+				mockBindings.On("GetWorkspaceRoleBindingByWorkspaceID", mock.Anything, jobWorkspace.Metadata.ID).
+					Return(&models.WorkspaceRoleBinding{RoleID: "role-1"}, nil).Once()
+				mockRoles.On("GetRoleByID", mock.Anything, "role-1").Return(role, nil).Once()
+			}
+
+			jobType := test.jobType
+			if jobType == "" {
+				jobType = models.JobApplyType
+			}
+
+			caller := &JobCaller{
+				Job:         &models.Job{Type: jobType},
+				WorkspaceID: jobWorkspace.Metadata.ID,
+				dbClient: &db.Client{
+					Workspaces:            mockWorkspaces,
+					Groups:                mockGroups,
+					WorkspaceRoleBindings: mockBindings,
+					Roles:                 mockRoles,
+				},
+			}
+
+			perm := models.DeleteManagedIdentityPermission
+			if test.perm != nil {
+				perm = *test.perm
+			}
+			err := caller.viewerAccessDenial(context.Background(), &perm, test.checks)
 
 			require.Error(t, err)
 			require.Equal(t, test.expectErrorCode, errors.ErrorCode(err))

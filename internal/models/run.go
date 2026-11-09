@@ -450,7 +450,12 @@ type Apply struct {
 	LatestJobID  *string
 	ID           string
 	Status       ApplyStatus
-	// TriggeredBy is nil until the apply is started.
+	// TriggeredBy is the principal who authorized the apply. It is set when the apply is approved
+	// (started manually) or auto-apply is enabled, including at run creation, and cleared when
+	// auto-apply is disabled. An auto-apply run with no recorded principal is attributed to the
+	// system when its apply becomes pending. A non-nil value does not mean the apply has started:
+	// an auto-apply run's apply may still be created, or skipped if it never ran. APIs expose it
+	// through TriggeredByIfStarted.
 	TriggeredBy *Actor
 	Comment     string
 	// ManagedIdentityIDs are the managed identities the apply job may create credentials for: those
@@ -462,6 +467,17 @@ type Apply struct {
 
 // GetID returns the node ID
 func (n *Apply) GetID() string { return n.ID }
+
+// TriggeredByIfStarted returns TriggeredBy once the apply has been triggered, or nil while it is
+// still created or was skipped without running. An auto-apply run records its trigger as soon as
+// auto-apply is enabled, so this keeps API callers from reporting an apply as triggered before it
+// has been.
+func (n *Apply) TriggeredByIfStarted() *Actor {
+	if n.Status == ApplyCreated || n.Status == ApplySkipped {
+		return nil
+	}
+	return n.TriggeredBy
+}
 
 // GetPath returns the run-relative path identifying this node within its run.
 func (n *Apply) GetPath() string { return ApplyNodePath }

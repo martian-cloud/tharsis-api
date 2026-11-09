@@ -804,6 +804,8 @@ func TestCreate_ManualApplyRunSkipsApplyStageRules(t *testing.T) {
 	assert.Equal(t, []string{"mi-1"}, run.Plan.ManagedIdentityIDs)
 	require.NotNil(t, run.Apply)
 	assert.Nil(t, run.Apply.ManagedIdentityIDs)
+	// Nobody has authorized the apply yet.
+	assert.Nil(t, run.Apply.TriggeredBy)
 }
 
 func TestCreate_AutoApplyRunEnforcesApplyStageRules(t *testing.T) {
@@ -818,13 +820,15 @@ func TestCreate_AutoApplyRunEnforcesApplyStageRules(t *testing.T) {
 	env.ruleEnforcer.On("EnforceRules", ctx, mock.Anything, matchRunStage(models.JobApplyType)).Return([]string{"mi-1"}, nil).Once()
 	env.stubCreatePersistence(ctx)
 
-	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1", AutoApply: true})
+	run, err := env.create(ctx, &CreateRunInput{CreatedBy: models.NewUserActor("user-1").WithSubject("u"), WorkspaceID: "ws-1", AutoApply: true})
 	require.NoError(t, err)
 	assert.True(t, run.AutoApply)
 	// The apply is authorized now, so it records its identities at creation too.
 	assert.Equal(t, []string{"mi-1"}, run.Plan.ManagedIdentityIDs)
 	require.NotNil(t, run.Apply)
 	assert.Equal(t, []string{"mi-1"}, run.Apply.ManagedIdentityIDs)
+	// The rules were checked against the creator, so the creator authorized the apply.
+	assert.Equal(t, new(models.NewUserActor("user-1").WithSubject("u")), run.Apply.TriggeredBy)
 }
 
 func TestCreate_AutoApplyRunApplyStageRuleDenied(t *testing.T) {

@@ -63,6 +63,30 @@ func TestGetRunHandler(t *testing.T) {
 			},
 		},
 		{
+			name: "apply that hasn't started doesn't report its trigger",
+			runModel: &models.Run{
+				Metadata:  models.ResourceMetadata{ID: gid.FromGlobalID(runID)},
+				Status:    models.RunPlanning,
+				AutoApply: true,
+				Apply:     &models.Apply{Status: models.ApplyCreated, TriggeredBy: &models.Actor{Subject: "user@example.com"}},
+			},
+			validate: func(t *testing.T, output getRunOutput) {
+				assert.Empty(t, output.Run.Apply.TriggeredBy)
+			},
+		},
+		{
+			name: "apply that has started reports its trigger",
+			runModel: &models.Run{
+				Metadata:  models.ResourceMetadata{ID: gid.FromGlobalID(runID)},
+				Status:    models.RunApplying,
+				AutoApply: true,
+				Apply:     &models.Apply{Status: models.ApplyRunning, TriggeredBy: &models.Actor{Subject: "user@example.com"}},
+			},
+			validate: func(t *testing.T, output getRunOutput) {
+				assert.Equal(t, "user@example.com", output.Run.Apply.TriggeredBy)
+			},
+		},
+		{
 			name:        "run not found",
 			returnErr:   errors.New("not found"),
 			expectError: true,

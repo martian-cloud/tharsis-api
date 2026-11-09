@@ -30,15 +30,15 @@ func (r *ApplyResolver) ErrorMessage() *string {
 	return r.run.Apply.ErrorMessage
 }
 
-// TriggeredBy resolver
+// TriggeredBy resolver returns null until the apply has been triggered.
 func (r *ApplyResolver) TriggeredBy() *string {
-	return models.ActorSubjectPtr(r.run.Apply.TriggeredBy)
+	return models.ActorSubjectPtr(r.run.Apply.TriggeredByIfStarted())
 }
 
 // TriggeredByActor resolver returns the structured identity behind triggeredBy, or null when
-// none was recorded.
+// none was recorded or the apply hasn't been triggered yet.
 func (r *ApplyResolver) TriggeredByActor() *ActorResolver {
-	return newOptionalActorResolver(r.run.Apply.TriggeredBy)
+	return newOptionalActorResolver(r.run.Apply.TriggeredByIfStarted())
 }
 
 // Metadata resolver

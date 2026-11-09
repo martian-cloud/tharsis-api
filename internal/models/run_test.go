@@ -664,6 +664,36 @@ func TestApply_TriggeredBy(t *testing.T) {
 	})
 }
 
+// TestApply_TriggeredByIfStarted covers that the trigger an auto-apply run records at
+// authorization time is withheld until the apply has actually been triggered.
+func TestApply_TriggeredByIfStarted(t *testing.T) {
+	actor := new(NewUserActor("2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e"))
+
+	tests := []struct {
+		status ApplyStatus
+		want   *Actor
+	}{
+		{status: ApplyCreated, want: nil},
+		{status: ApplySkipped, want: nil},
+		{status: ApplyPending, want: actor},
+		{status: ApplyQueued, want: actor},
+		{status: ApplyRunning, want: actor},
+		{status: ApplyFinished, want: actor},
+		{status: ApplyErrored, want: actor},
+		{status: ApplyCanceled, want: actor},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.status), func(t *testing.T) {
+			assert.Equal(t, test.want, (&Apply{Status: test.status, TriggeredBy: actor}).TriggeredByIfStarted())
+		})
+	}
+
+	t.Run("started apply without a recorded trigger", func(t *testing.T) {
+		assert.Nil(t, (&Apply{Status: ApplyRunning}).TriggeredByIfStarted())
+	})
+}
+
 // TestRun_CopyCreatedBy covers that Run.Copy copies the creator, so the
 // engine's pristine copy cannot be changed through the live run.
 func TestRun_CopyCreatedBy(t *testing.T) {

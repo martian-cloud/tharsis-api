@@ -154,7 +154,7 @@ func GetRun(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getRunInput, getRunOu
 			output.Run.Apply = &apply{
 				ApplyID:      applyNode.GetGlobalID(),
 				Status:       applyNode.Status,
-				TriggeredBy:  ptr.ToString(models.ActorSubjectPtr(applyNode.TriggeredBy)),
+				TriggeredBy:  ptr.ToString(models.ActorSubjectPtr(applyNode.TriggeredByIfStarted())),
 				Comment:      applyNode.Comment,
 				ErrorMessage: applyNode.ErrorMessage,
 				LatestJobID:  jobGlobalID(applyNode.LatestJobID),

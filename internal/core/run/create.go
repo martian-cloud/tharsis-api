@@ -222,8 +222,10 @@ func Create(
 	if !isSpeculative {
 		runModel.Apply = &models.Apply{Status: models.ApplyCreated}
 		if input.AutoApply {
-			// Authorized by the apply-stage check above. A manual apply records its own when started.
+			// Authorized by the apply-stage check above, which ran against the run's creator, so the
+			// creator is recorded as the trigger. A manual apply records its own when started.
 			runModel.Apply.ManagedIdentityIDs = slices.Clone(managedIdentityIDs)
+			runModel.Apply.TriggeredBy = new(input.CreatedBy)
 		}
 	}
 	runModel.TaskStages = taskStages

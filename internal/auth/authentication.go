@@ -200,14 +200,15 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 			return nil, errors.New("job token is no longer valid", errors.WithErrorCode(errors.EUnauthorized))
 		}
 
-		return &JobCaller{
-			Job:                      job,
-			JobTRN:                   output.PrivateClaims["job_trn"],
-			RunID:                    runID,
-			WorkspaceID:              workspaceID,
-			dbClient:                 t.dbClient,
-			inheritedSettingResolver: t.inheritedSettingResolver,
-		}, nil
+		return newJobCaller(
+			job,
+			output.PrivateClaims["job_trn"],
+			runID,
+			workspaceID,
+			t.dbClient,
+			t.inheritedSettingResolver,
+			useCache,
+		), nil
 	case SCIMTokenType:
 		if sErr := t.verifySCIMTokenClaim(ctx, output.Token); sErr != nil {
 			return nil, sErr
