@@ -757,12 +757,13 @@ func toPBApply(run *models.Run) *pb.Apply {
 	if a == nil {
 		return nil
 	}
+	triggeredBy := a.TriggeredByIfStarted()
 	pbApply := &pb.Apply{
 		Metadata:           toPBMetadataWithGID(a.Metadata(run), a.GetGlobalID()),
 		DeprecatedStatus:   string(a.Status),
 		Status:             toPBApplyStatus(a.Status),
-		TriggeredBy:        ptr.ToString(models.ActorSubjectPtr(a.TriggeredBy)),
-		TriggeredByActor:   toPBOptionalActor(a.TriggeredBy),
+		TriggeredBy:        ptr.ToString(models.ActorSubjectPtr(triggeredBy)),
+		TriggeredByActor:   toPBOptionalActor(triggeredBy),
 		ErrorMessage:       a.ErrorMessage,
 		ManagedIdentityIds: toManagedIdentityGIDs(a.ManagedIdentityIDs),
 	}

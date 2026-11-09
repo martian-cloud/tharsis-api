@@ -192,7 +192,7 @@ func TestSetRunAutoApply_Execute(t *testing.T) {
 
 		cmd := &SetRunAutoApply{
 			dbClient:      &db.Client{ActivityEvents: mockActivityEvents},
-			in:            &SetRunAutoApplyInput{RunID: "run-1", AutoApply: true},
+			in:            &SetRunAutoApplyInput{RunID: "run-1", AutoApply: true, Actor: models.NewUserActor("user-1")},
 			namespacePath: "groupA/ws",
 			// As set by Prepare after the apply-stage rules passed.
 			managedIdentityIDs: []string{"mi-1"},
@@ -203,6 +203,8 @@ func TestSetRunAutoApply_Execute(t *testing.T) {
 		assert.True(t, cmd.Updated.AutoApply)
 		// The apply job may only use the identities the rule check authorized.
 		assert.Equal(t, []string{"mi-1"}, cmd.Updated.Apply.ManagedIdentityIDs)
+		// The rules were checked against the caller, so the caller authorized the apply.
+		assert.Equal(t, new(models.NewUserActor("user-1")), cmd.Updated.Apply.TriggeredBy)
 	})
 
 	t.Run("enabling auto-apply without a rule check from Prepare is refused", func(t *testing.T) {
@@ -227,7 +229,7 @@ func TestSetRunAutoApply_Execute(t *testing.T) {
 		assert.Equal(t, errors.EConflict, errors.ErrorCode(err))
 	})
 
-	t.Run("disabling auto-apply records a disable activity event and clears the apply's identities", func(t *testing.T) {
+	t.Run("disabling auto-apply records a disable activity event and clears the apply's identities and trigger", func(t *testing.T) {
 		mockActivityEvents := db.NewMockActivityEvents(t)
 		mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.MatchedBy(func(in *models.ActivityEvent) bool {
 			var payload models.ActivityEventUpdateRunPayload
@@ -242,20 +244,26 @@ func TestSetRunAutoApply_Execute(t *testing.T) {
 			Status:    models.RunPlanning,
 			AutoApply: true,
 			Plan:      models.Plan{ID: "plan-1", Status: models.PlanRunning},
-			Apply:     &models.Apply{ID: "apply-1", Status: models.ApplyCreated, ManagedIdentityIDs: []string{"mi-1"}},
+			Apply: &models.Apply{
+				ID:                 "apply-1",
+				Status:             models.ApplyCreated,
+				ManagedIdentityIDs: []string{"mi-1"},
+				TriggeredBy:        new(models.NewUserActor("user-1")),
+			},
 		}
 		runStore := store.NewRunStore(&db.Client{})
 		runStore.AddRun(run)
 
 		cmd := &SetRunAutoApply{
 			dbClient: &db.Client{ActivityEvents: mockActivityEvents},
-			in:       &SetRunAutoApplyInput{RunID: "run-1", AutoApply: false},
+			in:       &SetRunAutoApplyInput{RunID: "run-1", AutoApply: false, Actor: models.NewUserActor("user-2")},
 		}
 
 		require.NoError(t, cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore}))
 		require.NotNil(t, cmd.Updated)
 		assert.False(t, cmd.Updated.AutoApply)
 		assert.Nil(t, cmd.Updated.Apply.ManagedIdentityIDs, "a manual apply is authorized when it is started")
+		assert.Nil(t, cmd.Updated.Apply.TriggeredBy, "a manual apply records its trigger when it is started")
 	})
 
 	t.Run("no-op when the setting already matches and records no activity event", func(t *testing.T) {
@@ -267,19 +275,21 @@ func TestSetRunAutoApply_Execute(t *testing.T) {
 			Status:    models.RunPlanning,
 			AutoApply: true,
 			Plan:      models.Plan{ID: "plan-1", Status: models.PlanRunning},
-			Apply:     &models.Apply{ID: "apply-1", Status: models.ApplyCreated},
+			Apply:     &models.Apply{ID: "apply-1", Status: models.ApplyCreated, TriggeredBy: new(models.NewUserActor("user-1"))},
 		}
 		runStore := store.NewRunStore(&db.Client{})
 		runStore.AddRun(run)
 
 		cmd := &SetRunAutoApply{
 			dbClient: &db.Client{ActivityEvents: mockActivityEvents},
-			in:       &SetRunAutoApplyInput{RunID: "run-1", AutoApply: true},
+			in:       &SetRunAutoApplyInput{RunID: "run-1", AutoApply: true, Actor: models.NewUserActor("user-2")},
 		}
 
 		require.NoError(t, cmd.Execute(ctx, &types.ExecuteInput{RunStore: runStore}))
 		require.NotNil(t, cmd.Updated)
 		assert.True(t, cmd.Updated.AutoApply)
+		// Re-enabling doesn't authorize anything new, so whoever enabled it first stays recorded.
+		assert.Equal(t, new(models.NewUserActor("user-1")), cmd.Updated.Apply.TriggeredBy)
 	})
 
 	t.Run("rejects a speculative run with no apply node", func(t *testing.T) {

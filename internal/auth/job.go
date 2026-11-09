@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -44,6 +45,170 @@ type JobCaller struct {
 	JobTRN      string
 	WorkspaceID string
 	RunID       string
+	// cache memoizes lookups for the lifetime of the caller. It is nil, and nothing is cached, unless
+	// the caller serves a single request (see newJobCaller): a long-lived caller, such as one for a
+	// subscription, must see changes to its workspace's role binding.
+	cache *jobCallerCache
+}
+
+// newJobCaller returns a JobCaller for job. useCache is set when the caller serves a single request,
+// and makes it memoize its lookups (see jobCallerCache).
+func newJobCaller(
+	job *models.Job,
+	jobTRN,
+	runID,
+	workspaceID string,
+	dbClient *db.Client,
+	inheritedSettingResolver namespace.InheritedSettingResolver,
+	useCache bool,
+) *JobCaller {
+	var cache *jobCallerCache
+	if useCache {
+		cache = &jobCallerCache{
+			workspaces: map[string]*models.Workspace{},
+			groupPaths: map[string]string{},
+		}
+	}
+
+	return &JobCaller{
+		Job:                      job,
+		JobTRN:                   jobTRN,
+		RunID:                    runID,
+		WorkspaceID:              workspaceID,
+		dbClient:                 dbClient,
+		inheritedSettingResolver: inheritedSettingResolver,
+		cache:                    cache,
+	}
+}
+
+// jobCallerCache holds the lookups a JobCaller repeats while authorizing a single request: the
+// workspaces and groups it is asked about, its own workspace among them, and the role bound to its
+// workspace. A denial alone would otherwise load the job's workspace and bound role several times,
+// and a list endpoint that checks each item would reload the bound role for every one of them.
+// Workspaces and groups are cached only when found; a workspace without a role binding is cached as
+// having no bound role.
+//
+// Its methods may be called on a nil cache: the getters then report a miss and the setters do
+// nothing, so a caller without a cache always loads from the database.
+type jobCallerCache struct {
+	lock            sync.Mutex
+	workspaces      map[string]*models.Workspace
+	groupPaths      map[string]string
+	boundRole       *models.Role
+	boundRoleLoaded bool
+}
+
+// getWorkspace returns the cached workspace with the given ID and whether it was cached.
+func (c *jobCallerCache) getWorkspace(workspaceID string) (*models.Workspace, bool) {
+	if c == nil {
+		return nil, false
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	ws, ok := c.workspaces[workspaceID]
+	return ws, ok
+}
+
+// setWorkspace caches the workspace with the given ID.
+func (c *jobCallerCache) setWorkspace(workspaceID string, ws *models.Workspace) {
+	if c == nil {
+		return
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.workspaces[workspaceID] = ws
+}
+
+// getGroupPath returns the cached full path of the group with the given ID and whether it was cached.
+func (c *jobCallerCache) getGroupPath(groupID string) (string, bool) {
+	if c == nil {
+		return "", false
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	path, ok := c.groupPaths[groupID]
+	return path, ok
+}
+
+// setGroupPath caches the full path of the group with the given ID.
+func (c *jobCallerCache) setGroupPath(groupID, path string) {
+	if c == nil {
+		return
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.groupPaths[groupID] = path
+}
+
+// getBoundRole returns the cached bound role and whether it has been loaded. A loaded nil role
+// means the workspace has no bound role.
+func (c *jobCallerCache) getBoundRole() (*models.Role, bool) {
+	if c == nil {
+		return nil, false
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.boundRole, c.boundRoleLoaded
+}
+
+// setBoundRole caches the bound role, which may be nil if the workspace has none.
+func (c *jobCallerCache) setBoundRole(role *models.Role) {
+	if c == nil {
+		return
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.boundRole, c.boundRoleLoaded = role, true
+}
+
+// getWorkspace returns the workspace with the given ID, or nil if it doesn't exist.
+func (j *JobCaller) getWorkspace(ctx context.Context, workspaceID string) (*models.Workspace, error) {
+	if ws, ok := j.cache.getWorkspace(workspaceID); ok {
+		return ws, nil
+	}
+
+	ws, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if ws != nil {
+		j.cache.setWorkspace(workspaceID, ws)
+	}
+
+	return ws, nil
+}
+
+// getGroupFullPath returns the full path of the group with the given ID, or "" if it doesn't exist.
+func (j *JobCaller) getGroupFullPath(ctx context.Context, groupID string) (string, error) {
+	if path, ok := j.cache.getGroupPath(groupID); ok {
+		return path, nil
+	}
+
+	group, err := j.dbClient.Groups.GetGroupByID(ctx, groupID)
+	if err != nil {
+		return "", err
+	}
+
+	if group == nil {
+		return "", nil
+	}
+
+	j.cache.setGroupPath(groupID, group.FullPath)
+
+	return group.FullPath, nil
 }
 
 // GetSubject returns the subject identifier for this caller
@@ -64,7 +229,7 @@ func (j *JobCaller) IsAdminModeActivated(_ context.Context) bool {
 // UnauthorizedError returns the unauthorized error for this specific caller type
 func (j *JobCaller) UnauthorizedError(ctx context.Context, hasViewerAccess bool) error {
 	// Get workspace path
-	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+	workspace, err := j.getWorkspace(ctx, j.WorkspaceID)
 	if err != nil {
 		return err
 	}
@@ -75,7 +240,7 @@ func (j *JobCaller) UnauthorizedError(ctx context.Context, hasViewerAccess bool)
 	}
 
 	forbiddedMsg := fmt.Sprintf(
-		"job in workspace %s is not authorized to perform the requested operation: a job only has read access to resources in its group, a workspace role binding must be created to perform write operations.",
+		"job in workspace %s is not authorized to perform the requested operation: a job can only read resources available to its workspace; a workspace role binding must be created to grant the job additional permissions in the workspace's group and its subgroups.",
 		workspacePath,
 	)
 
@@ -100,7 +265,7 @@ func (j *JobCaller) GetNamespacePermissions(ctx context.Context, namespacePath s
 		return []*models.Permission{}, nil
 	}
 
-	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+	workspace, err := j.getWorkspace(ctx, j.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -115,16 +280,7 @@ func (j *JobCaller) GetNamespacePermissions(ctx context.Context, namespacePath s
 		return []*models.Permission{}, nil
 	}
 
-	binding, err := j.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindingByWorkspaceID(ctx, j.WorkspaceID)
-	if err != nil {
-		return nil, err
-	}
-
-	if binding == nil {
-		return []*models.Permission{}, nil
-	}
-
-	role, err := j.dbClient.Roles.GetRoleByID(ctx, binding.RoleID)
+	role, err := j.getBoundRole(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +368,7 @@ func (j *JobCaller) RequirePermission(ctx context.Context, perm models.Permissio
 			return nil
 		}
 
-		return j.viewerAccessDenial(ctx, c)
+		return j.viewerAccessDenial(ctx, &perm, c)
 	}
 
 	// No handler at all for this permission. Try the bound-role fallthrough before falling all the
@@ -221,104 +377,190 @@ func (j *JobCaller) RequirePermission(ctx context.Context, perm models.Permissio
 		return nil
 	}
 
-	return j.viewerAccessDenial(ctx, c)
+	return j.viewerAccessDenial(ctx, &perm, c)
 }
 
 // viewerAccessDenial builds the final denial for a permission that neither a job-mechanics handler
-// nor a bound role satisfied, choosing EForbidden vs ENotFound based on whether the job has at least
-// viewer access to the constrained resource.
-func (j *JobCaller) viewerAccessDenial(ctx context.Context, c *constraints) error {
+// nor a bound role satisfied, choosing EForbidden vs ENotFound based on whether the job can at least
+// view resources of perm's type at the constrained target. That viewer check is the same one
+// RequireAccessToInheritableResource applies, so a target the bound role lets the job view is
+// reported as forbidden rather than not found.
+func (j *JobCaller) viewerAccessDenial(ctx context.Context, perm *models.Permission, c *constraints) error {
 	// If no constraints are provided, we can't determine if the job has viewer access
 	if c.workspaceID == nil && c.groupID == nil && len(c.namespacePaths) == 0 {
 		return j.UnauthorizedError(ctx, false)
 	}
 
-	hasViewerAccess := true
+	var targetPaths []string
 
-	if c.workspaceID != nil && j.WorkspaceID != *c.workspaceID {
-		// Job doesn't have access to the workspace
-		hasViewerAccess = false
+	// The job can always view its own workspace, so only another workspace needs checking.
+	if c.workspaceID != nil && *c.workspaceID != j.WorkspaceID {
+		workspace, err := j.getWorkspace(ctx, *c.workspaceID)
+		if err != nil {
+			return err
+		}
+		if workspace == nil {
+			return j.UnauthorizedError(ctx, false)
+		}
+		targetPaths = append(targetPaths, workspace.FullPath)
 	}
 
 	if c.groupID != nil {
-		if err := j.requireAccessToInheritedGroupResource(ctx, *c.groupID); err != nil {
-			// Job doesn't have access to the group
-			hasViewerAccess = false
+		groupPath, err := j.getGroupFullPath(ctx, *c.groupID)
+		if err != nil {
+			return err
 		}
+		if groupPath == "" {
+			return j.UnauthorizedError(ctx, false)
+		}
+		targetPaths = append(targetPaths, groupPath)
 	}
-	if len(c.namespacePaths) > 0 {
-		if err := j.requireAccessToInheritedNamespaceResource(ctx, c.namespacePaths); err != nil {
-			// Job doesn't have access to one of the namespaces
-			hasViewerAccess = false
-		}
+
+	targetPaths = append(targetPaths, c.namespacePaths...)
+
+	viewPerm := models.Permission{Action: models.ViewAction, ResourceType: perm.ResourceType}
+	hasViewerAccess, err := j.canViewInheritedResources(ctx, viewPerm, targetPaths)
+	if err != nil {
+		return err
 	}
 
 	return j.UnauthorizedError(ctx, hasViewerAccess)
 }
 
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
-func (j *JobCaller) RequireAccessToInheritableResource(ctx context.Context, _ types.ModelType, checks ...func(*constraints)) error {
+// See canViewInheritedResources for the rules.
+func (j *JobCaller) RequireAccessToInheritableResource(ctx context.Context, modelType types.ModelType, checks ...func(*constraints)) error {
 	if j.isJobFinished() {
 		return errJobFinished
 	}
 
 	c := getConstraints(checks...)
-	if c.groupID != nil {
-		return j.requireAccessToInheritedGroupResource(ctx, *c.groupID)
-	}
-	if len(c.namespacePaths) > 0 {
-		return j.requireAccessToInheritedNamespaceResource(ctx, c.namespacePaths)
+
+	var targetPaths []string
+	switch {
+	case c.groupID != nil:
+		groupPath, err := j.getGroupFullPath(ctx, *c.groupID)
+		if err != nil {
+			return err
+		}
+		if groupPath == "" {
+			return j.UnauthorizedError(ctx, false)
+		}
+		targetPaths = []string{groupPath}
+	case len(c.namespacePaths) > 0:
+		targetPaths = c.namespacePaths
+	default:
+		return errMissingConstraints
 	}
 
-	return errMissingConstraints
-}
-
-// requireAccessToInheritedGroupResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
-func (j *JobCaller) requireAccessToInheritedGroupResource(ctx context.Context, groupID string) error {
-	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+	viewPerm := models.Permission{Action: models.ViewAction, ResourceType: modelType.Name()}
+	ok, err := j.canViewInheritedResources(ctx, viewPerm, targetPaths)
 	if err != nil {
 		return err
 	}
 
-	if workspace == nil {
-		return j.UnauthorizedError(ctx, false)
-	}
-
-	// Job has access to view all parent group inherited resources
-	group, err := j.dbClient.Groups.GetGroupByID(ctx, groupID)
-	if err != nil {
-		return err
-	}
-
-	if group == nil {
-		return j.UnauthorizedError(ctx, false)
-	}
-
-	if !workspace.IsDescendantOfGroup(group.FullPath) {
+	if !ok {
 		return j.UnauthorizedError(ctx, false)
 	}
 
 	return nil
 }
 
-// requireAccessToInheritedNamespaceResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
-func (j *JobCaller) requireAccessToInheritedNamespaceResource(ctx context.Context, namespacePaths []string) error {
-	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+// canViewInheritedResources reports whether the job can view resources of viewPerm's type at every
+// one of namespacePaths. A job type that jobStageScopedPermissions withholds viewPerm from can't view
+// such resources anywhere. Otherwise a job can always view resources its workspace inherits, i.e.
+// those in any ancestor group of the workspace. If the workspace has a role binding, the job can
+// also view them in any namespace beneath the workspace's parent group, provided the bound role
+// grants viewPerm and the job's type may use it. This matches the authorizer, where a membership at
+// the parent group would grant inherited view access to everything beneath it.
+//
+// The bound role is only loaded if some path is not an ancestor of the workspace, and at most once.
+func (j *JobCaller) canViewInheritedResources(ctx context.Context, viewPerm models.Permission, namespacePaths []string) (bool, error) {
+	if !j.jobTypeAllowsStageScopedPermission(viewPerm) {
+		return false, nil
+	}
+
+	workspace, err := j.getWorkspace(ctx, j.WorkspaceID)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if workspace == nil {
-		return j.UnauthorizedError(ctx, false)
+		return false, nil
 	}
 
+	parentGroupPath := workspace.GetGroupPath()
+
+	var (
+		role       *models.Role
+		roleLoaded bool
+	)
+
 	for _, ns := range namespacePaths {
-		if !workspace.IsDescendantOfGroup(ns) {
-			return j.UnauthorizedError(ctx, false)
+		// Resources inherited by the job's own workspace are always visible to the job.
+		if workspace.IsDescendantOfGroup(ns) {
+			continue
+		}
+
+		// Otherwise the bound role must cover the target. The parent group is an ancestor and was
+		// handled above, so the target must be strictly beneath it: authority flows down from the
+		// parent, never up to it or sideways to an unrelated namespace.
+		if !utils.IsDescendantOfPath(ns, parentGroupPath) {
+			return false, nil
+		}
+
+		if !j.jobTypeAllowsBoundRolePermission(viewPerm) {
+			return false, nil
+		}
+
+		if !roleLoaded {
+			role, err = j.getBoundRole(ctx)
+			if err != nil {
+				return false, err
+			}
+			roleLoaded = true
+		}
+
+		if !roleGrants(role, &viewPerm) {
+			return false, nil
 		}
 	}
 
-	return nil
+	return true, nil
+}
+
+// getBoundRole returns the role bound to the job's workspace, or nil if the workspace has no role
+// binding or the bound role no longer exists.
+func (j *JobCaller) getBoundRole(ctx context.Context) (*models.Role, error) {
+	if role, ok := j.cache.getBoundRole(); ok {
+		return role, nil
+	}
+
+	binding, err := j.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindingByWorkspaceID(ctx, j.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	var role *models.Role
+	if binding != nil {
+		role, err = j.dbClient.Roles.GetRoleByID(ctx, binding.RoleID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	j.cache.setBoundRole(role)
+
+	return role, nil
+}
+
+// roleGrants reports whether role holds perm or a permission that implies it (see models.Permission.GTE).
+func roleGrants(role *models.Role, perm *models.Permission) bool {
+	if role == nil {
+		return false
+	}
+
+	return slices.ContainsFunc(role.GetPermissions(), func(p models.Permission) bool { return p.GTE(perm) })
 }
 
 // requireWorkspaceOutputVisibility enforces the output visibility setting when a job attempts
@@ -329,7 +571,7 @@ func (j *JobCaller) requireWorkspaceOutputVisibility(ctx context.Context, _ *mod
 		if j.WorkspaceID == *checks.workspaceID {
 			return nil // self-access is always allowed
 		}
-		workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, *checks.workspaceID)
+		workspace, err := j.getWorkspace(ctx, *checks.workspaceID)
 		if err != nil {
 			return err
 		}
@@ -381,7 +623,7 @@ func (j *JobCaller) requireAccessToWorkspace(ctx context.Context, workspaceID st
 		return nil
 	}
 
-	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
+	workspace, err := j.getWorkspace(ctx, workspaceID)
 	if err != nil || workspace == nil {
 		return j.UnauthorizedError(ctx, false)
 	}
@@ -400,7 +642,7 @@ func (j *JobCaller) requireAccessToJobWorkspace(ctx context.Context, _ *models.P
 	}
 
 	if len(checks.namespacePaths) > 0 {
-		workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+		workspace, err := j.getWorkspace(ctx, j.WorkspaceID)
 		if err != nil {
 			return err
 		}
@@ -548,7 +790,7 @@ func (j *JobCaller) requireJobAccess(ctx context.Context, _ *models.Permission, 
 }
 
 func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePaths []string) error {
-	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+	workspace, err := j.getWorkspace(ctx, j.WorkspaceID)
 	if err != nil {
 		return err
 	}
@@ -589,7 +831,7 @@ func (j *JobCaller) checkOutputVisibility(ctx context.Context, targetWorkspace *
 		models.OutputVisibilityDirectGroupOnly,
 		models.OutputVisibilityDirectGroupAndSubgroups:
 		// These cases require loading the requesting workspace
-		requestingWS, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+		requestingWS, err := j.getWorkspace(ctx, j.WorkspaceID)
 		if err != nil {
 			return err
 		}
@@ -644,7 +886,7 @@ func (j *JobCaller) requireProviderMirrorAccess(ctx context.Context, _ *models.P
 		return j.UnauthorizedError(ctx, true)
 	}
 
-	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+	workspace, err := j.getWorkspace(ctx, j.WorkspaceID)
 	if err != nil {
 		return err
 	}
@@ -671,12 +913,12 @@ func (j *JobCaller) requireProviderMirrorAccess(ctx context.Context, _ *models.P
 	}
 
 	// Fall back to groupID
-	group, err := j.dbClient.Groups.GetGroupByID(ctx, *checks.groupID)
+	groupPath, err := j.getGroupFullPath(ctx, *checks.groupID)
 	if err != nil {
 		return err
 	}
 
-	if group == nil || group.FullPath != rootGroupPath {
+	if groupPath != rootGroupPath {
 		return j.UnauthorizedError(ctx, false)
 	}
 
@@ -700,16 +942,7 @@ func (j *JobCaller) requireBoundRoleAccess(ctx context.Context, perm *models.Per
 		return j.UnauthorizedError(ctx, false)
 	}
 
-	binding, err := j.dbClient.WorkspaceRoleBindings.GetWorkspaceRoleBindingByWorkspaceID(ctx, j.WorkspaceID)
-	if err != nil {
-		return err
-	}
-
-	if binding == nil {
-		return j.UnauthorizedError(ctx, false)
-	}
-
-	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+	workspace, err := j.getWorkspace(ctx, j.WorkspaceID)
 	if err != nil {
 		return err
 	}
@@ -727,22 +960,16 @@ func (j *JobCaller) requireBoundRoleAccess(ctx context.Context, perm *models.Per
 		return j.UnauthorizedError(ctx, false)
 	}
 
-	role, err := j.dbClient.Roles.GetRoleByID(ctx, binding.RoleID)
+	role, err := j.getBoundRole(ctx)
 	if err != nil {
 		return err
 	}
 
-	if role == nil {
+	if !roleGrants(role, perm) {
 		return j.UnauthorizedError(ctx, false)
 	}
 
-	for _, p := range role.GetPermissions() {
-		if p.GTE(perm) {
-			return nil
-		}
-	}
-
-	return j.UnauthorizedError(ctx, false)
+	return nil
 }
 
 // resolveBoundRoleCheckTargetPath extracts the single namespace path the caller is asking about from
@@ -753,7 +980,7 @@ func (j *JobCaller) requireBoundRoleAccess(ctx context.Context, perm *models.Per
 func (j *JobCaller) resolveBoundRoleCheckTargetPath(ctx context.Context, checks *constraints) (string, error) {
 	switch {
 	case checks.workspaceID != nil:
-		ws, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, *checks.workspaceID)
+		ws, err := j.getWorkspace(ctx, *checks.workspaceID)
 		if err != nil {
 			return "", err
 		}
@@ -762,14 +989,7 @@ func (j *JobCaller) resolveBoundRoleCheckTargetPath(ctx context.Context, checks 
 		}
 		return ws.FullPath, nil
 	case checks.groupID != nil:
-		group, err := j.dbClient.Groups.GetGroupByID(ctx, *checks.groupID)
-		if err != nil {
-			return "", err
-		}
-		if group == nil {
-			return "", nil
-		}
-		return group.FullPath, nil
+		return j.getGroupFullPath(ctx, *checks.groupID)
 	case len(checks.namespacePaths) == 1:
 		return checks.namespacePaths[0], nil
 	default:

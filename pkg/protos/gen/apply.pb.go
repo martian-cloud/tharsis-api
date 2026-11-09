@@ -202,7 +202,8 @@ type Apply struct {
 	// Deprecated: Marked as deprecated in apply.proto.
 	DeprecatedStatus string `protobuf:"bytes,2,opt,name=deprecated_status,json=deprecatedStatus,proto3" json:"deprecated_status,omitempty"`
 	// triggered_by is the free-form identifier of the principal that triggered the
-	// apply. Deprecated in favour of triggered_by_actor.
+	// apply. Empty until the apply has been triggered. Deprecated in favour of
+	// triggered_by_actor.
 	//
 	// Deprecated: Marked as deprecated in apply.proto.
 	TriggeredBy  string      `protobuf:"bytes,3,opt,name=triggered_by,json=triggeredBy,proto3" json:"triggered_by,omitempty"`
@@ -214,8 +215,8 @@ type Apply struct {
 	// otherwise.
 	ManagedIdentityIds []string `protobuf:"bytes,7,rep,name=managed_identity_ids,json=managedIdentityIds,proto3" json:"managed_identity_ids,omitempty"`
 	// triggered_by_actor is the structured identity of the principal that
-	// triggered the apply. Absent for applies triggered before actors were
-	// introduced.
+	// triggered the apply. Absent until the apply has been triggered, and for
+	// applies triggered before actors were introduced.
 	TriggeredByActor *Actor `protobuf:"bytes,8,opt,name=triggered_by_actor,json=triggeredByActor,proto3" json:"triggered_by_actor,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache

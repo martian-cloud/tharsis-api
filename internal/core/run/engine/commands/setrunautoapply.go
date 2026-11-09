@@ -17,6 +17,9 @@ import (
 type SetRunAutoApplyInput struct {
 	RunID     string
 	AutoApply bool
+	// Actor is the principal changing the setting. When auto-apply is enabled the apply-stage rules
+	// are checked against it, so it is recorded as the apply's trigger.
+	Actor models.Actor
 }
 
 // SetRunAutoApply changes a run's auto-apply setting after creation, recording a run-update
@@ -116,10 +119,13 @@ func (c *SetRunAutoApply) Execute(ctx context.Context, input *types.ExecuteInput
 			return errors.New("the run's auto-apply setting changed concurrently, retry the request", errors.WithErrorCode(errors.EConflict))
 		}
 		run.Apply.ManagedIdentityIDs = c.managedIdentityIDs
+		// The rules were checked against this actor, so it authorized the apply.
+		run.Apply.TriggeredBy = new(c.in.Actor)
 	} else {
 		// The identities were authorized for the system-started apply. A manual apply is authorized
-		// again when it is started, so nothing is authorized until then.
+		// again when it is started, so nothing is authorized until then, and nobody has triggered it.
 		run.Apply.ManagedIdentityIDs = nil
+		run.Apply.TriggeredBy = nil
 	}
 	run.AutoApply = c.in.AutoApply
 

@@ -114,3 +114,31 @@ func TestToPBRunNodes_ManagedIdentityIDsAreGlobalIDs(t *testing.T) {
 	run.Apply.ManagedIdentityIDs = nil
 	assert.Empty(t, toPBApply(run).ManagedIdentityIds)
 }
+
+// TestToPBApply_TriggeredByOnlyOnceStarted verifies an auto-apply run's apply doesn't report who
+// triggered it while it is still waiting to start.
+func TestToPBApply_TriggeredByOnlyOnceStarted(t *testing.T) {
+	now := time.Now()
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{
+			ID:                   "run-1",
+			TRN:                  trn.TypeRun.Build("group", "ws", "run-1"),
+			CreationTimestamp:    &now,
+			LastUpdatedTimestamp: &now,
+		},
+		Apply: &models.Apply{
+			ID:          "apply-1",
+			Status:      models.ApplyCreated,
+			TriggeredBy: new(models.NewUserActor("user-1").WithSubject("user@example.com")),
+		},
+	}
+
+	pbApply := toPBApply(run)
+	assert.Empty(t, pbApply.TriggeredBy)
+	assert.Nil(t, pbApply.TriggeredByActor)
+
+	run.Apply.Status = models.ApplyPending
+	pbApply = toPBApply(run)
+	assert.Equal(t, "user@example.com", pbApply.TriggeredBy)
+	assert.NotNil(t, pbApply.TriggeredByActor)
+}

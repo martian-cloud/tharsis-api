@@ -31,6 +31,17 @@ func TestAutoApplyTransformer_Transform(t *testing.T) {
 			wantTrigger: new(models.SystemActor()),
 		},
 		{
+			// The run's creator or whoever enabled auto-apply is already recorded and must not be
+			// replaced by the system.
+			name: "auto-apply run whose apply already records who authorized it keeps that actor",
+			run: &models.Run{
+				AutoApply: true,
+				Apply:     &models.Apply{TriggeredBy: new(models.NewUserActor("user-1"))},
+			},
+			changes:     []statemachine.NodeStatusChange{applyPendingChange},
+			wantTrigger: new(models.NewUserActor("user-1")),
+		},
+		{
 			name: "run without auto-apply is left untouched",
 			run: &models.Run{
 				AutoApply: false,
