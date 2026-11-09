@@ -40,6 +40,7 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/graph-gophers/graphql-go v1.8.0
 	github.com/hashicorp/go-getter v1.8.6
+	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hashicorp/go-slug v0.16.4
 	github.com/hashicorp/go-tfe v1.51.0
