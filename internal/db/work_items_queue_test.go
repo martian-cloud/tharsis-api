@@ -153,3 +153,32 @@ func TestWorkItemsQueue_EvaluateRunPolicyCheckPayload(t *testing.T) {
 	assert.Equal(t, "run-eval", payload.RunID)
 	assert.Equal(t, "check-eval", payload.PolicyCheckID)
 }
+
+// TestWorkItemsQueue_ProcessTFProviderDocsPayload verifies the ProcessTFProviderDocsPayload
+// round-trips through the payload JSONB column: it comes back typed via
+// ToProcessTFProviderDocsPayload with its fields intact.
+func TestWorkItemsQueue_ProcessTFProviderDocsPayload(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	added, err := testClient.client.WorkItemsQueue.AddWorkItemToQueue(ctx, &AddWorkItemToQueueInput{
+		Type: ProcessTFProviderDocsType,
+		Payload: &ProcessTFProviderDocsPayload{
+			ProviderVersionID: "pv-docs",
+		},
+	})
+	require.NoError(t, err)
+
+	items, err := testClient.client.WorkItemsQueue.ClaimWorkItems(ctx, &ClaimWorkItemsInput{
+		Type:  ProcessTFProviderDocsType,
+		Limit: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, added.ID, items[0].ID)
+
+	payload, ok := items[0].ToProcessTFProviderDocsPayload()
+	require.True(t, ok)
+	assert.Equal(t, "pv-docs", payload.ProviderVersionID)
+}

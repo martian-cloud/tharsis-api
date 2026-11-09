@@ -229,6 +229,24 @@ func (_m *MockRESTClient) UploadProviderChecksums(ctx context.Context, input *Up
 	return r0
 }
 
+// UploadProviderDocs provides a mock function with given fields: ctx, input
+func (_m *MockRESTClient) UploadProviderDocs(ctx context.Context, input *UploadProviderDocsInput) error {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadProviderDocs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *UploadProviderDocsInput) error); ok {
+		r0 = rf(ctx, input)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UploadProviderPlatformBinary provides a mock function with given fields: ctx, input
 func (_m *MockRESTClient) UploadProviderPlatformBinary(ctx context.Context, input *UploadProviderPlatformBinaryInput) error {
 	ret := _m.Called(ctx, input)

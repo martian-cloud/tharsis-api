@@ -171,25 +171,7 @@ type ActivityEventUpdateWorkspacePayload {
   labelChanges: LabelChangePayload
 }
 
-"""
-Actor identifies the principal that performed an action. A field that holds an
-Actor is null when no actor was recorded, or when the recorded identifier is in
-no format an actor type can be inferred from; the deprecated string field
-beside it still carries the original identifier.
-
-Each actor type is its own implementing type, so a query selects what to show
-for each one with an inline fragment, and a principal is looked up only for the
-actor types whose principal field the query selects. Service accounts, VCS
-providers and jobs carry a snapshot of their TRN taken with the action, which is
-enough to display them without a lookup; a user carries no TRN snapshot and is displayed from
-its user field.
-"""
 interface Actor {
-  """
-  Global ID of the referenced record. Null for SYSTEM and SCIM, which have no
-  backing record. It is not named id because an actor is not itself a record:
-  it shares this ID with its principal.
-  """
   principalId: String
   type: ActorType!
 }
@@ -201,90 +183,6 @@ enum ActorType {
   SYSTEM
   USER
   VCS_PROVIDER
-}
-
-"""JobActor is an action performed by a job running in a workspace."""
-type JobActor implements Actor {
-  principalId: String
-
-  """
-  The job. Null when it has been deleted or the caller is not permitted to view
-  it.
-  """
-  job: Job
-
-  """
-  The job's TRN when the action was recorded, for display. It names the job's
-  workspace path and is not updated when the workspace is moved; use
-  principalId or job to reference the job itself.
-  """
-  trnSnapshot: String
-  type: ActorType!
-}
-
-"""SCIMActor is a SCIM provisioning action. It has no backing record."""
-type SCIMActor implements Actor {
-  principalId: String
-  type: ActorType!
-}
-
-"""ServiceAccountActor is an action performed by a service account."""
-type ServiceAccountActor implements Actor {
-  principalId: String
-
-  """
-  The service account's TRN when the action was recorded, for display. It is
-  not updated when the service account is renamed or moved; use principalId or
-  serviceAccount to reference the service account itself.
-  """
-  trnSnapshot: String
-
-  """
-  The service account. Null when it has been deleted or the caller is not
-  permitted to view it.
-  """
-  serviceAccount: ServiceAccount
-  type: ActorType!
-}
-
-"""SystemActor is an internal system action. It has no backing record."""
-type SystemActor implements Actor {
-  principalId: String
-  type: ActorType!
-}
-
-"""UserActor is an action performed by a user."""
-type UserActor implements Actor {
-  principalId: String
-  type: ActorType!
-
-  """
-  The user. Null when the user has been deleted or the caller is not permitted
-  to view it.
-  """
-  user: User
-}
-
-"""
-VCSProviderActor is an action performed by a VCS provider through a workspace
-link.
-"""
-type VCSProviderActor implements Actor {
-  principalId: String
-
-  """
-  The VCS provider's TRN when the action was recorded, for display. It is not
-  updated when the provider is renamed or moved; use principalId or
-  vcsProvider to reference the provider itself.
-  """
-  trnSnapshot: String
-  type: ActorType!
-
-  """
-  The VCS provider. Null when it has been deleted or the caller is not
-  permitted to view it.
-  """
-  vcsProvider: VCSProvider
 }
 
 input AddUserToTeamInput {
@@ -1028,7 +926,6 @@ input CreateRunnerInput {
   disabled: Boolean
   groupId: String
   groupPath: String
-  """Max concurrent jobs; 0 (default when omitted) means no limit."""
   jobLimit: Int
   name: String!
   runUntaggedJobs: Boolean!
@@ -1875,7 +1772,6 @@ type Group implements Namespace & Node {
   federatedRegistries(after: String, before: String, first: Int, last: Int, sort: FederatedRegistrySort): FederatedRegistryConnection!
   fullPath: String!
   gpgKeys(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: GPGKeySort): GPGKeyConnection!
-  """Whether the group contains any subgroups or workspaces"""
   hasChildren: Boolean!
   id: ID!
   managedIdentities(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: ManagedIdentitySort): ManagedIdentityConnection!
@@ -1933,6 +1829,12 @@ type IdpConfig {
 
 union Initiator = ServiceAccount | User
 
+"""
+A 64-bit signed integer, serialized as a JSON number. Used for counters that can exceed
+the 32-bit range of Int (e.g. byte and packet totals) without the precision loss of Float.
+"""
+scalar Int64
+
 type JWTClaim {
   name: String!
   value: String!
@@ -1972,6 +1874,13 @@ type Job implements Node {
   timestamps: JobTimestamps!
   type: JobType!
   workspace: Workspace!
+}
+
+type JobActor implements Actor {
+  job: Job
+  principalId: String
+  trnSnapshot: String
+  type: ActorType!
 }
 
 type JobCancellationEvent {
@@ -2032,6 +1941,10 @@ type JobResourceUsageLimits {
 
 type JobResourceUsageMetrics {
   peakMemoryBytes: Int64
+
+  """
+  Fractional (cgroup usage_usec / 1000), so it stays a Float; the counters below are whole-number Int64.
+  """
   totalCpuTimeMs: Float
   totalDiskReadBytes: Int64
   totalDiskWriteBytes: Int64
@@ -3390,7 +3303,6 @@ enum RunStatus {
 input RunSubscriptionInput {
   ancestorGroupId: String
   runId: String
-  """true only sends assessment runs, false leaves them out; unset sends every run"""
   workspaceAssessment: Boolean
   workspaceId: String
   workspacePath: String
@@ -3452,7 +3364,6 @@ type Runner implements Node {
   group: Group!
   groupPath: String!
   id: ID!
-  """Max concurrent jobs; 0 means no limit."""
   jobLimit: Int!
   jobs(after: String, before: String, first: Int, last: Int, sort: JobSort): JobConnection!
   metadata: ResourceMetadata!
@@ -3567,6 +3478,11 @@ enum RunnerType {
   shared
 }
 
+type SCIMActor implements Actor {
+  principalId: String
+  type: ActorType!
+}
+
 type SCIMToken implements Node {
   createdBy: String! @deprecated(reason: "Use createdByActor instead.")
   createdByActor: Actor
@@ -3605,6 +3521,13 @@ type ServiceAccount implements Node {
   namespaceMemberships(after: String, before: String, first: Int, last: Int): NamespaceMembershipConnection!
   oidcTrustPolicies: [OIDCTrustPolicy!]!
   resourcePath: String!
+}
+
+type ServiceAccountActor implements Actor {
+  principalId: String
+  serviceAccount: ServiceAccount
+  trnSnapshot: String
+  type: ActorType!
 }
 
 type ServiceAccountConnection {
@@ -3777,6 +3700,11 @@ type Subscription {
   runnerSessionEvents(input: RunnerSessionEventSubscriptionInput!): RunnerSessionEvent!
   workspaceEvents(input: WorkspaceSubscriptionInput!): WorkspaceEvent!
   workspaceRunEvents(input: RunSubscriptionInput!): RunEvent!
+}
+
+type SystemActor implements Actor {
+  principalId: String
+  type: ActorType!
 }
 
 type Team implements Node {
@@ -4108,6 +4036,21 @@ type TerraformProviderConnection {
   totalCount: Int!
 }
 
+type TerraformProviderDocItem {
+  category: TerraformProviderDocItemCategory!
+  filename: String!
+  subcategory: String
+}
+
+enum TerraformProviderDocItemCategory {
+  DATA_SOURCES
+  EPHEMERAL_RESOURCES
+  FUNCTIONS
+  GUIDES
+  OVERVIEW
+  RESOURCES
+}
+
 type TerraformProviderEdge {
   cursor: String!
   node: TerraformProvider
@@ -4142,6 +4085,7 @@ enum TerraformProviderSort {
 type TerraformProviderVersion implements Node {
   createdBy: String! @deprecated(reason: "Use createdByActor instead.")
   createdByActor: Actor
+  docs: TerraformProviderVersionDocs!
   gpgAsciiArmor: String
   gpgKeyId: String
   id: ID!
@@ -4161,6 +4105,20 @@ type TerraformProviderVersionConnection {
   edges: [TerraformProviderVersionEdge]
   pageInfo: PageInfo!
   totalCount: Int!
+}
+
+type TerraformProviderVersionDocs {
+  fileData(category: TerraformProviderDocItemCategory!, filename: String!): String
+  items: [TerraformProviderDocItem!]!
+  processingErrorMessage: String
+  processingStatus: TerraformProviderVersionDocsProcessingStatus!
+}
+
+enum TerraformProviderVersionDocsProcessingStatus {
+  COMPLETED
+  FAILED
+  NOT_STARTED
+  PENDING
 }
 
 type TerraformProviderVersionEdge {
@@ -4214,12 +4172,6 @@ enum TerraformResourceMode {
   data
   managed
 }
-
-"""
-A 64-bit signed integer, serialized as a JSON number. Used for counters that can exceed
-the 32-bit range of Int (e.g. byte and packet totals) without the precision loss of Float.
-"""
-scalar Int64
 
 """Time represented in ISO 8601"""
 scalar Time
@@ -4389,7 +4341,6 @@ input UpdateRunnerInput {
   description: String!
   disabled: Boolean
   id: ID!
-  """Max concurrent jobs; 0 means no limit. Omit to leave the current limit unchanged."""
   jobLimit: Int
   metadata: ResourceMetadataInput
   runUntaggedJobs: Boolean
@@ -4572,6 +4523,12 @@ type User implements Node {
   username: String!
 }
 
+type UserActor implements Actor {
+  principalId: String
+  type: ActorType!
+  user: User
+}
+
 enum UserAuthType {
   BASIC
   OIDC
@@ -4713,6 +4670,13 @@ type VCSProvider implements Node {
   resourcePath: String!
   type: VCSProviderType!
   url: String!
+}
+
+type VCSProviderActor implements Actor {
+  principalId: String
+  trnSnapshot: String
+  type: ActorType!
+  vcsProvider: VCSProvider
 }
 
 type VCSProviderConnection {

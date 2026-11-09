@@ -11,6 +11,16 @@ import remarkGfm from 'remark-gfm';
 import ConfirmationDialog from './ConfirmationDialog';
 import { StyledCode } from './StyledCode';
 
+// Prism (refractor) has no `terraform` grammar, so map Terraform fences to `hcl` to highlight them.
+const languageAliases: Record<string, string> = {
+    terraform: 'hcl',
+    tf: 'hcl',
+};
+
+function resolveLanguage(language: string): string {
+    return languageAliases[language.toLowerCase()] ?? language;
+}
+
 function MarkdownParagraph({ ...props }: any) {
     return (
         <Typography
@@ -59,6 +69,9 @@ function MarkdownHeading({ node, ...props }: any) {
                 borderBottom: level <= 2 ? '1px solid' : 'none',
                 borderColor: 'divider',
                 pb: level <= 2 ? 0.5 : 0,
+                // Wrap long unbreakable tokens so headings don't overflow.
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
             }}
         >
             {props.children}
@@ -199,7 +212,7 @@ function MarkdownCode({ className, children, ...props }: any) {
         <SyntaxHighlighter
             children={String(children).replace(/\n$/, '')}
             style={prismTheme}
-            language={match[1]}
+            language={resolveLanguage(match[1])}
             wrapLongLines
             lineProps={{
                 style: {
@@ -323,7 +336,11 @@ export default function Markdown(props: MarkdownProps) {
                 },
                 '&>:last-child': {
                     marginBottom: 0
-                }
+                },
+                // StyledCode sets inline code to nowrap; relax it so long code in headings can wrap.
+                '& h1 code, & h2 code, & h3 code, & h4 code, & h5 code, & h6 code': {
+                    whiteSpace: 'normal',
+                },
             }}
         >
             <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={components}>

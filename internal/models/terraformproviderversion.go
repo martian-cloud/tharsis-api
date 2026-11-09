@@ -9,16 +9,29 @@ import (
 
 var _ Model = (*TerraformProviderVersion)(nil)
 
+// TerraformProviderVersionDocsProcessingStatus represents the status of a provider version's documentation processing.
+type TerraformProviderVersionDocsProcessingStatus string
+
+// TerraformProviderVersionDocsProcessingStatus constants
+const (
+	TerraformProviderVersionDocsProcessingStatusNotStarted TerraformProviderVersionDocsProcessingStatus = "not_started"
+	TerraformProviderVersionDocsProcessingStatusPending    TerraformProviderVersionDocsProcessingStatus = "pending"
+	TerraformProviderVersionDocsProcessingStatusCompleted  TerraformProviderVersionDocsProcessingStatus = "completed"
+	TerraformProviderVersionDocsProcessingStatusFailed     TerraformProviderVersionDocsProcessingStatus = "failed"
+)
+
 // TerraformProviderVersion represents a version of a terraform provider
 type TerraformProviderVersion struct {
 	GPGASCIIArmor                  *string
 	GPGKeyID                       *uint64
 	CreatedBy                      Actor
+	DocsProcessingErrorMessage     *string
 	ProviderID                     string
 	SemanticVersion                string
 	ReadmeObjectStoreKey           *string
 	SHASumsObjectStoreKey          *string
 	SHASumsSignatureObjectStoreKey *string
+	DocsProcessingStatus           TerraformProviderVersionDocsProcessingStatus
 	Metadata                       ResourceMetadata
 	Protocols                      []string
 	SHASumsUploaded                bool

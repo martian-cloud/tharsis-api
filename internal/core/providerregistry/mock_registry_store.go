@@ -46,6 +46,66 @@ func (_m *MockRegistryStore) GetProviderPlatformBinaryPresignedURL(ctx context.C
 	return r0, r1
 }
 
+// GetProviderVersionDocFile provides a mock function with given fields: ctx, providerVersion, provider, category, name
+func (_m *MockRegistryStore) GetProviderVersionDocFile(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, category models.TerraformProviderDocItemCategory, name string) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, providerVersion, provider, category, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProviderVersionDocFile")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, models.TerraformProviderDocItemCategory, string) (io.ReadCloser, error)); ok {
+		return rf(ctx, providerVersion, provider, category, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, models.TerraformProviderDocItemCategory, string) io.ReadCloser); ok {
+		r0 = rf(ctx, providerVersion, provider, category, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, models.TerraformProviderDocItemCategory, string) error); ok {
+		r1 = rf(ctx, providerVersion, provider, category, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetProviderVersionDocsPackage provides a mock function with given fields: ctx, providerVersion, provider
+func (_m *MockRegistryStore) GetProviderVersionDocsPackage(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, providerVersion, provider)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProviderVersionDocsPackage")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) (io.ReadCloser, error)); ok {
+		return rf(ctx, providerVersion, provider)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) io.ReadCloser); ok {
+		r0 = rf(ctx, providerVersion, provider)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider) error); ok {
+		r1 = rf(ctx, providerVersion, provider)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetProviderVersionReadme provides a mock function with given fields: ctx, objectKey
 func (_m *MockRegistryStore) GetProviderVersionReadme(ctx context.Context, objectKey string) (io.ReadCloser, error) {
 	ret := _m.Called(ctx, objectKey)
@@ -162,6 +222,80 @@ func (_m *MockRegistryStore) UploadProviderPlatformBinary(ctx context.Context, p
 
 	if rf, ok := ret.Get(2).(func(context.Context, *models.TerraformProviderPlatform, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) error); ok {
 		r2 = rf(ctx, providerPlatform, providerVersion, provider, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// UploadProviderVersionDocFile provides a mock function with given fields: ctx, providerVersion, provider, category, name, body
+func (_m *MockRegistryStore) UploadProviderVersionDocFile(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, category models.TerraformProviderDocItemCategory, name string, body io.Reader) (db.RetainObjectRefFunc, string, error) {
+	ret := _m.Called(ctx, providerVersion, provider, category, name, body)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadProviderVersionDocFile")
+	}
+
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, models.TerraformProviderDocItemCategory, string, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, providerVersion, provider, category, name, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, models.TerraformProviderDocItemCategory, string, io.Reader) db.RetainObjectRefFunc); ok {
+		r0 = rf(ctx, providerVersion, provider, category, name, body)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, models.TerraformProviderDocItemCategory, string, io.Reader) string); ok {
+		r1 = rf(ctx, providerVersion, provider, category, name, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, models.TerraformProviderDocItemCategory, string, io.Reader) error); ok {
+		r2 = rf(ctx, providerVersion, provider, category, name, body)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// UploadProviderVersionDocsPackage provides a mock function with given fields: ctx, providerVersion, provider, body
+func (_m *MockRegistryStore) UploadProviderVersionDocsPackage(ctx context.Context, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider, body io.Reader) (db.RetainObjectRefFunc, string, error) {
+	ret := _m.Called(ctx, providerVersion, provider, body)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadProviderVersionDocsPackage")
+	}
+
+	var r0 db.RetainObjectRefFunc
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) (db.RetainObjectRefFunc, string, error)); ok {
+		return rf(ctx, providerVersion, provider, body)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) db.RetainObjectRefFunc); ok {
+		r0 = rf(ctx, providerVersion, provider, body)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(db.RetainObjectRefFunc)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) string); ok {
+		r1 = rf(ctx, providerVersion, provider, body)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.TerraformProviderVersion, *models.TerraformProvider, io.Reader) error); ok {
+		r2 = rf(ctx, providerVersion, provider, body)
 	} else {
 		r2 = ret.Error(2)
 	}

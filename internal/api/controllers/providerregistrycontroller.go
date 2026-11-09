@@ -94,6 +94,7 @@ func (c *providerRegistryController) RegisterRoutes(router chi.Router) {
 
 	router.Put("/provider-registry/platforms/{platformId}/upload", c.UploadPlatformBinary)
 	router.Put("/provider-registry/versions/{providerVersionId}/readme/upload", c.UploadProviderVersionReadme)
+	router.Put("/provider-registry/versions/{providerVersionId}/docs/upload", c.UploadProviderVersionDocs)
 	router.Put("/provider-registry/versions/{providerVersionId}/checksums/upload", c.UploadProviderVersionSHASums)
 	router.Put("/provider-registry/versions/{providerVersionId}/signature/upload", c.UploadProviderVersionSHASumsSignature)
 }
@@ -102,6 +103,18 @@ func (c *providerRegistryController) UploadProviderVersionReadme(w http.Response
 	providerVersionID := gid.FromGlobalID(chi.URLParam(r, "providerVersionId"))
 
 	if err := c.providerRegistryService.UploadProviderVersionReadme(r.Context(), providerVersionID, r.Body); err != nil {
+		c.respWriter.RespondWithError(r.Context(), w, err)
+		return
+	}
+
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusOK)
+}
+
+func (c *providerRegistryController) UploadProviderVersionDocs(w http.ResponseWriter, r *http.Request) {
+	providerVersionID := gid.FromGlobalID(chi.URLParam(r, "providerVersionId"))
+
+	// The upload size cap lives in the service, so it applies to every caller, not just this route.
+	if err := c.providerRegistryService.UploadProviderVersionDocs(r.Context(), providerVersionID, r.Body); err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}

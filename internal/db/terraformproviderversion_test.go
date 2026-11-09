@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -45,13 +46,17 @@ func TestTerraformProviderVersions_CreateProviderVersion(t *testing.T) {
 		expectErrorCode errors.CodeType
 		version         string
 		providerID      string
+		docStatus       models.TerraformProviderVersionDocsProcessingStatus
+		expectDocStatus models.TerraformProviderVersionDocsProcessingStatus
 	}
 
 	testCases := []testCase{
 		{
-			name:       "create provider version",
-			version:    "1.0.0",
-			providerID: provider.Metadata.ID,
+			name:            "create provider version",
+			version:         "1.0.0",
+			providerID:      provider.Metadata.ID,
+			docStatus:       models.TerraformProviderVersionDocsProcessingStatusNotStarted,
+			expectDocStatus: models.TerraformProviderVersionDocsProcessingStatusNotStarted,
 		},
 		{
 			name:            "create provider version with invalid provider ID",
@@ -64,9 +69,10 @@ func TestTerraformProviderVersions_CreateProviderVersion(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
-				SemanticVersion: test.version,
-				ProviderID:      test.providerID,
-				CreatedBy:       models.Actor{Subject: "db-integration-tests"},
+				SemanticVersion:      test.version,
+				ProviderID:           test.providerID,
+				CreatedBy:            models.Actor{Subject: "db-integration-tests"},
+				DocsProcessingStatus: test.docStatus,
 			})
 
 			if test.expectErrorCode != "" {
@@ -80,6 +86,8 @@ func TestTerraformProviderVersions_CreateProviderVersion(t *testing.T) {
 			assert.Equal(t, test.version, providerVersion.SemanticVersion)
 			assert.Equal(t, test.providerID, providerVersion.ProviderID)
 			assert.NotEmpty(t, providerVersion.Metadata.ID)
+			assert.Equal(t, test.expectDocStatus, providerVersion.DocsProcessingStatus)
+			assert.Nil(t, providerVersion.DocsProcessingErrorMessage)
 		})
 	}
 }
@@ -149,6 +157,8 @@ func TestTerraformProviderVersions_UpdateProviderVersion(t *testing.T) {
 			providerVersionToUpdate.Metadata.ID = test.providerVersionID
 			providerVersionToUpdate.Metadata.Version = test.version
 			providerVersionToUpdate.Protocols = test.protocols
+			providerVersionToUpdate.DocsProcessingStatus = models.TerraformProviderVersionDocsProcessingStatusFailed
+			providerVersionToUpdate.DocsProcessingErrorMessage = ptr.String("failed to parse docs")
 
 			updatedProviderVersion, err := testClient.client.TerraformProviderVersions.UpdateProviderVersion(ctx, &providerVersionToUpdate)
 
@@ -162,6 +172,9 @@ func TestTerraformProviderVersions_UpdateProviderVersion(t *testing.T) {
 
 			assert.Equal(t, test.protocols, updatedProviderVersion.Protocols)
 			assert.Equal(t, createdProviderVersion.Metadata.Version+1, updatedProviderVersion.Metadata.Version)
+			assert.Equal(t, models.TerraformProviderVersionDocsProcessingStatusFailed, updatedProviderVersion.DocsProcessingStatus)
+			require.NotNil(t, updatedProviderVersion.DocsProcessingErrorMessage)
+			assert.Equal(t, "failed to parse docs", *updatedProviderVersion.DocsProcessingErrorMessage)
 		})
 	}
 }

@@ -100,7 +100,7 @@ type terraformProviderVersions struct {
 	dbClient *Client
 }
 
-var providerVersionFieldList = append(metadataAndCreatedByFieldList, "provider_id", "provider_sem_version", "gpg_key_id", "gpg_ascii_armor", "protocols", "sha_sums_uploaded", "sha_sums_sig_uploaded", "readme_uploaded", "latest", "readme_object_store_key", "shasums_object_store_key", "shasums_signature_object_store_key")
+var providerVersionFieldList = append(metadataAndCreatedByFieldList, "provider_id", "provider_sem_version", "gpg_key_id", "gpg_ascii_armor", "protocols", "sha_sums_uploaded", "sha_sums_sig_uploaded", "readme_uploaded", "latest", "readme_object_store_key", "shasums_object_store_key", "shasums_signature_object_store_key", "docs_processing_status", "docs_processing_error_message")
 
 // NewTerraformProviderVersions returns an instance of the TerraformProviderVersions interface
 func NewTerraformProviderVersions(dbClient *Client) TerraformProviderVersions {
@@ -269,6 +269,8 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 					"readme_object_store_key":            providerVersion.ReadmeObjectStoreKey,
 					"shasums_object_store_key":           providerVersion.SHASumsObjectStoreKey,
 					"shasums_signature_object_store_key": providerVersion.SHASumsSignatureObjectStoreKey,
+					"docs_processing_status":             providerVersion.DocsProcessingStatus,
+					"docs_processing_error_message":      providerVersion.DocsProcessingErrorMessage,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("terraform_providers"), goqu.On(goqu.I("terraform_providers.id").Eq(goqu.I("terraform_provider_versions.provider_id")))).
@@ -320,6 +322,8 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 						"readme_object_store_key":            providerVersion.ReadmeObjectStoreKey,
 						"shasums_object_store_key":           providerVersion.SHASumsObjectStoreKey,
 						"shasums_signature_object_store_key": providerVersion.SHASumsSignatureObjectStoreKey,
+						"docs_processing_status":             providerVersion.DocsProcessingStatus,
+						"docs_processing_error_message":      providerVersion.DocsProcessingErrorMessage,
 					},
 				).Where(goqu.Ex{"id": providerVersion.Metadata.ID, "version": providerVersion.Metadata.Version}).
 				Returning("*"),
@@ -478,6 +482,7 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 	var groupPath, providerName string
 	var gpgKeyID *int64 // Scan as *int64 from PostgreSQL BIGINT
 	var readmeKey, shasumsKey, shasumsSigKey *string
+	var docsProcessingErrorMessage *string
 	providerVersion := &models.TerraformProviderVersion{}
 
 	fields := []interface{}{
@@ -501,6 +506,8 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 		&readmeKey,
 		&shasumsKey,
 		&shasumsSigKey,
+		&providerVersion.DocsProcessingStatus,
+		&docsProcessingErrorMessage,
 		&groupPath,
 		&providerName,
 	}
@@ -522,6 +529,7 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 	providerVersion.ReadmeObjectStoreKey = readmeKey
 	providerVersion.SHASumsObjectStoreKey = shasumsKey
 	providerVersion.SHASumsSignatureObjectStoreKey = shasumsSigKey
+	providerVersion.DocsProcessingErrorMessage = docsProcessingErrorMessage
 
 	providerVersion.Metadata.TRN = trn.TypeTerraformProviderVersion.Build(
 		groupPath,

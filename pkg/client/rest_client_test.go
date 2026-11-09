@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
@@ -331,6 +332,29 @@ func TestUploadProviderReadme(t *testing.T) {
 	err = client.UploadProviderReadme(t.Context(), &UploadProviderReadmeInput{
 		ProviderVersionID: "pv-123",
 		ReadmePath:        testFile,
+	})
+	require.NoError(t, err)
+}
+
+func TestUploadProviderDocs(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/v1/provider-registry/versions/pv-123/docs/upload", r.URL.Path)
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		body, _ := io.ReadAll(r.Body)
+		assert.Equal(t, "docs package", string(body))
+		assert.Equal(t, r.ContentLength, int64(len(body)))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client, err := NewRESTClient(&RESTClientConfig{Endpoint: server.URL, TokenResolver: &mockTokenResolver{token: "test-token"}, UserAgent: ptr.String("test")})
+	require.NoError(t, err)
+
+	err = client.UploadProviderDocs(t.Context(), &UploadProviderDocsInput{
+		ProviderVersionID: "pv-123",
+		Reader:            strings.NewReader("docs package"),
+		ContentLength:     int64(len("docs package")),
 	})
 	require.NoError(t, err)
 }

@@ -30,6 +30,12 @@ type TerraformProviderVersionQueryArgs struct {
 	ProviderName      string
 }
 
+// TerraformProviderVersionDocFileDataQueryArgs is used to query a single provider version doc item's content
+type TerraformProviderVersionDocFileDataQueryArgs struct {
+	Category string
+	Filename string
+}
+
 // TerraformProviderVersionEdgeResolver resolves providerVersion edges
 type TerraformProviderVersionEdgeResolver struct {
 	edge Edge
@@ -223,6 +229,82 @@ func (r *TerraformProviderVersionResolver) CreatedBy() string {
 // none was recorded.
 func (r *TerraformProviderVersionResolver) CreatedByActor() *ActorResolver {
 	return newActorResolver(r.providerVersion.CreatedBy)
+}
+
+// Docs resolver returns the version's documentation group; its fields are resolved lazily, so
+// requesting the status alone does not load the doc items catalog.
+func (r *TerraformProviderVersionResolver) Docs() *TerraformProviderVersionDocsResolver {
+	return &TerraformProviderVersionDocsResolver{providerVersion: r.providerVersion}
+}
+
+// TerraformProviderVersionDocsResolver resolves a provider version's documentation group
+type TerraformProviderVersionDocsResolver struct {
+	providerVersion *models.TerraformProviderVersion
+}
+
+// ProcessingStatus resolver
+func (r *TerraformProviderVersionDocsResolver) ProcessingStatus() string {
+	return toGraphqlEnum(string(r.providerVersion.DocsProcessingStatus))
+}
+
+// ProcessingErrorMessage resolver
+func (r *TerraformProviderVersionDocsResolver) ProcessingErrorMessage() *string {
+	return r.providerVersion.DocsProcessingErrorMessage
+}
+
+// Items resolver
+func (r *TerraformProviderVersionDocsResolver) Items(ctx context.Context) ([]*TerraformProviderDocItemResolver, error) {
+	docItems, err := getServiceCatalog(ctx).TerraformProviderRegistryService.GetProviderVersionDocItems(ctx, r.providerVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvers := make([]*TerraformProviderDocItemResolver, len(docItems))
+	for i := range docItems {
+		resolvers[i] = &TerraformProviderDocItemResolver{docItem: docItems[i]}
+	}
+
+	return resolvers, nil
+}
+
+// FileData resolver returns a single doc item's content. It returns nil rather than an error when the doc item
+// doesn't exist.
+func (r *TerraformProviderVersionDocsResolver) FileData(ctx context.Context, args *TerraformProviderVersionDocFileDataQueryArgs) (*string, error) {
+	category := models.TerraformProviderDocItemCategory(fromGraphqlEnum(args.Category))
+
+	content, err := getServiceCatalog(ctx).TerraformProviderRegistryService.GetProviderVersionDocItemData(ctx, &providerregistry.GetProviderVersionDocItemDataInput{
+		ProviderVersion: r.providerVersion,
+		Category:        category,
+		Filename:        args.Filename,
+	})
+	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &content, nil
+}
+
+// TerraformProviderDocItemResolver resolves a provider version doc item
+type TerraformProviderDocItemResolver struct {
+	docItem *models.TerraformProviderDocItem
+}
+
+// Filename resolver
+func (r *TerraformProviderDocItemResolver) Filename() string {
+	return r.docItem.Filename
+}
+
+// Category resolver
+func (r *TerraformProviderDocItemResolver) Category() string {
+	return toGraphqlEnum(string(r.docItem.Category))
+}
+
+// Subcategory resolver
+func (r *TerraformProviderDocItemResolver) Subcategory() *string {
+	return r.docItem.Subcategory
 }
 
 func terraformProviderVersionQuery(ctx context.Context, args *TerraformProviderVersionQueryArgs) (*TerraformProviderVersionResolver, error) {
