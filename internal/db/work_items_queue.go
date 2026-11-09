@@ -25,6 +25,7 @@ const (
 	QueuePendingRunsForWorkspaceType        WorkItemType = "QUEUE_PENDING_RUNS_FOR_WORKSPACE"
 	DiscardStalePlannedRunsForWorkspaceType WorkItemType = "DISCARD_STALE_PLANNED_RUNS_FOR_WORKSPACE"
 	EvaluateRunPolicyCheckType              WorkItemType = "EVALUATE_RUN_POLICY_CHECK"
+	ProcessTFProviderDocsType               WorkItemType = "PROCESS_TF_PROVIDER_DOCS"
 )
 
 // workItemPayloadFactories maps each work-item type to a constructor for its payload,
@@ -35,6 +36,7 @@ var workItemPayloadFactories = map[WorkItemType]func() any{
 	QueuePendingRunsForWorkspaceType:        func() any { return &QueuePendingRunsForWorkspacePayload{} },
 	DiscardStalePlannedRunsForWorkspaceType: func() any { return &DiscardStalePlannedRunsForWorkspacePayload{} },
 	EvaluateRunPolicyCheckType:              func() any { return &EvaluateRunPolicyCheckPayload{} },
+	ProcessTFProviderDocsType:               func() any { return &ProcessTFProviderDocsPayload{} },
 }
 
 // QueuePendingRunsForWorkspacePayload represents the payload for a QueuePendingRunsForWorkspace work item.
@@ -60,6 +62,11 @@ type DiscardStalePlannedRunsForWorkspacePayload struct {
 type EvaluateRunPolicyCheckPayload struct {
 	RunID         string `json:"runId"`
 	PolicyCheckID string `json:"policyCheckId"`
+}
+
+// ProcessTFProviderDocsPayload represents the payload for a ProcessTFProviderDocs work item.
+type ProcessTFProviderDocsPayload struct {
+	ProviderVersionID string `json:"providerVersionId"`
 }
 
 // ClaimWorkItemsInput is the input for claiming work items.
@@ -104,6 +111,12 @@ func (w *WorkItem) ToDiscardStalePlannedRunsForWorkspacePayload() (*DiscardStale
 // ToEvaluateRunPolicyCheckPayload returns the payload as an EvaluateRunPolicyCheckPayload.
 func (w *WorkItem) ToEvaluateRunPolicyCheckPayload() (*EvaluateRunPolicyCheckPayload, bool) {
 	payload, ok := w.Payload.(*EvaluateRunPolicyCheckPayload)
+	return payload, ok
+}
+
+// ToProcessTFProviderDocsPayload returns the payload as a ProcessTFProviderDocsPayload.
+func (w *WorkItem) ToProcessTFProviderDocsPayload() (*ProcessTFProviderDocsPayload, bool) {
+	payload, ok := w.Payload.(*ProcessTFProviderDocsPayload)
 	return payload, ok
 }
 

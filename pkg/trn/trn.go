@@ -81,6 +81,7 @@ const (
 	TypeTerraformModuleAttestation      Type = "terraform_module_attestation"
 	TypeTerraformModuleVersion          Type = "terraform_module_version"
 	TypeTerraformProvider               Type = "terraform_provider"
+	TypeTerraformProviderDocItem        Type = "terraform_provider_doc_item"
 	TypeTerraformProviderMirror         Type = "terraform_provider_mirror"
 	TypeTerraformProviderPlatform       Type = "terraform_provider_platform"
 	TypeTerraformProviderPlatformMirror Type = "terraform_provider_platform_mirror"

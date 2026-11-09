@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8947fbac6f9a636ba1bc6e43317eb95f>>
+ * @generated SignedSource<<9a4de283e3958d1106fe2c58e4d5db35>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -22,11 +22,10 @@ export type TerraformProviderVersionDetailsIndexFragment_details$data = {
     readonly registryNamespace: string;
     readonly " $fragmentSpreads": FragmentRefs<"TerraformProviderVersionListFragment_provider">;
   };
-  readonly readme: string;
   readonly shaSumsSigUploaded: boolean;
   readonly shaSumsUploaded: boolean;
   readonly version: string;
-  readonly " $fragmentSpreads": FragmentRefs<"TerraformProviderVersionDetailsSidebarFragment_details">;
+  readonly " $fragmentSpreads": FragmentRefs<"TerraformProviderVersionDetailsSidebarFragment_details" | "TerraformProviderVersionDocsFragment_details">;
   readonly " $fragmentType": "TerraformProviderVersionDetailsIndexFragment_details";
 };
 export type TerraformProviderVersionDetailsIndexFragment_details$key = {
@@ -54,13 +53,6 @@ return {
       "args": null,
       "kind": "ScalarField",
       "name": "version",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "readme",
       "storageKey": null
     },
     {
@@ -137,6 +129,11 @@ return {
       "args": null,
       "kind": "FragmentSpread",
       "name": "TerraformProviderVersionDetailsSidebarFragment_details"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "TerraformProviderVersionDocsFragment_details"
     }
   ],
   "type": "TerraformProviderVersion",
@@ -144,6 +141,6 @@ return {
 };
 })();
 
-(node as any).hash = "badd79b185a63331ac41cfe2b70f9317";
+(node as any).hash = "a642ca14a22c63e1e423f64ced04d3cc";
 
 export default node;

@@ -12,14 +12,14 @@ import { PreloadedQuery, useFragment, usePreloadedQuery } from 'react-relay/hook
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import MuiMarkdown from '../common/Markdown';
 import TRNButton from '../common/TRNButton';
 import ListSkeleton from '../skeletons/ListSkeleton';
 import { TerraformProviderVersionDetailsIndexFragment_details$key } from './__generated__/TerraformProviderVersionDetailsIndexFragment_details.graphql';
 import { TerraformProviderVersionDetailsQuery } from './__generated__/TerraformProviderVersionDetailsQuery.graphql';
 import TerraformProviderVersionDetailsSidebar, { SidebarWidth } from './TerraformProviderVersionDetailsSidebar';
+import TerraformProviderVersionDocs from './docs/TerraformProviderVersionDocs';
 import TerraformProviderVersionList from './TerraformProviderVersionList';
-import { PageLayoutProvider } from '@/layout/PageLayoutContext';
+import { PageLayoutProvider, usePageLayout } from '@/layout/PageLayoutContext';
 
 const query = graphql`
     query TerraformProviderVersionDetailsQuery($registryNamespace: String!, $providerName: String!, $version: String) {
@@ -87,6 +87,7 @@ interface IndexProps {
 }
 
 function TerraformProviderVersionDetailsIndex(props: IndexProps) {
+  usePageLayout('fullscreen');
   const [searchParams, setSearchParams] = useSearchParams();
 
   const theme = useTheme();
@@ -100,7 +101,6 @@ function TerraformProviderVersionDetailsIndex(props: IndexProps) {
           {
               id
               version
-              readme
               shaSumsUploaded
               shaSumsSigUploaded
               metadata {
@@ -114,21 +114,21 @@ function TerraformProviderVersionDetailsIndex(props: IndexProps) {
                   ...TerraformProviderVersionListFragment_provider
               }
               ...TerraformProviderVersionDetailsSidebarFragment_details
+              ...TerraformProviderVersionDocsFragment_details
           }
         `, props.fragmentRef);
 
-  let tab = searchParams.get('tab') || 'readme';
-  if (data.readme === '' && tab === 'readme') {
-    tab = 'usage'
-  }
+  const requestedTab = searchParams.get('tab');
+  // Known tabs only; anything else falls back to Docs.
+  const tab = ['docs', 'usage', 'versions'].includes(requestedTab ?? '') ? requestedTab as string : 'docs';
 
   const onToggleSidebar = () => {
     setSidebarOpen(prev => !prev);
   };
 
   const onTabChange = (event: React.SyntheticEvent, newValue: string) => {
-    searchParams.set('tab', newValue);
-    setSearchParams(searchParams, { replace: true });
+    // Replace the whole query string so the previous tab's params don't linger.
+    setSearchParams({ tab: newValue }, { replace: true });
   };
 
   const usageInfo = buildUsageInfo(data.provider.registryNamespace, data.provider.name, data.version);
@@ -174,15 +174,13 @@ function TerraformProviderVersionDetailsIndex(props: IndexProps) {
           </Box>
           <Box sx={{ border: 1, borderColor: 'divider', marginBottom: 2 }}>
             <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
-              {data.readme !== "" && <Tab label="README" value="readme" />}
+              <Tab label="Docs" value="docs" />
               <Tab label="How To Use" value="usage" />
               <Tab label="Versions" value="versions" />
             </Tabs>
           </Box>
           <React.Fragment>
-            {tab === 'readme' && <MuiMarkdown
-              children={data.readme}
-            />}
+            {tab === 'docs' && <Suspense fallback={<ListSkeleton rowCount={3} />}><TerraformProviderVersionDocs fragmentRef={data} /></Suspense>}
             {tab === 'usage' && <Box marginTop={2} position="relative">
               <IconButton sx={{ padding: 2, position: 'absolute', top: 0, right: 0 }} onClick={() => navigator.clipboard.writeText(usageInfo)}>
                 <CopyIcon sx={{ width: 16, height: 16 }} />

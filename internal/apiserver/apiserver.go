@@ -28,6 +28,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/cleanup"
 	packageregistrycore "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/packageregistry"
+	providerregistrycore "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/run/engine/admission"
@@ -241,7 +242,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	respWriter := response.NewWriter(logger)
 
 	artifactStore := coreworkspace.NewArtifactStore(trackedObjectStore, dbClient.ObjectStoreRefs)
-	providerRegistryStore := providerregistry.NewRegistryStore(trackedObjectStore, dbClient.ObjectStoreRefs)
+	providerRegistryStore := providerregistrycore.NewRegistryStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 	moduleRegistryStore := moduleregistry.NewRegistryStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 	packageStore := packageregistrycore.NewPackageStore(trackedObjectStore, dbClient.ObjectStoreRefs)
 	cliStore := cli.NewCLIStore(pluginCatalog.ObjectStore)
@@ -288,6 +289,11 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	// Start run work item consumer
 	runWorkItemConsumer := engine.NewWorkItemConsumer(logger, dbClient, eventManager, runCmdProcessor, runCmdFactory, maintenanceMonitor)
 	runWorkItemConsumer.Start(ctx)
+
+	// Start the provider-docs work item consumer
+	providerDocsProcessor := providerregistrycore.NewDocsProcessor(dbClient, providerRegistryStore, logger)
+	providerDocsWorkItemConsumer := providerregistrycore.NewWorkItemConsumer(logger, dbClient, eventManager, maintenanceMonitor, providerDocsProcessor)
+	providerDocsWorkItemConsumer.Start(ctx)
 
 	// Start the run reconciler: a safety net that re-drives runs stranded awaiting workspace
 	// admission when their work item was never enqueued or processed.

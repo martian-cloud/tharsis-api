@@ -70,6 +70,13 @@ type UploadProviderReadmeInput struct {
 	ReadmePath        string
 }
 
+// UploadProviderDocsInput is the input for uploading a provider docs package.
+type UploadProviderDocsInput struct {
+	ProviderVersionID string
+	Reader            io.Reader
+	ContentLength     int64
+}
+
 // UploadProviderChecksumsInput is the input for uploading provider checksums.
 type UploadProviderChecksumsInput struct {
 	ProviderVersionID string
@@ -150,6 +157,7 @@ type RESTClient interface {
 	DownloadConfigurationVersion(ctx context.Context, input *DownloadConfigurationVersionInput) error
 	UploadModuleVersion(ctx context.Context, input *UploadModuleVersionInput) error
 	UploadProviderReadme(ctx context.Context, input *UploadProviderReadmeInput) error
+	UploadProviderDocs(ctx context.Context, input *UploadProviderDocsInput) error
 	UploadProviderChecksums(ctx context.Context, input *UploadProviderChecksumsInput) error
 	UploadProviderChecksumSignature(ctx context.Context, input *UploadProviderChecksumSignatureInput) error
 	UploadProviderPlatformBinary(ctx context.Context, input *UploadProviderPlatformBinaryInput) error
@@ -303,6 +311,13 @@ func (c *restClient) UploadProviderReadme(ctx context.Context, input *UploadProv
 	uploadURL := c.baseURL.JoinPath("v1", "provider-registry", "versions", input.ProviderVersionID, "readme", "upload").String()
 
 	return c.doPut(ctx, uploadURL, reader, stat.Size())
+}
+
+// UploadProviderDocs uploads a provider docs package (tar.gz).
+func (c *restClient) UploadProviderDocs(ctx context.Context, input *UploadProviderDocsInput) error {
+	uploadURL := c.baseURL.JoinPath("v1", "provider-registry", "versions", input.ProviderVersionID, "docs", "upload").String()
+
+	return c.doPut(ctx, uploadURL, input.Reader, input.ContentLength)
 }
 
 // UploadProviderChecksums uploads provider checksums file.

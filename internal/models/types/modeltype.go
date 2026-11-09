@@ -58,6 +58,7 @@ var (
 	TerraformModuleVersionModelType          = ModelType{trnType: trn.TypeTerraformModuleVersion, gidCode: "TMV"}
 	TerraformProviderMirrorModelType         = ModelType{trnType: trn.TypeTerraformProviderMirror, gidCode: "TMP"}
 	TerraformProviderModelType               = ModelType{trnType: trn.TypeTerraformProvider, gidCode: "TP"}
+	TerraformProviderDocItemModelType        = ModelType{trnType: trn.TypeTerraformProviderDocItem, gidCode: "TPD"}
 	TerraformProviderPlatformMirrorModelType = ModelType{trnType: trn.TypeTerraformProviderPlatformMirror, gidCode: "TPM"}
 	TerraformProviderPlatformModelType       = ModelType{trnType: trn.TypeTerraformProviderPlatform, gidCode: "TPP"}
 	TerraformProviderVersionMirrorModelType  = ModelType{trnType: trn.TypeTerraformProviderVersionMirror, gidCode: "TVM"}

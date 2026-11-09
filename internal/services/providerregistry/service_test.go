@@ -2,8 +2,7 @@ package providerregistry
 
 import (
 	"context"
-	"fmt"
-	"path"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -13,8 +12,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/hashicorp/go-version"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	coreprovider "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -977,7 +976,11 @@ func TestCreateProviderVersion(t *testing.T) {
 					Return(test.expectUpdatedProviderVersion, nil)
 			}
 
-			mockProviderVersions.On("CreateProviderVersion", mock.Anything, mock.Anything).
+			// Verify the service sets the initial doc_processing_status
+			//so the version is never persisted with an empty docs_processing_status.
+			mockProviderVersions.On("CreateProviderVersion", mock.Anything, mock.MatchedBy(func(pv *models.TerraformProviderVersion) bool {
+				return pv.DocsProcessingStatus == models.TerraformProviderVersionDocsProcessingStatusNotStarted
+			})).
 				Return(test.expectCreatedProviderVersion, nil)
 
 			mockGroups.On("GetGroupByID", mock.Anything, mock.Anything).Return(&models.Group{
@@ -1546,61 +1549,488 @@ func mockCallerActor() models.Actor {
 	return models.NewUserActor("9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d")
 }
 
-func FuzzProviderObjectKeys(f *testing.F) {
-	f.Add("linux", "amd64", "aws", "1.0.0")
-	f.Add("darwin", "arm64", "my-provider", "2.0.0-beta.1")
-	f.Add("", "", "", "")
-	f.Add("..", "amd64", "aws", "1.0.0")
-	f.Add("../../x", "amd64", "aws", "1.0.0")
+func TestGetProviderVersionDocItemData(t *testing.T) {
+	providerID := "provider-1"
+	versionID := "version-1"
+	groupID := "group-1"
 
-	provider := &models.TerraformProvider{Metadata: models.ResourceMetadata{ID: "8b1d3c4e-1f2a-4b3c-9d8e-7f6a5b4c3d2e"}}
-	providerVersion := &models.TerraformProviderVersion{Metadata: models.ResourceMetadata{ID: "2e3d4c5b-6a7f-4e8d-9c3b-4a2f1e3d2c1b"}}
-	versionPrefix := fmt.Sprintf("registry/providers/%s/%s/", provider.Metadata.ID, providerVersion.Metadata.ID)
+	type testCase struct {
+		name               string
+		category           models.TerraformProviderDocItemCategory
+		filename           string
+		private            bool
+		docItems           []models.TerraformProviderDocItem
+		docFileContent     string
+		expectContent      string
+		expectDocFileFetch bool
+		docFileFetchFails  bool
+		withoutCaller      bool
+		authError          error
+		providerError      error
+		expectErrCode      errors.CodeType
+	}
 
-	f.Fuzz(func(t *testing.T, operatingSystem, architecture, name, semanticVersion string) {
-		p := *provider
-		p.Name = name
-		pv := *providerVersion
-		pv.SemanticVersion = semanticVersion
-		platform := &models.TerraformProviderPlatform{OperatingSystem: operatingSystem, Architecture: architecture}
+	testCases := []testCase{
+		{
+			name:          "overview returns not found when no docs/index exists",
+			category:      models.TerraformProviderDocItemCategoryOverview,
+			filename:      "index",
+			docItems:      nil,
+			expectErrCode: errors.ENotFound,
+		},
+		{
+			name:               "overview serves docs/index doc file when present",
+			category:           models.TerraformProviderDocItemCategoryOverview,
+			filename:           "index",
+			docItems:           []models.TerraformProviderDocItem{{Filename: "index", Category: models.TerraformProviderDocItemCategoryOverview}},
+			docFileContent:     "index doc file content",
+			expectContent:      "index doc file content",
+			expectDocFileFetch: true,
+		},
+		{
+			name:               "resource doc file is served",
+			category:           models.TerraformProviderDocItemCategoryResources,
+			filename:           "instance",
+			docItems:           []models.TerraformProviderDocItem{{Filename: "instance", Category: models.TerraformProviderDocItemCategoryResources}},
+			docFileContent:     "resource doc file content",
+			expectContent:      "resource doc file content",
+			expectDocFileFetch: true,
+		},
+		{
+			name:              "returns an internal error when the doc file content cannot be read from the store",
+			category:          models.TerraformProviderDocItemCategoryResources,
+			filename:          "instance",
+			docItems:          []models.TerraformProviderDocItem{{Filename: "instance", Category: models.TerraformProviderDocItemCategoryResources}},
+			docFileFetchFails: true,
+			expectErrCode:     errors.EInternal,
+		},
+		{
+			name:          "filename with no matching catalog item is rejected",
+			category:      models.TerraformProviderDocItemCategoryResources,
+			filename:      "../../docs-package.tar.gz",
+			docItems:      []models.TerraformProviderDocItem{{Filename: "instance", Category: models.TerraformProviderDocItemCategoryResources}},
+			expectErrCode: errors.ENotFound,
+		},
+		{
+			name:          "unauthenticated caller is rejected",
+			category:      models.TerraformProviderDocItemCategoryResources,
+			filename:      "instance",
+			withoutCaller: true,
+			expectErrCode: errors.EUnauthorized,
+		},
+		{
+			name:          "caller without access to private provider is forbidden",
+			category:      models.TerraformProviderDocItemCategoryResources,
+			filename:      "instance",
+			private:       true,
+			authError:     errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "provider not found",
+			category:      models.TerraformProviderDocItemCategoryResources,
+			filename:      "instance",
+			providerError: errors.New("not found", errors.WithErrorCode(errors.ENotFound)),
+			expectErrCode: errors.ENotFound,
+		},
+	}
 
-		keys := []string{
-			providerVersionReadmeObjectKey(&pv, &p),
-			providerVersionSHASumsObjectKey(&pv, &p),
-			providerVersionSHASumsSignatureObjectKey(&pv, &p),
-			providerPlatformObjectKey(platform, &pv, &p),
-		}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
 
-		// A version's objects never share a key, whatever the platform and version strings are.
-		seen := map[string]bool{}
-		for _, key := range keys {
-			assert.True(t, strings.HasPrefix(key, versionPrefix), key)
-			assert.False(t, seen[key], "duplicate key %q", key)
-			seen[key] = true
-		}
-		assert.True(t, strings.HasSuffix(keys[3], ".zip"))
+			providerVersion := &models.TerraformProviderVersion{
+				Metadata:   models.ResourceMetadata{ID: versionID},
+				ProviderID: providerID,
+			}
 
-		// Everything that reaches a key is validated before it is stored: the platform's OS and
-		// architecture, the provider name, and the version (stored in its normalized semver form).
-		// For any such input the keys stay inside this version's prefix once the filesystem object
-		// store cleans them, and the platform folder names exactly this OS and architecture.
-		if platform.Validate() != nil || p.Validate() != nil {
-			return
-		}
-		v, err := version.NewSemver(semanticVersion)
-		if err != nil {
-			return
-		}
-		pv.SemanticVersion = v.String()
-		platformKey := providerPlatformObjectKey(platform, &pv, &p)
-		for _, key := range append(keys[:3], platformKey) {
-			assert.Equal(t, "/"+key, path.Clean("/"+key), key)
-			assert.True(t, strings.HasPrefix(key, versionPrefix), key)
-		}
-		platformDir, _, _ := strings.Cut(strings.TrimPrefix(platformKey, versionPrefix+"platforms/"), "/")
-		assert.Equal(t, operatingSystem+"_"+architecture, platformDir)
-		gotOS, gotArch, _ := strings.Cut(platformDir, "_")
-		assert.Equal(t, operatingSystem, gotOS)
-		assert.Equal(t, architecture, gotArch)
-	})
+			provider := &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{ID: providerID},
+				GroupID:  groupID,
+				Private:  test.private,
+			}
+
+			mockCaller := auth.NewMockCaller(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+			mockDocItems := db.NewMockTerraformProviderDocItems(t)
+			mockRegistryStore := coreprovider.NewMockRegistryStore(t)
+
+			if !test.withoutCaller {
+				if test.providerError != nil {
+					mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(nil, test.providerError)
+				} else {
+					mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(provider, nil)
+				}
+			}
+
+			if test.private {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderModelType, mock.Anything).Return(test.authError)
+			}
+
+			// GetProviderVersionDocItemData resolves the doc file via a point lookup on (category, filename),
+			// reached only once the caller and provider checks pass.
+			if !test.withoutCaller && test.providerError == nil && test.authError == nil {
+				var matched *models.TerraformProviderDocItem
+				for i := range test.docItems {
+					if test.docItems[i].Filename == test.filename {
+						matched = &test.docItems[i]
+						break
+					}
+				}
+				mockDocItems.On("GetProviderDocItemByFilename", mock.Anything, &db.GetProviderDocItemByFilenameInput{
+					ProviderVersionID: versionID,
+					Category:          test.category,
+					Filename:          test.filename,
+				}).
+					Return(matched, nil)
+			}
+
+			if test.expectDocFileFetch {
+				mockRegistryStore.On("GetProviderVersionDocFile", mock.Anything, providerVersion, provider, test.category, mock.Anything).
+					Return(io.NopCloser(strings.NewReader(test.docFileContent)), nil)
+			}
+
+			if test.docFileFetchFails {
+				mockRegistryStore.On("GetProviderVersionDocFile", mock.Anything, providerVersion, provider, test.category, mock.Anything).
+					Return(nil, errors.New("object store unavailable", errors.WithErrorCode(errors.EInternal)))
+			}
+
+			dbClient := &db.Client{
+				TerraformProviders:        mockProviders,
+				TerraformProviderDocItems: mockDocItems,
+			}
+
+			service := &service{
+				dbClient:      dbClient,
+				registryStore: mockRegistryStore,
+			}
+
+			callerCtx := ctx
+			if !test.withoutCaller {
+				callerCtx = auth.WithCaller(ctx, mockCaller)
+			}
+
+			content, err := service.GetProviderVersionDocItemData(callerCtx, &GetProviderVersionDocItemDataInput{
+				ProviderVersion: providerVersion,
+				Category:        test.category,
+				Filename:        test.filename,
+			})
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectContent, content)
+		})
+	}
+}
+
+func TestGetProviderVersionDocItems(t *testing.T) {
+	providerID := "provider-1"
+	versionID := "version-1"
+	groupID := "group-1"
+
+	type testCase struct {
+		name          string
+		private       bool
+		withoutCaller bool
+		authError     error
+		providerError error
+		docItems      []*models.TerraformProviderDocItem
+		listError     error
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "returns doc items for a public provider",
+			docItems: []*models.TerraformProviderDocItem{
+				{Filename: "instance", Category: models.TerraformProviderDocItemCategoryResources},
+			},
+		},
+		{
+			name:     "returns doc items for a private provider the caller can access",
+			private:  true,
+			docItems: []*models.TerraformProviderDocItem{},
+		},
+		{
+			name:          "returns an internal error when the doc items query fails",
+			listError:     errors.New("db unavailable", errors.WithErrorCode(errors.EInternal)),
+			expectErrCode: errors.EInternal,
+		},
+		{
+			name:          "unauthenticated caller is rejected",
+			withoutCaller: true,
+			expectErrCode: errors.EUnauthorized,
+		},
+		{
+			name:          "caller without access to private provider is forbidden",
+			private:       true,
+			authError:     errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "provider not found",
+			providerError: errors.New("not found", errors.WithErrorCode(errors.ENotFound)),
+			expectErrCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			providerVersion := &models.TerraformProviderVersion{
+				Metadata:   models.ResourceMetadata{ID: versionID},
+				ProviderID: providerID,
+			}
+
+			provider := &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{ID: providerID},
+				GroupID:  groupID,
+				Private:  test.private,
+			}
+
+			mockCaller := auth.NewMockCaller(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+			mockDocItems := db.NewMockTerraformProviderDocItems(t)
+
+			if !test.withoutCaller {
+				if test.providerError != nil {
+					mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(nil, test.providerError)
+				} else {
+					mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(provider, nil)
+				}
+			}
+
+			if test.private {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderModelType, mock.Anything).Return(test.authError)
+			}
+
+			if test.listError != nil {
+				mockDocItems.On("GetProviderDocItems", mock.Anything, &db.GetProviderDocItemsInput{
+					ProviderVersionID: versionID,
+				}).Return(nil, test.listError)
+			} else if test.expectErrCode == "" {
+				mockDocItems.On("GetProviderDocItems", mock.Anything, &db.GetProviderDocItemsInput{
+					ProviderVersionID: versionID,
+				}).Return(test.docItems, nil)
+			}
+
+			dbClient := &db.Client{
+				TerraformProviders:        mockProviders,
+				TerraformProviderDocItems: mockDocItems,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			callerCtx := ctx
+			if !test.withoutCaller {
+				callerCtx = auth.WithCaller(ctx, mockCaller)
+			}
+
+			docItems, err := service.GetProviderVersionDocItems(callerCtx, providerVersion)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.docItems, docItems)
+		})
+	}
+}
+
+func TestUploadProviderVersionDocs(t *testing.T) {
+	providerID := "provider-1"
+	versionID := "version-1"
+	groupID := "group-1"
+
+	type testCase struct {
+		name           string
+		docStatus      models.TerraformProviderVersionDocsProcessingStatus
+		expectErrCode  errors.CodeType
+		expectEnqueue  bool
+		withoutCaller  bool
+		versionMissing bool
+		permissionErr  error
+		uploadFails    bool
+		claimConflict  bool
+		exceedsLimit   bool
+		atLimit        bool
+	}
+
+	testCases := []testCase{
+		{
+			name:          "uploads docs and enqueues processing when not started",
+			docStatus:     models.TerraformProviderVersionDocsProcessingStatusNotStarted,
+			expectEnqueue: true,
+		},
+		{
+			name:          "accepts an upload exactly at the max size",
+			docStatus:     models.TerraformProviderVersionDocsProcessingStatusNotStarted,
+			atLimit:       true,
+			expectEnqueue: true,
+		},
+		{
+			name:          "rejects upload when docs are already pending",
+			docStatus:     models.TerraformProviderVersionDocsProcessingStatusPending,
+			expectErrCode: errors.EConflict,
+		},
+		{
+			name:          "rejects upload when docs are already completed",
+			docStatus:     models.TerraformProviderVersionDocsProcessingStatusCompleted,
+			expectErrCode: errors.EConflict,
+		},
+		{
+			name:          "rejects upload when a previous run failed",
+			docStatus:     models.TerraformProviderVersionDocsProcessingStatusFailed,
+			expectErrCode: errors.EConflict,
+		},
+		{
+			name:          "returns an error when the upload fails",
+			docStatus:     models.TerraformProviderVersionDocsProcessingStatusNotStarted,
+			uploadFails:   true,
+			expectErrCode: errors.EInternal,
+		},
+		{
+			name:          "rejects a concurrent upload that loses the pending claim",
+			docStatus:     models.TerraformProviderVersionDocsProcessingStatusNotStarted,
+			claimConflict: true,
+			expectErrCode: errors.EConflict,
+		},
+		{
+			name:          "rejects an upload that exceeds the max size",
+			docStatus:     models.TerraformProviderVersionDocsProcessingStatusNotStarted,
+			exceedsLimit:  true,
+			expectErrCode: errors.ETooLarge,
+		},
+		{
+			name:          "unauthenticated caller is rejected",
+			withoutCaller: true,
+			expectErrCode: errors.EUnauthorized,
+		},
+		{
+			name:           "provider version not found",
+			versionMissing: true,
+			expectErrCode:  errors.ENotFound,
+		},
+		{
+			name:          "caller without update permission is forbidden",
+			docStatus:     models.TerraformProviderVersionDocsProcessingStatusNotStarted,
+			permissionErr: errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			providerVersion := &models.TerraformProviderVersion{
+				Metadata:             models.ResourceMetadata{ID: versionID},
+				ProviderID:           providerID,
+				DocsProcessingStatus: test.docStatus,
+			}
+
+			provider := &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{ID: providerID, TRN: trn.TypeTerraformProvider.Build("testgroup/testprovider")},
+				GroupID:  groupID,
+			}
+
+			mockCaller := auth.NewMockCaller(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+			mockProviderVersions := db.NewMockTerraformProviderVersions(t)
+			mockRegistryStore := coreprovider.NewMockRegistryStore(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockWorkItems := db.NewMockWorkItemsQueue(t)
+
+			if !test.withoutCaller {
+				if test.versionMissing {
+					mockProviderVersions.On("GetProviderVersionByID", mock.Anything, versionID).Return(nil, nil)
+				} else {
+					mockProviderVersions.On("GetProviderVersionByID", mock.Anything, versionID).Return(providerVersion, nil)
+					mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(provider, nil)
+					mockCaller.On("RequirePermission", mock.Anything, models.UpdateTerraformProviderPermission, mock.Anything).Return(test.permissionErr)
+				}
+			}
+
+			reachesUpload := !test.withoutCaller && !test.versionMissing && test.permissionErr == nil &&
+				test.docStatus == models.TerraformProviderVersionDocsProcessingStatusNotStarted && !test.exceedsLimit
+
+			if reachesUpload {
+				flipUpdate := mockProviderVersions.On("UpdateProviderVersion", mock.Anything,
+					mock.MatchedBy(func(pv *models.TerraformProviderVersion) bool {
+						return pv.DocsProcessingStatus == models.TerraformProviderVersionDocsProcessingStatusPending
+					}))
+
+				switch {
+				case test.claimConflict:
+					flipUpdate.Return(nil, db.ErrOptimisticLockError)
+				case test.uploadFails:
+					flipUpdate.Return(providerVersion, nil)
+					mockRegistryStore.On("UploadProviderVersionDocsPackage", mock.Anything, providerVersion, provider, mock.Anything).
+						Return(db.RetainObjectRefFunc(nil), "", errors.New("object store unavailable"))
+					mockProviderVersions.On("UpdateProviderVersion", mock.Anything,
+						mock.MatchedBy(func(pv *models.TerraformProviderVersion) bool {
+							return pv.DocsProcessingStatus == models.TerraformProviderVersionDocsProcessingStatusNotStarted
+						})).Return(providerVersion, nil)
+				default:
+					flipUpdate.Return(providerVersion, nil)
+					retainFn := func(_ context.Context, _ string) error { return nil }
+					mockRegistryStore.On("UploadProviderVersionDocsPackage", mock.Anything, providerVersion, provider, mock.Anything).
+						Return(db.RetainObjectRefFunc(retainFn), "docs-key", nil)
+					mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+					mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+					mockWorkItems.On("AddWorkItemToQueue", mock.Anything, mock.MatchedBy(func(input *db.AddWorkItemToQueueInput) bool {
+						return input.Type == db.ProcessTFProviderDocsType
+					})).Return(&db.WorkItem{}, nil)
+				}
+			}
+
+			dbClient := &db.Client{
+				TerraformProviders:        mockProviders,
+				TerraformProviderVersions: mockProviderVersions,
+				Transactions:              mockTransactions,
+				WorkItemsQueue:            mockWorkItems,
+			}
+
+			testLogger, _ := logger.NewForTest()
+
+			service := &service{
+				logger:        testLogger,
+				dbClient:      dbClient,
+				registryStore: mockRegistryStore,
+			}
+
+			callerCtx := ctx
+			if !test.withoutCaller {
+				callerCtx = auth.WithCaller(ctx, mockCaller)
+			}
+
+			// The size cases send a body exactly at or one byte past the limit; every other case uses a small placeholder.
+			uploadBody := io.Reader(strings.NewReader("docs tar.gz"))
+			switch {
+			case test.exceedsLimit:
+				uploadBody = strings.NewReader(strings.Repeat("a", maxDocsUploadSize+1))
+			case test.atLimit:
+				uploadBody = strings.NewReader(strings.Repeat("a", maxDocsUploadSize))
+			}
+
+			err := service.UploadProviderVersionDocs(callerCtx, versionID, uploadBody)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
 }

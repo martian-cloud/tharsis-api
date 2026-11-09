@@ -1,3 +1,4 @@
+// Package providerregistry package
 package providerregistry
 
 import (
@@ -12,16 +13,22 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
+	coreprovider "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/units"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/trn"
 )
+
+// maxDocsUploadSize bounds the compressed docs package upload as the first defense against a
+// memory-exhaustion attack, on top of the processor's own uncompressed, per-file, and entry-count caps.
+const maxDocsUploadSize = 5 * units.MiB
 
 // CreateProviderInput is the input for creating a terraform provider
 type CreateProviderInput struct {
@@ -81,6 +88,13 @@ type GetProviderPlatformsInput struct {
 	Architecture      *string
 }
 
+// GetProviderVersionDocItemDataInput is the input for reading a single provider version doc item's content
+type GetProviderVersionDocItemDataInput struct {
+	ProviderVersion *models.TerraformProviderVersion
+	Category        models.TerraformProviderDocItemCategory
+	Filename        string
+}
+
 // ProviderPlatformDownloadURLs contains the signed URLs for downloading a particular provider platform
 type ProviderPlatformDownloadURLs struct {
 	DownloadURL         string
@@ -105,6 +119,8 @@ type Service interface {
 	CreateProviderVersion(ctx context.Context, input *CreateProviderVersionInput) (*models.TerraformProviderVersion, error)
 	DeleteProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) error
 	GetProviderVersionReadme(ctx context.Context, providerVersion *models.TerraformProviderVersion) (string, error)
+	GetProviderVersionDocItems(ctx context.Context, providerVersion *models.TerraformProviderVersion) ([]*models.TerraformProviderDocItem, error)
+	GetProviderVersionDocItemData(ctx context.Context, input *GetProviderVersionDocItemDataInput) (string, error)
 	GetProviderPlatformByID(ctx context.Context, id string) (*models.TerraformProviderPlatform, error)
 	GetProviderPlatformByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatform, error)
 	GetProviderPlatforms(ctx context.Context, input *GetProviderPlatformsInput) (*db.ProviderPlatformsResult, error)
@@ -112,6 +128,7 @@ type Service interface {
 	DeleteProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) error
 	UploadProviderPlatformBinary(ctx context.Context, providerPlatformID string, reader io.Reader) error
 	UploadProviderVersionReadme(ctx context.Context, providerVersionID string, reader io.Reader) error
+	UploadProviderVersionDocs(ctx context.Context, providerVersionID string, reader io.Reader) error
 	UploadProviderVersionSHA256Sums(ctx context.Context, providerVersionID string, reader io.Reader) error
 	UploadProviderVersionSHA256SumsSignature(ctx context.Context, providerVersionID string, reader io.Reader) error
 	GetProviderPlatformDownloadURLs(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) (*ProviderPlatformDownloadURLs, error)
@@ -121,7 +138,7 @@ type service struct {
 	logger        logger.Logger
 	dbClient      *db.Client
 	limitChecker  limits.LimitChecker
-	registryStore RegistryStore
+	registryStore coreprovider.RegistryStore
 }
 
 // NewService creates an instance of Service
@@ -129,7 +146,7 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	registryStore RegistryStore,
+	registryStore coreprovider.RegistryStore,
 ) Service {
 	return &service{
 		logger,
@@ -573,6 +590,87 @@ func (s *service) GetProviderVersionReadme(ctx context.Context, providerVersion 
 	return string(buffer), nil
 }
 
+// GetProviderVersionDocItems returns all documentation files for a provider version (used for the docs sidebar).
+func (s *service) GetProviderVersionDocItems(ctx context.Context, providerVersion *models.TerraformProviderVersion) ([]*models.TerraformProviderDocItem, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetProviderVersionDocItems")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
+	}
+
+	if provider.Private {
+		if err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID)); err != nil {
+			return nil, err
+		}
+	}
+
+	docItems, err := s.dbClient.TerraformProviderDocItems.GetProviderDocItems(ctx, &db.GetProviderDocItemsInput{
+		ProviderVersionID: providerVersion.Metadata.ID,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get provider version doc items", errors.WithSpan(span))
+	}
+
+	return docItems, nil
+}
+
+// GetProviderVersionDocItemData returns a single documentation file's content, or ENotFound if the file doesn't exist.
+func (s *service) GetProviderVersionDocItemData(ctx context.Context, input *GetProviderVersionDocItemDataInput) (string, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetProviderVersionDocItemData")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	provider, err := s.getProviderByID(ctx, input.ProviderVersion.ProviderID)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
+	}
+
+	if provider.Private {
+		if err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID)); err != nil {
+			return "", err
+		}
+	}
+
+	// Look up the doc file by its stored category and filename; never trust client input for the object key, which
+	// blocks arbitrary reads and path traversal.
+	matched, err := s.dbClient.TerraformProviderDocItems.GetProviderDocItemByFilename(ctx, &db.GetProviderDocItemByFilenameInput{
+		ProviderVersionID: input.ProviderVersion.Metadata.ID,
+		Category:          input.Category,
+		Filename:          input.Filename,
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get provider version doc item", errors.WithSpan(span))
+	}
+
+	if matched == nil {
+		return "", errors.New("provider version doc file not found", errors.WithErrorCode(errors.ENotFound))
+	}
+
+	reader, err := s.registryStore.GetProviderVersionDocFile(ctx, input.ProviderVersion, provider, matched.Category, matched.Filename)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get provider version doc file", errors.WithSpan(span))
+	}
+	defer reader.Close()
+
+	buffer, err := io.ReadAll(reader)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to read provider version doc file", errors.WithSpan(span))
+	}
+
+	return string(buffer), nil
+}
+
 func (s *service) GetProviderVersionByID(ctx context.Context, id string) (*models.TerraformProviderVersion, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetProviderVersionByID")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -779,11 +877,12 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 	}
 
 	providerVersion, err := s.dbClient.TerraformProviderVersions.CreateProviderVersion(txContext, &models.TerraformProviderVersion{
-		ProviderID:      input.ProviderID,
-		SemanticVersion: semVersion.String(),
-		Protocols:       input.Protocols,
-		Latest:          isLatest,
-		CreatedBy:       caller.GetActor(),
+		ProviderID:           input.ProviderID,
+		SemanticVersion:      semVersion.String(),
+		Protocols:            input.Protocols,
+		Latest:               isLatest,
+		CreatedBy:            caller.GetActor(),
+		DocsProcessingStatus: models.TerraformProviderVersionDocsProcessingStatusNotStarted,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create provider version", errors.WithSpan(span))
@@ -1322,6 +1421,105 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Uploaded a provider version README.",
+		"providerVersionID", providerVersion.Metadata.ID,
+		"providerID", providerVersion.ProviderID,
+	)
+
+	return nil
+}
+
+// UploadProviderVersionDocs stores the uploaded docs package and enqueues async processing for it.
+func (s *service) UploadProviderVersionDocs(ctx context.Context, providerVersionID string, uploadReader io.Reader) (err error) {
+	ctx, span := tracer.Start(ctx, "svc.UploadProviderVersionDocs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return err
+	}
+
+	providerVersion, err := s.getProviderVersionByID(ctx, providerVersionID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get provider version by ID", errors.WithSpan(span))
+	}
+
+	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
+	}
+
+	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
+		return err
+	}
+
+	// Docs upload is one-shot per version; reject anything already uploaded, queued, processing, or finished.
+	// Re-upload isn't supported: delete the version or create a new one instead.
+	if providerVersion.DocsProcessingStatus != models.TerraformProviderVersionDocsProcessingStatusNotStarted {
+		return errors.New("provider version docs have already been uploaded; delete the version or create a new one to upload again", errors.WithErrorCode(errors.EConflict))
+	}
+
+	// Bound the uploaded package in the service so the limit applies to every caller, not just the HTTP controller.
+	// Reading one byte past the limit tells an oversized package apart from one exactly at the limit.
+	docsPackage, err := io.ReadAll(io.LimitReader(uploadReader, maxDocsUploadSize+1))
+	if err != nil {
+		return errors.Wrap(err, "failed to read provider version docs package", errors.WithSpan(span))
+	}
+
+	if int64(len(docsPackage)) > maxDocsUploadSize {
+		return errors.New("docs package exceeds the maximum size of %d bytes", maxDocsUploadSize, errors.WithErrorCode(errors.ETooLarge))
+	}
+
+	// Flip the status to pending under an optimistic lock so concurrent uploads can't both proceed.
+	providerVersion.DocsProcessingStatus = models.TerraformProviderVersionDocsProcessingStatusPending
+	providerVersion, err = s.dbClient.TerraformProviderVersions.UpdateProviderVersion(ctx, providerVersion)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.EOptimisticLock {
+			return errors.New("provider version docs have already been uploaded; delete the version or create a new one to upload again", errors.WithErrorCode(errors.EConflict))
+		}
+		return errors.Wrap(err, "failed to mark provider version docs pending", errors.WithSpan(span))
+	}
+
+	// Upload outside a transaction so the slow write doesn't hold one open.
+	docsRetainFn, _, err := s.registryStore.UploadProviderVersionDocsPackage(ctx, providerVersion, provider, bytes.NewReader(docsPackage))
+	if err != nil {
+		// Reset the pending status to not_started so a failed upload (no package stored, no work item queued) frees the version to retry.
+		providerVersion.DocsProcessingStatus = models.TerraformProviderVersionDocsProcessingStatusNotStarted
+		if _, resetErr := s.dbClient.TerraformProviderVersions.UpdateProviderVersion(ctx, providerVersion); resetErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to reset provider version docs status to not_started after a failed upload: %v", resetErr)
+		}
+		return errors.Wrap(err, "failed to upload provider version docs package", errors.WithSpan(span))
+	}
+
+	// Link the uploaded object and enqueue processing in one transaction so a visible pending status always
+	// has a matching queued work item.
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for UploadProviderVersionDocs: %v", txErr)
+		}
+	}()
+
+	if err = docsRetainFn(txContext, providerVersion.Metadata.ID); err != nil {
+		return errors.Wrap(err, "failed to link provider docs package object store ref", errors.WithSpan(span))
+	}
+
+	if _, err = s.dbClient.WorkItemsQueue.AddWorkItemToQueue(txContext, &db.AddWorkItemToQueueInput{
+		Type:    db.ProcessTFProviderDocsType,
+		Payload: &db.ProcessTFProviderDocsPayload{ProviderVersionID: providerVersion.Metadata.ID},
+	}); err != nil {
+		return errors.Wrap(err, "failed to enqueue provider docs processing work item", errors.WithSpan(span))
+	}
+
+	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("uploaded a provider version docs package",
 		"providerVersionID", providerVersion.Metadata.ID,
 		"providerID", providerVersion.ProviderID,
 	)

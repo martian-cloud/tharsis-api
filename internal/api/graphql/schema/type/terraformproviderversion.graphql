@@ -1,3 +1,19 @@
+enum TerraformProviderVersionDocsProcessingStatus {
+  NOT_STARTED
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum TerraformProviderDocItemCategory {
+  OVERVIEW
+  RESOURCES
+  DATA_SOURCES
+  EPHEMERAL_RESOURCES
+  FUNCTIONS
+  GUIDES
+}
+
 enum TerraformProviderVersionSort {
   CREATED_AT_ASC
   CREATED_AT_DESC
@@ -42,10 +58,28 @@ type TerraformProviderVersion implements Node {
   shaSumsSigUploaded: Boolean!
   readmeUploaded: Boolean!
   readme: String! @complexity(value: 1)
+  docs: TerraformProviderVersionDocs! @complexity(value: 5)
   platforms: [TerraformProviderPlatform!]!
   latest: Boolean!
   createdBy: String! @deprecated(reason: "Use createdByActor instead.")
   createdByActor: Actor @complexity(value: 0)
+}
+
+"""
+TerraformProviderVersionDocs groups a provider version's documentation: the upload/processing
+status, any processing error, the catalog of doc items, and the content of an individual doc item.
+"""
+type TerraformProviderVersionDocs {
+  processingStatus: TerraformProviderVersionDocsProcessingStatus!
+  processingErrorMessage: String
+  items: [TerraformProviderDocItem!]!
+  fileData(category: TerraformProviderDocItemCategory!, filename: String!): String @complexity(value: 5)
+}
+
+type TerraformProviderDocItem {
+  filename: String!
+  category: TerraformProviderDocItemCategory!
+  subcategory: String
 }
 
 input CreateTerraformProviderVersionInput {

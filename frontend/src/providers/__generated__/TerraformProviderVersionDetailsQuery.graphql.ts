@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<549b961783ee6403ed2230186470546b>>
+ * @generated SignedSource<<499264c8499d6b45afaa4fe4221a62eb>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -131,13 +131,6 @@ return {
             "args": null,
             "kind": "ScalarField",
             "name": "version",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "readme",
             "storageKey": null
           },
           {
@@ -352,6 +345,77 @@ return {
               }
             ],
             "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "readme",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "readmeUploaded",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "concreteType": "TerraformProviderVersionDocs",
+            "kind": "LinkedField",
+            "name": "docs",
+            "plural": false,
+            "selections": [
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "processingStatus",
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "processingErrorMessage",
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "concreteType": "TerraformProviderDocItem",
+                "kind": "LinkedField",
+                "name": "items",
+                "plural": true,
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "filename",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "category",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "subcategory",
+                    "storageKey": null
+                  }
+                ],
+                "storageKey": null
+              }
+            ],
+            "storageKey": null
           }
         ],
         "storageKey": null
@@ -359,12 +423,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "ff936520e258b5135ecb2f7d26d357bf",
+    "cacheID": "47378955031c0be8e9bf3c6013a47cc8",
     "id": null,
     "metadata": {},
     "name": "TerraformProviderVersionDetailsQuery",
     "operationKind": "query",
-    "text": "query TerraformProviderVersionDetailsQuery(\n  $registryNamespace: String!\n  $providerName: String!\n  $version: String\n) {\n  terraformProviderVersion(registryNamespace: $registryNamespace, providerName: $providerName, version: $version) {\n    id\n    ...TerraformProviderVersionDetailsIndexFragment_details\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment TerraformProviderVersionDetailsIndexFragment_details on TerraformProviderVersion {\n  id\n  version\n  readme\n  shaSumsUploaded\n  shaSumsSigUploaded\n  metadata {\n    trn\n  }\n  provider {\n    id\n    name\n    registryNamespace\n    private\n    ...TerraformProviderVersionListFragment_provider\n  }\n  ...TerraformProviderVersionDetailsSidebarFragment_details\n}\n\nfragment TerraformProviderVersionDetailsSidebarFragment_details on TerraformProviderVersion {\n  version\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  gpgKeyId\n  protocols\n  latest\n  platforms {\n    id\n    os\n    arch\n    binaryUploaded\n  }\n  metadata {\n    createdAt\n  }\n  provider {\n    id\n    name\n    registryNamespace\n    private\n    repositoryUrl\n  }\n}\n\nfragment TerraformProviderVersionListFragment_provider on TerraformProvider {\n  id\n}\n"
+    "text": "query TerraformProviderVersionDetailsQuery(\n  $registryNamespace: String!\n  $providerName: String!\n  $version: String\n) {\n  terraformProviderVersion(registryNamespace: $registryNamespace, providerName: $providerName, version: $version) {\n    id\n    ...TerraformProviderVersionDetailsIndexFragment_details\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment TerraformProviderVersionDetailsIndexFragment_details on TerraformProviderVersion {\n  id\n  version\n  shaSumsUploaded\n  shaSumsSigUploaded\n  metadata {\n    trn\n  }\n  provider {\n    id\n    name\n    registryNamespace\n    private\n    ...TerraformProviderVersionListFragment_provider\n  }\n  ...TerraformProviderVersionDetailsSidebarFragment_details\n  ...TerraformProviderVersionDocsFragment_details\n}\n\nfragment TerraformProviderVersionDetailsSidebarFragment_details on TerraformProviderVersion {\n  version\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  gpgKeyId\n  protocols\n  latest\n  platforms {\n    id\n    os\n    arch\n    binaryUploaded\n  }\n  metadata {\n    createdAt\n  }\n  provider {\n    id\n    name\n    registryNamespace\n    private\n    repositoryUrl\n  }\n}\n\nfragment TerraformProviderVersionDocsFragment_details on TerraformProviderVersion {\n  id\n  readme\n  readmeUploaded\n  docs {\n    processingStatus\n    processingErrorMessage\n    items {\n      filename\n      category\n    }\n  }\n  ...TerraformProviderVersionDocsSidebarFragment_details\n}\n\nfragment TerraformProviderVersionDocsSidebarFragment_details on TerraformProviderVersion {\n  docs {\n    items {\n      filename\n      category\n      subcategory\n    }\n  }\n}\n\nfragment TerraformProviderVersionListFragment_provider on TerraformProvider {\n  id\n}\n"
   }
 };
 })();
