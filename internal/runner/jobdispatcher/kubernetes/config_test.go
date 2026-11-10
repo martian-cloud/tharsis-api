@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -102,6 +103,12 @@ func Test_parseConfig_errors(t *testing.T) {
 			pluginData:          withData(map[string]string{"pod_active_deadline_seconds": "0"}),
 			wantErr:             true,
 			expectedErrContains: "pod_active_deadline_seconds must be a positive value",
+		},
+		{
+			name:                "invalid runtime_class",
+			pluginData:          withData(map[string]string{"runtime_class": "Isolated_Sandbox"}),
+			wantErr:             true,
+			expectedErrContains: "invalid runtime_class",
 		},
 	}
 
@@ -205,4 +212,67 @@ func TestConfig_buildPod_disablesServiceLinks(t *testing.T) {
 	assert.False(t, *pod.Spec.EnableServiceLinks)
 	require.NotNil(t, pod.Spec.AutomountServiceAccountToken)
 	assert.False(t, *pod.Spec.AutomountServiceAccountToken)
+}
+
+func Test_parseConfig_runtimeClass(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    *string
+		expected *string
+	}{
+		{
+			name:     "unset leaves runtime class nil",
+			value:    nil,
+			expected: nil,
+		},
+		{
+			name:     "empty value leaves runtime class nil",
+			value:    ptr.String(""),
+			expected: nil,
+		},
+		{
+			name:     "valid value is trimmed and set",
+			value:    ptr.String(" isolated-sandbox "),
+			expected: ptr.String("isolated-sandbox"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := baseInClusterData()
+			if tt.value != nil {
+				data["runtime_class"] = *tt.value
+			}
+
+			testLogger, _ := logger.NewForTest()
+			cfg, err := parseConfig(data, "discovery.example.com", testLogger)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, cfg.runtimeClass)
+		})
+	}
+}
+
+func TestConfig_buildPod_runtimeClass(t *testing.T) {
+	tests := []struct {
+		name         string
+		runtimeClass *string
+	}{
+		{
+			name:         "runtime class set on pod spec",
+			runtimeClass: ptr.String("isolated-sandbox"),
+		},
+		{
+			name:         "runtime class omitted when unset",
+			runtimeClass: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &config{limits: &dispatchertypes.ResourceLimits{}, runtimeClass: tt.runtimeClass}
+			pod, err := c.buildPod(testJobGID(t), "tok")
+			require.NoError(t, err)
+			assert.Equal(t, tt.runtimeClass, pod.Spec.RuntimeClassName)
+		})
+	}
 }
