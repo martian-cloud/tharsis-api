@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
@@ -39,6 +40,7 @@ type config struct {
 	labels                 map[string]string
 	limits                 *types.ResourceLimits
 	activeDeadlineSeconds  *int64
+	runtimeClass           *string
 	image                  string
 	apiEndpoint            string
 	namespace              string
@@ -92,6 +94,7 @@ func (c *config) buildPod(jobID, token string) (*corev1.Pod, error) {
 			AutomountServiceAccountToken: new(false),
 			// Disable service link env injection so the API's service address isn't leaked into user Terraform.
 			EnableServiceLinks:    new(false),
+			RuntimeClassName:      c.runtimeClass,
 			NodeSelector:          c.nodeSelector,
 			HostAliases:           c.hostAliases,
 			ActiveDeadlineSeconds: c.activeDeadlineSeconds,
@@ -184,6 +187,11 @@ func parseConfig(pluginData map[string]string, discoveryProtocolHost string, log
 		return nil, err
 	}
 
+	runtimeClass, err := parseRuntimeClass(pluginData["runtime_class"])
+	if err != nil {
+		return nil, err
+	}
+
 	namespace := "default"
 	if ns, ok := pluginData["namespace"]; ok && ns != "" {
 		namespace = ns
@@ -205,7 +213,22 @@ func parseConfig(pluginData map[string]string, discoveryProtocolHost string, log
 		labels:                 labels,
 		limits:                 limits,
 		activeDeadlineSeconds:  activeDeadlineSeconds,
+		runtimeClass:           runtimeClass,
 	}, nil
+}
+
+// parseRuntimeClass returns the RuntimeClass name job pods run under (e.g. isolated-sandbox), or nil to use the cluster default.
+func parseRuntimeClass(value string) (*string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+
+	if errs := validation.IsDNS1123Subdomain(value); len(errs) > 0 {
+		return nil, fmt.Errorf("invalid runtime_class %q for runner jobs: %s", value, strings.Join(errs, "; "))
+	}
+
+	return &value, nil
 }
 
 func parseSecurityContext(pluginData map[string]string) (*corev1.SecurityContext, error) {
