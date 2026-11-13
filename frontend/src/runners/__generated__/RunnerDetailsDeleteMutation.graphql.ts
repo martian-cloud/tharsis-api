@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<17a9d5b56a7aa393c7ba446da9995da3>>
+ * @generated SignedSource<<260e9da2def9047372ebf86d57327af9>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -99,8 +98,8 @@ v4 = {
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -108,7 +107,7 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v2/*: any*/),
+        "args": (v2/*:: as any*/),
         "concreteType": "DeleteRunnerPayload",
         "kind": "LinkedField",
         "name": "deleteRunner",
@@ -122,11 +121,11 @@ return {
             "name": "runner",
             "plural": false,
             "selections": [
-              (v3/*: any*/)
+              (v3/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -137,15 +136,15 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "RunnerDetailsDeleteMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v2/*: any*/),
+        "args": (v2/*:: as any*/),
         "concreteType": "DeleteRunnerPayload",
         "kind": "LinkedField",
         "name": "deleteRunner",
@@ -159,7 +158,7 @@ return {
             "name": "runner",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -179,7 +178,7 @@ return {
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<db32d59b068d07b51b1f9b7666717d9c>>
+ * @generated SignedSource<<eba92024bcf112eb6c46ea8f1daf1315>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -113,14 +112,14 @@ v2 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "GroupDriftDetectionSettingsMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateGroupPayload",
         "kind": "LinkedField",
         "name": "updateGroup",
@@ -153,7 +152,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -163,13 +162,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "GroupDriftDetectionSettingsMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateGroupPayload",
         "kind": "LinkedField",
         "name": "updateGroup",
@@ -225,7 +224,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }

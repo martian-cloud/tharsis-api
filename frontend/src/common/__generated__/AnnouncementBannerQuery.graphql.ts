@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<d572559cb7999adf8d5bba352edd1a0d>>
+ * @generated SignedSource<<01aee604def6a32befa695e839d5923e>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -114,7 +113,7 @@ return {
     "kind": "Fragment",
     "metadata": null,
     "name": "AnnouncementBannerQuery",
-    "selections": (v0/*: any*/),
+    "selections": (v0/*:: as any*/),
     "type": "Query",
     "abstractKey": null
   },
@@ -123,7 +122,7 @@ return {
     "argumentDefinitions": [],
     "kind": "Operation",
     "name": "AnnouncementBannerQuery",
-    "selections": (v0/*: any*/)
+    "selections": (v0/*:: as any*/)
   },
   "params": {
     "cacheID": "6e558ebe51928e9fc2773d7e2af12fbf",

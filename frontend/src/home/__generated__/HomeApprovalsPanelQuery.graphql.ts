@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<1a259a15d3851688a7081bd5bb9c2717>>
+ * @generated SignedSource<<2abacc5f4309fcee5e9155c92c295c10>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -113,7 +112,7 @@ return {
     "kind": "Fragment",
     "metadata": null,
     "name": "HomeApprovalsPanelQuery",
-    "selections": (v0/*: any*/),
+    "selections": (v0/*:: as any*/),
     "type": "Query",
     "abstractKey": null
   },
@@ -122,7 +121,7 @@ return {
     "argumentDefinitions": [],
     "kind": "Operation",
     "name": "HomeApprovalsPanelQuery",
-    "selections": (v0/*: any*/)
+    "selections": (v0/*:: as any*/)
   },
   "params": {
     "cacheID": "d91b65a15208ce45aa46b8d7cab29583",

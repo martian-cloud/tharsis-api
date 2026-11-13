@@ -19,7 +19,7 @@ function RunDetailsPlanDiffViewerContainer({ runId }: Props) {
     const queryData = useLazyLoadQuery<RunDetailsPlanDiffViewerQuery>(graphql`
         query RunDetailsPlanDiffViewerQuery($id: String!) {
             node(id: $id) {
-                ... on Run {
+                ... on Run @alias(as: "run") {
                     id
                     ...RunDetailsPlanDiffViewerFragment_run
                 }
@@ -27,11 +27,11 @@ function RunDetailsPlanDiffViewerContainer({ runId }: Props) {
         }
     `, { id: runId }, { fetchPolicy: 'store-and-network' });
 
-    if (!queryData.node) {
+    if (!queryData.node?.run) {
         return null;
     }
 
-    return <RunDetailsPlanDiffViewer fragmentRef={queryData.node} />;
+    return <RunDetailsPlanDiffViewer fragmentRef={queryData.node.run} />;
 }
 
 function getResourceKey(resource: any) {

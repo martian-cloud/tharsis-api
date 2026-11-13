@@ -26,7 +26,7 @@ const jobEventsSubscription = graphql`subscription RunnerJobListEventsSubscripti
 const query = graphql`
     query RunnerJobListQuery($id: String!, $first: Int!, $after: String) {
         node(id: $id) {
-            ... on Runner {
+            ... on Runner @alias(as: "runner") {
                 id
                 ...RunnerJobListFragment_jobs
             }
@@ -57,7 +57,7 @@ function RunnerJobList() {
                     }
                 }
             }
-        `, queryData.node
+        `, queryData.node?.runner
     );
 
     const jobSubscriptionConfig = useMemo<GraphQLSubscriptionConfig<RunnerJobListEventsSubscription>>(() => ({

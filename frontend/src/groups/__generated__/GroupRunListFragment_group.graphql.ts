@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<78a642b1218241937b4a1544e47fd6b9>>
+ * @generated SignedSource<<51806df253c4a70dd86d2d31840b7dd5>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -73,7 +72,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -83,7 +82,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": GroupRunListPaginationQuery_graphql
@@ -105,7 +104,7 @@ return {
       "name": "group",
       "plural": false,
       "selections": [
-        (v1/*: any*/),
+        (v1/*:: as any*/),
         {
           "alias": "runs",
           "args": [
@@ -146,7 +145,7 @@ return {
                   "name": "node",
                   "plural": false,
                   "selections": [
-                    (v1/*: any*/),
+                    (v1/*:: as any*/),
                     {
                       "alias": null,
                       "args": null,

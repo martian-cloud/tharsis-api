@@ -14,7 +14,7 @@ const INITIAL_ITEM_COUNT = 20;
 const query = graphql`
     query GroupPackageVersionDetailsQuery($id: String!, $first: Int, $last: Int, $after: String, $before: String) {
       node(id: $id) {
-        ... on Package {
+        ... on Package @alias(as: "package") {
           id
           name
           groupPath
@@ -35,7 +35,7 @@ function GroupPackageVersionDetails() {
         { id: packageId as string, first: INITIAL_ITEM_COUNT },
         { fetchPolicy: 'store-and-network' }
     );
-    const pkg = queryData.node;
+    const pkg = queryData.node?.package;
 
     return (
         <Box component="main" flexGrow={1} minWidth={0}>
@@ -49,7 +49,7 @@ function GroupPackageVersionDetails() {
     );
 }
 
-type PackageNode = NonNullable<GroupPackageVersionDetailsQuery['response']['node']>;
+type PackageNode = NonNullable<NonNullable<GroupPackageVersionDetailsQuery['response']['node']>['package']>;
 
 // The group owns the package, so this is where versions are created and edited.
 function GroupPackageVersionDetailsIndex({ pkg }: { pkg: PackageNode }) {

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<a378187db53b2f9a3e8adcbbe2b3e66d>>
+ * @generated SignedSource<<e454db45c10d85cd655f3f67ee19b8e7>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,7 +14,9 @@ export type WorkspaceRoleBindingQuery$variables = {
 };
 export type WorkspaceRoleBindingQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"WorkspaceRoleBindingRoleFragment_workspace">;
+    readonly workspace: {
+      readonly " $fragmentSpreads": FragmentRefs<"WorkspaceRoleBindingRoleFragment_workspace">;
+    } | null | undefined;
   } | null | undefined;
   readonly roles: {
     readonly edges: ReadonlyArray<{
@@ -55,7 +56,7 @@ v2 = {
   "storageKey": null
 },
 v3 = [
-  (v2/*: any*/),
+  (v2/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -100,7 +101,7 @@ v4 = {
           "kind": "LinkedField",
           "name": "node",
           "plural": false,
-          "selections": (v3/*: any*/),
+          "selections": (v3/*:: as any*/),
           "storageKey": null
         }
       ],
@@ -111,41 +112,52 @@ v4 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceRoleBindingQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "args": null,
-            "kind": "FragmentSpread",
-            "name": "WorkspaceRoleBindingRoleFragment_workspace"
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "WorkspaceRoleBindingRoleFragment_workspace"
+                }
+              ],
+              "type": "Workspace",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "workspace"
           }
         ],
         "storageKey": null
       },
-      (v4/*: any*/)
+      (v4/*:: as any*/)
     ],
     "type": "Query",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceRoleBindingQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -169,7 +181,7 @@ return {
                 "name": "roleBinding",
                 "plural": false,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -177,7 +189,7 @@ return {
                     "kind": "LinkedField",
                     "name": "role",
                     "plural": false,
-                    "selections": (v3/*: any*/),
+                    "selections": (v3/*:: as any*/),
                     "storageKey": null
                   }
                 ],
@@ -187,24 +199,24 @@ return {
             "type": "Workspace",
             "abstractKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       },
-      (v4/*: any*/)
+      (v4/*:: as any*/)
     ]
   },
   "params": {
-    "cacheID": "ca46c6982af8758638f77fbbfb9a68a4",
+    "cacheID": "bfd786dd482a7574a791583682ae2dcd",
     "id": null,
     "metadata": {},
     "name": "WorkspaceRoleBindingQuery",
     "operationKind": "query",
-    "text": "query WorkspaceRoleBindingQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...WorkspaceRoleBindingRoleFragment_workspace\n    id\n  }\n  roles(first: 5) {\n    edges {\n      node {\n        id\n        name\n        description\n      }\n    }\n  }\n}\n\nfragment WorkspaceRoleBindingRoleFragment_workspace on Workspace {\n  roleBinding {\n    id\n    role {\n      id\n      name\n      description\n    }\n  }\n}\n"
+    "text": "query WorkspaceRoleBindingQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Workspace {\n      ...WorkspaceRoleBindingRoleFragment_workspace\n    }\n    id\n  }\n  roles(first: 5) {\n    edges {\n      node {\n        id\n        name\n        description\n      }\n    }\n  }\n}\n\nfragment WorkspaceRoleBindingRoleFragment_workspace on Workspace {\n  roleBinding {\n    id\n    role {\n      id\n      name\n      description\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "23d1700e13c5b21b2f49635ef76a450f";
+(node as any).hash = "f7c677753ec93b9dd8b42413077a1926";
 
 export default node;

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<f9a0667073dc3b8e47d9cf2c5ed45423>>
+ * @generated SignedSource<<b7b09c435af3de9a99cabe18630b0024>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -132,20 +131,20 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "AdminAreaLogsSubscription",
-    "selections": (v1/*: any*/),
+    "selections": (v1/*:: as any*/),
     "type": "Subscription",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "AdminAreaLogsSubscription",
-    "selections": (v1/*: any*/)
+    "selections": (v1/*:: as any*/)
   },
   "params": {
     "cacheID": "fd8c2ae7180a2dd25609881846013dc1",

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<60241c944a2fe7f148b38f03e4dc2e21>>
+ * @generated SignedSource<<c1d87004d54fec9ab65dafa3d933cff2>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -28,7 +27,9 @@ export type TerraformModuleListQuery$variables = {
 };
 export type TerraformModuleListQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"TerraformModuleListFragment_terraformModules">;
+    readonly group: {
+      readonly " $fragmentSpreads": FragmentRefs<"TerraformModuleListFragment_terraformModules">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type TerraformModuleListQuery = {
@@ -138,13 +139,13 @@ v10 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/),
-      (v5/*: any*/),
-      (v6/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/),
+      (v5/*:: as any*/),
+      (v6/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -152,23 +153,27 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v7/*: any*/),
+        "args": (v7/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "TerraformModuleListFragment_terraformModules"
-              }
-            ],
-            "type": "Group",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "TerraformModuleListFragment_terraformModules"
+                }
+              ],
+              "type": "Group",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "group"
           }
         ],
         "storageKey": null
@@ -180,33 +185,33 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v5/*: any*/),
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v3/*: any*/),
-      (v6/*: any*/),
-      (v4/*: any*/)
+      (v2/*:: as any*/),
+      (v5/*:: as any*/),
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v3/*:: as any*/),
+      (v6/*:: as any*/),
+      (v4/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "TerraformModuleListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v7/*: any*/),
+        "args": (v7/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v8/*: any*/),
-          (v9/*: any*/),
+          (v8/*:: as any*/),
+          (v9/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v10/*: any*/),
+                "args": (v10/*:: as any*/),
                 "concreteType": "TerraformModuleConnection",
                 "kind": "LinkedField",
                 "name": "terraformModules",
@@ -228,7 +233,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v9/*: any*/),
+                          (v9/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -304,11 +309,11 @@ return {
                                 "name": "version",
                                 "storageKey": null
                               },
-                              (v9/*: any*/)
+                              (v9/*:: as any*/)
                             ],
                             "storageKey": null
                           },
-                          (v8/*: any*/)
+                          (v8/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -366,7 +371,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v10/*: any*/),
+                "args": (v10/*:: as any*/),
                 "filters": [
                   "search",
                   "sort",
@@ -398,6 +403,6 @@ return {
 };
 })();
 
-(node as any).hash = "e5c33960ded8f9d35d782884ca2545f0";
+(node as any).hash = "b2537a70efa195cc67d84dbefa4e518b";
 
 export default node;

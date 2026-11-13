@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<2007860b9dfcd239b70d4ce971c3fc29>>
+ * @generated SignedSource<<4d42dae44dd49a683f09d70377520d3c>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -66,7 +65,7 @@ return {
   "metadata": null,
   "name": "ManagedIdentityRulesFragment_managedIdentity",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -82,7 +81,7 @@ return {
       "name": "accessRules",
       "plural": true,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -130,7 +129,7 @@ return {
           "name": "allowedUsers",
           "plural": true,
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -156,8 +155,8 @@ return {
           "name": "allowedTeams",
           "plural": true,
           "selections": [
-            (v0/*: any*/),
-            (v1/*: any*/)
+            (v0/*:: as any*/),
+            (v1/*:: as any*/)
           ],
           "storageKey": null
         },
@@ -169,8 +168,8 @@ return {
           "name": "allowedServiceAccounts",
           "plural": true,
           "selections": [
-            (v0/*: any*/),
-            (v1/*: any*/),
+            (v0/*:: as any*/),
+            (v1/*:: as any*/),
             {
               "alias": null,
               "args": null,

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<76466aa1599fe5fb0a12db5c00ea2768>>
+ * @generated SignedSource<<23560282131feb2cfb97120b4806702f>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -66,7 +65,7 @@ var v0 = {
   "storageKey": null
 },
 v1 = [
-  (v0/*: any*/),
+  (v0/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -130,21 +129,21 @@ return {
         },
         {
           "kind": "InlineFragment",
-          "selections": (v1/*: any*/),
+          "selections": (v1/*:: as any*/),
           "type": "ActivityEventUpdateTeamMemberPayload",
           "abstractKey": null
         },
         {
           "kind": "InlineFragment",
           "selections": [
-            (v0/*: any*/)
+            (v0/*:: as any*/)
           ],
           "type": "ActivityEventRemoveTeamMemberPayload",
           "abstractKey": null
         },
         {
           "kind": "InlineFragment",
-          "selections": (v1/*: any*/),
+          "selections": (v1/*:: as any*/),
           "type": "ActivityEventAddTeamMemberPayload",
           "abstractKey": null
         }

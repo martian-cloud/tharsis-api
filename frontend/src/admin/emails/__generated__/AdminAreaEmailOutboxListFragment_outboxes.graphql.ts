@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<72e0d38a8188c2b53cb242518ceede7c>>
+ * @generated SignedSource<<4ceaa101a7a431088ba31469952a9b40>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -59,7 +58,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -69,7 +68,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": AdminAreaEmailOutboxListPaginationQuery_graphql

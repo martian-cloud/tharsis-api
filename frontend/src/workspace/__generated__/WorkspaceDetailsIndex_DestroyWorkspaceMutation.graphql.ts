@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<cc11269229599911205665bf28e7b6bb>>
+ * @generated SignedSource<<ab5abb3f79bcb9172163295ce5b5c09b>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -115,20 +114,20 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceDetailsIndex_DestroyWorkspaceMutation",
-    "selections": (v1/*: any*/),
+    "selections": (v1/*:: as any*/),
     "type": "Mutation",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceDetailsIndex_DestroyWorkspaceMutation",
-    "selections": (v1/*: any*/)
+    "selections": (v1/*:: as any*/)
   },
   "params": {
     "cacheID": "9aef538f33826cc68265b9c20f5f5217",

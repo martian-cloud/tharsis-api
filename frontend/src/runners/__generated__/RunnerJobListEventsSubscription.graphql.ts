@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<665225840d56fe084d4366ef91883b65>>
+ * @generated SignedSource<<fdda20346b26022d660915ffca2c1e20>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -62,20 +61,20 @@ v3 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "RunnerJobListEventsSubscription",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "JobEvent",
         "kind": "LinkedField",
         "name": "jobEvents",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -84,7 +83,7 @@ return {
             "name": "job",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
+              (v3/*:: as any*/),
               {
                 "args": null,
                 "kind": "FragmentSpread",
@@ -102,19 +101,19 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "RunnerJobListEventsSubscription",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "JobEvent",
         "kind": "LinkedField",
         "name": "jobEvents",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -123,7 +122,7 @@ return {
             "name": "job",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -199,7 +198,7 @@ return {
                     "name": "fullPath",
                     "storageKey": null
                   },
-                  (v3/*: any*/)
+                  (v3/*:: as any*/)
                 ],
                 "storageKey": null
               },

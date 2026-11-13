@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<a1d479df8a734971cd2170ff7904079f>>
+ * @generated SignedSource<<7975ec250d09dba8f8a36172458a94e3>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -100,14 +99,14 @@ v3 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "EditVariableDialogCreateVariableMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "NamespaceVariableMutationPayload",
         "kind": "LinkedField",
         "name": "createNamespaceVariable",
@@ -121,7 +120,7 @@ return {
             "name": "namespace",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -141,7 +140,7 @@ return {
             ],
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -151,13 +150,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "EditVariableDialogCreateVariableMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "NamespaceVariableMutationPayload",
         "kind": "LinkedField",
         "name": "createNamespaceVariable",
@@ -178,7 +177,7 @@ return {
                 "name": "__typename",
                 "storageKey": null
               },
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -187,7 +186,7 @@ return {
                 "name": "variables",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -254,7 +253,7 @@ return {
             ],
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }

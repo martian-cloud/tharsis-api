@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<e338706a2adfedc2e926bb8242d78514>>
+ * @generated SignedSource<<d7cd1ab0173ff1bac2159fdb6be5aeee>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -59,7 +58,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -69,7 +68,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -120,7 +119,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "args": null,
                   "kind": "FragmentSpread",
@@ -174,7 +173,7 @@ return {
       ],
       "storageKey": "__ManagedIdentityWorkspaceList_workspaces_connection(sort:\"FULL_PATH_ASC\")"
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "ManagedIdentity",
   "abstractKey": null

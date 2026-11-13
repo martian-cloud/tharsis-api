@@ -63,7 +63,7 @@ function WorkspaceSettingsContent({ workspaceId }: WorkspaceSettingsContentProps
     const queryData = useLazyLoadQuery<WorkspaceSettingsQuery>(graphql`
         query WorkspaceSettingsQuery($id: String!) {
             node(id: $id) {
-                ...on Workspace {
+                ...on Workspace @alias(as: "workspace") {
                     ...WorkspaceSettingsContentFragment_workspace
                 }
             }
@@ -88,7 +88,7 @@ function WorkspaceSettingsContent({ workspaceId }: WorkspaceSettingsContentProps
             ...WorkspaceStateSettingsFragment_workspace
             ...WorkspaceLabelSettingsFragment_workspace
         }
-    `, queryData.node
+    `, queryData.node?.workspace
     )
 
     if (!data) {

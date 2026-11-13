@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<80bed9a7fa80925b00978578fabc57ca>>
+ * @generated SignedSource<<3b5460906e8a43dc564450378fea7784>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */

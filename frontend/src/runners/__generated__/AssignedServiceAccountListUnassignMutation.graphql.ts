@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<ab85daac4846e8d3d58a903296836494>>
+ * @generated SignedSource<<4f82c87dd2159ca2688d136e13185292>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -127,8 +126,8 @@ v5 = {
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -136,7 +135,7 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v2/*: any*/),
+        "args": (v2/*:: as any*/),
         "concreteType": "AssignServiceAccountToRunnerPayload",
         "kind": "LinkedField",
         "name": "unassignServiceAccountFromRunner",
@@ -150,7 +149,7 @@ return {
             "name": "runner",
             "plural": false,
             "selections": [
-              (v3/*: any*/)
+              (v3/*:: as any*/)
             ],
             "storageKey": null
           },
@@ -162,11 +161,11 @@ return {
             "name": "serviceAccount",
             "plural": false,
             "selections": [
-              (v4/*: any*/)
+              (v4/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v5/*: any*/)
+          (v5/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -177,15 +176,15 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "AssignedServiceAccountListUnassignMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v2/*: any*/),
+        "args": (v2/*:: as any*/),
         "concreteType": "AssignServiceAccountToRunnerPayload",
         "kind": "LinkedField",
         "name": "unassignServiceAccountFromRunner",
@@ -199,8 +198,8 @@ return {
             "name": "runner",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
-              (v4/*: any*/)
+              (v3/*:: as any*/),
+              (v4/*:: as any*/)
             ],
             "storageKey": null
           },
@@ -212,7 +211,7 @@ return {
             "name": "serviceAccount",
             "plural": false,
             "selections": [
-              (v4/*: any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -232,7 +231,7 @@ return {
             ],
             "storageKey": null
           },
-          (v5/*: any*/)
+          (v5/*:: as any*/)
         ],
         "storageKey": null
       }

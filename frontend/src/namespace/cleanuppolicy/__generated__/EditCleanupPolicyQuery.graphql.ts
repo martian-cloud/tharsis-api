@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<1d8d02f21842dd9f568876c3f2db5938>>
+ * @generated SignedSource<<64628eb368aa4279f80a00c53e82901f>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -129,7 +128,7 @@ v7 = [
     "name": "namespace",
     "plural": false,
     "selections": [
-      (v1/*: any*/),
+      (v1/*:: as any*/),
       {
         "alias": null,
         "args": null,
@@ -152,7 +151,7 @@ v7 = [
         "name": "effectiveCleanupPolicies",
         "plural": true,
         "selections": [
-          (v1/*: any*/),
+          (v1/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -197,9 +196,9 @@ v7 = [
                 "name": "rules",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
-                  (v3/*: any*/),
-                  (v4/*: any*/),
+                  (v2/*:: as any*/),
+                  (v3/*:: as any*/),
+                  (v4/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -207,8 +206,8 @@ v7 = [
                     "name": "systemGlob",
                     "storageKey": null
                   },
-                  (v5/*: any*/),
-                  (v6/*: any*/)
+                  (v5/*:: as any*/),
+                  (v6/*:: as any*/)
                 ],
                 "storageKey": null
               }
@@ -231,11 +230,11 @@ v7 = [
                 "name": "rules",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
-                  (v3/*: any*/),
-                  (v4/*: any*/),
-                  (v5/*: any*/),
-                  (v6/*: any*/)
+                  (v2/*:: as any*/),
+                  (v3/*:: as any*/),
+                  (v4/*:: as any*/),
+                  (v5/*:: as any*/),
+                  (v6/*:: as any*/)
                 ],
                 "storageKey": null
               }
@@ -258,8 +257,8 @@ v7 = [
                 "name": "rules",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
-                  (v3/*: any*/),
+                  (v2/*:: as any*/),
+                  (v3/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -288,7 +287,7 @@ v7 = [
                     "name": "keepMin",
                     "storageKey": null
                   },
-                  (v6/*: any*/)
+                  (v6/*:: as any*/)
                 ],
                 "storageKey": null
               }
@@ -304,20 +303,20 @@ v7 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "EditCleanupPolicyQuery",
-    "selections": (v7/*: any*/),
+    "selections": (v7/*:: as any*/),
     "type": "Query",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "EditCleanupPolicyQuery",
-    "selections": (v7/*: any*/)
+    "selections": (v7/*:: as any*/)
   },
   "params": {
     "cacheID": "7d61d6730fa1f459a34d687733662983",

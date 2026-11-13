@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<628b56406105fbb932e185f78523b525>>
+ * @generated SignedSource<<b2a6bce8128a935c1b005d6a19cc01b1>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -110,8 +109,8 @@ return {
   "metadata": null,
   "name": "PolicyDetailsFragment_policy",
   "selections": [
-    (v0/*: any*/),
-    (v1/*: any*/),
+    (v0/*:: as any*/),
+    (v1/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -178,9 +177,9 @@ return {
           "name": "packageDigest",
           "storageKey": null
         },
-        (v2/*: any*/),
-        (v3/*: any*/),
-        (v4/*: any*/)
+        (v2/*:: as any*/),
+        (v3/*:: as any*/),
+        (v4/*:: as any*/)
       ],
       "storageKey": null
     },
@@ -213,9 +212,9 @@ return {
           "name": "verifyStateLineage",
           "storageKey": null
         },
-        (v2/*: any*/),
-        (v3/*: any*/),
-        (v4/*: any*/)
+        (v2/*:: as any*/),
+        (v3/*:: as any*/),
+        (v4/*:: as any*/)
       ],
       "storageKey": null
     },
@@ -266,7 +265,7 @@ return {
       "name": "allowedUsers",
       "plural": true,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -292,8 +291,8 @@ return {
       "name": "allowedTeams",
       "plural": true,
       "selections": [
-        (v0/*: any*/),
-        (v1/*: any*/)
+        (v0/*:: as any*/),
+        (v1/*:: as any*/)
       ],
       "storageKey": null
     },
@@ -305,8 +304,8 @@ return {
       "name": "allowedServiceAccounts",
       "plural": true,
       "selections": [
-        (v0/*: any*/),
-        (v1/*: any*/),
+        (v0/*:: as any*/),
+        (v1/*:: as any*/),
         {
           "alias": null,
           "args": null,

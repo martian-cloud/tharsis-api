@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<8f32f2422fcf7614e109b2da5b9ba277>>
+ * @generated SignedSource<<69e70bafe65f4e74e0c39101dc0fa6ff>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -121,14 +120,14 @@ v2 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceProviderMirrorSettingsMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateWorkspacePayload",
         "kind": "LinkedField",
         "name": "updateWorkspace",
@@ -161,7 +160,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -171,13 +170,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceProviderMirrorSettingsMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateWorkspacePayload",
         "kind": "LinkedField",
         "name": "updateWorkspace",
@@ -233,7 +232,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }

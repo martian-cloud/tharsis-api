@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<b9b6a7be713d8c4b4e027f051d02c351>>
+ * @generated SignedSource<<1d015f9236ecc300c87a0b9c172b210a>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -19,13 +18,15 @@ export type GroupPackageVersionDetailsQuery$variables = {
 };
 export type GroupPackageVersionDetailsQuery$data = {
   readonly node: {
-    readonly groupPath?: string;
-    readonly id?: string;
-    readonly metadata?: {
-      readonly trn: string;
-    };
-    readonly name?: string;
-    readonly " $fragmentSpreads": FragmentRefs<"PackageDetailsIndexFragment_package">;
+    readonly package: {
+      readonly groupPath: string;
+      readonly id: string;
+      readonly metadata: {
+        readonly trn: string;
+      };
+      readonly name: string;
+      readonly " $fragmentSpreads": FragmentRefs<"PackageDetailsIndexFragment_package">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type GroupPackageVersionDetailsQuery = {
@@ -150,7 +151,7 @@ v15 = {
   "name": "createdByActor",
   "plural": false,
   "selections": [
-    (v10/*: any*/),
+    (v10/*:: as any*/),
     {
       "kind": "TypeDiscriminator",
       "abstractKey": "__isActor"
@@ -187,7 +188,7 @@ v15 = {
               "name": "email",
               "storageKey": null
             },
-            (v6/*: any*/)
+            (v6/*:: as any*/)
           ],
           "storageKey": null
         }
@@ -197,19 +198,19 @@ v15 = {
     },
     {
       "kind": "InlineFragment",
-      "selections": (v14/*: any*/),
+      "selections": (v14/*:: as any*/),
       "type": "ServiceAccountActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v14/*: any*/),
+      "selections": (v14/*:: as any*/),
       "type": "VCSProviderActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v14/*: any*/),
+      "selections": (v14/*:: as any*/),
       "type": "JobActor",
       "abstractKey": null
     }
@@ -264,11 +265,11 @@ v17 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -276,27 +277,31 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v5/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v6/*: any*/),
-              (v7/*: any*/),
-              (v8/*: any*/),
-              (v9/*: any*/),
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "PackageDetailsIndexFragment_package"
-              }
-            ],
-            "type": "Package",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v6/*:: as any*/),
+                (v7/*:: as any*/),
+                (v8/*:: as any*/),
+                (v9/*:: as any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "PackageDetailsIndexFragment_package"
+                }
+              ],
+              "type": "Package",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "package"
           }
         ],
         "storageKey": null
@@ -308,31 +313,31 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v3/*: any*/),
-      (v2/*: any*/),
-      (v4/*: any*/),
-      (v0/*: any*/),
-      (v1/*: any*/)
+      (v3/*:: as any*/),
+      (v2/*:: as any*/),
+      (v4/*:: as any*/),
+      (v0/*:: as any*/),
+      (v1/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "GroupPackageVersionDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v5/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v10/*: any*/),
-          (v6/*: any*/),
+          (v10/*:: as any*/),
+          (v6/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v7/*: any*/),
-              (v8/*: any*/),
-              (v9/*: any*/),
+              (v7/*:: as any*/),
+              (v8/*:: as any*/),
+              (v9/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -355,9 +360,9 @@ return {
                 "name": "latestVersion",
                 "plural": false,
                 "selections": [
-                  (v6/*: any*/),
-                  (v11/*: any*/),
-                  (v12/*: any*/),
+                  (v6/*:: as any*/),
+                  (v11/*:: as any*/),
+                  (v12/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -365,8 +370,8 @@ return {
                     "name": "error",
                     "storageKey": null
                   },
-                  (v13/*: any*/),
-                  (v15/*: any*/),
+                  (v13/*:: as any*/),
+                  (v15/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -381,7 +386,7 @@ return {
                     "name": "size",
                     "storageKey": null
                   },
-                  (v16/*: any*/)
+                  (v16/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -401,7 +406,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v17/*: any*/),
+                "args": (v17/*:: as any*/),
                 "concreteType": "PackageVersionConnection",
                 "kind": "LinkedField",
                 "name": "versions",
@@ -423,13 +428,13 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v6/*: any*/),
-                          (v16/*: any*/),
-                          (v11/*: any*/),
-                          (v15/*: any*/),
-                          (v13/*: any*/),
-                          (v12/*: any*/),
-                          (v10/*: any*/)
+                          (v6/*:: as any*/),
+                          (v16/*:: as any*/),
+                          (v11/*:: as any*/),
+                          (v15/*:: as any*/),
+                          (v13/*:: as any*/),
+                          (v12/*:: as any*/),
+                          (v10/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -487,7 +492,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v17/*: any*/),
+                "args": (v17/*:: as any*/),
                 "filters": [
                   "sort"
                 ],
@@ -516,6 +521,6 @@ return {
 };
 })();
 
-(node as any).hash = "5710860ba0375070b2a761b39f62d430";
+(node as any).hash = "e2fc25d0b62f8447ae9a8c7ab6f01d41";
 
 export default node;

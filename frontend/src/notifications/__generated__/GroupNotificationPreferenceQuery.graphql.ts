@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<6b3f1f520b84e193088a90869a087841>>
+ * @generated SignedSource<<b2783fbd128bcce1ca2e04b493e20b57>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -53,7 +52,7 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "GroupNotificationPreferenceQuery",
@@ -68,7 +67,7 @@ return {
         "selections": [
           {
             "alias": null,
-            "args": (v1/*: any*/),
+            "args": (v1/*:: as any*/),
             "concreteType": "UserNamespacePreferenceConnection",
             "kind": "LinkedField",
             "name": "groupPreferences",
@@ -124,7 +123,7 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "GroupNotificationPreferenceQuery",
     "selections": [
@@ -138,7 +137,7 @@ return {
         "selections": [
           {
             "alias": null,
-            "args": (v1/*: any*/),
+            "args": (v1/*:: as any*/),
             "concreteType": "UserNamespacePreferenceConnection",
             "kind": "LinkedField",
             "name": "groupPreferences",

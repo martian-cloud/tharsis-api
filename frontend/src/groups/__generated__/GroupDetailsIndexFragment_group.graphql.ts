@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<405d5947993a75944b05505ff572ce90>>
+ * @generated SignedSource<<7ddad21b8e3ae99f746dcb6049798613>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -103,22 +102,22 @@ return {
     },
     {
       "alias": null,
-      "args": (v0/*: any*/),
+      "args": (v0/*:: as any*/),
       "concreteType": "GroupConnection",
       "kind": "LinkedField",
       "name": "descendentGroups",
       "plural": false,
-      "selections": (v1/*: any*/),
+      "selections": (v1/*:: as any*/),
       "storageKey": "descendentGroups(first:0)"
     },
     {
       "alias": null,
-      "args": (v0/*: any*/),
+      "args": (v0/*:: as any*/),
       "concreteType": "WorkspaceConnection",
       "kind": "LinkedField",
       "name": "workspaces",
       "plural": false,
-      "selections": (v1/*: any*/),
+      "selections": (v1/*:: as any*/),
       "storageKey": "workspaces(first:0)"
     },
     {

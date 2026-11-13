@@ -21,7 +21,9 @@ const LOAD_MORE_COUNT = 25;
 const query = graphql`
     query PolicyListQuery($first: Int!, $after: String, $id: String!) {
         node(id: $id) {
-            ...PolicyListFragment_policies
+            ... on Group @alias(as: "group") {
+                ...PolicyListFragment_policies
+            }
         }
     }
 `;
@@ -66,7 +68,7 @@ function PolicyList({ ownerId, ownerPath }: Props) {
                 }
             }
         }
-        `, queryData.node);
+        `, queryData.node?.group);
 
     const [commitDelete, deleteInFlight] = useMutation<PolicyListDeleteMutation>(graphql`
         mutation PolicyListDeleteMutation($input: DeletePolicyInput!, $connections: [ID!]!) {

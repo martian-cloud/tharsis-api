@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<7369d43dbcb184cccf22166a56d20629>>
+ * @generated SignedSource<<bc9c09d72c385894e8bbaed60a66c877>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -99,14 +98,14 @@ v4 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceStateSettingsLockWorkspaceMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "LockWorkspacePayload",
         "kind": "LinkedField",
         "name": "lockWorkspace",
@@ -120,12 +119,12 @@ return {
             "name": "workspace",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/)
+              (v2/*:: as any*/),
+              (v3/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -135,13 +134,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceStateSettingsLockWorkspaceMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "LockWorkspacePayload",
         "kind": "LinkedField",
         "name": "lockWorkspace",
@@ -155,8 +154,8 @@ return {
             "name": "workspace",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/),
+              (v2/*:: as any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -167,7 +166,7 @@ return {
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<997579b0b0272dbfa901d4bb8a5c2a64>>
+ * @generated SignedSource<<86f4f40079b76a35c0832e3f9247819d>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -82,7 +81,7 @@ v2 = {
               "kind": "LinkedField",
               "name": "node",
               "plural": false,
-              "selections": (v1/*: any*/),
+              "selections": (v1/*:: as any*/),
               "storageKey": null
             }
           ],
@@ -97,7 +96,7 @@ v2 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "NamespaceFavoriteButtonQuery",
@@ -110,7 +109,7 @@ return {
         "name": "me",
         "plural": false,
         "selections": [
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -120,7 +119,7 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "NamespaceFavoriteButtonQuery",
     "selections": [
@@ -139,10 +138,10 @@ return {
             "name": "__typename",
             "storageKey": null
           },
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
-            "selections": (v1/*: any*/),
+            "selections": (v1/*:: as any*/),
             "type": "Node",
             "abstractKey": "__isNode"
           }

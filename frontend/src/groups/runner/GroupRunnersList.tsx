@@ -34,7 +34,7 @@ function GroupRunnersList({ fragmentRef }: Props) {
     const queryData = useLazyLoadQuery<GroupRunnersListQuery>(graphql`
         query GroupRunnersListQuery($id: String!, $first: Int!, $after: String) {
             node(id: $id) {
-                ... on Group {
+                ... on Group @alias(as: "group") {
                     ...GroupRunnersListFragment_runners
                     fullPath
                 }
@@ -59,7 +59,7 @@ function GroupRunnersList({ fragmentRef }: Props) {
                     ...RunnerListFragment_runners
                 }
             }
-        `, queryData.node);
+        `, queryData.node?.group);
 
     if (!data) return null;
 
@@ -71,7 +71,7 @@ function GroupRunnersList({ fragmentRef }: Props) {
                     { title: "runners", path: 'runners' }
                 ]}
             />
-            <RunnerList fragmentRef={data.runners} loadNext={loadNext} hasNext={hasNext} groupPath={queryData?.node?.fullPath} />
+            <RunnerList fragmentRef={data.runners} loadNext={loadNext} hasNext={hasNext} groupPath={queryData?.node?.group?.fullPath} />
         </Box>
     );
 }

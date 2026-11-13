@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<73b15cd059dfe005e25481c2171b7958>>
+ * @generated SignedSource<<75cd6ab9a394ee32e1607abee0d91506>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -80,7 +79,7 @@ v3 = {
       "name": "field",
       "storageKey": null
     },
-    (v2/*: any*/)
+    (v2/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -115,7 +114,7 @@ v7 = {
   "storageKey": null
 },
 v8 = [
-  (v5/*: any*/),
+  (v5/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -124,7 +123,7 @@ v8 = [
     "name": "metadata",
     "plural": false,
     "selections": [
-      (v7/*: any*/)
+      (v7/*:: as any*/)
     ],
     "storageKey": null
   },
@@ -150,11 +149,11 @@ v8 = [
         "name": "cancelRequested",
         "storageKey": null
       },
-      (v4/*: any*/)
+      (v4/*:: as any*/)
     ],
     "storageKey": null
   },
-  (v4/*: any*/)
+  (v4/*:: as any*/)
 ],
 v9 = {
   "alias": null,
@@ -165,14 +164,14 @@ v9 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "RunDetailsSidebarSetRunAutoApplyMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunMutationPayload",
         "kind": "LinkedField",
         "name": "setRunAutoApply",
@@ -194,7 +193,7 @@ return {
             ],
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -204,13 +203,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "RunDetailsSidebarSetRunAutoApplyMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunMutationPayload",
         "kind": "LinkedField",
         "name": "setRunAutoApply",
@@ -224,8 +223,8 @@ return {
             "name": "run",
             "plural": false,
             "selections": [
-              (v4/*: any*/),
-              (v5/*: any*/),
+              (v4/*:: as any*/),
+              (v5/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -245,7 +244,7 @@ return {
                     "kind": "TypeDiscriminator",
                     "abstractKey": "__isActor"
                   },
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -271,7 +270,7 @@ return {
                             "name": "email",
                             "storageKey": null
                           },
-                          (v4/*: any*/)
+                          (v4/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -281,19 +280,19 @@ return {
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v6/*: any*/),
+                    "selections": (v6/*:: as any*/),
                     "type": "ServiceAccountActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v6/*: any*/),
+                    "selections": (v6/*:: as any*/),
                     "type": "VCSProviderActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v6/*: any*/),
+                    "selections": (v6/*:: as any*/),
                     "type": "JobActor",
                     "abstractKey": null
                   }
@@ -389,7 +388,7 @@ return {
                     "name": "fullPath",
                     "storageKey": null
                   },
-                  (v4/*: any*/)
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -401,7 +400,7 @@ return {
                 "name": "metadata",
                 "plural": false,
                 "selections": [
-                  (v7/*: any*/),
+                  (v7/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -420,7 +419,7 @@ return {
                 "name": "configurationVersion",
                 "plural": false,
                 "selections": [
-                  (v4/*: any*/)
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -431,7 +430,7 @@ return {
                 "kind": "LinkedField",
                 "name": "plan",
                 "plural": false,
-                "selections": (v8/*: any*/),
+                "selections": (v8/*:: as any*/),
                 "storageKey": null
               },
               {
@@ -442,8 +441,8 @@ return {
                 "name": "taskStages",
                 "plural": true,
                 "selections": [
-                  (v9/*: any*/),
-                  (v5/*: any*/),
+                  (v9/*:: as any*/),
+                  (v5/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -452,8 +451,8 @@ return {
                     "name": "policyChecks",
                     "plural": true,
                     "selections": [
-                      (v5/*: any*/),
-                      (v9/*: any*/)
+                      (v5/*:: as any*/),
+                      (v9/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -467,13 +466,13 @@ return {
                 "kind": "LinkedField",
                 "name": "apply",
                 "plural": false,
-                "selections": (v8/*: any*/),
+                "selections": (v8/*:: as any*/),
                 "storageKey": null
               }
             ],
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }

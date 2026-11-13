@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<997fa2910d3473d8f069d424f73e8b93>>
+ * @generated SignedSource<<7b7e272ca2d43070ce814a1c97ae03fc>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -99,8 +98,8 @@ v4 = {
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -108,7 +107,7 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v2/*: any*/),
+        "args": (v2/*:: as any*/),
         "concreteType": "DeleteAnnouncementPayload",
         "kind": "LinkedField",
         "name": "deleteAnnouncement",
@@ -122,11 +121,11 @@ return {
             "name": "announcement",
             "plural": false,
             "selections": [
-              (v3/*: any*/)
+              (v3/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -137,15 +136,15 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "AdminAreaAnnouncementListDeleteMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v2/*: any*/),
+        "args": (v2/*:: as any*/),
         "concreteType": "DeleteAnnouncementPayload",
         "kind": "LinkedField",
         "name": "deleteAnnouncement",
@@ -159,7 +158,7 @@ return {
             "name": "announcement",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -179,7 +178,7 @@ return {
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }

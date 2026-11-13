@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<35ee726e7765586cc079005a29494147>>
+ * @generated SignedSource<<70eacec68aa0e588babe52deb432b0e1>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -103,14 +102,14 @@ v4 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceDetailsDriftDetectionMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "AssessWorkspacePayload",
         "kind": "LinkedField",
         "name": "assessWorkspace",
@@ -124,7 +123,7 @@ return {
             "name": "run",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -133,7 +132,7 @@ return {
                 "name": "workspace",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
+                  (v3/*:: as any*/),
                   {
                     "args": null,
                     "kind": "FragmentSpread",
@@ -145,7 +144,7 @@ return {
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -155,13 +154,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceDetailsDriftDetectionMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "AssessWorkspacePayload",
         "kind": "LinkedField",
         "name": "assessWorkspace",
@@ -175,7 +174,7 @@ return {
             "name": "run",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -184,8 +183,8 @@ return {
                 "name": "workspace",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
-                  (v2/*: any*/),
+                  (v3/*:: as any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -223,7 +222,7 @@ return {
                         "name": "run",
                         "plural": false,
                         "selections": [
-                          (v2/*: any*/),
+                          (v2/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -234,7 +233,7 @@ return {
                         ],
                         "storageKey": null
                       },
-                      (v2/*: any*/)
+                      (v2/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -244,7 +243,7 @@ return {
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }

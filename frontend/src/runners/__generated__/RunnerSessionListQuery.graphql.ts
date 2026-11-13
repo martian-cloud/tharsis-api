@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<2b2a4dd2d8e1942232283c43bc48e0f7>>
+ * @generated SignedSource<<9ce5ffea360193c25e7f2ea2c2e9b39d>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -17,8 +16,10 @@ export type RunnerSessionListQuery$variables = {
 };
 export type RunnerSessionListQuery$data = {
   readonly node: {
-    readonly id?: string;
-    readonly " $fragmentSpreads": FragmentRefs<"RunnerSessionListFragment_sessions">;
+    readonly runner: {
+      readonly id: string;
+      readonly " $fragmentSpreads": FragmentRefs<"RunnerSessionListFragment_sessions">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type RunnerSessionListQuery = {
@@ -83,9 +84,9 @@ v6 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -93,24 +94,28 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v4/*: any*/),
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "RunnerSessionListFragment_sessions"
-              }
-            ],
-            "type": "Runner",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v4/*:: as any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "RunnerSessionListFragment_sessions"
+                }
+              ],
+              "type": "Runner",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "runner"
           }
         ],
         "storageKey": null
@@ -122,23 +127,23 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v2/*:: as any*/),
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "RunnerSessionListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v5/*: any*/),
-          (v4/*: any*/),
+          (v5/*:: as any*/),
+          (v4/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -151,7 +156,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v6/*: any*/),
+                "args": (v6/*:: as any*/),
                 "concreteType": "RunnerSessionConnection",
                 "kind": "LinkedField",
                 "name": "sessions",
@@ -180,7 +185,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v4/*: any*/),
+                          (v4/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -227,7 +232,7 @@ return {
                             ],
                             "storageKey": null
                           },
-                          (v5/*: any*/)
+                          (v5/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -271,7 +276,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v6/*: any*/),
+                "args": (v6/*:: as any*/),
                 "filters": [
                   "sort"
                 ],
@@ -300,6 +305,6 @@ return {
 };
 })();
 
-(node as any).hash = "3bfc5d3c017a20f0ba21e7a8bba13d1c";
+(node as any).hash = "aa1f6c8d9a4fb07ff3a27d5aea5d3e57";
 
 export default node;

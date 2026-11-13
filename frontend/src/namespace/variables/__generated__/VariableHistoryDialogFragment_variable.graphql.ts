@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<97d89d12a75d3385c10d84ad4d61c165>>
+ * @generated SignedSource<<94bb5cb3a74641f3d3cc5e16aa9f38a6>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -67,7 +66,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -77,7 +76,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -139,7 +138,7 @@ return {
                   ],
                   "storageKey": null
                 },
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -216,7 +215,7 @@ return {
       ],
       "storageKey": "__VariableHistoryDialog_versions_connection(sort:\"CREATED_AT_DESC\")"
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "NamespaceVariable",
   "abstractKey": null

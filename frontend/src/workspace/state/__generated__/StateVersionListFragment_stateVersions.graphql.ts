@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<dd1d238b5f8c28e5b59f17de3c90a03f>>
+ * @generated SignedSource<<f733a9aaa172eabbc95c23cafd6b3bc8>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -66,7 +65,7 @@ return {
         "count": null,
         "cursor": null,
         "direction": "bidirectional",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -79,7 +78,7 @@ return {
           "count": "last",
           "cursor": "before"
         },
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -123,7 +122,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "args": null,
                   "kind": "FragmentSpread",
@@ -191,7 +190,7 @@ return {
       ],
       "storageKey": "__StateVersionList_stateVersions_connection(sort:\"UPDATED_AT_ASC\")"
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "Workspace",
   "abstractKey": null

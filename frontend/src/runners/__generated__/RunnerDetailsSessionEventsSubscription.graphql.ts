@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<7b65155e2d41758777e864c86c26c763>>
+ * @generated SignedSource<<9d643481bbcf97b42306041eeebd83b9>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -64,20 +63,20 @@ v3 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "RunnerDetailsSessionEventsSubscription",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunnerSessionEvent",
         "kind": "LinkedField",
         "name": "runnerSessionEvents",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -86,7 +85,7 @@ return {
             "name": "runnerSession",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
+              (v3/*:: as any*/),
               {
                 "args": null,
                 "kind": "FragmentSpread",
@@ -104,19 +103,19 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "RunnerDetailsSessionEventsSubscription",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunnerSessionEvent",
         "kind": "LinkedField",
         "name": "runnerSessionEvents",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -125,7 +124,7 @@ return {
             "name": "runnerSession",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,

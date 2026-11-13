@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<17fc81a9dc3d98d8cee4505df0470d46>>
+ * @generated SignedSource<<079047cc6561218afbf321067babc456>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -19,7 +18,9 @@ export type StateVersionListQuery$variables = {
 };
 export type StateVersionListQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"StateVersionListFragment_stateVersions">;
+    readonly workspace: {
+      readonly " $fragmentSpreads": FragmentRefs<"StateVersionListFragment_stateVersions">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type StateVersionListQuery = {
@@ -118,7 +119,7 @@ v10 = {
   "name": "createdByActor",
   "plural": false,
   "selections": [
-    (v6/*: any*/),
+    (v6/*:: as any*/),
     {
       "kind": "TypeDiscriminator",
       "abstractKey": "__isActor"
@@ -155,7 +156,7 @@ v10 = {
               "name": "email",
               "storageKey": null
             },
-            (v7/*: any*/)
+            (v7/*:: as any*/)
           ],
           "storageKey": null
         }
@@ -165,19 +166,19 @@ v10 = {
     },
     {
       "kind": "InlineFragment",
-      "selections": (v9/*: any*/),
+      "selections": (v9/*:: as any*/),
       "type": "ServiceAccountActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v9/*: any*/),
+      "selections": (v9/*:: as any*/),
       "type": "VCSProviderActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v9/*: any*/),
+      "selections": (v9/*:: as any*/),
       "type": "JobActor",
       "abstractKey": null
     }
@@ -187,11 +188,11 @@ v10 = {
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -199,23 +200,27 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v5/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "StateVersionListFragment_stateVersions"
-              }
-            ],
-            "type": "Workspace",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "StateVersionListFragment_stateVersions"
+                }
+              ],
+              "type": "Workspace",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "workspace"
           }
         ],
         "storageKey": null
@@ -227,31 +232,31 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v4/*: any*/)
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v4/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "StateVersionListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v5/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v6/*: any*/),
-          (v7/*: any*/),
+          (v6/*:: as any*/),
+          (v7/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v8/*: any*/),
+                "args": (v8/*:: as any*/),
                 "concreteType": "StateVersionConnection",
                 "kind": "LinkedField",
                 "name": "stateVersions",
@@ -273,8 +278,8 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v7/*: any*/),
-                          (v10/*: any*/),
+                          (v7/*:: as any*/),
+                          (v10/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -308,12 +313,12 @@ return {
                             "name": "run",
                             "plural": false,
                             "selections": [
-                              (v7/*: any*/),
-                              (v10/*: any*/)
+                              (v7/*:: as any*/),
+                              (v10/*:: as any*/)
                             ],
                             "storageKey": null
                           },
-                          (v6/*: any*/)
+                          (v6/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -371,7 +376,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v8/*: any*/),
+                "args": (v8/*:: as any*/),
                 "filters": [
                   "sort"
                 ],
@@ -400,6 +405,6 @@ return {
 };
 })();
 
-(node as any).hash = "686bb8386feb70d3292cad633788384c";
+(node as any).hash = "2a92727ad389b8d20ef6fe15932f2b2d";
 
 export default node;

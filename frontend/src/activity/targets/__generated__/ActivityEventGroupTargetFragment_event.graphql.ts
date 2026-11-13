@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<1f2ba0ad4183a0f8d111298250daa864>>
+ * @generated SignedSource<<e04ec984e82f21241555235cd6764e58>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -94,7 +93,7 @@ v2 = {
   "name": "member",
   "plural": false,
   "selections": [
-    (v1/*: any*/),
+    (v1/*:: as any*/),
     {
       "kind": "InlineFragment",
       "selections": [
@@ -126,7 +125,7 @@ v2 = {
     {
       "kind": "InlineFragment",
       "selections": [
-        (v0/*: any*/)
+        (v0/*:: as any*/)
       ],
       "type": "Team",
       "abstractKey": null
@@ -158,7 +157,7 @@ return {
         {
           "kind": "InlineFragment",
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -188,11 +187,11 @@ return {
       "name": "payload",
       "plural": false,
       "selections": [
-        (v1/*: any*/),
+        (v1/*:: as any*/),
         {
           "kind": "InlineFragment",
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -207,7 +206,7 @@ return {
         {
           "kind": "InlineFragment",
           "selections": [
-            (v2/*: any*/),
+            (v2/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -222,7 +221,7 @@ return {
         {
           "kind": "InlineFragment",
           "selections": [
-            (v2/*: any*/)
+            (v2/*:: as any*/)
           ],
           "type": "ActivityEventRemoveNamespaceMembershipPayload",
           "abstractKey": null

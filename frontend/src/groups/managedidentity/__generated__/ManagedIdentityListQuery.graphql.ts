@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<256d706ee9e92fb8da23198a62de51d6>>
+ * @generated SignedSource<<e818f98973a9d3de399af145e8e840e0>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -20,7 +19,9 @@ export type ManagedIdentityListQuery$variables = {
 };
 export type ManagedIdentityListQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"ManagedIdentityListFragment_managedIdentities">;
+    readonly group: {
+      readonly " $fragmentSpreads": FragmentRefs<"ManagedIdentityListFragment_managedIdentities">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type ManagedIdentityListQuery = {
@@ -120,12 +121,12 @@ v9 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/),
-      (v5/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/),
+      (v5/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -133,23 +134,27 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v6/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "ManagedIdentityListFragment_managedIdentities"
-              }
-            ],
-            "type": "Group",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "ManagedIdentityListFragment_managedIdentities"
+                }
+              ],
+              "type": "Group",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "group"
           }
         ],
         "storageKey": null
@@ -161,32 +166,32 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v4/*: any*/),
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v3/*: any*/),
-      (v5/*: any*/)
+      (v2/*:: as any*/),
+      (v4/*:: as any*/),
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v3/*:: as any*/),
+      (v5/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "ManagedIdentityListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v6/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v7/*: any*/),
-          (v8/*: any*/),
+          (v7/*:: as any*/),
+          (v8/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v9/*: any*/),
+                "args": (v9/*:: as any*/),
                 "concreteType": "ManagedIdentityConnection",
                 "kind": "LinkedField",
                 "name": "managedIdentities",
@@ -208,7 +213,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v8/*: any*/),
+                          (v8/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -269,7 +274,7 @@ return {
                             "name": "resourcePath",
                             "storageKey": null
                           },
-                          (v7/*: any*/)
+                          (v7/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -327,7 +332,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v9/*: any*/),
+                "args": (v9/*:: as any*/),
                 "filters": [
                   "search",
                   "includeInherited",
@@ -358,6 +363,6 @@ return {
 };
 })();
 
-(node as any).hash = "cd741d437a029d760c0b5601bd23f04a";
+(node as any).hash = "1afb396ffe5986789c74460da6c51341";
 
 export default node;

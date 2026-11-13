@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<12ba1db267cb3e0a61f9bc2e0654a74e>>
+ * @generated SignedSource<<62a13aff8b26c52f1a9027f1a2b54701>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -66,7 +65,7 @@ return {
       "name": "workspaceVcsProviderLink",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -124,7 +123,7 @@ return {
           "name": "vcsProvider",
           "plural": false,
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "alias": null,
               "args": null,

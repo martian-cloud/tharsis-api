@@ -20,7 +20,7 @@ const INITIAL_ITEM_COUNT = 100;
 const query = graphql`
     query ManagedIdentityListQuery($first: Int, $last: Int, $after: String, $before: String, $groupId: String!, $search: String) {
         node(id: $groupId) {
-            ...on Group {
+            ...on Group @alias(as: "group") {
                 ...ManagedIdentityListFragment_managedIdentities
             }
         }
@@ -78,7 +78,7 @@ function ManagedIdentityList(props: Props) {
                 }
             }
         }
-        `, queryData.node
+        `, queryData.node?.group
     );
 
     const environment = useRelayEnvironment();

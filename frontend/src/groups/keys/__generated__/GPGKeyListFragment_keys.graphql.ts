@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<65dd38c20529f8c1e6caf2745df0f8c5>>
+ * @generated SignedSource<<bdfa415ec5635adab74e5b1a56b68157>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -69,7 +68,7 @@ return {
         "count": null,
         "cursor": null,
         "direction": "bidirectional",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -82,7 +81,7 @@ return {
           "count": "last",
           "cursor": "before"
         },
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -138,7 +137,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -220,7 +219,7 @@ return {
       ],
       "storageKey": "__GPGKeyList_gpgKeys_connection(includeInherited:true,sort:\"GROUP_LEVEL_DESC\")"
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "Group",
   "abstractKey": null

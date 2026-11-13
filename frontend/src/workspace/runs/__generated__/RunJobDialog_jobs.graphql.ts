@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<40c01c4ee38da072c840ef58f9bf6aab>>
+ * @generated SignedSource<<17d5ec26343598087a922b2aede2c638>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -54,7 +53,7 @@ return {
   },
   "name": "RunJobDialog_jobs",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -77,7 +76,7 @@ return {
       "name": "runner",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,

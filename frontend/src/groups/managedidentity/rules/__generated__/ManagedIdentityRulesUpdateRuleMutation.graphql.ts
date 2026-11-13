@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<e07d0cc02bc5669fad5940952872a894>>
+ * @generated SignedSource<<079498fa646005a9e1caea76b81a42bb>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -121,8 +120,8 @@ v4 = [
         "name": "accessRule",
         "plural": false,
         "selections": [
-          (v1/*: any*/),
-          (v2/*: any*/),
+          (v1/*:: as any*/),
+          (v2/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -138,7 +137,7 @@ v4 = [
             "name": "allowedUsers",
             "plural": true,
             "selections": [
-              (v1/*: any*/),
+              (v1/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -164,8 +163,8 @@ v4 = [
             "name": "allowedTeams",
             "plural": true,
             "selections": [
-              (v1/*: any*/),
-              (v3/*: any*/)
+              (v1/*:: as any*/),
+              (v3/*:: as any*/)
             ],
             "storageKey": null
           },
@@ -177,8 +176,8 @@ v4 = [
             "name": "allowedServiceAccounts",
             "plural": true,
             "selections": [
-              (v1/*: any*/),
-              (v3/*: any*/),
+              (v1/*:: as any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -239,7 +238,7 @@ v4 = [
             "name": "field",
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -249,20 +248,20 @@ v4 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "ManagedIdentityRulesUpdateRuleMutation",
-    "selections": (v4/*: any*/),
+    "selections": (v4/*:: as any*/),
     "type": "Mutation",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "ManagedIdentityRulesUpdateRuleMutation",
-    "selections": (v4/*: any*/)
+    "selections": (v4/*:: as any*/)
   },
   "params": {
     "cacheID": "928f4c58504e355940d191661277d772",

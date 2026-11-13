@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<50a8acd70cf99d7d821db9597741a7f3>>
+ * @generated SignedSource<<342071635561f93f7eb2df7f911de476>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -154,20 +153,20 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "AdminAreaResourceLimitSettingsUpdateMutation",
-    "selections": (v1/*: any*/),
+    "selections": (v1/*:: as any*/),
     "type": "Mutation",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "AdminAreaResourceLimitSettingsUpdateMutation",
-    "selections": (v1/*: any*/)
+    "selections": (v1/*:: as any*/)
   },
   "params": {
     "cacheID": "e1b6b2abebe1e8682a17920ae5eece81",

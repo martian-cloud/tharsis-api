@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<d6e4fbcdfdceb88bfa42085dd2feee6a>>
+ * @generated SignedSource<<ab73713e7daf6b73c8949f0054b85ad4>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -238,7 +237,7 @@ v2 = [
         "name": "oauthProviders",
         "plural": true,
         "selections": [
-          (v0/*: any*/),
+          (v0/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -452,7 +451,7 @@ v2 = [
         "kind": "LinkedField",
         "name": "objectStorePluginData",
         "plural": true,
-        "selections": (v1/*: any*/),
+        "selections": (v1/*:: as any*/),
         "storageKey": null
       },
       {
@@ -462,7 +461,7 @@ v2 = [
         "kind": "LinkedField",
         "name": "rateLimitStorePluginData",
         "plural": true,
-        "selections": (v1/*: any*/),
+        "selections": (v1/*:: as any*/),
         "storageKey": null
       },
       {
@@ -472,7 +471,7 @@ v2 = [
         "kind": "LinkedField",
         "name": "jwsProviderPluginData",
         "plural": true,
-        "selections": (v1/*: any*/),
+        "selections": (v1/*:: as any*/),
         "storageKey": null
       },
       {
@@ -482,7 +481,7 @@ v2 = [
         "kind": "LinkedField",
         "name": "secretManagerPluginData",
         "plural": true,
-        "selections": (v1/*: any*/),
+        "selections": (v1/*:: as any*/),
         "storageKey": null
       },
       {
@@ -492,7 +491,7 @@ v2 = [
         "kind": "LinkedField",
         "name": "emailClientPluginData",
         "plural": true,
-        "selections": (v1/*: any*/),
+        "selections": (v1/*:: as any*/),
         "storageKey": null
       },
       {
@@ -502,7 +501,7 @@ v2 = [
         "kind": "LinkedField",
         "name": "adminLogTailStorePluginData",
         "plural": true,
-        "selections": (v1/*: any*/),
+        "selections": (v1/*:: as any*/),
         "storageKey": null
       },
       {
@@ -611,7 +610,7 @@ v2 = [
         "name": "federatedRegistryTrustPolicies",
         "plural": true,
         "selections": [
-          (v0/*: any*/),
+          (v0/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -665,7 +664,7 @@ v2 = [
             "kind": "LinkedField",
             "name": "jobDispatcherData",
             "plural": true,
-            "selections": (v1/*: any*/),
+            "selections": (v1/*:: as any*/),
             "storageKey": null
           }
         ],
@@ -720,7 +719,7 @@ return {
     "kind": "Fragment",
     "metadata": null,
     "name": "AdminAreaConfigurationSettingsQuery",
-    "selections": (v2/*: any*/),
+    "selections": (v2/*:: as any*/),
     "type": "Query",
     "abstractKey": null
   },
@@ -729,7 +728,7 @@ return {
     "argumentDefinitions": [],
     "kind": "Operation",
     "name": "AdminAreaConfigurationSettingsQuery",
-    "selections": (v2/*: any*/)
+    "selections": (v2/*:: as any*/)
   },
   "params": {
     "cacheID": "026693d29d381afa5c08fda46cb47d6d",

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<4716d8f62072ce6612efffff5a527e43>>
+ * @generated SignedSource<<a2b9038f7c452ed20df196e642a66bbe>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -58,7 +57,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -68,7 +67,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -117,7 +116,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -171,7 +170,7 @@ return {
       ],
       "storageKey": "__GroupRunnersList_runners_connection(includeInherited:true,sort:\"GROUP_LEVEL_DESC\")"
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "Group",
   "abstractKey": null

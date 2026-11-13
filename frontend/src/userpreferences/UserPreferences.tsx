@@ -30,7 +30,7 @@ function UserPreferences({ queryRef }: Props) {
                     }
                 }
                 me {
-                    ... on User {
+                    ... on User @alias(as: "user") {
                         ...UserSessionsFragment_user
                     }
                 }
@@ -49,9 +49,9 @@ function UserPreferences({ queryRef }: Props) {
                 <GlobalNotificationPreference fragmentRef={data.userPreferences.globalPreferences} />
             </PreferenceSection>
 
-            {data.me && (
+            {data.me?.user && (
                 <PreferenceSection title="Security" isLast>
-                    <UserSessions fragmentRef={data.me} />
+                    <UserSessions fragmentRef={data.me.user} />
                 </PreferenceSection>
             )}
         </PageLayoutProvider>

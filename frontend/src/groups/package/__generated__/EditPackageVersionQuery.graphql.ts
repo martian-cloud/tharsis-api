@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<7b1a6c1d304b13b267743f64b62e07d1>>
+ * @generated SignedSource<<2618ab1b3122854871eead611e3a96f4>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -111,14 +110,14 @@ v9 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "EditPackageVersionQuery",
     "selections": [
       {
         "alias": "pkg",
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -127,10 +126,10 @@ return {
           {
             "kind": "InlineFragment",
             "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/),
-              (v4/*: any*/),
-              (v5/*: any*/)
+              (v2/*:: as any*/),
+              (v3/*:: as any*/),
+              (v4/*:: as any*/),
+              (v5/*:: as any*/)
             ],
             "type": "Package",
             "abstractKey": null
@@ -140,7 +139,7 @@ return {
       },
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v6/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -149,9 +148,9 @@ return {
           {
             "kind": "InlineFragment",
             "selections": [
-              (v2/*: any*/),
-              (v7/*: any*/),
-              (v8/*: any*/)
+              (v2/*:: as any*/),
+              (v7/*:: as any*/),
+              (v8/*:: as any*/)
             ],
             "type": "PackageVersion",
             "abstractKey": null
@@ -165,26 +164,26 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "EditPackageVersionQuery",
     "selections": [
       {
         "alias": "pkg",
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v9/*: any*/),
-          (v2/*: any*/),
+          (v9/*:: as any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v3/*: any*/),
-              (v4/*: any*/),
-              (v5/*: any*/)
+              (v3/*:: as any*/),
+              (v4/*:: as any*/),
+              (v5/*:: as any*/)
             ],
             "type": "Package",
             "abstractKey": null
@@ -194,19 +193,19 @@ return {
       },
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v6/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v9/*: any*/),
-          (v2/*: any*/),
+          (v9/*:: as any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v7/*: any*/),
-              (v8/*: any*/)
+              (v7/*:: as any*/),
+              (v8/*:: as any*/)
             ],
             "type": "PackageVersion",
             "abstractKey": null

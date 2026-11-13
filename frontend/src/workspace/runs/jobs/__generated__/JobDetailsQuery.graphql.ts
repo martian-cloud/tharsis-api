@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<c72559615198944f10acf6f8a365687f>>
+ * @generated SignedSource<<eb3268d20fb242ff4d0dd60528e3870d>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -19,42 +18,44 @@ export type JobDetailsQuery$variables = {
 };
 export type JobDetailsQuery$data = {
   readonly node: {
-    readonly forceCanceled?: boolean;
-    readonly id?: string;
-    readonly metadata?: {
-      readonly createdAt: any;
-      readonly trn: string;
-    };
-    readonly run?: {
-      readonly createdByActor: {
-        readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
-      } | null | undefined;
-      readonly hasAdvisoryFailures: boolean;
+    readonly job: {
+      readonly forceCanceled: boolean;
       readonly id: string;
-      readonly status: RunStatus;
+      readonly metadata: {
+        readonly createdAt: any;
+        readonly trn: string;
+      };
+      readonly run: {
+        readonly createdByActor: {
+          readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+        } | null | undefined;
+        readonly hasAdvisoryFailures: boolean;
+        readonly id: string;
+        readonly status: RunStatus;
+        readonly workspace: {
+          readonly fullPath: string;
+        };
+      };
+      readonly runner: {
+        readonly groupPath: string;
+        readonly id: string;
+        readonly name: string;
+        readonly type: RunnerType;
+      } | null | undefined;
+      readonly runnerPath: string | null | undefined;
+      readonly status: JobStatus;
+      readonly tags: ReadonlyArray<string>;
+      readonly timestamps: {
+        readonly finishedAt: any | null | undefined;
+        readonly pendingAt: any | null | undefined;
+        readonly runningAt: any | null | undefined;
+      };
+      readonly type: JobType;
       readonly workspace: {
         readonly fullPath: string;
       };
-    };
-    readonly runner?: {
-      readonly groupPath: string;
-      readonly id: string;
-      readonly name: string;
-      readonly type: RunnerType;
+      readonly " $fragmentSpreads": FragmentRefs<"JobDetailsResourceUsageCardFragment_job" | "OutdatedProtocolAlertFragment_job">;
     } | null | undefined;
-    readonly runnerPath?: string | null | undefined;
-    readonly status?: JobStatus;
-    readonly tags?: ReadonlyArray<string>;
-    readonly timestamps?: {
-      readonly finishedAt: any | null | undefined;
-      readonly pendingAt: any | null | undefined;
-      readonly runningAt: any | null | undefined;
-    };
-    readonly type?: JobType;
-    readonly workspace?: {
-      readonly fullPath: string;
-    };
-    readonly " $fragmentSpreads": FragmentRefs<"JobDetailsResourceUsageCardFragment_job" | "OutdatedProtocolAlertFragment_job">;
   } | null | undefined;
 };
 export type JobDetailsQuery = {
@@ -120,7 +121,7 @@ v7 = {
   "name": "runner",
   "plural": false,
   "selections": [
-    (v2/*: any*/),
+    (v2/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -128,7 +129,7 @@ v7 = {
       "name": "name",
       "storageKey": null
     },
-    (v4/*: any*/),
+    (v4/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -161,7 +162,7 @@ v10 = {
   "name": "workspace",
   "plural": false,
   "selections": [
-    (v9/*: any*/)
+    (v9/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -244,8 +245,8 @@ v15 = {
   "name": "workspace",
   "plural": false,
   "selections": [
-    (v9/*: any*/),
-    (v2/*: any*/)
+    (v9/*:: as any*/),
+    (v2/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -260,76 +261,80 @@ v16 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "JobDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/),
-              (v4/*: any*/),
-              (v5/*: any*/),
-              (v6/*: any*/),
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "OutdatedProtocolAlertFragment_job"
-              },
-              (v7/*: any*/),
-              (v8/*: any*/),
-              (v10/*: any*/),
-              (v11/*: any*/),
-              {
-                "alias": null,
-                "args": null,
-                "concreteType": "Run",
-                "kind": "LinkedField",
-                "name": "run",
-                "plural": false,
-                "selections": [
-                  (v2/*: any*/),
-                  {
-                    "alias": null,
-                    "args": null,
-                    "concreteType": null,
-                    "kind": "LinkedField",
-                    "name": "createdByActor",
-                    "plural": false,
-                    "selections": [
-                      {
-                        "args": null,
-                        "kind": "FragmentSpread",
-                        "name": "ActorDisplayFragment_actor"
-                      }
-                    ],
-                    "storageKey": null
-                  },
-                  (v3/*: any*/),
-                  (v12/*: any*/),
-                  (v10/*: any*/)
-                ],
-                "storageKey": null
-              },
-              (v13/*: any*/),
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "JobDetailsResourceUsageCardFragment_job"
-              }
-            ],
-            "type": "Job",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v2/*:: as any*/),
+                (v3/*:: as any*/),
+                (v4/*:: as any*/),
+                (v5/*:: as any*/),
+                (v6/*:: as any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "OutdatedProtocolAlertFragment_job"
+                },
+                (v7/*:: as any*/),
+                (v8/*:: as any*/),
+                (v10/*:: as any*/),
+                (v11/*:: as any*/),
+                {
+                  "alias": null,
+                  "args": null,
+                  "concreteType": "Run",
+                  "kind": "LinkedField",
+                  "name": "run",
+                  "plural": false,
+                  "selections": [
+                    (v2/*:: as any*/),
+                    {
+                      "alias": null,
+                      "args": null,
+                      "concreteType": null,
+                      "kind": "LinkedField",
+                      "name": "createdByActor",
+                      "plural": false,
+                      "selections": [
+                        {
+                          "args": null,
+                          "kind": "FragmentSpread",
+                          "name": "ActorDisplayFragment_actor"
+                        }
+                      ],
+                      "storageKey": null
+                    },
+                    (v3/*:: as any*/),
+                    (v12/*:: as any*/),
+                    (v10/*:: as any*/)
+                  ],
+                  "storageKey": null
+                },
+                (v13/*:: as any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "JobDetailsResourceUsageCardFragment_job"
+                }
+              ],
+              "type": "Job",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "job"
           }
         ],
         "storageKey": null
@@ -340,27 +345,27 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "JobDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v14/*: any*/),
-          (v2/*: any*/),
+          (v14/*:: as any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v3/*: any*/),
-              (v4/*: any*/),
-              (v5/*: any*/),
-              (v6/*: any*/),
+              (v3/*:: as any*/),
+              (v4/*:: as any*/),
+              (v5/*:: as any*/),
+              (v6/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -368,10 +373,10 @@ return {
                 "name": "outdatedJobProtocolVersion",
                 "storageKey": null
               },
-              (v7/*: any*/),
-              (v8/*: any*/),
-              (v15/*: any*/),
-              (v11/*: any*/),
+              (v7/*:: as any*/),
+              (v8/*:: as any*/),
+              (v15/*:: as any*/),
+              (v11/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -380,7 +385,7 @@ return {
                 "name": "run",
                 "plural": false,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -389,12 +394,12 @@ return {
                     "name": "createdByActor",
                     "plural": false,
                     "selections": [
-                      (v14/*: any*/),
+                      (v14/*:: as any*/),
                       {
                         "kind": "TypeDiscriminator",
                         "abstractKey": "__isActor"
                       },
-                      (v4/*: any*/),
+                      (v4/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -420,7 +425,7 @@ return {
                                 "name": "email",
                                 "storageKey": null
                               },
-                              (v2/*: any*/)
+                              (v2/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -430,32 +435,32 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v16/*: any*/),
+                        "selections": (v16/*:: as any*/),
                         "type": "ServiceAccountActor",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v16/*: any*/),
+                        "selections": (v16/*:: as any*/),
                         "type": "VCSProviderActor",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v16/*: any*/),
+                        "selections": (v16/*:: as any*/),
                         "type": "JobActor",
                         "abstractKey": null
                       }
                     ],
                     "storageKey": null
                   },
-                  (v3/*: any*/),
-                  (v12/*: any*/),
-                  (v15/*: any*/)
+                  (v3/*:: as any*/),
+                  (v12/*:: as any*/),
+                  (v15/*:: as any*/)
                 ],
                 "storageKey": null
               },
-              (v13/*: any*/),
+              (v13/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -575,6 +580,6 @@ return {
 };
 })();
 
-(node as any).hash = "c60877c4f7dc811bef0ab0d856903043";
+(node as any).hash = "af1875a4563db7135e6f15d74bbc5c2d";
 
 export default node;

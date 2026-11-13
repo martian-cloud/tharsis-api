@@ -151,7 +151,9 @@ function WorkspaceRoleBinding(props: Props) {
     const queryData = useLazyLoadQuery<WorkspaceRoleBindingQuery>(graphql`
         query WorkspaceRoleBindingQuery($id: String!) {
             node(id: $id) {
-                ...WorkspaceRoleBindingRoleFragment_workspace
+                ... on Workspace @alias(as: "workspace") {
+                    ...WorkspaceRoleBindingRoleFragment_workspace
+                }
             }
             # Only query for default roles
             roles(first: 5) {
@@ -177,7 +179,7 @@ function WorkspaceRoleBinding(props: Props) {
                 }
             }
         }
-    `, queryData.node);
+    `, queryData.node?.workspace);
 
     const roles = queryData.roles.edges?.map(edge => edge?.node as RoleOption) ?? [];
 

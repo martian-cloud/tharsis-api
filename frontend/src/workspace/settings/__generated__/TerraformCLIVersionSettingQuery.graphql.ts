@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<c9a1ef0b95c649491fa5c7bca636bb1b>>
+ * @generated SignedSource<<aab9a48ae4edb7906590da32063a6a69>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -47,7 +46,7 @@ return {
     "kind": "Fragment",
     "metadata": null,
     "name": "TerraformCLIVersionSettingQuery",
-    "selections": (v0/*: any*/),
+    "selections": (v0/*:: as any*/),
     "type": "Query",
     "abstractKey": null
   },
@@ -56,7 +55,7 @@ return {
     "argumentDefinitions": [],
     "kind": "Operation",
     "name": "TerraformCLIVersionSettingQuery",
-    "selections": (v0/*: any*/)
+    "selections": (v0/*:: as any*/)
   },
   "params": {
     "cacheID": "be83d1f64aa7238c5cdd748c6ad9a8e0",

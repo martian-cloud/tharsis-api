@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<cf791076f7ec7b45c5b60ee3f9cde2fe>>
+ * @generated SignedSource<<f378dbc5c2d3a50659b7fa4a3cf1ea41>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -115,12 +114,12 @@ v9 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/),
-      (v5/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/),
+      (v5/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -138,12 +137,12 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v4/*: any*/),
-      (v5/*: any*/)
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v4/*:: as any*/),
+      (v5/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "ProviderMirrorListQuery",
@@ -162,8 +161,8 @@ return {
         "name": "namespace",
         "plural": false,
         "selections": [
-          (v6/*: any*/),
-          (v7/*: any*/),
+          (v6/*:: as any*/),
+          (v7/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -184,7 +183,7 @@ return {
           },
           {
             "alias": null,
-            "args": (v8/*: any*/),
+            "args": (v8/*:: as any*/),
             "concreteType": "TerraformProviderVersionMirrorConnection",
             "kind": "LinkedField",
             "name": "terraformProviderMirrors",
@@ -213,7 +212,7 @@ return {
                     "name": "node",
                     "plural": false,
                     "selections": [
-                      (v6/*: any*/),
+                      (v6/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -261,7 +260,7 @@ return {
                         "name": "createdByActor",
                         "plural": false,
                         "selections": [
-                          (v7/*: any*/),
+                          (v7/*:: as any*/),
                           {
                             "kind": "TypeDiscriminator",
                             "abstractKey": "__isActor"
@@ -298,7 +297,7 @@ return {
                                     "name": "email",
                                     "storageKey": null
                                   },
-                                  (v6/*: any*/)
+                                  (v6/*:: as any*/)
                                 ],
                                 "storageKey": null
                               }
@@ -308,26 +307,26 @@ return {
                           },
                           {
                             "kind": "InlineFragment",
-                            "selections": (v9/*: any*/),
+                            "selections": (v9/*:: as any*/),
                             "type": "ServiceAccountActor",
                             "abstractKey": null
                           },
                           {
                             "kind": "InlineFragment",
-                            "selections": (v9/*: any*/),
+                            "selections": (v9/*:: as any*/),
                             "type": "VCSProviderActor",
                             "abstractKey": null
                           },
                           {
                             "kind": "InlineFragment",
-                            "selections": (v9/*: any*/),
+                            "selections": (v9/*:: as any*/),
                             "type": "JobActor",
                             "abstractKey": null
                           }
                         ],
                         "storageKey": null
                       },
-                      (v7/*: any*/)
+                      (v7/*:: as any*/)
                     ],
                     "storageKey": null
                   },
@@ -385,7 +384,7 @@ return {
           },
           {
             "alias": null,
-            "args": (v8/*: any*/),
+            "args": (v8/*:: as any*/),
             "filters": [
               "sort",
               "search"

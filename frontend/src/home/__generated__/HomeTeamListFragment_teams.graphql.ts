@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<2b976136f43e75f309f0a1b38cecb67b>>
+ * @generated SignedSource<<a1d171ad201db16be30c9c5b274b51d8>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -58,7 +57,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -68,7 +67,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -112,7 +111,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "args": null,
                   "kind": "FragmentSpread",
@@ -166,7 +165,7 @@ return {
       ],
       "storageKey": "__HomeTeamList_teams_connection(sort:\"NAME_ASC\")"
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "User",
   "abstractKey": null

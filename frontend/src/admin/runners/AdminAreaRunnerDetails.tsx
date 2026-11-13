@@ -13,7 +13,7 @@ function AdminAreaRunnerDetails() {
     const data = useLazyLoadQuery<AdminAreaRunnerDetailsQuery>(graphql`
         query AdminAreaRunnerDetailsQuery($id: String!) {
             node(id: $id) {
-                ... on Runner {
+                ... on Runner @alias(as: "runner") {
                     id
                     name
                     ...RunnerDetailsFragment_runner
@@ -21,9 +21,9 @@ function AdminAreaRunnerDetails() {
             }
         }`, { id: runnerId }, { fetchPolicy: 'store-and-network' });
 
-    const runner = data.node as any;
+    const runner = data.node?.runner;
 
-    if (data.node) {
+    if (runner) {
         return (
             <Box>
                 <AdminAreaBreadcrumbs
@@ -32,7 +32,7 @@ function AdminAreaRunnerDetails() {
                         { title: runner.name, path: runner.id }
                     ]}
                 />
-                <RunnerDetails fragmentRef={data.node} getConnections={GetConnections} />
+                <RunnerDetails fragmentRef={runner} getConnections={GetConnections} />
             </Box>
         );
     } else {

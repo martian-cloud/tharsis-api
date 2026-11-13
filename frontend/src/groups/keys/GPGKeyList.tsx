@@ -21,7 +21,7 @@ const INITIAL_ITEM_COUNT = 100;
 const query = graphql`
     query GPGKeyListQuery($first: Int, $last: Int, $after: String, $before: String, $groupId: String!) {
         node(id: $groupId) {
-            ...on Group {
+            ...on Group @alias(as: "group") {
                 ...GPGKeyListFragment_keys
             }
         }
@@ -82,7 +82,7 @@ function GPGKeyList(props: Props) {
                 }
             }
       }
-    `, queryData.node);
+    `, queryData.node?.group);
 
     const [commit, commitInFlight] = useMutation<GPGKeyListDeleteMutation>(graphql`
         mutation GPGKeyListDeleteMutation($input: DeleteGPGKeyInput!, $connections: [ID!]!) {

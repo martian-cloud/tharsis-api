@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<a4f7ae22bc4eed5956ace5d29b5dd3cd>>
+ * @generated SignedSource<<beaa92438034540692bdfdf086f55b21>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,7 +14,9 @@ export type AssignedManagedIdentityListQuery$variables = {
 };
 export type AssignedManagedIdentityListQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities">;
+    readonly workspace: {
+      readonly " $fragmentSpreads": FragmentRefs<"AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type AssignedManagedIdentityListQuery = {
@@ -47,30 +48,34 @@ v2 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "AssignedManagedIdentityListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities"
-              }
-            ],
-            "type": "Workspace",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities"
+                }
+              ],
+              "type": "Workspace",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "workspace"
           }
         ],
         "storageKey": null
@@ -81,13 +86,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "AssignedManagedIdentityListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -138,7 +143,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -156,7 +161,7 @@ return {
                 "name": "assignedManagedIdentities",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -210,7 +215,7 @@ return {
             "type": "Workspace",
             "abstractKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -227,6 +232,6 @@ return {
 };
 })();
 
-(node as any).hash = "32579b048b741923349d6863dd3a7cf7";
+(node as any).hash = "8147262dfd691734a53682ebabfe273e";
 
 export default node;

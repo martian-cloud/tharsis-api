@@ -33,7 +33,7 @@ const versionFragment = graphql`
 const selectedVersionQuery = graphql`
     query PackageDetailsIndexSelectedVersionQuery($id: String!) {
         node(id: $id) {
-            ... on PackageVersion {
+            ... on PackageVersion @alias(as: "packageVersion") {
                 ...PackageDetailsIndexFragment_version
             }
         }
@@ -173,7 +173,7 @@ function SelectedVersionBody({ versionId, ...props }: BodyProps & { versionId: s
         { fetchPolicy: 'store-and-network' },
     );
 
-    return <PackageDetailsBody versionFragmentRef={queryData.node ?? null} {...props} />;
+    return <PackageDetailsBody versionFragmentRef={queryData.node?.packageVersion ?? null} {...props} />;
 }
 
 function PackageDetailsBody(props: BodyProps & { versionFragmentRef: PackageDetailsIndexFragment_version$key | null }) {

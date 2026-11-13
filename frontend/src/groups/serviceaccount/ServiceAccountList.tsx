@@ -20,7 +20,7 @@ const INITIAL_ITEM_COUNT = 100;
 const query = graphql`
     query ServiceAccountListQuery($first: Int, $last: Int, $after: String, $before: String, $groupId: String!, $search: String) {
         node(id: $groupId) {
-            ...on Group {
+            ...on Group @alias(as: "group") {
                 ...ServiceAccountListFragment_serviceAccounts
             }
         }
@@ -79,7 +79,7 @@ function ServiceAccountList({ fragmentRef }: Props) {
                 }
             }
         }
-        `, queryData.node
+        `, queryData.node?.group
     );
 
     const environment = useRelayEnvironment();

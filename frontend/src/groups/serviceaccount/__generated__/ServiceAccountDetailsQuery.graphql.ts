@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<bfaae234348dba8d374494976075c094>>
+ * @generated SignedSource<<9c1f4005fd63fd00993cd09aa80610a7>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -164,7 +163,7 @@ v10 = {
       "name": "boundClaims",
       "plural": true,
       "selections": [
-        (v4/*: any*/),
+        (v4/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -189,25 +188,25 @@ v11 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "ServiceAccountDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "ServiceAccount",
         "kind": "LinkedField",
         "name": "serviceAccount",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
-          (v3/*: any*/),
-          (v4/*: any*/),
-          (v5/*: any*/),
-          (v6/*: any*/),
-          (v7/*: any*/),
+          (v2/*:: as any*/),
+          (v3/*:: as any*/),
+          (v4/*:: as any*/),
+          (v5/*:: as any*/),
+          (v6/*:: as any*/),
+          (v7/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -224,9 +223,9 @@ return {
             ],
             "storageKey": null
           },
-          (v8/*: any*/),
-          (v9/*: any*/),
-          (v10/*: any*/)
+          (v8/*:: as any*/),
+          (v9/*:: as any*/),
+          (v10/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -236,24 +235,24 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "ServiceAccountDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "ServiceAccount",
         "kind": "LinkedField",
         "name": "serviceAccount",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
-          (v3/*: any*/),
-          (v4/*: any*/),
-          (v5/*: any*/),
-          (v6/*: any*/),
-          (v7/*: any*/),
+          (v2/*:: as any*/),
+          (v3/*:: as any*/),
+          (v4/*:: as any*/),
+          (v5/*:: as any*/),
+          (v6/*:: as any*/),
+          (v7/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -305,7 +304,7 @@ return {
                         "name": "email",
                         "storageKey": null
                       },
-                      (v3/*: any*/)
+                      (v3/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -315,28 +314,28 @@ return {
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v11/*: any*/),
+                "selections": (v11/*:: as any*/),
                 "type": "ServiceAccountActor",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v11/*: any*/),
+                "selections": (v11/*:: as any*/),
                 "type": "VCSProviderActor",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v11/*: any*/),
+                "selections": (v11/*:: as any*/),
                 "type": "JobActor",
                 "abstractKey": null
               }
             ],
             "storageKey": null
           },
-          (v8/*: any*/),
-          (v9/*: any*/),
-          (v10/*: any*/)
+          (v8/*:: as any*/),
+          (v9/*:: as any*/),
+          (v10/*:: as any*/)
         ],
         "storageKey": null
       }

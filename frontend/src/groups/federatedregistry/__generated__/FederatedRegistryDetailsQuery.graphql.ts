@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<6a78bcdac69561bc3d1cdc14bcbefe2e>>
+ * @generated SignedSource<<5baa0820eb62777d2dc31dae147b6171>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -121,14 +120,14 @@ v8 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "FederatedRegistryDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -137,9 +136,9 @@ return {
           {
             "kind": "InlineFragment",
             "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/),
-              (v4/*: any*/),
+              (v2/*:: as any*/),
+              (v3/*:: as any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -164,11 +163,11 @@ return {
                 "name": "group",
                 "plural": false,
                 "selections": [
-                  (v5/*: any*/)
+                  (v5/*:: as any*/)
                 ],
                 "storageKey": null
               },
-              (v6/*: any*/)
+              (v6/*:: as any*/)
             ],
             "type": "FederatedRegistry",
             "abstractKey": null
@@ -182,25 +181,25 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "FederatedRegistryDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v7/*: any*/),
-          (v2/*: any*/),
+          (v7/*:: as any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v3/*: any*/),
-              (v4/*: any*/),
+              (v3/*:: as any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -209,7 +208,7 @@ return {
                 "name": "createdByActor",
                 "plural": false,
                 "selections": [
-                  (v7/*: any*/),
+                  (v7/*:: as any*/),
                   {
                     "kind": "TypeDiscriminator",
                     "abstractKey": "__isActor"
@@ -246,7 +245,7 @@ return {
                             "name": "email",
                             "storageKey": null
                           },
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -256,19 +255,19 @@ return {
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v8/*: any*/),
+                    "selections": (v8/*:: as any*/),
                     "type": "ServiceAccountActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v8/*: any*/),
+                    "selections": (v8/*:: as any*/),
                     "type": "VCSProviderActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v8/*: any*/),
+                    "selections": (v8/*:: as any*/),
                     "type": "JobActor",
                     "abstractKey": null
                   }
@@ -283,12 +282,12 @@ return {
                 "name": "group",
                 "plural": false,
                 "selections": [
-                  (v5/*: any*/),
-                  (v2/*: any*/)
+                  (v5/*:: as any*/),
+                  (v2/*:: as any*/)
                 ],
                 "storageKey": null
               },
-              (v6/*: any*/)
+              (v6/*:: as any*/)
             ],
             "type": "FederatedRegistry",
             "abstractKey": null

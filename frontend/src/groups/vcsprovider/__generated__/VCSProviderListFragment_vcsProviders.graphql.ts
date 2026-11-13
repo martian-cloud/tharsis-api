@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<145d083be28ea32f77874e36af17a02a>>
+ * @generated SignedSource<<d63148d2b836d7e28a11204b68003fef>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -72,7 +71,7 @@ return {
         "count": null,
         "cursor": null,
         "direction": "bidirectional",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -85,7 +84,7 @@ return {
           "count": "last",
           "cursor": "before"
         },
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -146,7 +145,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -221,7 +220,7 @@ return {
       ],
       "storageKey": null
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "Group",
   "abstractKey": null

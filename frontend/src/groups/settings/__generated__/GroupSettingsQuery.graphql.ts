@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<507f2abf8abac2c6f4a5f893a3687b62>>
+ * @generated SignedSource<<c9c3c7e67477400b390d126c381ddc06>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,7 +14,9 @@ export type GroupSettingsQuery$variables = {
 };
 export type GroupSettingsQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"GroupSettingsContentFragment_group">;
+    readonly group: {
+      readonly " $fragmentSpreads": FragmentRefs<"GroupSettingsContentFragment_group">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type GroupSettingsQuery = {
@@ -60,36 +61,40 @@ v4 = {
   "storageKey": null
 },
 v5 = [
-  (v2/*: any*/),
-  (v4/*: any*/),
-  (v3/*: any*/)
+  (v2/*:: as any*/),
+  (v4/*:: as any*/),
+  (v3/*:: as any*/)
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "GroupSettingsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "GroupSettingsContentFragment_group"
-              }
-            ],
-            "type": "Group",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "GroupSettingsContentFragment_group"
+                }
+              ],
+              "type": "Group",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "group"
           }
         ],
         "storageKey": null
@@ -100,13 +105,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "GroupSettingsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -151,9 +156,9 @@ return {
                 "name": "runnerTags",
                 "plural": false,
                 "selections": [
-                  (v2/*: any*/),
-                  (v3/*: any*/),
-                  (v4/*: any*/)
+                  (v2/*:: as any*/),
+                  (v3/*:: as any*/),
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -164,7 +169,7 @@ return {
                 "kind": "LinkedField",
                 "name": "driftDetectionEnabled",
                 "plural": false,
-                "selections": (v5/*: any*/),
+                "selections": (v5/*:: as any*/),
                 "storageKey": null
               },
               {
@@ -174,7 +179,7 @@ return {
                 "kind": "LinkedField",
                 "name": "providerMirrorEnabled",
                 "plural": false,
-                "selections": (v5/*: any*/),
+                "selections": (v5/*:: as any*/),
                 "storageKey": null
               },
               {
@@ -184,7 +189,7 @@ return {
                 "kind": "LinkedField",
                 "name": "outputVisibility",
                 "plural": false,
-                "selections": (v5/*: any*/),
+                "selections": (v5/*:: as any*/),
                 "storageKey": null
               }
             ],
@@ -214,6 +219,6 @@ return {
 };
 })();
 
-(node as any).hash = "5e36fa9538e2756eccd2bdeb859a8aa2";
+(node as any).hash = "acdd8c1f0c9f142cc73874158af86992";
 
 export default node;

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<f86f2f4d72d0365bdeb4f3a37cb943fb>>
+ * @generated SignedSource<<5848e5c6dd45a472ffe270c137de2b41>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -138,20 +137,20 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "ServiceAccountDetailsResetClientCredentialsMutation",
-    "selections": (v1/*: any*/),
+    "selections": (v1/*:: as any*/),
     "type": "Mutation",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "ServiceAccountDetailsResetClientCredentialsMutation",
-    "selections": (v1/*: any*/)
+    "selections": (v1/*:: as any*/)
   },
   "params": {
     "cacheID": "be3ff73bee3d3c71004ab4ba28b19d71",

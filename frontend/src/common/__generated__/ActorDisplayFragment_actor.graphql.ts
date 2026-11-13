@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<f32d1a724f5722e33ef3ea2df238fc0a>>
+ * @generated SignedSource<<9ef5352ebfa05810718a2fc07bc5dd52>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -82,19 +81,19 @@ return {
     },
     {
       "kind": "InlineFragment",
-      "selections": (v0/*: any*/),
+      "selections": (v0/*:: as any*/),
       "type": "ServiceAccountActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v0/*: any*/),
+      "selections": (v0/*:: as any*/),
       "type": "VCSProviderActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v0/*: any*/),
+      "selections": (v0/*:: as any*/),
       "type": "JobActor",
       "abstractKey": null
     }

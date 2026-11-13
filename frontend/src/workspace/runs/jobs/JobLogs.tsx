@@ -15,7 +15,7 @@ import { JobLogsSubscription, JobLogsSubscription$data } from './__generated__/J
 const query = graphql`
     query JobLogsQuery($id: String!, $startOffset: Int!, $limit: Int!) {
         node(id: $id) {
-            ...on Job {
+            ...on Job @alias(as: "job") {
                 ...JobLogsFragment_logs
             }
         }
@@ -57,7 +57,7 @@ function JobLogs(props: Props) {
     // the logs aren't cached yet. The jobLogStreamEvents subscription keeps the tail live.
     const queryData = useLazyLoadQuery<JobLogsQuery>(query, { id: props.jobId, startOffset: 0, limit: LOG_LIMIT }, { fetchPolicy: 'store-or-network' });
 
-    return queryData.node
+    return queryData.node?.job
         // Keyed on the job so a change of job remounts rather than reusing this instance. Every
         // piece of streaming state here — the log buffer, the sizes, the completed flag, the
         // auto-scroll default and the loaded-size high-water mark that dedupes subscription
@@ -66,7 +66,7 @@ function JobLogs(props: Props) {
         // silently discarded every event for the new job until it outgrew the previous one.
         ? <JobLogsContent
             key={props.jobId}
-            fragmentRef={queryData.node}
+            fragmentRef={queryData.node.job}
             scrollMode={props.scrollMode}
             height={props.height}
         />

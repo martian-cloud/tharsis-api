@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<308ef5ab72ab588971f9611d54138352>>
+ * @generated SignedSource<<a6cd3c0e43549dd32dc78f8384c09ce2>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -16,7 +15,9 @@ export type HomeTeamListQuery$variables = {
 };
 export type HomeTeamListQuery$data = {
   readonly me: {
-    readonly " $fragmentSpreads": FragmentRefs<"HomeTeamListFragment_teams">;
+    readonly user: {
+      readonly " $fragmentSpreads": FragmentRefs<"HomeTeamListFragment_teams">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type HomeTeamListQuery = {
@@ -69,8 +70,8 @@ v4 = {
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -85,16 +86,20 @@ return {
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "HomeTeamListFragment_teams"
-              }
-            ],
-            "type": "User",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "HomeTeamListFragment_teams"
+                }
+              ],
+              "type": "User",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "user"
           }
         ],
         "storageKey": null
@@ -106,8 +111,8 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "HomeTeamListQuery",
@@ -120,13 +125,13 @@ return {
         "name": "me",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v3/*: any*/),
+                "args": (v3/*:: as any*/),
                 "concreteType": "TeamConnection",
                 "kind": "LinkedField",
                 "name": "teams",
@@ -148,7 +153,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v4/*: any*/),
+                          (v4/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -156,7 +161,7 @@ return {
                             "name": "name",
                             "storageKey": null
                           },
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -200,7 +205,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v3/*: any*/),
+                "args": (v3/*:: as any*/),
                 "filters": [
                   "sort"
                 ],
@@ -209,7 +214,7 @@ return {
                 "kind": "LinkedHandle",
                 "name": "teams"
               },
-              (v4/*: any*/)
+              (v4/*:: as any*/)
             ],
             "type": "User",
             "abstractKey": null
@@ -217,7 +222,7 @@ return {
           {
             "kind": "InlineFragment",
             "selections": [
-              (v4/*: any*/)
+              (v4/*:: as any*/)
             ],
             "type": "Node",
             "abstractKey": "__isNode"
@@ -238,6 +243,6 @@ return {
 };
 })();
 
-(node as any).hash = "f7c7cd7ffdaa96a728d6b602c8f51740";
+(node as any).hash = "72f316314b1d322730b2fcb8de6ac3eb";
 
 export default node;

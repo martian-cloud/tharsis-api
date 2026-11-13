@@ -17,7 +17,7 @@ function WorkspaceDetailsDriftViewerContainer({ workspaceId }: Props) {
     const queryData = useLazyLoadQuery<WorkspaceDetailsDriftViewerQuery>(graphql`
         query WorkspaceDetailsDriftViewerQuery($id: String!) {
             node(id: $id) {
-                ... on Workspace {
+                ... on Workspace @alias(as: "workspace") {
                     id
                     ...WorkspaceDetailsDriftViewerFragment_workspace
                 }
@@ -25,11 +25,11 @@ function WorkspaceDetailsDriftViewerContainer({ workspaceId }: Props) {
         }
     `, { id: workspaceId }, { fetchPolicy: 'store-and-network' });
 
-    if (!queryData.node) {
+    if (!queryData.node?.workspace) {
         return null;
     }
 
-    return <WorkspaceDetailsDriftViewer fragmentRef={queryData.node} />;
+    return <WorkspaceDetailsDriftViewer fragmentRef={queryData.node.workspace} />;
 }
 
 function getResourceKey(resource: any) {

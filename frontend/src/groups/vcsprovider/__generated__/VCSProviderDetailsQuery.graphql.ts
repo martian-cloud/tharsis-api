@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<e54f14a67fc02057e12a16f9842a4ca3>>
+ * @generated SignedSource<<ecfa342fc197c911b84e7e5ff1e6c3bc>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -144,14 +143,14 @@ v11 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "VCSProviderDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -160,8 +159,8 @@ return {
           {
             "kind": "InlineFragment",
             "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/),
+              (v2/*:: as any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -178,12 +177,12 @@ return {
                 ],
                 "storageKey": null
               },
-              (v4/*: any*/),
-              (v5/*: any*/),
-              (v6/*: any*/),
-              (v7/*: any*/),
-              (v8/*: any*/),
-              (v9/*: any*/)
+              (v4/*:: as any*/),
+              (v5/*:: as any*/),
+              (v6/*:: as any*/),
+              (v7/*:: as any*/),
+              (v8/*:: as any*/),
+              (v9/*:: as any*/)
             ],
             "type": "VCSProvider",
             "abstractKey": null
@@ -197,24 +196,24 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "VCSProviderDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v10/*: any*/),
-          (v2/*: any*/),
+          (v10/*:: as any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v3/*: any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -223,12 +222,12 @@ return {
                 "name": "createdByActor",
                 "plural": false,
                 "selections": [
-                  (v10/*: any*/),
+                  (v10/*:: as any*/),
                   {
                     "kind": "TypeDiscriminator",
                     "abstractKey": "__isActor"
                   },
-                  (v5/*: any*/),
+                  (v5/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -254,7 +253,7 @@ return {
                             "name": "email",
                             "storageKey": null
                           },
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -264,31 +263,31 @@ return {
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v11/*: any*/),
+                    "selections": (v11/*:: as any*/),
                     "type": "ServiceAccountActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v11/*: any*/),
+                    "selections": (v11/*:: as any*/),
                     "type": "VCSProviderActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v11/*: any*/),
+                    "selections": (v11/*:: as any*/),
                     "type": "JobActor",
                     "abstractKey": null
                   }
                 ],
                 "storageKey": null
               },
-              (v4/*: any*/),
-              (v5/*: any*/),
-              (v6/*: any*/),
-              (v7/*: any*/),
-              (v8/*: any*/),
-              (v9/*: any*/)
+              (v4/*:: as any*/),
+              (v5/*:: as any*/),
+              (v6/*:: as any*/),
+              (v7/*:: as any*/),
+              (v8/*:: as any*/),
+              (v9/*:: as any*/)
             ],
             "type": "VCSProvider",
             "abstractKey": null

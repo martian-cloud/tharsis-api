@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<c0405e8c9cc5735ab355889868095b3e>>
+ * @generated SignedSource<<b11690bc3d3d787d1d1cd6355eb4cd02>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -97,9 +96,9 @@ v8 = {
   "storageKey": null
 },
 v9 = [
-  (v6/*: any*/),
-  (v7/*: any*/),
-  (v8/*: any*/)
+  (v6/*:: as any*/),
+  (v7/*:: as any*/),
+  (v8/*:: as any*/)
 ],
 v10 = {
   "alias": null,
@@ -109,9 +108,9 @@ v10 = {
   "storageKey": null
 },
 v11 = [
-  (v6/*: any*/),
-  (v8/*: any*/),
-  (v10/*: any*/)
+  (v6/*:: as any*/),
+  (v8/*:: as any*/),
+  (v10/*:: as any*/)
 ],
 v12 = {
   "alias": null,
@@ -123,34 +122,34 @@ v12 = {
 v13 = {
   "kind": "InlineFragment",
   "selections": [
-    (v12/*: any*/)
+    (v12/*:: as any*/)
   ],
   "type": "User",
   "abstractKey": null
 },
 v14 = [
-  (v6/*: any*/)
+  (v6/*:: as any*/)
 ],
 v15 = {
   "kind": "InlineFragment",
-  "selections": (v14/*: any*/),
+  "selections": (v14/*:: as any*/),
   "type": "Team",
   "abstractKey": null
 },
 v16 = {
   "kind": "InlineFragment",
   "selections": [
-    (v10/*: any*/)
+    (v10/*:: as any*/)
   ],
   "type": "ServiceAccount",
   "abstractKey": null
 },
 v17 = [
-  (v4/*: any*/)
+  (v4/*:: as any*/)
 ],
 v18 = {
   "kind": "InlineFragment",
-  "selections": (v17/*: any*/),
+  "selections": (v17/*:: as any*/),
   "type": "Node",
   "abstractKey": "__isNode"
 },
@@ -190,8 +189,8 @@ v23 = {
   "storageKey": null
 },
 v24 = [
-  (v6/*: any*/),
-  (v23/*: any*/)
+  (v6/*:: as any*/),
+  (v23/*:: as any*/)
 ],
 v25 = {
   "alias": null,
@@ -201,11 +200,11 @@ v25 = {
   "name": "member",
   "plural": false,
   "selections": [
-    (v5/*: any*/),
-    (v13/*: any*/),
-    (v16/*: any*/),
-    (v15/*: any*/),
-    (v18/*: any*/)
+    (v5/*:: as any*/),
+    (v13/*:: as any*/),
+    (v16/*:: as any*/),
+    (v15/*:: as any*/),
+    (v18/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -219,7 +218,7 @@ v26 = [
   }
 ],
 v27 = [
-  (v19/*: any*/),
+  (v19/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -244,7 +243,7 @@ v28 = [
         "kind": "LinkedField",
         "name": "added",
         "plural": true,
-        "selections": (v27/*: any*/),
+        "selections": (v27/*:: as any*/),
         "storageKey": null
       },
       {
@@ -254,7 +253,7 @@ v28 = [
         "kind": "LinkedField",
         "name": "updated",
         "plural": true,
-        "selections": (v27/*: any*/),
+        "selections": (v27/*:: as any*/),
         "storageKey": null
       },
       {
@@ -276,13 +275,13 @@ v29 = {
   "name": "user",
   "plural": false,
   "selections": [
-    (v12/*: any*/),
-    (v4/*: any*/)
+    (v12/*:: as any*/),
+    (v4/*:: as any*/)
   ],
   "storageKey": null
 },
 v30 = [
-  (v29/*: any*/),
+  (v29/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -294,9 +293,9 @@ v30 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -314,16 +313,16 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v1/*: any*/),
-      (v0/*: any*/),
-      (v2/*: any*/)
+      (v1/*:: as any*/),
+      (v0/*:: as any*/),
+      (v2/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "HomeActivityFeedQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": "ActivityEventConnection",
         "kind": "LinkedField",
         "name": "activityEvents",
@@ -345,8 +344,8 @@ return {
                 "name": "node",
                 "plural": false,
                 "selections": [
-                  (v4/*: any*/),
-                  (v5/*: any*/),
+                  (v4/*:: as any*/),
+                  (v5/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -355,23 +354,23 @@ return {
                     "name": "target",
                     "plural": false,
                     "selections": [
-                      (v5/*: any*/),
-                      (v4/*: any*/),
+                      (v5/*:: as any*/),
+                      (v4/*:: as any*/),
                       {
                         "kind": "InlineFragment",
-                        "selections": (v9/*: any*/),
+                        "selections": (v9/*:: as any*/),
                         "type": "Workspace",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v9/*: any*/),
+                        "selections": (v9/*:: as any*/),
                         "type": "Group",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v11/*: any*/),
+                        "selections": (v11/*:: as any*/),
                         "type": "ManagedIdentity",
                         "abstractKey": null
                       },
@@ -386,11 +385,11 @@ return {
                             "name": "member",
                             "plural": false,
                             "selections": [
-                              (v5/*: any*/),
-                              (v13/*: any*/),
-                              (v15/*: any*/),
-                              (v16/*: any*/),
-                              (v18/*: any*/)
+                              (v5/*:: as any*/),
+                              (v13/*:: as any*/),
+                              (v15/*:: as any*/),
+                              (v16/*:: as any*/),
+                              (v18/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -444,8 +443,8 @@ return {
                             "name": "managedIdentity",
                             "plural": false,
                             "selections": [
-                              (v4/*: any*/),
-                              (v10/*: any*/)
+                              (v4/*:: as any*/),
+                              (v10/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -455,24 +454,24 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v11/*: any*/),
+                        "selections": (v11/*:: as any*/),
                         "type": "ServiceAccount",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v19/*: any*/)
+                          (v19/*:: as any*/)
                         ],
                         "type": "NamespaceVariable",
                         "abstractKey": null
                       },
-                      (v15/*: any*/),
+                      (v15/*:: as any*/),
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v6/*: any*/),
-                          (v20/*: any*/)
+                          (v6/*:: as any*/),
+                          (v20/*:: as any*/)
                         ],
                         "type": "TerraformProvider",
                         "abstractKey": null
@@ -480,7 +479,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v21/*: any*/),
+                          (v21/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -489,9 +488,9 @@ return {
                             "name": "provider",
                             "plural": false,
                             "selections": [
-                              (v6/*: any*/),
-                              (v20/*: any*/),
-                              (v4/*: any*/)
+                              (v6/*:: as any*/),
+                              (v20/*:: as any*/),
+                              (v4/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -502,9 +501,9 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v6/*: any*/),
-                          (v22/*: any*/),
-                          (v20/*: any*/)
+                          (v6/*:: as any*/),
+                          (v22/*:: as any*/),
+                          (v20/*:: as any*/)
                         ],
                         "type": "TerraformModule",
                         "abstractKey": null
@@ -512,7 +511,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v21/*: any*/),
+                          (v21/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -521,10 +520,10 @@ return {
                             "name": "module",
                             "plural": false,
                             "selections": [
-                              (v6/*: any*/),
-                              (v22/*: any*/),
-                              (v20/*: any*/),
-                              (v4/*: any*/)
+                              (v6/*:: as any*/),
+                              (v22/*:: as any*/),
+                              (v20/*:: as any*/),
+                              (v4/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -534,19 +533,19 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v14/*: any*/),
+                        "selections": (v14/*:: as any*/),
                         "type": "VCSProvider",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v14/*: any*/),
+                        "selections": (v14/*:: as any*/),
                         "type": "Role",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v14/*: any*/),
+                        "selections": (v14/*:: as any*/),
                         "type": "Runner",
                         "abstractKey": null
                       },
@@ -567,7 +566,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v21/*: any*/),
+                          (v21/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -589,7 +588,7 @@ return {
                             "kind": "LinkedField",
                             "name": "run",
                             "plural": false,
-                            "selections": (v17/*: any*/),
+                            "selections": (v17/*:: as any*/),
                             "storageKey": null
                           }
                         ],
@@ -598,14 +597,14 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v24/*: any*/),
+                        "selections": (v24/*:: as any*/),
                         "type": "Package",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v21/*: any*/),
+                          (v21/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -614,9 +613,9 @@ return {
                             "name": "package",
                             "plural": false,
                             "selections": [
-                              (v4/*: any*/),
-                              (v6/*: any*/),
-                              (v23/*: any*/)
+                              (v4/*:: as any*/),
+                              (v6/*:: as any*/),
+                              (v23/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -626,7 +625,7 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v24/*: any*/),
+                        "selections": (v24/*:: as any*/),
                         "type": "Policy",
                         "abstractKey": null
                       },
@@ -641,9 +640,9 @@ return {
                             "name": "workspace",
                             "plural": false,
                             "selections": [
-                              (v6/*: any*/),
-                              (v7/*: any*/),
-                              (v4/*: any*/)
+                              (v6/*:: as any*/),
+                              (v7/*:: as any*/),
+                              (v4/*:: as any*/)
                             ],
                             "storageKey": null
                           },
@@ -655,8 +654,8 @@ return {
                             "name": "role",
                             "plural": false,
                             "selections": [
-                              (v6/*: any*/),
-                              (v4/*: any*/)
+                              (v6/*:: as any*/),
+                              (v4/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -682,11 +681,11 @@ return {
                     "name": "payload",
                     "plural": false,
                     "selections": [
-                      (v5/*: any*/),
+                      (v5/*:: as any*/),
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v6/*: any*/),
+                          (v6/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -701,7 +700,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v25/*: any*/),
+                          (v25/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -716,14 +715,14 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v25/*: any*/)
+                          (v25/*:: as any*/)
                         ],
                         "type": "ActivityEventRemoveNamespaceMembershipPayload",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v26/*: any*/),
+                        "selections": (v26/*:: as any*/),
                         "type": "ActivityEventMigrateWorkspacePayload",
                         "abstractKey": null
                       },
@@ -737,7 +736,7 @@ return {
                             "kind": "LinkedField",
                             "name": "labels",
                             "plural": true,
-                            "selections": (v27/*: any*/),
+                            "selections": (v27/*:: as any*/),
                             "storageKey": null
                           }
                         ],
@@ -746,19 +745,19 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v28/*: any*/),
+                        "selections": (v28/*:: as any*/),
                         "type": "ActivityEventUpdateWorkspacePayload",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v26/*: any*/),
+                        "selections": (v26/*:: as any*/),
                         "type": "ActivityEventMigrateGroupPayload",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v26/*: any*/),
+                        "selections": (v26/*:: as any*/),
                         "type": "ActivityEventMoveManagedIdentityPayload",
                         "abstractKey": null
                       },
@@ -806,21 +805,21 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v30/*: any*/),
+                        "selections": (v30/*:: as any*/),
                         "type": "ActivityEventUpdateTeamMemberPayload",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v29/*: any*/)
+                          (v29/*:: as any*/)
                         ],
                         "type": "ActivityEventRemoveTeamMemberPayload",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v30/*: any*/),
+                        "selections": (v30/*:: as any*/),
                         "type": "ActivityEventAddTeamMemberPayload",
                         "abstractKey": null
                       },
@@ -834,7 +833,7 @@ return {
                             "kind": "LinkedField",
                             "name": "labels",
                             "plural": true,
-                            "selections": (v27/*: any*/),
+                            "selections": (v27/*:: as any*/),
                             "storageKey": null
                           }
                         ],
@@ -843,7 +842,7 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v28/*: any*/),
+                        "selections": (v28/*:: as any*/),
                         "type": "ActivityEventUpdateTerraformModulePayload",
                         "abstractKey": null
                       },
@@ -897,11 +896,11 @@ return {
                     "name": "initiator",
                     "plural": false,
                     "selections": [
-                      (v5/*: any*/),
+                      (v5/*:: as any*/),
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v12/*: any*/),
+                          (v12/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -916,13 +915,13 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v6/*: any*/),
-                          (v10/*: any*/)
+                          (v6/*:: as any*/),
+                          (v10/*:: as any*/)
                         ],
                         "type": "ServiceAccount",
                         "abstractKey": null
                       },
-                      (v18/*: any*/)
+                      (v18/*:: as any*/)
                     ],
                     "storageKey": null
                   },
@@ -983,7 +982,7 @@ return {
       },
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "filters": [
           "sort",
           "username"

@@ -18,7 +18,7 @@ const query = graphql`
             emailEphemeralRetentionDays
         }
         node(id: $id) {
-            ... on EmailOutboxItem {
+            ... on EmailOutboxItem @alias(as: "emailOutboxItem") {
                 id
                 subject
                 emailType
@@ -85,7 +85,7 @@ function AdminAreaEmailOutboxDetailsContent() {
         { fetchPolicy: 'store-and-network' }
     );
 
-    const outbox = queryData.node;
+    const outbox = queryData.node?.emailOutboxItem;
 
     const breadcrumbs = [
         { title: 'email outbox', path: 'email_outbox' },

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<f44cfc84bc1150aa7ec9b29d184b1428>>
+ * @generated SignedSource<<1fab17eb02335c08ff2b1856a1a5de9a>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -48,7 +47,7 @@ return {
       "name": "roleBinding",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -57,7 +56,7 @@ return {
           "name": "role",
           "plural": false,
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "alias": null,
               "args": null,

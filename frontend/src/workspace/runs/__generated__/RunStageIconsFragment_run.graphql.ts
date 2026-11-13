@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<9fb60d43c5c501be864329ef99d9c642>>
+ * @generated SignedSource<<23c59848f9a60ae2c9fcf7a2eac6a4d2>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -48,7 +47,7 @@ var v0 = {
   "storageKey": null
 },
 v1 = [
-  (v0/*: any*/)
+  (v0/*:: as any*/)
 ];
 return {
   "argumentDefinitions": [],
@@ -63,7 +62,7 @@ return {
       "name": "id",
       "storageKey": null
     },
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -78,7 +77,7 @@ return {
       "kind": "LinkedField",
       "name": "plan",
       "plural": false,
-      "selections": (v1/*: any*/),
+      "selections": (v1/*:: as any*/),
       "storageKey": null
     },
     {
@@ -96,7 +95,7 @@ return {
           "name": "stageName",
           "storageKey": null
         },
-        (v0/*: any*/)
+        (v0/*:: as any*/)
       ],
       "storageKey": null
     },
@@ -107,7 +106,7 @@ return {
       "kind": "LinkedField",
       "name": "apply",
       "plural": false,
-      "selections": (v1/*: any*/),
+      "selections": (v1/*:: as any*/),
       "storageKey": null
     },
     {

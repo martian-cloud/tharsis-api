@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<47b1c17d6621a616b06e8d7e19a3a1c1>>
+ * @generated SignedSource<<ac640df163bf34e0d4d1cfd615e22430>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -84,8 +83,8 @@ return {
   "metadata": null,
   "name": "RunDetailsPlanStageFragment_plan",
   "selections": [
-    (v0/*: any*/),
-    (v1/*: any*/),
+    (v0/*:: as any*/),
+    (v1/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -128,7 +127,7 @@ return {
       "name": "plan",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -147,7 +146,7 @@ return {
           ],
           "storageKey": null
         },
-        (v1/*: any*/),
+        (v1/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -193,8 +192,8 @@ return {
           "name": "currentJob",
           "plural": false,
           "selections": [
-            (v0/*: any*/),
-            (v1/*: any*/),
+            (v0/*:: as any*/),
+            (v1/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -299,7 +298,7 @@ return {
       "name": "apply",
       "plural": false,
       "selections": [
-        (v1/*: any*/)
+        (v1/*:: as any*/)
       ],
       "storageKey": null
     },

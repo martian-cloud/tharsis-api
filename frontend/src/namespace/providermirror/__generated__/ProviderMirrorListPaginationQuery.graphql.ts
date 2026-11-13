@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<20d93f90f77a3e8ec3a251cdb228424a>>
+ * @generated SignedSource<<d0e1d5c60629e7a3989ce8ce5d1f50d7>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -116,7 +115,7 @@ v4 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "ProviderMirrorListPaginationQuery",
@@ -132,7 +131,7 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "ProviderMirrorListPaginationQuery",
     "selections": [
@@ -150,8 +149,8 @@ return {
         "name": "namespace",
         "plural": false,
         "selections": [
-          (v1/*: any*/),
-          (v2/*: any*/),
+          (v1/*:: as any*/),
+          (v2/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -172,7 +171,7 @@ return {
           },
           {
             "alias": null,
-            "args": (v3/*: any*/),
+            "args": (v3/*:: as any*/),
             "concreteType": "TerraformProviderVersionMirrorConnection",
             "kind": "LinkedField",
             "name": "terraformProviderMirrors",
@@ -201,7 +200,7 @@ return {
                     "name": "node",
                     "plural": false,
                     "selections": [
-                      (v1/*: any*/),
+                      (v1/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -249,7 +248,7 @@ return {
                         "name": "createdByActor",
                         "plural": false,
                         "selections": [
-                          (v2/*: any*/),
+                          (v2/*:: as any*/),
                           {
                             "kind": "TypeDiscriminator",
                             "abstractKey": "__isActor"
@@ -286,7 +285,7 @@ return {
                                     "name": "email",
                                     "storageKey": null
                                   },
-                                  (v1/*: any*/)
+                                  (v1/*:: as any*/)
                                 ],
                                 "storageKey": null
                               }
@@ -296,26 +295,26 @@ return {
                           },
                           {
                             "kind": "InlineFragment",
-                            "selections": (v4/*: any*/),
+                            "selections": (v4/*:: as any*/),
                             "type": "ServiceAccountActor",
                             "abstractKey": null
                           },
                           {
                             "kind": "InlineFragment",
-                            "selections": (v4/*: any*/),
+                            "selections": (v4/*:: as any*/),
                             "type": "VCSProviderActor",
                             "abstractKey": null
                           },
                           {
                             "kind": "InlineFragment",
-                            "selections": (v4/*: any*/),
+                            "selections": (v4/*:: as any*/),
                             "type": "JobActor",
                             "abstractKey": null
                           }
                         ],
                         "storageKey": null
                       },
-                      (v2/*: any*/)
+                      (v2/*:: as any*/)
                     ],
                     "storageKey": null
                   },
@@ -373,7 +372,7 @@ return {
           },
           {
             "alias": null,
-            "args": (v3/*: any*/),
+            "args": (v3/*:: as any*/),
             "filters": [
               "sort",
               "search"

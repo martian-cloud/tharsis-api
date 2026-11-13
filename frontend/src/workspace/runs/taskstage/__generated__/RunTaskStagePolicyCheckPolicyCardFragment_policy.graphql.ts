@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<dd300b97d38959776c450b1d554aedd9>>
+ * @generated SignedSource<<c0edd08089f6582712cc95dc1f1b29b2>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -55,7 +54,7 @@ return {
   "metadata": null,
   "name": "RunTaskStagePolicyCheckPolicyCardFragment_policy",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -174,7 +173,7 @@ return {
       "name": "policy",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,

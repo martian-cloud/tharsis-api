@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<c8ec660fc3c32d0469706a1ca6e0e785>>
+ * @generated SignedSource<<22dd9803e7eb761a0311a58cb8c9825f>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -100,19 +99,19 @@ v7 = {
   "storageKey": null
 },
 v8 = [
-  (v6/*: any*/),
-  (v2/*: any*/)
+  (v6/*:: as any*/),
+  (v2/*:: as any*/)
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "NamespaceMembershipListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -129,7 +128,7 @@ return {
                 "name": "memberships",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -138,12 +137,12 @@ return {
                     "name": "member",
                     "plural": false,
                     "selections": [
-                      (v3/*: any*/),
+                      (v3/*:: as any*/),
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v4/*: any*/),
-                          (v5/*: any*/)
+                          (v4/*:: as any*/),
+                          (v5/*:: as any*/)
                         ],
                         "type": "User",
                         "abstractKey": null
@@ -151,7 +150,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v6/*: any*/)
+                          (v6/*:: as any*/)
                         ],
                         "type": "Team",
                         "abstractKey": null
@@ -159,8 +158,8 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v7/*: any*/),
-                          (v6/*: any*/)
+                          (v7/*:: as any*/),
+                          (v6/*:: as any*/)
                         ],
                         "type": "ServiceAccount",
                         "abstractKey": null
@@ -189,19 +188,19 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "NamespaceMembershipListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v3/*: any*/),
+          (v3/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -213,7 +212,7 @@ return {
                 "name": "memberships",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -222,29 +221,29 @@ return {
                     "name": "member",
                     "plural": false,
                     "selections": [
-                      (v3/*: any*/),
+                      (v3/*:: as any*/),
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v4/*: any*/),
-                          (v5/*: any*/),
-                          (v2/*: any*/)
+                          (v4/*:: as any*/),
+                          (v5/*:: as any*/),
+                          (v2/*:: as any*/)
                         ],
                         "type": "User",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v8/*: any*/),
+                        "selections": (v8/*:: as any*/),
                         "type": "Team",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v7/*: any*/),
-                          (v6/*: any*/),
-                          (v2/*: any*/)
+                          (v7/*:: as any*/),
+                          (v6/*:: as any*/),
+                          (v2/*:: as any*/)
                         ],
                         "type": "ServiceAccount",
                         "abstractKey": null
@@ -252,7 +251,7 @@ return {
                       {
                         "kind": "InlineFragment",
                         "selections": [
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "type": "Node",
                         "abstractKey": "__isNode"
@@ -299,10 +298,10 @@ return {
                     "kind": "LinkedField",
                     "name": "role",
                     "plural": false,
-                    "selections": (v8/*: any*/),
+                    "selections": (v8/*:: as any*/),
                     "storageKey": null
                   },
-                  (v7/*: any*/)
+                  (v7/*:: as any*/)
                 ],
                 "storageKey": null
               }
@@ -310,7 +309,7 @@ return {
             "type": "Namespace",
             "abstractKey": "__isNamespace"
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }

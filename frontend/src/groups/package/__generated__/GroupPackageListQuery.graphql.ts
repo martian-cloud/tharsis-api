@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<3b2e8961585957609b0f855dec5e6e96>>
+ * @generated SignedSource<<916a27487aaa8380a66c19cf414c94ca>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -20,7 +19,9 @@ export type GroupPackageListQuery$variables = {
 };
 export type GroupPackageListQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"GroupPackageListFragment_packages">;
+    readonly group: {
+      readonly " $fragmentSpreads": FragmentRefs<"GroupPackageListFragment_packages">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type GroupPackageListQuery = {
@@ -101,7 +102,7 @@ v10 = [
     "name": "first",
     "variableName": "first"
   },
-  (v9/*: any*/),
+  (v9/*:: as any*/),
   {
     "kind": "Variable",
     "name": "last",
@@ -121,12 +122,12 @@ v10 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/),
-      (v5/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/),
+      (v5/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -134,23 +135,27 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v6/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "GroupPackageListFragment_packages"
-              }
-            ],
-            "type": "Group",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "GroupPackageListFragment_packages"
+                }
+              ],
+              "type": "Group",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "group"
           }
         ],
         "storageKey": null
@@ -162,26 +167,26 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v4/*: any*/),
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v3/*: any*/),
-      (v5/*: any*/)
+      (v2/*:: as any*/),
+      (v4/*:: as any*/),
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v3/*:: as any*/),
+      (v5/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "GroupPackageListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v6/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v7/*: any*/),
-          (v8/*: any*/),
+          (v7/*:: as any*/),
+          (v8/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -193,7 +198,7 @@ return {
                     "name": "first",
                     "value": 0
                   },
-                  (v9/*: any*/)
+                  (v9/*:: as any*/)
                 ],
                 "concreteType": "PackageConnection",
                 "kind": "LinkedField",
@@ -212,7 +217,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v10/*: any*/),
+                "args": (v10/*:: as any*/),
                 "concreteType": "PackageConnection",
                 "kind": "LinkedField",
                 "name": "packages",
@@ -234,7 +239,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v8/*: any*/),
+                          (v8/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -285,11 +290,11 @@ return {
                                 "name": "version",
                                 "storageKey": null
                               },
-                              (v8/*: any*/)
+                              (v8/*:: as any*/)
                             ],
                             "storageKey": null
                           },
-                          (v7/*: any*/)
+                          (v7/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -359,7 +364,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v10/*: any*/),
+                "args": (v10/*:: as any*/),
                 "filters": [
                   "search",
                   "sort",
@@ -390,6 +395,6 @@ return {
 };
 })();
 
-(node as any).hash = "6c22bf7b990c76fdd51a97399d4cfe0e";
+(node as any).hash = "24dff69c9eaada54171a1ca09b02287e";
 
 export default node;

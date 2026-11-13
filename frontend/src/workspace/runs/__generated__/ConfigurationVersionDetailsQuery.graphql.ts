@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<900980a27a6a4b042337525f55f3682e>>
+ * @generated SignedSource<<b206dcf963e4d8002f16aa06f93b5183>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -103,14 +102,14 @@ v6 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "ConfigurationVersionDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -119,8 +118,8 @@ return {
           {
             "kind": "InlineFragment",
             "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/),
+              (v2/*:: as any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -137,7 +136,7 @@ return {
                 ],
                 "storageKey": null
               },
-              (v4/*: any*/)
+              (v4/*:: as any*/)
             ],
             "type": "ConfigurationVersion",
             "abstractKey": null
@@ -151,24 +150,24 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "ConfigurationVersionDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v5/*: any*/),
-          (v2/*: any*/),
+          (v5/*:: as any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v3/*: any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -177,7 +176,7 @@ return {
                 "name": "createdByActor",
                 "plural": false,
                 "selections": [
-                  (v5/*: any*/),
+                  (v5/*:: as any*/),
                   {
                     "kind": "TypeDiscriminator",
                     "abstractKey": "__isActor"
@@ -214,7 +213,7 @@ return {
                             "name": "email",
                             "storageKey": null
                           },
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -224,26 +223,26 @@ return {
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v6/*: any*/),
+                    "selections": (v6/*:: as any*/),
                     "type": "ServiceAccountActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v6/*: any*/),
+                    "selections": (v6/*:: as any*/),
                     "type": "VCSProviderActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v6/*: any*/),
+                    "selections": (v6/*:: as any*/),
                     "type": "JobActor",
                     "abstractKey": null
                   }
                 ],
                 "storageKey": null
               },
-              (v4/*: any*/)
+              (v4/*:: as any*/)
             ],
             "type": "ConfigurationVersion",
             "abstractKey": null

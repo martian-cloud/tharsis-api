@@ -22,7 +22,7 @@ interface Props {
 const query = graphql`
     query AssignedManagedIdentityListQuery($id: String!) {
         node(id: $id) {
-            ...on Workspace {
+            ...on Workspace @alias(as: "workspace") {
                 ...AssignedManagedIdentityListAssignedFragment_assignedManagedIdentities
             }
         }
@@ -88,7 +88,7 @@ function AssignedManagedIdentityListContent(props: AssignedManagedIdentityListCo
                 ...AssignedManagedIdentityListItemFragment_managedIdentity
             }
         }
-    `, queryData.node)
+    `, queryData.node?.workspace)
 
     const [commitAssign, assignCommitInFlight] = useMutation<AssignedManagedIdentityListMutation>(graphql`
         mutation AssignedManagedIdentityListMutation($input: AssignManagedIdentityInput!) {

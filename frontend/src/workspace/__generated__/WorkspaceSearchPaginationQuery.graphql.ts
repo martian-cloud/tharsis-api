@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<d3e02496b7aad96bef51becc414f0857>>
+ * @generated SignedSource<<cc34a8af3ae3fc3abb794816e6ac3d24>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -105,7 +104,7 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceSearchPaginationQuery",
@@ -121,13 +120,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceSearchPaginationQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "WorkspaceConnection",
         "kind": "LinkedField",
         "name": "workspaces",
@@ -291,7 +290,7 @@ return {
       },
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "filters": [
           "search",
           "labelFilter",

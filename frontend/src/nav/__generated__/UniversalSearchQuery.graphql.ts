@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<fd645538d5f259adda23829eda1e50e0>>
+ * @generated SignedSource<<b87484272daa85b243269658df9402c4>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -104,17 +103,17 @@ v4 = {
   "storageKey": null
 },
 v5 = [
-  (v4/*: any*/)
+  (v4/*:: as any*/)
 ],
 v6 = {
   "kind": "InlineFragment",
-  "selections": (v5/*: any*/),
+  "selections": (v5/*:: as any*/),
   "type": "Group",
   "abstractKey": null
 },
 v7 = {
   "kind": "InlineFragment",
-  "selections": (v5/*: any*/),
+  "selections": (v5/*:: as any*/),
   "type": "Workspace",
   "abstractKey": null
 },
@@ -126,9 +125,9 @@ v8 = {
   "storageKey": null
 },
 v9 = [
-  (v3/*: any*/),
-  (v8/*: any*/),
-  (v4/*: any*/)
+  (v3/*:: as any*/),
+  (v8/*:: as any*/),
+  (v4/*:: as any*/)
 ],
 v10 = {
   "alias": null,
@@ -152,19 +151,19 @@ v12 = {
   "storageKey": null
 },
 v13 = [
-  (v8/*: any*/),
-  (v4/*: any*/)
+  (v8/*:: as any*/),
+  (v4/*:: as any*/)
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "UniversalSearchQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "SearchResponse",
         "kind": "LinkedField",
         "name": "search",
@@ -178,11 +177,11 @@ return {
             "name": "results",
             "plural": true,
             "selections": [
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "kind": "InlineFragment",
                 "selections": [
-                  (v3/*: any*/),
+                  (v3/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -191,9 +190,9 @@ return {
                     "name": "namespace",
                     "plural": false,
                     "selections": [
-                      (v2/*: any*/),
-                      (v6/*: any*/),
-                      (v7/*: any*/)
+                      (v2/*:: as any*/),
+                      (v6/*:: as any*/),
+                      (v7/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -203,24 +202,24 @@ return {
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v9/*: any*/),
+                "selections": (v9/*:: as any*/),
                 "type": "Group",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v9/*: any*/),
+                "selections": (v9/*:: as any*/),
                 "type": "Workspace",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
                 "selections": [
-                  (v3/*: any*/),
-                  (v8/*: any*/),
-                  (v10/*: any*/),
-                  (v11/*: any*/),
-                  (v12/*: any*/)
+                  (v3/*:: as any*/),
+                  (v8/*:: as any*/),
+                  (v10/*:: as any*/),
+                  (v11/*:: as any*/),
+                  (v12/*:: as any*/)
                 ],
                 "type": "TerraformModule",
                 "abstractKey": null
@@ -228,10 +227,10 @@ return {
               {
                 "kind": "InlineFragment",
                 "selections": [
-                  (v3/*: any*/),
-                  (v8/*: any*/),
-                  (v11/*: any*/),
-                  (v12/*: any*/)
+                  (v3/*:: as any*/),
+                  (v8/*:: as any*/),
+                  (v11/*:: as any*/),
+                  (v12/*:: as any*/)
                 ],
                 "type": "TerraformProvider",
                 "abstractKey": null
@@ -239,8 +238,8 @@ return {
               {
                 "kind": "InlineFragment",
                 "selections": [
-                  (v3/*: any*/),
-                  (v8/*: any*/)
+                  (v3/*:: as any*/),
+                  (v8/*:: as any*/)
                 ],
                 "type": "Team",
                 "abstractKey": null
@@ -257,13 +256,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "UniversalSearchQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "SearchResponse",
         "kind": "LinkedField",
         "name": "search",
@@ -277,8 +276,8 @@ return {
             "name": "results",
             "plural": true,
             "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/),
+              (v2/*:: as any*/),
+              (v3/*:: as any*/),
               {
                 "kind": "InlineFragment",
                 "selections": [
@@ -290,10 +289,10 @@ return {
                     "name": "namespace",
                     "plural": false,
                     "selections": [
-                      (v2/*: any*/),
-                      (v6/*: any*/),
-                      (v7/*: any*/),
-                      (v3/*: any*/)
+                      (v2/*:: as any*/),
+                      (v6/*:: as any*/),
+                      (v7/*:: as any*/),
+                      (v3/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -303,23 +302,23 @@ return {
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v13/*: any*/),
+                "selections": (v13/*:: as any*/),
                 "type": "Group",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v13/*: any*/),
+                "selections": (v13/*:: as any*/),
                 "type": "Workspace",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
                 "selections": [
-                  (v8/*: any*/),
-                  (v10/*: any*/),
-                  (v11/*: any*/),
-                  (v12/*: any*/)
+                  (v8/*:: as any*/),
+                  (v10/*:: as any*/),
+                  (v11/*:: as any*/),
+                  (v12/*:: as any*/)
                 ],
                 "type": "TerraformModule",
                 "abstractKey": null
@@ -327,9 +326,9 @@ return {
               {
                 "kind": "InlineFragment",
                 "selections": [
-                  (v8/*: any*/),
-                  (v11/*: any*/),
-                  (v12/*: any*/)
+                  (v8/*:: as any*/),
+                  (v11/*:: as any*/),
+                  (v12/*:: as any*/)
                 ],
                 "type": "TerraformProvider",
                 "abstractKey": null
@@ -337,7 +336,7 @@ return {
               {
                 "kind": "InlineFragment",
                 "selections": [
-                  (v8/*: any*/)
+                  (v8/*:: as any*/)
                 ],
                 "type": "Team",
                 "abstractKey": null

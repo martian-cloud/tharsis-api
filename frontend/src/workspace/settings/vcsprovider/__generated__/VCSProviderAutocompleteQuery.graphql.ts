@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<213ce4cda33137409b3f77bf16d5a7d5>>
+ * @generated SignedSource<<9fd8e66d4ed066d07369a8eb0755f739>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -101,7 +100,7 @@ v3 = {
           "name": "node",
           "plural": false,
           "selections": [
-            (v2/*: any*/),
+            (v2/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -141,20 +140,20 @@ v3 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "VCSProviderAutocompleteQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "Workspace",
         "kind": "LinkedField",
         "name": "workspace",
         "plural": false,
         "selections": [
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -164,20 +163,20 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "VCSProviderAutocompleteQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "Workspace",
         "kind": "LinkedField",
         "name": "workspace",
         "plural": false,
         "selections": [
-          (v3/*: any*/),
-          (v2/*: any*/)
+          (v3/*:: as any*/),
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }

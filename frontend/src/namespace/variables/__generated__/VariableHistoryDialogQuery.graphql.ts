@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<f187672105a258cbe61a094344beab10>>
+ * @generated SignedSource<<6b873b9869a7c20fd96764e66e8be5ca>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -18,8 +17,10 @@ export type VariableHistoryDialogQuery$variables = {
 };
 export type VariableHistoryDialogQuery$data = {
   readonly node: {
-    readonly sensitive?: boolean;
-    readonly " $fragmentSpreads": FragmentRefs<"VariableHistoryDialogFragment_variable">;
+    readonly namespaceVariable: {
+      readonly sensitive: boolean;
+      readonly " $fragmentSpreads": FragmentRefs<"VariableHistoryDialogFragment_variable">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type VariableHistoryDialogQuery = {
@@ -96,10 +97,10 @@ v8 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -107,24 +108,28 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v4/*: any*/),
+        "args": (v4/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v5/*: any*/),
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "VariableHistoryDialogFragment_variable"
-              }
-            ],
-            "type": "NamespaceVariable",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v5/*:: as any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "VariableHistoryDialogFragment_variable"
+                }
+              ],
+              "type": "NamespaceVariable",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "namespaceVariable"
           }
         ],
         "storageKey": null
@@ -136,31 +141,31 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v1/*: any*/),
-      (v0/*: any*/),
-      (v3/*: any*/)
+      (v2/*:: as any*/),
+      (v1/*:: as any*/),
+      (v0/*:: as any*/),
+      (v3/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "VariableHistoryDialogQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v4/*: any*/),
+        "args": (v4/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v6/*: any*/),
-          (v7/*: any*/),
+          (v6/*:: as any*/),
+          (v7/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v5/*: any*/),
+              (v5/*:: as any*/),
               {
                 "alias": null,
-                "args": (v8/*: any*/),
+                "args": (v8/*:: as any*/),
                 "concreteType": "NamespaceVariableVersionConnection",
                 "kind": "LinkedField",
                 "name": "versions",
@@ -200,7 +205,7 @@ return {
                             ],
                             "storageKey": null
                           },
-                          (v7/*: any*/),
+                          (v7/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -229,7 +234,7 @@ return {
                             "name": "hcl",
                             "storageKey": null
                           },
-                          (v6/*: any*/)
+                          (v6/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -273,7 +278,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v8/*: any*/),
+                "args": (v8/*:: as any*/),
                 "filters": [
                   "sort"
                 ],
@@ -302,6 +307,6 @@ return {
 };
 })();
 
-(node as any).hash = "aaefa30002f25c74341a94e8246e601d";
+(node as any).hash = "bd52f61762da6d4a9a7fdf2510ec8359";
 
 export default node;

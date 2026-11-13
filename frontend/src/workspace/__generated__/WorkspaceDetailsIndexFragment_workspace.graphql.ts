@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<f9c47a48a77d189a0738e1761f26522b>>
+ * @generated SignedSource<<c6782c0430fe9fa63314740ec4b033ea>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -64,7 +63,7 @@ return {
   "metadata": null,
   "name": "WorkspaceDetailsIndexFragment_workspace",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -191,7 +190,7 @@ return {
       "name": "currentApplyRun",
       "plural": false,
       "selections": [
-        (v0/*: any*/)
+        (v0/*:: as any*/)
       ],
       "storageKey": null
     },
@@ -203,7 +202,7 @@ return {
       "name": "currentStateVersion",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "args": null,
           "kind": "FragmentSpread",
@@ -248,7 +247,7 @@ return {
           "name": "run",
           "plural": false,
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "args": null,
               "kind": "FragmentSpread",

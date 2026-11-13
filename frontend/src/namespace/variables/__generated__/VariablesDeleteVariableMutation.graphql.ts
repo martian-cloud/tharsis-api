@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<2e10127c95a657b82199fd6a3cea40f3>>
+ * @generated SignedSource<<a1cd69342d55bcc6174124aef277f5a3>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -94,14 +93,14 @@ v3 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "VariablesDeleteVariableMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "NamespaceVariableMutationPayload",
         "kind": "LinkedField",
         "name": "deleteNamespaceVariable",
@@ -115,7 +114,7 @@ return {
             "name": "namespace",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -135,7 +134,7 @@ return {
             ],
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -145,13 +144,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "VariablesDeleteVariableMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "NamespaceVariableMutationPayload",
         "kind": "LinkedField",
         "name": "deleteNamespaceVariable",
@@ -172,7 +171,7 @@ return {
                 "name": "__typename",
                 "storageKey": null
               },
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -181,7 +180,7 @@ return {
                 "name": "variables",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -248,7 +247,7 @@ return {
             ],
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }

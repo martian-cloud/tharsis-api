@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<2d87bbd83a0683db06bf278091d285f7>>
+ * @generated SignedSource<<ae33bf8c3249a75ff7c49df38e55bc54>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -66,7 +65,7 @@ return {
         "count": null,
         "cursor": null,
         "direction": "bidirectional",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -79,7 +78,7 @@ return {
           "count": "last",
           "cursor": "before"
         },
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -93,7 +92,7 @@ return {
   },
   "name": "PackageVersionListFragment_package",
   "selections": [
-    (v1/*: any*/),
+    (v1/*:: as any*/),
     {
       "alias": "versions",
       "args": [
@@ -124,7 +123,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "args": null,
                   "kind": "FragmentSpread",

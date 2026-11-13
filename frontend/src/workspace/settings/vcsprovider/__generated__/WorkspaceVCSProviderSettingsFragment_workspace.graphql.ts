@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<4f76dcf1c00b701ebe08b8a68002ecc4>>
+ * @generated SignedSource<<ff6e7c633520c38c909f25645fb45ade>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -54,7 +53,7 @@ return {
       "kind": "LinkedField",
       "name": "workspaceVcsProviderLink",
       "plural": false,
-      "selections": (v0/*: any*/),
+      "selections": (v0/*:: as any*/),
       "storageKey": null
     },
     {
@@ -105,7 +104,7 @@ return {
               "kind": "LinkedField",
               "name": "node",
               "plural": false,
-              "selections": (v0/*: any*/),
+              "selections": (v0/*:: as any*/),
               "storageKey": null
             }
           ],

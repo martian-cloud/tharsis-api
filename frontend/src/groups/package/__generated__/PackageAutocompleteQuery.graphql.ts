@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<cf3916df9d6771680aa9d67da3929cec>>
+ * @generated SignedSource<<d6464156715c31b6de7bbdae59537a49>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -107,7 +106,7 @@ v3 = {
           "name": "node",
           "plural": false,
           "selections": [
-            (v2/*: any*/),
+            (v2/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -147,20 +146,20 @@ v3 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "PackageAutocompleteQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "Group",
         "kind": "LinkedField",
         "name": "group",
         "plural": false,
         "selections": [
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -170,20 +169,20 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "PackageAutocompleteQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "Group",
         "kind": "LinkedField",
         "name": "group",
         "plural": false,
         "selections": [
-          (v3/*: any*/),
-          (v2/*: any*/)
+          (v3/*:: as any*/),
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }

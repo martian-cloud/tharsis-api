@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<c99b2267e2bc498b6601cbb1c9cd1afb>>
+ * @generated SignedSource<<2115318b0204d840c2df872e72cc689f>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -17,7 +16,9 @@ export type JobLogsQuery$variables = {
 };
 export type JobLogsQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"JobLogsFragment_logs">;
+    readonly job: {
+      readonly " $fragmentSpreads": FragmentRefs<"JobLogsFragment_logs">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type JobLogsQuery = {
@@ -51,9 +52,9 @@ v3 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -61,23 +62,27 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "JobLogsFragment_logs"
-              }
-            ],
-            "type": "Job",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "JobLogsFragment_logs"
+                }
+              ],
+              "type": "Job",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "job"
           }
         ],
         "storageKey": null
@@ -89,16 +94,16 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v2/*: any*/),
-      (v1/*: any*/)
+      (v0/*:: as any*/),
+      (v2/*:: as any*/),
+      (v1/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "JobLogsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -194,6 +199,6 @@ return {
 };
 })();
 
-(node as any).hash = "50be62a82b1691241edc494ef91760d7";
+(node as any).hash = "6548c0f8adb4286534e720a6291890a8";
 
 export default node;

@@ -15,7 +15,7 @@ import { StateVersionListQuery } from './__generated__/StateVersionListQuery.gra
 const query = graphql`
     query StateVersionListQuery($first: Int, $last: Int, $after: String, $before: String, $workspaceId: String!) {
         node(id: $workspaceId) {
-            ...on Workspace {
+            ...on Workspace @alias(as: "workspace") {
                 ...StateVersionListFragment_stateVersions
             }
         }
@@ -72,7 +72,7 @@ function StateVersionListContent({ workspaceId, workspacePath }: StateVersionLis
                 }
             }
         }
-        `, queryData.node);
+        `, queryData.node?.workspace);
 
     const edges = data?.stateVersions?.edges ?? [];
 

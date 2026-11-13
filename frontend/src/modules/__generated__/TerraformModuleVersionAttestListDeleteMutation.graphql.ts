@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<ae9d98079ec4dced4a0b8aa6a0088cbf>>
+ * @generated SignedSource<<7cdbeb25297abbdb0f4e525905601364>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -95,8 +94,8 @@ v4 = {
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -104,7 +103,7 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v2/*: any*/),
+        "args": (v2/*:: as any*/),
         "concreteType": "DeleteTerraformModuleAttestationPayload",
         "kind": "LinkedField",
         "name": "deleteTerraformModuleAttestation",
@@ -118,11 +117,11 @@ return {
             "name": "moduleAttestation",
             "plural": false,
             "selections": [
-              (v3/*: any*/)
+              (v3/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -133,15 +132,15 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "TerraformModuleVersionAttestListDeleteMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v2/*: any*/),
+        "args": (v2/*:: as any*/),
         "concreteType": "DeleteTerraformModuleAttestationPayload",
         "kind": "LinkedField",
         "name": "deleteTerraformModuleAttestation",
@@ -155,7 +154,7 @@ return {
             "name": "moduleAttestation",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -175,7 +174,7 @@ return {
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }

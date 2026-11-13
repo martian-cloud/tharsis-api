@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<356fed6c6bf4d4e7797724a8a8b74ad1>>
+ * @generated SignedSource<<10bc78ec2abee7c19b1941146b6ad7ee>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,20 +14,22 @@ export type StateVersionDetailsQuery$variables = {
 };
 export type StateVersionDetailsQuery$data = {
   readonly node: {
-    readonly createdByActor?: {
-      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
-    } | null | undefined;
-    readonly id?: string;
-    readonly metadata?: {
-      readonly createdAt: any;
-      readonly trn: string;
-    };
-    readonly run?: {
+    readonly stateVersion: {
       readonly createdByActor: {
         readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
       } | null | undefined;
+      readonly id: string;
+      readonly metadata: {
+        readonly createdAt: any;
+        readonly trn: string;
+      };
+      readonly run: {
+        readonly createdByActor: {
+          readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+        } | null | undefined;
+      } | null | undefined;
+      readonly " $fragmentSpreads": FragmentRefs<"StateVersionFileFragment_stateVersion">;
     } | null | undefined;
-    readonly " $fragmentSpreads": FragmentRefs<"StateVersionFileFragment_stateVersion">;
   } | null | undefined;
 };
 export type StateVersionDetailsQuery = {
@@ -123,7 +124,7 @@ v7 = {
   "name": "createdByActor",
   "plural": false,
   "selections": [
-    (v5/*: any*/),
+    (v5/*:: as any*/),
     {
       "kind": "TypeDiscriminator",
       "abstractKey": "__isActor"
@@ -160,7 +161,7 @@ v7 = {
               "name": "email",
               "storageKey": null
             },
-            (v2/*: any*/)
+            (v2/*:: as any*/)
           ],
           "storageKey": null
         }
@@ -170,19 +171,19 @@ v7 = {
     },
     {
       "kind": "InlineFragment",
-      "selections": (v6/*: any*/),
+      "selections": (v6/*:: as any*/),
       "type": "ServiceAccountActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v6/*: any*/),
+      "selections": (v6/*:: as any*/),
       "type": "VCSProviderActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v6/*: any*/),
+      "selections": (v6/*:: as any*/),
       "type": "JobActor",
       "abstractKey": null
     }
@@ -191,45 +192,49 @@ v7 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "StateVersionDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/),
-              (v4/*: any*/),
-              {
-                "alias": null,
-                "args": null,
-                "concreteType": "Run",
-                "kind": "LinkedField",
-                "name": "run",
-                "plural": false,
-                "selections": [
-                  (v3/*: any*/)
-                ],
-                "storageKey": null
-              },
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "StateVersionFileFragment_stateVersion"
-              }
-            ],
-            "type": "StateVersion",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v2/*:: as any*/),
+                (v3/*:: as any*/),
+                (v4/*:: as any*/),
+                {
+                  "alias": null,
+                  "args": null,
+                  "concreteType": "Run",
+                  "kind": "LinkedField",
+                  "name": "run",
+                  "plural": false,
+                  "selections": [
+                    (v3/*:: as any*/)
+                  ],
+                  "storageKey": null
+                },
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "StateVersionFileFragment_stateVersion"
+                }
+              ],
+              "type": "StateVersion",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "stateVersion"
           }
         ],
         "storageKey": null
@@ -240,25 +245,25 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "StateVersionDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v5/*: any*/),
-          (v2/*: any*/),
+          (v5/*:: as any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v7/*: any*/),
-              (v4/*: any*/),
+              (v7/*:: as any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -267,8 +272,8 @@ return {
                 "name": "run",
                 "plural": false,
                 "selections": [
-                  (v7/*: any*/),
-                  (v2/*: any*/)
+                  (v7/*:: as any*/),
+                  (v2/*:: as any*/)
                 ],
                 "storageKey": null
               }
@@ -292,6 +297,6 @@ return {
 };
 })();
 
-(node as any).hash = "08dcd7eac11813ea2f46a736faa3b11c";
+(node as any).hash = "4abbe7af480013a91f8be956b622db6a";
 
 export default node;

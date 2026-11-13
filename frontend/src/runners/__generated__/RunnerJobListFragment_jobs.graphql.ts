@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<eff6d5c3806389152ed8ae3353d57328>>
+ * @generated SignedSource<<de45eeb09ffa1d6155d3c5e54a385d0c>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -60,7 +59,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -70,7 +69,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -121,7 +120,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "args": null,
                   "kind": "FragmentSpread",
@@ -175,7 +174,7 @@ return {
       ],
       "storageKey": "__RunnerJobList_jobs_connection(sort:\"CREATED_AT_DESC\")"
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "Runner",
   "abstractKey": null

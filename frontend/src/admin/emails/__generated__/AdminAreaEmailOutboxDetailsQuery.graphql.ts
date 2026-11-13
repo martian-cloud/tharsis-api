@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<cb07b00f365f7075f8f94b26ccc001a4>>
+ * @generated SignedSource<<a91c1dd7d6f73caad7958f5bc663ced9>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -26,23 +25,25 @@ export type AdminAreaEmailOutboxDetailsQuery$data = {
     readonly emailEphemeralRetentionDays: number;
   };
   readonly node: {
-    readonly emailType?: string;
-    readonly ephemeral?: boolean;
-    readonly id?: string;
-    readonly metadata?: {
-      readonly createdAt: any;
-      readonly trn: string;
-    };
-    readonly recipientStats?: {
-      readonly clicked: number;
-      readonly delivered: number;
-      readonly issues: number;
-      readonly opened: number;
-      readonly total: number;
-    };
-    readonly status?: EmailOutboxItemStatus;
-    readonly subject?: string;
-    readonly " $fragmentSpreads": FragmentRefs<"AdminAreaEmailRecipientListFragment_outbox">;
+    readonly emailOutboxItem: {
+      readonly emailType: string;
+      readonly ephemeral: boolean;
+      readonly id: string;
+      readonly metadata: {
+        readonly createdAt: any;
+        readonly trn: string;
+      };
+      readonly recipientStats: {
+        readonly clicked: number;
+        readonly delivered: number;
+        readonly issues: number;
+        readonly opened: number;
+        readonly total: number;
+      };
+      readonly status: EmailOutboxItemStatus;
+      readonly subject: string;
+      readonly " $fragmentSpreads": FragmentRefs<"AdminAreaEmailRecipientListFragment_outbox">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type AdminAreaEmailOutboxDetailsQuery = {
@@ -264,45 +265,49 @@ v17 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/),
-      (v5/*: any*/),
-      (v6/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/),
+      (v5/*:: as any*/),
+      (v6/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
     "name": "AdminAreaEmailOutboxDetailsQuery",
     "selections": [
-      (v7/*: any*/),
+      (v7/*:: as any*/),
       {
         "alias": null,
-        "args": (v8/*: any*/),
+        "args": (v8/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v9/*: any*/),
-              (v10/*: any*/),
-              (v11/*: any*/),
-              (v12/*: any*/),
-              (v13/*: any*/),
-              (v14/*: any*/),
-              (v15/*: any*/),
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "AdminAreaEmailRecipientListFragment_outbox"
-              }
-            ],
-            "type": "EmailOutboxItem",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v9/*:: as any*/),
+                (v10/*:: as any*/),
+                (v11/*:: as any*/),
+                (v12/*:: as any*/),
+                (v13/*:: as any*/),
+                (v14/*:: as any*/),
+                (v15/*:: as any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "AdminAreaEmailRecipientListFragment_outbox"
+                }
+              ],
+              "type": "EmailOutboxItem",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "emailOutboxItem"
           }
         ],
         "storageKey": null
@@ -314,40 +319,40 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v5/*: any*/),
-      (v2/*: any*/),
-      (v0/*: any*/),
-      (v6/*: any*/),
-      (v1/*: any*/),
-      (v4/*: any*/),
-      (v3/*: any*/)
+      (v5/*:: as any*/),
+      (v2/*:: as any*/),
+      (v0/*:: as any*/),
+      (v6/*:: as any*/),
+      (v1/*:: as any*/),
+      (v4/*:: as any*/),
+      (v3/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "AdminAreaEmailOutboxDetailsQuery",
     "selections": [
-      (v7/*: any*/),
+      (v7/*:: as any*/),
       {
         "alias": null,
-        "args": (v8/*: any*/),
+        "args": (v8/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v16/*: any*/),
-          (v9/*: any*/),
+          (v16/*:: as any*/),
+          (v9/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v10/*: any*/),
-              (v11/*: any*/),
-              (v12/*: any*/),
-              (v13/*: any*/),
-              (v14/*: any*/),
-              (v15/*: any*/),
+              (v10/*:: as any*/),
+              (v11/*:: as any*/),
+              (v12/*:: as any*/),
+              (v13/*:: as any*/),
+              (v14/*:: as any*/),
+              (v15/*:: as any*/),
               {
                 "alias": null,
-                "args": (v17/*: any*/),
+                "args": (v17/*:: as any*/),
                 "concreteType": "EmailRecipientConnection",
                 "kind": "LinkedField",
                 "name": "recipients",
@@ -369,7 +374,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v9/*: any*/),
+                          (v9/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -433,7 +438,7 @@ return {
                             "name": "failureReason",
                             "storageKey": null
                           },
-                          (v16/*: any*/)
+                          (v16/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -477,7 +482,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v17/*: any*/),
+                "args": (v17/*:: as any*/),
                 "filters": [
                   "search",
                   "deliveryStatuses",
@@ -510,6 +515,6 @@ return {
 };
 })();
 
-(node as any).hash = "48ac407651447301108d360889c51c8d";
+(node as any).hash = "70b170788c0c35863fccf9a21ff27706";
 
 export default node;

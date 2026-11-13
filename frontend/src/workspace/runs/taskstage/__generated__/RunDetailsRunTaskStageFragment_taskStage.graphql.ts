@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<a3facac37db50a96be5c8ac4440da5d3>>
+ * @generated SignedSource<<7b8a256092d99d772d67a9db4ce4d279>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -75,7 +74,7 @@ return {
   "metadata": null,
   "name": "RunDetailsRunTaskStageFragment_taskStage",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -130,7 +129,7 @@ return {
           "name": "stageName",
           "storageKey": null
         },
-        (v1/*: any*/),
+        (v1/*:: as any*/),
         {
           "args": null,
           "kind": "FragmentSpread",
@@ -151,7 +150,7 @@ return {
               "name": "checkType",
               "storageKey": null
             },
-            (v1/*: any*/),
+            (v1/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -217,8 +216,8 @@ return {
               "name": "policies",
               "plural": true,
               "selections": [
-                (v0/*: any*/),
-                (v1/*: any*/),
+                (v0/*:: as any*/),
+                (v1/*:: as any*/),
                 {
                   "args": null,
                   "kind": "FragmentSpread",

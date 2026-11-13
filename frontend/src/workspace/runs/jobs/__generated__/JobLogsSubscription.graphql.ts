@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<8d4ae647ee7509a73a08aadd894fdef6>>
+ * @generated SignedSource<<78777a25e1f5bcee3816af9a09529e7d>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -99,20 +98,20 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "JobLogsSubscription",
-    "selections": (v1/*: any*/),
+    "selections": (v1/*:: as any*/),
     "type": "Subscription",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "JobLogsSubscription",
-    "selections": (v1/*: any*/)
+    "selections": (v1/*:: as any*/)
   },
   "params": {
     "cacheID": "5c53020c1b1272c7f93bf58ada9bc3d9",

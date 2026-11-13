@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<9eca5b6e237b6b7fefbd42a6ed9deefe>>
+ * @generated SignedSource<<96af25768b4ff8e77d4c158e672a1b14>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -57,7 +56,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -67,7 +66,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": AnnouncementPaginationQuery_graphql

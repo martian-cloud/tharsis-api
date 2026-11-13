@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<90e9e03d400e2713c050bf9773798390>>
+ * @generated SignedSource<<c75c14db088be302e603e428635d2264>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -147,7 +146,7 @@ return {
               "name": "resources",
               "plural": true,
               "selections": [
-                (v0/*: any*/),
+                (v0/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -190,8 +189,8 @@ return {
                   "name": "mode",
                   "storageKey": null
                 },
-                (v1/*: any*/),
-                (v2/*: any*/),
+                (v1/*:: as any*/),
+                (v2/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -206,7 +205,7 @@ return {
                   "name": "imported",
                   "storageKey": null
                 },
-                (v3/*: any*/)
+                (v3/*:: as any*/)
               ],
               "storageKey": null
             },
@@ -218,7 +217,7 @@ return {
               "name": "outputs",
               "plural": true,
               "selections": [
-                (v0/*: any*/),
+                (v0/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -226,9 +225,9 @@ return {
                   "name": "outputName",
                   "storageKey": null
                 },
-                (v1/*: any*/),
-                (v2/*: any*/),
-                (v3/*: any*/)
+                (v1/*:: as any*/),
+                (v2/*:: as any*/),
+                (v3/*:: as any*/)
               ],
               "storageKey": null
             }

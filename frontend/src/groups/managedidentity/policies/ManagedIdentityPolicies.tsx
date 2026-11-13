@@ -13,7 +13,9 @@ import { StyledCode } from '@/common/StyledCode';
 const query = graphql`
     query ManagedIdentityPoliciesQuery($id: String!) {
         node(id: $id) {
-            ...ManagedIdentityPoliciesPoliciesFragment_managedIdentity
+            ... on ManagedIdentity @alias(as: "managedIdentity") {
+                ...ManagedIdentityPoliciesPoliciesFragment_managedIdentity
+            }
         }
     }
 `;
@@ -43,7 +45,7 @@ function ManagedIdentityPolicies({ fragmentRef }: Props) {
                 ...PolicyCardFragment_policy
             }
         }
-    `, queryData.node);
+    `, queryData.node?.managedIdentity);
 
     const policies = data?.referencingPolicies ?? [];
 

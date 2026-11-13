@@ -20,7 +20,7 @@ const INITIAL_ITEM_COUNT = 100;
 const query = graphql`
     query VCSProviderListQuery($first: Int, $last: Int, $after: String, $before: String, $groupId: String!, $search: String) {
         node(id: $groupId) {
-            ...on Group {
+            ...on Group @alias(as: "group") {
                 ...VCSProviderListFragment_vcsProviders
             }
         }
@@ -79,7 +79,7 @@ function VCSProviderList(props: Props) {
                 }
             }
       }
-    `, queryData.node);
+    `, queryData.node?.group);
 
     const environment = useRelayEnvironment();
 

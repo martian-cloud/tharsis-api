@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<3a884284782d5299ae888b62c44dcc45>>
+ * @generated SignedSource<<894098bc6f1592ba71c482150aa6d7bc>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -101,7 +100,7 @@ return {
       ],
       "storageKey": null
     },
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -149,7 +148,7 @@ return {
       "name": "apply",
       "plural": false,
       "selections": [
-        (v0/*: any*/)
+        (v0/*:: as any*/)
       ],
       "storageKey": null
     },

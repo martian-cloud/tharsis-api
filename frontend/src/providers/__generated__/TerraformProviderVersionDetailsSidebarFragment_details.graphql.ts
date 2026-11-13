@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<9e5766825ba18402be0b49fa13bbb843>>
+ * @generated SignedSource<<f70b8d39d553b92fd14a9309a8638ded>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -107,7 +106,7 @@ return {
       "name": "platforms",
       "plural": true,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -158,7 +157,7 @@ return {
       "name": "provider",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<875ffc9a9ba4c2d98410dfa4d7636adb>>
+ * @generated SignedSource<<90ac313b83cd38888f16bf326658f2b1>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,8 +14,10 @@ export type RunDetailsPlanDiffViewerQuery$variables = {
 };
 export type RunDetailsPlanDiffViewerQuery$data = {
   readonly node: {
-    readonly id?: string;
-    readonly " $fragmentSpreads": FragmentRefs<"RunDetailsPlanDiffViewerFragment_run">;
+    readonly run: {
+      readonly id: string;
+      readonly " $fragmentSpreads": FragmentRefs<"RunDetailsPlanDiffViewerFragment_run">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type RunDetailsPlanDiffViewerQuery = {
@@ -101,31 +102,35 @@ v6 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "RunDetailsPlanDiffViewerQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v2/*: any*/),
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "RunDetailsPlanDiffViewerFragment_run"
-              }
-            ],
-            "type": "Run",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v2/*:: as any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "RunDetailsPlanDiffViewerFragment_run"
+                }
+              ],
+              "type": "Run",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "run"
           }
         ],
         "storageKey": null
@@ -136,13 +141,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "RunDetailsPlanDiffViewerQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -155,7 +160,7 @@ return {
             "name": "__typename",
             "storageKey": null
           },
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -190,7 +195,7 @@ return {
                         "name": "resources",
                         "plural": true,
                         "selections": [
-                          (v3/*: any*/),
+                          (v3/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -233,8 +238,8 @@ return {
                             "name": "mode",
                             "storageKey": null
                           },
-                          (v4/*: any*/),
-                          (v5/*: any*/),
+                          (v4/*:: as any*/),
+                          (v5/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -249,7 +254,7 @@ return {
                             "name": "imported",
                             "storageKey": null
                           },
-                          (v6/*: any*/)
+                          (v6/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -261,7 +266,7 @@ return {
                         "name": "outputs",
                         "plural": true,
                         "selections": [
-                          (v3/*: any*/),
+                          (v3/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -269,16 +274,16 @@ return {
                             "name": "outputName",
                             "storageKey": null
                           },
-                          (v4/*: any*/),
-                          (v5/*: any*/),
-                          (v6/*: any*/)
+                          (v4/*:: as any*/),
+                          (v5/*:: as any*/),
+                          (v6/*:: as any*/)
                         ],
                         "storageKey": null
                       }
                     ],
                     "storageKey": null
                   },
-                  (v2/*: any*/)
+                  (v2/*:: as any*/)
                 ],
                 "storageKey": null
               }
@@ -302,6 +307,6 @@ return {
 };
 })();
 
-(node as any).hash = "6c5aa2a8c3ab44a15a83b6414f867b4b";
+(node as any).hash = "c41153f03e90250aa70851c41b528db1";
 
 export default node;

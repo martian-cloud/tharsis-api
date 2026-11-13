@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<e4b1e2f5b60fc0f7217362fc4e7f350e>>
+ * @generated SignedSource<<288eb1549fdff29bdae7031ee7dbb749>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -54,7 +53,7 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "AnnouncementPaginationQuery",
@@ -70,13 +69,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "AnnouncementPaginationQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "AnnouncementConnection",
         "kind": "LinkedField",
         "name": "announcements",
@@ -204,7 +203,7 @@ return {
       },
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "filters": [
           "sort"
         ],

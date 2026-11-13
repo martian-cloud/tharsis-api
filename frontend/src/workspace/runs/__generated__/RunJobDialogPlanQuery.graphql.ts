@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<6feac3fc6874e7472e00344ce64e5222>>
+ * @generated SignedSource<<0b66c9aad0e7c2fe7995a401f979401e>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -17,8 +16,10 @@ export type RunJobDialogPlanQuery$variables = {
 };
 export type RunJobDialogPlanQuery$data = {
   readonly node: {
-    readonly id?: string;
-    readonly " $fragmentSpreads": FragmentRefs<"RunJobDialogPlanFragment_jobs">;
+    readonly run: {
+      readonly id: string;
+      readonly " $fragmentSpreads": FragmentRefs<"RunJobDialogPlanFragment_jobs">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type RunJobDialogPlanQuery = {
@@ -83,9 +84,9 @@ v6 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -93,24 +94,28 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v4/*: any*/),
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "RunJobDialogPlanFragment_jobs"
-              }
-            ],
-            "type": "Run",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v4/*:: as any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "RunJobDialogPlanFragment_jobs"
+                }
+              ],
+              "type": "Run",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "run"
           }
         ],
         "storageKey": null
@@ -122,23 +127,23 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v2/*:: as any*/),
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "RunJobDialogPlanQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v5/*: any*/),
-          (v4/*: any*/),
+          (v5/*:: as any*/),
+          (v4/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -152,7 +157,7 @@ return {
                 "selections": [
                   {
                     "alias": null,
-                    "args": (v6/*: any*/),
+                    "args": (v6/*:: as any*/),
                     "concreteType": "JobConnection",
                     "kind": "LinkedField",
                     "name": "jobs",
@@ -174,7 +179,7 @@ return {
                             "name": "node",
                             "plural": false,
                             "selections": [
-                              (v4/*: any*/),
+                              (v4/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -197,7 +202,7 @@ return {
                                 "name": "runner",
                                 "plural": false,
                                 "selections": [
-                                  (v4/*: any*/),
+                                  (v4/*:: as any*/),
                                   {
                                     "alias": null,
                                     "args": null,
@@ -279,7 +284,7 @@ return {
                                 ],
                                 "storageKey": null
                               },
-                              (v5/*: any*/)
+                              (v5/*:: as any*/)
                             ],
                             "storageKey": null
                           },
@@ -323,7 +328,7 @@ return {
                   },
                   {
                     "alias": null,
-                    "args": (v6/*: any*/),
+                    "args": (v6/*:: as any*/),
                     "filters": [
                       "sort"
                     ],
@@ -332,7 +337,7 @@ return {
                     "kind": "LinkedHandle",
                     "name": "jobs"
                   },
-                  (v4/*: any*/)
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               }
@@ -356,6 +361,6 @@ return {
 };
 })();
 
-(node as any).hash = "ac6006d06d85db11156a1750a8be0e6d";
+(node as any).hash = "24b4ec0230382275103bcc0af9d4eea3";
 
 export default node;

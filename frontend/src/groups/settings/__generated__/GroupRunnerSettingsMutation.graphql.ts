@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<7ab4121c527f2e0d20972dd47123902a>>
+ * @generated SignedSource<<8e58f1412d6876a3d36c4b10de4fedf4>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -137,14 +136,14 @@ v5 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "GroupRunnerSettingsMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateGroupPayload",
         "kind": "LinkedField",
         "name": "updateGroup",
@@ -158,7 +157,7 @@ return {
             "name": "group",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -167,8 +166,8 @@ return {
                 "name": "runnerTags",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
-                  (v4/*: any*/)
+                  (v3/*:: as any*/),
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -180,7 +179,7 @@ return {
             ],
             "storageKey": null
           },
-          (v5/*: any*/)
+          (v5/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -190,13 +189,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "GroupRunnerSettingsMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateGroupPayload",
         "kind": "LinkedField",
         "name": "updateGroup",
@@ -210,7 +209,7 @@ return {
             "name": "group",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -219,8 +218,8 @@ return {
                 "name": "runnerTags",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
-                  (v4/*: any*/),
+                  (v3/*:: as any*/),
+                  (v4/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -241,7 +240,7 @@ return {
             ],
             "storageKey": null
           },
-          (v5/*: any*/)
+          (v5/*:: as any*/)
         ],
         "storageKey": null
       }

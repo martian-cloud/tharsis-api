@@ -8,7 +8,7 @@ import JobStatusChip from './JobStatusChip';
 import { JOB_TYPE_LABELS } from './jobUtils';
 import { JobDetailsQuery } from './__generated__/JobDetailsQuery.graphql';
 
-type Job = NonNullable<JobDetailsQuery['response']['node']>;
+type Job = NonNullable<NonNullable<JobDetailsQuery['response']['node']>['job']>;
 
 export const JobSidebarWidth = 320;
 
