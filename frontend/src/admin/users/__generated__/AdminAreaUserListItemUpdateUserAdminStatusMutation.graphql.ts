@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<0f8df4e260aaad595df1aed5534c7384>>
+ * @generated SignedSource<<4fc951ae8f429194aeefa9b5f5c75e71>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -84,14 +83,14 @@ v2 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "AdminAreaUserListItemUpdateUserAdminStatusMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateUserAdminStatusPayload",
         "kind": "LinkedField",
         "name": "updateUserAdminStatus",
@@ -113,7 +112,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -123,13 +122,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "AdminAreaUserListItemUpdateUserAdminStatusMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateUserAdminStatusPayload",
         "kind": "LinkedField",
         "name": "updateUserAdminStatus",
@@ -213,7 +212,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }

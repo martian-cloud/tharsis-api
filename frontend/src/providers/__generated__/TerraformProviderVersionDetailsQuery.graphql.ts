@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<499264c8499d6b45afaa4fe4221a62eb>>
+ * @generated SignedSource<<012a0bd3f70708ffc746358ebc9537bc>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -78,9 +77,9 @@ v5 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -88,13 +87,13 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": "TerraformProviderVersion",
         "kind": "LinkedField",
         "name": "terraformProviderVersion",
         "plural": false,
         "selections": [
-          (v4/*: any*/),
+          (v4/*:: as any*/),
           {
             "args": null,
             "kind": "FragmentSpread",
@@ -110,22 +109,22 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v1/*: any*/),
-      (v0/*: any*/),
-      (v2/*: any*/)
+      (v1/*:: as any*/),
+      (v0/*:: as any*/),
+      (v2/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "TerraformProviderVersionDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": "TerraformProviderVersion",
         "kind": "LinkedField",
         "name": "terraformProviderVersion",
         "plural": false,
         "selections": [
-          (v4/*: any*/),
+          (v4/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -180,7 +179,7 @@ return {
             "name": "provider",
             "plural": false,
             "selections": [
-              (v4/*: any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -263,7 +262,7 @@ return {
                         "name": "email",
                         "storageKey": null
                       },
-                      (v4/*: any*/)
+                      (v4/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -273,19 +272,19 @@ return {
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v5/*: any*/),
+                "selections": (v5/*:: as any*/),
                 "type": "ServiceAccountActor",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v5/*: any*/),
+                "selections": (v5/*:: as any*/),
                 "type": "VCSProviderActor",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v5/*: any*/),
+                "selections": (v5/*:: as any*/),
                 "type": "JobActor",
                 "abstractKey": null
               }
@@ -321,7 +320,7 @@ return {
             "name": "platforms",
             "plural": true,
             "selections": [
-              (v4/*: any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,

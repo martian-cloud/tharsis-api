@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<7ec7acfe3d943f9a7d24266cefdf39b3>>
+ * @generated SignedSource<<69f2f9746f975056858b6700b85086db>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -81,7 +80,7 @@ v3 = {
       "name": "field",
       "storageKey": null
     },
-    (v2/*: any*/)
+    (v2/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -114,7 +113,7 @@ v6 = {
       "name": "fullPath",
       "storageKey": null
     },
-    (v4/*: any*/)
+    (v4/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -129,14 +128,14 @@ v7 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "RunDetailsApplyStageCancelRunMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunMutationPayload",
         "kind": "LinkedField",
         "name": "cancelRun",
@@ -158,7 +157,7 @@ return {
             ],
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -168,13 +167,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "RunDetailsApplyStageCancelRunMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunMutationPayload",
         "kind": "LinkedField",
         "name": "cancelRun",
@@ -188,9 +187,9 @@ return {
             "name": "run",
             "plural": false,
             "selections": [
-              (v4/*: any*/),
-              (v5/*: any*/),
-              (v6/*: any*/),
+              (v4/*:: as any*/),
+              (v5/*:: as any*/),
+              (v6/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -199,7 +198,7 @@ return {
                 "name": "plan",
                 "plural": false,
                 "selections": [
-                  (v5/*: any*/),
+                  (v5/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -267,7 +266,7 @@ return {
                     ],
                     "storageKey": null
                   },
-                  (v4/*: any*/)
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -297,7 +296,7 @@ return {
                     ],
                     "storageKey": null
                   },
-                  (v5/*: any*/),
+                  (v5/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -324,7 +323,7 @@ return {
                         "kind": "TypeDiscriminator",
                         "abstractKey": "__isActor"
                       },
-                      (v2/*: any*/),
+                      (v2/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -350,7 +349,7 @@ return {
                                 "name": "email",
                                 "storageKey": null
                               },
-                              (v4/*: any*/)
+                              (v4/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -360,19 +359,19 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v7/*: any*/),
+                        "selections": (v7/*:: as any*/),
                         "type": "ServiceAccountActor",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v7/*: any*/),
+                        "selections": (v7/*:: as any*/),
                         "type": "VCSProviderActor",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v7/*: any*/),
+                        "selections": (v7/*:: as any*/),
                         "type": "JobActor",
                         "abstractKey": null
                       }
@@ -387,8 +386,8 @@ return {
                     "name": "currentJob",
                     "plural": false,
                     "selections": [
-                      (v4/*: any*/),
-                      (v5/*: any*/),
+                      (v4/*:: as any*/),
+                      (v5/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -442,7 +441,7 @@ return {
                         "name": "runnerAvailabilityStatus",
                         "storageKey": null
                       },
-                      (v6/*: any*/),
+                      (v6/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -576,7 +575,7 @@ return {
                     ],
                     "storageKey": "jobs(first:0)"
                   },
-                  (v4/*: any*/)
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -678,7 +677,7 @@ return {
                             "name": "name",
                             "storageKey": null
                           },
-                          (v5/*: any*/),
+                          (v5/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -694,7 +693,7 @@ return {
                                 "name": "address",
                                 "storageKey": null
                               },
-                              (v5/*: any*/),
+                              (v5/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -711,14 +710,14 @@ return {
                     ],
                     "storageKey": null
                   },
-                  (v4/*: any*/)
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               }
             ],
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }

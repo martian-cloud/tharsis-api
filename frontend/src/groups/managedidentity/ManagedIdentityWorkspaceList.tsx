@@ -18,7 +18,7 @@ interface Props {
 const query = graphql`
     query ManagedIdentityWorkspaceListQuery($first: Int, $after: String, $managedIdentityId: String!) {
         node(id: $managedIdentityId) {
-            ...on ManagedIdentity {
+            ...on ManagedIdentity @alias(as: "managedIdentity") {
                 ...ManagedIdentityWorkspaceListFragment_workspaces
             }
         }
@@ -46,7 +46,7 @@ function ManagedIdentityWorkspaceList({ managedIdentityId }: Props) {
                 }
             }
         }
-    `, queryData.node);
+    `, queryData.node?.managedIdentity);
 
     const edges = data?.workspaces?.edges ?? [];
     const edgeCount = edges.length;

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<77be9dd662460a40d8b33f0655d8b48c>>
+ * @generated SignedSource<<e28807b7ee8247d5fa316a387dbe6584>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -80,7 +79,7 @@ return {
         "count": null,
         "cursor": null,
         "direction": "bidirectional",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -93,7 +92,7 @@ return {
           "count": "last",
           "cursor": "before"
         },
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -115,7 +114,7 @@ return {
           "name": "first",
           "value": 0
         },
-        (v1/*: any*/)
+        (v1/*:: as any*/)
       ],
       "concreteType": "PackageConnection",
       "kind": "LinkedField",
@@ -135,7 +134,7 @@ return {
     {
       "alias": "packages",
       "args": [
-        (v1/*: any*/),
+        (v1/*:: as any*/),
         {
           "kind": "Variable",
           "name": "search",
@@ -168,7 +167,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v2/*: any*/),
+                (v2/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -255,7 +254,7 @@ return {
       ],
       "storageKey": null
     },
-    (v2/*: any*/)
+    (v2/*:: as any*/)
   ],
   "type": "Group",
   "abstractKey": null

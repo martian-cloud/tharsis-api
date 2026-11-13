@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<8608b9997418ed517d7de1b4fde466fa>>
+ * @generated SignedSource<<b5d00174467ccb27a2ad512dad4951c1>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,10 +14,14 @@ export type GroupOrWorkspaceRendererQuery$variables = {
 };
 export type GroupOrWorkspaceRendererQuery$data = {
   readonly namespace: {
-    readonly __typename: string;
     readonly fullPath: string;
+    readonly group: {
+      readonly " $fragmentSpreads": FragmentRefs<"GroupDetailsFragment_group">;
+    } | null | undefined;
     readonly id: string;
-    readonly " $fragmentSpreads": FragmentRefs<"GroupDetailsFragment_group" | "WorkspaceDetailsFragment_workspace">;
+    readonly workspace: {
+      readonly " $fragmentSpreads": FragmentRefs<"WorkspaceDetailsFragment_workspace">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type GroupOrWorkspaceRendererQuery = {
@@ -45,21 +48,21 @@ v2 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "__typename",
+  "name": "id",
   "storageKey": null
 },
 v3 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "id",
+  "name": "fullPath",
   "storageKey": null
 },
 v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "fullPath",
+  "name": "__typename",
   "storageKey": null
 },
 v5 = {
@@ -143,8 +146,8 @@ v14 = {
   "storageKey": null
 },
 v15 = [
-  (v13/*: any*/),
-  (v3/*: any*/)
+  (v13/*:: as any*/),
+  (v2/*:: as any*/)
 ],
 v16 = {
   "alias": null,
@@ -161,7 +164,7 @@ v16 = {
       "name": "stageName",
       "storageKey": null
     },
-    (v13/*: any*/)
+    (v13/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -172,7 +175,7 @@ v17 = {
   "kind": "LinkedField",
   "name": "apply",
   "plural": false,
-  "selections": (v15/*: any*/),
+  "selections": (v15/*:: as any*/),
   "storageKey": null
 },
 v18 = {
@@ -183,8 +186,8 @@ v18 = {
   "name": "workspace",
   "plural": false,
   "selections": [
-    (v4/*: any*/),
-    (v3/*: any*/)
+    (v3/*:: as any*/),
+    (v2/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -214,7 +217,7 @@ v20 = {
   "storageKey": null
 },
 v21 = [
-  (v3/*: any*/)
+  (v2/*:: as any*/)
 ],
 v22 = {
   "alias": null,
@@ -225,45 +228,52 @@ v22 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "GroupOrWorkspaceRendererQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "namespace",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
-          (v3/*: any*/),
-          (v4/*: any*/),
+          (v2/*:: as any*/),
+          (v3/*:: as any*/),
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "GroupDetailsFragment_group"
-              }
-            ],
-            "type": "Group",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "GroupDetailsFragment_group"
+                }
+              ],
+              "type": "Group",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "group"
           },
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "WorkspaceDetailsFragment_workspace"
-              }
-            ],
-            "type": "Workspace",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "WorkspaceDetailsFragment_workspace"
+                }
+              ],
+              "type": "Workspace",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "workspace"
           }
         ],
         "storageKey": null
@@ -274,48 +284,48 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "GroupOrWorkspaceRendererQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "namespace",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
-          (v3/*: any*/),
-          (v4/*: any*/),
+          (v4/*:: as any*/),
+          (v2/*:: as any*/),
+          (v3/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v5/*: any*/),
-              (v6/*: any*/),
-              (v7/*: any*/),
+              (v5/*:: as any*/),
+              (v6/*:: as any*/),
+              (v7/*:: as any*/),
               {
                 "alias": null,
-                "args": (v8/*: any*/),
+                "args": (v8/*:: as any*/),
                 "concreteType": "GroupConnection",
                 "kind": "LinkedField",
                 "name": "descendentGroups",
                 "plural": false,
-                "selections": (v9/*: any*/),
+                "selections": (v9/*:: as any*/),
                 "storageKey": "descendentGroups(first:0)"
               },
               {
                 "alias": null,
-                "args": (v8/*: any*/),
+                "args": (v8/*:: as any*/),
                 "concreteType": "WorkspaceConnection",
                 "kind": "LinkedField",
                 "name": "workspaces",
                 "plural": false,
-                "selections": (v9/*: any*/),
+                "selections": (v9/*:: as any*/),
                 "storageKey": "workspaces(first:0)"
               },
-              (v10/*: any*/)
+              (v10/*:: as any*/)
             ],
             "type": "Group",
             "abstractKey": null
@@ -323,8 +333,8 @@ return {
           {
             "kind": "InlineFragment",
             "selections": [
-              (v5/*: any*/),
-              (v6/*: any*/),
+              (v5/*:: as any*/),
+              (v6/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -354,12 +364,12 @@ return {
                 "name": "labels",
                 "plural": true,
                 "selections": [
-                  (v11/*: any*/),
-                  (v12/*: any*/)
+                  (v11/*:: as any*/),
+                  (v12/*:: as any*/)
                 ],
                 "storageKey": null
               },
-              (v7/*: any*/),
+              (v7/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -375,7 +385,7 @@ return {
                     "name": "hasDrift",
                     "storageKey": null
                   },
-                  (v3/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -398,8 +408,8 @@ return {
                     "name": "run",
                     "plural": false,
                     "selections": [
-                      (v3/*: any*/),
-                      (v13/*: any*/)
+                      (v2/*:: as any*/),
+                      (v13/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -414,9 +424,9 @@ return {
                 "name": "currentApplyRun",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
-                  (v13/*: any*/),
-                  (v14/*: any*/),
+                  (v2/*:: as any*/),
+                  (v13/*:: as any*/),
+                  (v14/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -424,12 +434,12 @@ return {
                     "kind": "LinkedField",
                     "name": "plan",
                     "plural": false,
-                    "selections": (v15/*: any*/),
+                    "selections": (v15/*:: as any*/),
                     "storageKey": null
                   },
-                  (v16/*: any*/),
-                  (v17/*: any*/),
-                  (v18/*: any*/),
+                  (v16/*:: as any*/),
+                  (v17/*:: as any*/),
+                  (v18/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -448,8 +458,8 @@ return {
                 "name": "currentStateVersion",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
-                  (v19/*: any*/),
+                  (v2/*:: as any*/),
+                  (v19/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -466,8 +476,8 @@ return {
                         "name": "resources",
                         "plural": true,
                         "selections": [
-                          (v2/*: any*/),
-                          (v5/*: any*/),
+                          (v4/*:: as any*/),
+                          (v5/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -475,7 +485,7 @@ return {
                             "name": "provider",
                             "storageKey": null
                           },
-                          (v20/*: any*/),
+                          (v20/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -516,7 +526,7 @@ return {
                             "name": "stateVersion",
                             "plural": false,
                             "selections": [
-                              (v3/*: any*/),
+                              (v2/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -546,7 +556,7 @@ return {
                             "name": "workspace",
                             "plural": false,
                             "selections": [
-                              (v3/*: any*/),
+                              (v2/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -554,7 +564,7 @@ return {
                                 "kind": "LinkedField",
                                 "name": "currentStateVersion",
                                 "plural": false,
-                                "selections": (v21/*: any*/),
+                                "selections": (v21/*:: as any*/),
                                 "storageKey": null
                               }
                             ],
@@ -571,8 +581,8 @@ return {
                         "name": "checkResults",
                         "plural": true,
                         "selections": [
-                          (v5/*: any*/),
-                          (v13/*: any*/),
+                          (v5/*:: as any*/),
+                          (v13/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -588,7 +598,7 @@ return {
                                 "name": "address",
                                 "storageKey": null
                               },
-                              (v13/*: any*/),
+                              (v13/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -627,9 +637,9 @@ return {
                         "name": "moduleVersion",
                         "storageKey": null
                       },
-                      (v3/*: any*/),
-                      (v13/*: any*/),
-                      (v14/*: any*/),
+                      (v2/*:: as any*/),
+                      (v13/*:: as any*/),
+                      (v14/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -638,8 +648,8 @@ return {
                         "name": "plan",
                         "plural": false,
                         "selections": [
-                          (v13/*: any*/),
-                          (v3/*: any*/),
+                          (v13/*:: as any*/),
+                          (v2/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -675,9 +685,9 @@ return {
                         ],
                         "storageKey": null
                       },
-                      (v16/*: any*/),
-                      (v17/*: any*/),
-                      (v18/*: any*/),
+                      (v16/*:: as any*/),
+                      (v17/*:: as any*/),
+                      (v18/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -686,8 +696,8 @@ return {
                         "name": "configurationVersion",
                         "plural": false,
                         "selections": [
-                          (v3/*: any*/),
-                          (v19/*: any*/),
+                          (v2/*:: as any*/),
+                          (v19/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -695,7 +705,7 @@ return {
                             "kind": "LinkedField",
                             "name": "vcsEvent",
                             "plural": false,
-                            "selections": (v21/*: any*/),
+                            "selections": (v21/*:: as any*/),
                             "storageKey": null
                           }
                         ],
@@ -709,7 +719,7 @@ return {
                         "name": "variables",
                         "plural": true,
                         "selections": [
-                          (v11/*: any*/),
+                          (v11/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -731,8 +741,8 @@ return {
                             "name": "includedInTfConfig",
                             "storageKey": null
                           },
-                          (v12/*: any*/),
-                          (v22/*: any*/),
+                          (v12/*:: as any*/),
+                          (v22/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -754,11 +764,11 @@ return {
                     "name": "outputs",
                     "plural": true,
                     "selections": [
-                      (v5/*: any*/),
-                      (v12/*: any*/),
-                      (v20/*: any*/),
-                      (v22/*: any*/),
-                      (v3/*: any*/)
+                      (v5/*:: as any*/),
+                      (v12/*:: as any*/),
+                      (v20/*:: as any*/),
+                      (v22/*:: as any*/),
+                      (v2/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -773,7 +783,7 @@ return {
                 "name": "workspaceVcsProviderLink",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -791,7 +801,7 @@ return {
                 "name": "groupPath",
                 "storageKey": null
               },
-              (v10/*: any*/)
+              (v10/*:: as any*/)
             ],
             "type": "Workspace",
             "abstractKey": null
@@ -812,6 +822,6 @@ return {
 };
 })();
 
-(node as any).hash = "bf01becf9164b83ab43327a67729eb3d";
+(node as any).hash = "25f058e4308efd3d7642fe0ec2b2faf1";
 
 export default node;

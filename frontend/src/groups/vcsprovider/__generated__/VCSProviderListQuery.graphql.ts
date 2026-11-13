@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<4c1b7ad6882c1bd97f6bfa2e33a31d56>>
+ * @generated SignedSource<<eeb134593c19855250b7b59d282d82f2>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -20,7 +19,9 @@ export type VCSProviderListQuery$variables = {
 };
 export type VCSProviderListQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"VCSProviderListFragment_vcsProviders">;
+    readonly group: {
+      readonly " $fragmentSpreads": FragmentRefs<"VCSProviderListFragment_vcsProviders">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type VCSProviderListQuery = {
@@ -120,12 +121,12 @@ v9 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/),
-      (v5/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/),
+      (v5/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -133,23 +134,27 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v6/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "VCSProviderListFragment_vcsProviders"
-              }
-            ],
-            "type": "Group",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "VCSProviderListFragment_vcsProviders"
+                }
+              ],
+              "type": "Group",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "group"
           }
         ],
         "storageKey": null
@@ -161,32 +166,32 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v4/*: any*/),
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v3/*: any*/),
-      (v5/*: any*/)
+      (v2/*:: as any*/),
+      (v4/*:: as any*/),
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v3/*:: as any*/),
+      (v5/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "VCSProviderListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v6/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v7/*: any*/),
-          (v8/*: any*/),
+          (v7/*:: as any*/),
+          (v8/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v9/*: any*/),
+                "args": (v9/*:: as any*/),
                 "concreteType": "VCSProviderConnection",
                 "kind": "LinkedField",
                 "name": "vcsProviders",
@@ -215,7 +220,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v8/*: any*/),
+                          (v8/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -255,7 +260,7 @@ return {
                             "name": "description",
                             "storageKey": null
                           },
-                          (v7/*: any*/)
+                          (v7/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -313,7 +318,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v9/*: any*/),
+                "args": (v9/*:: as any*/),
                 "filters": [
                   "search",
                   "includeInherited",
@@ -344,6 +349,6 @@ return {
 };
 })();
 
-(node as any).hash = "b304e6725066d4844c5cf76a3ead9d4f";
+(node as any).hash = "cb4d0783f4739cadbfce6ae72268ac9e";
 
 export default node;

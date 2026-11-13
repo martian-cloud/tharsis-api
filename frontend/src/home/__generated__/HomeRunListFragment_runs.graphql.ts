@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<d2cb8d022d1cba7d19f8bcd043124508>>
+ * @generated SignedSource<<bed978d576ba57a12ab10bef6566a3f3>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -50,7 +49,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -60,7 +59,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": HomeRunListPaginationQuery_graphql

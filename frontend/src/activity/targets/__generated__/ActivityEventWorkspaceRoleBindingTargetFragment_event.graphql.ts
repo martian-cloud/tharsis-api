@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<82a3bc2b17c959d3caa5191c65724a75>>
+ * @generated SignedSource<<1ea2e5b35361c4d5b0685fa91e4cf1f0>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -70,7 +69,7 @@ return {
               "name": "workspace",
               "plural": false,
               "selections": [
-                (v0/*: any*/),
+                (v0/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -89,7 +88,7 @@ return {
               "name": "role",
               "plural": false,
               "selections": [
-                (v0/*: any*/)
+                (v0/*:: as any*/)
               ],
               "storageKey": null
             }

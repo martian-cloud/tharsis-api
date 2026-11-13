@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<981c596af4a08054c6ef752c8d21e156>>
+ * @generated SignedSource<<9e596ef24b0f58b9556a0642f7acd9d0>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -132,8 +131,8 @@ v13 = {
   "storageKey": null
 },
 v14 = [
-  (v9/*: any*/),
-  (v11/*: any*/)
+  (v9/*:: as any*/),
+  (v11/*:: as any*/)
 ],
 v15 = [
   {
@@ -171,12 +170,12 @@ v18 = {
   "name": "createdByActor",
   "plural": false,
   "selections": [
-    (v16/*: any*/),
+    (v16/*:: as any*/),
     {
       "kind": "TypeDiscriminator",
       "abstractKey": "__isActor"
     },
-    (v11/*: any*/),
+    (v11/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -202,7 +201,7 @@ v18 = {
               "name": "email",
               "storageKey": null
             },
-            (v7/*: any*/)
+            (v7/*:: as any*/)
           ],
           "storageKey": null
         }
@@ -212,19 +211,19 @@ v18 = {
     },
     {
       "kind": "InlineFragment",
-      "selections": (v17/*: any*/),
+      "selections": (v17/*:: as any*/),
       "type": "ServiceAccountActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v17/*: any*/),
+      "selections": (v17/*:: as any*/),
       "type": "VCSProviderActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v17/*: any*/),
+      "selections": (v17/*:: as any*/),
       "type": "JobActor",
       "abstractKey": null
     }
@@ -234,12 +233,12 @@ v18 = {
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/),
-      (v5/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/),
+      (v5/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -247,13 +246,13 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v6/*:: as any*/),
         "concreteType": "TerraformModuleVersion",
         "kind": "LinkedField",
         "name": "terraformModuleVersion",
         "plural": false,
         "selections": [
-          (v7/*: any*/),
+          (v7/*:: as any*/),
           {
             "args": null,
             "kind": "FragmentSpread",
@@ -269,25 +268,25 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v3/*: any*/),
-      (v2/*: any*/),
-      (v4/*: any*/),
-      (v5/*: any*/),
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v3/*:: as any*/),
+      (v2/*:: as any*/),
+      (v4/*:: as any*/),
+      (v5/*:: as any*/),
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "TerraformModuleVersionDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v6/*:: as any*/),
         "concreteType": "TerraformModuleVersion",
         "kind": "LinkedField",
         "name": "terraformModuleVersion",
         "plural": false,
         "selections": [
-          (v7/*: any*/),
+          (v7/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -324,7 +323,7 @@ return {
                 "name": "trn",
                 "storageKey": null
               },
-              (v8/*: any*/)
+              (v8/*:: as any*/)
             ],
             "storageKey": null
           },
@@ -336,9 +335,9 @@ return {
             "name": "module",
             "plural": false,
             "selections": [
-              (v7/*: any*/),
-              (v9/*: any*/),
-              (v10/*: any*/),
+              (v7/*:: as any*/),
+              (v9/*:: as any*/),
+              (v10/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -431,7 +430,7 @@ return {
                 "name": "variables",
                 "plural": true,
                 "selections": [
-                  (v9/*: any*/),
+                  (v9/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -439,8 +438,8 @@ return {
                     "name": "required",
                     "storageKey": null
                   },
-                  (v11/*: any*/),
-                  (v12/*: any*/),
+                  (v11/*:: as any*/),
+                  (v12/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -448,7 +447,7 @@ return {
                     "name": "default",
                     "storageKey": null
                   },
-                  (v13/*: any*/)
+                  (v13/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -460,9 +459,9 @@ return {
                 "name": "outputs",
                 "plural": true,
                 "selections": [
-                  (v9/*: any*/),
-                  (v12/*: any*/),
-                  (v13/*: any*/)
+                  (v9/*:: as any*/),
+                  (v12/*:: as any*/),
+                  (v13/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -473,7 +472,7 @@ return {
                 "kind": "LinkedField",
                 "name": "managedResources",
                 "plural": true,
-                "selections": (v14/*: any*/),
+                "selections": (v14/*:: as any*/),
                 "storageKey": null
               },
               {
@@ -483,7 +482,7 @@ return {
                 "kind": "LinkedField",
                 "name": "dataResources",
                 "plural": true,
-                "selections": (v14/*: any*/),
+                "selections": (v14/*:: as any*/),
                 "storageKey": null
               },
               {
@@ -494,7 +493,7 @@ return {
                 "name": "requiredProviders",
                 "plural": true,
                 "selections": [
-                  (v10/*: any*/),
+                  (v10/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -510,7 +509,7 @@ return {
           },
           {
             "alias": null,
-            "args": (v15/*: any*/),
+            "args": (v15/*:: as any*/),
             "concreteType": "TerraformModuleAttestationConnection",
             "kind": "LinkedField",
             "name": "attestations",
@@ -532,7 +531,7 @@ return {
                     "name": "node",
                     "plural": false,
                     "selections": [
-                      (v7/*: any*/),
+                      (v7/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -540,7 +539,7 @@ return {
                         "name": "data",
                         "storageKey": null
                       },
-                      (v12/*: any*/),
+                      (v12/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -556,12 +555,12 @@ return {
                         "name": "metadata",
                         "plural": false,
                         "selections": [
-                          (v8/*: any*/)
+                          (v8/*:: as any*/)
                         ],
                         "storageKey": null
                       },
-                      (v18/*: any*/),
-                      (v16/*: any*/)
+                      (v18/*:: as any*/),
+                      (v16/*:: as any*/)
                     ],
                     "storageKey": null
                   },
@@ -605,14 +604,14 @@ return {
           },
           {
             "alias": null,
-            "args": (v15/*: any*/),
+            "args": (v15/*:: as any*/),
             "filters": null,
             "handle": "connection",
             "key": "TerraformModuleVersionAttestList_attestations",
             "kind": "LinkedHandle",
             "name": "attestations"
           },
-          (v18/*: any*/),
+          (v18/*:: as any*/),
           {
             "alias": null,
             "args": null,

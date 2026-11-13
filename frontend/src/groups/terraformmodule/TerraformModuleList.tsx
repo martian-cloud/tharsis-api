@@ -22,7 +22,7 @@ const INITIAL_ITEM_COUNT = 20;
 const query = graphql`
     query TerraformModuleListQuery($first: Int, $last: Int, $after: String, $before: String, $groupId: String!, $search: String, $labelFilter: TerraformModuleLabelsFilter) {
         node(id: $groupId) {
-            ...on Group {
+            ...on Group @alias(as: "group") {
                 ...TerraformModuleListFragment_terraformModules
             }
         }
@@ -72,7 +72,7 @@ function TerraformModuleList({ group, queryRef, search = '', labelFilters = [], 
                 }
             }
         }
-        `, queryData.node
+        `, queryData.node?.group
     );
 
     const edges = data?.terraformModules?.edges || [];

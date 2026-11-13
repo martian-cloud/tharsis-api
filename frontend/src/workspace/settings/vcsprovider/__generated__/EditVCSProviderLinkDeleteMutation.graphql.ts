@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<e8e585180a5941ff8d7cb26395be1d37>>
+ * @generated SignedSource<<28b80bcf8e8cbf190827c739ed020227>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -74,7 +73,7 @@ v3 = {
   "name": "workspace",
   "plural": false,
   "selections": [
-    (v2/*: any*/),
+    (v2/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -83,7 +82,7 @@ v3 = {
       "name": "workspaceVcsProviderLink",
       "plural": false,
       "selections": [
-        (v2/*: any*/)
+        (v2/*:: as any*/)
       ],
       "storageKey": null
     }
@@ -124,14 +123,14 @@ v4 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "EditVCSProviderLinkDeleteMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "DeleteWorkspaceVCSProviderLinkPayload",
         "kind": "LinkedField",
         "name": "deleteWorkspaceVCSProviderLink",
@@ -145,11 +144,11 @@ return {
             "name": "vcsProviderLink",
             "plural": false,
             "selections": [
-              (v3/*: any*/)
+              (v3/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -159,13 +158,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "EditVCSProviderLinkDeleteMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "DeleteWorkspaceVCSProviderLinkPayload",
         "kind": "LinkedField",
         "name": "deleteWorkspaceVCSProviderLink",
@@ -179,12 +178,12 @@ return {
             "name": "vcsProviderLink",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
-              (v2/*: any*/)
+              (v3/*:: as any*/),
+              (v2/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v4/*: any*/)
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }

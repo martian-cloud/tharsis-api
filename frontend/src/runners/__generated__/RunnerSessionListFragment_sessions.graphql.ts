@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<6d1a121e701692bccd26388175c889c5>>
+ * @generated SignedSource<<55e27b767108032f3617350e30c28ca7>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -61,7 +60,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -71,7 +70,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -129,7 +128,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "args": null,
                   "kind": "FragmentSpread",
@@ -183,7 +182,7 @@ return {
       ],
       "storageKey": "__RunnerSessionList_sessions_connection(sort:\"LAST_CONTACTED_AT_DESC\")"
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "Runner",
   "abstractKey": null

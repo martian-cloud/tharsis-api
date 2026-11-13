@@ -9,13 +9,12 @@ import { GroupOrWorkspaceRendererQuery } from './__generated__/GroupOrWorkspaceR
 const query = graphql`
     query GroupOrWorkspaceRendererQuery($fullPath: String!) {
       namespace(fullPath: $fullPath) {
-        __typename
         id
         fullPath
-        ...on Group {
+        ...on Group @alias(as: "group") {
           ...GroupDetailsFragment_group
         }
-        ...on Workspace {
+        ...on Workspace @alias(as: "workspace") {
           ...WorkspaceDetailsFragment_workspace
         }
       }
@@ -30,10 +29,10 @@ interface Props {
 function GroupOrWorkspaceDetails(props: Props) {
   const queryData = usePreloadedQuery<GroupOrWorkspaceRendererQuery>(query, props.queryRef);
 
-  if (queryData.namespace && queryData.namespace.__typename === 'Group') {
-    return <GroupDetails fragmentRef={queryData.namespace} route={props.route} />;
-  } else if (queryData.namespace && queryData.namespace.__typename === 'Workspace') {
-    return <WorkspaceDetails fragmentRef={queryData.namespace} route={props.route} />;
+  if (queryData.namespace?.group) {
+    return <GroupDetails fragmentRef={queryData.namespace.group} route={props.route} />;
+  } else if (queryData.namespace?.workspace) {
+    return <WorkspaceDetails fragmentRef={queryData.namespace.workspace} route={props.route} />;
   } else {
     return (
       <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" height="400px">

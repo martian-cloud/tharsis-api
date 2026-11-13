@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<b528f109118035df0cc4cece648491c1>>
+ * @generated SignedSource<<9dc8f7dd61e68508a34b22d8e8489012>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -105,7 +104,7 @@ v4 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "TerraformProviderVersionListPaginationQuery",
@@ -121,7 +120,7 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "TerraformProviderVersionListPaginationQuery",
     "selections": [
@@ -139,13 +138,13 @@ return {
         "name": "node",
         "plural": false,
         "selections": [
-          (v1/*: any*/),
+          (v1/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v2/*: any*/),
+                "args": (v2/*:: as any*/),
                 "concreteType": "TerraformProviderVersionConnection",
                 "kind": "LinkedField",
                 "name": "versions",
@@ -167,7 +166,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v3/*: any*/),
+                          (v3/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -201,7 +200,7 @@ return {
                             "name": "createdByActor",
                             "plural": false,
                             "selections": [
-                              (v1/*: any*/),
+                              (v1/*:: as any*/),
                               {
                                 "kind": "TypeDiscriminator",
                                 "abstractKey": "__isActor"
@@ -238,7 +237,7 @@ return {
                                         "name": "email",
                                         "storageKey": null
                                       },
-                                      (v3/*: any*/)
+                                      (v3/*:: as any*/)
                                     ],
                                     "storageKey": null
                                   }
@@ -248,19 +247,19 @@ return {
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v4/*: any*/),
+                                "selections": (v4/*:: as any*/),
                                 "type": "ServiceAccountActor",
                                 "abstractKey": null
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v4/*: any*/),
+                                "selections": (v4/*:: as any*/),
                                 "type": "VCSProviderActor",
                                 "abstractKey": null
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v4/*: any*/),
+                                "selections": (v4/*:: as any*/),
                                 "type": "JobActor",
                                 "abstractKey": null
                               }
@@ -296,11 +295,11 @@ return {
                                 "name": "registryNamespace",
                                 "storageKey": null
                               },
-                              (v3/*: any*/)
+                              (v3/*:: as any*/)
                             ],
                             "storageKey": null
                           },
-                          (v1/*: any*/)
+                          (v1/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -358,7 +357,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v2/*: any*/),
+                "args": (v2/*:: as any*/),
                 "filters": [
                   "sort"
                 ],
@@ -371,7 +370,7 @@ return {
             "type": "TerraformProvider",
             "abstractKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }

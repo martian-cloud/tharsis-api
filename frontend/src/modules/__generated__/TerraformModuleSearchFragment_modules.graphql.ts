@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<71eef3fa8695b71d42e1c4885b355de4>>
+ * @generated SignedSource<<857354988e5815a3271f3fc45ae58fbe>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -67,7 +66,7 @@ return {
         "count": null,
         "cursor": null,
         "direction": "bidirectional",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -80,7 +79,7 @@ return {
           "count": "last",
           "cursor": "before"
         },
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": TerraformModuleSearchPaginationQuery_graphql

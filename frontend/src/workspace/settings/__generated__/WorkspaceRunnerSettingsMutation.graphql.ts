@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<5742a32bfc04190628b04b2652198cc3>>
+ * @generated SignedSource<<66f89283ee98e65c70745ada207e59b0>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -145,14 +144,14 @@ v5 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceRunnerSettingsMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateWorkspacePayload",
         "kind": "LinkedField",
         "name": "updateWorkspace",
@@ -166,7 +165,7 @@ return {
             "name": "workspace",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -175,8 +174,8 @@ return {
                 "name": "runnerTags",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
-                  (v4/*: any*/)
+                  (v3/*:: as any*/),
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -188,7 +187,7 @@ return {
             ],
             "storageKey": null
           },
-          (v5/*: any*/)
+          (v5/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -198,13 +197,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceRunnerSettingsMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateWorkspacePayload",
         "kind": "LinkedField",
         "name": "updateWorkspace",
@@ -218,7 +217,7 @@ return {
             "name": "workspace",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -227,8 +226,8 @@ return {
                 "name": "runnerTags",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
-                  (v4/*: any*/),
+                  (v3/*:: as any*/),
+                  (v4/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -249,7 +248,7 @@ return {
             ],
             "storageKey": null
           },
-          (v5/*: any*/)
+          (v5/*:: as any*/)
         ],
         "storageKey": null
       }

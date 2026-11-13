@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<d26e16a2ee1535783a1489d8d8d9eae3>>
+ * @generated SignedSource<<f203d9c4cb0b83c7ce9660dc69abf749>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -122,8 +121,8 @@ return {
       "name": "currentApplyRun",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
-        (v1/*: any*/),
+        (v0/*:: as any*/),
+        (v1/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -142,8 +141,8 @@ return {
       "name": "currentStateVersion",
       "plural": false,
       "selections": [
-        (v1/*: any*/),
-        (v2/*: any*/),
+        (v1/*:: as any*/),
+        (v2/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -186,9 +185,9 @@ return {
               "kind": "FragmentSpread",
               "name": "ModuleSourceLinkFragment_run"
             },
-            (v0/*: any*/),
-            (v1/*: any*/),
-            (v3/*: any*/),
+            (v0/*:: as any*/),
+            (v1/*:: as any*/),
+            (v3/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -197,7 +196,7 @@ return {
               "name": "apply",
               "plural": false,
               "selections": [
-                (v3/*: any*/)
+                (v3/*:: as any*/)
               ],
               "storageKey": null
             },
@@ -266,8 +265,8 @@ return {
               "name": "configurationVersion",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
-                (v2/*: any*/),
+                (v1/*:: as any*/),
+                (v2/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -276,7 +275,7 @@ return {
                   "name": "vcsEvent",
                   "plural": false,
                   "selections": [
-                    (v1/*: any*/)
+                    (v1/*:: as any*/)
                   ],
                   "storageKey": null
                 }

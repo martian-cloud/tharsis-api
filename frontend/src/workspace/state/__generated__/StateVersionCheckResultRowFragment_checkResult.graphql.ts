@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<d2c386948caac1eff1cc9b5edd1a5adf>>
+ * @generated SignedSource<<4b618a976fe73d4a6bcbfa661dff33bf>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -47,7 +46,7 @@ return {
       "name": "name",
       "storageKey": null
     },
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -63,7 +62,7 @@ return {
           "name": "address",
           "storageKey": null
         },
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,

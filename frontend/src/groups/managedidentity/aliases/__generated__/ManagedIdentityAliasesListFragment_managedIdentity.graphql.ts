@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<2d59677811493f87c344328f72ca0ce4>>
+ * @generated SignedSource<<f3a544ac1a50256a4cdd85aef8a272fc>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -66,7 +65,7 @@ return {
         "count": null,
         "cursor": null,
         "direction": "bidirectional",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -79,7 +78,7 @@ return {
           "count": "last",
           "cursor": "before"
         },
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -93,7 +92,7 @@ return {
   },
   "name": "ManagedIdentityAliasesListFragment_managedIdentity",
   "selections": [
-    (v1/*: any*/),
+    (v1/*:: as any*/),
     {
       "alias": "aliases",
       "args": null,
@@ -118,7 +117,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "args": null,
                   "kind": "FragmentSpread",

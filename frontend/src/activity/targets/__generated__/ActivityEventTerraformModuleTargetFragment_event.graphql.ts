@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<65b27c3b57addb8082bf097e54e996a0>>
+ * @generated SignedSource<<78ff508bb4c5613d47d009f376b1c1d1>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -152,7 +151,7 @@ return {
               "kind": "LinkedField",
               "name": "labels",
               "plural": true,
-              "selections": (v0/*: any*/),
+              "selections": (v0/*:: as any*/),
               "storageKey": null
             }
           ],
@@ -177,7 +176,7 @@ return {
                   "kind": "LinkedField",
                   "name": "added",
                   "plural": true,
-                  "selections": (v0/*: any*/),
+                  "selections": (v0/*:: as any*/),
                   "storageKey": null
                 },
                 {
@@ -187,7 +186,7 @@ return {
                   "kind": "LinkedField",
                   "name": "updated",
                   "plural": true,
-                  "selections": (v0/*: any*/),
+                  "selections": (v0/*:: as any*/),
                   "storageKey": null
                 },
                 {

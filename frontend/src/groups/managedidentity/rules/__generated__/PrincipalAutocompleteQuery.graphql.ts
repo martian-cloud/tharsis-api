@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<9fadc05cc689dfc23e32520689300858>>
+ * @generated SignedSource<<14d6f05de30d3085a8134b251a3bb72e>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -101,13 +100,13 @@ v5 = {
 v6 = {
   "alias": null,
   "args": [
-    (v2/*: any*/),
+    (v2/*:: as any*/),
     {
       "kind": "Literal",
       "name": "includeInherited",
       "value": true
     },
-    (v3/*: any*/)
+    (v3/*:: as any*/)
   ],
   "concreteType": "ServiceAccountConnection",
   "kind": "LinkedField",
@@ -130,8 +129,8 @@ v6 = {
           "name": "node",
           "plural": false,
           "selections": [
-            (v4/*: any*/),
-            (v5/*: any*/),
+            (v4/*:: as any*/),
+            (v5/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -149,12 +148,12 @@ v6 = {
   "storageKey": null
 },
 v7 = [
-  (v2/*: any*/),
-  (v3/*: any*/)
+  (v2/*:: as any*/),
+  (v3/*:: as any*/)
 ],
 v8 = {
   "alias": null,
-  "args": (v7/*: any*/),
+  "args": (v7/*:: as any*/),
   "concreteType": "TeamConnection",
   "kind": "LinkedField",
   "name": "teams",
@@ -176,8 +175,8 @@ v8 = {
           "name": "node",
           "plural": false,
           "selections": [
-            (v4/*: any*/),
-            (v5/*: any*/)
+            (v4/*:: as any*/),
+            (v5/*:: as any*/)
           ],
           "storageKey": null
         }
@@ -189,7 +188,7 @@ v8 = {
 },
 v9 = {
   "alias": null,
-  "args": (v7/*: any*/),
+  "args": (v7/*:: as any*/),
   "concreteType": "UserConnection",
   "kind": "LinkedField",
   "name": "users",
@@ -211,7 +210,7 @@ v9 = {
           "name": "node",
           "plural": false,
           "selections": [
-            (v4/*: any*/),
+            (v4/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -237,50 +236,50 @@ v9 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "PrincipalAutocompleteQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "Group",
         "kind": "LinkedField",
         "name": "group",
         "plural": false,
         "selections": [
-          (v6/*: any*/)
+          (v6/*:: as any*/)
         ],
         "storageKey": null
       },
-      (v8/*: any*/),
-      (v9/*: any*/)
+      (v8/*:: as any*/),
+      (v9/*:: as any*/)
     ],
     "type": "Query",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "PrincipalAutocompleteQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "Group",
         "kind": "LinkedField",
         "name": "group",
         "plural": false,
         "selections": [
-          (v6/*: any*/),
-          (v4/*: any*/)
+          (v6/*:: as any*/),
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       },
-      (v8/*: any*/),
-      (v9/*: any*/)
+      (v8/*:: as any*/),
+      (v9/*:: as any*/)
     ]
   },
   "params": {

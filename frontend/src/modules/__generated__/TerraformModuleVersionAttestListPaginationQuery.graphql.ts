@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<a8a36c2def147646f144c4e7b9b1555a>>
+ * @generated SignedSource<<507b5dfd5a60fe8d6e6a1fdb27b4a787>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -87,14 +86,14 @@ v5 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "TerraformModuleVersionAttestListPaginationQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -114,26 +113,26 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "TerraformModuleVersionAttestListPaginationQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
-          (v3/*: any*/),
+          (v2/*:: as any*/),
+          (v3/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v4/*: any*/),
+                "args": (v4/*:: as any*/),
                 "concreteType": "TerraformModuleAttestationConnection",
                 "kind": "LinkedField",
                 "name": "attestations",
@@ -155,7 +154,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v3/*: any*/),
+                          (v3/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -203,7 +202,7 @@ return {
                             "name": "createdByActor",
                             "plural": false,
                             "selections": [
-                              (v2/*: any*/),
+                              (v2/*:: as any*/),
                               {
                                 "kind": "TypeDiscriminator",
                                 "abstractKey": "__isActor"
@@ -240,7 +239,7 @@ return {
                                         "name": "email",
                                         "storageKey": null
                                       },
-                                      (v3/*: any*/)
+                                      (v3/*:: as any*/)
                                     ],
                                     "storageKey": null
                                   }
@@ -250,26 +249,26 @@ return {
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v5/*: any*/),
+                                "selections": (v5/*:: as any*/),
                                 "type": "ServiceAccountActor",
                                 "abstractKey": null
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v5/*: any*/),
+                                "selections": (v5/*:: as any*/),
                                 "type": "VCSProviderActor",
                                 "abstractKey": null
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v5/*: any*/),
+                                "selections": (v5/*:: as any*/),
                                 "type": "JobActor",
                                 "abstractKey": null
                               }
                             ],
                             "storageKey": null
                           },
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -313,7 +312,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v4/*: any*/),
+                "args": (v4/*:: as any*/),
                 "filters": null,
                 "handle": "connection",
                 "key": "TerraformModuleVersionAttestList_attestations",

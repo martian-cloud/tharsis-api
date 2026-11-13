@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<f95649066f4001ce71322f48944cc300>>
+ * @generated SignedSource<<4b1848707aea8971f92bdd626c1f85d7>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -38,7 +37,7 @@ return {
   "metadata": null,
   "name": "CreateRunFragment_workspace",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -54,7 +53,7 @@ return {
       "name": "workspaceVcsProviderLink",
       "plural": false,
       "selections": [
-        (v0/*: any*/)
+        (v0/*:: as any*/)
       ],
       "storageKey": null
     },

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<498425ddec7606e5332f4ff86d5d4025>>
+ * @generated SignedSource<<ebe540cf1830e6f915e63a49c1cd6f7c>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -66,7 +65,7 @@ return {
   "metadata": null,
   "name": "ApprovalGateCardFragment_gate",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -93,7 +92,7 @@ return {
       "name": "run",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -130,7 +129,7 @@ return {
       "name": "policyCheck",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -138,7 +137,7 @@ return {
           "name": "checkType",
           "storageKey": null
         },
-        (v1/*: any*/),
+        (v1/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -154,8 +153,8 @@ return {
           "name": "policies",
           "plural": true,
           "selections": [
-            (v0/*: any*/),
-            (v1/*: any*/)
+            (v0/*:: as any*/),
+            (v1/*:: as any*/)
           ],
           "storageKey": null
         },

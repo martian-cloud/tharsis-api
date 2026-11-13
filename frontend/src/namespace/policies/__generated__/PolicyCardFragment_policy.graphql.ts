@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<7b27e4ef71bce1f6621595926d40ee50>>
+ * @generated SignedSource<<f62189029b16292e2d764f43d60602fa>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -79,7 +78,7 @@ v2 = {
   "storageKey": null
 },
 v3 = [
-  (v0/*: any*/)
+  (v0/*:: as any*/)
 ];
 return {
   "argumentDefinitions": [],
@@ -87,7 +86,7 @@ return {
   "metadata": null,
   "name": "PolicyCardFragment_policy",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -161,8 +160,8 @@ return {
           "name": "packageVersionConstraint",
           "storageKey": null
         },
-        (v1/*: any*/),
-        (v2/*: any*/)
+        (v1/*:: as any*/),
+        (v2/*:: as any*/)
       ],
       "storageKey": null
     },
@@ -188,8 +187,8 @@ return {
           "name": "predicateType",
           "storageKey": null
         },
-        (v1/*: any*/),
-        (v2/*: any*/)
+        (v1/*:: as any*/),
+        (v2/*:: as any*/)
       ],
       "storageKey": null
     },
@@ -225,7 +224,7 @@ return {
       "kind": "LinkedField",
       "name": "allowedUsers",
       "plural": true,
-      "selections": (v3/*: any*/),
+      "selections": (v3/*:: as any*/),
       "storageKey": null
     },
     {
@@ -235,7 +234,7 @@ return {
       "kind": "LinkedField",
       "name": "allowedTeams",
       "plural": true,
-      "selections": (v3/*: any*/),
+      "selections": (v3/*:: as any*/),
       "storageKey": null
     },
     {
@@ -245,7 +244,7 @@ return {
       "kind": "LinkedField",
       "name": "allowedServiceAccounts",
       "plural": true,
-      "selections": (v3/*: any*/),
+      "selections": (v3/*:: as any*/),
       "storageKey": null
     }
   ],

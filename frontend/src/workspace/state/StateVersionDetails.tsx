@@ -30,7 +30,7 @@ function StateVersionDetails(props: Props) {
     const queryData = useLazyLoadQuery<StateVersionDetailsQuery>(graphql`
         query StateVersionDetailsQuery($id: String!) {
             node(id: $id) {
-                ... on StateVersion {
+                ... on StateVersion @alias(as: "stateVersion") {
                     id
                     createdByActor {
                         ...ActorDisplayFragment_actor
@@ -50,9 +50,10 @@ function StateVersionDetails(props: Props) {
         }
     `, { id: stateVersionId }, { fetchPolicy: 'store-and-network' })
 
-    const createdByActor = queryData.node?.run ? queryData.node.run.createdByActor : queryData.node?.createdByActor
+    const stateVersion = queryData.node?.stateVersion;
+    const createdByActor = stateVersion?.run ? stateVersion.run.createdByActor : stateVersion?.createdByActor
 
-    return queryData.node ? (
+    return stateVersion ? (
         <Box>
             <NamespaceBreadcrumbs
                 namespacePath={data.fullPath}
@@ -63,15 +64,15 @@ function StateVersionDetails(props: Props) {
             />
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1 }}>
                 <Typography component="div" sx={{ paddingRight: '6px' }}>State version created{' '}
-                    <Timestamp timestamp={queryData.node?.metadata?.createdAt as string} />
+                    <Timestamp timestamp={stateVersion.metadata.createdAt as string} />
                     {' '}by
                     <Box sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 1 }}>
                         <ActorDisplay fragmentRef={createdByActor} variant="avatar" size={20} />
                     </Box>
                 </Typography>
-                <TRNButton trn={queryData.node?.metadata?.trn || ''} size="small" />
+                <TRNButton trn={stateVersion.metadata.trn || ''} size="small" />
             </Box>
-            <StateVersionFile fragmentRef={queryData.node} />
+            <StateVersionFile fragmentRef={stateVersion} />
         </Box>
     ) : <Box>Not Found</Box>;
 }

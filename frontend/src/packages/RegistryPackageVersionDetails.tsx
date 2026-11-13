@@ -12,7 +12,7 @@ import { PageLayoutProvider, usePageLayout } from '@/layout/PageLayoutContext';
 const query = graphql`
     query RegistryPackageVersionDetailsQuery($id: String!, $first: Int, $last: Int, $after: String, $before: String) {
       node(id: $id) {
-        ... on Package {
+        ... on Package @alias(as: "package") {
           id
           name
           metadata {
@@ -31,7 +31,7 @@ interface Props {
 function RegistryPackageVersionDetails(props: Props) {
     const { queryRef } = props;
     const queryData = usePreloadedQuery<RegistryPackageVersionDetailsQuery>(query, queryRef);
-    const pkg = queryData.node;
+    const pkg = queryData.node?.package;
 
     return (
         <Box component="main" flexGrow={1} minWidth={0}>
@@ -59,7 +59,7 @@ function RegistryPackageVersionDetails(props: Props) {
     );
 }
 
-type PackageNode = NonNullable<RegistryPackageVersionDetailsQuery['response']['node']>;
+type PackageNode = NonNullable<NonNullable<RegistryPackageVersionDetailsQuery['response']['node']>['package']>;
 
 // The registry page is read-only: versions are created and edited from the owning group, so the only
 // header action is the TRN.

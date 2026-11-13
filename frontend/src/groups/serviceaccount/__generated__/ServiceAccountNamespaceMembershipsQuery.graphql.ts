@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<ae0d31bbb71137c27c74625b10794a73>>
+ * @generated SignedSource<<99f428811c3510eaa328e7b5e0355bba>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -17,7 +16,9 @@ export type ServiceAccountNamespaceMembershipsQuery$variables = {
 };
 export type ServiceAccountNamespaceMembershipsQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"ServiceAccountNamespaceMembershipsFragment">;
+    readonly serviceAccount: {
+      readonly " $fragmentSpreads": FragmentRefs<"ServiceAccountNamespaceMembershipsFragment">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type ServiceAccountNamespaceMembershipsQuery = {
@@ -77,9 +78,9 @@ v6 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -87,23 +88,27 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "ServiceAccountNamespaceMembershipsFragment"
-              }
-            ],
-            "type": "ServiceAccount",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "ServiceAccountNamespaceMembershipsFragment"
+                }
+              ],
+              "type": "ServiceAccount",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "serviceAccount"
           }
         ],
         "storageKey": null
@@ -115,29 +120,29 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v2/*:: as any*/),
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "ServiceAccountNamespaceMembershipsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v4/*: any*/),
-          (v5/*: any*/),
+          (v4/*:: as any*/),
+          (v5/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v6/*: any*/),
+                "args": (v6/*:: as any*/),
                 "concreteType": "NamespaceMembershipConnection",
                 "kind": "LinkedField",
                 "name": "namespaceMemberships",
@@ -166,7 +171,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v5/*: any*/),
+                          (v5/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -193,7 +198,7 @@ return {
                             "name": "namespace",
                             "plural": false,
                             "selections": [
-                              (v4/*: any*/),
+                              (v4/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -201,7 +206,7 @@ return {
                                 "name": "fullPath",
                                 "storageKey": null
                               },
-                              (v5/*: any*/)
+                              (v5/*:: as any*/)
                             ],
                             "storageKey": null
                           },
@@ -220,11 +225,11 @@ return {
                                 "name": "name",
                                 "storageKey": null
                               },
-                              (v5/*: any*/)
+                              (v5/*:: as any*/)
                             ],
                             "storageKey": null
                           },
-                          (v4/*: any*/)
+                          (v4/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -268,7 +273,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v6/*: any*/),
+                "args": (v6/*:: as any*/),
                 "filters": null,
                 "handle": "connection",
                 "key": "ServiceAccountNamespaceMemberships_namespaceMemberships",
@@ -295,6 +300,6 @@ return {
 };
 })();
 
-(node as any).hash = "051ed87943f1bc27c69d31b9effa541c";
+(node as any).hash = "38798b7671a707286b0c7b785229daf0";
 
 export default node;

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<19b6fd3a91896930a5e597ed4ef2e5f8>>
+ * @generated SignedSource<<e82ea2290b55cd7f3f860dd2c625b1a0>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -55,7 +54,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -65,7 +64,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": TeamsPaginationQuery_graphql

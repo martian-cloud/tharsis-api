@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<6059dd3f069f2bd725eec5163fecaba5>>
+ * @generated SignedSource<<6497a338cd66d176512ec74d9d1722ca>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -114,7 +113,7 @@ v7 = {
   "name": "platformMirrors",
   "plural": true,
   "selections": [
-    (v2/*: any*/),
+    (v2/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -150,14 +149,14 @@ v9 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "ProviderMirrorVersionDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -166,9 +165,9 @@ return {
           {
             "kind": "InlineFragment",
             "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/),
-              (v4/*: any*/),
+              (v2/*:: as any*/),
+              (v3/*:: as any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -185,9 +184,9 @@ return {
                 ],
                 "storageKey": null
               },
-              (v5/*: any*/),
-              (v6/*: any*/),
-              (v7/*: any*/)
+              (v5/*:: as any*/),
+              (v6/*:: as any*/),
+              (v7/*:: as any*/)
             ],
             "type": "TerraformProviderVersionMirror",
             "abstractKey": null
@@ -201,25 +200,25 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "ProviderMirrorVersionDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v8/*: any*/),
-          (v2/*: any*/),
+          (v8/*:: as any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v3/*: any*/),
-              (v4/*: any*/),
+              (v3/*:: as any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -228,7 +227,7 @@ return {
                 "name": "createdByActor",
                 "plural": false,
                 "selections": [
-                  (v8/*: any*/),
+                  (v8/*:: as any*/),
                   {
                     "kind": "TypeDiscriminator",
                     "abstractKey": "__isActor"
@@ -265,7 +264,7 @@ return {
                             "name": "email",
                             "storageKey": null
                           },
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -275,28 +274,28 @@ return {
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v9/*: any*/),
+                    "selections": (v9/*:: as any*/),
                     "type": "ServiceAccountActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v9/*: any*/),
+                    "selections": (v9/*:: as any*/),
                     "type": "VCSProviderActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v9/*: any*/),
+                    "selections": (v9/*:: as any*/),
                     "type": "JobActor",
                     "abstractKey": null
                   }
                 ],
                 "storageKey": null
               },
-              (v5/*: any*/),
-              (v6/*: any*/),
-              (v7/*: any*/)
+              (v5/*:: as any*/),
+              (v6/*:: as any*/),
+              (v7/*:: as any*/)
             ],
             "type": "TerraformProviderVersionMirror",
             "abstractKey": null

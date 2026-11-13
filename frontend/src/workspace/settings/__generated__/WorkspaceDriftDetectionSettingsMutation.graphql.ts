@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<44029ba2175f399388ecf5abff6e814d>>
+ * @generated SignedSource<<7367a1968bced72e687b4f2de9c44e7d>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -121,14 +120,14 @@ v2 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceDriftDetectionSettingsMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateWorkspacePayload",
         "kind": "LinkedField",
         "name": "updateWorkspace",
@@ -161,7 +160,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -171,13 +170,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceDriftDetectionSettingsMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "UpdateWorkspacePayload",
         "kind": "LinkedField",
         "name": "updateWorkspace",
@@ -233,7 +232,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }

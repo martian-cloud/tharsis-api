@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<e18bad9fba9e0583572fe269e02b5eed>>
+ * @generated SignedSource<<852d879a7eb3a619f9639296bcb149bf>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,7 +14,9 @@ export type WorkspaceSettingsQuery$variables = {
 };
 export type WorkspaceSettingsQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"WorkspaceSettingsContentFragment_workspace">;
+    readonly workspace: {
+      readonly " $fragmentSpreads": FragmentRefs<"WorkspaceSettingsContentFragment_workspace">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type WorkspaceSettingsQuery = {
@@ -88,9 +89,9 @@ v8 = {
   "storageKey": null
 },
 v9 = [
-  (v6/*: any*/),
-  (v8/*: any*/),
-  (v7/*: any*/)
+  (v6/*:: as any*/),
+  (v8/*:: as any*/),
+  (v7/*:: as any*/)
 ],
 v10 = {
   "alias": null,
@@ -110,30 +111,34 @@ v11 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceSettingsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "WorkspaceSettingsContentFragment_workspace"
-              }
-            ],
-            "type": "Workspace",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "WorkspaceSettingsContentFragment_workspace"
+                }
+              ],
+              "type": "Workspace",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "workspace"
           }
         ],
         "storageKey": null
@@ -144,25 +149,25 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceSettingsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
-          (v3/*: any*/),
+          (v2/*:: as any*/),
+          (v3/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v4/*: any*/),
-              (v5/*: any*/),
+              (v4/*:: as any*/),
+              (v5/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -178,9 +183,9 @@ return {
                 "name": "runnerTags",
                 "plural": false,
                 "selections": [
-                  (v6/*: any*/),
-                  (v7/*: any*/),
-                  (v8/*: any*/)
+                  (v6/*:: as any*/),
+                  (v7/*:: as any*/),
+                  (v8/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -212,7 +217,7 @@ return {
                 "kind": "LinkedField",
                 "name": "driftDetectionEnabled",
                 "plural": false,
-                "selections": (v9/*: any*/),
+                "selections": (v9/*:: as any*/),
                 "storageKey": null
               },
               {
@@ -222,7 +227,7 @@ return {
                 "kind": "LinkedField",
                 "name": "providerMirrorEnabled",
                 "plural": false,
-                "selections": (v9/*: any*/),
+                "selections": (v9/*:: as any*/),
                 "storageKey": null
               },
               {
@@ -232,7 +237,7 @@ return {
                 "kind": "LinkedField",
                 "name": "outputVisibility",
                 "plural": false,
-                "selections": (v9/*: any*/),
+                "selections": (v9/*:: as any*/),
                 "storageKey": null
               },
               {
@@ -250,7 +255,7 @@ return {
                 "name": "workspaceVcsProviderLink",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/),
+                  (v3/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -284,12 +289,12 @@ return {
                     "name": "createdByActor",
                     "plural": false,
                     "selections": [
-                      (v2/*: any*/),
+                      (v2/*:: as any*/),
                       {
                         "kind": "TypeDiscriminator",
                         "abstractKey": "__isActor"
                       },
-                      (v10/*: any*/),
+                      (v10/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -315,7 +320,7 @@ return {
                                 "name": "email",
                                 "storageKey": null
                               },
-                              (v3/*: any*/)
+                              (v3/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -325,19 +330,19 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v11/*: any*/),
+                        "selections": (v11/*:: as any*/),
                         "type": "ServiceAccountActor",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v11/*: any*/),
+                        "selections": (v11/*:: as any*/),
                         "type": "VCSProviderActor",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v11/*: any*/),
+                        "selections": (v11/*:: as any*/),
                         "type": "JobActor",
                         "abstractKey": null
                       }
@@ -401,10 +406,10 @@ return {
                     "name": "vcsProvider",
                     "plural": false,
                     "selections": [
-                      (v3/*: any*/),
-                      (v4/*: any*/),
-                      (v5/*: any*/),
-                      (v10/*: any*/),
+                      (v3/*:: as any*/),
+                      (v4/*:: as any*/),
+                      (v5/*:: as any*/),
+                      (v10/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -453,7 +458,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v3/*: any*/)
+                          (v3/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -485,7 +490,7 @@ return {
                     "name": "key",
                     "storageKey": null
                   },
-                  (v8/*: any*/)
+                  (v8/*:: as any*/)
                 ],
                 "storageKey": null
               }
@@ -509,6 +514,6 @@ return {
 };
 })();
 
-(node as any).hash = "b19e9230031be8ad458f1ac22d0b859a";
+(node as any).hash = "645c707678f254c97767f182e50ed7b3";
 
 export default node;

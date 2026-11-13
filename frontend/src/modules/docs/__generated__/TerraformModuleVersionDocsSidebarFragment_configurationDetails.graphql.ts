@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<6c643411e186fa39af66e269320a2626>>
+ * @generated SignedSource<<a67e67f484665a8c10774dac8be2e9ef>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -64,7 +63,7 @@ return {
       "kind": "LinkedField",
       "name": "variables",
       "plural": true,
-      "selections": (v0/*: any*/),
+      "selections": (v0/*:: as any*/),
       "storageKey": null
     },
     {
@@ -74,7 +73,7 @@ return {
       "kind": "LinkedField",
       "name": "outputs",
       "plural": true,
-      "selections": (v0/*: any*/),
+      "selections": (v0/*:: as any*/),
       "storageKey": null
     },
     {
@@ -84,7 +83,7 @@ return {
       "kind": "LinkedField",
       "name": "managedResources",
       "plural": true,
-      "selections": (v0/*: any*/),
+      "selections": (v0/*:: as any*/),
       "storageKey": null
     },
     {
@@ -94,7 +93,7 @@ return {
       "kind": "LinkedField",
       "name": "dataResources",
       "plural": true,
-      "selections": (v0/*: any*/),
+      "selections": (v0/*:: as any*/),
       "storageKey": null
     },
     {

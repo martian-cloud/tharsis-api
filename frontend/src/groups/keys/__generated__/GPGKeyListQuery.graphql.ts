@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<3ae7d23237540587cbc2aa742618e8bd>>
+ * @generated SignedSource<<b5825dd8a2eb2a2e2077afc40057d58b>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -19,7 +18,9 @@ export type GPGKeyListQuery$variables = {
 };
 export type GPGKeyListQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"GPGKeyListFragment_keys">;
+    readonly group: {
+      readonly " $fragmentSpreads": FragmentRefs<"GPGKeyListFragment_keys">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type GPGKeyListQuery = {
@@ -118,11 +119,11 @@ v9 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -130,23 +131,27 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v5/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "GPGKeyListFragment_keys"
-              }
-            ],
-            "type": "Group",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "GPGKeyListFragment_keys"
+                }
+              ],
+              "type": "Group",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "group"
           }
         ],
         "storageKey": null
@@ -158,31 +163,31 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v4/*: any*/),
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v3/*: any*/)
+      (v2/*:: as any*/),
+      (v4/*:: as any*/),
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v3/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "GPGKeyListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v5/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v6/*: any*/),
-          (v7/*: any*/),
+          (v6/*:: as any*/),
+          (v7/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v8/*: any*/),
+                "args": (v8/*:: as any*/),
                 "concreteType": "GPGKeyConnection",
                 "kind": "LinkedField",
                 "name": "gpgKeys",
@@ -211,7 +216,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v7/*: any*/),
+                          (v7/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -266,7 +271,7 @@ return {
                             "name": "createdByActor",
                             "plural": false,
                             "selections": [
-                              (v6/*: any*/),
+                              (v6/*:: as any*/),
                               {
                                 "kind": "TypeDiscriminator",
                                 "abstractKey": "__isActor"
@@ -303,7 +308,7 @@ return {
                                         "name": "email",
                                         "storageKey": null
                                       },
-                                      (v7/*: any*/)
+                                      (v7/*:: as any*/)
                                     ],
                                     "storageKey": null
                                   }
@@ -313,26 +318,26 @@ return {
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v9/*: any*/),
+                                "selections": (v9/*:: as any*/),
                                 "type": "ServiceAccountActor",
                                 "abstractKey": null
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v9/*: any*/),
+                                "selections": (v9/*:: as any*/),
                                 "type": "VCSProviderActor",
                                 "abstractKey": null
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v9/*: any*/),
+                                "selections": (v9/*:: as any*/),
                                 "type": "JobActor",
                                 "abstractKey": null
                               }
                             ],
                             "storageKey": null
                           },
-                          (v6/*: any*/)
+                          (v6/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -390,7 +395,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v8/*: any*/),
+                "args": (v8/*:: as any*/),
                 "filters": [
                   "includeInherited",
                   "sort"
@@ -420,6 +425,6 @@ return {
 };
 })();
 
-(node as any).hash = "b1a5791f82339fd1a7023117f7607b39";
+(node as any).hash = "9c9535f1c319484f3e8f94a13aa26a37";
 
 export default node;

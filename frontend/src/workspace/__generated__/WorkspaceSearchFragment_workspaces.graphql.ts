@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<5e31cb89c0ef0020fdcf6bf75d8aa0e5>>
+ * @generated SignedSource<<313e686212a044921bbd59f7245dd2da>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -67,7 +66,7 @@ return {
         "count": null,
         "cursor": null,
         "direction": "bidirectional",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -80,7 +79,7 @@ return {
           "count": "last",
           "cursor": "before"
         },
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": WorkspaceSearchPaginationQuery_graphql

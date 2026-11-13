@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<b978d752a09604124873a40b6d019608>>
+ * @generated SignedSource<<4c5d38e7c44d2929268ded59e72666cb>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -87,7 +86,7 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "NestedNamespaceListPaginationQuery",
@@ -103,13 +102,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "NestedNamespaceListPaginationQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "NamespaceConnection",
         "kind": "LinkedField",
         "name": "namespaces",
@@ -280,7 +279,7 @@ return {
       },
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "filters": [
           "parentId",
           "sort"

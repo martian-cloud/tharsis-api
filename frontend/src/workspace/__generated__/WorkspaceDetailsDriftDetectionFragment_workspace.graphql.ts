@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<8f90829ac9951783f8dcd37955b42df6>>
+ * @generated SignedSource<<0a522aae5a4ecf1d072d48e7f08fc95c>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -44,7 +43,7 @@ return {
   "metadata": null,
   "name": "WorkspaceDetailsDriftDetectionFragment_workspace",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -89,7 +88,7 @@ return {
           "name": "run",
           "plural": false,
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "alias": null,
               "args": null,

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<6c61cf585027a07f08d9ed6acd89f630>>
+ * @generated SignedSource<<d306ac29c24423bc880656587fdb637a>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -131,8 +130,8 @@ v8 = [
         "name": "user",
         "plural": false,
         "selections": [
-          (v6/*: any*/),
-          (v3/*: any*/)
+          (v6/*:: as any*/),
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -142,19 +141,19 @@ v8 = [
   },
   {
     "kind": "InlineFragment",
-    "selections": (v7/*: any*/),
+    "selections": (v7/*:: as any*/),
     "type": "ServiceAccountActor",
     "abstractKey": null
   },
   {
     "kind": "InlineFragment",
-    "selections": (v7/*: any*/),
+    "selections": (v7/*:: as any*/),
     "type": "VCSProviderActor",
     "abstractKey": null
   },
   {
     "kind": "InlineFragment",
-    "selections": (v7/*: any*/),
+    "selections": (v7/*:: as any*/),
     "type": "JobActor",
     "abstractKey": null
   }
@@ -166,7 +165,7 @@ v9 = {
   "kind": "LinkedField",
   "name": "createdByActor",
   "plural": false,
-  "selections": (v8/*: any*/),
+  "selections": (v8/*:: as any*/),
   "storageKey": null
 },
 v10 = {
@@ -191,7 +190,7 @@ v11 = {
       "name": "fullPath",
       "storageKey": null
     },
-    (v3/*: any*/)
+    (v3/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -203,7 +202,7 @@ v12 = {
   "name": "metadata",
   "plural": false,
   "selections": [
-    (v5/*: any*/)
+    (v5/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -250,9 +249,9 @@ v17 = {
       "name": "runnerPath",
       "storageKey": null
     },
-    (v13/*: any*/),
-    (v3/*: any*/),
-    (v10/*: any*/),
+    (v13/*:: as any*/),
+    (v3/*:: as any*/),
+    (v10/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -275,13 +274,13 @@ v17 = {
           "name": "pendingAt",
           "storageKey": null
         },
-        (v14/*: any*/),
-        (v15/*: any*/)
+        (v14/*:: as any*/),
+        (v15/*:: as any*/)
       ],
       "storageKey": null
     },
-    (v16/*: any*/),
-    (v11/*: any*/),
+    (v16/*:: as any*/),
+    (v11/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -437,8 +436,8 @@ v21 = {
   "name": "checkResults",
   "plural": true,
   "selections": [
-    (v20/*: any*/),
-    (v10/*: any*/),
+    (v20/*:: as any*/),
+    (v10/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -454,7 +453,7 @@ v21 = {
           "name": "address",
           "storageKey": null
         },
-        (v10/*: any*/),
+        (v10/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -476,8 +475,8 @@ v22 = {
   "storageKey": null
 },
 v23 = [
-  (v3/*: any*/),
-  (v20/*: any*/),
+  (v3/*:: as any*/),
+  (v20/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -509,20 +508,20 @@ v26 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceDetailsRunSubscription",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunEvent",
         "kind": "LinkedField",
         "name": "workspaceRunEvents",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -531,8 +530,8 @@ return {
             "name": "run",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
-              (v4/*: any*/),
+              (v3/*:: as any*/),
+              (v4/*:: as any*/),
               {
                 "args": null,
                 "kind": "FragmentSpread",
@@ -570,19 +569,19 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceDetailsRunSubscription",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunEvent",
         "kind": "LinkedField",
         "name": "workspaceRunEvents",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -591,8 +590,8 @@ return {
             "name": "run",
             "plural": false,
             "selections": [
-              (v3/*: any*/),
-              (v4/*: any*/),
+              (v3/*:: as any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -601,7 +600,7 @@ return {
                 "name": "metadata",
                 "plural": false,
                 "selections": [
-                  (v5/*: any*/),
+                  (v5/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -612,8 +611,8 @@ return {
                 ],
                 "storageKey": null
               },
-              (v9/*: any*/),
-              (v10/*: any*/),
+              (v9/*:: as any*/),
+              (v10/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -628,7 +627,7 @@ return {
                 "name": "hasAdvisoryFailures",
                 "storageKey": null
               },
-              (v11/*: any*/),
+              (v11/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -637,11 +636,11 @@ return {
                 "name": "apply",
                 "plural": false,
                 "selections": [
-                  (v10/*: any*/),
-                  (v3/*: any*/),
-                  (v12/*: any*/),
-                  (v17/*: any*/),
-                  (v18/*: any*/),
+                  (v10/*:: as any*/),
+                  (v3/*:: as any*/),
+                  (v12/*:: as any*/),
+                  (v17/*:: as any*/),
+                  (v18/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -649,10 +648,10 @@ return {
                     "kind": "LinkedField",
                     "name": "triggeredByActor",
                     "plural": false,
-                    "selections": (v8/*: any*/),
+                    "selections": (v8/*:: as any*/),
                     "storageKey": null
                   },
-                  (v19/*: any*/)
+                  (v19/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -664,11 +663,11 @@ return {
                 "name": "plan",
                 "plural": false,
                 "selections": [
-                  (v10/*: any*/),
-                  (v3/*: any*/),
-                  (v12/*: any*/),
-                  (v17/*: any*/),
-                  (v18/*: any*/),
+                  (v10/*:: as any*/),
+                  (v3/*:: as any*/),
+                  (v12/*:: as any*/),
+                  (v17/*:: as any*/),
+                  (v18/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -683,8 +682,8 @@ return {
                     "name": "diffSize",
                     "storageKey": null
                   },
-                  (v21/*: any*/),
-                  (v19/*: any*/),
+                  (v21/*:: as any*/),
+                  (v19/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -763,8 +762,8 @@ return {
                 "name": "taskStages",
                 "plural": true,
                 "selections": [
-                  (v22/*: any*/),
-                  (v10/*: any*/),
+                  (v22/*:: as any*/),
+                  (v10/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -773,8 +772,8 @@ return {
                     "name": "policyChecks",
                     "plural": true,
                     "selections": [
-                      (v10/*: any*/),
-                      (v22/*: any*/),
+                      (v10/*:: as any*/),
+                      (v22/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -783,10 +782,10 @@ return {
                         "name": "currentJob",
                         "plural": false,
                         "selections": [
-                          (v13/*: any*/),
-                          (v3/*: any*/),
-                          (v16/*: any*/),
-                          (v11/*: any*/),
+                          (v13/*:: as any*/),
+                          (v3/*:: as any*/),
+                          (v16/*:: as any*/),
+                          (v11/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -795,8 +794,8 @@ return {
                             "name": "timestamps",
                             "plural": false,
                             "selections": [
-                              (v14/*: any*/),
-                              (v15/*: any*/)
+                              (v14/*:: as any*/),
+                              (v15/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -826,7 +825,7 @@ return {
                             "name": "approvalRules",
                             "plural": true,
                             "selections": [
-                              (v20/*: any*/),
+                              (v20/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -842,7 +841,7 @@ return {
                                 "name": "allowedUsers",
                                 "plural": true,
                                 "selections": [
-                                  (v3/*: any*/),
+                                  (v3/*:: as any*/),
                                   {
                                     "alias": null,
                                     "args": null,
@@ -850,7 +849,7 @@ return {
                                     "name": "username",
                                     "storageKey": null
                                   },
-                                  (v6/*: any*/)
+                                  (v6/*:: as any*/)
                                 ],
                                 "storageKey": null
                               },
@@ -861,7 +860,7 @@ return {
                                 "kind": "LinkedField",
                                 "name": "allowedServiceAccounts",
                                 "plural": true,
-                                "selections": (v23/*: any*/),
+                                "selections": (v23/*:: as any*/),
                                 "storageKey": null
                               },
                               {
@@ -872,8 +871,8 @@ return {
                                 "name": "allowedTeams",
                                 "plural": true,
                                 "selections": [
-                                  (v3/*: any*/),
-                                  (v20/*: any*/)
+                                  (v3/*:: as any*/),
+                                  (v20/*:: as any*/)
                                 ],
                                 "storageKey": null
                               }
@@ -888,7 +887,7 @@ return {
                             "name": "approvals",
                             "plural": true,
                             "selections": [
-                              (v3/*: any*/),
+                              (v3/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -896,7 +895,7 @@ return {
                                 "name": "decision",
                                 "storageKey": null
                               },
-                              (v9/*: any*/),
+                              (v9/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -912,8 +911,8 @@ return {
                                 "name": "user",
                                 "plural": false,
                                 "selections": [
-                                  (v3/*: any*/),
-                                  (v6/*: any*/)
+                                  (v3/*:: as any*/),
+                                  (v6/*:: as any*/)
                                 ],
                                 "storageKey": null
                               },
@@ -924,7 +923,7 @@ return {
                                 "kind": "LinkedField",
                                 "name": "serviceAccount",
                                 "plural": false,
-                                "selections": (v23/*: any*/),
+                                "selections": (v23/*:: as any*/),
                                 "storageKey": null
                               },
                               {
@@ -934,12 +933,12 @@ return {
                                 "name": "comment",
                                 "storageKey": null
                               },
-                              (v12/*: any*/)
+                              (v12/*:: as any*/)
                             ],
                             "storageKey": null
                           },
-                          (v3/*: any*/),
-                          (v10/*: any*/),
+                          (v3/*:: as any*/),
+                          (v10/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -947,7 +946,7 @@ return {
                             "kind": "LinkedField",
                             "name": "overriddenByActor",
                             "plural": false,
-                            "selections": (v8/*: any*/),
+                            "selections": (v8/*:: as any*/),
                             "storageKey": null
                           },
                           {
@@ -986,9 +985,9 @@ return {
                         "name": "policies",
                         "plural": true,
                         "selections": [
-                          (v3/*: any*/),
-                          (v10/*: any*/),
-                          (v20/*: any*/),
+                          (v3/*:: as any*/),
+                          (v10/*:: as any*/),
+                          (v20/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -1060,7 +1059,7 @@ return {
                             "name": "enforcementLevel",
                             "storageKey": null
                           },
-                          (v24/*: any*/),
+                          (v24/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -1087,7 +1086,7 @@ return {
                             "name": "policy",
                             "plural": false,
                             "selections": [
-                              (v3/*: any*/),
+                              (v3/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -1108,7 +1107,7 @@ return {
                         "name": "nodePath",
                         "storageKey": null
                       },
-                      (v19/*: any*/),
+                      (v19/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -1117,7 +1116,7 @@ return {
                         "name": "messagesSummary",
                         "plural": false,
                         "selections": [
-                          (v24/*: any*/),
+                          (v24/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -1142,8 +1141,8 @@ return {
                 "name": "annotations",
                 "plural": true,
                 "selections": [
-                  (v25/*: any*/),
-                  (v26/*: any*/),
+                  (v25/*:: as any*/),
+                  (v26/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -1183,7 +1182,7 @@ return {
                 "name": "configurationVersion",
                 "plural": false,
                 "selections": [
-                  (v3/*: any*/)
+                  (v3/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -1195,7 +1194,7 @@ return {
                 "name": "variables",
                 "plural": true,
                 "selections": [
-                  (v25/*: any*/),
+                  (v25/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -1217,7 +1216,7 @@ return {
                     "name": "includedInTfConfig",
                     "storageKey": null
                   },
-                  (v26/*: any*/),
+                  (v26/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -1258,11 +1257,11 @@ return {
                     "name": "inventory",
                     "plural": false,
                     "selections": [
-                      (v21/*: any*/)
+                      (v21/*:: as any*/)
                     ],
                     "storageKey": null
                   },
-                  (v3/*: any*/)
+                  (v3/*:: as any*/)
                 ],
                 "storageKey": null
               }

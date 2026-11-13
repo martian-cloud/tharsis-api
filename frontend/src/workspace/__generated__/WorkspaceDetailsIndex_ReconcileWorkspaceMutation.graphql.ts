@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<7519c6853d4ee50c9f89f28e0d9f7dec>>
+ * @generated SignedSource<<5ca58d260e6733eff4d94af140c1a835>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -113,20 +112,20 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceDetailsIndex_ReconcileWorkspaceMutation",
-    "selections": (v1/*: any*/),
+    "selections": (v1/*:: as any*/),
     "type": "Mutation",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceDetailsIndex_ReconcileWorkspaceMutation",
-    "selections": (v1/*: any*/)
+    "selections": (v1/*:: as any*/)
   },
   "params": {
     "cacheID": "ad3fcf07943c6fc95fd04155ef79722c",

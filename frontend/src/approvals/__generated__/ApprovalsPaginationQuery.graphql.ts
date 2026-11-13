@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<d392c7e225aedce349385598f11c0e40>>
+ * @generated SignedSource<<726c049a7c559e9708235678e8605980>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -68,7 +67,7 @@ v3 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "ApprovalsPaginationQuery",
@@ -84,13 +83,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "ApprovalsPaginationQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunGateConnection",
         "kind": "LinkedField",
         "name": "runGatesAwaitingMyDecision",
@@ -119,7 +118,7 @@ return {
                 "name": "node",
                 "plural": false,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -146,7 +145,7 @@ return {
                     "name": "run",
                     "plural": false,
                     "selections": [
-                      (v2/*: any*/),
+                      (v2/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -169,7 +168,7 @@ return {
                             "name": "fullPath",
                             "storageKey": null
                           },
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -184,7 +183,7 @@ return {
                     "name": "policyCheck",
                     "plural": false,
                     "selections": [
-                      (v2/*: any*/),
+                      (v2/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -192,7 +191,7 @@ return {
                         "name": "checkType",
                         "storageKey": null
                       },
-                      (v3/*: any*/),
+                      (v3/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -208,8 +207,8 @@ return {
                         "name": "policies",
                         "plural": true,
                         "selections": [
-                          (v2/*: any*/),
-                          (v3/*: any*/)
+                          (v2/*:: as any*/),
+                          (v3/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -303,7 +302,7 @@ return {
       },
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "filters": [
           "sort"
         ],

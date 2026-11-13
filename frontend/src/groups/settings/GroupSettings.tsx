@@ -61,7 +61,7 @@ function GroupSettingsContent({ groupId }: GroupSettingsContentProps) {
     const queryData = useLazyLoadQuery<GroupSettingsQuery>(graphql`
         query GroupSettingsQuery($id: String!) {
             node(id: $id) {
-                ...on Group {
+                ...on Group @alias(as: "group") {
                     ...GroupSettingsContentFragment_group
                 }
             }
@@ -79,7 +79,7 @@ function GroupSettingsContent({ groupId }: GroupSettingsContentProps) {
             ...GroupProviderMirrorSettingsFragment_group
             ...GroupOutputVisibilitySettingsFragment_group
         }
-    `, queryData.node
+    `, queryData.node?.group
     )
 
     if (!data) {

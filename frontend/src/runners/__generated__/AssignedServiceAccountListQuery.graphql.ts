@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<ea2fdb11282b89833b3a78586c86f9a4>>
+ * @generated SignedSource<<f82946310f50be66447242f71c74e540>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -17,8 +16,10 @@ export type AssignedServiceAccountListQuery$variables = {
 };
 export type AssignedServiceAccountListQuery$data = {
   readonly node: {
-    readonly id?: string;
-    readonly " $fragmentSpreads": FragmentRefs<"AssignedServiceAccountListFragment_assignedServiceAccounts">;
+    readonly runner: {
+      readonly id: string;
+      readonly " $fragmentSpreads": FragmentRefs<"AssignedServiceAccountListFragment_assignedServiceAccounts">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type AssignedServiceAccountListQuery = {
@@ -85,9 +86,9 @@ v7 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -95,24 +96,28 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v4/*: any*/),
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "AssignedServiceAccountListFragment_assignedServiceAccounts"
-              }
-            ],
-            "type": "Runner",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v4/*:: as any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "AssignedServiceAccountListFragment_assignedServiceAccounts"
+                }
+              ],
+              "type": "Runner",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "runner"
           }
         ],
         "storageKey": null
@@ -124,23 +129,23 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v2/*:: as any*/),
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "AssignedServiceAccountListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v5/*: any*/),
-          (v4/*: any*/),
+          (v5/*:: as any*/),
+          (v4/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -151,7 +156,7 @@ return {
                 "name": "type",
                 "storageKey": null
               },
-              (v6/*: any*/),
+              (v6/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -167,13 +172,13 @@ return {
                     "name": "fullPath",
                     "storageKey": null
                   },
-                  (v4/*: any*/)
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               },
               {
                 "alias": null,
-                "args": (v7/*: any*/),
+                "args": (v7/*:: as any*/),
                 "concreteType": "ServiceAccountConnection",
                 "kind": "LinkedField",
                 "name": "assignedServiceAccounts",
@@ -202,7 +207,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v4/*: any*/),
+                          (v4/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -210,7 +215,7 @@ return {
                             "name": "name",
                             "storageKey": null
                           },
-                          (v6/*: any*/),
+                          (v6/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -243,7 +248,7 @@ return {
                             ],
                             "storageKey": null
                           },
-                          (v5/*: any*/)
+                          (v5/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -287,7 +292,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v7/*: any*/),
+                "args": (v7/*:: as any*/),
                 "filters": null,
                 "handle": "connection",
                 "key": "AssignedServiceAccountList_assignedServiceAccounts",
@@ -314,6 +319,6 @@ return {
 };
 })();
 
-(node as any).hash = "55a744a7414675228fc2f6a9087b62e9";
+(node as any).hash = "ad0eaefa5891b61ecaa458415d4cb51d";
 
 export default node;

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<88eb4612202d0ca1de7daf2872f7b496>>
+ * @generated SignedSource<<8545565101f96a17bd566b2f8ca2a4d9>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -67,8 +66,8 @@ v4 = {
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -86,8 +85,8 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "UserPreferencesQuery",
@@ -193,13 +192,13 @@ return {
         "name": "me",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v3/*: any*/),
+                "args": (v3/*:: as any*/),
                 "concreteType": "UserSessionConnection",
                 "kind": "LinkedField",
                 "name": "userSessions",
@@ -221,7 +220,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v4/*: any*/),
+                          (v4/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -268,7 +267,7 @@ return {
                             ],
                             "storageKey": null
                           },
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -312,7 +311,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v3/*: any*/),
+                "args": (v3/*:: as any*/),
                 "filters": [
                   "sort"
                 ],
@@ -321,7 +320,7 @@ return {
                 "kind": "LinkedHandle",
                 "name": "userSessions"
               },
-              (v4/*: any*/)
+              (v4/*:: as any*/)
             ],
             "type": "User",
             "abstractKey": null
@@ -329,7 +328,7 @@ return {
           {
             "kind": "InlineFragment",
             "selections": [
-              (v4/*: any*/)
+              (v4/*:: as any*/)
             ],
             "type": "Node",
             "abstractKey": "__isNode"

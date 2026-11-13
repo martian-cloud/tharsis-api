@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<6915a3f8831ead968e0d15cffc3e57ff>>
+ * @generated SignedSource<<d192a72c5a5bc720a01c26d811f3a68b>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -112,7 +111,7 @@ v12 = {
   "name": "createdByActor",
   "plural": false,
   "selections": [
-    (v6/*: any*/),
+    (v6/*:: as any*/),
     {
       "kind": "TypeDiscriminator",
       "abstractKey": "__isActor"
@@ -149,7 +148,7 @@ v12 = {
               "name": "email",
               "storageKey": null
             },
-            (v7/*: any*/)
+            (v7/*:: as any*/)
           ],
           "storageKey": null
         }
@@ -159,19 +158,19 @@ v12 = {
     },
     {
       "kind": "InlineFragment",
-      "selections": (v11/*: any*/),
+      "selections": (v11/*:: as any*/),
       "type": "ServiceAccountActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v11/*: any*/),
+      "selections": (v11/*:: as any*/),
       "type": "VCSProviderActor",
       "abstractKey": null
     },
     {
       "kind": "InlineFragment",
-      "selections": (v11/*: any*/),
+      "selections": (v11/*:: as any*/),
       "type": "JobActor",
       "abstractKey": null
     }
@@ -226,11 +225,11 @@ v14 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/),
-      (v4/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/),
+      (v4/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -238,7 +237,7 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v5/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -259,25 +258,25 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v4/*: any*/),
-      (v3/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v4/*:: as any*/),
+      (v3/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "PackageDetailsIndexRefetchQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v5/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v6/*: any*/),
-          (v7/*: any*/),
+          (v6/*:: as any*/),
+          (v7/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -317,9 +316,9 @@ return {
                 "name": "latestVersion",
                 "plural": false,
                 "selections": [
-                  (v7/*: any*/),
-                  (v8/*: any*/),
-                  (v9/*: any*/),
+                  (v7/*:: as any*/),
+                  (v8/*:: as any*/),
+                  (v9/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -327,8 +326,8 @@ return {
                     "name": "error",
                     "storageKey": null
                   },
-                  (v10/*: any*/),
-                  (v12/*: any*/),
+                  (v10/*:: as any*/),
+                  (v12/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -343,7 +342,7 @@ return {
                     "name": "size",
                     "storageKey": null
                   },
-                  (v13/*: any*/)
+                  (v13/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -363,7 +362,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v14/*: any*/),
+                "args": (v14/*:: as any*/),
                 "concreteType": "PackageVersionConnection",
                 "kind": "LinkedField",
                 "name": "versions",
@@ -385,13 +384,13 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v7/*: any*/),
-                          (v13/*: any*/),
-                          (v8/*: any*/),
-                          (v12/*: any*/),
-                          (v10/*: any*/),
-                          (v9/*: any*/),
-                          (v6/*: any*/)
+                          (v7/*:: as any*/),
+                          (v13/*:: as any*/),
+                          (v8/*:: as any*/),
+                          (v12/*:: as any*/),
+                          (v10/*:: as any*/),
+                          (v9/*:: as any*/),
+                          (v6/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -449,7 +448,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v14/*: any*/),
+                "args": (v14/*:: as any*/),
                 "filters": [
                   "sort"
                 ],

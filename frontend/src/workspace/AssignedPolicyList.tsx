@@ -11,7 +11,9 @@ import NoResults from '@/common/NoResults';
 const query = graphql`
     query AssignedPolicyListQuery($id: String!) {
         node(id: $id) {
-            ...AssignedPolicyListPoliciesFragment_workspace
+            ... on Workspace @alias(as: "workspace") {
+                ...AssignedPolicyListPoliciesFragment_workspace
+            }
         }
     }
 `;
@@ -41,7 +43,7 @@ function AssignedPolicyList(props: Props) {
                 ...PolicyCardFragment_policy
             }
         }
-    `, queryData.node);
+    `, queryData.node?.workspace);
 
     const policies = data?.assignedPolicies ?? [];
 

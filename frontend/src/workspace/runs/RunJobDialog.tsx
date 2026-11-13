@@ -20,7 +20,7 @@ const PAGE_SIZE = 20;
 const planQuery = graphql`
     query RunJobDialogPlanQuery($id: String!, $first: Int!, $after: String) {
         node(id: $id) {
-            ...on Run {
+            ...on Run @alias(as: "run") {
                 id
                 ...RunJobDialogPlanFragment_jobs
             }
@@ -31,7 +31,7 @@ const planQuery = graphql`
 const applyQuery = graphql`
     query RunJobDialogApplyQuery($id: String!, $first: Int!, $after: String) {
         node(id: $id) {
-            ...on Run {
+            ...on Run @alias(as: "run") {
                 id
                 ...RunJobDialogApplyFragment_jobs
             }
@@ -109,7 +109,7 @@ function PlanJobsLoader({ runId, onSelectJob }: LoaderProps) {
                 }
             }
         }
-        `, queryData.node ?? null
+        `, queryData.node?.run ?? null
     );
 
     const jobs = (data?.plan?.jobs.edges ?? []).flatMap(edge => edge?.node ? [edge.node] : []);
@@ -135,7 +135,7 @@ function ApplyJobsLoader({ runId, onSelectJob }: LoaderProps) {
                 }
             }
         }
-        `, queryData.node ?? null
+        `, queryData.node?.run ?? null
     );
 
     const jobs = (data?.apply?.jobs.edges ?? []).flatMap(edge => edge?.node ? [edge.node] : []);

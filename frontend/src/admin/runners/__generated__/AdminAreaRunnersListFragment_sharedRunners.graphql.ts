@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<a0b974f64c6d4a57d0e1e2fd60f59d1f>>
+ * @generated SignedSource<<4cbb0a8ff5fe132d92b1cc5d2761bb07>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -50,7 +49,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -60,7 +59,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": AdminAreaRunnersListPaginationQuery_graphql

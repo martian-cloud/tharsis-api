@@ -33,7 +33,7 @@ function VariableHistory({ variableId, sensitive }: { variableId: string, sensit
     const variable = useLazyLoadQuery<VariableHistoryDialogQuery>(graphql`
     query VariableHistoryDialogQuery($id: String!, $first: Int!, $after: String, $includeValues: Boolean!) {
         node(id: $id) {
-            ... on NamespaceVariable {
+            ... on NamespaceVariable @alias(as: "namespaceVariable") {
                 sensitive
                 ...VariableHistoryDialogFragment_variable
             }
@@ -62,7 +62,7 @@ function VariableHistory({ variableId, sensitive }: { variableId: string, sensit
                     }
                 }
             }
-        `, variable.node);
+        `, variable.node?.namespaceVariable);
 
     return (
         <Box>

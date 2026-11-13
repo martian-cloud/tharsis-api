@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<906aa46a809bece288587179e3522e85>>
+ * @generated SignedSource<<9a50c4a96a44392e03379595d413a303>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -67,7 +66,7 @@ return {
         "count": null,
         "cursor": null,
         "direction": "bidirectional",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -80,7 +79,7 @@ return {
           "count": "last",
           "cursor": "before"
         },
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -131,7 +130,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "args": null,
                   "kind": "FragmentSpread",
@@ -199,7 +198,7 @@ return {
       ],
       "storageKey": "__FederatedRegistryList_federatedRegistries_connection(sort:\"UPDATED_AT_DESC\")"
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "Group",
   "abstractKey": null

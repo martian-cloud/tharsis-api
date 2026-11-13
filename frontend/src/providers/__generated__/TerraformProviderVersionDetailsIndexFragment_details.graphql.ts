@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<9a4de283e3958d1106fe2c58e4d5db35>>
+ * @generated SignedSource<<484f900f32535186a3bc2afac2886084>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -47,7 +46,7 @@ return {
   "metadata": null,
   "name": "TerraformProviderVersionDetailsIndexFragment_details",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -95,7 +94,7 @@ return {
       "name": "provider",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,

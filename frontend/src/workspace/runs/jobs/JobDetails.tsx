@@ -21,7 +21,7 @@ import { usePageLayout } from '@/layout/PageLayoutContext';
 const jobDetailsQuery = graphql`
     query JobDetailsQuery($id: String!) {
         node(id: $id) {
-            ...on Job {
+            ...on Job @alias(as: "job") {
                 id
                 status
                 type
@@ -92,7 +92,7 @@ function JobDetailsContent({ jobId }: { jobId: string }) {
         { fetchPolicy: 'store-and-network' }
     );
 
-    const job = data.node;
+    const job = data.node?.job;
     const status = job?.status ?? '';
     const statusColor = useJobStatusColor(status);
 

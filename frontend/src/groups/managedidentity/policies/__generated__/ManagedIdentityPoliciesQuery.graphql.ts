@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<50050e4f6f1133966727eb97031d83a0>>
+ * @generated SignedSource<<7dd87811d2377f756d480ff9a978c002>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,7 +14,9 @@ export type ManagedIdentityPoliciesQuery$variables = {
 };
 export type ManagedIdentityPoliciesQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"ManagedIdentityPoliciesPoliciesFragment_managedIdentity">;
+    readonly managedIdentity: {
+      readonly " $fragmentSpreads": FragmentRefs<"ManagedIdentityPoliciesPoliciesFragment_managedIdentity">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type ManagedIdentityPoliciesQuery = {
@@ -76,27 +77,38 @@ v6 = {
   "storageKey": null
 },
 v7 = [
-  (v3/*: any*/)
+  (v3/*:: as any*/)
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "ManagedIdentityPoliciesQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "args": null,
-            "kind": "FragmentSpread",
-            "name": "ManagedIdentityPoliciesPoliciesFragment_managedIdentity"
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "ManagedIdentityPoliciesPoliciesFragment_managedIdentity"
+                }
+              ],
+              "type": "ManagedIdentity",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "managedIdentity"
           }
         ],
         "storageKey": null
@@ -107,19 +119,19 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "ManagedIdentityPoliciesQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -131,7 +143,7 @@ return {
                 "name": "referencingPolicies",
                 "plural": true,
                 "selections": [
-                  (v3/*: any*/),
+                  (v3/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -168,7 +180,7 @@ return {
                     "name": "createdByActor",
                     "plural": false,
                     "selections": [
-                      (v2/*: any*/),
+                      (v2/*:: as any*/),
                       {
                         "kind": "TypeDiscriminator",
                         "abstractKey": "__isActor"
@@ -205,7 +217,7 @@ return {
                                 "name": "email",
                                 "storageKey": null
                               },
-                              (v3/*: any*/)
+                              (v3/*:: as any*/)
                             ],
                             "storageKey": null
                           }
@@ -215,19 +227,19 @@ return {
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v4/*: any*/),
+                        "selections": (v4/*:: as any*/),
                         "type": "ServiceAccountActor",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v4/*: any*/),
+                        "selections": (v4/*:: as any*/),
                         "type": "VCSProviderActor",
                         "abstractKey": null
                       },
                       {
                         "kind": "InlineFragment",
-                        "selections": (v4/*: any*/),
+                        "selections": (v4/*:: as any*/),
                         "type": "JobActor",
                         "abstractKey": null
                       }
@@ -263,8 +275,8 @@ return {
                         "name": "packageVersionConstraint",
                         "storageKey": null
                       },
-                      (v5/*: any*/),
-                      (v6/*: any*/)
+                      (v5/*:: as any*/),
+                      (v6/*:: as any*/)
                     ],
                     "storageKey": null
                   },
@@ -290,8 +302,8 @@ return {
                         "name": "predicateType",
                         "storageKey": null
                       },
-                      (v5/*: any*/),
-                      (v6/*: any*/)
+                      (v5/*:: as any*/),
+                      (v6/*:: as any*/)
                     ],
                     "storageKey": null
                   },
@@ -327,7 +339,7 @@ return {
                     "kind": "LinkedField",
                     "name": "allowedUsers",
                     "plural": true,
-                    "selections": (v7/*: any*/),
+                    "selections": (v7/*:: as any*/),
                     "storageKey": null
                   },
                   {
@@ -337,7 +349,7 @@ return {
                     "kind": "LinkedField",
                     "name": "allowedTeams",
                     "plural": true,
-                    "selections": (v7/*: any*/),
+                    "selections": (v7/*:: as any*/),
                     "storageKey": null
                   },
                   {
@@ -347,7 +359,7 @@ return {
                     "kind": "LinkedField",
                     "name": "allowedServiceAccounts",
                     "plural": true,
-                    "selections": (v7/*: any*/),
+                    "selections": (v7/*:: as any*/),
                     "storageKey": null
                   }
                 ],
@@ -357,23 +369,23 @@ return {
             "type": "ManagedIdentity",
             "abstractKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "2fc07e0b9add6e6b1d1843f8dad08961",
+    "cacheID": "1483fe0162e7d0e045322d8e55e13753",
     "id": null,
     "metadata": {},
     "name": "ManagedIdentityPoliciesQuery",
     "operationKind": "query",
-    "text": "query ManagedIdentityPoliciesQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...ManagedIdentityPoliciesPoliciesFragment_managedIdentity\n    id\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment ManagedIdentityPoliciesPoliciesFragment_managedIdentity on ManagedIdentity {\n  referencingPolicies {\n    id\n    ...PolicyCardFragment_policy\n  }\n}\n\nfragment PolicyCardFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    stage\n    enforcementLevel\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    stage\n    enforcementLevel\n  }\n  scope {\n    action\n  }\n  groupPath\n  allowedUsers {\n    id\n  }\n  allowedTeams {\n    id\n  }\n  allowedServiceAccounts {\n    id\n  }\n}\n"
+    "text": "query ManagedIdentityPoliciesQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on ManagedIdentity {\n      ...ManagedIdentityPoliciesPoliciesFragment_managedIdentity\n    }\n    id\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment ManagedIdentityPoliciesPoliciesFragment_managedIdentity on ManagedIdentity {\n  referencingPolicies {\n    id\n    ...PolicyCardFragment_policy\n  }\n}\n\nfragment PolicyCardFragment_policy on Policy {\n  id\n  name\n  description\n  kind\n  createdBy\n  createdByActor {\n    __typename\n    ...ActorDisplayFragment_actor\n  }\n  requiredApprovals\n  opaData {\n    packageSource\n    packageVersionConstraint\n    stage\n    enforcementLevel\n  }\n  moduleAttestationData {\n    publicKey\n    predicateType\n    stage\n    enforcementLevel\n  }\n  scope {\n    action\n  }\n  groupPath\n  allowedUsers {\n    id\n  }\n  allowedTeams {\n    id\n  }\n  allowedServiceAccounts {\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "072cbdb317845aada1f036afbb994a49";
+(node as any).hash = "c2fb0b4789faca90b1d00cb483119eab";
 
 export default node;

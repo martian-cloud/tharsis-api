@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<86b0adf51edb074e76daf1ed91ac090c>>
+ * @generated SignedSource<<7d5803183c81995e24b837dcd6a667c4>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -17,8 +16,10 @@ export type GroupRunnersListQuery$variables = {
 };
 export type GroupRunnersListQuery$data = {
   readonly node: {
-    readonly fullPath?: string;
-    readonly " $fragmentSpreads": FragmentRefs<"GroupRunnersListFragment_runners">;
+    readonly group: {
+      readonly fullPath: string;
+      readonly " $fragmentSpreads": FragmentRefs<"GroupRunnersListFragment_runners">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type GroupRunnersListQuery = {
@@ -104,9 +105,9 @@ v8 = [
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -114,24 +115,28 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "GroupRunnersListFragment_runners"
-              },
-              (v4/*: any*/)
-            ],
-            "type": "Group",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "GroupRunnersListFragment_runners"
+                },
+                (v4/*:: as any*/)
+              ],
+              "type": "Group",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "group"
           }
         ],
         "storageKey": null
@@ -143,29 +148,29 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v2/*: any*/),
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v2/*:: as any*/),
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "GroupRunnersListQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v3/*: any*/),
+        "args": (v3/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v5/*: any*/),
-          (v6/*: any*/),
+          (v5/*:: as any*/),
+          (v6/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v7/*: any*/),
+                "args": (v7/*:: as any*/),
                 "concreteType": "RunnerConnection",
                 "kind": "LinkedField",
                 "name": "runners",
@@ -187,8 +192,8 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v6/*: any*/),
-                          (v5/*: any*/),
+                          (v6/*:: as any*/),
+                          (v5/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -243,7 +248,7 @@ return {
                             "name": "createdByActor",
                             "plural": false,
                             "selections": [
-                              (v5/*: any*/),
+                              (v5/*:: as any*/),
                               {
                                 "kind": "TypeDiscriminator",
                                 "abstractKey": "__isActor"
@@ -280,7 +285,7 @@ return {
                                         "name": "email",
                                         "storageKey": null
                                       },
-                                      (v6/*: any*/)
+                                      (v6/*:: as any*/)
                                     ],
                                     "storageKey": null
                                   }
@@ -290,19 +295,19 @@ return {
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v8/*: any*/),
+                                "selections": (v8/*:: as any*/),
                                 "type": "ServiceAccountActor",
                                 "abstractKey": null
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v8/*: any*/),
+                                "selections": (v8/*:: as any*/),
                                 "type": "VCSProviderActor",
                                 "abstractKey": null
                               },
                               {
                                 "kind": "InlineFragment",
-                                "selections": (v8/*: any*/),
+                                "selections": (v8/*:: as any*/),
                                 "type": "JobActor",
                                 "abstractKey": null
                               }
@@ -352,7 +357,7 @@ return {
               },
               {
                 "alias": null,
-                "args": (v7/*: any*/),
+                "args": (v7/*:: as any*/),
                 "filters": [
                   "includeInherited",
                   "sort"
@@ -362,7 +367,7 @@ return {
                 "kind": "LinkedHandle",
                 "name": "runners"
               },
-              (v4/*: any*/)
+              (v4/*:: as any*/)
             ],
             "type": "Group",
             "abstractKey": null
@@ -383,6 +388,6 @@ return {
 };
 })();
 
-(node as any).hash = "f51bb3b4a30e8eecc48a42d495f74549";
+(node as any).hash = "0f93160e94311f117bd3f2acc7f926d5";
 
 export default node;

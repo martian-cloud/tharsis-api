@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<117411c3c4eee430d34ee0c0cc5c681f>>
+ * @generated SignedSource<<91c9ffc91f1bdc1138653b2d6eccb3d3>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -100,7 +99,7 @@ v2 = {
   "storageKey": null
 },
 v3 = [
-  (v1/*: any*/),
+  (v1/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -109,7 +108,7 @@ v3 = [
     "name": "metadata",
     "plural": false,
     "selections": [
-      (v2/*: any*/)
+      (v2/*:: as any*/)
     ],
     "storageKey": null
   },
@@ -152,8 +151,8 @@ return {
   "metadata": null,
   "name": "RunDetailsSidebarFragment_details",
   "selections": [
-    (v0/*: any*/),
-    (v1/*: any*/),
+    (v0/*:: as any*/),
+    (v1/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -266,7 +265,7 @@ return {
       "name": "metadata",
       "plural": false,
       "selections": [
-        (v2/*: any*/),
+        (v2/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -285,7 +284,7 @@ return {
       "name": "configurationVersion",
       "plural": false,
       "selections": [
-        (v0/*: any*/)
+        (v0/*:: as any*/)
       ],
       "storageKey": null
     },
@@ -296,7 +295,7 @@ return {
       "kind": "LinkedField",
       "name": "plan",
       "plural": false,
-      "selections": (v3/*: any*/),
+      "selections": (v3/*:: as any*/),
       "storageKey": null
     },
     {
@@ -307,8 +306,8 @@ return {
       "name": "taskStages",
       "plural": true,
       "selections": [
-        (v4/*: any*/),
-        (v1/*: any*/),
+        (v4/*:: as any*/),
+        (v1/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -317,8 +316,8 @@ return {
           "name": "policyChecks",
           "plural": true,
           "selections": [
-            (v1/*: any*/),
-            (v4/*: any*/)
+            (v1/*:: as any*/),
+            (v4/*:: as any*/)
           ],
           "storageKey": null
         }
@@ -332,7 +331,7 @@ return {
       "kind": "LinkedField",
       "name": "apply",
       "plural": false,
-      "selections": (v3/*: any*/),
+      "selections": (v3/*:: as any*/),
       "storageKey": null
     }
   ],

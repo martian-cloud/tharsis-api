@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<7f073ca672b6f8abc10470246be6c9d9>>
+ * @generated SignedSource<<a37021236b5644e54e17b082456e833c>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -78,7 +77,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v0/*: any*/)
+                (v0/*:: as any*/)
               ],
               "storageKey": null
             }
@@ -96,7 +95,7 @@ return {
       "name": "assignedManagedIdentities",
       "plural": true,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "args": null,
           "kind": "FragmentSpread",

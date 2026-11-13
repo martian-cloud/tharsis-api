@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<5d2eb5af79742bcd637244e967d0ff4e>>
+ * @generated SignedSource<<9030a10fef85d695fa25bd2c67c9b97a>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -132,14 +131,14 @@ v8 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "EditCleanupPolicyDeleteMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "CleanupPolicyMutationPayload",
         "kind": "LinkedField",
         "name": "deleteCleanupPolicy",
@@ -172,7 +171,7 @@ return {
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -182,13 +181,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "EditCleanupPolicyDeleteMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "CleanupPolicyMutationPayload",
         "kind": "LinkedField",
         "name": "deleteCleanupPolicy",
@@ -217,7 +216,7 @@ return {
                 "name": "effectiveCleanupPolicies",
                 "plural": true,
                 "selections": [
-                  (v3/*: any*/),
+                  (v3/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -280,9 +279,9 @@ return {
                         "name": "rules",
                         "plural": true,
                         "selections": [
-                          (v4/*: any*/),
-                          (v5/*: any*/),
-                          (v6/*: any*/),
+                          (v4/*:: as any*/),
+                          (v5/*:: as any*/),
+                          (v6/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -290,8 +289,8 @@ return {
                             "name": "systemGlob",
                             "storageKey": null
                           },
-                          (v7/*: any*/),
-                          (v8/*: any*/)
+                          (v7/*:: as any*/),
+                          (v8/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -314,11 +313,11 @@ return {
                         "name": "rules",
                         "plural": true,
                         "selections": [
-                          (v4/*: any*/),
-                          (v5/*: any*/),
-                          (v6/*: any*/),
-                          (v7/*: any*/),
-                          (v8/*: any*/)
+                          (v4/*:: as any*/),
+                          (v5/*:: as any*/),
+                          (v6/*:: as any*/),
+                          (v7/*:: as any*/),
+                          (v8/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -341,8 +340,8 @@ return {
                         "name": "rules",
                         "plural": true,
                         "selections": [
-                          (v4/*: any*/),
-                          (v5/*: any*/),
+                          (v4/*:: as any*/),
+                          (v5/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -371,7 +370,7 @@ return {
                             "name": "keepMin",
                             "storageKey": null
                           },
-                          (v8/*: any*/)
+                          (v8/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -381,11 +380,11 @@ return {
                 ],
                 "storageKey": null
               },
-              (v3/*: any*/)
+              (v3/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v2/*: any*/)
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       }

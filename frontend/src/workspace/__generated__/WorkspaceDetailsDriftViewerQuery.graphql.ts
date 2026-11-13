@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<e014c095e8de80b3c203373c96191fb9>>
+ * @generated SignedSource<<444046722e02ba0d8efcac53a2103161>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,8 +14,10 @@ export type WorkspaceDetailsDriftViewerQuery$variables = {
 };
 export type WorkspaceDetailsDriftViewerQuery$data = {
   readonly node: {
-    readonly id?: string;
-    readonly " $fragmentSpreads": FragmentRefs<"WorkspaceDetailsDriftViewerFragment_workspace">;
+    readonly workspace: {
+      readonly id: string;
+      readonly " $fragmentSpreads": FragmentRefs<"WorkspaceDetailsDriftViewerFragment_workspace">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type WorkspaceDetailsDriftViewerQuery = {
@@ -48,31 +49,35 @@ v2 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceDetailsDriftViewerQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v2/*: any*/),
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "WorkspaceDetailsDriftViewerFragment_workspace"
-              }
-            ],
-            "type": "Workspace",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v2/*:: as any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "WorkspaceDetailsDriftViewerFragment_workspace"
+                }
+              ],
+              "type": "Workspace",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "workspace"
           }
         ],
         "storageKey": null
@@ -83,13 +88,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceDetailsDriftViewerQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -102,7 +107,7 @@ return {
             "name": "__typename",
             "storageKey": null
           },
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -261,15 +266,15 @@ return {
                             ],
                             "storageKey": null
                           },
-                          (v2/*: any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       },
-                      (v2/*: any*/)
+                      (v2/*:: as any*/)
                     ],
                     "storageKey": null
                   },
-                  (v2/*: any*/)
+                  (v2/*:: as any*/)
                 ],
                 "storageKey": null
               }
@@ -293,6 +298,6 @@ return {
 };
 })();
 
-(node as any).hash = "cf3949586a548099d4fd45b6194d9ce2";
+(node as any).hash = "e2282f8d981eec4efdb166474bef773b";
 
 export default node;

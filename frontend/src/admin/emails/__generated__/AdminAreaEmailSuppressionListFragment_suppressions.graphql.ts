@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<5fa00cb23e9d02dd35c36d0a466e0e41>>
+ * @generated SignedSource<<3b995a8cfdd8b268e552149dc5544408>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -56,7 +55,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -66,7 +65,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": AdminAreaEmailSuppressionListPaginationQuery_graphql

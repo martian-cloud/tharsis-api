@@ -30,7 +30,7 @@ const NewButton =
 const query = graphql`
     query FederatedRegistryListQuery($first: Int, $last: Int, $after: String, $before: String, $groupId: String!) {
         node(id: $groupId) {
-            ...on Group {
+            ...on Group @alias(as: "group") {
                 ...FederatedRegistryListFragment_federatedRegistries
             }
         }
@@ -84,7 +84,7 @@ function FederatedRegistryList({ fragmentRef }: Props) {
                 }
             }
       }
-    `, queryData.node);
+    `, queryData.node?.group);
 
     const federatedRegistries = data?.federatedRegistries?.edges;
     const totalCount = data?.federatedRegistries?.totalCount ?? 0;

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<d4317ee28a30fd4891dd2603d944223f>>
+ * @generated SignedSource<<bfd4c41899a65d2f0a87ec2905fbc062>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -92,7 +91,7 @@ return {
         "count": null,
         "cursor": null,
         "direction": "bidirectional",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -105,7 +104,7 @@ return {
           "count": "last",
           "cursor": "before"
         },
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": ProviderMirrorListPaginationQuery_graphql
@@ -127,8 +126,8 @@ return {
       "name": "namespace",
       "plural": false,
       "selections": [
-        (v1/*: any*/),
-        (v2/*: any*/),
+        (v1/*:: as any*/),
+        (v2/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -189,7 +188,7 @@ return {
                   "name": "node",
                   "plural": false,
                   "selections": [
-                    (v1/*: any*/),
+                    (v1/*:: as any*/),
                     {
                       "alias": null,
                       "args": null,
@@ -216,7 +215,7 @@ return {
                       "kind": "FragmentSpread",
                       "name": "ProviderMirrorListItemFragment_mirror"
                     },
-                    (v2/*: any*/)
+                    (v2/*:: as any*/)
                   ],
                   "storageKey": null
                 },

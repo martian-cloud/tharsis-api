@@ -23,7 +23,7 @@ export function GetConnections(runnerId: string): [string] {
 const query = graphql`
     query RunnerSessionListQuery($id: String!, $first: Int!, $after: String) {
         node(id: $id) {
-            ... on Runner {
+            ... on Runner @alias(as: "runner") {
                 id
                 ...RunnerSessionListFragment_sessions
             }
@@ -57,7 +57,7 @@ function RunnerSessionList() {
                     }
                 }
             }
-        `, queryData.node
+        `, queryData.node?.runner
     );
 
     const edges = data?.sessions?.edges ?? [];

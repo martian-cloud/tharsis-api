@@ -26,7 +26,7 @@ function GroupRunnerDetails({ fragmentRef }: Props) {
     const data = useLazyLoadQuery<GroupRunnerDetailsQuery>(graphql`
         query GroupRunnerDetailsQuery($id: String!) {
             node(id: $id) {
-                ... on Runner {
+                ... on Runner @alias(as: "runner") {
                     id
                     name
                     ...RunnerDetailsFragment_runner
@@ -34,9 +34,9 @@ function GroupRunnerDetails({ fragmentRef }: Props) {
             }
         }`, { id: runnerId }, { fetchPolicy: 'store-and-network' });
 
-    const runner = data.node as any;
+    const runner = data.node?.runner;
 
-    if (data.node) {
+    if (runner) {
         return (
             <Box>
                 <NamespaceBreadcrumbs
@@ -46,7 +46,7 @@ function GroupRunnerDetails({ fragmentRef }: Props) {
                         { title: runner.name, path: runner.id }
                     ]}
                 />
-                <RunnerDetails fragmentRef={data.node} getConnections={() => GetConnections(group.id)} />
+                <RunnerDetails fragmentRef={runner} getConnections={() => GetConnections(group.id)} />
             </Box>
         );
     } else {

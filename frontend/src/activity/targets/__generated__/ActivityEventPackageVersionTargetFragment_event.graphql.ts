@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<693fe4deaa8e46e697f5b23e229d22e3>>
+ * @generated SignedSource<<2afdf53d72b4ace457b806c6c46f8eec>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -62,7 +61,7 @@ return {
         {
           "kind": "InlineFragment",
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -78,7 +77,7 @@ return {
               "name": "package",
               "plural": false,
               "selections": [
-                (v0/*: any*/),
+                (v0/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,

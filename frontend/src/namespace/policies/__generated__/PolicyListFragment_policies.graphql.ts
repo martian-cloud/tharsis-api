@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<090058ca95d72036af0cf2cf811a7e78>>
+ * @generated SignedSource<<ad9537aa0054cadeef6cbade246e5d15>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -61,7 +60,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -71,7 +70,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -127,7 +126,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
@@ -200,7 +199,7 @@ return {
       ],
       "storageKey": "__PolicyList_policies_connection(includeInherited:true,sort:\"CREATED_AT_DESC\")"
     },
-    (v1/*: any*/)
+    (v1/*:: as any*/)
   ],
   "type": "Group",
   "abstractKey": null

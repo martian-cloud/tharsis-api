@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<c65545d3e45a0763ddccbab81a0a29f6>>
+ * @generated SignedSource<<ab06b503103d5e3f8051e4cb72e2d5c4>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -81,7 +80,7 @@ v3 = {
       "name": "field",
       "storageKey": null
     },
-    (v2/*: any*/)
+    (v2/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -120,7 +119,7 @@ v7 = [
     "kind": "TypeDiscriminator",
     "abstractKey": "__isActor"
   },
-  (v2/*: any*/),
+  (v2/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -139,8 +138,8 @@ v7 = [
         "name": "user",
         "plural": false,
         "selections": [
-          (v5/*: any*/),
-          (v4/*: any*/)
+          (v5/*:: as any*/),
+          (v4/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -150,19 +149,19 @@ v7 = [
   },
   {
     "kind": "InlineFragment",
-    "selections": (v6/*: any*/),
+    "selections": (v6/*:: as any*/),
     "type": "ServiceAccountActor",
     "abstractKey": null
   },
   {
     "kind": "InlineFragment",
-    "selections": (v6/*: any*/),
+    "selections": (v6/*:: as any*/),
     "type": "VCSProviderActor",
     "abstractKey": null
   },
   {
     "kind": "InlineFragment",
-    "selections": (v6/*: any*/),
+    "selections": (v6/*:: as any*/),
     "type": "JobActor",
     "abstractKey": null
   }
@@ -174,7 +173,7 @@ v8 = {
   "kind": "LinkedField",
   "name": "createdByActor",
   "plural": false,
-  "selections": (v7/*: any*/),
+  "selections": (v7/*:: as any*/),
   "storageKey": null
 },
 v9 = {
@@ -210,7 +209,7 @@ v10 = {
       "name": "fullPath",
       "storageKey": null
     },
-    (v4/*: any*/)
+    (v4/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -229,8 +228,8 @@ v12 = {
   "storageKey": null
 },
 v13 = [
-  (v4/*: any*/),
-  (v12/*: any*/),
+  (v4/*:: as any*/),
+  (v12/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -248,14 +247,14 @@ v14 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "RunTaskStageCancelRunButtonMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunMutationPayload",
         "kind": "LinkedField",
         "name": "cancelRun",
@@ -277,7 +276,7 @@ return {
             ],
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -287,13 +286,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "RunTaskStageCancelRunButtonMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "RunMutationPayload",
         "kind": "LinkedField",
         "name": "cancelRun",
@@ -307,9 +306,9 @@ return {
             "name": "run",
             "plural": false,
             "selections": [
-              (v4/*: any*/),
-              (v8/*: any*/),
-              (v9/*: any*/),
+              (v4/*:: as any*/),
+              (v8/*:: as any*/),
+              (v9/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -317,7 +316,7 @@ return {
                 "name": "forceCancelAvailableAt",
                 "storageKey": null
               },
-              (v10/*: any*/),
+              (v10/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -333,7 +332,7 @@ return {
                     "name": "stageName",
                     "storageKey": null
                   },
-                  (v11/*: any*/),
+                  (v11/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -357,7 +356,7 @@ return {
                             "name": "cancelRequested",
                             "storageKey": null
                           },
-                          (v4/*: any*/),
+                          (v4/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -365,7 +364,7 @@ return {
                             "name": "runnerAvailabilityStatus",
                             "storageKey": null
                           },
-                          (v10/*: any*/),
+                          (v10/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -401,7 +400,7 @@ return {
                         "name": "checkType",
                         "storageKey": null
                       },
-                      (v11/*: any*/),
+                      (v11/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -418,7 +417,7 @@ return {
                             "name": "approvalRules",
                             "plural": true,
                             "selections": [
-                              (v12/*: any*/),
+                              (v12/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -434,7 +433,7 @@ return {
                                 "name": "allowedUsers",
                                 "plural": true,
                                 "selections": [
-                                  (v4/*: any*/),
+                                  (v4/*:: as any*/),
                                   {
                                     "alias": null,
                                     "args": null,
@@ -442,7 +441,7 @@ return {
                                     "name": "username",
                                     "storageKey": null
                                   },
-                                  (v5/*: any*/)
+                                  (v5/*:: as any*/)
                                 ],
                                 "storageKey": null
                               },
@@ -453,7 +452,7 @@ return {
                                 "kind": "LinkedField",
                                 "name": "allowedServiceAccounts",
                                 "plural": true,
-                                "selections": (v13/*: any*/),
+                                "selections": (v13/*:: as any*/),
                                 "storageKey": null
                               },
                               {
@@ -464,8 +463,8 @@ return {
                                 "name": "allowedTeams",
                                 "plural": true,
                                 "selections": [
-                                  (v4/*: any*/),
-                                  (v12/*: any*/)
+                                  (v4/*:: as any*/),
+                                  (v12/*:: as any*/)
                                 ],
                                 "storageKey": null
                               }
@@ -480,7 +479,7 @@ return {
                             "name": "approvals",
                             "plural": true,
                             "selections": [
-                              (v4/*: any*/),
+                              (v4/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -488,7 +487,7 @@ return {
                                 "name": "decision",
                                 "storageKey": null
                               },
-                              (v8/*: any*/),
+                              (v8/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -504,8 +503,8 @@ return {
                                 "name": "user",
                                 "plural": false,
                                 "selections": [
-                                  (v4/*: any*/),
-                                  (v5/*: any*/)
+                                  (v4/*:: as any*/),
+                                  (v5/*:: as any*/)
                                 ],
                                 "storageKey": null
                               },
@@ -516,7 +515,7 @@ return {
                                 "kind": "LinkedField",
                                 "name": "serviceAccount",
                                 "plural": false,
-                                "selections": (v13/*: any*/),
+                                "selections": (v13/*:: as any*/),
                                 "storageKey": null
                               },
                               {
@@ -526,12 +525,12 @@ return {
                                 "name": "comment",
                                 "storageKey": null
                               },
-                              (v9/*: any*/)
+                              (v9/*:: as any*/)
                             ],
                             "storageKey": null
                           },
-                          (v4/*: any*/),
-                          (v11/*: any*/),
+                          (v4/*:: as any*/),
+                          (v11/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -539,7 +538,7 @@ return {
                             "kind": "LinkedField",
                             "name": "overriddenByActor",
                             "plural": false,
-                            "selections": (v7/*: any*/),
+                            "selections": (v7/*:: as any*/),
                             "storageKey": null
                           },
                           {
@@ -578,9 +577,9 @@ return {
                         "name": "policies",
                         "plural": true,
                         "selections": [
-                          (v4/*: any*/),
-                          (v11/*: any*/),
-                          (v12/*: any*/),
+                          (v4/*:: as any*/),
+                          (v11/*:: as any*/),
+                          (v12/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -652,7 +651,7 @@ return {
                             "name": "enforcementLevel",
                             "storageKey": null
                           },
-                          (v14/*: any*/),
+                          (v14/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -679,7 +678,7 @@ return {
                             "name": "policy",
                             "plural": false,
                             "selections": [
-                              (v4/*: any*/),
+                              (v4/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -732,7 +731,7 @@ return {
                         "name": "messagesSummary",
                         "plural": false,
                         "selections": [
-                          (v14/*: any*/),
+                          (v14/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -752,7 +751,7 @@ return {
             ],
             "storageKey": null
           },
-          (v3/*: any*/)
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       }

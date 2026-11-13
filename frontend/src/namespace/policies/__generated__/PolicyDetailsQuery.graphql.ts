@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<1d31222be5cf1fb64980c47871c2a212>>
+ * @generated SignedSource<<1ebfd6d233bb4161baee4dd12f66a7ba>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,7 +14,9 @@ export type PolicyDetailsQuery$variables = {
 };
 export type PolicyDetailsQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"PolicyDetailsFragment_policy">;
+    readonly policy: {
+      readonly " $fragmentSpreads": FragmentRefs<"PolicyDetailsFragment_policy">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type PolicyDetailsQuery = {
@@ -105,30 +106,34 @@ v10 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "PolicyDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "PolicyDetailsFragment_policy"
-              }
-            ],
-            "type": "Policy",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "PolicyDetailsFragment_policy"
+                }
+              ],
+              "type": "Policy",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "policy"
           }
         ],
         "storageKey": null
@@ -139,24 +144,24 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "PolicyDetailsQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
-          (v3/*: any*/),
+          (v2/*:: as any*/),
+          (v3/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v4/*: any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -179,12 +184,12 @@ return {
                 "name": "createdByActor",
                 "plural": false,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "kind": "TypeDiscriminator",
                     "abstractKey": "__isActor"
                   },
-                  (v5/*: any*/),
+                  (v5/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -203,8 +208,8 @@ return {
                         "name": "user",
                         "plural": false,
                         "selections": [
-                          (v6/*: any*/),
-                          (v3/*: any*/)
+                          (v6/*:: as any*/),
+                          (v3/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -214,19 +219,19 @@ return {
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v7/*: any*/),
+                    "selections": (v7/*:: as any*/),
                     "type": "ServiceAccountActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v7/*: any*/),
+                    "selections": (v7/*:: as any*/),
                     "type": "VCSProviderActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v7/*: any*/),
+                    "selections": (v7/*:: as any*/),
                     "type": "JobActor",
                     "abstractKey": null
                   }
@@ -269,9 +274,9 @@ return {
                     "name": "packageDigest",
                     "storageKey": null
                   },
-                  (v8/*: any*/),
-                  (v9/*: any*/),
-                  (v10/*: any*/)
+                  (v8/*:: as any*/),
+                  (v9/*:: as any*/),
+                  (v10/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -304,9 +309,9 @@ return {
                     "name": "verifyStateLineage",
                     "storageKey": null
                   },
-                  (v8/*: any*/),
-                  (v9/*: any*/),
-                  (v10/*: any*/)
+                  (v8/*:: as any*/),
+                  (v9/*:: as any*/),
+                  (v10/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -318,7 +323,7 @@ return {
                 "name": "scope",
                 "plural": true,
                 "selections": [
-                  (v5/*: any*/),
+                  (v5/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -351,8 +356,8 @@ return {
                 "name": "allowedUsers",
                 "plural": true,
                 "selections": [
-                  (v3/*: any*/),
-                  (v6/*: any*/),
+                  (v3/*:: as any*/),
+                  (v6/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -371,8 +376,8 @@ return {
                 "name": "allowedTeams",
                 "plural": true,
                 "selections": [
-                  (v3/*: any*/),
-                  (v4/*: any*/)
+                  (v3/*:: as any*/),
+                  (v4/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -384,8 +389,8 @@ return {
                 "name": "allowedServiceAccounts",
                 "plural": true,
                 "selections": [
-                  (v3/*: any*/),
-                  (v4/*: any*/),
+                  (v3/*:: as any*/),
+                  (v4/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -416,6 +421,6 @@ return {
 };
 })();
 
-(node as any).hash = "11a7ac2e01284e501be16fd1dae1fcae";
+(node as any).hash = "44a1df9373ae16ea3d82775dc91f8b87";
 
 export default node;

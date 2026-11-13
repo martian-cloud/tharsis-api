@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<39566797e0421631b001372b4e8a45f9>>
+ * @generated SignedSource<<4ed1ada4928865993459bfadcdd75b21>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -77,8 +76,8 @@ v2 = {
   "storageKey": null
 },
 v3 = [
-  (v1/*: any*/),
-  (v0/*: any*/),
+  (v1/*:: as any*/),
+  (v0/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -101,7 +100,7 @@ return {
       "name": "approvalRules",
       "plural": true,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -117,7 +116,7 @@ return {
           "name": "allowedUsers",
           "plural": true,
           "selections": [
-            (v1/*: any*/),
+            (v1/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -125,7 +124,7 @@ return {
               "name": "username",
               "storageKey": null
             },
-            (v2/*: any*/)
+            (v2/*:: as any*/)
           ],
           "storageKey": null
         },
@@ -136,7 +135,7 @@ return {
           "kind": "LinkedField",
           "name": "allowedServiceAccounts",
           "plural": true,
-          "selections": (v3/*: any*/),
+          "selections": (v3/*:: as any*/),
           "storageKey": null
         },
         {
@@ -147,8 +146,8 @@ return {
           "name": "allowedTeams",
           "plural": true,
           "selections": [
-            (v1/*: any*/),
-            (v0/*: any*/)
+            (v1/*:: as any*/),
+            (v0/*:: as any*/)
           ],
           "storageKey": null
         }
@@ -163,7 +162,7 @@ return {
       "name": "approvals",
       "plural": true,
       "selections": [
-        (v1/*: any*/),
+        (v1/*:: as any*/),
         {
           "alias": null,
           "args": null,
@@ -202,8 +201,8 @@ return {
           "name": "user",
           "plural": false,
           "selections": [
-            (v1/*: any*/),
-            (v2/*: any*/)
+            (v1/*:: as any*/),
+            (v2/*:: as any*/)
           ],
           "storageKey": null
         },
@@ -214,7 +213,7 @@ return {
           "kind": "LinkedField",
           "name": "serviceAccount",
           "plural": false,
-          "selections": (v3/*: any*/),
+          "selections": (v3/*:: as any*/),
           "storageKey": null
         }
       ],

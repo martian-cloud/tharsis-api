@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<a880f6a80c6c1c30d196a374a9327e45>>
+ * @generated SignedSource<<2582b4b935793a52ef0ce3f09c13d599>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -107,7 +106,7 @@ return {
       ],
       "storageKey": null
     },
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -116,11 +115,11 @@ return {
       "name": "role",
       "plural": false,
       "selections": [
-        (v1/*: any*/)
+        (v1/*:: as any*/)
       ],
       "storageKey": null
     },
-    (v2/*: any*/),
+    (v2/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -139,7 +138,7 @@ return {
         {
           "kind": "InlineFragment",
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -161,8 +160,8 @@ return {
         {
           "kind": "InlineFragment",
           "selections": [
-            (v0/*: any*/),
-            (v1/*: any*/)
+            (v0/*:: as any*/),
+            (v1/*:: as any*/)
           ],
           "type": "Team",
           "abstractKey": null
@@ -170,9 +169,9 @@ return {
         {
           "kind": "InlineFragment",
           "selections": [
-            (v0/*: any*/),
-            (v1/*: any*/),
-            (v2/*: any*/)
+            (v0/*:: as any*/),
+            (v1/*:: as any*/),
+            (v2/*:: as any*/)
           ],
           "type": "ServiceAccount",
           "abstractKey": null

@@ -17,7 +17,7 @@ import { ScopeRuleActionValue, ScopeRuleTypeValue, toScopeRuleInputs } from './s
 const query = graphql`
     query EditPolicyQuery($id: String!) {
         node(id: $id) {
-            ... on Policy {
+            ... on Policy @alias(as: "policy") {
                 ...EditPolicyFragment_policy
             }
         }
@@ -67,7 +67,7 @@ function EditPolicy({ ownerPath, groupPath }: Props) {
             allowedTeams { id name }
             allowedServiceAccounts { id name resourcePath }
         }
-    `, queryData.node);
+    `, queryData.node?.policy);
 
     const packageSource = policy?.opaData?.packageSource ?? '';
     // The two kind-specific data objects are mutually exclusive, so whichever is present carries the

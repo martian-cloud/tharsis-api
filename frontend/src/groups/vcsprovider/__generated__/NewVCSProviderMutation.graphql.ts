@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<2c9d40c5b6d1f0beba88da087c4da516>>
+ * @generated SignedSource<<7e700237b4459b57d54640662bf2c44f>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -139,8 +138,8 @@ v5 = {
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -148,15 +147,15 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v2/*: any*/),
+        "args": (v2/*:: as any*/),
         "concreteType": "CreateVCSProviderPayload",
         "kind": "LinkedField",
         "name": "createVCSProvider",
         "plural": false,
         "selections": [
-          (v3/*: any*/),
-          (v4/*: any*/),
-          (v5/*: any*/)
+          (v3/*:: as any*/),
+          (v4/*:: as any*/),
+          (v5/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -167,21 +166,21 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v1/*: any*/),
-      (v0/*: any*/)
+      (v1/*:: as any*/),
+      (v0/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "NewVCSProviderMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v2/*: any*/),
+        "args": (v2/*:: as any*/),
         "concreteType": "CreateVCSProviderPayload",
         "kind": "LinkedField",
         "name": "createVCSProvider",
         "plural": false,
         "selections": [
-          (v3/*: any*/),
+          (v3/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -203,8 +202,8 @@ return {
               }
             ]
           },
-          (v4/*: any*/),
-          (v5/*: any*/)
+          (v4/*:: as any*/),
+          (v5/*:: as any*/)
         ],
         "storageKey": null
       }

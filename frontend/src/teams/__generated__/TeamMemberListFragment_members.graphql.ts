@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<b575558b8304c7dace55ef606c28abdc>>
+ * @generated SignedSource<<972bb77fe871389ec8efb9bbfe8bad42>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -58,7 +57,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -68,7 +67,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -82,7 +81,7 @@ return {
   },
   "name": "TeamMemberListFragment_members",
   "selections": [
-    (v1/*: any*/),
+    (v1/*:: as any*/),
     {
       "alias": "members",
       "args": null,
@@ -107,7 +106,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "args": null,
                   "kind": "FragmentSpread",

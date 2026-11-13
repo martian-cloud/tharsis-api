@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<2856ac7fb68d49598f8e22986c8334ed>>
+ * @generated SignedSource<<f3abe576035bd1c6ed3ba575cf41ebdf>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -55,7 +54,7 @@ return {
   "metadata": null,
   "name": "TerraformModuleVersionDetailsSidebarFragment_details",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -119,7 +118,7 @@ return {
       "name": "module",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,

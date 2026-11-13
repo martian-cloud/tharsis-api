@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<a4f818f372537a866450031fdc37fd51>>
+ * @generated SignedSource<<be8a5f27737d76bc395894601bea9d5a>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -62,8 +61,8 @@ return {
   "metadata": null,
   "name": "StateVersionListItemFragment_stateVersion",
   "selections": [
-    (v0/*: any*/),
-    (v1/*: any*/),
+    (v0/*:: as any*/),
+    (v1/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -97,8 +96,8 @@ return {
       "name": "run",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
-        (v1/*: any*/)
+        (v0/*:: as any*/),
+        (v1/*:: as any*/)
       ],
       "storageKey": null
     }

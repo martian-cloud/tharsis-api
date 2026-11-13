@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<76bea8580aaf6a3c1f392e3f0a9aaf21>>
+ * @generated SignedSource<<5e569e3ab4079729fe7f27848eae8d9c>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -95,8 +94,8 @@ v8 = {
   "storageKey": null
 },
 v9 = [
-  (v7/*: any*/),
-  (v2/*: any*/)
+  (v7/*:: as any*/),
+  (v2/*:: as any*/)
 ],
 v10 = {
   "alias": null,
@@ -113,7 +112,7 @@ v10 = {
       "name": "stageName",
       "storageKey": null
     },
-    (v7/*: any*/)
+    (v7/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -124,7 +123,7 @@ v11 = {
   "kind": "LinkedField",
   "name": "apply",
   "plural": false,
-  "selections": (v9/*: any*/),
+  "selections": (v9/*:: as any*/),
   "storageKey": null
 },
 v12 = {
@@ -135,8 +134,8 @@ v12 = {
   "name": "workspace",
   "plural": false,
   "selections": [
-    (v4/*: any*/),
-    (v2/*: any*/)
+    (v4/*:: as any*/),
+    (v2/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -166,7 +165,7 @@ v14 = {
   "storageKey": null
 },
 v15 = [
-  (v2/*: any*/)
+  (v2/*:: as any*/)
 ],
 v16 = {
   "alias": null,
@@ -177,14 +176,14 @@ v16 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceDetailsWorkspaceEventSubscription",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "WorkspaceEvent",
         "kind": "LinkedField",
         "name": "workspaceEvents",
@@ -198,7 +197,7 @@ return {
             "name": "workspace",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
+              (v2/*:: as any*/),
               {
                 "args": null,
                 "kind": "FragmentSpread",
@@ -216,13 +215,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceDetailsWorkspaceEventSubscription",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "WorkspaceEvent",
         "kind": "LinkedField",
         "name": "workspaceEvents",
@@ -236,8 +235,8 @@ return {
             "name": "workspace",
             "plural": false,
             "selections": [
-              (v2/*: any*/),
-              (v3/*: any*/),
+              (v2/*:: as any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -245,7 +244,7 @@ return {
                 "name": "description",
                 "storageKey": null
               },
-              (v4/*: any*/),
+              (v4/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -275,8 +274,8 @@ return {
                 "name": "labels",
                 "plural": true,
                 "selections": [
-                  (v5/*: any*/),
-                  (v6/*: any*/)
+                  (v5/*:: as any*/),
+                  (v6/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -313,7 +312,7 @@ return {
                     "name": "hasDrift",
                     "storageKey": null
                   },
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -336,8 +335,8 @@ return {
                     "name": "run",
                     "plural": false,
                     "selections": [
-                      (v2/*: any*/),
-                      (v7/*: any*/)
+                      (v2/*:: as any*/),
+                      (v7/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -352,9 +351,9 @@ return {
                 "name": "currentApplyRun",
                 "plural": false,
                 "selections": [
-                  (v2/*: any*/),
-                  (v7/*: any*/),
-                  (v8/*: any*/),
+                  (v2/*:: as any*/),
+                  (v7/*:: as any*/),
+                  (v8/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -362,12 +361,12 @@ return {
                     "kind": "LinkedField",
                     "name": "plan",
                     "plural": false,
-                    "selections": (v9/*: any*/),
+                    "selections": (v9/*:: as any*/),
                     "storageKey": null
                   },
-                  (v10/*: any*/),
-                  (v11/*: any*/),
-                  (v12/*: any*/),
+                  (v10/*:: as any*/),
+                  (v11/*:: as any*/),
+                  (v12/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -386,8 +385,8 @@ return {
                 "name": "currentStateVersion",
                 "plural": false,
                 "selections": [
-                  (v2/*: any*/),
-                  (v13/*: any*/),
+                  (v2/*:: as any*/),
+                  (v13/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -411,7 +410,7 @@ return {
                             "name": "__typename",
                             "storageKey": null
                           },
-                          (v3/*: any*/),
+                          (v3/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -419,7 +418,7 @@ return {
                             "name": "provider",
                             "storageKey": null
                           },
-                          (v14/*: any*/),
+                          (v14/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -460,7 +459,7 @@ return {
                             "name": "stateVersion",
                             "plural": false,
                             "selections": [
-                              (v2/*: any*/),
+                              (v2/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -490,7 +489,7 @@ return {
                             "name": "workspace",
                             "plural": false,
                             "selections": [
-                              (v2/*: any*/),
+                              (v2/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -498,7 +497,7 @@ return {
                                 "kind": "LinkedField",
                                 "name": "currentStateVersion",
                                 "plural": false,
-                                "selections": (v15/*: any*/),
+                                "selections": (v15/*:: as any*/),
                                 "storageKey": null
                               }
                             ],
@@ -515,8 +514,8 @@ return {
                         "name": "checkResults",
                         "plural": true,
                         "selections": [
-                          (v3/*: any*/),
-                          (v7/*: any*/),
+                          (v3/*:: as any*/),
+                          (v7/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -532,7 +531,7 @@ return {
                                 "name": "address",
                                 "storageKey": null
                               },
-                              (v7/*: any*/),
+                              (v7/*:: as any*/),
                               {
                                 "alias": null,
                                 "args": null,
@@ -571,9 +570,9 @@ return {
                         "name": "moduleVersion",
                         "storageKey": null
                       },
-                      (v2/*: any*/),
-                      (v7/*: any*/),
-                      (v8/*: any*/),
+                      (v2/*:: as any*/),
+                      (v7/*:: as any*/),
+                      (v8/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -582,8 +581,8 @@ return {
                         "name": "plan",
                         "plural": false,
                         "selections": [
-                          (v7/*: any*/),
-                          (v2/*: any*/),
+                          (v7/*:: as any*/),
+                          (v2/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -619,9 +618,9 @@ return {
                         ],
                         "storageKey": null
                       },
-                      (v10/*: any*/),
-                      (v11/*: any*/),
-                      (v12/*: any*/),
+                      (v10/*:: as any*/),
+                      (v11/*:: as any*/),
+                      (v12/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -630,8 +629,8 @@ return {
                         "name": "configurationVersion",
                         "plural": false,
                         "selections": [
-                          (v2/*: any*/),
-                          (v13/*: any*/),
+                          (v2/*:: as any*/),
+                          (v13/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -639,7 +638,7 @@ return {
                             "kind": "LinkedField",
                             "name": "vcsEvent",
                             "plural": false,
-                            "selections": (v15/*: any*/),
+                            "selections": (v15/*:: as any*/),
                             "storageKey": null
                           }
                         ],
@@ -653,7 +652,7 @@ return {
                         "name": "variables",
                         "plural": true,
                         "selections": [
-                          (v5/*: any*/),
+                          (v5/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -675,8 +674,8 @@ return {
                             "name": "includedInTfConfig",
                             "storageKey": null
                           },
-                          (v6/*: any*/),
-                          (v16/*: any*/),
+                          (v6/*:: as any*/),
+                          (v16/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -698,11 +697,11 @@ return {
                     "name": "outputs",
                     "plural": true,
                     "selections": [
-                      (v3/*: any*/),
-                      (v6/*: any*/),
-                      (v14/*: any*/),
-                      (v16/*: any*/),
-                      (v2/*: any*/)
+                      (v3/*:: as any*/),
+                      (v6/*:: as any*/),
+                      (v14/*:: as any*/),
+                      (v16/*:: as any*/),
+                      (v2/*:: as any*/)
                     ],
                     "storageKey": null
                   }

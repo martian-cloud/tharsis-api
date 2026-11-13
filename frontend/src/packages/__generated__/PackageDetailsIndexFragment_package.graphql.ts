@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<3c52ccd2fdb4ac793c9d6131d1826a75>>
+ * @generated SignedSource<<b783da8aa7a83e820216cb3c67e9dfe9>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -73,7 +72,7 @@ return {
   },
   "name": "PackageDetailsIndexFragment_package",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -110,7 +109,7 @@ return {
       "name": "latestVersion",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "args": null,
           "kind": "FragmentSpread",

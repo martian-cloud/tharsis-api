@@ -25,7 +25,7 @@ import { PolicyDetailsQuery } from './__generated__/PolicyDetailsQuery.graphql';
 const query = graphql`
     query PolicyDetailsQuery($id: String!) {
         node(id: $id) {
-            ... on Policy {
+            ... on Policy @alias(as: "policy") {
                 ...PolicyDetailsFragment_policy
             }
         }
@@ -190,7 +190,7 @@ function PolicyDetails({ ownerId, ownerPath, currentGroupPath }: Props) {
             allowedTeams { id name }
             allowedServiceAccounts { id name resourcePath }
         }
-    `, queryData.node);
+    `, queryData.node?.policy);
 
     const [commitDelete, commitDeleteInFlight] = useMutation<PolicyDetailsDeleteMutation>(graphql`
         mutation PolicyDetailsDeleteMutation($input: DeletePolicyInput!, $connections: [ID!]!) {

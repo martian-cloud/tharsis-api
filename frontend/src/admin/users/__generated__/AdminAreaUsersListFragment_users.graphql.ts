@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<525afff05b23db2c44edcfb32ac8663f>>
+ * @generated SignedSource<<11cc3e47f0395beb0983ff3c51337eed>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -55,7 +54,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -65,7 +64,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [],
       "operation": AdminAreaUsersListPaginationQuery_graphql

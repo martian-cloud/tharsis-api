@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<abd8189f9219252fe24b2a78432d0197>>
+ * @generated SignedSource<<c9b20df82d3260958741bfe65bc43882>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -52,7 +51,7 @@ return {
   "metadata": null,
   "name": "TerraformModuleVersionDetailsIndexFragment_details",
   "selections": [
-    (v0/*: any*/),
+    (v0/*:: as any*/),
     {
       "alias": null,
       "args": null,
@@ -100,7 +99,7 @@ return {
       "name": "module",
       "plural": false,
       "selections": [
-        (v0/*: any*/),
+        (v0/*:: as any*/),
         {
           "alias": null,
           "args": null,

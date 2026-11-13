@@ -11,7 +11,7 @@ const INITIAL_ITEM_COUNT = 5;
 const query = graphql`
     query HomeTeamListQuery($first: Int!, $after: String) {
         me {
-            ...on User {
+            ...on User @alias(as: "user") {
                 ...HomeTeamListFragment_teams
             }
         }
@@ -39,7 +39,7 @@ function HomeTeamList() {
                     }
                 }
             }
-        `, queryData.me);
+        `, queryData.me?.user);
 
     const edgeCount = data?.teams?.edges?.length ?? 0;
 

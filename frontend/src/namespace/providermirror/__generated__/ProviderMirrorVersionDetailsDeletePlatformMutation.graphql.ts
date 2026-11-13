@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<0b2f311dee8c32b2a6917a15a495aa3f>>
+ * @generated SignedSource<<97c104fb44ebf3d2c9bb47ebbf9d312b>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -79,20 +78,20 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "ProviderMirrorVersionDetailsDeletePlatformMutation",
-    "selections": (v1/*: any*/),
+    "selections": (v1/*:: as any*/),
     "type": "Mutation",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "ProviderMirrorVersionDetailsDeletePlatformMutation",
-    "selections": (v1/*: any*/)
+    "selections": (v1/*:: as any*/)
   },
   "params": {
     "cacheID": "367af68adb10b56281e458aa9ca48758",

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<85a647a483c39450080e9dcf9e246649>>
+ * @generated SignedSource<<c8d88045c72799cf4e082aa0b254bf11>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -53,7 +52,7 @@ v1 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "WorkspaceNotificationPreferenceQuery",
@@ -68,7 +67,7 @@ return {
         "selections": [
           {
             "alias": null,
-            "args": (v1/*: any*/),
+            "args": (v1/*:: as any*/),
             "concreteType": "UserNamespacePreferenceConnection",
             "kind": "LinkedField",
             "name": "workspacePreferences",
@@ -124,7 +123,7 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "WorkspaceNotificationPreferenceQuery",
     "selections": [
@@ -138,7 +137,7 @@ return {
         "selections": [
           {
             "alias": null,
-            "args": (v1/*: any*/),
+            "args": (v1/*:: as any*/),
             "concreteType": "UserNamespacePreferenceConnection",
             "kind": "LinkedField",
             "name": "workspacePreferences",

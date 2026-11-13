@@ -27,7 +27,7 @@ function GetConnections(runnerId: string): [string] {
 const query = graphql`
     query AssignedServiceAccountListQuery($id: String!, $first: Int!, $after: String) {
         node(id: $id) {
-            ... on Runner {
+            ... on Runner @alias(as: "runner") {
                 id
                 ...AssignedServiceAccountListFragment_assignedServiceAccounts
             }
@@ -76,7 +76,7 @@ function AssignedServiceAccountList({ fragmentRef }: Props) {
                     }
                 }
             }
-        `, queryData.node
+        `, queryData.node?.runner
     );
 
     const [commitAssign, assignCommitInFlight] = useMutation<AssignedServiceAccountListAssignMutation>(graphql`

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<3de8549182865d523d372ec804db2b08>>
+ * @generated SignedSource<<0971756034a6701467d812b57cd2b67d>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,7 +14,9 @@ export type PackageDetailsIndexSelectedVersionQuery$variables = {
 };
 export type PackageDetailsIndexSelectedVersionQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"PackageDetailsIndexFragment_version">;
+    readonly packageVersion: {
+      readonly " $fragmentSpreads": FragmentRefs<"PackageDetailsIndexFragment_version">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type PackageDetailsIndexSelectedVersionQuery = {
@@ -63,30 +64,34 @@ v4 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "PackageDetailsIndexSelectedVersionQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "PackageDetailsIndexFragment_version"
-              }
-            ],
-            "type": "PackageVersion",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "PackageDetailsIndexFragment_version"
+                }
+              ],
+              "type": "PackageVersion",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "packageVersion"
           }
         ],
         "storageKey": null
@@ -97,20 +102,20 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "PackageDetailsIndexSelectedVersionQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
-          (v3/*: any*/),
+          (v2/*:: as any*/),
+          (v3/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -150,7 +155,7 @@ return {
                 "name": "createdByActor",
                 "plural": false,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "kind": "TypeDiscriminator",
                     "abstractKey": "__isActor"
@@ -187,7 +192,7 @@ return {
                             "name": "email",
                             "storageKey": null
                           },
-                          (v3/*: any*/)
+                          (v3/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -197,19 +202,19 @@ return {
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v4/*: any*/),
+                    "selections": (v4/*:: as any*/),
                     "type": "ServiceAccountActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v4/*: any*/),
+                    "selections": (v4/*:: as any*/),
                     "type": "VCSProviderActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v4/*: any*/),
+                    "selections": (v4/*:: as any*/),
                     "type": "JobActor",
                     "abstractKey": null
                   }
@@ -268,6 +273,6 @@ return {
 };
 })();
 
-(node as any).hash = "a53fc2c453e1d0ede175a88b2c01cea8";
+(node as any).hash = "347461f23fccec438f661909c5830dc8";
 
 export default node;

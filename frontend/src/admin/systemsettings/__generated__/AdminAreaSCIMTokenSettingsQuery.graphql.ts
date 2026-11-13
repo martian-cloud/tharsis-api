@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<5ac95859eccda712d4cea6df17dd168f>>
+ * @generated SignedSource<<03ce73e5d554d00d1a96a0988118c32f>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -126,11 +125,11 @@ return {
             ],
             "storageKey": null
           },
-          (v0/*: any*/)
+          (v0/*:: as any*/)
         ],
         "storageKey": null
       },
-      (v1/*: any*/)
+      (v1/*:: as any*/)
     ],
     "type": "Query",
     "abstractKey": null
@@ -200,7 +199,7 @@ return {
                         "name": "email",
                         "storageKey": null
                       },
-                      (v2/*: any*/)
+                      (v2/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -210,31 +209,31 @@ return {
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v3/*: any*/),
+                "selections": (v3/*:: as any*/),
                 "type": "ServiceAccountActor",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v3/*: any*/),
+                "selections": (v3/*:: as any*/),
                 "type": "VCSProviderActor",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v3/*: any*/),
+                "selections": (v3/*:: as any*/),
                 "type": "JobActor",
                 "abstractKey": null
               }
             ],
             "storageKey": null
           },
-          (v0/*: any*/),
-          (v2/*: any*/)
+          (v0/*:: as any*/),
+          (v2/*:: as any*/)
         ],
         "storageKey": null
       },
-      (v1/*: any*/)
+      (v1/*:: as any*/)
     ]
   },
   "params": {

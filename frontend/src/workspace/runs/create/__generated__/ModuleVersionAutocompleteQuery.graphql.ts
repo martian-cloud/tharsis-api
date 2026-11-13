@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<3be6f781b67244a0210af42fbabe0b8f>>
+ * @generated SignedSource<<d326d27d02035fa7cd116c6915edadc2>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -103,10 +102,10 @@ v7 = {
 return {
   "fragment": {
     "argumentDefinitions": [
-      (v0/*: any*/),
-      (v1/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/)
+      (v0/*:: as any*/),
+      (v1/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -114,7 +113,7 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v4/*: any*/),
+        "args": (v4/*:: as any*/),
         "concreteType": "TerraformModule",
         "kind": "LinkedField",
         "name": "terraformModule",
@@ -122,7 +121,7 @@ return {
         "selections": [
           {
             "alias": null,
-            "args": (v5/*: any*/),
+            "args": (v5/*:: as any*/),
             "concreteType": "TerraformModuleVersionConnection",
             "kind": "LinkedField",
             "name": "versions",
@@ -144,7 +143,7 @@ return {
                     "name": "node",
                     "plural": false,
                     "selections": [
-                      (v6/*: any*/)
+                      (v6/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -164,17 +163,17 @@ return {
   "kind": "Request",
   "operation": {
     "argumentDefinitions": [
-      (v1/*: any*/),
-      (v0/*: any*/),
-      (v2/*: any*/),
-      (v3/*: any*/)
+      (v1/*:: as any*/),
+      (v0/*:: as any*/),
+      (v2/*:: as any*/),
+      (v3/*:: as any*/)
     ],
     "kind": "Operation",
     "name": "ModuleVersionAutocompleteQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v4/*: any*/),
+        "args": (v4/*:: as any*/),
         "concreteType": "TerraformModule",
         "kind": "LinkedField",
         "name": "terraformModule",
@@ -182,7 +181,7 @@ return {
         "selections": [
           {
             "alias": null,
-            "args": (v5/*: any*/),
+            "args": (v5/*:: as any*/),
             "concreteType": "TerraformModuleVersionConnection",
             "kind": "LinkedField",
             "name": "versions",
@@ -204,8 +203,8 @@ return {
                     "name": "node",
                     "plural": false,
                     "selections": [
-                      (v6/*: any*/),
-                      (v7/*: any*/)
+                      (v6/*:: as any*/),
+                      (v7/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -215,7 +214,7 @@ return {
             ],
             "storageKey": null
           },
-          (v7/*: any*/)
+          (v7/*:: as any*/)
         ],
         "storageKey": null
       }

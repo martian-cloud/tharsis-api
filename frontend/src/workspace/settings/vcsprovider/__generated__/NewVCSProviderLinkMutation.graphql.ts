@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<e390f4399d2c67ca4761d56000c483ad>>
+ * @generated SignedSource<<c04508d30bc8202ba8e09961662aa147>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -216,7 +215,7 @@ v16 = {
       "name": "field",
       "storageKey": null
     },
-    (v12/*: any*/)
+    (v12/*:: as any*/)
   ],
   "storageKey": null
 },
@@ -231,14 +230,14 @@ v17 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "NewVCSProviderLinkMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "CreateWorkspaceVCSProviderLinkPayload",
         "kind": "LinkedField",
         "name": "createWorkspaceVCSProviderLink",
@@ -260,7 +259,7 @@ return {
                 "name": "workspace",
                 "plural": false,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -269,9 +268,9 @@ return {
                     "name": "workspaceVcsProviderLink",
                     "plural": false,
                     "selections": [
-                      (v2/*: any*/),
-                      (v3/*: any*/),
-                      (v4/*: any*/),
+                      (v2/*:: as any*/),
+                      (v3/*:: as any*/),
+                      (v4/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -288,13 +287,13 @@ return {
                         ],
                         "storageKey": null
                       },
-                      (v5/*: any*/),
-                      (v6/*: any*/),
-                      (v7/*: any*/),
-                      (v8/*: any*/),
-                      (v9/*: any*/),
-                      (v10/*: any*/),
-                      (v11/*: any*/)
+                      (v5/*:: as any*/),
+                      (v6/*:: as any*/),
+                      (v7/*:: as any*/),
+                      (v8/*:: as any*/),
+                      (v9/*:: as any*/),
+                      (v10/*:: as any*/),
+                      (v11/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -309,17 +308,17 @@ return {
                 "name": "vcsProvider",
                 "plural": false,
                 "selections": [
-                  (v12/*: any*/),
-                  (v13/*: any*/)
+                  (v12/*:: as any*/),
+                  (v13/*:: as any*/)
                 ],
                 "storageKey": null
               }
             ],
             "storageKey": null
           },
-          (v14/*: any*/),
-          (v15/*: any*/),
-          (v16/*: any*/)
+          (v14/*:: as any*/),
+          (v15/*:: as any*/),
+          (v16/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -329,13 +328,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "NewVCSProviderLinkMutation",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": "CreateWorkspaceVCSProviderLinkPayload",
         "kind": "LinkedField",
         "name": "createWorkspaceVCSProviderLink",
@@ -357,7 +356,7 @@ return {
                 "name": "workspace",
                 "plural": false,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -366,9 +365,9 @@ return {
                     "name": "workspaceVcsProviderLink",
                     "plural": false,
                     "selections": [
-                      (v2/*: any*/),
-                      (v3/*: any*/),
-                      (v4/*: any*/),
+                      (v2/*:: as any*/),
+                      (v3/*:: as any*/),
+                      (v4/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -388,7 +387,7 @@ return {
                             "kind": "TypeDiscriminator",
                             "abstractKey": "__isActor"
                           },
-                          (v12/*: any*/),
+                          (v12/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -414,7 +413,7 @@ return {
                                     "name": "email",
                                     "storageKey": null
                                   },
-                                  (v2/*: any*/)
+                                  (v2/*:: as any*/)
                                 ],
                                 "storageKey": null
                               }
@@ -424,32 +423,32 @@ return {
                           },
                           {
                             "kind": "InlineFragment",
-                            "selections": (v17/*: any*/),
+                            "selections": (v17/*:: as any*/),
                             "type": "ServiceAccountActor",
                             "abstractKey": null
                           },
                           {
                             "kind": "InlineFragment",
-                            "selections": (v17/*: any*/),
+                            "selections": (v17/*:: as any*/),
                             "type": "VCSProviderActor",
                             "abstractKey": null
                           },
                           {
                             "kind": "InlineFragment",
-                            "selections": (v17/*: any*/),
+                            "selections": (v17/*:: as any*/),
                             "type": "JobActor",
                             "abstractKey": null
                           }
                         ],
                         "storageKey": null
                       },
-                      (v5/*: any*/),
-                      (v6/*: any*/),
-                      (v7/*: any*/),
-                      (v8/*: any*/),
-                      (v9/*: any*/),
-                      (v10/*: any*/),
-                      (v11/*: any*/)
+                      (v5/*:: as any*/),
+                      (v6/*:: as any*/),
+                      (v7/*:: as any*/),
+                      (v8/*:: as any*/),
+                      (v9/*:: as any*/),
+                      (v10/*:: as any*/),
+                      (v11/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -464,19 +463,19 @@ return {
                 "name": "vcsProvider",
                 "plural": false,
                 "selections": [
-                  (v12/*: any*/),
-                  (v13/*: any*/),
-                  (v2/*: any*/)
+                  (v12/*:: as any*/),
+                  (v13/*:: as any*/),
+                  (v2/*:: as any*/)
                 ],
                 "storageKey": null
               },
-              (v2/*: any*/)
+              (v2/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v14/*: any*/),
-          (v15/*: any*/),
-          (v16/*: any*/)
+          (v14/*:: as any*/),
+          (v15/*:: as any*/),
+          (v16/*:: as any*/)
         ],
         "storageKey": null
       }

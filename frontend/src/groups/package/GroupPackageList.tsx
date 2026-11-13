@@ -23,7 +23,7 @@ const INITIAL_ITEM_COUNT = 20;
 const query = graphql`
     query GroupPackageListQuery($first: Int, $last: Int, $after: String, $before: String, $groupId: String!, $search: String) {
         node(id: $groupId) {
-            ...on Group {
+            ...on Group @alias(as: "group") {
                 ...GroupPackageListFragment_packages
             }
         }
@@ -86,7 +86,7 @@ function GroupPackageList({ group, queryRef, search = '' }: InnerProps) {
                 }
             }
         }
-        `, queryData.node
+        `, queryData.node?.group
     );
 
     const edges = data?.packages?.edges || [];

@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<5f8cea151b8ff0d866feefdd7f517af2>>
+ * @generated SignedSource<<47054d3f1dca849a1c7e0db5277a0eb1>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -92,7 +91,7 @@ return {
     "kind": "Fragment",
     "metadata": null,
     "name": "AdminAreaResourceLimitSettingsQuery",
-    "selections": (v0/*: any*/),
+    "selections": (v0/*:: as any*/),
     "type": "Query",
     "abstractKey": null
   },
@@ -101,7 +100,7 @@ return {
     "argumentDefinitions": [],
     "kind": "Operation",
     "name": "AdminAreaResourceLimitSettingsQuery",
-    "selections": (v0/*: any*/)
+    "selections": (v0/*:: as any*/)
   },
   "params": {
     "cacheID": "ea9654ae9f9a971834b8b96148a4318f",

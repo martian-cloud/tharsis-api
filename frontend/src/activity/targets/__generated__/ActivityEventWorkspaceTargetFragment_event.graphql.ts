@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<7a7e6a58b0527d580c77e376e91fb816>>
+ * @generated SignedSource<<ee343a6ab944fe32d6ab6eaa3409c667>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -113,7 +112,7 @@ v2 = {
   "name": "member",
   "plural": false,
   "selections": [
-    (v1/*: any*/),
+    (v1/*:: as any*/),
     {
       "kind": "InlineFragment",
       "selections": [
@@ -145,7 +144,7 @@ v2 = {
     {
       "kind": "InlineFragment",
       "selections": [
-        (v0/*: any*/)
+        (v0/*:: as any*/)
       ],
       "type": "Team",
       "abstractKey": null
@@ -193,7 +192,7 @@ return {
         {
           "kind": "InlineFragment",
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -223,11 +222,11 @@ return {
       "name": "payload",
       "plural": false,
       "selections": [
-        (v1/*: any*/),
+        (v1/*:: as any*/),
         {
           "kind": "InlineFragment",
           "selections": [
-            (v0/*: any*/),
+            (v0/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -242,7 +241,7 @@ return {
         {
           "kind": "InlineFragment",
           "selections": [
-            (v2/*: any*/),
+            (v2/*:: as any*/),
             {
               "alias": null,
               "args": null,
@@ -257,7 +256,7 @@ return {
         {
           "kind": "InlineFragment",
           "selections": [
-            (v2/*: any*/)
+            (v2/*:: as any*/)
           ],
           "type": "ActivityEventRemoveNamespaceMembershipPayload",
           "abstractKey": null
@@ -286,7 +285,7 @@ return {
               "kind": "LinkedField",
               "name": "labels",
               "plural": true,
-              "selections": (v3/*: any*/),
+              "selections": (v3/*:: as any*/),
               "storageKey": null
             }
           ],
@@ -311,7 +310,7 @@ return {
                   "kind": "LinkedField",
                   "name": "added",
                   "plural": true,
-                  "selections": (v3/*: any*/),
+                  "selections": (v3/*:: as any*/),
                   "storageKey": null
                 },
                 {
@@ -321,7 +320,7 @@ return {
                   "kind": "LinkedField",
                   "name": "updated",
                   "plural": true,
-                  "selections": (v3/*: any*/),
+                  "selections": (v3/*:: as any*/),
                   "storageKey": null
                 },
                 {

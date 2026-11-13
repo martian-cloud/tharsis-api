@@ -14,7 +14,7 @@ const INITIAL_ITEM_COUNT = 100;
 const query = graphql`
     query ServiceAccountNamespaceMembershipsQuery($id: String!, $first: Int!, $after: String) {
         node(id: $id) {
-            ... on ServiceAccount {
+            ... on ServiceAccount @alias(as: "serviceAccount") {
                 ...ServiceAccountNamespaceMembershipsFragment
             }
         }
@@ -60,7 +60,7 @@ function ServiceAccountNamespaceMemberships({ serviceAccountId }: Props) {
                 }
             }
         `,
-        queryData.node
+        queryData.node?.serviceAccount
     );
 
     const edges = data?.namespaceMemberships?.edges ?? [];

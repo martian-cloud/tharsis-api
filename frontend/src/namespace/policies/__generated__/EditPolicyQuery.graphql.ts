@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<8cd87f547c26ac918522107ab7c947b8>>
+ * @generated SignedSource<<5ed39b412fa3a61827f661be23d2b7a2>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -15,7 +14,9 @@ export type EditPolicyQuery$variables = {
 };
 export type EditPolicyQuery$data = {
   readonly node: {
-    readonly " $fragmentSpreads": FragmentRefs<"EditPolicyFragment_policy">;
+    readonly policy: {
+      readonly " $fragmentSpreads": FragmentRefs<"EditPolicyFragment_policy">;
+    } | null | undefined;
   } | null | undefined;
 };
 export type EditPolicyQuery = {
@@ -75,30 +76,34 @@ v6 = {
 };
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "EditPolicyQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "args": null,
-                "kind": "FragmentSpread",
-                "name": "EditPolicyFragment_policy"
-              }
-            ],
-            "type": "Policy",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "EditPolicyFragment_policy"
+                }
+              ],
+              "type": "Policy",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "policy"
           }
         ],
         "storageKey": null
@@ -109,13 +114,13 @@ return {
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "EditPolicyQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v1/*:: as any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -128,11 +133,11 @@ return {
             "name": "__typename",
             "storageKey": null
           },
-          (v2/*: any*/),
+          (v2/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v3/*: any*/),
+              (v3/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -183,9 +188,9 @@ return {
                     "name": "packageDigest",
                     "storageKey": null
                   },
-                  (v4/*: any*/),
-                  (v5/*: any*/),
-                  (v6/*: any*/)
+                  (v4/*:: as any*/),
+                  (v5/*:: as any*/),
+                  (v6/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -218,9 +223,9 @@ return {
                     "name": "verifyStateLineage",
                     "storageKey": null
                   },
-                  (v4/*: any*/),
-                  (v5/*: any*/),
-                  (v6/*: any*/)
+                  (v4/*:: as any*/),
+                  (v5/*:: as any*/),
+                  (v6/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -264,7 +269,7 @@ return {
                 "name": "allowedUsers",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -290,8 +295,8 @@ return {
                 "name": "allowedTeams",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
-                  (v3/*: any*/)
+                  (v2/*:: as any*/),
+                  (v3/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -303,8 +308,8 @@ return {
                 "name": "allowedServiceAccounts",
                 "plural": true,
                 "selections": [
-                  (v2/*: any*/),
-                  (v3/*: any*/),
+                  (v2/*:: as any*/),
+                  (v3/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -335,6 +340,6 @@ return {
 };
 })();
 
-(node as any).hash = "0df4084425a8485a4e33e26fd4449fbf";
+(node as any).hash = "026459ae59352ed0852f8fe74ccaae67";
 
 export default node;

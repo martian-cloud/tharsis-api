@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<1bf3764623adc706864d96ec6ddf0ce8>>
+ * @generated SignedSource<<f90b190e36d6311400d0cbb7f3821613>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -144,9 +143,9 @@ v3 = {
   "storageKey": null
 },
 v4 = [
-  (v1/*: any*/),
-  (v2/*: any*/),
-  (v3/*: any*/)
+  (v1/*:: as any*/),
+  (v2/*:: as any*/),
+  (v3/*:: as any*/)
 ],
 v5 = {
   "alias": null,
@@ -163,9 +162,9 @@ v6 = {
   "storageKey": null
 },
 v7 = [
-  (v1/*: any*/),
-  (v5/*: any*/),
-  (v6/*: any*/)
+  (v1/*:: as any*/),
+  (v5/*:: as any*/),
+  (v6/*:: as any*/)
 ],
 v8 = {
   "alias": null,
@@ -175,13 +174,13 @@ v8 = {
   "storageKey": null
 },
 v9 = [
-  (v1/*: any*/),
-  (v5/*: any*/),
-  (v8/*: any*/)
+  (v1/*:: as any*/),
+  (v5/*:: as any*/),
+  (v8/*:: as any*/)
 ],
 v10 = [
-  (v1/*: any*/),
-  (v5/*: any*/)
+  (v1/*:: as any*/),
+  (v5/*:: as any*/)
 ],
 v11 = {
   "alias": null,
@@ -191,7 +190,7 @@ v11 = {
   "storageKey": null
 },
 v12 = [
-  (v1/*: any*/),
+  (v1/*:: as any*/),
   {
     "alias": null,
     "args": null,
@@ -224,22 +223,22 @@ v13 = [
       },
       {
         "kind": "InlineFragment",
-        "selections": (v4/*: any*/),
+        "selections": (v4/*:: as any*/),
         "type": "AgentSessionRunStartedEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v4/*: any*/),
+        "selections": (v4/*:: as any*/),
         "type": "AgentSessionRunFinishedEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
         "selections": [
-          (v1/*: any*/),
-          (v2/*: any*/),
-          (v3/*: any*/),
+          (v1/*:: as any*/),
+          (v2/*:: as any*/),
+          (v3/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -254,7 +253,7 @@ v13 = [
       {
         "kind": "InlineFragment",
         "selections": [
-          (v1/*: any*/),
+          (v1/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -275,27 +274,27 @@ v13 = [
       },
       {
         "kind": "InlineFragment",
-        "selections": (v7/*: any*/),
+        "selections": (v7/*:: as any*/),
         "type": "AgentSessionTextMessageStartEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v9/*: any*/),
+        "selections": (v9/*:: as any*/),
         "type": "AgentSessionTextMessageContentEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v10/*: any*/),
+        "selections": (v10/*:: as any*/),
         "type": "AgentSessionTextMessageEndEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
         "selections": [
-          (v1/*: any*/),
-          (v11/*: any*/),
+          (v1/*:: as any*/),
+          (v11/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -317,9 +316,9 @@ v13 = [
       {
         "kind": "InlineFragment",
         "selections": [
-          (v1/*: any*/),
-          (v11/*: any*/),
-          (v8/*: any*/)
+          (v1/*:: as any*/),
+          (v11/*:: as any*/),
+          (v8/*:: as any*/)
         ],
         "type": "AgentSessionToolCallArgsEvent",
         "abstractKey": null
@@ -327,8 +326,8 @@ v13 = [
       {
         "kind": "InlineFragment",
         "selections": [
-          (v1/*: any*/),
-          (v11/*: any*/)
+          (v1/*:: as any*/),
+          (v11/*:: as any*/)
         ],
         "type": "AgentSessionToolCallEndEvent",
         "abstractKey": null
@@ -336,9 +335,9 @@ v13 = [
       {
         "kind": "InlineFragment",
         "selections": [
-          (v1/*: any*/),
-          (v5/*: any*/),
-          (v11/*: any*/),
+          (v1/*:: as any*/),
+          (v5/*:: as any*/),
+          (v11/*:: as any*/),
           {
             "alias": null,
             "args": null,
@@ -346,50 +345,50 @@ v13 = [
             "name": "content",
             "storageKey": null
           },
-          (v6/*: any*/)
+          (v6/*:: as any*/)
         ],
         "type": "AgentSessionToolCallResultEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v10/*: any*/),
+        "selections": (v10/*:: as any*/),
         "type": "AgentSessionReasoningStartEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v7/*: any*/),
+        "selections": (v7/*:: as any*/),
         "type": "AgentSessionReasoningMessageStartEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v9/*: any*/),
+        "selections": (v9/*:: as any*/),
         "type": "AgentSessionReasoningMessageContentEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v10/*: any*/),
+        "selections": (v10/*:: as any*/),
         "type": "AgentSessionReasoningMessageEndEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v10/*: any*/),
+        "selections": (v10/*:: as any*/),
         "type": "AgentSessionReasoningEndEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v12/*: any*/),
+        "selections": (v12/*:: as any*/),
         "type": "AgentSessionStepStartedEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v12/*: any*/),
+        "selections": (v12/*:: as any*/),
         "type": "AgentSessionStepFinishedEvent",
         "abstractKey": null
       }
@@ -399,20 +398,20 @@ v13 = [
 ];
 return {
   "fragment": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "agentSessionEventsSubscription",
-    "selections": (v13/*: any*/),
+    "selections": (v13/*:: as any*/),
     "type": "Subscription",
     "abstractKey": null
   },
   "kind": "Request",
   "operation": {
-    "argumentDefinitions": (v0/*: any*/),
+    "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "agentSessionEventsSubscription",
-    "selections": (v13/*: any*/)
+    "selections": (v13/*:: as any*/)
   },
   "params": {
     "cacheID": "7472d376efae21032db1fc8f05b8894e",

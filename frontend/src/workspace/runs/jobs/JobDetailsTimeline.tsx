@@ -5,7 +5,7 @@ import Timestamp from '../../../common/Timestamp';
 import { humanizeDurationBetween, jobDuration, useJobStatusColor } from './jobUtils';
 import { JobDetailsQuery } from './__generated__/JobDetailsQuery.graphql';
 
-type Job = NonNullable<JobDetailsQuery['response']['node']>;
+type Job = NonNullable<NonNullable<JobDetailsQuery['response']['node']>['job']>;
 type TimelineState = 'done' | 'current' | 'pending';
 
 // TimelineStep is one phase on the vertical timeline: a dot, a connector to the next, label + time.

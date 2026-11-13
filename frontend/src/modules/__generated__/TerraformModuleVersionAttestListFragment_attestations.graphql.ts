@@ -1,7 +1,6 @@
 /**
- * @generated SignedSource<<3f57e3357faf8f565fca52fecb77dfbb>>
+ * @generated SignedSource<<5eef8c5c786d5d82960395106ce9ccf4>>
  * @lightSyntaxTransform
- * @nogrep
  */
 
 /* tslint:disable */
@@ -59,7 +58,7 @@ return {
         "count": "first",
         "cursor": "after",
         "direction": "forward",
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       }
     ],
     "refetch": {
@@ -69,7 +68,7 @@ return {
           "cursor": "after"
         },
         "backward": null,
-        "path": (v0/*: any*/)
+        "path": (v0/*:: as any*/)
       },
       "fragmentPathInResult": [
         "node"
@@ -83,7 +82,7 @@ return {
   },
   "name": "TerraformModuleVersionAttestListFragment_attestations",
   "selections": [
-    (v1/*: any*/),
+    (v1/*:: as any*/),
     {
       "alias": "attestations",
       "args": null,
@@ -108,7 +107,7 @@ return {
               "name": "node",
               "plural": false,
               "selections": [
-                (v1/*: any*/),
+                (v1/*:: as any*/),
                 {
                   "alias": null,
                   "args": null,
