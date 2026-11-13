@@ -51,7 +51,13 @@ function TerraformProviderSearchListItem(props: Props) {
             <ListItemIcon sx={{ minWidth: 40 }}>
                 <TerraformIcon color="disabled" />
             </ListItemIcon>
-            <Box flex={1} display="flex" justifyContent="space-between" alignItems="center">
+            <Box
+                sx={{
+                    flex: 1,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                }}>
                 <Box>
                     <Link
                         component="div"

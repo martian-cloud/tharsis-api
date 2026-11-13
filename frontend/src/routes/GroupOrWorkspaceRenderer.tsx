@@ -36,7 +36,15 @@ function GroupOrWorkspaceDetails(props: Props) {
     return <WorkspaceDetails fragmentRef={queryData.namespace} route={props.route} />;
   } else {
     return (
-      <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" height="400px">
+      <Box
+        sx={{
+          padding: 4,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "400px"
+        }}>
         <Typography variant="h3" color="textSecondary">404</Typography>
         <Typography variant="h5" color="textSecondary">The page you're looking for does not exist or you're not authorized to view it</Typography>
       </Box>

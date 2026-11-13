@@ -62,7 +62,12 @@ function NamespaceActivity(props: Props) {
                 ]}
             />
             {eventCount > 0 && <ActivityEventList fragmentRef={data.activityEvents} loadNext={loadNext} hasNext={hasNext} />}
-            {eventCount === 0 && <Box sx={{ marginTop: 8 }} display="flex" justifyContent="center">
+            {eventCount === 0 && <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 8
+                }}>
                 <Typography variant="h6" color="textSecondary">
                     This {namespace.__typename === 'Group' ? 'group' : 'workspace'} does not have any activity events
                 </Typography>

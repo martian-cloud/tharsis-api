@@ -97,7 +97,12 @@ function CleanupRuleDialog<R extends CleanupRule>({
                                                 sx={{ position: 'absolute', top: 6, right: 6, color: 'primary.main' }}
                                             />
                                         )}
-                                        <Typography variant="body2" fontWeight={500} pr={selected ? 2.5 : 0}>
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
+                                                fontWeight: 500,
+                                                pr: selected ? 2.5 : 0
+                                            }}>
                                             {t.label}
                                         </Typography>
                                         <Typography variant="caption" color="textSecondary">{t.detail}</Typography>
@@ -128,7 +133,9 @@ function CleanupRuleDialog<R extends CleanupRule>({
                 {safetyNote && (
                     <Stack direction="row" spacing={0.75} sx={{ mt: 3 }}>
                         <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', mt: '2px' }} />
-                        <Typography variant="body2" color="textSecondary" fontStyle="italic">
+                        <Typography variant="body2" color="textSecondary" sx={{
+                            fontStyle: "italic"
+                        }}>
                             {safetyNote}
                         </Typography>
                     </Stack>

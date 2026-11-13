@@ -173,7 +173,13 @@ function ServiceAccountList({ fragmentRef }: Props) {
                     />
                 </Box>
                 <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                    <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                    <Box
+                        sx={{
+                            padding: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between"
+                        }}>
                         <Typography variant="subtitle1">
                             {data?.serviceAccounts.totalCount} service account{data?.serviceAccounts.totalCount === 1 ? '' : 's'}
                         </Typography>
@@ -208,8 +214,21 @@ function ServiceAccountList({ fragmentRef }: Props) {
                     </List>
                 </InfiniteScroll>
             </Box>}
-            {search === '' && edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+            {search === '' && edges.length === 0 && <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        maxWidth: 600
+                    }}>
                     <Typography variant="h6">Get started with service accounts</Typography>
                     <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
                         {DESCRIPTION}

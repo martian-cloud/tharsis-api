@@ -45,8 +45,10 @@ function GlobField<R extends Record<string, any>>({
         <TextField size="small" fullWidth label={label} placeholder={placeholder}
             value={value}
             helperText={value ? undefined : `Exact match or glob, e.g. ${placeholder}`}
-            inputProps={{ maxLength: 100 }}
-            onChange={e => onChange({ ...rule, [field]: e.target.value })} />
+            onChange={e => onChange({ ...rule, [field]: e.target.value })}
+            slotProps={{
+                htmlInput: { maxLength: 100 }
+            }} />
     );
 }
 
@@ -96,7 +98,9 @@ function RunFilterFields({
         <Stack spacing={2}>
             <Box>
                 <Typography variant="body2" sx={{ mb: 1 }}>Run kind</Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Stack direction="row" spacing={1} useFlexGap sx={{
+                    flexWrap: "wrap"
+                }}>
                     {toggle('Speculative', 'speculative')}{toggle('Assessment', 'assessment')}
                 </Stack>
                 <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
@@ -319,7 +323,9 @@ export const CLEANUP_POLICY_KINDS: Record<CleanupPolicyKind, AnyKindDefinition> 
         templates: versionTemplates('module version', moduleRule),
         conditions: globConditions,
         filterFields: (r, setR) => (
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-start">
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{
+                alignItems: "flex-start"
+            }}>
                 <GlobField label="Module name" field="nameGlob" placeholder="aws-*" rule={r} onChange={setR} />
                 <GlobField label="System" field="systemGlob" placeholder="aws" rule={r} onChange={setR} />
                 <GlobField label="Module version" field="versionGlob" placeholder="1.*" rule={r} onChange={setR} />
@@ -340,7 +346,9 @@ export const CLEANUP_POLICY_KINDS: Record<CleanupPolicyKind, AnyKindDefinition> 
         templates: versionTemplates('provider version', providerRule),
         conditions: globConditions,
         filterFields: (r, setR) => (
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-start">
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{
+                alignItems: "flex-start"
+            }}>
                 <GlobField label="Provider name" field="nameGlob" placeholder="aws-*" rule={r} onChange={setR} />
                 <GlobField label="Provider version" field="versionGlob" placeholder="1.*" rule={r} onChange={setR} />
             </Stack>

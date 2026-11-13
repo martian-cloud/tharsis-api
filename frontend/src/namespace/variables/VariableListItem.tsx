@@ -43,7 +43,14 @@ function VariableListItem(props: Props) {
 
     const keyContent = (
         <Box>
-            <Box display="flex" alignItems="center" sx={{ fontWeight: 'bold', fontFamily: monoFontFamily, wordBreak: 'break-all' }}>
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    fontWeight: 'bold',
+                    fontFamily: monoFontFamily,
+                    wordBreak: 'break-all'
+                }}>
                 {data.key}
                 <CopyButton
                     data={data.key}
@@ -79,7 +86,9 @@ function VariableListItem(props: Props) {
         {data.namespacePath}
     </Link>;
 
-    const actions = data.namespacePath === namespacePath ? <Stack direction="row" spacing={1} justifyContent="flex-end">
+    const actions = data.namespacePath === namespacePath ? <Stack direction="row" spacing={1} sx={{
+        justifyContent: "flex-end"
+    }}>
         <Button
             onClick={() => onEdit(data)}
             sx={{ minWidth: 40, padding: '2px' }}

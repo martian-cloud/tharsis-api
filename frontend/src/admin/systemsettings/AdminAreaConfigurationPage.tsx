@@ -11,7 +11,12 @@ function AdminAreaConfigurationPage() {
             <Box>
                 <AdminAreaBreadcrumbs childRoutes={BREADCRUMB_ROUTES} />
                 <Typography variant="h5" gutterBottom>API Configuration</Typography>
-                <Box display="flex" justifyContent="center" paddingTop={4}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        paddingTop: 4
+                    }}>
                     <CircularProgress size={24} />
                 </Box>
             </Box>

@@ -7,9 +7,9 @@ import {
     ThreadPrimitive,
 } from '@assistant-ui/react';
 import BuildIcon from '@mui/icons-material/Build';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SendIcon from '@mui/icons-material/Send';
 import StopIcon from '@mui/icons-material/Stop';
@@ -126,8 +126,12 @@ function AgentSessionChat({ showToolCalls = true }: { showToolCalls?: boolean })
             <ThreadPrimitive.Viewport autoScroll style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <ThreadPrimitive.Empty>
                     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, px: 3, textAlign: 'center', opacity: 0.6 }}>
-                        <Typography variant="h6" color="text.secondary">How can I help you?</Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="h6" sx={{
+                            color: "text.secondary"
+                        }}>How can I help you?</Typography>
+                        <Typography variant="body2" sx={{
+                            color: "text.secondary"
+                        }}>
                             I'm an AI assistant. I can help troubleshoot failed runs, explain plan changes, answer questions about Tharsis, and more.
                         </Typography>
                     </Box>
@@ -177,7 +181,14 @@ function AgentSessionChat({ showToolCalls = true }: { showToolCalls?: boolean })
                     </AuiIf>
                 </ComposerPrimitive.Root>
             </Box>
-            <Typography variant="caption" color="text.secondary" align="center" sx={{ px: 1.5, mb: 1 }}>
+            <Typography
+                variant="caption"
+                align="center"
+                sx={{
+                    color: "text.secondary",
+                    px: 1.5,
+                    mb: 1
+                }}>
                 Copilot is AI and can make mistakes. Please verify responses.
             </Typography>
         </ThreadPrimitive.Root>

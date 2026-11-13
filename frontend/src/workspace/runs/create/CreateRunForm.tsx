@@ -49,8 +49,12 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
             </Alert>}
             <Box sx={{ mt: 4, mb: 4 }}>
                 <Typography variant="subtitle1" gutterBottom>Select Source</Typography>
-                <Divider light />
-                <Stack marginTop={2} direction="row" spacing={2}>
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
+                <Stack direction="row" spacing={2} sx={{
+                    marginTop: 2
+                }}>
                     {SOURCE_TYPES.map(source => <PanelButton
                         key={source.name}
                         selected={data.source === source.name}
@@ -70,10 +74,20 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
                     </PanelButton>)}
                 </Stack>
             </Box>
-            {(data.source === 'module' || data.source === 'configuration_version') && <Box marginBottom={4}>
+            {(data.source === 'module' || data.source === 'configuration_version') && <Box sx={{
+                marginBottom: 4
+            }}>
                 <Typography variant="subtitle1" gutterBottom>Select Run Type</Typography>
-                <Divider light />
-                <Stack marginTop={2} marginBottom={2} direction="row" spacing={2}>
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
+                <Stack
+                    direction="row"
+                    spacing={2}
+                    sx={{
+                        marginTop: 2,
+                        marginBottom: 2
+                    }}>
                     {RUN_TYPES.map(run => <PanelButton
                         key={run.type}
                         selected={data.runType === run.type}
@@ -86,9 +100,13 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
                     </PanelButton>)}
                 </Stack>
             </Box>}
-            {(data.source === 'module' || data.source === 'configuration_version') && <Box marginBottom={4}>
+            {(data.source === 'module' || data.source === 'configuration_version') && <Box sx={{
+                marginBottom: 4
+            }}>
                 <Typography variant="subtitle1" gutterBottom>Options</Typography>
-                <Divider light />
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
                 <FormControlLabel
                     sx={{ mt: 1 }}
                     control={
@@ -100,7 +118,13 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
                     }
                     label="Auto Apply"
                 />
-                <Typography variant="caption" display="block" sx={{ ml: 4, color: 'text.secondary' }}>
+                <Typography
+                    variant="caption"
+                    sx={{
+                        display: "block",
+                        ml: 4,
+                        color: 'text.secondary'
+                    }}>
                     Automatically apply the run once the plan completes successfully, without waiting for manual approval. Not available for plan-only runs.
                 </Typography>
                 <FormControlLabel
@@ -113,7 +137,13 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
                     }
                     label="Refresh Only"
                 />
-                <Typography variant="caption" display="block" sx={{ ml: 4, color: 'text.secondary' }}>
+                <Typography
+                    variant="caption"
+                    sx={{
+                        display: "block",
+                        ml: 4,
+                        color: 'text.secondary'
+                    }}>
                     Only update Terraform state to reflect real infrastructure. No resources will be created, changed, or destroyed.
                 </Typography>
             </Box>}
@@ -134,7 +164,9 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
                     onChange={(options: VCSRunDataOptions) => onChange({ ...data, options })}
                     fragmentRef={fragmentRef as VCSWorkspaceLinkSourceFragment_workspace$key} />
             }
-            <Divider light />
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
         </Box>
     );
 }

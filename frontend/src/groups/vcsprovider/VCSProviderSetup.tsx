@@ -18,7 +18,9 @@ function VCSProviderSetup({ data, onChange }: Props) {
                 <Typography>Start the process to register a new OAuth application in {data.type ===  'github' ? 'GitHub' : 'GitLab'}. Copy the following, required for creating a new OAuth application:</Typography>
                 <Stack sx={{ mt: 2 , mb: 2, ml: 2 }}>
                 {data.type === 'github' ?
-                    <Stack direction="row" marginBottom={0.5}>
+                    <Stack direction="row" sx={{
+                        marginBottom: 0.5
+                    }}>
                         <Typography variant="body1" component="span"><strong>Homepage URL:</strong> {window.location.protocol}//{window.location.host}</Typography>
                         <IconButton sx={{ padding: '4px' }} onClick={() => navigator.clipboard.writeText(`${window.location.protocol}//${window.location.host}`)}>
                             <CopyIcon sx={{ width: 16, height: 16 }} />
@@ -33,7 +35,9 @@ function VCSProviderSetup({ data, onChange }: Props) {
                         </IconButton>
                     </Stack>
                 </Stack>
-            {data.type === 'gitlab' ? <Box marginBottom={2}>
+            {data.type === 'gitlab' ? <Box sx={{
+                marginBottom: 2
+            }}>
                 <Typography>Enable the <StyledCode>Confidential</StyledCode> setting. Additionally, enable the following two scopes:</Typography>
                 <Paper sx={{ pt: 0.25, pb: 0.25, mt: 1, mb: 1 }}>
                     <ul>
@@ -46,7 +50,11 @@ function VCSProviderSetup({ data, onChange }: Props) {
                 <Typography>After registering a new OAuth application, {data.type === 'github' ? 'a Client ID and Client Secret' : 'an Application ID and Secret value'} will be generated. Copy and paste the ID and Secret into the fields below.</Typography>
             </Box>
             </Box> : null}
-            {data.type && <Box marginTop={2} marginBottom={2}>
+            {data.type && <Box
+                sx={{
+                    marginTop: 2,
+                    marginBottom: 2
+                }}>
                 <TextField
                     size="small"
                     fullWidth
@@ -63,12 +71,16 @@ function VCSProviderSetup({ data, onChange }: Props) {
                     onChange={event => onChange({ ...data, oAuthClientSecret: event.target.value })}
                 />
             </Box>}
-            {data.type && <Box marginBottom={2}>
+            {data.type && <Box sx={{
+                marginBottom: 2
+            }}>
                 <Typography>
                     If creation is successful, Tharsis will immediately generate a new authorization URL and redirect the browser to the VCS provider to finalize the OAuth flow.
                 </Typography>
             </Box>}
-            <Divider light/>
+            <Divider sx={{
+                opacity: "0.6"
+            }}/>
         </Box>
     );
 }

@@ -72,7 +72,9 @@ function ServiceAccountFormTrustPolicy(props: Props) {
             >
                 <DeleteIcon />
             </IconButton>
-            <Box mb={3}>
+            <Box sx={{
+                mb: 3
+            }}>
                 <Typography gutterBottom>Issuer URL</Typography>
                 <TextField
                     size="small"
@@ -83,14 +85,20 @@ function ServiceAccountFormTrustPolicy(props: Props) {
                     onChange={event => onChange({ ...trustPolicy, issuer: event.target.value })}
                 />
             </Box>
-            <Box mb={3}>
+            <Box sx={{
+                mb: 3
+            }}>
                 <Typography gutterBottom>Bound Claims</Typography>
-                <Box display="flex" flexWrap="wrap" sx={{
-                    margin: '0 -4px',
-                    '& > *': {
-                        margin: '4px'
-                    },
-                }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        margin: '0 -4px',
+
+                        '& > *': {
+                            margin: '4px'
+                        }
+                    }}>
                     {trustPolicy.boundClaims.map((claim: any) => (
                         <Box key={claim.name}>
                             <Chip
@@ -121,7 +129,11 @@ function ServiceAccountFormTrustPolicy(props: Props) {
                     onChange={event => onChange({ ...trustPolicy, boundClaimsType: event.target.checked ? 'GLOB' : 'STRING' })}
                 />}
                 label={
-                    <Box display="flex" alignItems="center">
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center"
+                        }}>
                         <Typography variant="body2">Enable wildcard matching for bound claims</Typography>
                         <Tooltip title="When enabled, wildcard characters can be used in claim values to match any string">
                             <InfoIcon sx={{

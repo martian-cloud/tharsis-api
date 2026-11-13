@@ -36,9 +36,16 @@ function AdminAreaRunnerDetails() {
             </Box>
         );
     } else {
-        return <Box display="flex" justifyContent="center" mt={4}>
-            <Typography color="textSecondary">Runner with ID {runnerId} not found</Typography>
-        </Box>;
+        return (
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    mt: 4
+                }}>
+                <Typography color="textSecondary">Runner with ID {runnerId} not found</Typography>
+            </Box>
+        );
     }
 }
 

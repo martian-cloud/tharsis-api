@@ -117,10 +117,23 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
                 {error.message}
             </Alert>}
 
-            <Box marginTop={4} marginBottom={4}>
+            <Box
+                sx={{
+                    marginTop: 4,
+                    marginBottom: 4
+                }}>
                 <Typography variant="subtitle1" gutterBottom>Select Type</Typography>
-                <Divider light />
-                <Stack marginTop={2} direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
+                <Stack
+                    direction={{ xs: 'column', md: 'row' }}
+                    spacing={2}
+                    useFlexGap
+                    sx={{
+                        marginTop: 2,
+                        flexWrap: "wrap"
+                    }}>
                     {ManagedIdentityTypes.map(type => <PanelButton
                         key={type.name}
                         disabled={editMode}
@@ -135,13 +148,24 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
                 </Stack>
             </Box>
             <Typography variant="subtitle1" gutterBottom>Details</Typography>
-            <Divider light />
-            <Box marginTop={2} marginBottom={4}>
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
+            <Box
+                sx={{
+                    marginTop: 2,
+                    marginBottom: 4
+                }}>
                 <TextField autoComplete="off" disabled={editMode} size="small" fullWidth label="Name" value={data.name} onChange={event => onChange({ ...data, name: event.target.value })} />
                 <TextField autoComplete="off" size="small" margin='normal' fullWidth label="Description" value={data.description} onChange={event => onChange({ ...data, description: event.target.value })} />
             </Box>
             {!editMode && <React.Fragment>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-end">
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-end"
+                    }}>
                     <Typography variant="subtitle1" gutterBottom>Access Rules</Typography>
                     <Button
                         sx={{ marginBottom: 1 }}
@@ -152,9 +176,15 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
                         Add Access Rule
                     </Button>
                 </Box>
-                <Divider light />
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
 
-                <Box marginTop={2} marginBottom={4}>
+                <Box
+                    sx={{
+                        marginTop: 2,
+                        marginBottom: 4
+                    }}>
                     <Typography color="textSecondary" gutterBottom>
                         Access rules determine which principals are allowed to use this managed identity for a particular run stage
                     </Typography>
@@ -167,7 +197,9 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
             </React.Fragment>}
             {!!data.type && <Box>
                 <Typography variant="subtitle1" gutterBottom>Provider Configuration</Typography>
-                <Divider light />
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
                 {data.type === 'aws_federated' && <Box>
                     <TextField
                         size="small"
@@ -177,7 +209,9 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
                         value={data.payload.role} onChange={event => onPayloadFieldChange('role', event.target.value)}
                     />
                 </Box>}
-                {data.type === 'azure_federated' && <Box marginTop={2}>
+                {data.type === 'azure_federated' && <Box sx={{
+                    marginTop: 2
+                }}>
                     <TextField
                         size="small"
                         fullWidth
@@ -194,7 +228,9 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
                         onChange={event => onPayloadFieldChange('tenantId', event.target.value)}
                     />
                 </Box>}
-                {data.type === 'kubernetes_federated' && <Box marginTop={2}>
+                {data.type === 'kubernetes_federated' && <Box sx={{
+                    marginTop: 2
+                }}>
                     <TextField
                         autoComplete="off"
                         size="small"
@@ -205,14 +241,24 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
                         required
 
                     />
-                    <Typography color="textSecondary" variant="caption" mt={1} display="block">
+                    <Typography
+                        color="textSecondary"
+                        variant="caption"
+                        sx={{
+                            mt: 1,
+                            display: "block"
+                        }}>
                         Specify the audience for this Kubernetes managed identity. This determines which EKS clusters
                         can accept tokens from this managed identity. The audience should match the client_id configured
                         in your EKS OIDC identity provider. If not provided, the default value is <strong>"kubernetes"</strong>.
                     </Typography>
                 </Box>}
-                {data.type === 'tharsis_federated' && <Box marginTop={2}>
-                    <Box marginBottom={2}>
+                {data.type === 'tharsis_federated' && <Box sx={{
+                    marginTop: 2
+                }}>
+                    <Box sx={{
+                        marginBottom: 2
+                    }}>
                         <TextField
                             autoComplete="off"
                             size="small"
@@ -222,13 +268,17 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
                             value={data.payload.serviceAccountPath}
                             onChange={event => onPayloadFieldChange('serviceAccountPath', event.target.value)}
                         />
-                        <Typography color="textSecondary" variant="caption" mt={1}>
+                        <Typography color="textSecondary" variant="caption" sx={{
+                            mt: 1
+                        }}>
                             Specify the full resource path for the service account that this managed identity will assume. The resource path
                             consists of the group path for the service account and the service account name.
                         </Typography>
                     </Box>
 
-                    <Box marginBottom={2}>
+                    <Box sx={{
+                        marginBottom: 2
+                    }}>
                         <FormControlLabel
                             control={<Checkbox
                                 color="secondary"

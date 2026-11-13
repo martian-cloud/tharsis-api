@@ -87,7 +87,9 @@ function PackageFilesEditor({ files, onChange }: Props) {
                         >
                             <ListItemText
                                 primary={file.name || '(unnamed)'}
-                                primaryTypographyProps={{ noWrap: true }}
+                                slotProps={{
+                                    primary: { noWrap: true }
+                                }}
                             />
                             <IconButton
                                 aria-label='Remove file'

@@ -89,7 +89,13 @@ function TeamList() {
                 onKeyDown={onKeyDown}
             />
             <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                <Box
+                    sx={{
+                        padding: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between"
+                    }}>
                     <Typography variant="subtitle1">
                         {data.teams?.totalCount ?? 0} team{data.teams?.totalCount === 1 ? '' : 's'}
                     </Typography>

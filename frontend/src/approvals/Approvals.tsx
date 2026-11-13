@@ -94,7 +94,9 @@ function ApprovalList() {
                 </Typography>
             ) : (
                 <Fragment>
-                    <Typography variant="subtitle1" color="textSecondary" mb={1}>
+                    <Typography variant="subtitle1" color="textSecondary" sx={{
+                        mb: 1
+                    }}>
                         {count} pending approval request{count === 1 ? '' : 's'}
                     </Typography>
                     <InfiniteScroll

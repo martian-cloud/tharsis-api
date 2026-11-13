@@ -61,14 +61,20 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
             <ListItemText
                 primary={
                     <Stack>
-                        <Box display="flex" alignItems="center">
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center"
+                            }}>
                             <Link
                                 to={runPath}
                                 component={LinkRouter}
                                 underline="hover"
-                                fontWeight={500}
                                 variant="body2"
                                 color="textPrimary"
+                                sx={{
+                                    fontWeight: 500
+                                }}
                             >
                                 {`${data.id.substring(0, 8)}`}
                             </Link>
@@ -87,10 +93,14 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
                                 {formattedWorkspacePath}
                             </Link>
                         </Tooltip>
-                        <Box mt={0.5}>
+                        <Box sx={{
+                            mt: 0.5
+                        }}>
                             <RunStageIcons fragmentRef={data} />
                         </Box>
-                        <Box mt={0.5}>
+                        <Box sx={{
+                            mt: 0.5
+                        }}>
                             {/* Cap at 3 visible annotations, consistent with the other run views. */}
                             <RunAnnotations fragmentRef={data} maxVisible={3} />
                         </Box>

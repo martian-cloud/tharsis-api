@@ -123,7 +123,13 @@ function FederatedRegistryList({ fragmentRef }: Props) {
                         borderBottomLeftRadius: 0,
                         borderBottomRightRadius: 0,
                     }}>
-                        <Box p={2} display="flex" alignItems="center" justifyContent="space-between">
+                        <Box
+                            sx={{
+                                p: 2,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between"
+                            }}>
                             <Typography variant="subtitle1">
                                 {totalCount} federated registr{totalCount === 1 ? 'y' : 'ies'}
                             </Typography>
@@ -144,8 +150,21 @@ function FederatedRegistryList({ fragmentRef }: Props) {
                     </InfiniteScroll>
                 </Box>}
 
-                {!hasRegistries && <Box sx={{ mt: 4 }} display="flex" justifyContent="center">
-                    <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ p: 4, maxWidth: 600 }}>
+                {!hasRegistries && <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        mt: 4
+                    }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            p: 4,
+                            maxWidth: 600
+                        }}>
                         <Typography variant="h6">Get started with federated registries</Typography>
                         <Typography color="textSecondary" align="center" sx={{ mb: 2 }}>
                             {DESCRIPTION}

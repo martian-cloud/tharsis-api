@@ -80,10 +80,14 @@ function UserSession({ fragmentRef }: Props) {
                         {data.userAgent}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" sx={{
+                            color: "text.secondary"
+                        }}>
                             Created: <Timestamp timestamp={data.metadata.createdAt} />
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" sx={{
+                            color: "text.secondary"
+                        }}>
                             Expires: <Timestamp timestamp={data.expiration} />
                         </Typography>
                     </Box>

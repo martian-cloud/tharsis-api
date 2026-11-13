@@ -300,7 +300,12 @@ const LogEntryRow = memo(function LogEntryRow({ entry, isExpanded, onToggle, mob
                     ...(highlightSx ?? {}),
                 }}
             >
-                <Box display="flex" alignItems="center" gap={1}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1
+                    }}>
                     <Chip label={entry.level} color={levelColor(entry.level)} size="small" />
                     <Timestamp timestamp={entry.timestamp} format="relative" variant="caption" color="textSecondary" />
                     <Box sx={{ flexGrow: 1 }} />
@@ -518,7 +523,13 @@ function AdminAreaLogsContent() {
                 <AdminAreaBreadcrumbs childRoutes={BREADCRUMB_ROUTES} />
                 <Typography variant="h5" gutterBottom>API Logs</Typography>
                 <Typography variant="body2" sx={{ marginBottom: 3 }}>{DESCRIPTION}</Typography>
-                <Box display="flex" flexDirection="column" alignItems="center" padding={4}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        padding: 4
+                    }}>
                     <Typography variant="h6">API log tailing is disabled</Typography>
                     <Typography color="textSecondary" align="center">
                         Set THARSIS_ADMIN_LOG_TAIL_STORE_PLUGIN_TYPE to memory or redis to enable it.
@@ -545,13 +556,20 @@ function AdminAreaLogsContent() {
                 borderBottomRightRadius: 0,
             }}>
                 <Box
-                    padding={2}
-                    display="flex"
-                    gap={2}
-                    flexDirection={mobile ? 'column' : 'row'}
-                    alignItems={mobile ? 'stretch' : 'center'}
-                >
-                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                    sx={{
+                        padding: 2,
+                        display: "flex",
+                        gap: 2,
+                        flexDirection: mobile ? 'column' : 'row',
+                        alignItems: mobile ? 'stretch' : 'center'
+                    }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            flexWrap: "wrap"
+                        }}>
                         <Typography variant="body2" color="textSecondary" sx={{ mr: 0.5 }}>Levels</Typography>
                         <ToggleButtonGroup
                             size="small"
@@ -588,12 +606,18 @@ function AdminAreaLogsContent() {
                             value={search}
                             onChange={onSearchChange}
                             onKeyDown={onSearchKeyDown}
-                            inputProps={{ maxLength: 256 }}
+                            slotProps={{ htmlInput: { maxLength: 256 } }}
                             sx={{ width: '100%', maxWidth: mobile ? 'none' : 480 }}
                         />
                     </Box>
 
-                    <Box display="flex" alignItems="center" gap={1} justifyContent={mobile ? 'space-between' : undefined}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            justifyContent: mobile ? 'space-between' : undefined
+                        }}>
                         <Typography variant="body2" color="textSecondary">Live tail</Typography>
                         <Switch
                             checked={liveTail}
@@ -653,7 +677,9 @@ function AdminAreaLogsContent() {
                                 {combined.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={5} align="center">
-                                            <Typography color="textSecondary" padding={2}>No log entries</Typography>
+                                            <Typography color="textSecondary" sx={{
+                                                padding: 2
+                                            }}>No log entries</Typography>
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -682,7 +708,12 @@ function AdminAreaLogs() {
             <Box>
                 <AdminAreaBreadcrumbs childRoutes={BREADCRUMB_ROUTES} />
                 <Typography variant="h5" sx={{ marginBottom: 2 }}>API Logs</Typography>
-                <Box display="flex" justifyContent="center" paddingTop={4}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        paddingTop: 4
+                    }}>
                     <CircularProgress size={24} />
                 </Box>
             </Box>

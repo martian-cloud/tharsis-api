@@ -96,7 +96,13 @@ function CleanupPolicyListItem({
                 onClick={onToggle}
             >
                 <Box sx={{ minWidth: 0, flexGrow: { sm: 1 } }}>
-                    <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                    <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{
+                            alignItems: "center",
+                            flexWrap: "wrap"
+                        }}>
                         <Typography variant="subtitle1">{label}</Typography>
                         {disabled && (
                             <Chip size="small" color="warning" label="Disabled" />
@@ -122,9 +128,10 @@ function CleanupPolicyListItem({
                     <Stack
                         direction={{ xs: 'column', sm: 'row' }}
                         spacing={1}
-                        alignItems={{ xs: 'stretch', sm: 'center' }}
-                        sx={{ flexGrow: { xs: 1, sm: 0 } }}
-                    >
+                        sx={{
+                            alignItems: { xs: 'stretch', sm: 'center' },
+                            flexGrow: { xs: 1, sm: 0 }
+                        }}>
                         {trn && <TRNButton trn={trn} size="small" sx={{ width: { xs: '100%', sm: 'auto' } }} />}
                         {inheritedFrom ? (
                             <Tooltip title="Create a policy that takes precedence over the inherited one">
@@ -175,7 +182,14 @@ function CleanupPolicyListItem({
                     )}
                     {inheritedFrom && (
                         <Box sx={{ mt: 1.5 }}>
-                            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 1.5, px: 0.5 }}>
+                            <Stack
+                                direction="row"
+                                spacing={0.5}
+                                sx={{
+                                    alignItems: "center",
+                                    mt: 1.5,
+                                    px: 0.5
+                                }}>
                                 <Typography variant="caption" color="textSecondary">
                                     Inherited from
                                 </Typography>

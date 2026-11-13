@@ -56,7 +56,13 @@ function GroupPackageListItem(props: Props) {
             <ListItemIcon sx={{ minWidth: 40 }}>
                 <PackageIcon color="disabled" />
             </ListItemIcon>
-            <Box flex={1} display="flex" justifyContent="space-between" alignItems="center">
+            <Box
+                sx={{
+                    flex: 1,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                }}>
                 <Box sx={{ minWidth: 0 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                         <Link
@@ -73,9 +79,16 @@ function GroupPackageListItem(props: Props) {
                         <PackageKindPill kind={data.kind} />
                     </Box>
                     {data.description && <Typography variant="body2" color="textSecondary">{data.description}</Typography>}
-                    {props.inherited && <Typography mt={0.5} color="textSecondary" variant="caption">Inherited from group <strong>{data.groupPath}</strong></Typography>}
+                    {props.inherited && <Typography color="textSecondary" variant="caption" sx={{
+                        mt: 0.5
+                    }}>Inherited from group <strong>{data.groupPath}</strong></Typography>}
                 </Box>
-                <Box display="flex" alignItems="center" gap={1}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1
+                    }}>
                     <Chip sx={{ marginLeft: 2 }} variant="outlined" size="small" label={data.visibility} />
                     {/* The row is a link, so the actions have to swallow the click that reaches them. */}
                     {!props.inherited && <IconButton

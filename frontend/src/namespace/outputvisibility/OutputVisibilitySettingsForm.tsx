@@ -96,7 +96,11 @@ function OutputVisibilitySettingsForm({ formData, onChange, error, isRootGroup, 
                     label="Inherit from parent group"
                 />
                 {formData.inherit && data.inherited && <Paper sx={{ p: 2 }}>
-                    <Box display="flex" gap={0.5}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            gap: 0.5
+                        }}>
                         <Typography variant="body2" color="textSecondary">Output visibility inherited from group</Typography>
                         <Link
                             to={`/groups/${data.namespacePath}`}

@@ -58,24 +58,39 @@ function JobDetailsSidebar({ job, status, open, temporary, onClose }: Props) {
             anchor="right"
             onClose={onClose}
         >
-            <Box padding={2}>
-                <Box marginBottom={3} display="flex" alignItems="center" justifyContent="space-between" gap={1}>
+            <Box sx={{
+                padding: 2
+            }}>
+                <Box
+                    sx={{
+                        marginBottom: 3,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 1
+                    }}>
                     <Typography variant="h6">Job Details</Typography>
                     <TRNButton size="small" trn={job.metadata!.trn} />
                 </Box>
 
-                <Box marginBottom={3}>
+                <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Status</Typography>
                     <JobStatusChip status={status} />
                 </Box>
 
-                <Box marginBottom={3}>
+                <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Type</Typography>
                     <Chip size="small" label={JOB_TYPE_LABELS[job.type ?? ''] ?? job.type} />
                 </Box>
 
                 {job.tags && job.tags.length > 0 && (
-                    <Box marginBottom={3}>
+                    <Box sx={{
+                        marginBottom: 3
+                    }}>
                         <Typography sx={{ marginBottom: 1 }}>Tags</Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
                             {job.tags.map(tag => <Chip key={tag} size="small" color="secondary" label={tag} />)}
@@ -83,7 +98,9 @@ function JobDetailsSidebar({ job, status, open, temporary, onClose }: Props) {
                     </Box>
                 )}
 
-                <Box marginBottom={3}>
+                <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Workspace</Typography>
                     {job.workspace ? (
                         <Link
@@ -105,9 +122,18 @@ function JobDetailsSidebar({ job, status, open, temporary, onClose }: Props) {
                 </Box>
 
                 {job.run && (
-                    <Box marginBottom={3}>
+                    <Box sx={{
+                        marginBottom: 3
+                    }}>
                         <Typography sx={{ marginBottom: 1 }}>Run</Typography>
-                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Stack
+                            direction="row"
+                            spacing={1}
+                            useFlexGap
+                            sx={{
+                                alignItems: "center",
+                                flexWrap: "wrap"
+                            }}>
                             <Link color="secondary" sx={{ fontWeight: 500 }} to={`/groups/${job.run.workspace.fullPath}/-/runs/${job.run.id}`}>
                                 {job.run.id.substring(0, 8)}…
                             </Link>
@@ -116,12 +142,16 @@ function JobDetailsSidebar({ job, status, open, temporary, onClose }: Props) {
                     </Box>
                 )}
 
-                <Box marginBottom={3}>
+                <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Runner</Typography>
                     {runnerValue(job)}
                 </Box>
 
-                <Box marginBottom={3}>
+                <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Timeline</Typography>
                     <JobDetailsTimeline job={job} />
                 </Box>

@@ -100,7 +100,9 @@ function AdminAreaNewAnnouncement() {
                 error={error}
             />
             <Divider sx={{ opacity: 0.6 }} />
-            <Box marginTop={4}>
+            <Box sx={{
+                marginTop: 4
+            }}>
                 <Button
                     sx={{ mr: 2 }}
                     loading={isInFlight}

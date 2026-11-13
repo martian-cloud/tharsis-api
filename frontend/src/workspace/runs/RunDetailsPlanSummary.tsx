@@ -94,7 +94,12 @@ function RunDetailsPlanStageSummary({ fragmentRef, ml, mr, completed }: Props) {
         }), [data.summary, completed]);
 
     return (
-        <Box ml={ml} mr={mr} display="flex">
+        <Box
+            sx={{
+                ml: ml,
+                mr: mr,
+                display: "flex"
+            }}>
             <Box>
                 {planSummaryItems.map((item) => (
                     <SummaryRowCol key={item.key} sx={{ pl: 2, pr: 2 }}>
@@ -110,11 +115,17 @@ function RunDetailsPlanStageSummary({ fragmentRef, ml, mr, completed }: Props) {
                     </SummaryRowCol>
                 ))}
             </Box>
-            <Box flex={1}>
+            <Box sx={{
+                flex: 1
+            }}>
                 {planSummaryItems.map((item) => (
                     <SummaryRowCol key={item.key} sx={{ pr: 2 }}>
-                        <Typography variant="body2" fontWeight={500}>{item.label}</Typography>
-                        <Box component="span" flexGrow={1} />
+                        <Typography variant="body2" sx={{
+                            fontWeight: 500
+                        }}>{item.label}</Typography>
+                        <Box component="span" sx={{
+                            flexGrow: 1
+                        }} />
                         <InfoIcon text={item.info} />
                     </SummaryRowCol>
                 ))}

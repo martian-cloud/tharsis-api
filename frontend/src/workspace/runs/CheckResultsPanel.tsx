@@ -35,7 +35,9 @@ function CheckResultsPanel({ fragmentRefs }: Props) {
     return (
         <Paper sx={{ marginBottom: 2, pt: 2, px: 2, pb: 0 }}>
             <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 1 }}>Check Results</Typography>
-            <Box mx={-2}>
+            <Box sx={{
+                mx: -2
+            }}>
                 {checkResults.map((check) => {
                     const failureMessages = collectFailureMessages(check.objects);
                     return (
@@ -49,7 +51,17 @@ function CheckResultsPanel({ fragmentRefs }: Props) {
                                 <CheckStatusChip status={check.status} withBackground />
                             </Box>
                             <Tooltip title={check.name} placement="top">
-                                <Typography variant="body2" fontWeight={500} sx={{ fontFamily: 'monospace', whiteSpace: 'nowrap', width: { xs: '100%', md: 250 }, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <Typography
+                                    variant="body2"
+                                    sx={{
+                                        fontWeight: 500,
+                                        fontFamily: 'monospace',
+                                        whiteSpace: 'nowrap',
+                                        width: { xs: '100%', md: 250 },
+                                        flexShrink: 0,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
+                                    }}>
                                     {check.name}
                                 </Typography>
                             </Tooltip>
@@ -58,7 +70,9 @@ function CheckResultsPanel({ fragmentRefs }: Props) {
                                     <FailureMessagesList messages={failureMessages} />
                                 </Box>
                             )}
-                            <Box component="span" flexGrow={1} />
+                            <Box component="span" sx={{
+                                flexGrow: 1
+                            }} />
                         </SummaryRowCol>
                     );
                 })}

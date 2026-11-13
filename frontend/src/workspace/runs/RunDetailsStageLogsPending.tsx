@@ -6,8 +6,18 @@ import RocketLottieFileJson from '../../lotties/rocket-in-space-lottie.json';
 // runner has claimed it and is preparing to run, so logs will start streaming shortly.
 function RunDetailsStageLogsPending() {
     return (
-        <Box display="flex" justifyContent="center" sx={{ py: 6 }}>
-            <Box display="flex" flexDirection="column" alignItems="center">
+        <Box
+            sx={{
+                display: "flex",
+                justifyContent: "center",
+                py: 6
+            }}>
+            <Box
+                sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center"
+                }}>
                 <Lottie
                     renderer={undefined}
                     rendererSettings={undefined}

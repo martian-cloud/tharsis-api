@@ -383,10 +383,14 @@ function RunDetailsPlanStage(props: Props) {
     } else if (data.plan.status === 'finished') {
         statusCardContent = data.plan.hasChanges ? <React.Fragment>
             <RunDetailsPlanSummary fragmentRef={data.plan} ml={-2} mr={-2} completed={false} />
-            <Box mt={2}>
+            <Box sx={{
+                mt: 2
+            }}>
                 <Link color="secondary" to={'?tab=changes'}>View changes</Link>
             </Box>
-        </React.Fragment> : <Typography mt={2} variant="body2">
+        </React.Fragment> : <Typography variant="body2" sx={{
+            mt: 2
+        }}>
             This plan does not contain any changes to apply
         </Typography>;
     }
@@ -418,7 +422,9 @@ function RunDetailsPlanStage(props: Props) {
                         <Tab label="Resource Usage" value="resources" />
                     </Tabs>
                 </Box>
-                {tab === 'logs' && <Box marginTop={2}>
+                {tab === 'logs' && <Box sx={{
+                    marginTop: 2
+                }}>
                     {viewingEarlierJob && <Alert severity="warning" sx={{ my: 2 }}>
                         Showing logs for an earlier job{' '}
                         <Link color="inherit" to={'?tab=logs'}>(view latest job)</Link>
@@ -427,18 +433,26 @@ function RunDetailsPlanStage(props: Props) {
                         <Suspense fallback={<Box sx={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress /></Box>}>
                             <JobLogs jobId={effectiveJobId} />
                         </Suspense>
-                        {data.plan.hasChanges && data.plan.status === 'finished' && <Box mt={2}>
+                        {data.plan.hasChanges && data.plan.status === 'finished' && <Box sx={{
+                            mt: 2
+                        }}>
                             <Link color="secondary" to={'?tab=changes'}>View plan changes</Link>
                         </Box>}
                     </React.Fragment>}
-                    {!(logsAvailable && effectiveJobId) && (jobPending ? <RunDetailsStageLogsPending /> : <Box marginTop={2}>
+                    {!(logsAvailable && effectiveJobId) && (jobPending ? <RunDetailsStageLogsPending /> : <Box sx={{
+                        marginTop: 2
+                    }}>
                         <RunDetailsStageTabEmptyState message="Logs will be displayed once the plan has started" />
                     </Box>)}
                 </Box>}
-                {tab === 'variables' && <Box marginTop={2}>
+                {tab === 'variables' && <Box sx={{
+                    marginTop: 2
+                }}>
                     <RunVariables fragmentRef={data} />
                 </Box>}
-                {tab === 'changes' && <Box marginTop={2}>
+                {tab === 'changes' && <Box sx={{
+                    marginTop: 2
+                }}>
                     {maxDiffSizeExceeded && <Paper
                         variant="outlined"
                         sx={{
@@ -470,13 +484,17 @@ function RunDetailsPlanStage(props: Props) {
                             'Changes will be displayed once the plan has completed' : 'This plan does not contain any changes'}
                     />}
                 </Box>}
-                {tab === 'planjson' && <Box marginTop={2}>
+                {tab === 'planjson' && <Box sx={{
+                    marginTop: 2
+                }}>
                     {data.plan.status === 'finished' ? <RunDetailsPlanFile planId={data.plan.id} /> : <RunDetailsStageTabEmptyState
                         message={['pending', 'queued', 'running'].includes(data.plan.status) ?
                             'The plan file will be available once the plan has completed' : 'The plan file is not available'}
                     />}
                 </Box>}
-                {tab === 'resources' && <Box marginTop={2}>
+                {tab === 'resources' && <Box sx={{
+                    marginTop: 2
+                }}>
                     {data.plan.currentJob ? <JobResourceUsageMetrics
                         fragmentRef={data.plan.currentJob}
                         columns="single"

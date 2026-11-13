@@ -72,7 +72,12 @@ function JobDetails() {
 
     return (
         <Suspense fallback={
-            <Box display="flex" justifyContent="center" mt={6}>
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    mt: 6
+                }}>
                 <CircularProgress />
             </Box>
         }>

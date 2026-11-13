@@ -105,8 +105,12 @@ function NewGroup() {
                 data={formData}
                 onChange={(data: FormData) => setFormData(data)}
                 error={error} />
-            <Divider light />
-            <Box marginTop={2}>
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     loading={isInFlight}
                     disabled={!formData.name}

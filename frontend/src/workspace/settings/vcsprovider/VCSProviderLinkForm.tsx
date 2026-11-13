@@ -176,7 +176,11 @@ function VCSProviderLinkForm(props: Props) {
                     onChange={event => onChange({ ...data, tagRegex: event.target.value })}
                 />
                 <Typography sx={{ mb: 4 }} variant="subtitle2">A tag regular expression defines the commit tag format that may create a Tharsis run. For example, the regular expression <StyledCode>\d+.\d+.\d+$</StyledCode> only allows tags like <StyledCode>v0.0.1</StyledCode> to create runs. If no tag regular expression is defined, then all tagged commits are ignored.</Typography>
-                <Box display="flex" sx={{ mb: 1 }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        mb: 1
+                    }}>
                     <TextField
                         size="small"
                         margin="dense"
@@ -191,8 +195,10 @@ function VCSProviderLinkForm(props: Props) {
                 </Box>
                 <Box sx={{ mb: data.globPatterns.length > 0 ? 1 : 4 }}>
                     <Typography
-                        marginBottom={1}
-                        variant="subtitle2">Glob patterns are triggers for automatic Tharsis runs. When defined, the workspace only creates runs when certain files or directories that have changed in a commit match the glob pattern(s). If any pattern matches, a run will be triggered.
+                        variant="subtitle2"
+                        sx={{
+                            marginBottom: 1
+                        }}>Glob patterns are triggers for automatic Tharsis runs. When defined, the workspace only creates runs when certain files or directories that have changed in a commit match the glob pattern(s). If any pattern matches, a run will be triggered.
                     </Typography>
                     <Typography variant="subtitle2">You can generate a list of glob patterns to add to your VCS provider link by entering a glob pattern in the field above and clicking <StyledCode>ADD</StyledCode>.
                     </Typography>
@@ -237,7 +243,7 @@ function VCSProviderLinkForm(props: Props) {
                 </Box>
             </Box>
         </Box>
-    )
+    );
 }
 
 export default VCSProviderLinkForm

@@ -158,7 +158,12 @@ function NotificationPreferenceDialog({ onClose, path, preferenceData, isGlobalP
                                     </MenuItem>
                                 ))}
                             </Select>
-                            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: "text.secondary",
+                                    mt: 1
+                                }}>
                                 {optionDescription}
                             </Typography>
                         </FormControl>
@@ -183,7 +188,10 @@ function NotificationPreferenceDialog({ onClose, path, preferenceData, isGlobalP
                                 </Select>
                                 <Typography
                                     variant="caption"
-                                    color="text.secondary" sx={{ mt: 1 }}>
+                                    sx={{
+                                        color: "text.secondary",
+                                        mt: 1
+                                    }}>
                                     {optionDescription}
                                 </Typography>
                                 <InheritedMessage preferenceData={preferenceData} />

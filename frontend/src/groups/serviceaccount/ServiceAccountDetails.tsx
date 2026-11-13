@@ -230,12 +230,21 @@ function ServiceAccountDetails(props: Props) {
                     </Alert>
                 )}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, marginBottom: 2 }}>
-                    <Box display="flex" alignItems="center" sx={{ minWidth: 0 }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            minWidth: 0
+                        }}>
                         <Avatar variant="rounded" sx={{ width: 32, height: 32, marginRight: 1, bgcolor: 'avatar.default' }}>
                             {data.serviceAccount.name[0].toUpperCase()}
                         </Avatar>
                         <Box sx={{ minWidth: 0 }}>
-                            <Box display="flex" alignItems="center">
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center"
+                                }}>
                                 <Typography variant="h5" sx={{ marginRight: 1, wordBreak: 'break-word' }}>{data.serviceAccount.name}</Typography>
                             </Box>
                             <Typography color="textSecondary">{data.serviceAccount.description}</Typography>
@@ -306,15 +315,15 @@ function ServiceAccountDetails(props: Props) {
                                             {
                                                 label: 'Bound Claims', content: (
                                                     <Box
-                                                        display="flex"
-                                                        flexWrap="wrap"
                                                         sx={{
+                                                            display: "flex",
+                                                            flexWrap: "wrap",
                                                             margin: '0 -4px',
+
                                                             '& > *': {
                                                                 margin: '4px'
-                                                            },
-                                                        }}
-                                                    >
+                                                            }
+                                                        }}>
                                                         {trustPolicy.boundClaims.map(claim => (
                                                             <Chip
                                                                 size="small"
@@ -348,17 +357,35 @@ function ServiceAccountDetails(props: Props) {
                         </Typography>
                         {data.serviceAccount.clientCredentialsEnabled ? (
                             <Paper sx={{ padding: 2 }}>
-                                <Typography variant="body2" fontWeight="medium">Client ID</Typography>
-                                <Box display="flex" alignItems="center" gap={0.5} mb={2}>
+                                <Typography variant="body2" sx={{
+                                    fontWeight: "medium"
+                                }}>Client ID</Typography>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 0.5,
+                                        mb: 2
+                                    }}>
                                     <Typography variant="body2" color="textSecondary" sx={{ wordBreak: 'break-all', minWidth: 0 }}>{data.serviceAccount.id}</Typography>
                                     <CopyButton data={data.serviceAccount.id} toolTip="Click to copy" />
                                 </Box>
-                                <Typography variant="body2" fontWeight="medium">Token Endpoint (POST)</Typography>
-                                <Box display="flex" alignItems="center" gap={0.5} mb={2}>
+                                <Typography variant="body2" sx={{
+                                    fontWeight: "medium"
+                                }}>Token Endpoint (POST)</Typography>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 0.5,
+                                        mb: 2
+                                    }}>
                                     <Typography variant="body2" color="textSecondary" sx={{ wordBreak: 'break-all', minWidth: 0 }}>{cfg.apiUrl}/v1/serviceaccounts/token</Typography>
                                     <CopyButton data={`${cfg.apiUrl}/v1/serviceaccounts/token`} toolTip="Click to copy" />
                                 </Box>
-                                <Typography variant="body2" fontWeight="medium">Secret Expires</Typography>
+                                <Typography variant="body2" sx={{
+                                    fontWeight: "medium"
+                                }}>Secret Expires</Typography>
                                 <Timestamp timestamp={data.serviceAccount.clientSecretExpiresAt as string} format="absolute" variant="body2" color="textSecondary" />
                             </Paper>
                         ) : (
@@ -418,9 +445,16 @@ function ServiceAccountDetails(props: Props) {
             </Box >
         );
     } else {
-        return <Box display="flex" justifyContent="center" marginTop={4}>
-            <Typography color="textSecondary">Service account with ID {serviceAccountId} not found</Typography>
-        </Box>;
+        return (
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
+                <Typography color="textSecondary">Service account with ID {serviceAccountId} not found</Typography>
+            </Box>
+        );
     }
 }
 

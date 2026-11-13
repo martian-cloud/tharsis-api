@@ -88,7 +88,7 @@ function NewWorkspace(){
         })
     };
 
-    return(
+    return (
         <PageLayoutProvider>
             <NamespaceBreadcrumbs
                 namespacePath={parentGroupPath}
@@ -102,7 +102,9 @@ function NewWorkspace(){
                 error={error}
             />
             <Divider />
-            <Box marginTop={2}>
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     loading={isInFlight}
                     disabled={!formData.name}
@@ -116,7 +118,7 @@ function NewWorkspace(){
                 <Button color="inherit" onClick={()=>(navigate(parentGroupPath ? `../groups/${parentGroupPath}` : '..'))}>Cancel</Button>
             </Box>
         </PageLayoutProvider>
-    )
+    );
 
 }
 

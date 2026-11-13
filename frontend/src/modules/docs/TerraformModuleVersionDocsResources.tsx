@@ -22,11 +22,19 @@ function TerraformModuleVersionDocsResources({ fragmentRef }: Props) {
 
     return (
         <Box>
-            {data.managedResources.length === 0 && <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+            {data.managedResources.length === 0 && <Box
+                sx={{
+                    padding: 2,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center"
+                }}>
                 <Typography color="textSecondary">This module does not create any resources</Typography>
             </Box>}
             {data.managedResources.length > 0 && <>
-                <Typography color="textSecondary" variant="body1" mb={1}>
+                <Typography color="textSecondary" variant="body1" sx={{
+                    mb: 1
+                }}>
                     This module creates the following resources:
                 </Typography>
                 <List disablePadding>

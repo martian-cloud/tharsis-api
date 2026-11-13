@@ -128,7 +128,9 @@ function EditAdminAreaAnnouncement() {
                 error={error}
             />
             <Divider sx={{ opacity: 0.6 }} />
-            <Box mt={2}>
+            <Box sx={{
+                mt: 2
+            }}>
                 <Button
                     loading={isInFlight}
                     disabled={!isFormValid || !hasFormChanged}

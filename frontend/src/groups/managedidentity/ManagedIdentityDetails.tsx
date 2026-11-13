@@ -292,7 +292,12 @@ function ManagedIdentityDetails(props: Props) {
                 />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, marginBottom: 2 }}>
                     <Box sx={{ minWidth: 0 }}>
-                        <Box display="flex" alignItems="center" flexWrap="wrap">
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                flexWrap: "wrap"
+                            }}>
                             <Typography variant="h5" sx={{ marginRight: 1, wordBreak: 'break-word' }}>{data.managedIdentity.name}</Typography>
                             <ManagedIdentityTypeChip mr={1} type={data.managedIdentity.type} />
                             {data.managedIdentity.isAlias && <Chip label="alias" color="secondary" size="small" />}
@@ -389,7 +394,7 @@ function ManagedIdentityDetails(props: Props) {
                             <FieldValue>{payload.serviceAccountPath}</FieldValue>
                             <FieldLabel>Use Service Account for Terraform CLI</FieldLabel>
                             <Typography color="textSecondary">{payload.useServiceAccountForTerraformCLI ? 'Yes' : 'No'}</Typography>
-                            <FieldLabel marginTop={2}>Trusted Identity Provider</FieldLabel>
+                            <FieldLabel sx={{ mt: 2 }}>Trusted Identity Provider</FieldLabel>
                             <Typography color="textSecondary">
                                 Add the identity provider settings below to your service account to allow this managed identity to use it
                             </Typography>
@@ -419,7 +424,7 @@ function ManagedIdentityDetails(props: Props) {
                             <FieldValue>{payload.audience}</FieldValue>
                             <FieldLabel>Subject Name</FieldLabel>
                             <FieldValue>{`${ISSUER}#${data.managedIdentity.id}`}</FieldValue>
-                            <FieldLabel marginTop={2}>Terraform Configuration</FieldLabel>
+                            <FieldLabel sx={{ mt: 2 }}>Terraform Configuration</FieldLabel>
                             <Typography color="textSecondary">
                                 Use the Terraform configuration below to configure your EKS cluster OIDC identity provider and allow this managed identity access.
                             </Typography>
@@ -463,9 +468,16 @@ function ManagedIdentityDetails(props: Props) {
             </Box>
         );
     } else {
-        return <Box display="flex" justifyContent="center" marginTop={4}>
-            <Typography color="textSecondary">Managed identity with ID {managedIdentityId} not found</Typography>
-        </Box>;
+        return (
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
+                <Typography color="textSecondary">Managed identity with ID {managedIdentityId} not found</Typography>
+            </Box>
+        );
     }
 }
 

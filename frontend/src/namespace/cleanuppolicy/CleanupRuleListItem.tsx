@@ -21,9 +21,16 @@ const ACTION_BUTTON_SX = {
 function ConditionBadge({ label, value }: Condition) {
     return (
         <Stack
-            direction="row" spacing={0.5} alignItems="center"
-            sx={{ px: 1, py: 0.25, borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
-        >
+            direction="row"
+            spacing={0.5}
+            sx={{
+                alignItems: "center",
+                px: 1,
+                py: 0.25,
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'divider'
+            }}>
             <ConditionText label={label} value={value} />
         </Stack>
     );
@@ -59,9 +66,13 @@ function CleanupRuleListItem({ rule, resource, conditions, index, readOnly, canM
                 label: 'Outcome',
                 content: (
                     <Box>
-                        <Stack direction="row" alignItems="center" spacing={1}>
+                        <Stack direction="row" spacing={1} sx={{
+                            alignItems: "center"
+                        }}>
                             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: dotColor, flexShrink: 0 }} />
-                            <Typography variant="body2" fontWeight={500}><Verdict rule={rule} resource={resource} /></Typography>
+                            <Typography variant="body2" sx={{
+                                fontWeight: 500
+                            }}><Verdict rule={rule} resource={resource} /></Typography>
                         </Stack>
                         {rule.description && (
                             <Typography variant="caption" color="textSecondary">{rule.description}</Typography>
@@ -73,7 +84,9 @@ function CleanupRuleListItem({ rule, resource, conditions, index, readOnly, canM
                 label: 'Applies To',
                 content: conditions.length > 0
                     ? (
-                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                        <Stack direction="row" spacing={0.5} useFlexGap sx={{
+                            flexWrap: "wrap"
+                        }}>
                             {conditions.map(condition => (
                                 <ConditionBadge key={condition.label} {...condition} />
                             ))}
@@ -85,7 +98,9 @@ function CleanupRuleListItem({ rule, resource, conditions, index, readOnly, canM
                 footer: true,
                 align: 'right' as const,
                 content: (
-                    <Stack direction="row" justifyContent="flex-end">
+                    <Stack direction="row" sx={{
+                        justifyContent: "flex-end"
+                    }}>
                         <IconButton size="small" disabled={!canMoveUp} aria-label="move rule up" onClick={() => onMove?.(-1)} sx={ACTION_BUTTON_SX}>
                             <ArrowUpIcon fontSize="small" />
                         </IconButton>

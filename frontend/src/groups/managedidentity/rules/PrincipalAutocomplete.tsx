@@ -1,5 +1,5 @@
-import TeamIcon from '@mui/icons-material/PeopleOutline';
-import UserIcon from '@mui/icons-material/PersonOutline';
+import TeamIcon from '@mui/icons-material/PeopleOutlined';
+import UserIcon from '@mui/icons-material/PersonOutlined';
 import { Autocomplete, Avatar, Box, ListItem, ListItemText, styled, TextField, useTheme } from '@mui/material';
 import CircularProgress from '@mui/material/CircularProgress';
 import match from 'autosuggest-highlight/match';
@@ -110,29 +110,29 @@ function PrincipalAutocomplete(props: Props) {
                         { fetchPolicy: 'network-only' }
                     ).toPromise().then(async response => {
                         const options = [
-                            ...response?.teams?.edges?.map(edge => ({
+                            ...(response?.teams?.edges?.map(edge => ({
                                 type: 'team',
                                 id: edge?.node?.id,
                                 label: edge?.node?.name,
                                 name: edge?.node?.name,
                                 avatarLabel: edge?.node?.name[0].toUpperCase()
-                            } as TeamOption)) || [],
-                            ...response?.users?.edges?.map(edge => ({
+                            } as TeamOption)) || []),
+                            ...(response?.users?.edges?.map(edge => ({
                                 type: 'user',
                                 id: edge?.node?.id,
                                 label: edge?.node?.username,
                                 username: edge?.node?.username,
                                 email: edge?.node?.email,
                                 avatarLabel: edge?.node?.email
-                            } as UserOption)) || [],
-                            ...response?.group?.serviceAccounts?.edges?.map(edge => ({
+                            } as UserOption)) || []),
+                            ...(response?.group?.serviceAccounts?.edges?.map(edge => ({
                                 type: 'serviceaccount',
                                 id: edge?.node?.id,
                                 label: edge?.node?.resourcePath,
                                 name: edge?.node?.name,
                                 resourcePath: edge?.node?.resourcePath,
                                 avatarLabel: edge?.node?.name[0].toUpperCase()
-                            } as ServiceAccountOption)) || []
+                            } as ServiceAccountOption)) || [])
                         ];
                         callback(options);
                     });
@@ -179,7 +179,9 @@ function PrincipalAutocomplete(props: Props) {
                 const parts = parse(option.label, matches);
                 return (
                     <ListItem dense key={key} {...optionProps}>
-                        <Box marginRight={1}>
+                        <Box sx={{
+                            marginRight: 1
+                        }}>
                             {option.type === 'user' && <Gravatar width={24} height={24} email={option.avatarLabel} />}
                             {(option.type === 'team' || option.type === 'serviceaccount') && <StyledAvatar>{option.avatarLabel}</StyledAvatar>}
                         </Box>
@@ -194,10 +196,16 @@ function PrincipalAutocomplete(props: Props) {
                                     {part.text}
                                 </span>
                             ))}
-                            primaryTypographyProps={{ noWrap: true }}
+                            slotProps={{
+                                primary: { noWrap: true }
+                            }}
                         />
-                        <Box flex={1} />
-                        <Box marginLeft={1}>
+                        <Box sx={{
+                            flex: 1
+                        }} />
+                        <Box sx={{
+                            marginLeft: 1
+                        }}>
                             {option.type === 'user' && <UserIcon sx={{ color: theme.palette.text.secondary }} />}
                             {option.type === 'team' && <TeamIcon sx={{ color: theme.palette.text.secondary }} />}
                             {option.type === 'serviceaccount' && <ServiceAccountIcon sx={{ color: theme.palette.text.secondary }} />}
@@ -212,12 +220,14 @@ function PrincipalAutocomplete(props: Props) {
                     {...params}
                     placeholder='Select a principal to add'
                     slotProps={{
+                        ...params.slotProps,
+
                         input: {
-                            ...params.InputProps,
+                            ...params.slotProps.input,
                             endAdornment: (
                                 <React.Fragment>
                                     {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                    {params.InputProps.endAdornment}
+                                    {params.slotProps.input.endAdornment}
                                 </React.Fragment>
                             ),
                         }

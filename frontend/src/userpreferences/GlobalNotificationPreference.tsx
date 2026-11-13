@@ -24,7 +24,9 @@ function GlobalNotificationPreference({ fragmentRef }: Props) {
     return (
         <Box>
             <Typography variant="subtitle1" gutterBottom>Global Notification</Typography>
-            <Typography variant="body2" mb={2} color="textSecondary">
+            <Typography variant="body2" color="textSecondary" sx={{
+                mb: 2
+            }}>
                 By default, all groups and workspaces use the global notification preference
             </Typography>
             <NotificationButton

@@ -24,7 +24,12 @@ export function PageLayoutProvider({ children, size }: PageLayoutProviderProps) 
     const mx = currentSize === 'fullscreen' ? 2 : 'auto';
     return (
         <PageLayoutContext.Provider value={setSize}>
-            <Box maxWidth={maxWidth} mx={mx} padding={2}>
+            <Box
+                sx={{
+                    maxWidth: maxWidth,
+                    mx: mx,
+                    padding: 2
+                }}>
                 {children}
             </Box>
         </PageLayoutContext.Provider>

@@ -170,7 +170,9 @@ function NotificationButton({ path, fragmentRef, isGlobalPreference = false }: P
                         }}
                     >
                         <Typography
-                            fontWeight="bold">
+                            sx={{
+                                fontWeight: "bold"
+                            }}>
                             {preferenceData.scope}
                         </Typography>
                         <Typography

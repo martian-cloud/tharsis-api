@@ -37,7 +37,11 @@ function AdminAreaEmailRecipientListItem({ fragmentRef }: Props) {
                 cells={[
                     {
                         content: (
-                            <Box display="flex" alignItems="center">
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center"
+                                }}>
                                 <Gravatar width={24} height={24} email={recipient.address} />
                                 <Typography variant="body2" sx={{ ml: 2, wordBreak: 'break-all', fontWeight: 500 }}>
                                     {recipient.address}
@@ -62,7 +66,9 @@ function AdminAreaEmailRecipientListItem({ fragmentRef }: Props) {
                     {
                         label: 'Complained',
                         content: recipient.complainedAt
-                            ? <Typography variant="body2" color="error.main">Yes</Typography>
+                            ? <Typography variant="body2" sx={{
+                            color: "error.main"
+                        }}>Yes</Typography>
                             : <Typography variant="body2" color="textSecondary">—</Typography>,
                     },
                 ]}

@@ -108,31 +108,31 @@ function TerraformProviderVersionDocs({ fragmentRef }: Props) {
 
     return (
         <Box
-            display="flex"
-            width="100%"
             sx={{
+                display: "flex",
+                width: "100%",
+
                 [theme.breakpoints.down('lg')]: {
                     flexDirection: 'column',
                     alignItems: 'flex-start',
                     '& > *': { mb: 4 },
                 }
-            }}
-        >
+            }}>
             {/* Keyed by version so switching versions resets the tree's expansion state. */}
             <TerraformProviderVersionDocsSidebar key={data.id} fragmentRef={data} onItemChange={onItemChange} />
             <Box
-                flex={1}
-                pl={2}
-                borderLeft={`1px solid ${theme.palette.divider}`}
                 sx={{
+                    flex: 1,
+                    pl: 2,
+                    borderLeft: `1px solid ${theme.palette.divider}`,
                     minWidth: 0,
+
                     [theme.breakpoints.down('lg')]: {
                         borderLeft: 'none',
                         paddingLeft: 0,
                         width: '100%'
                     }
-                }}
-            >
+                }}>
                 {!name ? (
                     docItems.some(item => item.category === category) ? (
                         <NoResults>Select a document from the sidebar</NoResults>

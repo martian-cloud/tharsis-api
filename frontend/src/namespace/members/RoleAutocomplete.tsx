@@ -124,12 +124,14 @@ function RoleAutocomplete(props: Props) {
                     {...params}
                     placeholder='Select a role'
                     slotProps={{
+                        ...params.slotProps,
+
                         input: {
-                            ...params.InputProps,
+                            ...params.slotProps.input,
                             endAdornment: (
                                 <React.Fragment>
                                     {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                    {params.InputProps.endAdornment}
+                                    {params.slotProps.input.endAdornment}
                                 </React.Fragment>
                             ),
                         }

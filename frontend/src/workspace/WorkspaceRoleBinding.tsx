@@ -305,7 +305,11 @@ function WorkspaceRoleBinding(props: Props) {
                 </Box>
             </Paper>
 
-            <Divider light sx={{ mt: 4 }} />
+            <Divider
+                sx={{
+                    mt: 4,
+                    opacity: "0.6"
+                }} />
             <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                 <Button
                     variant="outlined"

@@ -46,7 +46,13 @@ function TerraformModuleVersionDocs({ fragmentRef }: Props) {
 
     if (!data) {
         return (
-            <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+            <Box
+                sx={{
+                    padding: 2,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center"
+                }}>
                 <Typography color="textSecondary">No documentation for this version</Typography>
             </Box>
         );
@@ -54,30 +60,30 @@ function TerraformModuleVersionDocs({ fragmentRef }: Props) {
 
     return (
         <Box
-            display="flex"
-            width="100%"
             sx={{
+                display: "flex",
+                width: "100%",
+
                 [theme.breakpoints.down('lg')]: {
                     flexDirection: 'column',
                     alignItems: 'flex-start',
                     '& > *': { mb: 4 },
                 }
-            }}
-        >
+            }}>
             <TerraformModuleVersionDocsSidebar fragmentRef={data} onItemChange={onTreeItemChange} />
             <Box
-                flex={1}
-                pl={2}
-                width="75%"
-                borderLeft={`1px solid ${theme.palette.divider}`}
                 sx={{
+                    flex: 1,
+                    pl: 2,
+                    width: "75%",
+                    borderLeft: `1px solid ${theme.palette.divider}`,
+
                     [theme.breakpoints.down('lg')]: {
                         borderLeft: 'none',
                         paddingLeft: 0,
                         width: '100%'
                     }
-                }}
-            >
+                }}>
                 {selected === 'overview' && (
                     <Box>
                         <MuiMarkdown

@@ -72,7 +72,13 @@ function AdminAreaEmailSuppressionListItem({ fragmentRef, connectionId }: Props)
     };
 
     const actions = (
-        <Box display="flex" alignItems="center" gap={1} justifyContent="flex-end">
+        <Box
+            sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                justifyContent: "flex-end"
+            }}>
             <TRNButton trn={suppression.metadata.trn} size="small" />
             <IconButton
                 aria-label="suppression options"

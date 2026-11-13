@@ -44,7 +44,12 @@ function EditFederatedRegistry({ fragmentRef }: Props) {
 
     if (!queryData.node) {
         return (
-            <Box display="flex" justifyContent="center" marginTop={4}>
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
                 <Typography color="textSecondary">Federated registry not found</Typography>
             </Box>
         );

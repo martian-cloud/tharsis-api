@@ -29,28 +29,31 @@ function VCSWorkspaceLinkSource({ data, onChange, fragmentRef }: Props) {
         }
     `, fragmentRef);
 
-    return (
-        workspace.workspaceVcsProviderLink ?
-            <Box mb={4}>
-                <Typography variant="subtitle1" gutterBottom>Select Branch</Typography>
-                <Divider light />
-                <Box mt={2}>
-                    <TextField
-                        autoComplete="off"
-                        size="small"
-                        fullWidth
-                        label="Branch"
-                        defaultValue={workspace.workspaceVcsProviderLink.branch}
-                        onChange={(event: any) => onChange({ ...data, referenceName: event.target.value })}
-                    />
-                    <Typography color="textSecondary" variant="caption" mt={1}>OPTIONAL: Enter the branch name in the repository that will trigger this run. If no branch name is entered, the run will be triggered in the VCS workspace link's default branch.</Typography>
-                </Box>
-            </Box>
-            :
-            <Alert sx={{ mb: 4 }} severity="warning">
-                This option is not available because this workspace is not linked to a VCS Provider.
-            </Alert>
-    );
+    return (workspace.workspaceVcsProviderLink ? <Box sx={{
+        mb: 4
+    }}>
+        <Typography variant="subtitle1" gutterBottom>Select Branch</Typography>
+        <Divider sx={{
+            opacity: "0.6"
+        }} />
+        <Box sx={{
+            mt: 2
+        }}>
+            <TextField
+                autoComplete="off"
+                size="small"
+                fullWidth
+                label="Branch"
+                defaultValue={workspace.workspaceVcsProviderLink.branch}
+                onChange={(event: any) => onChange({ ...data, referenceName: event.target.value })}
+            />
+            <Typography color="textSecondary" variant="caption" sx={{
+                mt: 1
+            }}>OPTIONAL: Enter the branch name in the repository that will trigger this run. If no branch name is entered, the run will be triggered in the VCS workspace link's default branch.</Typography>
+        </Box>
+    </Box> : <Alert sx={{ mb: 4 }} severity="warning">
+        This option is not available because this workspace is not linked to a VCS Provider.
+    </Alert>);
 }
 
 export default VCSWorkspaceLinkSource

@@ -149,10 +149,23 @@ function FederatedRegistryDetails({ fragmentRef }: Props) {
                 />
                 <Paper variant="outlined" sx={{ mt: 3, padding: CARD_PADDING }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-                        <Box display="flex" alignItems="center" sx={{ minWidth: 0 }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                minWidth: 0
+                            }}>
                             <FederatedRegistryIcon />
-                            <Box marginLeft={1} sx={{ minWidth: 0 }}>
-                                <Box display="flex" alignItems="center">
+                            <Box
+                                sx={{
+                                    marginLeft: 1,
+                                    minWidth: 0
+                                }}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center"
+                                    }}>
                                     <Typography variant="h5" sx={{ mr: 1, wordBreak: 'break-word' }}>{federatedRegistry.hostname}</Typography>
                                 </Box>
                             </Box>
@@ -236,9 +249,16 @@ function FederatedRegistryDetails({ fragmentRef }: Props) {
         );
     }
     else {
-        return <Box display="flex" justifyContent="center" sx={{ mt: 4 }}>
-            <Typography color="textSecondary">Federated registry with ID {federatedRegistryId} not found</Typography>
-        </Box>;
+        return (
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    mt: 4
+                }}>
+                <Typography color="textSecondary">Federated registry with ID {federatedRegistryId} not found</Typography>
+            </Box>
+        );
     }
 }
 

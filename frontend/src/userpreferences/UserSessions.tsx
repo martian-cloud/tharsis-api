@@ -44,7 +44,12 @@ function UserSessions({ fragmentRef }: Props) {
             <Typography variant="h6" gutterBottom>
                 Sessions
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            <Typography
+                variant="body2"
+                sx={{
+                    color: "text.secondary",
+                    mb: 3
+                }}>
                 Manage your active login sessions. You can revoke any session to immediately log out from that device or browser.
             </Typography>
 

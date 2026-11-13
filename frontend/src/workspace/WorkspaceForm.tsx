@@ -36,8 +36,14 @@ function WorkspaceForm({
             </Alert>}
 
             <Typography variant="subtitle1" gutterBottom>Details</Typography>
-            <Divider light />
-            <Box marginTop={2} marginBottom={2}>
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
+            <Box
+                sx={{
+                    marginTop: 2,
+                    marginBottom: 2
+                }}>
                 <TextField
                     disabled={editMode}
                     size="small"
@@ -56,7 +62,11 @@ function WorkspaceForm({
                 />
             </Box>
 
-            <Divider light sx={{ my: 3 }} />
+            <Divider
+                sx={{
+                    my: 3,
+                    opacity: "0.6"
+                }} />
             <LabelManager
                 labels={data.labels || []}
                 onSave={handleLabelsChange}

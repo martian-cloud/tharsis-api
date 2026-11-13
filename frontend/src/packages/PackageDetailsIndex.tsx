@@ -143,7 +143,12 @@ function PackageDetailsIndex(props: Props) {
     // while the selected version loads, rather than falling back to the spinner.
     return (
         <Suspense fallback={
-            <Box padding={4} display="flex" justifyContent="center">
+            <Box
+                sx={{
+                    padding: 4,
+                    display: "flex",
+                    justifyContent: "center"
+                }}>
                 <CircularProgress />
             </Box>
         }>
@@ -305,7 +310,13 @@ function PackageDetailsBody(props: BodyProps & { versionFragmentRef: PackageDeta
                 <Box sx={{ minWidth: 0 }}>
                     {tab === 'files' && (filesAvailable && version
                         ? <PackageVersionFiles versionId={version.id} />
-                        : <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+                        : <Box
+                        sx={{
+                            padding: 2,
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center"
+                        }}>
                             <Typography color="textSecondary">No files are available for this version.</Typography>
                         </Box>)}
                     {tab === 'versions' && <Suspense fallback={<ListSkeleton rowCount={3} />}>

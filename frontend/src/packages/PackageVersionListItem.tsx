@@ -46,12 +46,21 @@ function PackageVersionListItem(props: Props) {
                 }
             }}>
             <ListItemText
-                primary={<Box display="flex" alignItems="center" gap={1}>
+                primary={<Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1
+                    }}>
                     <Typography>{data.version}</Typography>
                     {data.latest && <Chip size="small" color="secondary" label="latest" />}
                     {data.status !== 'UPLOADED' && <Chip size="small" variant="outlined" color={data.status === 'ERRORED' ? 'error' : 'warning'} label={data.status} />}
                 </Box>} />
-            <Box display="flex" alignItems="center">
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center"
+                }}>
                 <Typography variant="body2" color="textSecondary" sx={{ marginRight: 1 }}>
                     <Timestamp component="span" timestamp={data.metadata.createdAt} /> by
                 </Typography>

@@ -33,7 +33,12 @@ function TerraformModuleVersionAttestListItem({ fragmentRef, onOpenDataDialog, o
     `, fragmentRef);
 
     const created = (
-        <Box display="flex" alignItems="center" gap={0.5}>
+        <Box
+            sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5
+            }}>
             <Timestamp variant="body2" timestamp={data.metadata.createdAt as string} />
             <Typography variant="body2">by</Typography>
             <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={20} />
@@ -60,7 +65,9 @@ function TerraformModuleVersionAttestListItem({ fragmentRef, onOpenDataDialog, o
 
     return (
         <ResponsiveRow cells={[
-            { primary: true, content: <Typography fontWeight={500}>{data.id.substring(0, 8)}...</Typography> },
+            { primary: true, content: <Typography sx={{
+                fontWeight: 500
+            }}>{data.id.substring(0, 8)}...</Typography> },
             { label: 'Description', content: <Typography variant="body2">{data.description}</Typography> },
             { label: 'Predicate Type', content: <Typography variant="body2">{data.predicateType}</Typography> },
             { label: 'Created', content: created },

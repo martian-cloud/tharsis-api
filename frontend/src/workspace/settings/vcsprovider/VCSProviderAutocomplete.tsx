@@ -107,12 +107,14 @@ function VCSProviderAutocomplete(props: Props) {
                     placeholder="VCS Provider"
                     label="VCS Provider"
                     slotProps={{
+                        ...params.slotProps,
+
                         input: {
-                            ...params.InputProps,
+                            ...params.slotProps.input,
                             endAdornment: (
                                 <React.Fragment>
                                     {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                    {params.InputProps.endAdornment}
+                                    {params.slotProps.input.endAdornment}
                                 </React.Fragment>
                             ),
                         }
@@ -123,7 +125,13 @@ function VCSProviderAutocomplete(props: Props) {
                 const { key, ...otherProps } = props as any;
                 return (
                     <Box component="li" key={key} {...otherProps}>
-                        <Box width="100%" display="flex" justifyContent="space-between" alignItems="center">
+                        <Box
+                            sx={{
+                                width: "100%",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center"
+                            }}>
                             <Box>
                                 <Typography>
                                     {parts.map((part: { text: string, highlight: boolean }, index: number) => (
@@ -139,7 +147,7 @@ function VCSProviderAutocomplete(props: Props) {
                             <VCSProviderTypeChip type={option.type} />
                         </Box>
                     </Box>
-                )
+                );
             }}
         />
     );

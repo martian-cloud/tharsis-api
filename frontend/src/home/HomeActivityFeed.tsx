@@ -48,7 +48,13 @@ function HomeActivityFeed() {
 
     return (
         <React.Fragment>
-            {eventCount === 0 && <Box flex={1} mt={4} display="flex" justifyContent="center">
+            {eventCount === 0 && <Box
+                sx={{
+                    flex: 1,
+                    mt: 4,
+                    display: "flex",
+                    justifyContent: "center"
+                }}>
                 <Box
                     sx={{
                         p: 4,
@@ -65,8 +71,18 @@ function HomeActivityFeed() {
                 </Box>
             </Box>}
             {eventCount > 0 && <React.Fragment>
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h6" fontWeight={600} mb={1}>Activity</Typography>
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                    }}>
+                    <Typography
+                        variant="h6"
+                        sx={{
+                            fontWeight: 600,
+                            mb: 1
+                        }}>Activity</Typography>
                     <ToggleButton
                         onChange={() => setSearchParams(!showMyActivity ? { filter: 'myActivity' } : {}, { replace: true })}
                         color="secondary"

@@ -31,7 +31,9 @@ function MaxJobDurationSetting(props: Props) {
     return (
         <Box sx={{ mb: 4 }}>
             <Typography variant="subtitle1" gutterBottom>Maximum Job Duration</Typography>
-            <Typography marginBottom={2} variant="subtitle2">Current Maximum Job Duration: {convertJobTime(maxJobData.maxJobDuration)}</Typography>
+            <Typography variant="subtitle2" sx={{
+                marginBottom: 2
+            }}>Current Maximum Job Duration: {convertJobTime(maxJobData.maxJobDuration)}</Typography>
             <Box>
                 <TextField
                     sx={{ minWidth: 250, mb: 1 }}
@@ -43,7 +45,7 @@ function MaxJobDurationSetting(props: Props) {
                 <Typography sx={{ mb: 1 }} variant="subtitle2">Jobs will timeout if they run longer than the maximum job duration. Input value is in minutes by default.</Typography>
             </Box>
         </Box>
-    )
+    );
 }
 
 export default MaxJobDurationSetting

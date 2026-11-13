@@ -197,16 +197,19 @@ function PackageAutocomplete(props: Props) {
                                         {part.text}
                                     </span>
                                 ))}
-                            primaryTypographyProps={{ noWrap: true }}
                             // undefined rather than an empty string so a package without a description
                             // renders as a single-line option instead of a blank second line.
                             secondary={description || undefined}
-                            secondaryTypographyProps={{ noWrap: true }}
                             // minWidth lets both lines clip to the row instead of widening it past the
                             // visibility chip, which is what makes noWrap take effect.
                             sx={{ minWidth: 0, mr: 1 }}
-                        />
-                        <Box flex={1} />
+                            slotProps={{
+                                primary: { noWrap: true },
+                                secondary: { noWrap: true }
+                            }} />
+                        <Box sx={{
+                            flex: 1
+                        }} />
                         {isPackageOption(option) && <Chip size="small" variant="outlined" label={option.visibility} />}
                     </ListItem>
                 );
@@ -218,12 +221,14 @@ function PackageAutocomplete(props: Props) {
                     {...params}
                     placeholder='Select or enter a package source'
                     slotProps={{
+                        ...params.slotProps,
+
                         input: {
-                            ...params.InputProps,
+                            ...params.slotProps.input,
                             endAdornment: (
                                 <React.Fragment>
                                     {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                    {params.InputProps.endAdornment}
+                                    {params.slotProps.input.endAdornment}
                                 </React.Fragment>
                             ),
                         }

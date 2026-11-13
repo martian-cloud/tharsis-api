@@ -120,7 +120,9 @@ function EditTerraformModule(props: Props) {
                 error={error}
             />
             <Divider sx={{ marginTop: 4 }} />
-            <Box marginTop={2}>
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     loading={isInFlight}
                     variant="outlined"

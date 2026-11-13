@@ -89,7 +89,9 @@ function ApprovalGateCard({ fragmentRef, connectionIds, onDecided, onError }: Pr
                         <VerifiedUserOutlinedIcon
                             sx={{ width: 18, height: 18, mr: 0.875, flexShrink: 0 }}
                         />
-                        <Typography variant="subtitle1" fontWeight={500}>
+                        <Typography variant="subtitle1" sx={{
+                            fontWeight: 500
+                        }}>
                             <Link color="inherit" to={checkPath}>
                                 Policy check
                             </Link>

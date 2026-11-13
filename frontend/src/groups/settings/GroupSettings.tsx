@@ -41,9 +41,17 @@ function GroupSettings(props: Props) {
                 childRoutes={[
                     { title: "settings", path: 'settings' },
                 ]} />
-            <Typography marginBottom={4} variant="h5" gutterBottom>Group Settings</Typography>
+            <Typography variant="h5" gutterBottom sx={{
+                marginBottom: 4
+            }}>Group Settings</Typography>
             <Suspense fallback={
-                <Box padding={4} display="flex" justifyContent="center" alignItems="center">
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center"
+                    }}>
                     <CircularProgress />
                 </Box>
             }>

@@ -75,7 +75,12 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
 
     if (!mirror) {
         return (
-            <Box display="flex" justifyContent="center" marginTop={4}>
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
                 <Typography color="textSecondary">Provider mirror with ID {mirrorId} not found</Typography>
             </Box>
         );
@@ -152,13 +157,32 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
                 ]}
             />
 
-            <Box mb={3} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+            <Box
+                sx={{
+                    mb: 3,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: 2
+                }}>
                 <Box sx={{ minWidth: 0 }}>
-                    <Box display="flex" alignItems="center" gap={1} mb={1} flexWrap="wrap">
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            mb: 1,
+                            flexWrap: "wrap"
+                        }}>
                         <Typography variant="h5" sx={{ wordBreak: 'break-word' }}>{mirror.providerAddress}</Typography>
                         <Chip label={`v${mirror.version}`} size="small" />
                     </Box>
-                    <Box display="flex" alignItems="center">
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center"
+                        }}>
                         <Typography variant="body2" color="textSecondary">
                             Cached <Timestamp component="span" timestamp={mirror.metadata?.createdAt} /> by
                         </Typography>
@@ -167,7 +191,12 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
                         </Box>
                     </Box>
                 </Box>
-                <Box display="flex" gap={1} sx={{ flexShrink: 0 }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        gap: 1,
+                        flexShrink: 0
+                    }}>
                     <TRNButton trn={mirror.metadata.trn} />
                     {!isInherited && (
                         <Button variant="outlined" color="error" onClick={() => setShowDeleteVersion(true)}>
@@ -178,7 +207,9 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
             </Box>
 
             <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                <Box padding={2}>
+                <Box sx={{
+                    padding: 2
+                }}>
                     <Typography variant="subtitle1">{platforms.length} platform{platforms.length === 1 ? '' : 's'}</Typography>
                 </Box>
             </Paper>
@@ -188,7 +219,12 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
                 </Box>
             ) : (
                 <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderTop: 0, borderBottomLeftRadius: 4, borderBottomRightRadius: 4, p: 2 }}>
-                    <Box display="flex" flexWrap="wrap" gap={1}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 1
+                        }}>
                         {platforms.map((platform) => (
                             <Chip
                                 key={platform.id}

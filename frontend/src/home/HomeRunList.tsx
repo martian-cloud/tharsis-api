@@ -117,7 +117,9 @@ function HomeRunList() {
 
     return (
         <Box>
-            <Typography variant="subtitle1" fontWeight={600}>Recent Runs</Typography>
+            <Typography variant="subtitle1" sx={{
+                fontWeight: 600
+            }}>Recent Runs</Typography>
             {edgeCount === 0 && <Box sx={{ mt: 2, mb: 2, p: 2, border: `1px dashed ${theme.palette.divider}`, borderRadius: 2 }}>
                 <Typography color="textSecondary" variant="body2">
                     There are no recent runs.

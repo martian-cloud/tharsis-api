@@ -150,7 +150,13 @@ function NamespaceList({ parentPath, header, emptyState }: Props) {
     return (
         <React.Fragment>
             {header}
-            <Box display="flex" alignItems="stretch" gap={1} sx={{ marginBottom: 2 }}>
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "stretch",
+                    gap: 1,
+                    marginBottom: 2
+                }}>
                 <SearchInput
                     placeholder="search namespaces"
                     fullWidth
@@ -174,7 +180,13 @@ function NamespaceList({ parentPath, header, emptyState }: Props) {
                         </Typography>
                     )}
                     {edges.length === 0 && !search && (emptyState ?? (
-                        <Box padding={4} display="flex" justifyContent="center" alignItems="center">
+                        <Box
+                            sx={{
+                                padding: 4,
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center"
+                            }}>
                             <Typography color="textSecondary">No subgroups or workspaces in this group</Typography>
                         </Box>
                     ))}

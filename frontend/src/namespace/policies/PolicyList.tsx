@@ -183,8 +183,21 @@ function PolicyList({ ownerId, ownerPath }: Props) {
                 </Box>
             )}
             {!hasPolicies && (
-                <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
-                    <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        marginTop: 4
+                    }}>
+                    <Box
+                        sx={{
+                            padding: 4,
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            maxWidth: 600
+                        }}>
                         <Typography variant="h6">Get started with policies</Typography>
                         <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
                             {DESCRIPTION}

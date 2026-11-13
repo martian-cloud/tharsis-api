@@ -34,7 +34,12 @@ function RegistryPackageVersionDetails(props: Props) {
     const pkg = queryData.node;
 
     return (
-        <Box component="main" flexGrow={1} minWidth={0}>
+        <Box
+            component="main"
+            sx={{
+                flexGrow: 1,
+                minWidth: 0
+            }}>
             <Suspense fallback={<Box
                 sx={{
                     width: '100%',
@@ -48,7 +53,12 @@ function RegistryPackageVersionDetails(props: Props) {
             </Box>}>
                 <PageLayoutProvider size="wide">
                     {pkg && <RegistryPackageVersionDetailsIndex pkg={pkg} />}
-                    {!pkg && <Box display="flex" justifyContent="center" marginTop={4}>
+                    {!pkg && <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            marginTop: 4
+                        }}>
                         <Typography variant="h6" color="textSecondary">
                             package not found
                         </Typography>
@@ -72,7 +82,9 @@ function RegistryPackageVersionDetailsIndex({ pkg }: { pkg: PackageNode }) {
             breadcrumbs={
                 <Breadcrumbs aria-label="breadcrumb" sx={{ marginBottom: 2 }}>
                     <Link color="inherit" to="/package-registry">package registry</Link>
-                    <Typography color="inherit">{pkg.name}</Typography>
+                    <Typography sx={{
+                        color: "inherit"
+                    }}>{pkg.name}</Typography>
                 </Breadcrumbs>
             }
             actions={pkg.metadata && <TRNButton trn={pkg.metadata.trn} size="small" />}

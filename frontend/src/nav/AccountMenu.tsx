@@ -76,7 +76,9 @@ function AccountMenu({ fragmentRef }: Props) {
                 }}
             >
                 <div>
-                    <Box padding={2}>
+                    <Box sx={{
+                        padding: 2
+                    }}>
                         <Typography>{user.username}</Typography>
                     </Box>
                     <Divider />

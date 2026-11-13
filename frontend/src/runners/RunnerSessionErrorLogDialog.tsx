@@ -147,17 +147,23 @@ function ErrorLogDialogContent(props: ErrorLogDialogContentProps) {
     }
 
     return (
-        <Box display="flex" flexDirection="column" flex={1}>
+        <Box
+            sx={{
+                display: "flex",
+                flexDirection: "column",
+                flex: 1
+            }}>
             <Paper square>
                 <Box
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    paddingLeft={2}
-                    paddingRight={2}
-                    paddingTop={1}
-                    paddingBottom={1}
-                >
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        paddingLeft: 2,
+                        paddingRight: 2,
+                        paddingTop: 1,
+                        paddingBottom: 1
+                    }}>
                     <Typography>
                         {errorCount} error{errorCount === 1 ? '' : 's'}
                     </Typography>
@@ -166,8 +172,21 @@ function ErrorLogDialogContent(props: ErrorLogDialogContentProps) {
                     </Typography>}
                 </Box>
             </Paper>
-            <Box display="flex" flexDirection="column" flex={1} position="relative">
-                <Box position="absolute" top={0} left={0} width="100%" height="100%">
+            <Box
+                sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    flex: 1,
+                    position: "relative"
+                }}>
+                <Box
+                    sx={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: "100%"
+                    }}>
                     <LogViewer
                         logs={logs}
                         scrollMode="container"

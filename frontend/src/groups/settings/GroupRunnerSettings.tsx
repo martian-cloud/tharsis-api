@@ -123,7 +123,9 @@ function GroupRunnerSettings({ fragmentRef }: Props) {
                         fragmentRef={data.runnerTags}
                         error={error}
                     />}
-                <Box marginTop={3}>
+                <Box sx={{
+                    marginTop: 3
+                }}>
                     <Button
                         size="small"
                         loading={isInFlight}

@@ -101,7 +101,9 @@ function LabelEditor({
                                 helperText={getFieldError(index, 'key')}
                                 disabled={disabled}
                                 sx={{ width: '100%' }}
-                                inputProps={{ maxLength: 63 }}
+                                slotProps={{
+                                    htmlInput: { maxLength: 63 }
+                                }}
                             />
                         </Box>
                         <Box sx={{ flex: 2 }}>
@@ -115,7 +117,9 @@ function LabelEditor({
                                 helperText={getFieldError(index, 'value')}
                                 disabled={disabled}
                                 sx={{ width: '100%' }}
-                                inputProps={{ maxLength: 255 }}
+                                slotProps={{
+                                    htmlInput: { maxLength: 255 }
+                                }}
                             />
                         </Box>
                         <IconButton

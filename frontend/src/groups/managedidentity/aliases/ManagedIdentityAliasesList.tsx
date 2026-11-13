@@ -49,7 +49,13 @@ function ManagedIdentityAliasesList({ fragmentRef }: Props) {
     return (edges.length > 0) ?
         <Box>
             <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                <Box
+                    sx={{
+                        padding: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between"
+                    }}>
                     <Typography variant="subtitle1">
                     {edges.length} alias{edges.length === 1 ? '' : 'es'}</Typography>
                 </Box>
@@ -72,7 +78,7 @@ function ManagedIdentityAliasesList({ fragmentRef }: Props) {
         :
         <Paper sx={{ p: 2 }}>
             <Typography>No aliases exist for this managed identity</Typography>
-        </Paper>
+        </Paper>;
 }
 
 export default ManagedIdentityAliasesList

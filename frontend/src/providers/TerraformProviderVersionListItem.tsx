@@ -45,11 +45,19 @@ function TerraformProviderVersionListItem(props: Props) {
                 }
             }}>
             <ListItemText
-                primary={<Box display="flex" alignItems="center">
+                primary={<Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center"
+                    }}>
                     <Typography>{data.version}</Typography>
                     {data.latest && <Chip size="small" color="secondary" sx={{ marginLeft: 1 }} label="latest" />}
                 </Box>} />
-            <Box display="flex" alignItems="center">
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center"
+                }}>
                 <Typography variant="body2" color="textSecondary" sx={{ marginRight: 1 }}>
                     <Timestamp component="span" timestamp={data.metadata.createdAt} /> by
                 </Typography>

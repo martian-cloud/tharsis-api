@@ -289,7 +289,12 @@ function RunDetailsApplyStage(props: Props) {
         // Speculative and assessment runs have no apply stage; the sidebar never links
         // here, so this only renders on direct URL navigation.
         return (
-            <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
                 <Typography color="textSecondary">This run does not have an apply stage</Typography>
             </Box>
         );
@@ -339,7 +344,9 @@ function RunDetailsApplyStage(props: Props) {
     } else if (apply.status === 'finished') {
         statusCardContent = <React.Fragment>
             <RunDetailsPlanSummary fragmentRef={data.plan} ml={-2} mr={-2} completed={true} />
-            <Box mt={2}>
+            <Box sx={{
+                mt: 2
+            }}>
                 <Link color="secondary" to={'../plan?tab=changes'}>View changes</Link>
             </Box>
         </React.Fragment>;
@@ -383,7 +390,9 @@ function RunDetailsApplyStage(props: Props) {
                         <Tab label="Resource Usage" value="resources" />
                     </Tabs>
                 </Box>
-                {tab === 'logs' && <Box marginTop={2}>
+                {tab === 'logs' && <Box sx={{
+                    marginTop: 2
+                }}>
                     {viewingEarlierJob && <Alert severity="warning" sx={{ my: 2 }}>
                         Showing logs for an earlier job{' '}
                         <Link color="inherit" to={'?tab=logs'}>(view latest job)</Link>
@@ -391,21 +400,29 @@ function RunDetailsApplyStage(props: Props) {
                     {logsAvailable && effectiveJobId && <Suspense fallback={<Box sx={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress /></Box>}>
                         <JobLogs jobId={effectiveJobId} />
                     </Suspense>}
-                    {!(logsAvailable && effectiveJobId) && (jobPending ? <RunDetailsStageLogsPending /> : <Box marginTop={2}>
+                    {!(logsAvailable && effectiveJobId) && (jobPending ? <RunDetailsStageLogsPending /> : <Box sx={{
+                        marginTop: 2
+                    }}>
                         <RunDetailsStageTabEmptyState message={logsEmptyMessage} />
                     </Box>)}
                 </Box>}
-                {tab === 'variables' && <Box marginTop={2}>
+                {tab === 'variables' && <Box sx={{
+                    marginTop: 2
+                }}>
                     <RunVariables fragmentRef={data} />
                 </Box>}
                 {tab === 'state' && (data.stateVersion ?
                     <Suspense fallback={<Box sx={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress /></Box>}>
                         <StateVersionFile fragmentRef={data.stateVersion} />
                     </Suspense> :
-                    <Box marginTop={2}>
+                    <Box sx={{
+                        marginTop: 2
+                    }}>
                         <RunDetailsStageTabEmptyState message={stateEmptyMessage} />
                     </Box>)}
-                {tab === 'resources' && <Box marginTop={2}>
+                {tab === 'resources' && <Box sx={{
+                    marginTop: 2
+                }}>
                     {data.apply?.currentJob ? <JobResourceUsageMetrics
                         fragmentRef={data.apply.currentJob}
                         columns="single"

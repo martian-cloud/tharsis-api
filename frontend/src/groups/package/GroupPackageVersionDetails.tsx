@@ -38,9 +38,19 @@ function GroupPackageVersionDetails() {
     const pkg = queryData.node;
 
     return (
-        <Box component="main" flexGrow={1} minWidth={0}>
+        <Box
+            component="main"
+            sx={{
+                flexGrow: 1,
+                minWidth: 0
+            }}>
             {pkg && <GroupPackageVersionDetailsIndex pkg={pkg} />}
-            {!pkg && <Box display="flex" justifyContent="center" marginTop={4}>
+            {!pkg && <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
                 <Typography variant="h6" color="textSecondary">
                     package not found
                 </Typography>

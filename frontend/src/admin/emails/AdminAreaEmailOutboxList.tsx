@@ -131,7 +131,9 @@ function AdminAreaEmailOutboxListContent() {
             <Typography variant="h5" gutterBottom>Email Outbox</Typography>
             <Typography variant="body2" sx={{ mb: 2 }}>{DESCRIPTION}</Typography>
 
-            <Box marginBottom={2}>
+            <Box sx={{
+                marginBottom: 2
+            }}>
                 <SearchInput
                     fullWidth
                     placeholder="Search by subject"
@@ -141,7 +143,13 @@ function AdminAreaEmailOutboxListContent() {
             </Box>
 
             <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                <Box
+                    sx={{
+                        padding: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between"
+                    }}>
                     <Typography variant="subtitle1">
                         {totalCount} {totalCount === 1 ? 'email' : 'emails'}
                     </Typography>
@@ -182,7 +190,9 @@ function AdminAreaEmailOutboxListContent() {
                 borderBottomRightRadius: 4,
             }}>
                 {outboxes.length === 0 ? (
-                    <Typography align="center" color="textSecondary" padding={4}>
+                    <Typography align="center" color="textSecondary" sx={{
+                        padding: 4
+                    }}>
                         {search ? <>No emails matching <strong>{search}</strong></> : 'No emails to show'}
                     </Typography>
                 ) : (

@@ -203,7 +203,12 @@ const ConfigRow = memo(function ConfigRow({ field, text, code, sensitive, mobile
             <JsonBlock json={text} />
         </Box>
     ) : (
-        <Box display="flex" alignItems="center" gap={0.5}>
+        <Box
+            sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5
+            }}>
             {masked
                 ? <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>••••••••</Typography>
                 : <Typography variant="body2" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{text}</Typography>}
@@ -279,7 +284,13 @@ function AdminAreaConfigurationSettings() {
                 Read-only view of the running API server configuration.
             </Typography>
 
-            <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                    mb: 2
+                }}>
                 {viewMode === 'table' && (
                     <SearchInput
                         fullWidth

@@ -223,7 +223,9 @@ function GroupPackageList({ group, queryRef, search = '' }: InnerProps) {
                     </Box>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', marginTop: 2, marginBottom: 2 }}>
-                    <Box flex={1}>
+                    <Box sx={{
+                        flex: 1
+                    }}>
                         <SearchInput
                             fullWidth
                             defaultValue={search}
@@ -234,7 +236,13 @@ function GroupPackageList({ group, queryRef, search = '' }: InnerProps) {
                     </Box>
                 </Box>
                 <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                    <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                    <Box
+                        sx={{
+                            padding: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between"
+                        }}>
                         <Typography variant="subtitle1">
                             {edges.length} package{edges.length === 1 ? '' : 's'}
                         </Typography>
@@ -280,8 +288,21 @@ function GroupPackageList({ group, queryRef, search = '' }: InnerProps) {
                 Are you sure you want to delete package <strong>{packageToDelete.name}</strong>? All of
                 its versions will be deleted as well.
             </ConfirmationDialog>}
-            {!hasPackages && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+            {!hasPackages && <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        maxWidth: 600
+                    }}>
                     <Typography variant="h6">No packages found</Typography>
                     <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
                         {DESCRIPTION}

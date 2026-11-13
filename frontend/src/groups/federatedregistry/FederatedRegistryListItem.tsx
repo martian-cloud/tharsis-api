@@ -52,13 +52,12 @@ function FederatedRegistryListItem({ fragmentRef }: Props) {
                 }}
                 primary={<Box>
                     <Typography
-                        fontWeight={500}
                         noWrap={false}
                         sx={{
+                            fontWeight: 500,
                             wordBreak: 'break-word',
                             maxWidth: '100%'
-                        }}
-                    >
+                        }}>
                         {data.hostname}
                     </Typography>
                 </Box>} />

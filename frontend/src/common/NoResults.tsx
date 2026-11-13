@@ -9,7 +9,14 @@ interface Props {
 function NoResults({ sx, children }: Props) {
   return (
     <Paper variant="outlined" sx={{ display: 'flex', justifyContent: 'center', background: 'inherit', ...sx }}>
-      <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
+      <Box
+        sx={{
+          padding: 4,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center"
+        }}>
         <Typography color="textSecondary" align="center">
           {children}
         </Typography>

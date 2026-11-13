@@ -33,7 +33,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function VersionId({ id, to, toolTip }: { id: string, to: string, toolTip: string }) {
     return (
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{
+            alignItems: "center"
+        }}>
             <Link color="secondary" underline="hover" to={to} sx={{ fontFamily: 'monospace', fontSize: 16 }}>
                 {shortId(id)}
             </Link>
@@ -170,7 +172,9 @@ function WorkspaceDetailsStatusPanel({ fragmentRef }: Props) {
             }}>
                 <Stack spacing={1} sx={{ px: 2.5, py: 2 }}>
                     <SectionLabel>State Version</SectionLabel>
-                    <Stack direction="row" spacing={1} alignItems="baseline">
+                    <Stack direction="row" spacing={1} sx={{
+                        alignItems: "baseline"
+                    }}>
                         <Typography sx={{ fontSize: 32, fontWeight: 600, lineHeight: 1 }}>
                             {resourceCount}
                         </Typography>
@@ -211,7 +215,9 @@ function WorkspaceDetailsStatusPanel({ fragmentRef }: Props) {
                         <Box sx={{ fontSize: 16 }}>
                             <ModuleSourceLink fragmentRef={sourceRun} />
                         </Box>
-                        <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack direction="row" spacing={1} sx={{
+                            alignItems: "center"
+                        }}>
                             <Typography variant="body2" color="textSecondary">Version</Typography>
                             <Chip size="small" label={sourceRun.moduleVersion} />
                         </Stack>

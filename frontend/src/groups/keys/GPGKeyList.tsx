@@ -139,7 +139,9 @@ function GPGKeyList(props: Props) {
                 ]}
             />
             {edges.length !== 0 && <Box>
-                <Box marginBottom={2}>
+                <Box sx={{
+                    marginBottom: 2
+                }}>
                     <Box sx={{
                         display: 'flex',
                         flexDirection: 'row',
@@ -164,7 +166,13 @@ function GPGKeyList(props: Props) {
                     </Box>
                 </Box>
                 <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                    <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                    <Box
+                        sx={{
+                            padding: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between"
+                        }}>
                         <Typography variant="subtitle1">
                             {data?.gpgKeys.totalCount} key{data?.gpgKeys.totalCount === 1 ? '' : 's'}
                         </Typography>
@@ -186,8 +194,21 @@ function GPGKeyList(props: Props) {
                     </List>
                 </InfiniteScroll>
             </Box>}
-            {edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+            {edges.length === 0 && <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        maxWidth: 600
+                    }}>
                     <Typography variant="h6">This group does not have any GPG Keys</Typography>
                     <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
                         {DESCRIPTION}

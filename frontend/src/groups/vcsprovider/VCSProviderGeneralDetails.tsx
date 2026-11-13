@@ -34,8 +34,16 @@ function VCSProviderGeneralDetails({ editMode, data, onChange }: Props) {
         <Box>
             <Typography variant="subtitle1" gutterBottom>VCS Provider</Typography>
             {!editMode && <Typography sx={{ mb: 2 }} variant="subtitle2" color="textSecondary">Select a VCS Provider type. Tharsis supports the following VCS providers:</Typography>}
-            <Divider light />
-            <Stack marginTop={2} marginBottom={2} direction="row" spacing={2}>
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
+            <Stack
+                direction="row"
+                spacing={2}
+                sx={{
+                    marginTop: 2,
+                    marginBottom: 2
+                }}>
                 {VCSProviderTypes.map(type => <PanelButton
                     key={type.name}
                     disabled={editMode}
@@ -48,8 +56,14 @@ function VCSProviderGeneralDetails({ editMode, data, onChange }: Props) {
             </Stack>
             <Typography sx={{ mt: 2 }} variant="subtitle1" gutterBottom>Provider Details</Typography>
             {!editMode && <Typography sx={{ mb: 2 }} variant="subtitle2" color="textSecondary">Choose a unique name as a group can have multiple instances of a VCS provider.</Typography>}
-            <Divider light />
-            <Box marginTop={2} marginBottom={2}>
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
+            <Box
+                sx={{
+                    marginTop: 2,
+                    marginBottom: 2
+                }}>
                 <TextField
                     disabled={editMode}
                     size="small" fullWidth
@@ -69,8 +83,14 @@ function VCSProviderGeneralDetails({ editMode, data, onChange }: Props) {
             {!!data.type && <React.Fragment>
                 <Typography sx={{ mt: 2 }} variant="subtitle1" gutterBottom>URL &#x28;optional&#x29;</Typography>
                 {!editMode && <Typography sx={{ mb: 2 }} variant="subtitle2" color="textSecondary">You may enter an API URL. If no URL is entered, Tharsis will use the selected provider type's publicly available API URL.</Typography>}
-                <Divider light />
-                <Box marginTop={2} marginBottom={2}>
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
+                <Box
+                    sx={{
+                        marginTop: 2,
+                        marginBottom: 2
+                    }}>
                     <TextField
                         disabled={editMode}
                         size="small" fullWidth
@@ -81,8 +101,14 @@ function VCSProviderGeneralDetails({ editMode, data, onChange }: Props) {
                 </Box>
                 <Typography sx={{ mt: 2 }} variant="subtitle1" gutterBottom>Automatically create webhooks?</Typography>
                 <Typography sx={{ mb: 2 }} variant="subtitle2" color="textSecondary">Webhooks allow runs to be made automatically in response to new commits to a branch.</Typography>
-                <Divider light />
-                <Box marginTop={2} marginBottom={2}>
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
+                <Box
+                    sx={{
+                        marginTop: 2,
+                        marginBottom: 2
+                    }}>
                     <FormControlLabel
                         disabled={editMode}
                         label={data.autoCreateWebhooks ? "Yes" : "No"}
@@ -95,10 +121,12 @@ function VCSProviderGeneralDetails({ editMode, data, onChange }: Props) {
                         }
                     />
                 </Box>
-                <Divider light/>
+                <Divider sx={{
+                    opacity: "0.6"
+                }}/>
             </React.Fragment>}
         </Box>
-    )
+    );
 }
 
 export default VCSProviderGeneralDetails

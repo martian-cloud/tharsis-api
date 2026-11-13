@@ -55,8 +55,15 @@ function TerraformProviderVersionDetails(props: Props) {
   const queryData = usePreloadedQuery<TerraformProviderVersionDetailsQuery>(query, queryRef);
 
   return (
-    <Box display="flex">
-      <Box component="main" flexGrow={1} minWidth={0}>
+    <Box sx={{
+      display: "flex"
+    }}>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          minWidth: 0
+        }}>
         <Suspense fallback={<Box
           sx={{
             width: '100%',
@@ -70,7 +77,12 @@ function TerraformProviderVersionDetails(props: Props) {
         </Box>}>
           <PageLayoutProvider size="wide">
             {queryData.terraformProviderVersion && <TerraformProviderVersionDetailsIndex fragmentRef={queryData.terraformProviderVersion} />}
-            {!queryData.terraformProviderVersion && <Box display="flex" justifyContent="center" marginTop={4}>
+            {!queryData.terraformProviderVersion && <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                marginTop: 4
+              }}>
               <Typography variant="h6" color="textSecondary">
                 version <strong>{version || 'latest'}</strong> not found for provider <strong>{registryNamespace}/{providerName}</strong>
               </Typography>
@@ -142,7 +154,9 @@ function TerraformProviderVersionDetailsIndex(props: IndexProps) {
         onClose={onToggleSidebar}
       />
       <Box>
-        <Box paddingRight={!mobile ? `${SidebarWidth}px` : 0}>
+        <Box sx={{
+          paddingRight: !mobile ? `${SidebarWidth}px` : 0
+        }}>
           {(!data.shaSumsUploaded || !data.shaSumsSigUploaded) && <Alert sx={{ marginBottom: 2 }} severity="warning">
             This provider version is missing the required checksum files
           </Alert>}
@@ -156,8 +170,18 @@ function TerraformProviderVersionDetailsIndex(props: IndexProps) {
               gap: { xs: 2 }
             }}
           >
-            <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-              <Box display="flex" alignItems="center">
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                width: "100%"
+              }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center"
+                }}>
                 <Typography variant="h6">{data.provider.registryNamespace} / {data.provider.name}</Typography>
                 {data.provider.private && <Chip sx={{ marginLeft: 2 }} variant="outlined" color="warning" size="small" label="private" />}
               </Box>
@@ -181,13 +205,19 @@ function TerraformProviderVersionDetailsIndex(props: IndexProps) {
           </Box>
           <React.Fragment>
             {tab === 'docs' && <Suspense fallback={<ListSkeleton rowCount={3} />}><TerraformProviderVersionDocs fragmentRef={data} /></Suspense>}
-            {tab === 'usage' && <Box marginTop={2} position="relative">
+            {tab === 'usage' && <Box
+              sx={{
+                marginTop: 2,
+                position: "relative"
+              }}>
               <IconButton sx={{ padding: 2, position: 'absolute', top: 0, right: 0 }} onClick={() => navigator.clipboard.writeText(usageInfo)}>
                 <CopyIcon sx={{ width: 16, height: 16 }} />
               </IconButton>
               <SyntaxHighlighter wrapLines customStyle={{ fontSize: 14 }} language="hcl" style={prismTheme} children={usageInfo} />
             </Box>}
-            {tab === 'versions' && <Box marginTop={2}>
+            {tab === 'versions' && <Box sx={{
+              marginTop: 2
+            }}>
               <Suspense fallback={<ListSkeleton rowCount={3} />}>
                 <TerraformProviderVersionList fragmentRef={data.provider} />
               </Suspense>

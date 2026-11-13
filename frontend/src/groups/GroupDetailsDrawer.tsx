@@ -1,4 +1,4 @@
-import MembersIcon from '@mui/icons-material/PeopleOutline';
+import MembersIcon from '@mui/icons-material/PeopleOutlined';
 import SettingsIcon from '@mui/icons-material/SettingsOutlined';
 import ActivityIcon from '@mui/icons-material/TimelineOutlined';
 import VariablesIcon from '@mui/icons-material/WindowOutlined';

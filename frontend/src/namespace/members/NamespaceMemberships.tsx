@@ -93,7 +93,13 @@ function NamespaceMembershipsIndex(props: NamespaceMembershipsIndexProps) {
                 onChange={onSearchChange}
             />
             <Suspense fallback={
-                <Box padding={4} display="flex" justifyContent="center" alignItems="center">
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center"
+                    }}>
                     <CircularProgress />
                 </Box>
             }>

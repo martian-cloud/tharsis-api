@@ -147,12 +147,13 @@ function EditVariableDialog(props: Props) {
             open={!!variable}
         >
             <Box
-                display="flex"
-                justifyContent="space-between"
-                paddingTop={2}
-                paddingLeft={3}
-                paddingRight={3}
-            >
+                sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    paddingTop: 2,
+                    paddingLeft: 3,
+                    paddingRight: 3
+                }}>
                 <Box>
                     <Typography variant="h6">
                         {editMode ? 'Edit' : 'New'} {editedVariable.category === 'terraform' ? 'Terraform' : 'Environment'} Variable

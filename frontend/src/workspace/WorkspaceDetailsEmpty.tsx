@@ -24,7 +24,14 @@ function WorkspaceDetailsEmpty(props: Props) {
     return (
         <React.Fragment>
             <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center"
+                    }}>
                     <Typography color="textSecondary" variant="h6" align="center" gutterBottom>
                         This workspace is empty
                     </Typography>
@@ -36,19 +43,36 @@ function WorkspaceDetailsEmpty(props: Props) {
 
             <Typography variant="h6" color="textSecondary" sx={{ marginBottom: 2 }}>Get started using the CLI</Typography>
 
-            <Box mb={2}>
+            <Box sx={{
+                mb: 2
+            }}>
                 <Typography variant="subtitle1">Login using your SSO credentials</Typography>
                 <Paper>
-                    <Box component="pre" padding={2} marginTop={0} marginBottom={0}>
+                    <Box
+                        component="pre"
+                        sx={{
+                            padding: 2,
+                            marginTop: 0,
+                            marginBottom: 0
+                        }}>
                         tharsis sso login
                     </Box>
                 </Paper>
             </Box>
 
-            <Box mb={2}>
+            <Box sx={{
+                mb: 2
+            }}>
                 <Typography variant="subtitle1">Apply a local configuration version</Typography>
                 <Paper>
-                    <Box component="pre" padding={2} marginTop={0} marginBottom={0} whiteSpace="pre-line">
+                    <Box
+                        component="pre"
+                        sx={{
+                            padding: 2,
+                            marginTop: 0,
+                            marginBottom: 0,
+                            whiteSpace: "pre-line"
+                        }}>
                         tharsis apply --directory-path &lt;path-to-configuration-version&gt; {data.fullPath}
                     </Box>
                 </Paper>
@@ -57,7 +81,14 @@ function WorkspaceDetailsEmpty(props: Props) {
             <Box>
                 <Typography variant="subtitle1">Apply a module from a module registry</Typography>
                 <Paper>
-                    <Box component="pre" padding={2} marginTop={0} marginBottom={0} whiteSpace="pre-line">
+                    <Box
+                        component="pre"
+                        sx={{
+                            padding: 2,
+                            marginTop: 0,
+                            marginBottom: 0,
+                            whiteSpace: "pre-line"
+                        }}>
                         tharsis apply --module-source &lt;module-source-path&gt; {data.fullPath}
                     </Box>
                 </Paper>

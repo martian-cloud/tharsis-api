@@ -138,14 +138,15 @@ function JobLogsContent(props: { fragmentRef: JobLogsFragment_logs$key, scrollMo
         <Box>
             <Paper square>
                 <Box
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    paddingLeft={2}
-                    paddingRight={2}
-                    paddingTop={1}
-                    paddingBottom={1}
-                >
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        paddingLeft: 2,
+                        paddingRight: 2,
+                        paddingTop: 1,
+                        paddingBottom: 1
+                    }}>
                     {data.logLastUpdatedAt && <Typography color="textSecondary">
                         last updated <Timestamp timestamp={data.logLastUpdatedAt as string} />
                     </Typography>}

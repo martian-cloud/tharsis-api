@@ -1,5 +1,5 @@
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlined';
 import { Alert, Box, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { Suspense, useMemo, useState } from 'react';
@@ -39,7 +39,9 @@ const StatusMessage = ({
     workspacePath: string
 }) => (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
-        <Typography color="textSecondary" mr={1}>
+        <Typography color="textSecondary" sx={{
+            mr: 1
+        }}>
             {isInProgress ? 'Drift detection started' : 'Drift last checked'}{' '}
             <Timestamp
                 component="span"
@@ -178,7 +180,14 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
 
             {isAssessmentInProgress && (
                 <Paper variant="outlined" sx={{ marginTop: 2, display: "flex", justifyContent: "center" }}>
-                    <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
+                    <Box
+                        sx={{
+                            padding: 4,
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "center",
+                            alignItems: "center"
+                        }}>
                         <CircularProgress size={24} sx={{ mb: 2 }} />
                         <Typography color="textSecondary" align="center">
                             Drift detection is in progress
@@ -189,7 +198,14 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
 
             {data.assessment && !isAssessmentInProgress && assessmentRunFailed && (
                 <Paper variant="outlined" sx={{ marginTop: 2, display: "flex", justifyContent: "center" }}>
-                    <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
+                    <Box
+                        sx={{
+                            padding: 4,
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "center",
+                            alignItems: "center"
+                        }}>
                         <ErrorOutlineIcon color="error" sx={{ mb: 1 }} />
                         <Typography color="error" align="center">
                             The most recent drift detection run failed, so drift status could not be determined
@@ -230,7 +246,13 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
 
             {data.assessment && !isAssessmentInProgress && !assessmentRunFailed && !data.assessment.hasDrift && (
                 <Paper variant="outlined" sx={{ marginTop: 2, display: "flex", justifyContent: "center" }}>
-                    <Box padding={4} flexDirection="column" justifyContent="center" alignItems="center">
+                    <Box
+                        sx={{
+                            padding: 4,
+                            flexDirection: "column",
+                            justifyContent: "center",
+                            alignItems: "center"
+                        }}>
                         <Typography color="textSecondary">
                             No drift detected for this workspace
                         </Typography>
@@ -240,7 +262,14 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
 
             {!data.assessment && (
                 <Paper variant="outlined" sx={{ marginTop: 4, display: "flex", justifyContent: "center" }}>
-                    <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
+                    <Box
+                        sx={{
+                            padding: 4,
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "center",
+                            alignItems: "center"
+                        }}>
                         <Typography variant="h6">
                             This workspace has not been checked for drift
                         </Typography>

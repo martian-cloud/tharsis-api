@@ -260,9 +260,13 @@ function TraceContent({ queryRef }: { queryRef: PreloadedQuery<AgentSessionTrace
 
     if (!trace) {
         return (
-            <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                No trace data available.
-            </Typography>
+            <Typography
+                sx={{
+                    color: "text.secondary",
+                    py: 2,
+                    textAlign: 'center'
+                }}>No trace data available.
+                            </Typography>
         );
     }
 
@@ -310,9 +314,13 @@ function AgentSessionTraceViewer({ sessionId, fetchKey = 0 }: { sessionId: strin
 
     if (!selectedRunId) {
         return (
-            <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                No runs yet.
-            </Typography>
+            <Typography
+                sx={{
+                    color: "text.secondary",
+                    py: 2,
+                    textAlign: 'center'
+                }}>No runs yet.
+                            </Typography>
         );
     }
 
@@ -333,7 +341,12 @@ function AgentSessionTraceViewer({ sessionId, fetchKey = 0 }: { sessionId: strin
                 </Select>
             )}
             {!canShowTrace ? (
-                <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                <Typography
+                    sx={{
+                        color: "text.secondary",
+                        py: 2,
+                        textAlign: 'center'
+                    }}>
                     Run is still in progress. Refresh to view trace when the run completes.
                 </Typography>
             ) : traceQueryRef ? (

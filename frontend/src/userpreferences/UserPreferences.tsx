@@ -41,10 +41,12 @@ function UserPreferences({ queryRef }: Props) {
 
     return (
         <PageLayoutProvider>
-            <Typography marginBottom={4} variant="h5" gutterBottom>
+            <Typography variant="h5" gutterBottom sx={{
+                marginBottom: 4
+            }}>
                 Preferences
             </Typography>
-            
+
             <PreferenceSection title="Notifications">
                 <GlobalNotificationPreference fragmentRef={data.userPreferences.globalPreferences} />
             </PreferenceSection>
