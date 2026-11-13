@@ -69,7 +69,9 @@ function AdminAreaAnnouncementForm({ data, onChange, editMode, error }: Props) {
                 </Box>
             )}
 
-            <Typography mt={2} variant="subtitle1" gutterBottom>Details</Typography>
+            <Typography variant="subtitle1" gutterBottom sx={{
+                mt: 2
+            }}>Details</Typography>
             <Divider />
             <Box sx={{ mt: 2, mb: 2 }}>
                 <TextField
@@ -138,7 +140,9 @@ function AdminAreaAnnouncementForm({ data, onChange, editMode, error }: Props) {
                         />
                     </LocalizationProvider>
                     {data.startTime?.isValid() && (
-                        <Typography mt={1} variant="caption" color="textSecondary">
+                        <Typography variant="caption" color="textSecondary" sx={{
+                            mt: 1
+                        }}>
                             This announcement {data.startTime.isBefore(moment()) ? 'became active' : 'will become active'}{' '}
                             <Timestamp
                                 timestamp={data.startTime.toISOString()}
@@ -147,7 +151,9 @@ function AdminAreaAnnouncementForm({ data, onChange, editMode, error }: Props) {
                         </Typography>
                     )}
                     {!data.startTime && (
-                        <Typography mt={1} variant="caption" color="textSecondary">
+                        <Typography variant="caption" color="textSecondary" sx={{
+                            mt: 1
+                        }}>
                             This announcement will become active immediately when saved.
                         </Typography>
                     )}
@@ -171,7 +177,9 @@ function AdminAreaAnnouncementForm({ data, onChange, editMode, error }: Props) {
                         />
                     </LocalizationProvider>
                     {data.endTime?.isValid() && (
-                        <Typography mt={1} variant="caption" color="textSecondary">
+                        <Typography variant="caption" color="textSecondary" sx={{
+                            mt: 1
+                        }}>
                             This announcement {data.endTime.isBefore(moment()) ? 'expired' : 'will expire'}{' '}
                             <Timestamp
                                 timestamp={data.endTime.toISOString()}
@@ -180,7 +188,9 @@ function AdminAreaAnnouncementForm({ data, onChange, editMode, error }: Props) {
                         </Typography>
                     )}
                     {!data.endTime && (
-                        <Typography mt={1} variant="caption" color="textSecondary">
+                        <Typography variant="caption" color="textSecondary" sx={{
+                            mt: 1
+                        }}>
                             This announcement will remain active indefinitely until manually deleted.
                         </Typography>
                     )}

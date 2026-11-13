@@ -53,7 +53,9 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
     return (
         <Paper sx={{ p: 2 }}>
             <Typography variant="caption" color="textSecondary">{label}</Typography>
-            <Box mt={0.5}>{children}</Box>
+            <Box sx={{
+                mt: 0.5
+            }}>{children}</Box>
         </Paper>
     );
 }
@@ -62,7 +64,12 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 function StatCard({ label, value, color, description }: { label: string; value: number; color?: string; description?: string }) {
     return (
         <Paper sx={{ p: 2 }}>
-            <Box display="flex" alignItems="center" gap={0.5}>
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.5
+                }}>
                 <Typography variant="caption" color="textSecondary">{label}</Typography>
                 {description && (
                     <Tooltip title={description}>
@@ -96,7 +103,12 @@ function AdminAreaEmailOutboxDetailsContent() {
         return (
             <Box>
                 <AdminAreaBreadcrumbs childRoutes={breadcrumbs} />
-                <Box display="flex" justifyContent="center" sx={{ mt: 4 }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        mt: 4
+                    }}>
                     <Typography color="textSecondary">Email not found</Typography>
                 </Box>
             </Box>
@@ -128,13 +140,30 @@ function AdminAreaEmailOutboxDetailsContent() {
                     '& > *': { mb: 2 },
                 },
             }}>
-                <Box display="flex" alignItems="center" mb={2} sx={{ minWidth: 0 }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        mb: 2,
+                        minWidth: 0
+                    }}>
                     <EmailOutlinedIcon sx={{ mr: 2 }} />
                     <Box sx={{ minWidth: 0 }}>
-                        <Box display="flex" alignItems="center" gap={1}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1
+                            }}>
                             <Typography variant="h5" sx={{ wordBreak: 'break-word' }}>{outbox.subject}</Typography>
                         </Box>
-                        <Box display="flex" alignItems="center" flexWrap="wrap" gap={0.5}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                flexWrap: "wrap",
+                                gap: 0.5
+                            }}>
                             <Typography variant="caption" color="textSecondary">
                                 Created <Timestamp timestamp={outbox.metadata.createdAt} />
                             </Typography>
@@ -160,7 +189,13 @@ function AdminAreaEmailOutboxDetailsContent() {
                 </InfoCard>
                 <InfoCard label="Status">
                     {statusMeta ? (
-                        <Typography color="textSecondary" display="flex" alignItems="center" gap={0.5}>
+                        <Typography
+                            color="textSecondary"
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5
+                            }}>
                             <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: statusMeta.color, display: 'inline-block' }} />
                             {statusMeta.label}
                         </Typography>

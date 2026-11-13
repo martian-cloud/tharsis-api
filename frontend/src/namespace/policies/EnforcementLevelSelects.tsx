@@ -31,7 +31,13 @@ function EnforcementLevelSelects({
 }: Props) {
     return (
         <>
-            {disabled && <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 1 }}>
+            {disabled && <Typography
+                variant="caption"
+                color="textSecondary"
+                sx={{
+                    display: "block",
+                    mb: 1
+                }}>
                 Post-apply policies can only be enforced at Advisory: state has already been written by the time this stage evaluates, so there is no run outcome left for a stronger level to block.
             </Typography>}
             <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 1 }}>

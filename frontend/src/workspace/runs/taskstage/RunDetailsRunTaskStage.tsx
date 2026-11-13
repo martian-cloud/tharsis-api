@@ -78,7 +78,12 @@ function RunDetailsRunTaskStage(props: Props) {
         // policy stage; the sidebar never links here, so this only renders on direct URL
         // navigation.
         return (
-            <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
                 <Typography color="textSecondary">
                     This run does not have a {stageLabel(props.stageName)} policy stage
                 </Typography>
@@ -89,7 +94,12 @@ function RunDetailsRunTaskStage(props: Props) {
     if (checks.length === 0) {
         // The policy stage exists but has no policy checks to display.
         return (
-            <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
                 <Typography color="textSecondary">This policy stage has no checks</Typography>
             </Box>
         );

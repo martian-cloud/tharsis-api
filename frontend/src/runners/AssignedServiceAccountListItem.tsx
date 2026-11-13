@@ -45,7 +45,14 @@ function AssignedServiceAccountListItem({ fragmentRef, onDelete }: Props) {
                     borderBottomRightRadius: 4
                 }
             }}>
-            <Box display="flex" alignItems="center" sx={{ minWidth: 0, flexGrow: 1, width: { xs: '100%', sm: 'auto' } }}>
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    minWidth: 0,
+                    flexGrow: 1,
+                    width: { xs: '100%', sm: 'auto' }
+                }}>
                 <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: 'avatar.serviceAccount', marginRight: 2, flexShrink: 0 }}>
                     {data.name[0].toUpperCase()}
                 </Avatar>
@@ -61,7 +68,15 @@ function AssignedServiceAccountListItem({ fragmentRef, onDelete }: Props) {
                         </Link>}
                     secondary={data.description} />
             </Box>
-            <Box display="flex" alignItems="center" gap={1} sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'space-between', sm: 'flex-end' }, flexShrink: 0 }}>
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    width: { xs: '100%', sm: 'auto' },
+                    justifyContent: { xs: 'space-between', sm: 'flex-end' },
+                    flexShrink: 0
+                }}>
                 <Timestamp variant="body2" color="textSecondary" timestamp={data.metadata.updatedAt as string} />
                 <Button
                     onClick={() => onDelete(data.resourcePath)}

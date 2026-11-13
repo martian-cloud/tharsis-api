@@ -21,7 +21,12 @@ function ClientCredentialsDialog({ clientId, clientSecret, onClose }: Props) {
         <Dialog open maxWidth="md" fullWidth>
             <DialogTitle>Client Credentials</DialogTitle>
             <DialogContent>
-                <Typography variant="body2" color="warning.main" sx={{ mb: 1 }}>
+                <Typography
+                    variant="body2"
+                    sx={{
+                        color: "warning.main",
+                        mb: 1
+                    }}>
                     <strong>Save these credentials now.</strong> The client secret will not be shown again.
                 </Typography>
                 <TextField

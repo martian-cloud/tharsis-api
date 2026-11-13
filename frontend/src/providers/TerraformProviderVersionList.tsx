@@ -62,7 +62,13 @@ function TerraformProviderVersionList(props: Props) {
     return (
         <Box>
             <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                <Box
+                    sx={{
+                        padding: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between"
+                    }}>
                     <Typography variant="subtitle1">
                         {edges.length} version{edges.length === 1 ? '' : 's'}
                     </Typography>
@@ -82,7 +88,7 @@ function TerraformProviderVersionList(props: Props) {
                 </List>
             </InfiniteScroll>
         </Box>
-    )
+    );
 }
 
 export default TerraformProviderVersionList

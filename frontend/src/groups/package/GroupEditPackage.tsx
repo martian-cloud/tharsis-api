@@ -167,7 +167,12 @@ function GroupEditPackage(props: Props) {
                 error={error}
             />
             <Divider sx={{ marginTop: 4 }} />
-            <Box marginTop={2} display="flex" alignItems="center">
+            <Box
+                sx={{
+                    marginTop: 2,
+                    display: "flex",
+                    alignItems: "center"
+                }}>
                 <Button
                     loading={isInFlight}
                     variant="outlined"
@@ -178,7 +183,9 @@ function GroupEditPackage(props: Props) {
                     Update Package
                 </Button>
                 <Button component={RouterLink} color="inherit" to={listPath}>Cancel</Button>
-                <Box flex={1} />
+                <Box sx={{
+                    flex: 1
+                }} />
                 <Button color="error" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
             </Box>
             {showDeleteConfirm && (

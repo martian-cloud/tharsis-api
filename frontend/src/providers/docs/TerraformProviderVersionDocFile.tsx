@@ -45,7 +45,12 @@ function DocFileContent({ providerVersionId, category, filename }: Props) {
 
 function TerraformProviderVersionDocFile(props: Props) {
     return (
-        <Suspense fallback={<Box display="flex" justifyContent="center" padding={2}><CircularProgress size={20} /></Box>}>
+        <Suspense fallback={<Box
+            sx={{
+                display: "flex",
+                justifyContent: "center",
+                padding: 2
+            }}><CircularProgress size={20} /></Box>}>
             <DocFileContent {...props} />
         </Suspense>
     );

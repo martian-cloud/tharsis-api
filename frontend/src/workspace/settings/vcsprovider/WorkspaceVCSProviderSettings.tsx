@@ -41,7 +41,11 @@ function WebhooksDialog(props: WebhooksDialogProps){
                         <Typography variant="subtitle1">Copy this URL {webhooksData.type === 'gitlab' ? 'and token' : null} to manually configure webhooks in your VCS provider</Typography>
                     </Box>
                     <Box sx={{ mb: 3 }}>
-                        <Box display="flex" flexDirection="row">
+                        <Box
+                            sx={{
+                                display: "flex",
+                                flexDirection: "row"
+                            }}>
                             <Typography variant="subtitle1">Webhook URL</Typography>
                             <IconButton sx={{ padding: '4px' }} onClick={() => navigator.clipboard.writeText(webhooksData.url)}>
                                 <CopyIcon sx={{ width: 16, height: 16 }} />
@@ -50,7 +54,11 @@ function WebhooksDialog(props: WebhooksDialogProps){
                         <Typography noWrap>{webhooksData?.url}</Typography>
                     </Box>
                     {webhooksData.type === 'gitlab' ? <Box sx={{ mb: 3 }}>
-                        <Box display="flex" flexDirection="row">
+                        <Box
+                            sx={{
+                                display: "flex",
+                                flexDirection: "row"
+                            }}>
                             <Typography variant="subtitle1">Webhook token</Typography>
                             <IconButton sx={{ padding: '4px' }} onClick={() => navigator.clipboard.writeText(webhooksData.token || '')}>
                                 <CopyIcon sx={{ width: 16, height: 16 }} />
@@ -68,7 +76,7 @@ function WebhooksDialog(props: WebhooksDialogProps){
                     </Button>
                 </DialogActions>
             </Dialog>
-        )
+        );
     } else {
         return null
     }
@@ -118,11 +126,17 @@ function WorkspaceVCSProviderSettings({ fragmentRef }: Props) {
                         handleWebhookDialog={(confirm: boolean, data: WebhooksData) => handleWebhookDialog(confirm, data)} />}
                     {!data.workspaceVcsProviderLink && edges.length === 0 && <Box>
                         <Box sx={{ marginTop: 2, display: "flex", marginBottom: 2 }}>
-                            <Box display="flex" flexDirection="column">
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexDirection: "column"
+                                }}>
                                 <Typography variant="subtitle1" gutterBottom>
                                     This workspace is not linked to a VCS Provider and there are no inherited VCS Providers. Get started by creating a VCS Provider in this group.
                                 </Typography>
-                                <Box marginTop={2}>
+                                <Box sx={{
+                                    marginTop: 2
+                                }}>
                                     <Button sx={{ minWidth: 200 }}
                                         component={RouterLink}
                                         variant="outlined"

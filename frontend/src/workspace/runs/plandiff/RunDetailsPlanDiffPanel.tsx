@@ -232,16 +232,32 @@ function RunDetailsPlanDiffPanel({ title, action, drift, imported, diff, oldSrc,
 
     return (
         <Paper key={title} sx={{ mb: 2 }} variant="outlined">
-            <Box p={1} display="flex" justifyContent="space-between" alignItems="center">
-                <Box display="flex" alignItems="center">
+            <Box
+                sx={{
+                    p: 1,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center"
+                    }}>
                     <IconButton size="small" onClick={() => onCollapseChange(!collapsed)}>
                         {!collapsed && <ExpandMoreIcon />}
                         {collapsed && <ChevronRightIcon />}
                     </IconButton>
-                    <Typography variant="code" fontWeight={600}>{title}</Typography>
+                    <Typography variant="code" sx={{
+                        fontWeight: 600
+                    }}>{title}</Typography>
                     {drift && <Chip size="xs" label="drift" sx={{ color: colors.drift, ml: 1 }} />}
                 </Box>
-                <Box display="flex" alignItems="center">
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center"
+                    }}>
                     <DiffActionChip action={action} importing={imported} />
                     {/* Unchanged lines can only be hidden relative to the original source. */}
                     {oldSrc && <>

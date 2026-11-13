@@ -60,7 +60,9 @@ function ModuleSourceLink({ fragmentRef, truncateAt }: Props) {
         : moduleSource;
 
     return (
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{
+            alignItems: "center"
+        }}>
             <Tooltip title={data.moduleSource}>
                 <Typography sx={{ wordBreak: 'break-all' }}>
                     {displayText}

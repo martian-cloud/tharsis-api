@@ -106,7 +106,9 @@ function ProviderMirrorList(props: Props) {
             <NamespaceBreadcrumbs namespacePath={namespacePath} childRoutes={[{ title: "provider_mirror", path: 'provider_mirror' }]} />
             {showList && <Box>
                 {mirrorDisabled && hasResults && <Alert severity="warning" variant="outlined" sx={{ mb: 2 }}><AlertTitle>Provider mirroring is disabled</AlertTitle>Runs will download providers directly from upstream registries. Update in <Link component={RouterLink} to={settingsLink}>Provider Mirror Settings</Link>.</Alert>}
-                <Box marginBottom={2}>
+                <Box sx={{
+                    marginBottom: 2
+                }}>
                     <Typography variant="h5" gutterBottom>Terraform Provider Mirror</Typography>
                     <Typography variant="body2">{DESCRIPTION}{isRootGroup ? '' : ' Managed at root group.'}</Typography>
                 </Box>
@@ -118,7 +120,13 @@ function ProviderMirrorList(props: Props) {
                     onKeyDown={onKeyDown}
                 />
                 <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                    <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                    <Box
+                        sx={{
+                            padding: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between"
+                        }}>
                         <Typography variant="subtitle1">
                             {data?.namespace?.terraformProviderMirrors?.totalCount} provider{data?.namespace?.terraformProviderMirrors?.totalCount === 1 ? '' : 's'}
                         </Typography>
@@ -141,8 +149,21 @@ function ProviderMirrorList(props: Props) {
                     </List>
                 </InfiniteScroll>
             </Box>}
-            {!showList && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+            {!showList && <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        maxWidth: 600
+                    }}>
                     <Typography variant="h6" gutterBottom>No provider mirrors available</Typography>
                     <Typography color="textSecondary" align="center">
                         {DESCRIPTION} Enable in <Link component={RouterLink} to={settingsLink}>Provider Mirror Settings</Link>.

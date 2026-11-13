@@ -37,8 +37,21 @@ function GroupTreeContainer(props: Props) {
     const isAdmin = userData.me?.adminModeEnabled;
 
     const emptyState = (
-        <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
-            <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+        <Box
+            sx={{
+                display: "flex",
+                justifyContent: "center",
+                marginTop: 4
+            }}>
+            <Box
+                sx={{
+                    padding: 4,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    maxWidth: 600
+                }}>
                 {!isAdmin && <React.Fragment>
                     <Typography variant="h6">You're not a member of any groups</Typography>
                     <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
@@ -57,8 +70,14 @@ function GroupTreeContainer(props: Props) {
     );
 
     const header = (
-        <Box display="flex" justifyContent="space-between">
-            <Typography variant="h5" mb={2}>Groups</Typography>
+        <Box
+            sx={{
+                display: "flex",
+                justifyContent: "space-between"
+            }}>
+            <Typography variant="h5" sx={{
+                mb: 2
+            }}>Groups</Typography>
             {isAdmin && <Box>
                 <Button component={RouterLink} variant="outlined" color="primary" to={`/groups/-/new`}>New Group</Button>
             </Box>}

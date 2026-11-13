@@ -42,18 +42,18 @@ function HomeWorkspaceListItem({ fragmentRef, last }: Props) {
                 primary={
                     <Tooltip title={data.fullPath}>
                         <Typography
-                            fontWeight={500}
                             variant="body2"
                             color="textPrimary"
                             sx={{
+                                fontWeight: 500,
                                 wordWrap: 'break-word',
                                 textDecoration: 'underline',
                                 textDecorationColor: 'transparent',
+
                                 '&:hover': {
                                     textDecorationColor: 'currentColor'
                                 }
-                            }}
-                        >
+                            }}>
                             {formattedWorkspacePath}
                         </Typography>
                     </Tooltip>

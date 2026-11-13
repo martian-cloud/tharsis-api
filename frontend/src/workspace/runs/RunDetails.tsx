@@ -142,7 +142,9 @@ function RunDetails(props: Props) {
                 onError={onError}
             />
             <Box>
-                <Box paddingRight={!mobile ? `${SidebarWidth}px` : 0}>
+                <Box sx={{
+                    paddingRight: !mobile ? `${SidebarWidth}px` : 0
+                }}>
                     <NamespaceBreadcrumbs
                         namespacePath={data.fullPath}
                         childRoutes={[
@@ -159,7 +161,11 @@ function RunDetails(props: Props) {
                     {error && <Alert sx={{ marginBottom: 2 }} severity={error.severity}>
                         {error.message}
                     </Alert>}
-                    {mobile && <Box display="flex" justifyContent="space-between">
+                    {mobile && <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "space-between"
+                        }}>
                         <Typography variant="h6">{stageName} Details</Typography>
                         <IconButton onClick={onToggleSidebar}><DoubleArrowIcon sx={{ transform: 'rotate(180deg)' }} /></IconButton>
                     </Box>}
@@ -179,7 +185,9 @@ function RunDetails(props: Props) {
             </Box>
         </Box>
     ) : <Box>
-        <Typography mt={4} variant="h6" color="textSecondary" align="center">Run not found</Typography>
+        <Typography variant="h6" color="textSecondary" align="center" sx={{
+            mt: 4
+        }}>Run not found</Typography>
     </Box>;
 }
 

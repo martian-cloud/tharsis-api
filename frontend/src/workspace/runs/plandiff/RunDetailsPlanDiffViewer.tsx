@@ -182,14 +182,21 @@ function RunDetailsPlanDiffViewer({ fragmentRef }: { fragmentRef: RunDetailsPlan
                 </Typography>
             </Paper>}
             {(filteredDiffs.length > 0 || search !== '') && <Box>
-                <Box mb={2} display="flex" alignItems="center">
+                <Box
+                    sx={{
+                        mb: 2,
+                        display: "flex",
+                        alignItems: "center"
+                    }}>
                     <SearchInput
                         fullWidth
                         placeholder="search for change by resource or output name"
                         onChange={(event: React.ChangeEvent<HTMLInputElement>) => throttledSetSearch(event.target.value)}
                         onKeyPress={onKeyPress}
                     />
-                    <Box ml={2}>
+                    <Box sx={{
+                        ml: 2
+                    }}>
                         <ToggleButton
                             sx={{ whiteSpace: 'nowrap' }}
                             onChange={() => onCollapseAllChange(!collapseAll)}
@@ -201,7 +208,13 @@ function RunDetailsPlanDiffViewer({ fragmentRef }: { fragmentRef: RunDetailsPlan
                         </ToggleButton>
                     </Box>
                 </Box>
-                {filteredDiffs.length === 0 && <Box minHeight={100} display="flex" flexDirection="column" justifyContent="center">
+                {filteredDiffs.length === 0 && <Box
+                    sx={{
+                        minHeight: 100,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center"
+                    }}>
                     <Typography color="textSecondary" align="center">No changes matching search <strong>{search}</strong></Typography>
                 </Box>}
                 {filteredDiffs.map((diff) => {

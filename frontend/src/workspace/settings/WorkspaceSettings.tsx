@@ -43,9 +43,17 @@ function WorkspaceSettings(props: Props) {
             <NamespaceBreadcrumbs
                 namespacePath={workspace.fullPath}
                 childRoutes={[{ title: "settings", path: 'settings' }]} />
-            <Typography marginBottom={4} variant="h5" gutterBottom>Workspace Settings</Typography>
+            <Typography variant="h5" gutterBottom sx={{
+                marginBottom: 4
+            }}>Workspace Settings</Typography>
             <Suspense fallback={
-                <Box padding={4} display="flex" justifyContent="center" alignItems="center">
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center"
+                    }}>
                     <CircularProgress />
                 </Box>
             }>

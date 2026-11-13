@@ -108,7 +108,9 @@ function TerraformProviderSearch(props: Props) {
 
       {(search !== '' || edges.length !== 0) && <React.Fragment>
         <Typography variant="h5" sx={{ marginBottom: 2 }}>Terraform Providers</Typography>
-        <Box marginBottom={2}>
+        <Box sx={{
+          marginBottom: 2
+        }}>
           <SearchInput
             fullWidth
             placeholder="search for providers"
@@ -117,7 +119,13 @@ function TerraformProviderSearch(props: Props) {
           />
         </Box>
         <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-          <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+          <Box
+            sx={{
+              padding: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between"
+            }}>
             <Typography variant="subtitle1">
               {data.terraformProviders.totalCount} provider{data.terraformProviders.totalCount === 1 ? '' : 's'}
             </Typography>
@@ -152,8 +160,21 @@ function TerraformProviderSearch(props: Props) {
         </InfiniteScroll>
       </React.Fragment>}
 
-      {!search && edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
-        <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+      {!search && edges.length === 0 && <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          marginTop: 4
+        }}>
+        <Box
+          sx={{
+            padding: 4,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            maxWidth: 600
+          }}>
           <Typography variant="h6">You don't have access to any Terraform Providers</Typography>
         </Box>
       </Box>}

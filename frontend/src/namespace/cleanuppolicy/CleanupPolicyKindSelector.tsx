@@ -42,7 +42,9 @@ function CleanupPolicyKindSelector({ kinds, selectedKind, onSelect, disabledKind
                             opacity: disabledReason && !selected ? 0.5 : 1,
                         }}
                     >
-                        <Typography variant="body2" fontWeight={600}>{kindDef.label}</Typography>
+                        <Typography variant="body2" sx={{
+                            fontWeight: 600
+                        }}>{kindDef.label}</Typography>
                         <Typography variant="caption" color="textSecondary">{kindDef.description}</Typography>
                     </PanelButton>
                 );

@@ -176,7 +176,9 @@ function TerraformModuleList({ group, queryRef, search = '', labelFilters = [], 
                         </Box>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', marginTop: 2, marginBottom: 2 }}>
-                        <Box flex={1}>
+                        <Box sx={{
+                            flex: 1
+                        }}>
                             <SearchInput
                                 fullWidth
                                 defaultValue={search}
@@ -213,7 +215,9 @@ function TerraformModuleList({ group, queryRef, search = '', labelFilters = [], 
                         </Box>
                     </Box>
                     {filterExpanded && (
-                        <Box marginBottom={2}>
+                        <Box sx={{
+                            marginBottom: 2
+                        }}>
                             <LabelFilter
                                 filters={labelFilters}
                                 onFiltersChange={onLabelFiltersChange}
@@ -223,7 +227,13 @@ function TerraformModuleList({ group, queryRef, search = '', labelFilters = [], 
                     )}
                 </Box>
                 <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                    <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                    <Box
+                        sx={{
+                            padding: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between"
+                        }}>
                         <Typography variant="subtitle1">
                             {edges.length} terraform module{edges.length === 1 ? '' : 's'}
                         </Typography>
@@ -258,8 +268,21 @@ function TerraformModuleList({ group, queryRef, search = '', labelFilters = [], 
                     </List>
                 </InfiniteScroll>
             </Box>}
-            {!search && labelFilters.length === 0 && edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+            {!search && labelFilters.length === 0 && edges.length === 0 && <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        maxWidth: 600
+                    }}>
                     <Typography variant="h6">No terraform modules found</Typography>
                     <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
                         {DESCRIPTION}

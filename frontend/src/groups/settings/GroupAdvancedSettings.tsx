@@ -86,7 +86,9 @@ function GroupAdvancedSettings({ fragmentRef }: Props) {
             <SettingsSection section="advanced" title="Advanced Settings">
                 <Box sx={{ mb: 4 }}>
                     <Typography variant="subtitle1" gutterBottom>Migrate Group</Typography>
-                    <Typography marginBottom={2} variant="subtitle2">Migrate group to another parent or sibling group</Typography>
+                    <Typography variant="subtitle2" sx={{
+                        marginBottom: 2
+                    }}>Migrate group to another parent or sibling group</Typography>
                     <Alert sx={{ mb: 2 }} severity="warning">Migrating a group is potentially destructive.</Alert>
                     <Button
                         variant="outlined"

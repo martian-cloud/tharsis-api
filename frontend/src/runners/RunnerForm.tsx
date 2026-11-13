@@ -26,7 +26,11 @@ function RunnerForm({ data, onChange, editMode, error }: Props) {
                 {error.message}
             </Alert>}
             <Typography sx={{ mt: 2 }} variant="subtitle1" gutterBottom>Details</Typography>
-            <Divider light sx={{ mb: 2 }} />
+            <Divider
+                sx={{
+                    mb: 2,
+                    opacity: "0.6"
+                }} />
             <Box sx={{ mt: 2, mb: 2 }}>
                 <TextField
                     disabled={editMode}
@@ -46,12 +50,20 @@ function RunnerForm({ data, onChange, editMode, error }: Props) {
                 />
             </Box>
             <Typography sx={{ mt: 2 }} variant="subtitle1" gutterBottom>Tags</Typography>
-            <Divider light sx={{ mb: 2 }} />
+            <Divider
+                sx={{
+                    mb: 2,
+                    opacity: "0.6"
+                }} />
             <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" mb={1} color="textSecondary">
+                <Typography variant="body2" color="textSecondary" sx={{
+                    mb: 1
+                }}>
                     Add tags to target specific jobs. A runner must have all tags specified for a job in order to claim it.
                 </Typography>
-                <Box mb={2}>
+                <Box sx={{
+                    mb: 2
+                }}>
                     <TagForm
                         data={data.tags}
                         onChange={({ tags }: { tags: string[] }) => onChange({ ...data, tags })}
@@ -67,7 +79,11 @@ function RunnerForm({ data, onChange, editMode, error }: Props) {
                 />
             </Box>
             <Typography sx={{ mt: 2 }} variant="subtitle1" gutterBottom>Job Limit</Typography>
-            <Divider light sx={{ mb: 2 }} />
+            <Divider
+                sx={{
+                    mb: 2,
+                    opacity: "0.6"
+                }} />
             <Box sx={{ mb: 3 }}>
                 <TextField
                     // MUI only links helperText to the input via aria-describedby when the field has an id.
@@ -85,9 +101,15 @@ function RunnerForm({ data, onChange, editMode, error }: Props) {
                 />
             </Box>
             <Typography sx={{ mt: 2 }} variant="subtitle1" gutterBottom>Status</Typography>
-            <Divider light sx={{ mb: 2 }} />
+            <Divider
+                sx={{
+                    mb: 2,
+                    opacity: "0.6"
+                }} />
             <Box sx={{ mb: 4 }}>
-                <Typography variant="body2" mb={1} color="textSecondary">
+                <Typography variant="body2" color="textSecondary" sx={{
+                    mb: 1
+                }}>
                     A runner will not claim any jobs when it's disabled.
                 </Typography>
                 <FormControlLabel

@@ -162,8 +162,16 @@ function TerraformModuleSearch({ search = '', labelFilters = [], filterExpanded 
 
       {(!!search || labelFilters.length > 0 || edges.length !== 0) && <React.Fragment>
         <Typography variant="h5" sx={{ marginBottom: 2 }}>Terraform Modules</Typography>
-        <Box marginBottom={2} display="flex" gap={1} alignItems="flex-start">
-          <Box flex={1}>
+        <Box
+          sx={{
+            marginBottom: 2,
+            display: "flex",
+            gap: 1,
+            alignItems: "flex-start"
+          }}>
+          <Box sx={{
+            flex: 1
+          }}>
             <SearchInput
               fullWidth
               defaultValue={search}
@@ -191,7 +199,9 @@ function TerraformModuleSearch({ search = '', labelFilters = [], filterExpanded 
           </Box>
         </Box>
         {filterExpanded && (
-          <Box marginBottom={2}>
+          <Box sx={{
+            marginBottom: 2
+          }}>
             <LabelFilter
               filters={labelFilters}
               onFiltersChange={onLabelFiltersChange}
@@ -200,7 +210,13 @@ function TerraformModuleSearch({ search = '', labelFilters = [], filterExpanded 
           </Box>
         )}
         <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-          <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+          <Box
+            sx={{
+              padding: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between"
+            }}>
             <Typography variant="subtitle1">
               {data.terraformModules.totalCount} module{data.terraformModules.totalCount === 1 ? '' : 's'}
             </Typography>
@@ -235,8 +251,21 @@ function TerraformModuleSearch({ search = '', labelFilters = [], filterExpanded 
         </InfiniteScroll>
       </React.Fragment>}
 
-      {!search && labelFilters.length === 0 && edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
-        <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+      {!search && labelFilters.length === 0 && edges.length === 0 && <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          marginTop: 4
+        }}>
+        <Box
+          sx={{
+            padding: 4,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            maxWidth: 600
+          }}>
           <Typography variant="h6">You don't have access to any Terraform Modules</Typography>
         </Box>
       </Box>}

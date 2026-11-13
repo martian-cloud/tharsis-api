@@ -95,7 +95,13 @@ function ArchiveFileBrowser({ load, downloadName, preferredFile, filePicker = 't
 
     if (loading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" padding={4}>
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    padding: 4
+                }}>
                 <CircularProgress />
             </Box>
         );
@@ -111,7 +117,13 @@ function ArchiveFileBrowser({ load, downloadName, preferredFile, filePicker = 't
 
     if (files.length === 0) {
         return (
-            <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+            <Box
+                sx={{
+                    padding: 2,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center"
+                }}>
                 <Typography color="textSecondary">No files in this archive</Typography>
             </Box>
         );
@@ -119,7 +131,11 @@ function ArchiveFileBrowser({ load, downloadName, preferredFile, filePicker = 't
 
     if (filePicker === 'dropdown') {
         return (
-            <Box width="100%" minWidth={0}>
+            <Box
+                sx={{
+                    width: "100%",
+                    minWidth: 0
+                }}>
                 <FilePickerBar files={files} selected={selected} onSelectFile={onSelectFile} />
                 {/* Joined to the bar above: square top corners and no top border, so the two read as
                     one panel. */}
@@ -144,15 +160,15 @@ function ArchiveFileBrowser({ load, downloadName, preferredFile, filePicker = 't
 
     return (
         <Box
-            display="flex"
-            width="100%"
             sx={{
+                display: "flex",
+                width: "100%",
+
                 [theme.breakpoints.down('lg')]: {
                     flexDirection: 'column',
                     '& > *': { mb: 4 },
                 }
-            }}
-        >
+            }}>
             <Box sx={{ minWidth: 250, mr: 1 }}>
                 <RichTreeView
                     items={tree}
@@ -166,18 +182,18 @@ function ArchiveFileBrowser({ load, downloadName, preferredFile, filePicker = 't
                 />
             </Box>
             <Box
-                flex={1}
-                pl={2}
-                borderLeft={`1px solid ${theme.palette.divider}`}
                 sx={{
+                    flex: 1,
+                    pl: 2,
+                    borderLeft: `1px solid ${theme.palette.divider}`,
                     overflowX: 'auto',
+
                     [theme.breakpoints.down('lg')]: {
                         borderLeft: 'none',
                         paddingLeft: 0,
                         minWidth: 0,
                     }
-                }}
-            >
+                }}>
                 {selectedFile && <FileContent
                     file={selectedFile}
                     activeLine={activeLine}
@@ -292,7 +308,14 @@ const FileContent = memo(function FileContent({ file, activeLine, onSelectLine, 
 
     if (decoded.binary) {
         return (
-            <Box padding={2} display="flex" flexDirection="column" alignItems="center" gap={2}>
+            <Box
+                sx={{
+                    padding: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 2
+                }}>
                 <Typography color="textSecondary">This file can't be previewed.</Typography>
                 <Button size="small" color="info" variant="outlined" startIcon={<DownloadIcon />} onClick={() => onDownload(file)}>
                     Download
@@ -306,7 +329,9 @@ const FileContent = memo(function FileContent({ file, activeLine, onSelectLine, 
             {decoded.truncated && <Alert severity="warning" sx={{ marginBottom: 2 }}>
                 This file is too large to preview in full. Showing a truncated preview — download to view the full contents.
             </Alert>}
-            <Box position="relative">
+            <Box sx={{
+                position: "relative"
+            }}>
                 <Box sx={{ position: 'absolute', top: 4, right: 4, zIndex: 1 }}>
                     <CopyButton data={decoded.fullText} toolTip="Copy file contents" />
                 </Box>

@@ -101,7 +101,14 @@ function NamespaceMembershipListItem(props: Props) {
     const membershipNamespacePath = data.resourcePath.split("/").slice(0, -1).join("/");
 
     const name = (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ fontWeight: 'bold', minWidth: 0 }}>
+        <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+                alignItems: "center",
+                fontWeight: 'bold',
+                minWidth: 0
+            }}>
             {type === 'User' && <React.Fragment>
                 <Gravatar width={24} height={24} sx={{ marginRight: 1 }} email={data.member?.email ?? ''} />
                 <Box sx={{ wordBreak: 'break-word' }}>{data.member?.username}</Box>
@@ -137,7 +144,9 @@ function NamespaceMembershipListItem(props: Props) {
         ? <Typography variant="body2" color="textSecondary">Direct Member</Typography>
         : <Link to={`/groups/${membershipNamespacePath}/-/members`} color="inherit" variant="body2">{membershipNamespacePath}</Link>;
 
-    const actions = editMode ? <Stack direction="row" spacing={1} justifyContent="flex-end">
+    const actions = editMode ? <Stack direction="row" spacing={1} sx={{
+        justifyContent: "flex-end"
+    }}>
         <Button
             loading={updateInFlight}
             onClick={onSave}
@@ -153,7 +162,9 @@ function NamespaceMembershipListItem(props: Props) {
             variant="outlined">
             Cancel
         </Button>
-    </Stack> : (namespacePath === membershipNamespacePath ? <Stack direction="row" spacing={1} justifyContent="flex-end">
+    </Stack> : (namespacePath === membershipNamespacePath ? <Stack direction="row" spacing={1} sx={{
+        justifyContent: "flex-end"
+    }}>
         <TRNButton trn={data.metadata.trn} />
         <Button
             onClick={() => setEditMode(true)}

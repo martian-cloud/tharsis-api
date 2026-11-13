@@ -16,8 +16,18 @@ interface Props {
 function CleanupPolicyFormSection({ step, title, action, children }: Props) {
     return (
         <Box sx={{ mb: 4 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
+            <Stack
+                direction="row"
+                sx={{
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: 1,
+                    mb: 1.5
+                }}>
+                <Stack direction="row" spacing={1} sx={{
+                    alignItems: "center"
+                }}>
                     <NumberBadge value={step} />
                     <Typography variant="subtitle2">{title}</Typography>
                 </Stack>

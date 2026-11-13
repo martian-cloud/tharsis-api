@@ -46,11 +46,19 @@ function TerraformModuleVersionDocsRequiredProviders({ fragmentRef }: Props) {
 
     return (
         <Box>
-            {!hasProviders && <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+            {!hasProviders && <Box
+                sx={{
+                    padding: 2,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center"
+                }}>
                 <Typography color="textSecondary">This module does not require any providers</Typography>
             </Box>}
             {hasProviders && <>
-                <Typography color="textSecondary" variant="body1" mb={1}>
+                <Typography color="textSecondary" variant="body1" sx={{
+                    mb: 1
+                }}>
                     This module requires the following providers:
                 </Typography>
                 <List>

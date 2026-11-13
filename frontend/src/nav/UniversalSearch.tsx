@@ -301,9 +301,19 @@ function UniversalSearch() {
                 clearOnEscape
                 noOptionsText="No results found"
                 groupBy={(option: AutocompleteOption) => option.category}
-                renderGroup={((params: AutocompleteRenderGroupParams) => <Box key={params.key} mt={1}>
+                renderGroup={((params: AutocompleteRenderGroupParams) => <Box key={params.key} sx={{
+                    mt: 1
+                }}>
                     <Divider />
-                    <Typography pt={1} pb={1} pl={2} pr={2} fontWeight={700} variant='body2'>{params.group}</Typography>
+                    <Typography
+                        variant='body2'
+                        sx={{
+                            pt: 1,
+                            pb: 1,
+                            pl: 2,
+                            pr: 2,
+                            fontWeight: 700
+                        }}>{params.group}</Typography>
                     <Divider />
                     <Box>
                         {params.children}
@@ -316,8 +326,10 @@ function UniversalSearch() {
                         onFocus={handleFocus}
                         onBlur={handleBlur}
                         slotProps={{
+                            ...params.slotProps,
+
                             input: {
-                                ...params.InputProps,
+                                ...params.slotProps.input,
                                 endAdornment: (
                                     <React.Fragment>
                                         {loading ? <CircularProgress color="inherit" size={20} /> : null}
@@ -333,8 +345,22 @@ function UniversalSearch() {
                     return (
                         <Box component="li" key={key} {...otherProps}>
                             <Tooltip title={label}>
-                                <Box width="100%" display="flex" justifyContent="space-between" alignItems="center">
-                                    <Typography color="textSecondary" variant='body2' whiteSpace='nowrap' overflow='hidden' textOverflow='ellipsis' mr={2}>
+                                <Box
+                                    sx={{
+                                        width: "100%",
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center"
+                                    }}>
+                                    <Typography
+                                        color="textSecondary"
+                                        variant='body2'
+                                        sx={{
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            mr: 2
+                                        }}>
                                         {parts.map((part: { text: string, highlight: boolean }, index: number) => (
                                             <span
                                                 key={index}
@@ -350,7 +376,7 @@ function UniversalSearch() {
                                 </Box>
                             </Tooltip>
                         </Box>
-                    )
+                    );
                 }}
             />
         </Box>

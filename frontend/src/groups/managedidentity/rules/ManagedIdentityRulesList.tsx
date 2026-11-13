@@ -67,11 +67,15 @@ function ManagedIdentityRulesList(props: Props) {
                     {
                         label: 'Policy', content: <>
                             {row.type === 'eligible_principals' && <Fragment>
-                                {row.principals && row.principals.length === 0 && <Typography variant="body2" fontWeight={500}>
+                                {row.principals && row.principals.length === 0 && <Typography variant="body2" sx={{
+                                    fontWeight: 500
+                                }}>
                                     No principals are permitted
                                 </Typography>}
                                 {row.principals && row.principals.length > 0 && <Box>
-                                    <Typography gutterBottom variant="body2" fontWeight={500}>Only the following principals are permitted:</Typography>
+                                    <Typography gutterBottom variant="body2" sx={{
+                                        fontWeight: 500
+                                    }}>Only the following principals are permitted:</Typography>
                                     <AvatarContainer>
                                         {row.principals.map(((rule: any) => (
                                             <Tooltip key={rule.id} title={rule.tooltip}>
@@ -84,7 +88,9 @@ function ManagedIdentityRulesList(props: Props) {
                                     </AvatarContainer>
                                 </Box>}
                             </Fragment>}
-                            {row.type === 'module_attestation' && <Typography variant="body2" fontWeight={500}>
+                            {row.type === 'module_attestation' && <Typography variant="body2" sx={{
+                                fontWeight: 500
+                            }}>
                                 Only root modules with the required attestations are permitted
                             </Typography>}
                         </>

@@ -84,8 +84,21 @@ function RunnerList({ fragmentRef, loadNext, hasNext, hideNewRunnerButton, group
                         ))}
                     </ResponsiveTable>
                 </InfiniteScroll>
-            </Box> : <Box sx={{ mt: 4 }} display="flex" justifyContent="center">
-                <Box p={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+            </Box> : <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    mt: 4
+                }}>
+                <Box
+                    sx={{
+                        p: 4,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        maxWidth: 600
+                    }}>
                     <Typography variant="h6">Get started with runners</Typography>
                     <Typography sx={{ mb: 2 }} color="textSecondary" align="center" >
                         {DESCRIPTION}

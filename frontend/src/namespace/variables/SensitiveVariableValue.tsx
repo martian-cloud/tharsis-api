@@ -56,7 +56,9 @@ function SensitiveVariableValue({ variableVersionId }: Props) {
 function SensitiveVariableValueContainer({ variableVersionId }: Props) {
     const [showValue, setShowValue] = useState(false);
     return (
-        <Box minWidth={100}>
+        <Box sx={{
+            minWidth: 100
+        }}>
             <ErrorBoundary fallbackRender={({ error }) => {
                 if (!error?.codes?.includes('FORBIDDEN')) {
                     throw error;

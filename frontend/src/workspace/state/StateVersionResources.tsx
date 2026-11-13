@@ -55,7 +55,14 @@ function StateVersionResources(props: Props) {
                 No resources matching search <strong>{search}</strong>
             </Typography>}
             {(filteredOutputs.length === 0 && search === '' && destroyed) && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center"
+                    }}>
                     <DeleteForeverOutlinedIcon sx={{ fontSize: 48, color: 'runStatus.destroy', mb: 1 }} />
                     <Typography align="center" gutterBottom>
                         Workspace destroyed

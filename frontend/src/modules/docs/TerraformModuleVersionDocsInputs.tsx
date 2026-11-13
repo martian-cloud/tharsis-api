@@ -17,9 +17,13 @@ interface VariableListProps {
 function VariableList({ title, variables }: VariableListProps) {
     return (
         <>
-            <Typography pb={2} variant="h5">{title}</Typography>
+            <Typography variant="h5" sx={{
+                pb: 2
+            }}>{title}</Typography>
             {variables.length === 0 && (
-                <Typography mb={4}>No {title.toLowerCase()} inputs</Typography>
+                <Typography sx={{
+                    mb: 4
+                }}>No {title.toLowerCase()} inputs</Typography>
             )}
             {variables.map((variable: any) => (
                 <TerraformModuleVersionDocsInputCard
@@ -56,11 +60,19 @@ function TerraformModuleVersionDocsInputs({ fragmentRef }: Props) {
 
     return (
         <Box>
-            {data.variables.length === 0 && <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+            {data.variables.length === 0 && <Box
+                sx={{
+                    padding: 2,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center"
+                }}>
                 <Typography color="textSecondary">This module does not contain any inputs</Typography>
             </Box>}
             {data.variables.length > 0 && <>
-                <Typography color="textSecondary" variant="body1" mb={2}>
+                <Typography color="textSecondary" variant="body1" sx={{
+                    mb: 2
+                }}>
                     This module contains the following inputs:
                 </Typography>
                 <VariableList

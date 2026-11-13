@@ -47,7 +47,12 @@ function WorkspaceSearchListItem(props: Props) {
                 }
             }}
         >
-            <Box flex={1} display="flex" alignItems="center">
+            <Box
+                sx={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center"
+                }}>
                 <NamespaceAvatar name={data.name} type="workspace" sx={{ marginRight: 2 }} />
                 <Box sx={{
                     display: 'flex',

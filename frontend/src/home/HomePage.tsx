@@ -1,4 +1,4 @@
-import HelpIcon from '@mui/icons-material/HelpOutline';
+import HelpIcon from '@mui/icons-material/HelpOutlined';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunchOutlined';
 import { Box, CircularProgress, Link, ListItemButton, Paper, Typography, useTheme } from '@mui/material';
 import { Suspense, useContext } from 'react';
@@ -17,7 +17,9 @@ function HomePage() {
     const { expanded: copilotExpanded } = useAgentCopilot();
 
     return (
-        <Box display="flex">
+        <Box sx={{
+            display: "flex"
+        }}>
             <HomeDrawer />
             <Box component="main" sx={{ flexGrow: 1 }}>
                 <Box sx={{
@@ -30,7 +32,11 @@ function HomePage() {
                         '& > *': { mb: 2 }
                     }
                 }}>
-                    <Box padding={`${theme.spacing(2)} ${theme.spacing(3)}`} flex={1}>
+                    <Box
+                        sx={{
+                            padding: `${theme.spacing(2)} ${theme.spacing(3)}`,
+                            flex: 1
+                        }}>
                         <Suspense fallback={<Box
                             sx={{
                                 width: '100%',
@@ -56,7 +62,9 @@ function HomePage() {
                             <ListItemButton component={Link} target='_blank' rel='noopener noreferrer' href={apiConfig.tharsisSupportUrl}>
                                 <HelpIcon sx={{ mr: 2 }} />
                                 <Box>
-                                    <Typography variant="subtitle1" fontWeight={600}>Need assistance?</Typography>
+                                    <Typography variant="subtitle1" sx={{
+                                        fontWeight: 600
+                                    }}>Need assistance?</Typography>
                                     <Typography variant="body2">Contact our support team or report an issue</Typography>
                                 </Box>
                             </ListItemButton>
@@ -65,7 +73,9 @@ function HomePage() {
                             <ListItemButton component={Link} target='_blank' rel='noopener noreferrer' href={config.docsUrl}>
                                 <RocketLaunchIcon sx={{ mr: 2, width: 28, height: 28 }} />
                                 <Box>
-                                    <Typography variant="subtitle1" fontWeight={600}>Getting Started</Typography>
+                                    <Typography variant="subtitle1" sx={{
+                                        fontWeight: 600
+                                    }}>Getting Started</Typography>
                                     <Typography variant="body2">Learn how to use Tharsis</Typography>
                                 </Box>
                             </ListItemButton>

@@ -192,12 +192,14 @@ function VariablesIndex(props: VariablesIndexProps) {
                         size="small"
                         margin='none'
                         placeholder="search for variables"
-                        InputProps={{
-                            sx: { background: darken(theme.palette.background.default, 0.5) }
-                        }}
                         sx={{ width: { xs: '100%', sm: 300 } }}
                         onChange={onSearchChange}
                         autoComplete="off"
+                        slotProps={{
+                            input: {
+                                sx: { background: darken(theme.palette.background.default, 0.5) }
+                            }
+                        }}
                     />
                     <Button
                         size="small"
@@ -213,7 +215,14 @@ function VariablesIndex(props: VariablesIndexProps) {
                 No variables matching search
             </Typography>}
             {search === '' && filteredVariables.length === 0 && <Paper variant="outlined" sx={{ marginTop: 4, display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
-                <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center">
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center"
+                    }}>
                     {variableCategory === 'terraform' && <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
                         Add Terraform variables which will be provided as inputs to your Terraform modules
                     </Typography>}
@@ -223,9 +232,17 @@ function VariablesIndex(props: VariablesIndexProps) {
                     <Button variant="outlined" color="primary" onClick={onNewVariable}>New Variable</Button>
                 </Box>
             </Paper>}
-            {(filteredVariables.length > 0) && <Box marginBottom={6}>
+            {(filteredVariables.length > 0) && <Box sx={{
+                marginBottom: 6
+            }}>
                 <Paper>
-                    <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                    <Box
+                        sx={{
+                            padding: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between"
+                        }}>
                         <Typography variant="subtitle1">{filteredVariables.length} variable{filteredVariables.length === 1 ? '' : 's'}</Typography>
                         <Button size="small" variant="outlined" color="secondary" onClick={onNewVariable}>New Variable</Button>
                     </Box>

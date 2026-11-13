@@ -95,14 +95,15 @@ function VariableHistory({ variableId, sensitive }: { variableId: string, sensit
                 </Table>
             </TableContainer>
             {hasNext && <Link
-                mt={2}
                 component="div"
                 variant="body2"
                 color="textSecondary"
-                sx={{ cursor: 'pointer' }}
                 underline="hover"
                 onClick={() => loadNext(INITIAL_ITEM_COUNT)}
-            >
+                sx={{
+                    mt: 2,
+                    cursor: 'pointer'
+                }}>
                 Show more
             </Link>}
         </Box>

@@ -56,7 +56,12 @@ function NamespaceListItem({ namespaceKey, last, pathRelativeTo, expandable = tr
 
     return (
         <ListItem disablePadding divider={!last} sx={{ flexDirection: 'column', alignItems: 'stretch' }}>
-            <Box display="flex" alignItems="center" width="100%">
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    width: "100%"
+                }}>
                 <ListItemButton
                     // A group with children expands on row click; only its name navigates
                     {...(hasChildren
@@ -82,7 +87,9 @@ function NamespaceListItem({ namespaceKey, last, pathRelativeTo, expandable = tr
                         }
                     }}>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Stack direction="row" spacing={1} alignItems="center">
+                            <Stack direction="row" spacing={1} sx={{
+                                alignItems: "center"
+                            }}>
                                 {hasChildren ? (
                                     <Link
                                         component={LinkRouter}

@@ -53,8 +53,15 @@ function TerraformModuleVersionDetails(props: Props) {
     const queryData = usePreloadedQuery<TerraformModuleVersionDetailsQuery>(query, queryRef);
 
     return (
-        <Box display="flex">
-            <Box component="main" flexGrow={1} minWidth={0}>
+        <Box sx={{
+            display: "flex"
+        }}>
+            <Box
+                component="main"
+                sx={{
+                    flexGrow: 1,
+                    minWidth: 0
+                }}>
                 <Suspense fallback={<Box
                     sx={{
                         width: '100%',
@@ -68,7 +75,12 @@ function TerraformModuleVersionDetails(props: Props) {
                 </Box>}>
                     <PageLayoutProvider size="wide">
                         {queryData.terraformModuleVersion && <TerraformModuleVersionDetailsIndex fragmentRef={queryData.terraformModuleVersion} />}
-                        {!queryData.terraformModuleVersion && <Box display="flex" justifyContent="center" marginTop={4}>
+                        {!queryData.terraformModuleVersion && <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "center",
+                                marginTop: 4
+                            }}>
                             <Typography variant="h6" color="textSecondary">
                                 version <strong>{version || 'latest'}</strong> not found for module <strong>{registryNamespace}/{moduleName}/{system}</strong>
                             </Typography>
@@ -184,8 +196,18 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
                             gap: { xs: 2 }
                         }}
                     >
-                        <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                            <Box display="flex" alignItems="center">
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                width: "100%"
+                            }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center"
+                                }}>
                                 <Typography variant="h6">{data.module.registryNamespace} / {data.module.name} / {data.module.system}</Typography>
                                 {data.module.private && <Chip sx={{ marginLeft: 2 }} variant="outlined" color="warning" size="small" label="private" />}
                             </Box>
@@ -211,10 +233,16 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
                         </Tabs>
                     </Box>
                     <React.Fragment>
-                        {tab === 'docs' && <Box mt={2}>
+                        {tab === 'docs' && <Box sx={{
+                            mt: 2
+                        }}>
                             <TerraformModuleVersionDocs fragmentRef={data.configurationDetails} />
                         </Box>}
-                        {tab === 'usage' && <Box marginTop={2} position="relative">
+                        {tab === 'usage' && <Box
+                            sx={{
+                                marginTop: 2,
+                                position: "relative"
+                            }}>
                             <IconButton sx={{ padding: 2, position: 'absolute', top: 0, right: 0, zIndex: 1 }} onClick={() => navigator.clipboard.writeText(usageInfo)}>
                                 <CopyIcon sx={{ width: 16, height: 16 }} />
                             </IconButton>
@@ -222,19 +250,31 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
                                 <SyntaxHighlighter wrapLongLines customStyle={{ fontSize: 14, paddingRight: 48 }} language="hcl" style={prismTheme} children={usageInfo} />
                             </Box>
                         </Box>}
-                        {tab === 'files' && <Box mt={2}>
+                        {tab === 'files' && <Box sx={{
+                            mt: 2
+                        }}>
                             {filesAvailable
                                 ? <TerraformModuleVersionFiles module={moduleParams} />
-                                : <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+                                : <Box
+                                sx={{
+                                    padding: 2,
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center"
+                                }}>
                                     <Typography color="textSecondary">No files are available for this version.</Typography>
                                 </Box>}
                         </Box>}
-                        {tab === 'versions' && <Box marginTop={2}>
+                        {tab === 'versions' && <Box sx={{
+                            marginTop: 2
+                        }}>
                             <Suspense fallback={<ListSkeleton rowCount={3} />}>
                                 <TerraformModuleVersionList fragmentRef={data.module} />
                             </Suspense>
                         </Box>}
-                        {tab === 'attestations' && <Box marginTop={2}>
+                        {tab === 'attestations' && <Box sx={{
+                            marginTop: 2
+                        }}>
                             <Suspense fallback={<ListSkeleton rowCount={3} />}>
                                 <TerraformModuleVersionAttestList fragmentRef={data} />
                             </Suspense>

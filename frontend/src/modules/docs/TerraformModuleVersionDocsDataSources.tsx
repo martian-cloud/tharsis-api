@@ -23,11 +23,19 @@ function TerraformModuleVersionDocsDataSources({ fragmentRef }: Props) {
 
     return (
         <Box>
-            {data.dataResources.length === 0 && <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+            {data.dataResources.length === 0 && <Box
+                sx={{
+                    padding: 2,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center"
+                }}>
                 <Typography color="textSecondary">This module does not use any datasources</Typography>
             </Box>}
             {data.dataResources.length > 0 && <>
-                <Typography color="textSecondary" variant="body1" mb={1}>
+                <Typography color="textSecondary" variant="body1" sx={{
+                    mb: 1
+                }}>
                     This module uses the following data sources:
                 </Typography>
                 <List disablePadding>

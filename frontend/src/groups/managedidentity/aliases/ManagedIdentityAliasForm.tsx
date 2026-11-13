@@ -22,7 +22,11 @@ function ManagedIdentityAliasForm({ data, onChange, error, groupPath }: Props) {
     };
 
     return (
-        <Box display="flex" flexDirection="column">
+        <Box
+            sx={{
+                display: "flex",
+                flexDirection: "column"
+            }}>
             {error && <Alert sx={{ marginBottom: 2 }} severity={error.severity}>
                 {error.message}
             </Alert>}

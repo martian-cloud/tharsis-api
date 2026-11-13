@@ -1,4 +1,4 @@
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutlined';
 import { Chip, Stack, Theme, Tooltip, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
@@ -182,23 +182,42 @@ function RunDetailsSidebar(props: Props) {
             anchor='right'
             onClose={onClose}
         >
-            <Box padding={2}>
-                <Box marginBottom={2} display="flex" alignItems="center" justifyContent="space-between">
+            <Box sx={{
+                padding: 2
+            }}>
+                <Box
+                    sx={{
+                        marginBottom: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between"
+                    }}>
                     <Typography variant="h6">Run Details</Typography>
                     <TRNButton size="small" trn={data.metadata.trn} />
                 </Box>
-                <Box marginBottom={3}>
+                <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Status</Typography>
                     <RunStatusChip status={data.status} hasAdvisoryFailures={data.hasAdvisoryFailures} />
                 </Box>
-                <Box marginBottom={3}>
+                <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Type</Typography>
                     {!data.isDestroy && data.apply && <Chip size="small" label="Apply" />}
                     {data.isDestroy && <Chip size="small" label="Destroy" sx={{ color: 'runStatus.destroy' }} />}
                     {!data.apply && <Chip size="small" label={data.assessment ? "Assessment" : "Speculative"} />}
                 </Box>
-                {data.apply && <Box marginBottom={3}>
-                    <Box display="flex" alignItems="center" sx={{ marginBottom: 1 }}>
+                {data.apply && <Box sx={{
+                    marginBottom: 3
+                }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            marginBottom: 1
+                        }}>
                         <Typography>Auto Apply</Typography>
                         <Tooltip title="When auto apply is enabled, the apply stage starts automatically after the plan completes with changes. When disabled, the run waits at the planned state for a user to manually start the apply.">
                             <HelpOutlineIcon sx={{
@@ -225,16 +244,26 @@ function RunDetailsSidebar(props: Props) {
                         </Tooltip>
                         : <Chip size="small" label={data.autoApply ? 'Enabled' : 'Disabled'} sx={autoApplyChipSx} />}
                 </Box>}
-                <Box marginBottom={3}>
+                <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Created</Typography>
-                    <Box display="flex" alignItems="center">
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center"
+                        }}>
                         <Timestamp variant="subtitle1" sx={{ marginRight: 1 }} timestamp={data.metadata.createdAt} />
                         <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={20} />
                     </Box>
                 </Box>
-                {data.configurationVersion && <Box marginBottom={3}>
+                {data.configurationVersion && <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Configuration Version</Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} sx={{
+                        alignItems: "center"
+                    }}>
                         <Tooltip title="view files">
                             <Link
                                 color="secondary"
@@ -247,25 +276,35 @@ function RunDetailsSidebar(props: Props) {
                         </Tooltip>
                     </Stack>
                 </Box>}
-                {data.moduleSource && <Box marginBottom={3}>
+                {data.moduleSource && <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Module Source</Typography>
                     <ModuleSourceLink fragmentRef={data} truncateAt={24} />
                 </Box>}
-                {data.moduleVersion && <Box marginBottom={3}>
+                {data.moduleVersion && <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Module Version</Typography>
                     <Chip size="small" label={data.moduleVersion} />
                 </Box>}
-                {data.annotations.length > 0 && <Box marginBottom={3}>
+                {data.annotations.length > 0 && <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Annotations</Typography>
                     <RunAnnotations fragmentRef={data} maxVisible={3} stacked />
                 </Box>}
-                {(data as any)[stage]?.currentJob?.runnerPath && <Box marginBottom={3}>
+                {(data as any)[stage]?.currentJob?.runnerPath && <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Runner</Typography>
                     <Tooltip title={(data as any)[stage].currentJob.runnerPath} >
                         <Chip size="small" label={(data as any)[stage].currentJob.runnerPath} />
                     </Tooltip>
                 </Box>}
-                <Box marginBottom={3}>
+                <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ marginBottom: 1 }}>Stages</Typography>
                     <Box sx={{ py: 0.5 }}>
                         {/* Pre-Plan Policy (runs before the plan) */}
@@ -277,7 +316,9 @@ function RunDetailsSidebar(props: Props) {
                                 sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === taskStagePath(prePlanStage.stageName) ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
                             >
                                 <PrePlanStatusIcon sx={{ flexShrink: 0 }} />
-                                <Typography variant="body2" color="text.primary">Pre-Plan</Typography>
+                                <Typography variant="body2" sx={{
+                                    color: "text.primary"
+                                }}>Pre-Plan</Typography>
                             </Box>
                             <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
                         </>}
@@ -290,7 +331,9 @@ function RunDetailsSidebar(props: Props) {
                             sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === 'plan' ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
                         >
                             <PlanStatusIcon sx={{ flexShrink: 0 }} />
-                            <Typography variant="body2" color="text.primary">Plan</Typography>
+                            <Typography variant="body2" sx={{
+                                color: "text.primary"
+                            }}>Plan</Typography>
                         </Box>
 
                         {/* Connector: Plan → Post-Plan (or Plan → Pre-Apply/Apply if no post-plan policy) */}
@@ -307,7 +350,9 @@ function RunDetailsSidebar(props: Props) {
                                 sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === taskStagePath(postPlanStage.stageName) ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
                             >
                                 <PolicyStatusIcon sx={{ flexShrink: 0 }} />
-                                <Typography variant="body2" color="text.primary">Post-Plan</Typography>
+                                <Typography variant="body2" sx={{
+                                    color: "text.primary"
+                                }}>Post-Plan</Typography>
                             </Box>
                             {(preApplyStage || data.apply) && (
                                 <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
@@ -323,7 +368,9 @@ function RunDetailsSidebar(props: Props) {
                                 sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === taskStagePath(preApplyStage.stageName) ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
                             >
                                 <PreApplyStatusIcon sx={{ flexShrink: 0 }} />
-                                <Typography variant="body2" color="text.primary">Pre-Apply</Typography>
+                                <Typography variant="body2" sx={{
+                                    color: "text.primary"
+                                }}>Pre-Apply</Typography>
                             </Box>
                             {data.apply && (
                                 <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
@@ -339,7 +386,9 @@ function RunDetailsSidebar(props: Props) {
                                 sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === 'apply' ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
                             >
                                 <ApplyStatusIcon sx={{ flexShrink: 0 }} />
-                                <Typography variant="body2" color="text.primary">Apply</Typography>
+                                <Typography variant="body2" sx={{
+                                    color: "text.primary"
+                                }}>Apply</Typography>
                             </Box>
                             {postApplyStage && (
                                 <Box sx={{ ml: '19px', width: 2, height: 10, bgcolor: 'divider' }} />
@@ -355,7 +404,9 @@ function RunDetailsSidebar(props: Props) {
                                 sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.75, borderRadius: 1, textDecoration: 'none', bgcolor: stage === taskStagePath(postApplyStage.stageName) ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}
                             >
                                 <PostApplyStatusIcon sx={{ flexShrink: 0 }} />
-                                <Typography variant="body2" color="text.primary">Post-Apply</Typography>
+                                <Typography variant="body2" sx={{
+                                    color: "text.primary"
+                                }}>Post-Apply</Typography>
                             </Box>
                         )}
                     </Box>

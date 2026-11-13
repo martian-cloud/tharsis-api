@@ -74,9 +74,16 @@ function GroupDetails(props: Props) {
     const groupPath = data.fullPath;
 
     return (
-        <Box display="flex">
+        <Box sx={{
+            display: "flex"
+        }}>
             <GroupDetailsDrawer groupName={data.name} groupPath={groupPath} route={route} />
-            <Box component="main" flexGrow={1} minWidth={0}>
+            <Box
+                component="main"
+                sx={{
+                    flexGrow: 1,
+                    minWidth: 0
+                }}>
                 <Suspense fallback={
                     <Box
                         sx={{
@@ -227,7 +234,12 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                         '& > *': { marginBottom: 2 },
                     }
                 }}>
-                    <Box display="flex" marginBottom={3} alignItems="center">
+                    <Box
+                        sx={{
+                            display: "flex",
+                            marginBottom: 3,
+                            alignItems: "center"
+                        }}>
                         <NamespaceAvatar name={data.name} type="group" size="lg" sx={{ marginRight: 2 }} />
                         <Stack>
                             <Typography noWrap variant="h5" sx={{ maxWidth: 400, fontWeight: "bold" }}>{data.name}</Typography>
@@ -239,7 +251,9 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                     </Box>
                     <Box>
                         <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'stretch', md: 'center' } }}>
-                            <Stack direction="row" spacing={1} alignItems="center">
+                            <Stack direction="row" spacing={1} sx={{
+                                alignItems: "center"
+                            }}>
                                 <NamespaceFavoriteButton
                                     namespacePath={data.fullPath}
                                     namespaceType="GROUP"

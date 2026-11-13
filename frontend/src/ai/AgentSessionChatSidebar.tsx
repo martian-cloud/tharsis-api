@@ -44,7 +44,14 @@ function SidebarToolbar({ onClose, showToolCalls, onToggleToolCalls }: { onClose
             color: 'common.white',
         }}>
             <MartianAgentIcon sx={{ color: 'common.white', fontSize: 20 }} />
-            <Typography variant="subtitle1" sx={{ flexGrow: 1, color: 'common.white', fontWeight: 600 }} ml={1}>Copilot</Typography>
+            <Typography
+                variant="subtitle1"
+                sx={{
+                    ml: 1,
+                    flexGrow: 1,
+                    color: 'common.white',
+                    fontWeight: 600
+                }}>Copilot</Typography>
             {user.adminModeEnabled && agentSessionId && <AgentSessionTraceViewerButton sessionId={agentSessionId} />}
             <IconButton onClick={e => setAnchorEl(e.currentTarget)} size="medium" sx={{ color: 'common.white' }}>
                 <FilterListIcon />

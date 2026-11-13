@@ -18,10 +18,16 @@ function ConfigurationVersionSource({ data, onChange }: Props) {
     const theme = useTheme();
 
     return (
-        <Box mb={4}>
+        <Box sx={{
+            mb: 4
+        }}>
             <Typography variant="subtitle1" gutterBottom>Upload tar.gz file</Typography>
-            <Divider light />
-            <Box marginTop={2}>
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
+            <Box sx={{
+                marginTop: 2
+            }}>
                 {data.file ?
                     <List sx={{ border: `1px solid ${theme.palette.divider}`, maxWidth: 400 }}>
                         <ListItem

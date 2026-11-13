@@ -61,7 +61,11 @@ function ManagedIdentityWorkspaceList({ managedIdentityId }: Props) {
                 No workspaces assigned
             </Typography>}
             {edgeCount > 0 && <React.Fragment>
-                <Typography mb={1} fontWeight={500}>{data?.workspaces.totalCount} assigned workspace{data?.workspaces.totalCount === 1 ? '' : 's'}</Typography>
+                <Typography
+                    sx={{
+                        mb: 1,
+                        fontWeight: 500
+                    }}>{data?.workspaces.totalCount} assigned workspace{data?.workspaces.totalCount === 1 ? '' : 's'}</Typography>
                 <InfiniteScroll
                     dataLength={edges.length}
                     next={() => loadNext(INITIAL_ITEM_COUNT)}

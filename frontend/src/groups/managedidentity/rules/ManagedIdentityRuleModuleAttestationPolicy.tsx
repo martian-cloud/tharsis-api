@@ -22,7 +22,9 @@ function ManagedIdentityRuleModuleAttestationPolicy(props: Props) {
             >
                 <DeleteIcon />
             </IconButton>
-            <Box marginBottom={2}>
+            <Box sx={{
+                marginBottom: 2
+            }}>
                 <Typography gutterBottom>Public Key</Typography>
                 <TextField
                     size="small"

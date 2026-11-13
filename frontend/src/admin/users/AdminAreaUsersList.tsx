@@ -104,7 +104,9 @@ function AdminAreaUsersList() {
             />
             {(search !== '' || edges.length !== 0) && <React.Fragment>
                 <Typography variant="h5" sx={{ marginBottom: 2 }}>Users</Typography>
-                <Box marginBottom={2}>
+                <Box sx={{
+                    marginBottom: 2
+                }}>
                     <SearchInput
                         fullWidth
                         placeholder="search for users"
@@ -113,7 +115,13 @@ function AdminAreaUsersList() {
                     />
                 </Box>
                 <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                    <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                    <Box
+                        sx={{
+                            padding: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between"
+                        }}>
                         <Typography variant="subtitle1">
                             {data?.users.totalCount} user{data?.users.totalCount === 1 ? '' : 's'}
                         </Typography>
@@ -129,7 +137,9 @@ function AdminAreaUsersList() {
                     {(edges.length === 0) && search !== '' && <Typography
                         align="center"
                         color="textSecondary"
-                        padding={4}
+                        sx={{
+                            padding: 4
+                        }}
                     >
                         No users matching search <strong>{search}</strong>
                     </Typography>}

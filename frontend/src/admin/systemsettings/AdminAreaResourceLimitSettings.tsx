@@ -123,7 +123,9 @@ function LimitRow({ limit, editing, saving, mobile, onEdit, onCancel, onSave }: 
     );
 
     const saveCancel = (
-        <Stack direction="row" spacing={1} justifyContent="flex-end">
+        <Stack direction="row" spacing={1} sx={{
+            justifyContent: "flex-end"
+        }}>
             <Button size="small" variant="outlined" color="primary" loading={saving} disabled={!changed} onClick={() => onSave(Number(draft.trim()))}>Save</Button>
             <Button size="small" color="inherit" disabled={saving} onClick={onCancel}>Cancel</Button>
         </Stack>
@@ -140,7 +142,12 @@ function LimitRow({ limit, editing, saving, mobile, onEdit, onCancel, onSave }: 
     if (mobile) {
         return (
             <Box component="li" sx={{ listStyle: 'none', px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider', '&:last-of-type': { borderBottom: 0 } }}>
-                <Box display="flex" alignItems="center" gap={1}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1
+                    }}>
                     <Typography variant="body2" sx={{ flexGrow: 1, overflowWrap: 'anywhere' }}>{limit.display}</Typography>
                     {!editing && editButton}
                 </Box>

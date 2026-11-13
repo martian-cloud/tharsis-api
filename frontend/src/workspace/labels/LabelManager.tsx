@@ -172,8 +172,10 @@ function LabelManager({
                 onClose={handleClose}
                 maxWidth="md"
                 fullWidth
-                PaperProps={{
-                    sx: { minHeight: '400px' }
+                slotProps={{
+                    paper: {
+                        sx: { minHeight: '400px' }
+                    }
                 }}
             >
                 <DialogTitle>

@@ -280,7 +280,12 @@ function EditCleanupPolicy({ namespacePath }: Props) {
 
     if (!CLEANUP_POLICY_KINDS[kind]) {
         return (
-            <Box display="flex" justifyContent="center" mt={4}>
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    mt: 4
+                }}>
                 <Typography color="textSecondary">Policy kind not found.</Typography>
             </Box>
         );

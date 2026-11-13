@@ -70,7 +70,7 @@ export function AgentSessionRuntimeProvider({ children }: Readonly<{ children: R
         { title: "How to get started with Tharsis", prompt: "How do I get started with Tharsis?" },
     ], []);
 
-    const allSuggestions = useMemo(() => [...copilotState?.suggestions ?? [], ...defaultSuggestions].map(s => ({ ...s, label: '' })), [copilotState?.suggestions, defaultSuggestions]);
+    const allSuggestions = useMemo(() => [...(copilotState?.suggestions ?? []), ...defaultSuggestions].map(s => ({ ...s, label: '' })), [copilotState?.suggestions, defaultSuggestions]);
     const suggestionsKey = useMemo(() => allSuggestions.map(s => s.prompt).join('|'), [allSuggestions]);
 
     const aui = useAui({

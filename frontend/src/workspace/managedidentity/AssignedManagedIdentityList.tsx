@@ -47,7 +47,13 @@ function AssignedManagedIdentityList(props: Props) {
             />
             <Typography variant="h5" gutterBottom>Assigned Managed Identities</Typography>
             <Suspense fallback={
-                <Box padding={4} display="flex" justifyContent="center" alignItems="center">
+                <Box
+                    sx={{
+                        padding: 4,
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center"
+                    }}>
                     <CircularProgress />
                 </Box>
             }>
@@ -193,14 +199,20 @@ function AssignedManagedIdentityListContent(props: AssignedManagedIdentityListCo
         <Box>
             {edges.length > 0 &&
                 <Paper variant="outlined" sx={{ marginTop: 4, marginBottom: 4 }}>
-                    <Box padding={2}>
+                    <Box sx={{
+                        padding: 2
+                    }}>
                         <Typography gutterBottom>
                             Assign Managed Identity
                         </Typography>
                         <Typography variant="body2">
                             The managed identities assigned to this workspace will be automatically used by runs triggered against this workspace.
                         </Typography>
-                        <Box display="flex" marginTop={2}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                marginTop: 2
+                            }}>
                             <ManagedIdentityAutocomplete
                                 value={selected}
                                 namespacePath={workspacePath}
@@ -226,7 +238,9 @@ function AssignedManagedIdentityListContent(props: AssignedManagedIdentityListCo
                 No managed identities have been created in any parent group
             </NoResults>}
 
-            {assignedManagedIdentities.length > 0 && <Box marginTop={2}>
+            {assignedManagedIdentities.length > 0 && <Box sx={{
+                marginTop: 2
+            }}>
                 <Typography variant="h6" gutterBottom>
                     {assignedManagedIdentities.length} Assigned Managed Identit{assignedManagedIdentities.length === 1 ? 'y' : 'ies'}
                 </Typography>
@@ -247,7 +261,7 @@ function AssignedManagedIdentityListContent(props: AssignedManagedIdentityListCo
                 </ResponsiveTable>
             </Box>}
         </Box>
-    )
+    );
 }
 
 export default AssignedManagedIdentityList

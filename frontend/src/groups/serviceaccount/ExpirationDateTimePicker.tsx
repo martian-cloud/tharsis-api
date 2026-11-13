@@ -44,7 +44,13 @@ function ExpirationDateTimePicker({ value, onChange, maxExpirationDays, disabled
                     closeOnSelect={false}
                 />
             </LocalizationProvider>
-            <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>
+            <Typography
+                variant="caption"
+                color="textSecondary"
+                sx={{
+                    display: "block",
+                    mt: 0.5
+                }}>
                 {value?.isValid()
                     ? <>Secret will expire <Timestamp timestamp={value.toISOString()} /></>
                     : `Min: ${MIN_EXPIRATION_DAYS} day, max and default: ${maxExpirationDays} days`}

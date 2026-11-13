@@ -90,11 +90,22 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
                 <RunAnnotations fragmentRef={data} emptyPlaceholder="--" maxVisible={3} />
             </TableCell>
             <TableCell>
-                <Box display="flex" alignItems="center" gap={1}>
-                    <Box display="flex" flexShrink={0}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1
+                    }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            flexShrink: 0
+                        }}>
                         <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={24} />
                     </Box>
-                    <Box minWidth={0}>
+                    <Box sx={{
+                        minWidth: 0
+                    }}>
                         <Timestamp timestamp={data.metadata.createdAt} />
                     </Box>
                 </Box>
@@ -118,8 +129,8 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
                             to={runPath}
                             component={LinkRouter}
                             underline="hover"
-                            fontWeight={500}
                             variant="body2"
+                            sx={{ fontWeight: 500 }}
                             color="textPrimary"
                         >
                             {`${data.id.substring(0, 8)}...`}
@@ -140,7 +151,9 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
                         <Typography variant="body2" color="textSecondary">
                             created <Timestamp variant="inherit" color="inherit" timestamp={data.metadata.createdAt} />
                         </Typography>
-                        <Box mt={0.5}>
+                        <Box sx={{
+                            mt: 0.5
+                        }}>
                             <RunAnnotations fragmentRef={data} maxVisible={3} />
                         </Box>
                     </Stack>

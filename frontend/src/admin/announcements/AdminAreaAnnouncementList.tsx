@@ -134,15 +134,21 @@ function AdminAreaAnnouncementList() {
                         { title: "announcements", path: 'announcements' }
                     ]}
                 />
-                <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        marginTop: 4
+                    }}>
                     <Box
-                        padding={4}
-                        display="flex"
-                        flexDirection="column"
-                        justifyContent="center"
-                        alignItems="center"
-                        sx={{ maxWidth: 600 }}
-                    >
+                        sx={{
+                            padding: 4,
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            maxWidth: 600
+                        }}>
                         <Typography variant="h6">Get started with announcements</Typography>
                         <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
                             {DESCRIPTION}
@@ -195,7 +201,13 @@ function AdminAreaAnnouncementList() {
 
             <Box sx={{ marginTop: 2 }}>
                 <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                    <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                    <Box
+                        sx={{
+                            padding: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between"
+                        }}>
                         <Typography variant="subtitle1">
                             {announcements.length} announcement{announcements.length === 1 ? '' : 's'}
                         </Typography>

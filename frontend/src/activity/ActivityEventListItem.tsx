@@ -52,7 +52,13 @@ function ActivityEventListItem({ fragmentRef, icon, primary, secondary }: Props)
             </ListItemIcon>
             <Box>
                 <Box>
-                    <Box display="flex" alignItems="center" flex={1} mb={0.5}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            flex: 1,
+                            mb: 0.5
+                        }}>
                         {data.initiator.__typename === 'User' && <Gravatar width={18} height={18} email={data.initiator.email} />}
                         {data.initiator.__typename === 'ServiceAccount' && <Avatar
                             variant="rounded"
@@ -60,17 +66,28 @@ function ActivityEventListItem({ fragmentRef, icon, primary, secondary }: Props)
                         >
                             {data.initiator.name[0].toUpperCase()}
                         </Avatar>}
-                        <Typography ml={0.5} variant="body2" component="span" fontWeight={600} color="textSecondary">
+                        <Typography
+                            variant="body2"
+                            component="span"
+                            color="textSecondary"
+                            sx={{
+                                ml: 0.5,
+                                fontWeight: 600
+                            }}>
                             {data.initiator.__typename === 'User' && data.initiator.username}
                             {data.initiator.__typename === 'ServiceAccount' && data.initiator.resourcePath}
                         </Typography>
-                        <Timestamp ml={2} variant="body2" color="textSecondary" timestamp={data.metadata.createdAt} />
+                        <Timestamp variant="body2" color="textSecondary" timestamp={data.metadata.createdAt} sx={{ ml: 2 }} />
                     </Box>
                     <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>
                         {primary}
                     </Typography>
                 </Box>
-                {secondary && <Box mt={1} display="flex">
+                {secondary && <Box
+                    sx={{
+                        mt: 1,
+                        display: "flex"
+                    }}>
                     {secondary}
                 </Box>}
             </Box>

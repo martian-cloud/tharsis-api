@@ -101,11 +101,29 @@ function AdminAreaUserListItem({ fragmentRef }: Props) {
     const cardMode = useCardMode();
 
     const name = (
-        <Box display="flex" alignItems="center">
+        <Box
+            sx={{
+                display: "flex",
+                alignItems: "center"
+            }}>
             <Gravatar width={24} height={24} email={data.email} />
-            <Box ml={2} sx={{ minWidth: 0 }}>
-                <Box display="flex" alignItems="center">
-                    <Typography fontWeight={500} noWrap sx={{ minWidth: 0, flexShrink: 1 }}>{data.username}</Typography>
+            <Box
+                sx={{
+                    ml: 2,
+                    minWidth: 0
+                }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center"
+                    }}>
+                    <Typography
+                        noWrap
+                        sx={{
+                            fontWeight: 500,
+                            minWidth: 0,
+                            flexShrink: 1
+                        }}>{data.username}</Typography>
                     {data.admin && <Chip sx={{ ml: 1, flexShrink: 0 }} color="secondary" size="xs" label="Admin" />}
                     {!data.active && <Chip sx={{ ml: 1, flexShrink: 0 }} color="warning" size="xs" label="Inactive" />}
                 </Box>
@@ -115,7 +133,13 @@ function AdminAreaUserListItem({ fragmentRef }: Props) {
     );
 
     const actions = (
-        <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
+        <Box
+            sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 1
+            }}>
             <TRNButton trn={data.metadata.trn} size="small" />
             {showDropdownMenuButton && <>
                 <IconButton

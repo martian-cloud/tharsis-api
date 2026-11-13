@@ -141,7 +141,9 @@ function LabelFilter({
                         <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
                             Add Label Filter:
                         </Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-start">
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{
+                            alignItems: "flex-start"
+                        }}>
                             <Box sx={{ flex: 1, width: '100%', minWidth: { sm: 200 } }}>
                                 <TextField
                                     size="small"

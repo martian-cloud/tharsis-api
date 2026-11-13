@@ -47,7 +47,9 @@ function RunnerSettingsForm({ formData, fragmentRef, error, onChange, showInheri
                 {error.message}
             </Alert>}
             <Typography variant="subtitle1" gutterBottom>Tags</Typography>
-            <Typography variant="body2" mb={1} color="textSecondary">
+            <Typography variant="body2" color="textSecondary" sx={{
+                mb: 1
+            }}>
                 Use tags to target specific runners. The tags will be automatically added to any jobs created within this namespace.
             </Typography>
             {!showInheritOption && <Box>
@@ -61,7 +63,11 @@ function RunnerSettingsForm({ formData, fragmentRef, error, onChange, showInheri
                 />
                 {formData.inherit && data.inherited && <Paper sx={{ p: 2 }}>
                     {data.value.length > 0 && <>
-                        <Box display="flex" gap={0.5}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                gap: 0.5
+                            }}>
                             <Typography variant='body2' color='textSecondary'>The following tags inherited from group</Typography>
                             <Link
                                 to={`/groups/${data.namespacePath}`}

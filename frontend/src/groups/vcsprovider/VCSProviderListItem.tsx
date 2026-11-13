@@ -44,9 +44,13 @@ function VCSProviderListItem({ fragmentRef, inherited }: Props) {
             </Avatar>
             <ListItemText
                 primary={<Box>
-                    <Typography fontWeight={500}>{data.name}</Typography>
+                    <Typography sx={{
+                        fontWeight: 500
+                    }}>{data.name}</Typography>
                     {data.description && <Typography variant="body2" color="textSecondary">{data.description}</Typography>}
-                    {inherited && <Typography mt={0.5} color="textSecondary" variant="caption">Inherited from group <strong>{data.groupPath}</strong></Typography>}
+                    {inherited && <Typography color="textSecondary" variant="caption" sx={{
+                        mt: 0.5
+                    }}>Inherited from group <strong>{data.groupPath}</strong></Typography>}
                 </Box>}
             />
             <Timestamp variant="body2" color="textSecondary" timestamp={data.metadata.updatedAt} />

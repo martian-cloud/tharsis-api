@@ -116,7 +116,9 @@ function AdminAreaEmailSuppressionListContent() {
             <Typography variant="h5" gutterBottom>Email Suppressions</Typography>
             <Typography variant="body2" sx={{ mb: 2 }}>{DESCRIPTION}</Typography>
 
-            <Box marginBottom={2}>
+            <Box sx={{
+                marginBottom: 2
+            }}>
                 <SearchInput
                     fullWidth
                     placeholder="Search by address"
@@ -126,7 +128,9 @@ function AdminAreaEmailSuppressionListContent() {
             </Box>
 
             <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                <Box padding={2}>
+                <Box sx={{
+                    padding: 2
+                }}>
                     <Typography variant="subtitle1">
                         {totalCount} {totalCount === 1 ? 'suppressed address' : 'suppressed addresses'}
                     </Typography>
@@ -141,7 +145,9 @@ function AdminAreaEmailSuppressionListContent() {
                 borderBottomRightRadius: 4,
             }}>
                 {suppressions.length === 0 ? (
-                    <Typography align="center" color="textSecondary" padding={4}>
+                    <Typography align="center" color="textSecondary" sx={{
+                        padding: 4
+                    }}>
                         {search ? <>No suppressed addresses matching <strong>{search}</strong></> : 'No suppressed addresses'}
                     </Typography>
                 ) : (

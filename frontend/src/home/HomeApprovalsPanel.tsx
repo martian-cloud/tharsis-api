@@ -40,8 +40,14 @@ function HomeApprovalsPanel() {
             <Badge badgeContent={count || null} color="warning">
                 <ApprovalIcon color={count > 0 ? 'warning' : undefined} sx={{ width: 28, height: 28 }} />
             </Badge>
-            <Box flex={1} minWidth={0}>
-                <Typography variant="subtitle1" fontWeight={600}>Awaiting My Approval</Typography>
+            <Box
+                sx={{
+                    flex: 1,
+                    minWidth: 0
+                }}>
+                <Typography variant="subtitle1" sx={{
+                    fontWeight: 600
+                }}>Awaiting My Approval</Typography>
                 <Typography variant="body2" color="textSecondary" noWrap>
                     {latestNode
                         ? <>latest <Timestamp variant="inherit" color="inherit" timestamp={latestNode.metadata.createdAt} /></>

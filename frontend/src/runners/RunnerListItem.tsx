@@ -33,15 +33,24 @@ function RunnerListItem({ fragmentRef, inherited }: Props) {
 
     const name = (
         <>
-            <Typography fontWeight={500}>
+            <Typography sx={{
+                fontWeight: 500
+            }}>
                 <Link color="inherit" to={data.id}>{data.name}</Link>
             </Typography>
-            {inherited && <Typography mt={0.5} color="textSecondary" variant="caption">Inherited from group <strong>{data.groupPath}</strong></Typography>}
+            {inherited && <Typography color="textSecondary" variant="caption" sx={{
+                mt: 0.5
+            }}>Inherited from group <strong>{data.groupPath}</strong></Typography>}
         </>
     );
 
     const created = (
-        <Box display="flex" alignItems="center" gap={0.5}>
+        <Box
+            sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5
+            }}>
             <Timestamp variant="body2" timestamp={data.metadata.createdAt} />
             <Typography variant="body2">by</Typography>
             <ActorDisplay fragmentRef={data.createdByActor} variant="avatar" size={20} />

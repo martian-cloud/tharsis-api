@@ -222,8 +222,14 @@ function EditPolicy({ ownerPath, groupPath }: Props) {
                 onChange={setFormData}
                 error={error}
             />
-            <Divider light sx={{ marginTop: 4 }} />
-            <Box marginTop={2}>
+            <Divider
+                sx={{
+                    marginTop: 4,
+                    opacity: "0.6"
+                }} />
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     loading={commitUpdateInFlight}
                     variant="outlined"

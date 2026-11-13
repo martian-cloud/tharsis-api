@@ -36,17 +36,17 @@ function HomeTeamListItem({ fragmentRef, last }: Props) {
             </Avatar>
             <ListItemText
                 primary={<Typography
-                    fontWeight={500}
                     variant="body2"
                     color="textPrimary"
                     sx={{
+                        fontWeight: 500,
                         textDecoration: 'underline',
                         textDecorationColor: 'transparent',
+
                         '&:hover': {
                             textDecorationColor: 'currentColor'
                         }
-                    }}
-                >
+                    }}>
                     {data.name}
                 </Typography>} />
         </ListItemButton>

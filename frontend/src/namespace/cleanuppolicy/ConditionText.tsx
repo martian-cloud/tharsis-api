@@ -10,7 +10,11 @@ import { Condition } from './types';
 // glob, or a status -- so it reads as a literal rather than blending into the surrounding prose.
 // Exported so Verdict can highlight its own numbers the same way.
 export function Value({ children }: { children: React.ReactNode }) {
-    return <Typography component="span" variant="code" color="primary.main">{children}</Typography>;
+    return (
+        <Typography component="span" variant="code" sx={{
+            color: "primary.main"
+        }}>{children}</Typography>
+    );
 }
 
 // ConditionText renders one condition as prose (a muted label, and — if the condition carries a
@@ -19,7 +23,9 @@ export function Value({ children }: { children: React.ReactNode }) {
 function ConditionText({ label, value }: Condition) {
     return (
         <>
-            <Typography component="span" variant="caption" color="text.secondary">{label}</Typography>
+            <Typography component="span" variant="caption" sx={{
+                color: "text.secondary"
+            }}>{label}</Typography>
             {value && <>{' '}<Value>{value}</Value></>}
         </>
     );

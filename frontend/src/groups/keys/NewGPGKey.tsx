@@ -102,7 +102,11 @@ function NewGPGKey(props: Props) {
                 ]}
             />
             <Typography variant="h5">New GPG Key</Typography>
-            <Box marginBottom={2} marginTop={2}>
+            <Box
+                sx={{
+                    marginBottom: 2,
+                    marginTop: 2
+                }}>
                 {error && <Alert sx={{ marginTop: 2, marginBottom: 2 }} severity={error.severity}>
                     {error.message}
                 </Alert>}
@@ -117,8 +121,12 @@ function NewGPGKey(props: Props) {
                     onChange={event => setPubKey(event.target.value)}
                 />
             </Box>
-            <Divider light />
-            <Box marginTop={2}>
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     loading={isInFlight}
                     variant="outlined"

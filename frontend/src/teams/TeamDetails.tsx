@@ -40,7 +40,12 @@ function TeamDetails({ queryRef }: Props) {
 
     if (data) {
         return (
-            <Box maxWidth={1000} margin="auto" padding={2}>
+            <Box
+                sx={{
+                    maxWidth: 1000,
+                    margin: "auto",
+                    padding: 2
+                }}>
                 <Suspense fallback={<Box
                     sx={{
                         width: '100%',
@@ -61,7 +66,12 @@ function TeamDetails({ queryRef }: Props) {
                             '& > *': { marginBottom: 2 },
                         }
                     }}>
-                        <Box display="flex" marginBottom={4} alignItems="center">
+                        <Box
+                            sx={{
+                                display: "flex",
+                                marginBottom: 4,
+                                alignItems: "center"
+                            }}>
                             <Avatar
                                 sx={{
                                     width: 56,
@@ -86,9 +96,16 @@ function TeamDetails({ queryRef }: Props) {
             </Box>
         );
     } else {
-        return <Box display="flex" justifyContent="center" paddingTop={2}>
-            <Typography color="textSecondary">Team not found</Typography>
-        </Box>;
+        return (
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    paddingTop: 2
+                }}>
+                <Typography color="textSecondary">Team not found</Typography>
+            </Box>
+        );
     }
 }
 

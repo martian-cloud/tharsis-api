@@ -1,14 +1,14 @@
 import GroupIcon from '@mui/icons-material/FolderOutlined';
 import WorkspaceIcon from '@mui/icons-material/WorkspacesOutlined';
-import MemberIcon from '@mui/icons-material/PeopleOutline';
+import MemberIcon from '@mui/icons-material/PeopleOutlined';
 import SettingsIcon from '@mui/icons-material/SettingsOutlined';
 import StateVersionIcon from '@mui/icons-material/InsertDriveFileOutlined'
 import VariableIcon from '@mui/icons-material/WindowOutlined';
-import UserIcon from '@mui/icons-material/PersonOutline';
+import UserIcon from '@mui/icons-material/PersonOutlined';
 import AnnouncementIcon from '@mui/icons-material/Campaign';
 // A question mark rather than a trash can: a target the API declined to resolve is far more often one
 // the viewer lost access to than one that was deleted, and the two cannot be told apart client-side.
-import UnavailableResourceIcon from '@mui/icons-material/HelpOutline';
+import UnavailableResourceIcon from '@mui/icons-material/HelpOutlined';
 import TharsisIcon from './TharsisIcon';
 import {
     SourceMerge as VCSProviderIcon,

@@ -65,49 +65,54 @@ function AdminArea({ queryRef }: Props) {
         }
     }, [location]);
 
-    return (
-        data.me?.adminModeEnabled ?
-            <Box display="flex">
-                <AdminDetailsDrawer />
-                <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
-                    <Suspense fallback={<Box
-                        sx={{
-                            width: '100%',
-                            height: `calc(100vh - 64px)`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}
-                    >
-                        <CircularProgress />
-                    </Box>}>
-                        <PageLayoutProvider>
-                            <Routes>
-                                <Route index path={`users/*`} element={<AdminAreaUsers />} />
-                                <Route path={`runners/*`} element={<AdminAreaRunners />} />
-                                <Route path={`announcements`} element={<AdminAreaAnnouncementList />} />
-                                <Route path={`announcements/new`} element={<AdminAreaNewAnnouncement />} />
-                                <Route path={`announcements/:announcementId/edit`} element={<EditAdminAreaAnnouncement />} />
-                                <Route path={`email_outbox`} element={<AdminAreaEmailOutboxList />} />
-                                <Route path={`email_outbox/:outboxId`} element={<AdminAreaEmailOutboxDetails />} />
-                                <Route path={`email_suppressions`} element={<AdminAreaEmailSuppressionList />} />
-                                <Route path={`system_settings`} element={<AdminAreaSystemSettings />} />
-                                <Route path={`configuration`} element={<AdminAreaConfigurationPage />} />
-                                <Route path={`resource_limits`} element={<AdminAreaResourceLimitsPage />} />
-                                <Route path={`logs`} element={<AdminAreaLogs />} />
-                            </Routes>
-                        </PageLayoutProvider>
-                    </Suspense>
-                </Box>
-            </Box>
-            :
-            <Box padding={4} display="flex" flexDirection="column" alignItems="center" justifyContent="center" textAlign="center">
-                <Typography variant="h6">You do not have access to the Admin Area</Typography>
-                <Typography color="textSecondary">
-                    Contact the system administrator for information about access
-                </Typography>
-            </Box>
-    );
+    return (data.me?.adminModeEnabled ? <Box sx={{
+        display: "flex"
+    }}>
+        <AdminDetailsDrawer />
+        <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Suspense fallback={<Box
+                sx={{
+                    width: '100%',
+                    height: `calc(100vh - 64px)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}
+            >
+                <CircularProgress />
+            </Box>}>
+                <PageLayoutProvider>
+                    <Routes>
+                        <Route index path={`users/*`} element={<AdminAreaUsers />} />
+                        <Route path={`runners/*`} element={<AdminAreaRunners />} />
+                        <Route path={`announcements`} element={<AdminAreaAnnouncementList />} />
+                        <Route path={`announcements/new`} element={<AdminAreaNewAnnouncement />} />
+                        <Route path={`announcements/:announcementId/edit`} element={<EditAdminAreaAnnouncement />} />
+                        <Route path={`email_outbox`} element={<AdminAreaEmailOutboxList />} />
+                        <Route path={`email_outbox/:outboxId`} element={<AdminAreaEmailOutboxDetails />} />
+                        <Route path={`email_suppressions`} element={<AdminAreaEmailSuppressionList />} />
+                        <Route path={`system_settings`} element={<AdminAreaSystemSettings />} />
+                        <Route path={`configuration`} element={<AdminAreaConfigurationPage />} />
+                        <Route path={`resource_limits`} element={<AdminAreaResourceLimitsPage />} />
+                        <Route path={`logs`} element={<AdminAreaLogs />} />
+                    </Routes>
+                </PageLayoutProvider>
+            </Suspense>
+        </Box>
+    </Box> : <Box
+        sx={{
+            padding: 4,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center"
+        }}>
+        <Typography variant="h6">You do not have access to the Admin Area</Typography>
+        <Typography color="textSecondary">
+            Contact the system administrator for information about access
+        </Typography>
+    </Box>);
 }
 
 export default AdminAreaEntryPoint;

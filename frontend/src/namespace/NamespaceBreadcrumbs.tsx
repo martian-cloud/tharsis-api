@@ -19,7 +19,9 @@ function NamespaceBreadcrumbs(props: Props) {
     const childRoutePaths = props.childRoutes?.map(r => r.path) ?? [];
 
     return (
-        <Stack direction="row" spacing={2} marginBottom={2}>
+        <Stack direction="row" spacing={2} sx={{
+            marginBottom: 2
+        }}>
             <Breadcrumbs aria-label="group breadcrumb">
                 <Link color="inherit" to={'/groups'}>
                     groups
@@ -31,7 +33,9 @@ function NamespaceBreadcrumbs(props: Props) {
                 ))}
                 {props?.childRoutes?.map(({ title, path, disabled }, i) => (
                     disabled ?
-                        <Typography key={path} color="inherit">{title}</Typography>
+                        <Typography key={path} sx={{
+                            color: "inherit"
+                        }}>{title}</Typography>
                         : path[0] === '/' ?
                             <Link key={path} color="inherit" to={path}>{title}</Link>
                             :

@@ -137,7 +137,9 @@ function AdminAreaMaintenanceSettings() {
             </Typography>
 
             <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" color="textSecondary" paragraph>
+                <Typography variant="body2" color="textSecondary" sx={{
+                    marginBottom: "16px"
+                }}>
                     When maintenance mode is enabled, the system will go into read-only mode
                     and users will not be able to make changes or perform write operations.
                 </Typography>

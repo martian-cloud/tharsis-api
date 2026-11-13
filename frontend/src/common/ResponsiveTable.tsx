@@ -119,7 +119,13 @@ export function ResponsiveRow({ cells, onClick }: ResponsiveRowProps) {
             >
                 <Stack spacing={1}>
                     {(primaryCells.length > 0 || actionCells.length > 0) && (
-                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={2}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "flex-start",
+                                gap: 2
+                            }}>
                             <Box sx={{ minWidth: 0 }}>
                                 {primaryCells.map((cell, index) => <Box key={index}>{cell.content}</Box>)}
                             </Box>
@@ -131,13 +137,26 @@ export function ResponsiveRow({ cells, onClick }: ResponsiveRowProps) {
                         </Box>
                     )}
                     {labeledCells.map((cell, index) => (
-                        <Box key={index} display="flex" alignItems="center" gap={1} sx={{ minWidth: 0 }}>
+                        <Box
+                            key={index}
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                minWidth: 0
+                            }}>
                             <Typography variant="body2" color="textSecondary" sx={{ minWidth: 100, flexShrink: 0 }}>{cell.label}</Typography>
                             <Box sx={{ minWidth: 0 }}>{dataContent(cell)}</Box>
                         </Box>
                     ))}
                     {footerCells.length > 0 && (
-                        <Box display="flex" justifyContent="flex-end" gap={1} sx={{ pt: 2 }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                gap: 1,
+                                pt: 2
+                            }}>
                             {footerCells.map((cell, index) => <Box key={index}>{cell.content}</Box>)}
                         </Box>
                     )}

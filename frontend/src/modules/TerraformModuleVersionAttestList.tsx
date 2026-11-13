@@ -135,7 +135,13 @@ function TerraformModuleVersionAttestList({ fragmentRef }: Props) {
     return (edges.length > 0) ?
         <Box>
             <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+                <Box
+                    sx={{
+                        padding: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between"
+                    }}>
                     <Typography variant="subtitle1">
                         {edges.length} attestation{edges.length === 1 ? '' : 's'}
                     </Typography>
@@ -182,9 +188,15 @@ function TerraformModuleVersionAttestList({ fragmentRef }: Props) {
             )}
         </Box>
         :
-        <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+        <Box
+            sx={{
+                padding: 2,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center"
+            }}>
             <Typography color="textSecondary">No attestations for this version</Typography>
-        </Box>
+        </Box>;
 }
 
 export default TerraformModuleVersionAttestList

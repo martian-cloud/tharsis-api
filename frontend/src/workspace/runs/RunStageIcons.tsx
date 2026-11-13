@@ -74,9 +74,17 @@ function RunStageIcons({ fragmentRef }: Props) {
     // hovered as one — matching RunStatusChip, where the tooltip covers the whole chip rather than
     // the glyph alone. The stage tally to their right is deliberately left outside it.
     const statusReadout = (
-        <Box display="flex" alignItems="center" sx={{ gap: '8px', minWidth: 0 }}>
+        <Box
+            sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: '8px',
+                minWidth: 0
+            }}>
             <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: activeInfo.color, flexShrink: 0 }} />
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" sx={{
+                color: "text.secondary"
+            }}>
                 {runStatusLabel}
             </Typography>
             {/* Amber regardless of the run's status colour: the glyph is the advisory signal, the
@@ -94,7 +102,12 @@ function RunStageIcons({ fragmentRef }: Props) {
 
     return (
         <Box>
-            <Box display="flex" sx={{ gap: '3px', mb: 0.5 }}>
+            <Box
+                sx={{
+                    display: "flex",
+                    gap: '3px',
+                    mb: 0.5
+                }}>
                 {stages.map(stage => {
                     const info = RunStageStatusTypes[stage.status.toLowerCase()] ?? RunStageStatusTypes.created;
                     const isRunning = RUNNING_STATUSES.has(stage.status.toLowerCase());
@@ -128,7 +141,12 @@ function RunStageIcons({ fragmentRef }: Props) {
                     );
                 })}
             </Box>
-            <Box display="flex" alignItems="center" sx={{ gap: '8px' }}>
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: '8px'
+                }}>
                 {data.hasAdvisoryFailures
                     ? <Tooltip title={ADVISORY_FAILURES_TOOLTIP}>{statusReadout}</Tooltip>
                     : statusReadout}

@@ -116,7 +116,9 @@ function EditVCSProviderOAuth(props: Props) {
                 onChange={(data: OAuthFormData) => setFormData(data)}
                 error={error}
             />
-            <Box marginTop={2}>
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     loading={isInFlight}
                     disabled={formData.oAuthClientId === '' || formData.oAuthClientSecret === ''}

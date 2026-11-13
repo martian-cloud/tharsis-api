@@ -89,7 +89,13 @@ function WorkspaceGeneralSettings(props: Props) {
             <SettingsSection section="general" title="General Settings">
                 <Box>
                     <Box>
-                        <Typography mt={2} mb={2} variant="subtitle1" gutterBottom>Details</Typography>
+                        <Typography
+                            variant="subtitle1"
+                            gutterBottom
+                            sx={{
+                                mt: 2,
+                                mb: 2
+                            }}>Details</Typography>
                         <TextField
                             disabled
                             size="small"

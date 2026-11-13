@@ -35,7 +35,13 @@ function TerraformModuleForm({ data, onChange, error }: Props) {
                         <MenuItem value="private">Private</MenuItem>
                     </Select>
                 </FormControl>
-                <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
+                <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    sx={{
+                        display: "block",
+                        mt: 1
+                    }}>
                     Internal modules are accessible to all groups. Private modules are restricted to its parent group and subgroups.
                 </Typography>
             </Box>

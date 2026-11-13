@@ -24,9 +24,11 @@ function resolveLanguage(language: string): string {
 function MarkdownParagraph({ ...props }: any) {
     return (
         <Typography
-            sx={{ wordBreak: 'break-word' }}
-            fontSize={'.85rem'}
-            paragraph>
+            sx={{
+                fontSize: '.85rem',
+                wordBreak: 'break-word',
+                marginBottom: "16px"
+            }}>
             {props.children}
         </Typography>
     );

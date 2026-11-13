@@ -48,7 +48,11 @@ function EditPackageVersion() {
     const version = queryData.node?.version;
 
     return (
-        <Box flexGrow={1} minWidth={0}>
+        <Box
+            sx={{
+                flexGrow: 1,
+                minWidth: 0
+            }}>
             {pkg && version != null && <EditPackageVersionForm
                 packageId={pkg.id!}
                 name={pkg.name!}
@@ -57,7 +61,12 @@ function EditPackageVersion() {
                 versionId={versionId as string}
                 version={version}
             />}
-            {(!pkg || version == null) && <Box display="flex" justifyContent="center" marginTop={4}>
+            {(!pkg || version == null) && <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
                 <Typography variant="h6" color="textSecondary">
                     pkg version not found
                 </Typography>
@@ -137,9 +146,23 @@ function EditPackageVersionForm({ packageId, name, groupPath, kind, versionId, v
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: `calc(100vh - ${headerHeight}px - 32px)` }}>
-            <Box marginBottom={2} display="flex" justifyContent="space-between" alignItems="flex-start" gap={2}>
-                <Box minWidth={0}>
-                    <Box display="flex" alignItems="center" gap={1}>
+            <Box
+                sx={{
+                    marginBottom: 2,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: 2
+                }}>
+                <Box sx={{
+                    minWidth: 0
+                }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1
+                        }}>
                         <Typography variant="h6">{name}</Typography>
                         <Chip variant="outlined" size="small" label={`editing ${version}`} />
                     </Box>
@@ -172,14 +195,21 @@ function EditPackageVersionForm({ packageId, name, groupPath, kind, versionId, v
             <Box sx={{ flexGrow: 1, minHeight: 0, marginTop: 2, display: 'flex', gap: 2 }}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                     {files == null
-                        ? <Box display="flex" justifyContent="center" padding={4}><CircularProgress /></Box>
+                        ? <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            padding: 4
+                        }}><CircularProgress /></Box>
                         : <PackageFilesEditor files={files} onChange={setFiles} />}
                 </Box>
 
                 {kind === 'OPA_POLICY' && showSampleInput && <OPASampleInputsPanel />}
             </Box>
 
-            <Box marginTop={2}>
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     sx={{ marginRight: 2 }}
                     loading={uploading}

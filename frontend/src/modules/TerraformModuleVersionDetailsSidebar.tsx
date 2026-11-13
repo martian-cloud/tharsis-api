@@ -73,10 +73,16 @@ function TerraformModuleVersionDetailsSidebar(props: Props) {
             anchor='right'
             onClose={onClose}
         >
-            <Box padding={2}>
+            <Box sx={{
+                padding: 2
+            }}>
                 <Section>
                     <FieldLabel>Version</FieldLabel>
-                    <Box display="flex" alignItems="center">
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center"
+                        }}>
                         <Typography>
                             {data.version}
                         </Typography>
@@ -99,7 +105,11 @@ function TerraformModuleVersionDetailsSidebar(props: Props) {
                 </Section>
                 {data && <Section>
                     <FieldLabel>Published</FieldLabel>
-                    <Box display="flex" alignItems="center">
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center"
+                        }}>
                         <Typography sx={{ marginRight: 1 }}>
                             <Timestamp component="span" timestamp={data.metadata.createdAt} /> by
                         </Typography>

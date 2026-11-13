@@ -129,8 +129,14 @@ function EditManagedIdentity(props: Props) {
                 onChange={(data: FormData) => setFormData(data)}
                 error={error}
             />
-            <Divider light sx={{ marginTop: 4 }} />
-            <Box marginTop={2}>
+            <Divider
+                sx={{
+                    marginTop: 4,
+                    opacity: "0.6"
+                }} />
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     loading={isInFlight}
                     variant="outlined"

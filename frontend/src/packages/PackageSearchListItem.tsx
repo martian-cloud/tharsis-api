@@ -53,7 +53,13 @@ function PackageSearchListItem(props: Props) {
             <ListItemIcon sx={{ minWidth: 40 }}>
                 <PackageIcon color="disabled" />
             </ListItemIcon>
-            <Box flex={1} display="flex" justifyContent="space-between" alignItems="center">
+            <Box
+                sx={{
+                    flex: 1,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                }}>
                 <Box sx={{ minWidth: 0 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                         <Link

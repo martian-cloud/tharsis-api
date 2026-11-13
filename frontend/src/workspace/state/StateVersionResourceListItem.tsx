@@ -63,7 +63,13 @@ function StateVersionResourceListItem(props: Props) {
                 </Box>
             },
             {
-                label: 'Provider', content: <Box display="flex" alignItems="center" gap={1} sx={{ wordBreak: 'break-word' }}>
+                label: 'Provider', content: <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    wordBreak: 'break-word'
+                }}>
                     <ProviderIcon size={20} color="currentColor" />
                     {data.provider}
                 </Box>

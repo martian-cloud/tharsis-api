@@ -56,7 +56,13 @@ function TerraformModuleListItem(props: Props) {
                 <ListItemIcon sx={{ minWidth: 40 }}>
                     <TerraformIcon color="disabled" />
                 </ListItemIcon>
-                <Box flex={1} display="flex" justifyContent="space-between" alignItems="center">
+                <Box
+                    sx={{
+                        flex: 1,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                    }}>
                     <Box>
                         <Link
                             component="div"
@@ -68,7 +74,11 @@ function TerraformModuleListItem(props: Props) {
                             {data.name}/{data.system}
                         </Link>
                         <Box>
-                            {data.latestVersion && <Box display="flex" alignItems="center">
+                            {data.latestVersion && <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center"
+                                }}>
                                 <Typography variant="body2" color="textSecondary">
                                     {data.latestVersion.version}
                                 </Typography>
@@ -78,7 +88,9 @@ function TerraformModuleListItem(props: Props) {
                             </Typography>}
                         </Box>
                         {data.labels && data.labels.length > 0 && (
-                            <Box mt={0.5}>
+                            <Box sx={{
+                                mt: 0.5
+                            }}>
                                 <LabelList
                                     labels={[...data.labels]}
                                     maxVisible={5}
@@ -86,9 +98,16 @@ function TerraformModuleListItem(props: Props) {
                                 />
                             </Box>
                         )}
-                        {props.inherited && <Typography mt={0.5} color="textSecondary" variant="caption">Inherited from group <strong>{data.groupPath}</strong></Typography>}
+                        {props.inherited && <Typography color="textSecondary" variant="caption" sx={{
+                            mt: 0.5
+                        }}>Inherited from group <strong>{data.groupPath}</strong></Typography>}
                     </Box>
-                    <Box display="flex" alignItems="center" gap={1}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1
+                        }}>
                         <Chip sx={{ marginLeft: 2 }} variant="outlined" color={data.private ? 'warning' : 'default'} size="small" label={data.private ? 'private' : 'internal'} />
                         {!props.inherited && <IconButton
                             size="small"

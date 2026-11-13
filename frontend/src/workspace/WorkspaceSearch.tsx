@@ -164,8 +164,16 @@ function WorkspaceSearch({ search = '', labelFilters = [], filterExpanded = fals
 
       {(search !== '' || labelFilters.length > 0 || edges.length !== 0) && <React.Fragment>
         <Typography variant="h5" sx={{ marginBottom: 2 }}>Workspaces</Typography>
-        <Box marginBottom={2} display="flex" gap={1} alignItems="flex-start">
-          <Box flex={1}>
+        <Box
+          sx={{
+            marginBottom: 2,
+            display: "flex",
+            gap: 1,
+            alignItems: "flex-start"
+          }}>
+          <Box sx={{
+            flex: 1
+          }}>
             <SearchInput
               fullWidth
               defaultValue={search}
@@ -193,7 +201,9 @@ function WorkspaceSearch({ search = '', labelFilters = [], filterExpanded = fals
           </Box>
         </Box>
         {filterExpanded && (
-          <Box marginBottom={2}>
+          <Box sx={{
+            marginBottom: 2
+          }}>
             <LabelFilter
               filters={labelFilters}
               onFiltersChange={onLabelFiltersChange}
@@ -202,7 +212,13 @@ function WorkspaceSearch({ search = '', labelFilters = [], filterExpanded = fals
           </Box>
         )}
         <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-          <Box padding={2} display="flex" alignItems="center" justifyContent="space-between">
+          <Box
+            sx={{
+              padding: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between"
+            }}>
             <Typography variant="subtitle1">
               {data.workspaces.totalCount} workspace{data.workspaces.totalCount === 1 ? '' : 's'}
             </Typography>
@@ -243,8 +259,21 @@ function WorkspaceSearch({ search = '', labelFilters = [], filterExpanded = fals
         </InfiniteScroll>
       </React.Fragment>}
 
-      {!search && labelFilters.length === 0 && edges.length === 0 && <Box sx={{ marginTop: 4 }} display="flex" justifyContent="center">
-        <Box padding={4} display="flex" flexDirection="column" justifyContent="center" alignItems="center" sx={{ maxWidth: 600 }}>
+      {!search && labelFilters.length === 0 && edges.length === 0 && <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          marginTop: 4
+        }}>
+        <Box
+          sx={{
+            padding: 4,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            maxWidth: 600
+          }}>
           <Typography variant="h6">You don't have access to any workspaces</Typography>
         </Box>
       </Box>}

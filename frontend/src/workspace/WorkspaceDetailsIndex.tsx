@@ -227,10 +227,16 @@ function WorkspaceDetailsIndex(props: Props) {
                         '& > *:not(:last-child)': { mb: 2 },
                     }
                 }}>
-                <Box display="flex" alignItems="center">
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center"
+                    }}>
                     <NamespaceAvatar name={data.name} type="workspace" size="lg" sx={{ marginRight: 2 }} />
                     <Stack>
-                        <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack direction="row" spacing={1} sx={{
+                            alignItems: "center"
+                        }}>
                             <Typography variant="h5" sx={{ fontWeight: "bold" }}>{data.name}</Typography>
                             {workspaceDestroyed && <Chip size="small" label="Destroyed" sx={{ color: 'runStatus.destroy' }} />}
                         </Stack>
@@ -247,7 +253,9 @@ function WorkspaceDetailsIndex(props: Props) {
                     </Stack>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'stretch', md: 'center' } }}>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} sx={{
+                        alignItems: "center"
+                    }}>
                         <NamespaceFavoriteButton
                             namespacePath={data.fullPath}
                             namespaceType="WORKSPACE"
@@ -323,7 +331,9 @@ function WorkspaceDetailsIndex(props: Props) {
                 </Alert>
             }
 
-            {(data.currentApplyRun || data.currentStateVersion) && <Box marginBottom={2}>
+            {(data.currentApplyRun || data.currentStateVersion) && <Box sx={{
+                marginBottom: 2
+            }}>
                 <WorkspaceDetailsStatusPanel fragmentRef={data} />
             </Box>}
 
@@ -385,7 +395,9 @@ function WorkspaceDetailsIndex(props: Props) {
                             }
                             label={
                                 <Box sx={{ pt: 0.75 }}>
-                                    <Typography variant="subtitle1" fontWeight={500}>Auto apply</Typography>
+                                    <Typography variant="subtitle1" sx={{
+                                        fontWeight: 500
+                                    }}>Auto apply</Typography>
                                     <Typography variant="body2" color="textSecondary">
                                         Automatically apply the destroy plan once it completes successfully, without waiting for manual approval.
                                     </Typography>

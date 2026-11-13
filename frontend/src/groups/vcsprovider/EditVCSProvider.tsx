@@ -120,7 +120,9 @@ function EditVCSProvider(props: Props) {
                 onChange={(data: FormData) => setFormData(data)}
                 error={error}
             />
-            <Box marginTop={2}>
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     loading={isInFlight}
                     variant="outlined"

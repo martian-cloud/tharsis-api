@@ -28,7 +28,9 @@ function TeamMemberListItem({ fragmentRef }: Props) {
     return (
         <TableRow>
             <TableCell sx={{ fontWeight: 'bold' }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
+                <Stack direction="row" spacing={1} sx={{
+                    alignItems: "center"
+                }}>
                     <React.Fragment>
                         <Gravatar width={24} height={24} sx={{ marginRight: 1 }} email={data.user.email ?? ''} />
                         <Box>{data.user.username}</Box>

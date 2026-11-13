@@ -14,7 +14,9 @@ function AdminAreaBreadcrumbs({ childRoutes }: Props) {
     const childRoutePaths = childRoutes?.map(r => r.path) ?? [];
 
     return (
-        <Stack direction="row" spacing={2} marginBottom={2}>
+        <Stack direction="row" spacing={2} sx={{
+            marginBottom: 2
+        }}>
             <Breadcrumbs aria-label="admin breadcrumb">
                 <Link color="inherit" to='/admin'>
                     admin area

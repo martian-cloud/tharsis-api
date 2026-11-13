@@ -29,7 +29,12 @@ function TerraformModuleVersionDocsInputCard({ fragmentRef }: Props) {
             <CardHeader
                 sx={{ pb: 0 }}
                 title={
-                    <Box display="flex" alignItems="center" mb={1}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            mb: 1
+                        }}>
                         <Typography sx={{ fontWeight: 'bold' }} component="code">{variable.name}</Typography>
                         {variable.sensitive && <Chip
                             sx={{ ml: 1 }}
@@ -40,7 +45,9 @@ function TerraformModuleVersionDocsInputCard({ fragmentRef }: Props) {
                         />}
                     </Box>
                 }
-                subheader={variable.type ? <Box display="flex">
+                subheader={variable.type ? <Box sx={{
+                    display: "flex"
+                }}>
                     <SyntaxHighlighter
                         wrapLines
                         customStyle={{ fontSize: 13, padding: '8px', margin: 0 }}
@@ -51,16 +58,26 @@ function TerraformModuleVersionDocsInputCard({ fragmentRef }: Props) {
                 </Box> : <Typography color="textSecondary">No type specified</Typography>}
             />
             <CardContent>
-                {variable.description && <Typography mb={1} color="textSecondary">
+                {variable.description && <Typography color="textSecondary" sx={{
+                    mb: 1
+                }}>
                     {variable.description}
                 </Typography>}
-                {!variable.default && <Box display="flex">
-                    <Typography mr={1}>Default:</Typography>
+                {!variable.default && <Box sx={{
+                    display: "flex"
+                }}>
+                    <Typography sx={{
+                        mr: 1
+                    }}>Default:</Typography>
                     <Typography color="textSecondary">None</Typography>
                 </Box>}
                 {variable.default && <Box>
-                    <Typography mb={1}>Default:</Typography>
-                    <Box display="flex">
+                    <Typography sx={{
+                        mb: 1
+                    }}>Default:</Typography>
+                    <Box sx={{
+                        display: "flex"
+                    }}>
                         <SyntaxHighlighter
                             wrapLines
                             customStyle={{ fontSize: 13, padding: '8px', margin: 0 }}

@@ -45,9 +45,13 @@ function ModuleSource({ data, onChange, fragmentRef }: Props) {
     `, fragmentRef);
 
     return (
-        <Box marginBottom={4}>
+        <Box sx={{
+            marginBottom: 4
+        }}>
             <Typography variant="subtitle1" gutterBottom>Module Registry</Typography>
-            <Divider light />
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
             <Stack sx={{ mt: 2, mb: 4 }} direction="row" spacing={2}>
                 {ModuleSourceTypes.map(type => <PanelButton
                     key={type.name}
@@ -63,10 +67,16 @@ function ModuleSource({ data, onChange, fragmentRef }: Props) {
             </Stack>
             {data.moduleRegistryType && <Box>
                 <Typography variant="subtitle1" gutterBottom>Select Module Source</Typography>
-                <Divider light sx={{ mb: 2 }} />
+                <Divider
+                    sx={{
+                        mb: 2,
+                        opacity: "0.6"
+                    }} />
             </Box>}
             {data.moduleRegistryType === "Tharsis" && <Box>
-                <Box marginBottom={2}>
+                <Box sx={{
+                    marginBottom: 2
+                }}>
                     <ModuleAutocomplete
                         workspacePath={workspace.fullPath}
                         onSelected={(value: ModuleOption | null) => {
@@ -96,7 +106,9 @@ function ModuleSource({ data, onChange, fragmentRef }: Props) {
                 </Box>}
             </Box>}
             {data.moduleRegistryType === "External" && <Box>
-                <Box marginBottom={2}>
+                <Box sx={{
+                    marginBottom: 2
+                }}>
                     <TextField
                         autoComplete="off"
                         size="small"
@@ -104,7 +116,9 @@ function ModuleSource({ data, onChange, fragmentRef }: Props) {
                         label="Module"
                         value={data.moduleSource}
                         onChange={event => onChange({ ...data, moduleSource: event.target.value })} />
-                    <Typography marginTop={1} color="textSecondary" variant="caption">Enter the path to a Terraform module, for example: <StyledCode>example.com/path/to/module_source</StyledCode>
+                    <Typography color="textSecondary" variant="caption" sx={{
+                        marginTop: 1
+                    }}>Enter the path to a Terraform module, for example: <StyledCode>example.com/path/to/module_source</StyledCode>
                     </Typography>
                 </Box>
                 <Stack>
@@ -116,7 +130,9 @@ function ModuleSource({ data, onChange, fragmentRef }: Props) {
                         value={data.moduleVersion}
                         onChange={event => onChange({ ...data, moduleVersion: event.target.value })}
                     />
-                    <Typography marginTop={1} color="textSecondary" variant="caption">OPTIONAL: Enter a version number for this module, for example: <StyledCode>0.3.0</StyledCode></Typography>
+                    <Typography color="textSecondary" variant="caption" sx={{
+                        marginTop: 1
+                    }}>OPTIONAL: Enter a version number for this module, for example: <StyledCode>0.3.0</StyledCode></Typography>
                 </Stack>
             </Box>}
         </Box>

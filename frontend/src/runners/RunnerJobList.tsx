@@ -94,7 +94,9 @@ function RunnerJobList() {
                 :
                 <Box sx={{ p: 2 }}>
                     <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                        <Box padding={2}>
+                        <Box sx={{
+                            padding: 2
+                        }}>
                             <Typography variant="subtitle1">
                                 {edges.length} job{edges.length !== 1 && 's'}
                             </Typography>

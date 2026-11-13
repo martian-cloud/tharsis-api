@@ -57,7 +57,9 @@ function CleanupPolicyForm({ kind, data, onChange, onValidationChange, error }: 
                 <Typography variant="body2" color="textSecondary" sx={{ mb: 1.5 }}>
                     A {kindDef.label.toLowerCase()} sweep will not claim or delete anything while this policy is disabled.
                 </Typography>
-                <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Stack direction="row" spacing={1.5} sx={{
+                    alignItems: "center"
+                }}>
                     <Switch color="secondary" checked={!data.disabled} onChange={e => onChange({ ...data, disabled: !e.target.checked })} />
                     <Typography variant="body2">{data.disabled ? 'Disabled' : 'Enabled'}</Typography>
                 </Stack>

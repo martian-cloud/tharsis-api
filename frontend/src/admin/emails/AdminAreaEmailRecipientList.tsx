@@ -147,7 +147,12 @@ function AdminAreaEmailRecipientList({ outboxId, fragmentRef, recipientCount, ep
                     alignItems: { sm: 'center' },
                     gap: 1,
                 }}>
-                    <Box display="flex" gap={1} flexWrap="wrap">
+                    <Box
+                        sx={{
+                            display: "flex",
+                            gap: 1,
+                            flexWrap: "wrap"
+                        }}>
                         {FILTER_PILLS.map(pill => (
                             <Chip
                                 key={pill.key}

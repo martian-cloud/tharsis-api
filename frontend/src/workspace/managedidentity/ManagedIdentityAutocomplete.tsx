@@ -111,7 +111,13 @@ function ManagedIdentityAutocomplete(props: Props) {
                 const { key, ...otherProps } = props as any;
                 return (
                     <Box component="li" key={key} {...otherProps}>
-                        <Box width="100%" display="flex" justifyContent="space-between" alignItems="center">
+                        <Box
+                            sx={{
+                                width: "100%",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center"
+                            }}>
                             <Box>
                                 <Typography>
                                     {parts.map((part: any, index: number) => (
@@ -139,12 +145,14 @@ function ManagedIdentityAutocomplete(props: Props) {
                     {...params}
                     placeholder='Select a managed identity'
                     slotProps={{
+                        ...params.slotProps,
+
                         input: {
-                            ...params.InputProps,
+                            ...params.slotProps.input,
                             endAdornment: (
                                 <React.Fragment>
                                     {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                    {params.InputProps.endAdornment}
+                                    {params.slotProps.input.endAdornment}
                                 </React.Fragment>
                             ),
                         }

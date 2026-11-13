@@ -332,8 +332,17 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                 fixed once the policy exists: a policy's data is stored per kind. */}
             <Box sx={{ mb: 4 }}>
                 <Typography variant="subtitle1" gutterBottom>Select Type</Typography>
-                <Divider light />
-                <Stack marginTop={2} direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
+                <Stack
+                    direction={{ xs: 'column', md: 'row' }}
+                    spacing={2}
+                    useFlexGap
+                    sx={{
+                        marginTop: 2,
+                        flexWrap: "wrap"
+                    }}>
                     {KIND_OPTIONS.map(opt => <PanelButton
                         key={opt.value}
                         disabled={editMode}
@@ -348,7 +357,9 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                 </Stack>
             </Box>
             <Typography variant="subtitle1" gutterBottom>Details</Typography>
-            <Divider light />
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
             <Box sx={{ mt: 2, mb: 4 }}>
                 <Box sx={{ mb: 2 }}>
                     <TextField
@@ -376,7 +387,9 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                 gets sent as opaData — so it stays hidden until OPA is the chosen type. */}
             {data.kind === 'OPA' && <>
                 <Typography variant="subtitle1" gutterBottom>OPA Configuration</Typography>
-                <Divider light />
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
                 <Box sx={{ mt: 2, mb: 4 }}>
                     <Box sx={{ mb: 3 }}>
                         <Typography variant="subtitle2" gutterBottom>Stage</Typography>
@@ -397,7 +410,9 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                         />
                     </Box>
                     <Box sx={{ mb: 3 }}>
-                        <Typography variant="subtitle2" mb={2}>Enforcement Level</Typography>
+                        <Typography variant="subtitle2" sx={{
+                            mb: 2
+                        }}>Enforcement Level</Typography>
                         <EnforcementLevelSelects
                             enforcementLevel={data.enforcementLevel}
                             speculativeRunEnforcementLevel={data.speculativeRunEnforcementLevel}
@@ -424,7 +439,13 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                         />
                         {/* The field itself already shows the fully-qualified source, so this is only a hint
                     for an empty field — including that an unpublished package may be named by hand. */}
-                        {!data.opa.package?.packageSource && <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>
+                        {!data.opa.package?.packageSource && <Typography
+                            variant="caption"
+                            color="textSecondary"
+                            sx={{
+                                display: "block",
+                                mt: 0.5
+                            }}>
                             Pick a package, or type the source of one that is not published yet, e.g. my-group/sub-group/my-package.
                         </Typography>}
                     </Box>
@@ -458,7 +479,9 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                 stageOptionsForKind), so there is no post-apply-advisory clamp to apply here. */}
             {data.kind === 'MODULE_ATTESTATION' && <>
                 <Typography variant="subtitle1" gutterBottom>Module Attestation Configuration</Typography>
-                <Divider light />
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
                 <Box sx={{ mt: 2, mb: 4 }}>
                     <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" gutterBottom>Stage</Typography>
@@ -470,7 +493,9 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                         />
                     </Box>
                     <Box sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" mb={2}>Enforcement Level</Typography>
+                        <Typography variant="subtitle2" sx={{
+                            mb: 2
+                        }}>Enforcement Level</Typography>
                         <EnforcementLevelSelects
                             enforcementLevel={data.enforcementLevel}
                             speculativeRunEnforcementLevel={data.speculativeRunEnforcementLevel}
@@ -513,7 +538,9 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                             }
                             label="Verify state lineage"
                         />
-                        <Typography variant="caption" color="textSecondary" display="block">
+                        <Typography variant="caption" color="textSecondary" sx={{
+                            display: "block"
+                        }}>
                             Also require the workspace's current state to have been written by a run using the same module source,
                             so state cannot be carried over from an unattested module.
                         </Typography>
@@ -522,9 +549,17 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
             </>}
 
             <Typography variant="subtitle1" gutterBottom>Scope Rules</Typography>
-            <Divider light />
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
             <Box sx={{ mt: 2, mb: 4 }}>
-                <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 1.5 }}>
+                <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    sx={{
+                        display: "block",
+                        mb: 1.5
+                    }}>
                     Restrict which workspaces this policy evaluates on. Empty scope applies to all workspaces under the owning group.
                     Excludes are checked first; if an exclude matches, the policy is skipped regardless of includes. Scope rules support
                     path glob patterns or TRNs.
@@ -541,7 +576,13 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                     ))}
                 </Stack>
                 {hasIncompleteScopeRule && (
-                    <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 1.5 }}>
+                    <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        sx={{
+                            display: "block",
+                            mb: 1.5
+                        }}>
                         Rules without a value are ignored.
                     </Typography>
                 )}
@@ -559,13 +600,17 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                 they are not tied to the selected type — only to the level that can be overridden. */}
             {data.enforcementLevel === 'SOFT_MANDATORY' && <Box>
                 <Typography variant="subtitle1" gutterBottom>Approvals</Typography>
-                <Divider light />
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
                 <Typography sx={{ mt: 2, mb: 2 }} color="textSecondary" variant="body2">
                     Approvals are optional. At zero, a soft failure can be overridden by anyone with
                     permission to do so. Above zero, the run waits for that many approvals from the
                     approvers named below.
                 </Typography>
-                <Box marginBottom={3}>
+                <Box sx={{
+                    marginBottom: 3
+                }}>
                     <Typography sx={{ mb: 1 }} variant="body1">Required Approvals</Typography>
                     <TextField
                         type="number"
@@ -582,7 +627,13 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                     form state when the count returns to zero, so putting it back restores the list. */}
                 {data.requiredApprovals > 0 && <>
                     <Typography sx={{ mb: 1 }} variant="body1">Allowed Approvers</Typography>
-                    <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: '4px' }} marginBottom={2} padding={2}>
+                    <Box
+                        sx={{
+                            marginBottom: 2,
+                            padding: 2,
+                            border: `1px solid ${theme.palette.divider}`,
+                            borderRadius: '4px'
+                        }}>
                         <Box sx={{ marginBottom: 2 }}>
                             <PrincipalAutocomplete
                                 groupPath={groupPath}
@@ -603,11 +654,15 @@ function PolicyForm({ groupPath, data, onChange, error, editMode }: Props) {
                                     key={pr.id}>
                                     {pr.type === 'user' && <Gravatar sx={{ marginRight: 1 }} width={24} height={24} email={pr.label} />}
                                     {pr.type !== 'user' && <StyledAvatar sx={{ marginRight: 1 }}>{pr.label}</StyledAvatar>}
-                                    <ListItemText primary={pr.name} primaryTypographyProps={{ noWrap: true }} />
+                                    <ListItemText primary={pr.name} slotProps={{
+                                        primary: { noWrap: true }
+                                    }} />
                                 </ListItem>))}
                         </List>
                     </Box>
-                    {isMissingApprovers(data) && <Typography variant="caption" color="warning" display="block">
+                    {isMissingApprovers(data) && <Typography variant="caption" color="warning" sx={{
+                        display: "block"
+                    }}>
                         Add at least one approver, or set required approvals back to zero.
                     </Typography>}
                 </>}

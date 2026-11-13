@@ -243,7 +243,12 @@ function EditVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
                 onChange={(data: VCSFormData) => setFormData(data)}
                 fragmentRef={data}
             />
-            <Box sx={{ mt: 2 }} display="flex" alignItems="baseline">
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    mt: 2
+                }}>
                 <Button
                     size="small"
                     loading={updateIsInFlight || deleteIsInFlight}
@@ -255,7 +260,7 @@ function EditVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
                 </Button>
             </Box>
         </Box>
-    )
+    );
 }
 
 export default EditVCSProviderLink

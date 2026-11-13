@@ -80,7 +80,11 @@ function InheritableToggleSetting({
                     label="Inherit from parent group"
                 />
                 {formData.inherit && setting.inherited && <Paper sx={{ p: 2 }}>
-                    <Box display="flex" gap={0.5}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            gap: 0.5
+                        }}>
                         <Typography variant="body2" color="textSecondary">{inheritedLabel}</Typography>
                         <Link
                             to={inheritedLinkTo ?? `/groups/${setting.namespacePath}`}

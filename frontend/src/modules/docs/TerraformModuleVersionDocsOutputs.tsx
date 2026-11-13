@@ -22,18 +22,30 @@ function TerraformModuleVersionDocsOutputs({ fragmentRef }: Props) {
 
     return (
         <Box>
-            {data.outputs.length === 0 && <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+            {data.outputs.length === 0 && <Box
+                sx={{
+                    padding: 2,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center"
+                }}>
                 <Typography color="textSecondary">This module does not provide any outputs</Typography>
             </Box>}
             {data.outputs.length > 0 && <>
-                <Typography color="textSecondary" variant="body1" mb={2}>
+                <Typography color="textSecondary" variant="body1" sx={{
+                    mb: 2
+                }}>
                     This module provides the following outputs:
                 </Typography>
                 <List disablePadding>
                     {data.outputs.map((output, index) => (
                         <ListItem key={output.name} divider={index !== (data.outputs.length - 1)}>
                             <ListItemText
-                                primary={<Box display="flex" alignItems="center">
+                                primary={<Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center"
+                                    }}>
                                     <Typography sx={{ fontWeight: 'bold' }} component="code">{output.name}</Typography>
                                     {output.sensitive && <Chip
                                         sx={{ ml: 1 }}

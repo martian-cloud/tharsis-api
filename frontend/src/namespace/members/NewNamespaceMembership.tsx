@@ -137,10 +137,18 @@ function NewNamespaceMembership(props: Props) {
             {error && <Alert sx={{ marginTop: 2 }} severity={error.severity}>
                 <Typography>{error.message}</Typography>
             </Alert>}
-            <Box marginTop={2} marginBottom={2}>
+            <Box
+                sx={{
+                    marginTop: 2,
+                    marginBottom: 2
+                }}>
                 <Typography variant="subtitle1" gutterBottom>Select a Member Type</Typography>
-                <Divider light />
-                <Stack marginTop={2} direction="row" spacing={2}>
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
+                <Stack direction="row" spacing={2} sx={{
+                    marginTop: 2
+                }}>
                     {MemberTypes.map(type => <PanelButton
                         key={type.name}
                         selected={type.name === memberType}
@@ -155,27 +163,45 @@ function NewNamespaceMembership(props: Props) {
             </Box>
             {!!memberType && <React.Fragment>
                 <Typography variant="subtitle1" gutterBottom>Details</Typography>
-                <Divider light />
-                <Box marginTop={2} marginBottom={2}>
-                    {memberType === 'user' && <Box marginBottom={2}>
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
+                <Box
+                    sx={{
+                        marginTop: 2,
+                        marginBottom: 2
+                    }}>
+                    {memberType === 'user' && <Box sx={{
+                        marginBottom: 2
+                    }}>
                         <Typography gutterBottom color="textSecondary">User</Typography>
                         <UserAutocomplete onSelected={onUserChange} />
                     </Box>}
-                    {memberType === 'team' && <Box marginBottom={2}>
+                    {memberType === 'team' && <Box sx={{
+                        marginBottom: 2
+                    }}>
                         <Typography gutterBottom color="textSecondary">Team</Typography>
                         <TeamAutocomplete onSelected={onTeamChange} />
                     </Box>}
-                    {memberType === 'serviceAccount' && <Box marginBottom={2}>
+                    {memberType === 'serviceAccount' && <Box sx={{
+                        marginBottom: 2
+                    }}>
                         <Typography gutterBottom color="textSecondary">Service Account</Typography>
                         <ServiceAccountAutocomplete namespacePath={data.fullPath} onSelected={onServiceAccountChange} />
                     </Box>}
-                    <Box marginBottom={2}>
+                    <Box sx={{
+                        marginBottom: 2
+                    }}>
                         <Typography gutterBottom color="textSecondary">Role</Typography>
                         <RoleAutocomplete onSelected={onRoleChange} />
                     </Box>
                 </Box>
-                <Divider light />
-                <Box marginTop={2}>
+                <Divider sx={{
+                    opacity: "0.6"
+                }} />
+                <Box sx={{
+                    marginTop: 2
+                }}>
                     <Button
                         loading={isInFlight}
                         disabled={!member || !role}

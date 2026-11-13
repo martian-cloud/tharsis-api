@@ -12,7 +12,12 @@ function NumberBadge({ value }: Props) {
             width: 24, height: 24, borderRadius: '50%', bgcolor: 'action.selected',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
-            <Typography variant="caption" fontWeight={600} lineHeight={1}>{value}</Typography>
+            <Typography
+                variant="caption"
+                sx={{
+                    fontWeight: 600,
+                    lineHeight: 1
+                }}>{value}</Typography>
         </Box>
     );
 }

@@ -95,7 +95,9 @@ function WorkspaceAdvancedSettings({ fragmentRef }: Props) {
                 <Box>
                     <Box sx={{ mb: 4 }}>
                         <Typography variant="subtitle1" gutterBottom>Migrate Workspace</Typography>
-                        <Typography marginBottom={2} variant="subtitle2">Migrate workspace to another group</Typography>
+                        <Typography variant="subtitle2" sx={{
+                            marginBottom: 2
+                        }}>Migrate workspace to another group</Typography>
                         <Alert sx={{ mb: 2 }} severity="warning">Migrating a workspace may result in changes to its configuration if any assigned resources are not available in the new group.</Alert>
                         <Button
                             variant="outlined"

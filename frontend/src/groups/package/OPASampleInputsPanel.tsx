@@ -25,11 +25,17 @@ function OPASampleInputsPanel() {
         >
             <Stack
                 direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                gap={1}
-                sx={{ px: 2, py: 1, borderBottom: 1, borderColor: 'divider', bgcolor: 'action.hover', minHeight: 48 }}
-            >
+                sx={{
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 1,
+                    px: 2,
+                    py: 1,
+                    borderBottom: 1,
+                    borderColor: 'divider',
+                    bgcolor: 'action.hover',
+                    minHeight: 48
+                }}>
                 <TextField
                     select
                     size="small"

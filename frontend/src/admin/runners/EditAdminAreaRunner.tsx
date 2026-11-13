@@ -110,8 +110,12 @@ function EditAdminAreaRunner() {
                 onChange={(data: FormData) => setFormData(data)}
                 error={error}
             />
-            <Divider light />
-            <Box mt={2}>
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
+            <Box sx={{
+                mt: 2
+            }}>
                 <Button
                     loading={isInFlight}
                     variant="outlined"

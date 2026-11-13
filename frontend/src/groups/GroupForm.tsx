@@ -22,8 +22,14 @@ function GroupForm({ data, onChange, editMode, error }: Props) {
                 {error.message}
             </Alert>}
             <Typography variant="subtitle1" gutterBottom>Details</Typography>
-            <Divider light />
-            <Box marginTop={2} marginBottom={2}>
+            <Divider sx={{
+                opacity: "0.6"
+            }} />
+            <Box
+                sx={{
+                    marginTop: 2,
+                    marginBottom: 2
+                }}>
                 <TextField
                     disabled={editMode}
                     size="small"

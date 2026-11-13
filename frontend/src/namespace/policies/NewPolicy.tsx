@@ -97,15 +97,23 @@ function NewPolicy({ ownerId, ownerPath, groupPath }: Props) {
                     { title: 'new', path: 'new' },
                 ]}
             />
-            <Typography variant="h5" mb={2}>New Policy</Typography>
+            <Typography variant="h5" sx={{
+                mb: 2
+            }}>New Policy</Typography>
             <PolicyForm
                 groupPath={groupPath}
                 data={formData}
                 onChange={setFormData}
                 error={error}
             />
-            <Divider light sx={{ marginTop: 4 }} />
-            <Box marginTop={2}>
+            <Divider
+                sx={{
+                    marginTop: 4,
+                    opacity: "0.6"
+                }} />
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     loading={commitCreateInFlight}
                     disabled={!formData.kind || !formData.name || !hasRequiredKindData(formData) || isMissingApprovers(formData)}

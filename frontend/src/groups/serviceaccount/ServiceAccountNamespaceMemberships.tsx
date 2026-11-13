@@ -78,7 +78,9 @@ function ServiceAccountNamespaceMemberships({ serviceAccountId }: Props) {
     return (
         <Box>
             <Paper variant="outlined" sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                <Box padding={2}>
+                <Box sx={{
+                    padding: 2
+                }}>
                     <Typography variant="subtitle1">
                         {data?.namespaceMemberships.totalCount} namespace membership{data?.namespaceMemberships.totalCount !== 1 && 's'}
                     </Typography>
@@ -106,9 +108,16 @@ function ServiceAccountNamespaceMemberships({ serviceAccountId }: Props) {
                         >
                             <ListItemText
                                 primary={
-                                    <Box display="flex" alignItems="center" gap={1}>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1
+                                        }}>
                                         <Link color="inherit" to={`/groups/${edge.node.namespace?.fullPath}/-/members`}>
-                                            <Typography fontWeight={500}>{edge.node.namespace?.fullPath}</Typography>
+                                            <Typography sx={{
+                                                fontWeight: 500
+                                            }}>{edge.node.namespace?.fullPath}</Typography>
                                         </Link>
                                         <Chip size="small" variant="outlined" label={edge.node.role.name} />
                                     </Box>

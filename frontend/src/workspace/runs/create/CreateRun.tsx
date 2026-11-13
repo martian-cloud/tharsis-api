@@ -276,7 +276,9 @@ function CreateRun({ fragmentRef }: Props) {
                     setError(undefined)
                 }}
             />
-            <Box marginTop={2}>
+            <Box sx={{
+                marginTop: 2
+            }}>
                 <Button
                     sx={{ marginRight: 2 }}
                     loading={vcsRunIsInFlight || moduleRunIsInFlight || runIsInFlight}

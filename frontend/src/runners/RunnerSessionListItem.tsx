@@ -37,11 +37,26 @@ function RunnerSessionListItem({ fragmentRef, onClick }: Props) {
                     borderBottomRightRadius: 4
                 }
             }}>
-            <Box display="flex" alignItems="flex-start" justifyContent="space-between" flex={1} padding={1}>
-                <Box display="flex" alignItems="center">
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    flex: 1,
+                    padding: 1
+                }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center"
+                    }}>
                     <Box sx={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: data.active ? 'success.main' : 'runStatus.unknown', mr: 2 }} />
                     <Box>
-                        <Box display="flex" alignItems="center">
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center"
+                            }}>
                             <Box sx={{ textDecoration: 'none', minWidth: 100 }}>
                                 {`${data.id.substring(0, 8)}...`}
                             </Box>

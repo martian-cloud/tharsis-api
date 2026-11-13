@@ -89,7 +89,9 @@ function AppHeader(props: Props) {
     );
 
     const navButtons = (
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{
+            alignItems: "center"
+        }}>
             <Button
                 color="inherit"
                 sx={{ textTransform: "none", fontWeight: 600 }}
@@ -144,15 +146,26 @@ function AppHeader(props: Props) {
                         {compactNav ? (
                             <Box sx={{ mr: 1 }}>{navMenu}</Box>
                         ) : (
-                            <Box marginRight={4}>
+                            <Box sx={{
+                                marginRight: 4
+                            }}>
                                 <Link underline="none" color="primary" variant="h5" sx={{ fontWeight: "bold" }} to="/">Tharsis</Link>
                             </Box>
                         )}
-                        <Box display="flex" flex="1" alignItems="center" justifyContent="center" sx={{ gap: 2 }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                flex: "1",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 2
+                            }}>
                             {!hideSearch && <UniversalSearch />}
                             {!compactNav && copilotButton}
                         </Box>
-                        <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack direction="row" spacing={1} sx={{
+                            alignItems: "center"
+                        }}>
                             {compactNav && copilotButton}
                             {!compactNav && navButtons}
                             <AccountMenu fragmentRef={data} />

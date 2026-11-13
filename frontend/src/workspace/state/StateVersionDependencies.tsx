@@ -53,9 +53,16 @@ function StateVersionDependencies(props: Props) {
             {(filteredDependencies.length === 0 && search === '') && <NoResults sx={{ mt: 4 }}>
                 This workspace does not have any workspace dependencies
             </NoResults>}
-            {filteredDependencies.length > 0 && <Box marginTop={2}>
+            {filteredDependencies.length > 0 && <Box sx={{
+                marginTop: 2
+            }}>
                 <Paper>
-                    <Box padding={'8px 16px'} display="flex" alignItems="center">
+                    <Box
+                        sx={{
+                            padding: '8px 16px',
+                            display: "flex",
+                            alignItems: "center"
+                        }}>
                         <Typography variant="subtitle1">{filteredDependencies.length} dependenc{filteredDependencies.length === 1 ? 'y' : 'ies'}</Typography>
                     </Box>
                 </Paper>

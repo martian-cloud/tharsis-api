@@ -97,8 +97,10 @@ function RunsIndex({ fragmentRef }: RunsIndexProps) {
                         open={Boolean(menuAnchorEl)}
                         onClose={() => setMenuAnchorEl(null)}
                         disableScrollLock
-                        MenuListProps={{
-                            'aria-labelledby': 'filter-button',
+                        slotProps={{
+                            list: {
+                                'aria-labelledby': 'filter-button',
+                            }
                         }}
                     >
                         <MenuItem

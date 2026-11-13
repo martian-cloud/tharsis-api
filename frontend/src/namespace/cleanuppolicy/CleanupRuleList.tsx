@@ -82,7 +82,13 @@ function CleanupRuleList<R extends CleanupRule>({
                     {cardMode ? (
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
                             <Tooltip title="Rules are checked in order; the first match decides the outcome.">
-                                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ cursor: 'default' }}>
+                                <Stack
+                                    direction="row"
+                                    spacing={0.5}
+                                    sx={{
+                                        alignItems: "center",
+                                        cursor: 'default'
+                                    }}>
                                     <InfoOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                                     <Typography variant="caption" color="textSecondary">First matching rule wins</Typography>
                                 </Stack>
@@ -92,7 +98,13 @@ function CleanupRuleList<R extends CleanupRule>({
                         <Box sx={{ position: 'absolute', right: 16, top: 0, height: 53, display: 'flex', alignItems: 'center', zIndex: 1, pointerEvents: 'none' }}>
                             <Box sx={{ pointerEvents: 'auto' }}>
                                 <Tooltip title="Rules are checked in order; the first match decides the outcome.">
-                                    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ cursor: 'default' }}>
+                                    <Stack
+                                        direction="row"
+                                        spacing={0.5}
+                                        sx={{
+                                            alignItems: "center",
+                                            cursor: 'default'
+                                        }}>
                                         <InfoOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                                         <Typography variant="caption" color="textSecondary">First matching rule wins</Typography>
                                     </Stack>

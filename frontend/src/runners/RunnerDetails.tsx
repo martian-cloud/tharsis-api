@@ -210,7 +210,12 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
                     '& > *': { mb: 2 },
                 }
             }}>
-                <Box display="flex" alignItems="center" mb={2}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        mb: 2
+                    }}>
                     <RunnerIcon sx={{ color: active ? 'success.main' : null, mr: 2 }} />
                     <Box>
                         <Typography variant="h5">
@@ -268,26 +273,46 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
             </Box>
             <TabContent>
                 {tab === 'details' && <Box sx={{ border: 1, borderTop: 0, borderBottomLeftRadius: 4, borderBottomRightRadius: 4, borderColor: 'divider', padding: 2 }}>
-                    <Typography mb={0.25}>Type</Typography>
-                    <Typography mb={2} color="textSecondary">{runner.type[0].toUpperCase() + runner.type.slice(1).toLowerCase()}</Typography>
-                    <Box mb={2}>
-                        <Typography mb={1}>Tags</Typography>
+                    <Typography sx={{
+                        mb: 0.25
+                    }}>Type</Typography>
+                    <Typography color="textSecondary" sx={{
+                        mb: 2
+                    }}>{runner.type[0].toUpperCase() + runner.type.slice(1).toLowerCase()}</Typography>
+                    <Box sx={{
+                        mb: 2
+                    }}>
+                        <Typography sx={{
+                            mb: 1
+                        }}>Tags</Typography>
                         {runner.tags.length > 0 && <Stack direction="row" spacing={1}>
                             {runner.tags.map(tag => <Chip key={tag} size="small" color="secondary" label={tag} />)}
                         </Stack>}
                         {runner.tags.length === 0 && <Typography color="textSecondary">No Tags</Typography>}
                     </Box>
-                    <Box mb={2}>
-                        <Typography mb={1}>Run Untagged Jobs</Typography>
+                    <Box sx={{
+                        mb: 2
+                    }}>
+                        <Typography sx={{
+                            mb: 1
+                        }}>Run Untagged Jobs</Typography>
                         <Typography color="textSecondary">{runner.runUntaggedJobs ? 'Yes' : 'No'}</Typography>
                     </Box>
-                    <Box mb={2}>
-                        <Typography mb={1}>Job Limit</Typography>
+                    <Box sx={{
+                        mb: 2
+                    }}>
+                        <Typography sx={{
+                            mb: 1
+                        }}>Job Limit</Typography>
                         <Typography color="textSecondary">{runner.jobLimit === 0 ? 'Unlimited' : runner.jobLimit}</Typography>
                     </Box>
-                    <Typography mb={0.25}>Status</Typography>
+                    <Typography sx={{
+                        mb: 0.25
+                    }}>Status</Typography>
                     <RunnerChip disabled={runner.disabled} />
-                    <Box mt={4}>
+                    <Box sx={{
+                        mt: 4
+                    }}>
                         <Link
                             sx={{ display: "flex", alignItems: "center" }}
                             component="button" variant="body1"
@@ -298,7 +323,9 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
                             More Details {showMore ? <ArrowDropUp /> : <ArrowDropDown />}
                         </Link>
                         <Collapse in={showMore} timeout="auto" unmountOnExit>
-                            <Box mt={2}>
+                            <Box sx={{
+                                mt: 2
+                            }}>
                                 <Typography variant="body2">
                                     Created <Timestamp timestamp={runner.metadata.createdAt as string} /> by <ActorDisplay fragmentRef={runner.createdByActor} variant="text" />
                                 </Typography>

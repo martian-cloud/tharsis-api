@@ -74,10 +74,16 @@ function TerraformProviderVersionDetailsSidebar(props: Props) {
       anchor='right'
       onClose={onClose}
     >
-      <Box padding={2}>
+      <Box sx={{
+        padding: 2
+      }}>
         <Section>
           <FieldLabel>Version</FieldLabel>
-          <Box display="flex" alignItems="center">
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center"
+            }}>
             <Typography>
               {data.version}
             </Typography>
@@ -86,7 +92,11 @@ function TerraformProviderVersionDetailsSidebar(props: Props) {
         </Section>
         {data && <Section>
           <FieldLabel>Published</FieldLabel>
-          <Box display="flex" alignItems="center">
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center"
+            }}>
             <Typography sx={{ marginRight: 1 }}>
               <Timestamp component="span" timestamp={data.metadata.createdAt} /> by
             </Typography>
@@ -113,15 +123,15 @@ function TerraformProviderVersionDetailsSidebar(props: Props) {
         <Section>
           <FieldLabel>Protocols</FieldLabel>
           {data.protocols.length > 0 && <Box
-            display="flex"
-            flexWrap="wrap"
             sx={{
+              display: "flex",
+              flexWrap: "wrap",
               margin: '0 -4px',
+
               '& > *': {
                 margin: '4px'
-              },
-            }}
-          >
+              }
+            }}>
             {data.protocols.map((protocol: string) => (
               <Chip
                 size="small"
@@ -135,15 +145,15 @@ function TerraformProviderVersionDetailsSidebar(props: Props) {
         <Section>
           <FieldLabel>Platforms</FieldLabel>
           {filteredPlatforms.length > 0 && <Box
-            display="flex"
-            flexWrap="wrap"
             sx={{
+              display: "flex",
+              flexWrap: "wrap",
               margin: '0 -4px',
+
               '& > *': {
                 margin: '4px'
-              },
-            }}
-          >
+              }
+            }}>
             {filteredPlatforms.map((platform: any) => (
               <Chip
                 size="small"

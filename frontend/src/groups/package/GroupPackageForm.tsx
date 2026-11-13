@@ -71,7 +71,13 @@ function GroupPackageForm({ data, onChange, editMode, error }: Props) {
                         ))}
                     </Select>
                 </FormControl>
-                <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
+                <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    sx={{
+                        display: "block",
+                        mt: 1
+                    }}>
                     {KIND_OPTIONS.find(o => o.value === data.kind)?.description ?? 'Select the package type.'}
                 </Typography>
             </Box>
@@ -90,7 +96,13 @@ function GroupPackageForm({ data, onChange, editMode, error }: Props) {
                         ))}
                     </Select>
                 </FormControl>
-                <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
+                <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    sx={{
+                        display: "block",
+                        mt: 1
+                    }}>
                     {VISIBILITY_OPTIONS.find(o => o.value === data.visibility)?.description}
                 </Typography>
             </Box>
@@ -106,7 +118,13 @@ function GroupPackageForm({ data, onChange, editMode, error }: Props) {
                     }
                     label="Allow mutable versions"
                 />
-                <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
+                <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    sx={{
+                        display: "block",
+                        mt: 1
+                    }}>
                     When enabled, an already-uploaded version can be re-uploaded in place to replace its
                     contents without publishing a new version. When disabled, versions are immutable once uploaded.
                 </Typography>

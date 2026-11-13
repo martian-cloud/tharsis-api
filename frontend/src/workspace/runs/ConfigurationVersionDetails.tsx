@@ -87,7 +87,7 @@ function ConfigurationVersionDetails({ fragmentRef }: Props) {
 
     const onDownload = async () => {
         try {
-            const buffer = cachedBuffer.current ?? await load();
+            const buffer = cachedBuffer.current ?? (await load());
             downloadFile(`${configurationVersionId}.tar.gz`, new Blob([buffer]));
         } catch (error) {
             console.error('failed to download configuration version', error);
@@ -117,14 +117,24 @@ function ConfigurationVersionDetails({ fragmentRef }: Props) {
             {status === 'errored' && <Alert sx={{ marginBottom: 2 }} severity="error">
                 Upload failed for this configuration version
             </Alert>}
-            <Box display="flex" justifyContent="space-between" alignItems="center" marginBottom={2}>
-                <Stack direction="row" spacing={0.75} alignItems="center">
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 2
+                }}>
+                <Stack direction="row" spacing={0.75} sx={{
+                    alignItems: "center"
+                }}>
                     <Typography component="div">Configuration version created</Typography>
                     <Timestamp timestamp={queryData.node.metadata?.createdAt as string} />
                     <Typography component="div">by</Typography>
                     <ActorDisplay fragmentRef={queryData.node.createdByActor} variant="avatar" size={20} />
                 </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{
+                    alignItems: "center"
+                }}>
                     <TRNButton trn={queryData.node.metadata?.trn ?? ''} size="small" />
                     {filesAvailable && <Button size="small" color="info" variant="outlined" startIcon={<DownloadIcon />} onClick={onDownload}>
                         Download
@@ -133,7 +143,13 @@ function ConfigurationVersionDetails({ fragmentRef }: Props) {
             </Box>
             {filesAvailable
                 ? <ArchiveFileBrowser load={load} preferredFile="main.tf" />
-                : <Box padding={2} display="flex" justifyContent="center" alignItems="center">
+                : <Box
+                sx={{
+                    padding: 2,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center"
+                }}>
                     <Typography color="textSecondary">No files are available for this version.</Typography>
                 </Box>}
         </Box>

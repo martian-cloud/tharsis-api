@@ -87,11 +87,12 @@ function RunAnnotations({ fragmentRef, emptyPlaceholder, maxVisible, stacked }: 
 
     const chips = (
         <Box
-            display="flex"
-            flexDirection={stacked ? 'column' : 'row'}
-            flexWrap={stacked ? 'nowrap' : 'wrap'}
-            alignItems="flex-start"
-        >
+            sx={{
+                display: "flex",
+                flexDirection: stacked ? 'column' : 'row',
+                flexWrap: stacked ? 'nowrap' : 'wrap',
+                alignItems: "flex-start"
+            }}>
             {visibleAnnotations.map((annotation, index) => renderChip(annotation, index))}
             {shouldCollapse && (
                 <Chip

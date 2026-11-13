@@ -42,7 +42,9 @@ function ManagedIdentityAliasesListItem({ fragmentRef }: Props) {
             }}>
             <ListItemText
                 primary={<Box>
-                    <Box display="flex">
+                    <Box sx={{
+                        display: "flex"
+                    }}>
                         <Typography sx={{ marginRight: 1 }}>{data.name}</Typography>
                         <ManagedIdentityTypeChip type={data.type} />
                     </Box>

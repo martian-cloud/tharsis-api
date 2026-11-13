@@ -149,9 +149,13 @@ function ManagedIdentityRuleForm(props: Props) {
             {error && <Alert sx={{ marginTop: 2, marginBottom: 2 }} severity={error.severity}>
                 {error.message}
             </Alert>}
-            <Box marginBottom={2}>
+            <Box sx={{
+                marginBottom: 2
+            }}>
                 <Typography variant="subtitle1" gutterBottom>Rule Type</Typography>
-                <Stack marginTop={2} direction="row" spacing={2}>
+                <Stack direction="row" spacing={2} sx={{
+                    marginTop: 2
+                }}>
                     <PanelButton
                         disabled={editMode}
                         selected={rule.type === 'eligible_principals'}
@@ -174,7 +178,9 @@ function ManagedIdentityRuleForm(props: Props) {
                     </PanelButton>
                 </Stack>
             </Box>
-            {rule.type && <Box marginBottom={2}>
+            {rule.type && <Box sx={{
+                marginBottom: 2
+            }}>
                 <Typography sx={{ mb: 1 }} variant="body1">Run Stage</Typography>
                 <Select
                     disabled={editMode}
@@ -188,7 +194,13 @@ function ManagedIdentityRuleForm(props: Props) {
             </Box>}
             {rule.type === 'eligible_principals' && <Fragment>
                 <Typography sx={{ mb: 1 }} variant="body1">Add Principals</Typography>
-                <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: '4px' }} marginBottom={4} padding={2}>
+                <Box
+                    sx={{
+                        marginBottom: 4,
+                        padding: 2,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: '4px'
+                    }}>
                     <Box sx={{ marginBottom: 2 }}>
                         <PrincipalAutocomplete
                             groupPath={groupPath}
@@ -210,13 +222,17 @@ function ManagedIdentityRuleForm(props: Props) {
                                 {pr.type === 'user' && <Gravatar sx={{ marginRight: 1 }} width={24} height={24} email={pr.label} />}
                                 {pr.type !== 'user' &&
                                     <StyledAvatar sx={{ marginRight: 1 }}>{pr.label}</StyledAvatar>}
-                                <ListItemText primary={pr.name} primaryTypographyProps={{ noWrap: true }} />
+                                <ListItemText primary={pr.name} slotProps={{
+                                    primary: { noWrap: true }
+                                }} />
                             </ListItem>))}
                     </List>
                 </Box>
             </Fragment>}
             {rule.type === 'module_attestation' && <Box>
-                <Box marginBottom={2}>
+                <Box sx={{
+                    marginBottom: 2
+                }}>
                     <Typography variant="subtitle1">Module Attestation Policies</Typography>
                     <Typography variant="caption" color="textSecondary">
                         All of the module attestation policies must be satisfied
@@ -235,7 +251,7 @@ function ManagedIdentityRuleForm(props: Props) {
                 </Box>
             </Box>}
         </Box>
-    )
+    );
 }
 
 export default ManagedIdentityRuleForm;

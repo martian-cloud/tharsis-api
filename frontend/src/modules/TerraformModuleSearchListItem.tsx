@@ -57,7 +57,13 @@ function TerraformModuleSearchListItem(props: Props) {
             <ListItemIcon sx={{ minWidth: 40 }}>
                 <TerraformIcon color="disabled" />
             </ListItemIcon>
-            <Box flex={1} display="flex" justifyContent="space-between" alignItems="center">
+            <Box
+                sx={{
+                    flex: 1,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                }}>
                 <Box>
                     <Link
                         component="div"
@@ -80,7 +86,9 @@ function TerraformModuleSearchListItem(props: Props) {
                         </Typography>}
                     </Box>
                     {data.labels && data.labels.length > 0 && (
-                        <Box mt={0.5}>
+                        <Box sx={{
+                            mt: 0.5
+                        }}>
                             <LabelList
                                 labels={data.labels.map((l: any) => ({ key: l.key, value: l.value }))}
                                 maxVisible={5}

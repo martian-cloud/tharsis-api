@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import Box from '@mui/material/Box';
-import { TreeViewBaseItem } from '@mui/x-tree-view/models';
+import { TreeViewDefaultItemModelProperties } from '@mui/x-tree-view/models';
 import { RichTreeView } from '@mui/x-tree-view/RichTreeView';
 import { useFragment } from 'react-relay/hooks';
 import graphql from 'babel-plugin-relay/macro';
@@ -39,8 +39,8 @@ function TerraformModuleVersionDocsSidebar({ fragmentRef, onItemChange }: Props)
         `, fragmentRef
     );
 
-    const sidebarItems: TreeViewBaseItem[] = useMemo(() => {
-        const items: TreeViewBaseItem[] = [];
+    const sidebarItems: TreeViewDefaultItemModelProperties[] = useMemo(() => {
+        const items: TreeViewDefaultItemModelProperties[] = [];
 
         if (data.readme) {
             items.push({

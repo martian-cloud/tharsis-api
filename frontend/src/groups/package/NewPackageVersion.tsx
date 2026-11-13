@@ -87,7 +87,11 @@ function NewPackageVersion() {
     );
 
     return (
-        <Box flexGrow={1} minWidth={0}>
+        <Box
+            sx={{
+                flexGrow: 1,
+                minWidth: 0
+            }}>
             {queryData.node?.name !== undefined && <NewPackageVersionForm
                 packageId={queryData.node.id!}
                 name={queryData.node.name}
@@ -97,7 +101,12 @@ function NewPackageVersion() {
                     ? queryData.node.latestVersion.id
                     : undefined}
             />}
-            {queryData.node?.name === undefined && <Box display="flex" justifyContent="center" marginTop={4}>
+            {queryData.node?.name === undefined && <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
                 <Typography variant="h6" color="textSecondary">
                     package not found
                 </Typography>
@@ -244,9 +253,23 @@ function NewPackageVersionForm({ packageId, name, groupPath, kind, seedVersionId
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: `calc(100vh - ${headerHeight}px - 32px)` }}>
-            <Box marginBottom={2} display="flex" justifyContent="space-between" alignItems="flex-start" gap={2}>
-                <Box minWidth={0}>
-                    <Box display="flex" alignItems="center" gap={1}>
+            <Box
+                sx={{
+                    marginBottom: 2,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: 2
+                }}>
+                <Box sx={{
+                    minWidth: 0
+                }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1
+                        }}>
                         <Typography variant="h6">{name}</Typography>
                         <Chip variant="outlined" size="small" label="new version" />
                     </Box>
@@ -279,14 +302,26 @@ function NewPackageVersionForm({ packageId, name, groupPath, kind, seedVersionId
             <Box sx={{ flexGrow: 1, minHeight: 0, marginTop: 2, display: 'flex', gap: 2 }}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                     {files == null
-                        ? <Box display="flex" justifyContent="center" padding={4}><CircularProgress /></Box>
+                        ? <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            padding: 4
+                        }}><CircularProgress /></Box>
                         : <PackageFilesEditor files={files} onChange={setFiles} />}
                 </Box>
 
                 {kind === 'OPA_POLICY' && showSampleInput && <OPASampleInputsPanel />}
             </Box>
 
-            <Box marginTop={2} display="flex" alignItems="center" justifyContent="space-between" gap={2}>
+            <Box
+                sx={{
+                    marginTop: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 2
+                }}>
                 <Box>
                     <Button
                         sx={{ marginRight: 2 }}

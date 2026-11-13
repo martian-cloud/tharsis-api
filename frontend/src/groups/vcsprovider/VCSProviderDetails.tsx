@@ -245,12 +245,25 @@ function VCSProviderDetails(props: Props) {
                 />
                 <Paper variant="outlined" sx={{ marginTop: 3, padding: CARD_PADDING }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-                        <Box display="flex" alignItems="center" sx={{ minWidth: 0 }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                minWidth: 0
+                            }}>
                             <Avatar variant="rounded" sx={{ width: 32, height: 32, marginRight: 1, bgcolor: 'avatar.default' }}>
                                 {vcsProvider.name[0].toUpperCase()}
                             </Avatar>
-                            <Box marginLeft={1} sx={{ minWidth: 0 }}>
-                                <Box display="flex" alignItems="center">
+                            <Box
+                                sx={{
+                                    marginLeft: 1,
+                                    minWidth: 0
+                                }}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center"
+                                    }}>
                                     <Typography variant="h5" sx={{ marginRight: 1 }}>{vcsProvider.name}</Typography>
                                 </Box>
                                 <Typography color="textSecondary">{vcsProvider.description}</Typography>
@@ -309,7 +322,9 @@ function VCSProviderDetails(props: Props) {
                             <FieldLabel>Automatically create webhooks?</FieldLabel>
                             <FieldValue>{vcsProvider.autoCreateWebhooks ? 'Yes' : 'No'}</FieldValue>
                         </Box>
-                        <Box marginTop={4}>
+                        <Box sx={{
+                            marginTop: 4
+                        }}>
                             <Link
                                 sx={{ display: 'flex', alignItems: 'center' }}
                                 component="button" variant="body1"
@@ -320,7 +335,9 @@ function VCSProviderDetails(props: Props) {
                                 More Details {showMore ? <ArrowDropUp /> : <ArrowDropDown />}
                             </Link>
                             <Collapse in={showMore} timeout="auto" unmountOnExit>
-                                <Box marginTop={2}>
+                                <Box sx={{
+                                    marginTop: 2
+                                }}>
                                     <Typography variant="body2">
                                         Created <Timestamp timestamp={vcsProvider.metadata.createdAt as string} /> by <ActorDisplay fragmentRef={vcsProvider.createdByActor} variant="text" />
                                     </Typography>
@@ -351,9 +368,16 @@ function VCSProviderDetails(props: Props) {
         );
     }
     else {
-        return <Box display="flex" justifyContent="center" marginTop={4}>
-            <Typography color="textSecondary">VCS Provider with ID {vcsProviderId} not found</Typography>
-        </Box>;
+        return (
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 4
+                }}>
+                <Typography color="textSecondary">VCS Provider with ID {vcsProviderId} not found</Typography>
+            </Box>
+        );
     }
 }
 

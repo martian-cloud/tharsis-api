@@ -33,7 +33,11 @@ function RunDetailsStageStatusCard({ icon, title, durationMs, description, actio
                     },
                 }
             }}>
-                <Box display="flex" alignItems="center">
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center"
+                    }}>
                     {icon}
                     <Box>
                         <Typography variant="h6">{title}</Typography>
@@ -45,7 +49,11 @@ function RunDetailsStageStatusCard({ icon, title, durationMs, description, actio
                         </Typography>}
                     </Box>
                 </Box>
-                {actions && <Box display="flex" gap={1}>
+                {actions && <Box
+                    sx={{
+                        display: "flex",
+                        gap: 1
+                    }}>
                     {actions}
                 </Box>}
             </Box>
