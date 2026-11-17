@@ -11,7 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
-func validateCSRFToken(ctx context.Context, r *http.Request, requestSessionID string, sessionManager auth.UserSessionManager) error {
+func validateCSRFToken(ctx context.Context, r *http.Request, requestSessionID string, sessionManager auth.UserSessionManager) (bool, error) {
 	csrfTokenCookie, _ := r.Cookie(sessionManager.GetUserSessionCSRFTokenCookieName())
 	if csrfTokenCookie == nil {
 		// A request authenticated by the session cookie must always carry the CSRF token: the browser
@@ -20,21 +20,24 @@ func validateCSRFToken(ctx context.Context, r *http.Request, requestSessionID st
 		// attached by a browser on its own, so those requests do not need one. FindToken rejects a
 		// request carrying both, so a present access token cookie means the cookie authenticated it.
 		if accessTokenCookie, _ := r.Cookie(sessionManager.GetUserSessionAccessTokenCookieName()); accessTokenCookie != nil {
-			return errors.New("csrf token cookie is missing in request", errors.WithErrorCode(errors.EUnauthorized))
+			return true, errors.New("csrf token cookie is missing in request", errors.WithErrorCode(errors.EUnauthorized))
 		}
-		return nil
+		return false, nil
 	}
 
 	csrfTokenHeader := r.Header.Get(auth.CSRFTokenHeader)
 	if csrfTokenHeader == "" {
-		return errors.New("csrf token header is missing in request", errors.WithErrorCode(errors.EUnauthorized))
+		return false, errors.New("csrf token header is missing in request", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
 	if csrfTokenCookie.Value != csrfTokenHeader {
-		return errors.New("csrf token header does not match cookie value", errors.WithErrorCode(errors.EUnauthorized))
+		return false, errors.New("csrf token header does not match cookie value", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	return sessionManager.VerifyCSRFToken(ctx, requestSessionID, csrfTokenHeader)
+	if err := sessionManager.VerifyCSRFToken(ctx, requestSessionID, csrfTokenHeader); err != nil {
+		return true, err
+	}
+	return false, nil
 }
 
 // NewCSRFMiddleware checks if this is a user session and verifies the CSRF token
@@ -49,14 +52,16 @@ func NewCSRFMiddleware(
 
 			// Only check CSRF token if this is a user session authenticated request and if it's not a graphql subscription websocket request
 			if requestSessionID, ok := auth.GetRequestUserSessionID(r.Context()); ok && !isGraphqlSubscriptionRequest(r) {
-				if err := validateCSRFToken(ctx, r, requestSessionID, sessionManager); err != nil {
+				if clearCookies, err := validateCSRFToken(ctx, r, requestSessionID, sessionManager); err != nil {
 					logger.WithContextFields(ctx).Infow("Request has invalid CSRF token",
 						"error", err,
 						"subject", ptr.ToString(auth.GetSubject(r.Context())),
 					)
-					// Clear cookies so the browser starts a clean login flow rather than
-					// looping (e.g. after a signing key rotation invalidates existing tokens).
-					sessionManager.ClearUserSessionCookies(w)
+					// Clear cookies so the browser starts a clean login flow rather than looping.
+					// Not done for a missing or mismatched header, which a page on the same site can trigger to log the user out.
+					if clearCookies {
+						sessionManager.ClearUserSessionCookies(w)
+					}
 					respWriter.RespondWithError(r.Context(), w, err)
 					return
 				}

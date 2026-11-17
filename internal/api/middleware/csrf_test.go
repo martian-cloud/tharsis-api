@@ -26,6 +26,8 @@ func TestValidateCSRFToken(t *testing.T) {
 		csrfHeader      string
 		bearerToken     bool
 		expectVerify    bool
+		verifyErr       error
+		expectClear     bool
 		expectErrorCode errors.CodeType
 	}{
 		{
@@ -36,11 +38,23 @@ func TestValidateCSRFToken(t *testing.T) {
 			expectVerify: true,
 		},
 		{
+			// The cookie and header match but the token no longer verifies, e.g. after a signing key rotation.
+			name:            "matching csrf cookie and header that no longer verify clears cookies",
+			accessCookie:    true,
+			csrfCookie:      "csrf-token",
+			csrfHeader:      "csrf-token",
+			expectVerify:    true,
+			verifyErr:       errors.New("csrf token is invalid", errors.WithErrorCode(errors.EUnauthorized)),
+			expectClear:     true,
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
 			// The CSRF cookie was removed or never sent: the browser still attached the session
 			// cookie, so the request must not skip the check.
-			name:            "cookie session without csrf cookie is rejected",
+			name:            "cookie session without csrf cookie is rejected and clears cookies",
 			accessCookie:    true,
 			csrfHeader:      "csrf-token",
+			expectClear:     true,
 			expectErrorCode: errors.EUnauthorized,
 		},
 		{
@@ -69,7 +83,7 @@ func TestValidateCSRFToken(t *testing.T) {
 			sessionManager.On("GetUserSessionCSRFTokenCookieName").Return(csrfCookieName).Maybe()
 			sessionManager.On("GetUserSessionAccessTokenCookieName").Return(accessCookieName).Maybe()
 			if test.expectVerify {
-				sessionManager.On("VerifyCSRFToken", mock.Anything, sessionID, test.csrfHeader).Return(nil)
+				sessionManager.On("VerifyCSRFToken", mock.Anything, sessionID, test.csrfHeader).Return(test.verifyErr)
 			}
 
 			r := httptest.NewRequest(http.MethodPost, "/graphql", nil)
@@ -86,7 +100,8 @@ func TestValidateCSRFToken(t *testing.T) {
 				r.Header.Set("Authorization", "Bearer access-token")
 			}
 
-			err := validateCSRFToken(context.Background(), r, sessionID, sessionManager)
+			clearCookies, err := validateCSRFToken(context.Background(), r, sessionID, sessionManager)
+			assert.Equal(t, test.expectClear, clearCookies)
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
