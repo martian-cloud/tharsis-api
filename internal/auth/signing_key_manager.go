@@ -241,6 +241,14 @@ func (s *signingKeyManager) GetKeys(_ context.Context) ([]byte, error) {
 	return json.Marshal(s.keySet)
 }
 
+// jwsKeyFilter limits a signing key query to JWT signing keys with the given statuses. Every query filters on
+// the usage, because the table also holds keys of other usages, such as audit checkpoint keys, that this manager
+// must never use, rotate, or delete.
+func jwsKeyFilter(statuses ...models.AsymSigningKeyStatus) *db.AsymSigningKeyFilter {
+	usage := models.AsymSigningKeyUsageJWS
+	return &db.AsymSigningKeyFilter{KeyUsage: &usage, Status: statuses}
+}
+
 func (s *signingKeyManager) initializeKeySet(ctx context.Context) error {
 	// Cleanup that failed to create and are stuck in the creating state
 	if err := s.cleanupFailedKeys(ctx); err != nil {
@@ -249,9 +257,7 @@ func (s *signingKeyManager) initializeKeySet(ctx context.Context) error {
 
 	// Check if signing key already exists or is in the process of being created
 	signingKeys, err := s.dbClient.AsymSigningKeys.GetAsymSigningKeys(ctx, &db.GetAsymSigningKeysInput{
-		Filter: &db.AsymSigningKeyFilter{
-			Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusCreating, models.AsymSigningKeyStatusActive},
-		},
+		Filter: jwsKeyFilter(models.AsymSigningKeyStatusCreating, models.AsymSigningKeyStatusActive),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to query for existing signing keys: %w", err)
@@ -346,9 +352,7 @@ func (s *signingKeyManager) listenForDBEvents(ctx context.Context) {
 func (s *signingKeyManager) deleteDecommissionedKeys(ctx context.Context) error {
 	// Get decommissioned keys
 	decommissionedKeys, err := s.dbClient.AsymSigningKeys.GetAsymSigningKeys(ctx, &db.GetAsymSigningKeysInput{
-		Filter: &db.AsymSigningKeyFilter{
-			Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusDecommissioning},
-		},
+		Filter: jwsKeyFilter(models.AsymSigningKeyStatusDecommissioning),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to query for decommissioned signing keys: %v", err)
@@ -472,7 +476,10 @@ func (s *signingKeyManager) rotateKey(ctx context.Context, expiredKey *models.As
 }
 
 func (s *signingKeyManager) syncKeySet(ctx context.Context) error {
-	signingKeys, err := s.dbClient.AsymSigningKeys.GetAsymSigningKeys(ctx, &db.GetAsymSigningKeysInput{})
+	// Only keys that can verify tokens; creating keys have no public key yet.
+	signingKeys, err := s.dbClient.AsymSigningKeys.GetAsymSigningKeys(ctx, &db.GetAsymSigningKeysInput{
+		Filter: jwsKeyFilter(models.AsymSigningKeyStatusActive, models.AsymSigningKeyStatusDecommissioning),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to query for existing signing keys: %w", err)
 	}
@@ -505,9 +512,7 @@ func (s *signingKeyManager) syncKeySet(ctx context.Context) error {
 
 func (s *signingKeyManager) cleanupFailedKeys(ctx context.Context) error {
 	keys, err := s.dbClient.AsymSigningKeys.GetAsymSigningKeys(ctx, &db.GetAsymSigningKeysInput{
-		Filter: &db.AsymSigningKeyFilter{
-			Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusCreating},
-		},
+		Filter: jwsKeyFilter(models.AsymSigningKeyStatusCreating),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to query for existing signing keys: %w", err)
@@ -539,9 +544,7 @@ func (s *signingKeyManager) waitForActiveKey(ctx context.Context) (*models.AsymS
 		select {
 		case <-ticker.C:
 			keys, err := s.dbClient.AsymSigningKeys.GetAsymSigningKeys(ctx, &db.GetAsymSigningKeysInput{
-				Filter: &db.AsymSigningKeyFilter{
-					Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusActive},
-				},
+				Filter: jwsKeyFilter(models.AsymSigningKeyStatusActive),
 				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1), // Only one signing key can be active at a time
 				},
@@ -609,9 +612,7 @@ func (s *signingKeyManager) createKey(ctx context.Context) (*models.AsymSigningK
 
 func (s *signingKeyManager) getActiveKey(ctx context.Context) (*models.AsymSigningKey, error) {
 	keys, err := s.dbClient.AsymSigningKeys.GetAsymSigningKeys(ctx, &db.GetAsymSigningKeysInput{
-		Filter: &db.AsymSigningKeyFilter{
-			Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusActive},
-		},
+		Filter: jwsKeyFilter(models.AsymSigningKeyStatusActive),
 		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1), // Only one signing key can be active at a time
 		},

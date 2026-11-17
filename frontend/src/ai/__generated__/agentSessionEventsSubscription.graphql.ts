@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f90b190e36d6311400d0cbb7f3821613>>
+ * @generated SignedSource<<76475951834d5964a3a55ed973e1938f>>
  * @lightSyntaxTransform
  */
 
@@ -94,11 +94,13 @@ export type agentSessionEventsSubscription$data = {
     readonly content: string;
     readonly messageId: string;
     readonly role: string;
+    readonly timestamp: number | null | undefined;
     readonly toolCallId: string;
     readonly type: string;
   } | {
     readonly __typename: "AgentSessionToolCallStartEvent";
     readonly parentMessageId: string | null | undefined;
+    readonly timestamp: number | null | undefined;
     readonly toolCallId: string;
     readonly toolCallName: string;
     readonly type: string;
@@ -189,7 +191,14 @@ v11 = {
   "name": "toolCallId",
   "storageKey": null
 },
-v12 = [
+v12 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "timestamp",
+  "storageKey": null
+},
+v13 = [
   (v1/*:: as any*/),
   {
     "alias": null,
@@ -199,7 +208,7 @@ v12 = [
     "storageKey": null
   }
 ],
-v13 = [
+v14 = [
   {
     "alias": null,
     "args": [
@@ -308,7 +317,8 @@ v13 = [
             "kind": "ScalarField",
             "name": "parentMessageId",
             "storageKey": null
-          }
+          },
+          (v12/*:: as any*/)
         ],
         "type": "AgentSessionToolCallStartEvent",
         "abstractKey": null
@@ -345,7 +355,8 @@ v13 = [
             "name": "content",
             "storageKey": null
           },
-          (v6/*:: as any*/)
+          (v6/*:: as any*/),
+          (v12/*:: as any*/)
         ],
         "type": "AgentSessionToolCallResultEvent",
         "abstractKey": null
@@ -382,13 +393,13 @@ v13 = [
       },
       {
         "kind": "InlineFragment",
-        "selections": (v12/*:: as any*/),
+        "selections": (v13/*:: as any*/),
         "type": "AgentSessionStepStartedEvent",
         "abstractKey": null
       },
       {
         "kind": "InlineFragment",
-        "selections": (v12/*:: as any*/),
+        "selections": (v13/*:: as any*/),
         "type": "AgentSessionStepFinishedEvent",
         "abstractKey": null
       }
@@ -402,7 +413,7 @@ return {
     "kind": "Fragment",
     "metadata": null,
     "name": "agentSessionEventsSubscription",
-    "selections": (v13/*:: as any*/),
+    "selections": (v14/*:: as any*/),
     "type": "Subscription",
     "abstractKey": null
   },
@@ -411,19 +422,19 @@ return {
     "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
     "name": "agentSessionEventsSubscription",
-    "selections": (v13/*:: as any*/)
+    "selections": (v14/*:: as any*/)
   },
   "params": {
-    "cacheID": "7472d376efae21032db1fc8f05b8894e",
+    "cacheID": "4c072a1e24de46c2032fd6732598ef6d",
     "id": null,
     "metadata": {},
     "name": "agentSessionEventsSubscription",
     "operationKind": "subscription",
-    "text": "subscription agentSessionEventsSubscription(\n  $input: AgentSessionEventSubscriptionInput!\n) {\n  agentSessionEvents(input: $input) {\n    __typename\n    ... on AgentSessionRunStartedEvent {\n      type\n      threadId\n      runId\n    }\n    ... on AgentSessionRunFinishedEvent {\n      type\n      threadId\n      runId\n    }\n    ... on AgentSessionRunErrorEvent {\n      type\n      threadId\n      runId\n      message\n    }\n    ... on AgentSessionCustomEvent {\n      type\n      name\n      value\n    }\n    ... on AgentSessionTextMessageStartEvent {\n      type\n      messageId\n      role\n    }\n    ... on AgentSessionTextMessageContentEvent {\n      type\n      messageId\n      delta\n    }\n    ... on AgentSessionTextMessageEndEvent {\n      type\n      messageId\n    }\n    ... on AgentSessionToolCallStartEvent {\n      type\n      toolCallId\n      toolCallName\n      parentMessageId\n    }\n    ... on AgentSessionToolCallArgsEvent {\n      type\n      toolCallId\n      delta\n    }\n    ... on AgentSessionToolCallEndEvent {\n      type\n      toolCallId\n    }\n    ... on AgentSessionToolCallResultEvent {\n      type\n      messageId\n      toolCallId\n      content\n      role\n    }\n    ... on AgentSessionReasoningStartEvent {\n      type\n      messageId\n    }\n    ... on AgentSessionReasoningMessageStartEvent {\n      type\n      messageId\n      role\n    }\n    ... on AgentSessionReasoningMessageContentEvent {\n      type\n      messageId\n      delta\n    }\n    ... on AgentSessionReasoningMessageEndEvent {\n      type\n      messageId\n    }\n    ... on AgentSessionReasoningEndEvent {\n      type\n      messageId\n    }\n    ... on AgentSessionStepStartedEvent {\n      type\n      stepName\n    }\n    ... on AgentSessionStepFinishedEvent {\n      type\n      stepName\n    }\n  }\n}\n"
+    "text": "subscription agentSessionEventsSubscription(\n  $input: AgentSessionEventSubscriptionInput!\n) {\n  agentSessionEvents(input: $input) {\n    __typename\n    ... on AgentSessionRunStartedEvent {\n      type\n      threadId\n      runId\n    }\n    ... on AgentSessionRunFinishedEvent {\n      type\n      threadId\n      runId\n    }\n    ... on AgentSessionRunErrorEvent {\n      type\n      threadId\n      runId\n      message\n    }\n    ... on AgentSessionCustomEvent {\n      type\n      name\n      value\n    }\n    ... on AgentSessionTextMessageStartEvent {\n      type\n      messageId\n      role\n    }\n    ... on AgentSessionTextMessageContentEvent {\n      type\n      messageId\n      delta\n    }\n    ... on AgentSessionTextMessageEndEvent {\n      type\n      messageId\n    }\n    ... on AgentSessionToolCallStartEvent {\n      type\n      toolCallId\n      toolCallName\n      parentMessageId\n      timestamp\n    }\n    ... on AgentSessionToolCallArgsEvent {\n      type\n      toolCallId\n      delta\n    }\n    ... on AgentSessionToolCallEndEvent {\n      type\n      toolCallId\n    }\n    ... on AgentSessionToolCallResultEvent {\n      type\n      messageId\n      toolCallId\n      content\n      role\n      timestamp\n    }\n    ... on AgentSessionReasoningStartEvent {\n      type\n      messageId\n    }\n    ... on AgentSessionReasoningMessageStartEvent {\n      type\n      messageId\n      role\n    }\n    ... on AgentSessionReasoningMessageContentEvent {\n      type\n      messageId\n      delta\n    }\n    ... on AgentSessionReasoningMessageEndEvent {\n      type\n      messageId\n    }\n    ... on AgentSessionReasoningEndEvent {\n      type\n      messageId\n    }\n    ... on AgentSessionStepStartedEvent {\n      type\n      stepName\n    }\n    ... on AgentSessionStepFinishedEvent {\n      type\n      stepName\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "862bf3ae1580050d14bbfdbe35a537b6";
+(node as any).hash = "a47ce51a2f1aa193a3cf04de9e52707f";
 
 export default node;

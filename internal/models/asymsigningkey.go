@@ -17,6 +17,15 @@ const (
 	AsymSigningKeyStatusDecommissioning AsymSigningKeyStatus = "decommissioning"
 )
 
+// AsymSigningKeyUsage is what a signing key signs. The database column defaults to jws.
+type AsymSigningKeyUsage string
+
+// AsymSigningKeyUsage types
+const (
+	// AsymSigningKeyUsageJWS keys sign JWTs and are published in the JWK set.
+	AsymSigningKeyUsageJWS AsymSigningKeyUsage = "jws"
+)
+
 // AsymSigningKey represents a GPG key used for signing
 type AsymSigningKey struct {
 	PublicKey  []byte

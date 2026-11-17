@@ -233,14 +233,6 @@ func (r *AgentSessionEventResolver) ToAgentSessionReasoningEndEvent() (*AgentSes
 
 /* Concrete event resolvers */
 
-func timestampPtr(t *int64) *int32 {
-	if t == nil {
-		return nil
-	}
-	v := int32(*t)
-	return &v
-}
-
 // AgentSessionRunStartedEventResolver resolves an AgentSessionRunStartedEvent
 type AgentSessionRunStartedEventResolver struct{ event *agent.RunStartedEvent }
 
@@ -258,8 +250,8 @@ func (r *AgentSessionRunStartedEventResolver) RunID() string {
 }
 
 // Timestamp resolver
-func (r *AgentSessionRunStartedEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionRunStartedEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionRunFinishedEventResolver resolves an AgentSessionRunFinishedEvent
@@ -279,8 +271,8 @@ func (r *AgentSessionRunFinishedEventResolver) RunID() string {
 }
 
 // Timestamp resolver
-func (r *AgentSessionRunFinishedEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionRunFinishedEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionRunErrorEventResolver resolves an AgentSessionRunErrorEvent
@@ -303,8 +295,8 @@ func (r *AgentSessionRunErrorEventResolver) RunID() string {
 func (r *AgentSessionRunErrorEventResolver) Message() string { return r.event.Message }
 
 // Timestamp resolver
-func (r *AgentSessionRunErrorEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionRunErrorEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionCustomEventResolver resolves an AgentSessionCustomEvent
@@ -330,7 +322,9 @@ func (r *AgentSessionCustomEventResolver) Value() *string {
 }
 
 // Timestamp resolver
-func (r *AgentSessionCustomEventResolver) Timestamp() *int32 { return timestampPtr(r.event.Timestamp) }
+func (r *AgentSessionCustomEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
+}
 
 // AgentSessionStepStartedEventResolver resolves an AgentSessionStepStartedEvent
 type AgentSessionStepStartedEventResolver struct{ event *agent.StepStartedEvent }
@@ -342,8 +336,8 @@ func (r *AgentSessionStepStartedEventResolver) Type() string { return string(r.e
 func (r *AgentSessionStepStartedEventResolver) StepName() string { return r.event.StepName }
 
 // Timestamp resolver
-func (r *AgentSessionStepStartedEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionStepStartedEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionStepFinishedEventResolver resolves an AgentSessionStepFinishedEvent
@@ -356,8 +350,8 @@ func (r *AgentSessionStepFinishedEventResolver) Type() string { return string(r.
 func (r *AgentSessionStepFinishedEventResolver) StepName() string { return r.event.StepName }
 
 // Timestamp resolver
-func (r *AgentSessionStepFinishedEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionStepFinishedEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionTextMessageStartEventResolver resolves an AgentSessionTextMessageStartEvent
@@ -377,8 +371,8 @@ func (r *AgentSessionTextMessageStartEventResolver) MessageID() string {
 func (r *AgentSessionTextMessageStartEventResolver) Role() string { return r.event.Role }
 
 // Timestamp resolver
-func (r *AgentSessionTextMessageStartEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionTextMessageStartEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionTextMessageContentEventResolver resolves an AgentSessionTextMessageContentEvent
@@ -400,8 +394,8 @@ func (r *AgentSessionTextMessageContentEventResolver) MessageID() string {
 func (r *AgentSessionTextMessageContentEventResolver) Delta() string { return r.event.Delta }
 
 // Timestamp resolver
-func (r *AgentSessionTextMessageContentEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionTextMessageContentEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionTextMessageEndEventResolver resolves an AgentSessionTextMessageEndEvent
@@ -418,8 +412,8 @@ func (r *AgentSessionTextMessageEndEventResolver) MessageID() string {
 }
 
 // Timestamp resolver
-func (r *AgentSessionTextMessageEndEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionTextMessageEndEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionToolCallStartEventResolver resolves an AgentSessionToolCallStartEvent
@@ -444,8 +438,8 @@ func (r *AgentSessionToolCallStartEventResolver) ParentMessageID() *string {
 }
 
 // Timestamp resolver
-func (r *AgentSessionToolCallStartEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionToolCallStartEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionToolCallArgsEventResolver resolves an AgentSessionToolCallArgsEvent
@@ -461,8 +455,8 @@ func (r *AgentSessionToolCallArgsEventResolver) ToolCallID() string { return r.e
 func (r *AgentSessionToolCallArgsEventResolver) Delta() string { return r.event.Delta }
 
 // Timestamp resolver
-func (r *AgentSessionToolCallArgsEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionToolCallArgsEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionToolCallEndEventResolver resolves an AgentSessionToolCallEndEvent
@@ -475,8 +469,8 @@ func (r *AgentSessionToolCallEndEventResolver) Type() string { return string(r.e
 func (r *AgentSessionToolCallEndEventResolver) ToolCallID() string { return r.event.ToolCallID }
 
 // Timestamp resolver
-func (r *AgentSessionToolCallEndEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionToolCallEndEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionToolCallResultEventResolver resolves an AgentSessionToolCallResultEvent
@@ -502,8 +496,8 @@ func (r *AgentSessionToolCallResultEventResolver) Content() string { return r.ev
 func (r *AgentSessionToolCallResultEventResolver) Role() string { return r.event.Role }
 
 // Timestamp resolver
-func (r *AgentSessionToolCallResultEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionToolCallResultEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionReasoningStartEventResolver resolves an AgentSessionReasoningStartEvent
@@ -520,8 +514,8 @@ func (r *AgentSessionReasoningStartEventResolver) MessageID() string {
 }
 
 // Timestamp resolver
-func (r *AgentSessionReasoningStartEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionReasoningStartEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionReasoningMessageStartEventResolver resolves an AgentSessionReasoningMessageStartEvent
@@ -543,8 +537,8 @@ func (r *AgentSessionReasoningMessageStartEventResolver) MessageID() string {
 func (r *AgentSessionReasoningMessageStartEventResolver) Role() string { return r.event.Role }
 
 // Timestamp resolver
-func (r *AgentSessionReasoningMessageStartEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionReasoningMessageStartEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionReasoningMessageContentEventResolver resolves an AgentSessionReasoningMessageContentEvent
@@ -566,8 +560,8 @@ func (r *AgentSessionReasoningMessageContentEventResolver) MessageID() string {
 func (r *AgentSessionReasoningMessageContentEventResolver) Delta() string { return r.event.Delta }
 
 // Timestamp resolver
-func (r *AgentSessionReasoningMessageContentEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionReasoningMessageContentEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionReasoningMessageEndEventResolver resolves an AgentSessionReasoningMessageEndEvent
@@ -586,8 +580,8 @@ func (r *AgentSessionReasoningMessageEndEventResolver) MessageID() string {
 }
 
 // Timestamp resolver
-func (r *AgentSessionReasoningMessageEndEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionReasoningMessageEndEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 // AgentSessionReasoningEndEventResolver resolves an AgentSessionReasoningEndEvent
@@ -602,8 +596,8 @@ func (r *AgentSessionReasoningEndEventResolver) MessageID() string {
 }
 
 // Timestamp resolver
-func (r *AgentSessionReasoningEndEventResolver) Timestamp() *int32 {
-	return timestampPtr(r.event.Timestamp)
+func (r *AgentSessionReasoningEndEventResolver) Timestamp() *Int64 {
+	return int64PtrToInt64ScalarPtr(r.event.Timestamp)
 }
 
 /* CreateAgentSession Mutation */

@@ -5,6 +5,7 @@ import {
     MessagePrimitive,
     SuggestionPrimitive,
     ThreadPrimitive,
+    useToolCallElapsed,
 } from '@assistant-ui/react';
 import BuildIcon from '@mui/icons-material/Build';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
@@ -20,13 +21,16 @@ import Collapse from '@mui/material/Collapse';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
-import { useMemo, useState, type FC } from 'react';
+import { useState, type FC } from 'react';
+import { shortDuration } from '../common/duration';
 import LoadingDots from '../common/LoadingDots';
 import Markdown from '../common/Markdown';
 
 const ToolFallback: FC<{ toolName: string; argsText?: string; result?: unknown; status?: { type: string; reason?: string }; showToolCalls?: boolean }> = ({ toolName, argsText, result, status, showToolCalls = true }) => {
     const [open, setOpen] = useState(false);
     const isRunning = status?.type === 'running';
+    // Ticks once per second while the tool runs; undefined when the call has no timing or never finished.
+    const elapsedMs = useToolCallElapsed();
 
     if (!showToolCalls) return null;
 
@@ -47,6 +51,11 @@ const ToolFallback: FC<{ toolName: string; argsText?: string; result?: unknown; 
                 <Typography variant="caption" sx={{ fontWeight: 600, flex: 1 }}>
                     {isRunning ? 'Calling' : 'Used'}: {toolName}
                 </Typography>
+                {elapsedMs !== undefined && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+                        {shortDuration(isRunning ? Math.floor(elapsedMs / 1000) * 1000 : elapsedMs)}
+                    </Typography>
+                )}
                 {open ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ChevronRightIcon sx={{ fontSize: 16 }} />}
             </Box>
             <Collapse in={open}>
@@ -85,25 +94,28 @@ const AssistantMessage: FC<{ showToolCalls?: boolean }> = ({ showToolCalls = tru
     return (
         <MessagePrimitive.Root>
             <Box sx={{ px: 1, py: 0.5, maxWidth: '90%' }}>
-                <MessagePrimitive.Parts
-                    components={{
-                        Text: ({ text }) => text ? (
-                            <Box sx={{ my: 0.5, overflowWrap: 'anywhere', '& code': { whiteSpace: 'pre-wrap' } }}>
-                                <Markdown restrictExternalContent>{text}</Markdown>
+                <MessagePrimitive.Parts>
+                    {({ part }) => {
+                        if (part.type === 'text') {
+                            return part.text ? (
+                                <Box sx={{ my: 0.5, overflowWrap: 'anywhere', '& code': { whiteSpace: 'pre-wrap' } }}>
+                                    <Markdown restrictExternalContent>{part.text}</Markdown>
+                                    <MessagePartPrimitive.InProgress>
+                                        <LoadingDots />
+                                    </MessagePartPrimitive.InProgress>
+                                </Box>
+                            ) : (
                                 <MessagePartPrimitive.InProgress>
                                     <LoadingDots />
                                 </MessagePartPrimitive.InProgress>
-                            </Box>
-                        ) : (
-                            <MessagePartPrimitive.InProgress>
-                                <LoadingDots />
-                            </MessagePartPrimitive.InProgress>
-                        ),
-                        tools: {
-                            Fallback: (props) => <ToolFallback {...props} showToolCalls={showToolCalls} />,
-                        },
+                            );
+                        }
+                        if (part.type === 'tool-call') {
+                            return part.toolUI ?? <ToolFallback {...part} showToolCalls={showToolCalls} />;
+                        }
+                        return null;
                     }}
-                />
+                </MessagePrimitive.Parts>
             </Box>
         </MessagePrimitive.Root>
     );
@@ -118,13 +130,12 @@ const SuggestionCard = () => (
 );
 
 function AgentSessionChat({ showToolCalls = true }: { showToolCalls?: boolean }) {
-    const BoundAssistantMessage = useMemo(() => () => <AssistantMessage showToolCalls={showToolCalls} />, [showToolCalls]);
-
     return (
         <ThreadPrimitive.Root style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
 
-            <ThreadPrimitive.Viewport autoScroll style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <ThreadPrimitive.Empty>
+            {/* turnAnchor="top" scrolls each new user message to the top of the panel while its reply streams in below it. */}
+            <ThreadPrimitive.Viewport turnAnchor="top" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <AuiIf condition={s => s.thread.isEmpty}>
                     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, px: 3, textAlign: 'center', opacity: 0.6 }}>
                         <Typography variant="h6" sx={{
                             color: "text.secondary"
@@ -140,8 +151,14 @@ function AgentSessionChat({ showToolCalls = true }: { showToolCalls?: boolean })
                             {() => <SuggestionCard />}
                         </ThreadPrimitive.Suggestions>
                     </Box>
-                </ThreadPrimitive.Empty>
-                <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage: BoundAssistantMessage }} />
+                </AuiIf>
+                <ThreadPrimitive.Messages>
+                    {({ message }) => {
+                        if (message.role === 'user') return <UserMessage />;
+                        if (message.role === 'assistant') return <AssistantMessage showToolCalls={showToolCalls} />;
+                        return null;
+                    }}
+                </ThreadPrimitive.Messages>
             </ThreadPrimitive.Viewport>
 
             <Box sx={{

@@ -105,6 +105,8 @@ type APIServer struct {
 	traceShutdown func(context.Context) error
 	tlsConfig     *tls.Config
 	shutdownOnce  sync.Once
+	// promAddr is the listen address of the Prometheus metrics server
+	promAddr string
 }
 
 // New creates a new APIServer instance
@@ -560,6 +562,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		},
 		traceShutdown: traceProviderShutdown,
 		tlsConfig:     tlsConfig,
+		promAddr:      fmt.Sprintf(":%v", cfg.PrometheusServerPort),
 	}, nil
 }
 
@@ -569,7 +572,7 @@ func (api *APIServer) Start() {
 		// Serve Prometheus endpoint on its own port since it
 		// won't be publicly exposed
 		promServer := &http.Server{
-			Addr:              ":9090",
+			Addr:              api.promAddr,
 			Handler:           promhttp.Handler(),
 			ReadHeaderTimeout: 3 * time.Second,
 			TLSConfig:         api.tlsConfig,

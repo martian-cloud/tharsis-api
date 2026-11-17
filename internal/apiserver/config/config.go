@@ -20,6 +20,7 @@ import (
 const (
 	defaultServerPort                                  = "8000"
 	defaultGRPCServerPort                              = "50051"
+	defaultPrometheusServerPort                        = "9090"
 	envOidcProviderConfigPrefix                        = "THARSIS_OAUTH_PROVIDERS_"
 	envRunnerConfigPrefix                              = "THARSIS_INTERNAL_RUNNERS_"
 	envFederatedRegistryTrustPolicyName                = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
@@ -143,6 +144,9 @@ type Config struct {
 	// GRPCServerPort is the GRPC server port. Defaults to 50051
 	GRPCServerPort string `yaml:"grpc_server_port" env:"GRPC_SERVER_PORT"`
 
+	// PrometheusServerPort is the port of the Prometheus metrics server, which is not publicly exposed. Defaults to 9090
+	PrometheusServerPort string `yaml:"prometheus_server_port" env:"PROMETHEUS_SERVER_PORT"`
+
 	// ExternalGRPCPort is the external GRPC port when using a reverse proxy. Defaults to the GRPC port
 	ExternalGRPCPort string `yaml:"external_grpc_server_port" env:"EXTERNAL_GRPC_PORT"`
 
@@ -265,6 +269,7 @@ func (c Config) Validate() error {
 	return validation.ValidateStruct(&c,
 		validation.Field(&c.ServerPort, is.Port),
 		validation.Field(&c.GRPCServerPort, is.Port),
+		validation.Field(&c.PrometheusServerPort, is.Port),
 		validation.Field(&c.ExternalGRPCPort, is.Port),
 		validation.Field(&c.ObjectStorePluginType, validation.Required),
 		validation.Field(&c.TharsisAPIURL, validation.Required),
@@ -285,6 +290,7 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	c := Config{
 		ServerPort:                                  defaultServerPort,
 		GRPCServerPort:                              defaultGRPCServerPort,
+		PrometheusServerPort:                        defaultPrometheusServerPort,
 		MaxGraphQLComplexity:                        defaultMaxGraphQLComplexity,
 		RateLimitStorePluginType:                    defaultRateLimitStorePluginType,
 		MaxGRPCRecvMsgSize:                          defaultMaxGRPCRecvMsgSize,
