@@ -4759,6 +4759,9 @@ type Workspace implements Namespace & Node {
 
 type WorkspaceAssessment implements Node {
   completedAt: Time
+
+  """Why the last assessment attempt could not produce a drift verdict."""
+  errorMessage: String
   hasDrift: Boolean!
   id: ID!
   metadata: ResourceMetadata!

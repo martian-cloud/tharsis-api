@@ -138,3 +138,88 @@ func TestCreateAssessmentRun_Execute(t *testing.T) {
 		})
 	}
 }
+
+// TestCreateAssessmentRun_Execute_ClearsErrorMessage covers the other half of recording an
+// assessment failure: once resolution succeeds the stored reason is stale and must not linger.
+// Reaching Execute is itself the proof, because Prepare resolved the source run and module
+// before the transaction opened.
+func TestCreateAssessmentRun_Execute_ClearsErrorMessage(t *testing.T) {
+	completed := time.Now().UTC().Add(-time.Hour)
+
+	t.Run("a recorded reason is cleared when the next assessment run is created", func(t *testing.T) {
+		ctx := context.Background()
+
+		existing := &models.WorkspaceAssessment{
+			Metadata:             models.ResourceMetadata{ID: "wa-1", Version: 5},
+			CompletedAtTimestamp: &completed,
+			HasDrift:             true,
+			ErrorMessage:         ptr.String("module not found for source registry/example/aws"),
+			AvailableAtTimestamp: ptr.Time(time.Now().UTC().Add(4 * time.Hour)),
+			ConsecutiveFailures:  3,
+		}
+
+		workspaceAssessments := db.NewMockWorkspaceAssessments(t)
+		workspaceAssessments.On("GetWorkspaceAssessmentByWorkspaceID", ctx, "ws-1").Return(existing, nil)
+		workspaceAssessments.On("UpdateWorkspaceAssessment", ctx, mock.MatchedBy(func(a *models.WorkspaceAssessment) bool {
+			// The drift verdict is untouched; only the failure reason, the backoff state, and
+			// the timestamps move. Creation succeeding ends the run of consecutive failures
+			// backoff was tracking, so both reset alongside the error message.
+			return a.ErrorMessage == nil && a.CompletedAtTimestamp == nil && a.HasDrift &&
+				a.AvailableAtTimestamp == nil && a.ConsecutiveFailures == 0
+		})).Return(&models.WorkspaceAssessment{}, nil).Once()
+
+		cmd := &CreateAssessmentRun{
+			dbClient:          &db.Client{WorkspaceAssessments: workspaceAssessments},
+			variablesRetainFn: func(_ context.Context, _ string) error { return nil },
+			createRun: func(_ context.Context, _ *corerun.CreateRunInput) (*models.Run, error) {
+				return &models.Run{
+					Metadata: models.ResourceMetadata{ID: "run-new"},
+					Status:   models.RunPending,
+					Plan:     models.Plan{Status: models.PlanCreated},
+				}, nil
+			},
+			in:          &CreateAssessmentRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"},
+			createInput: &corerun.CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"},
+		}
+
+		err := cmd.Execute(ctx, &types.ExecuteInput{RunStore: store.NewRunStore(&db.Client{})})
+
+		require.NoError(t, err)
+		require.NotNil(t, cmd.Created)
+	})
+
+	t.Run("the in-progress conflict guard still takes precedence over clearing", func(t *testing.T) {
+		ctx := context.Background()
+		recent := time.Now().UTC()
+
+		// An in-progress, non-stale assessment must still be rejected, so no update happens and
+		// the recorded reason is left alone.
+		existing := &models.WorkspaceAssessment{
+			Metadata:             models.ResourceMetadata{ID: "wa-1", Version: 5, LastUpdatedTimestamp: &recent},
+			CompletedAtTimestamp: nil,
+			ErrorMessage:         ptr.String("module not found for source registry/example/aws"),
+		}
+
+		workspaceAssessments := db.NewMockWorkspaceAssessments(t)
+		workspaceAssessments.On("GetWorkspaceAssessmentByWorkspaceID", ctx, "ws-1").Return(existing, nil)
+
+		createCalled := false
+		cmd := &CreateAssessmentRun{
+			dbClient:          &db.Client{WorkspaceAssessments: workspaceAssessments},
+			variablesRetainFn: func(_ context.Context, _ string) error { return nil },
+			createRun: func(_ context.Context, _ *corerun.CreateRunInput) (*models.Run, error) {
+				createCalled = true
+				return nil, nil
+			},
+			in:          &CreateAssessmentRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"},
+			createInput: &corerun.CreateRunInput{CreatedBy: models.Actor{Subject: "u"}, WorkspaceID: "ws-1"},
+		}
+
+		err := cmd.Execute(ctx, &types.ExecuteInput{RunStore: store.NewRunStore(&db.Client{})})
+
+		require.Error(t, err)
+		assert.Equal(t, errors.EConflict, errors.ErrorCode(err))
+		assert.False(t, createCalled)
+		require.NotNil(t, existing.ErrorMessage, "a rejected attempt must not clear the recorded reason")
+	})
+}

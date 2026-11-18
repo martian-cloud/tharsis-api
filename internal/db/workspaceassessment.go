@@ -84,7 +84,7 @@ type workspaceAssessments struct {
 	dbClient *Client
 }
 
-var workspaceAssessmentsFieldList = append(metadataFieldList, "workspace_id", "started_at", "completed_at", "has_drift", "requires_notification", "completed_run_id")
+var workspaceAssessmentsFieldList = append(metadataFieldList, "workspace_id", "started_at", "completed_at", "has_drift", "requires_notification", "completed_run_id", "error_message", "available_at", "consecutive_failures")
 
 // NewWorkspaceAssessments returns an instance of the WorkspaceAssessments interface.
 func NewWorkspaceAssessments(dbClient *Client) WorkspaceAssessments {
@@ -230,6 +230,9 @@ func (r *workspaceAssessments) CreateWorkspaceAssessment(ctx context.Context, as
 					"requires_notification": assessment.RequiresNotification,
 					"completed_at":          assessment.CompletedAtTimestamp,
 					"started_at":            assessment.StartedAtTimestamp,
+					"error_message":         assessment.ErrorMessage,
+					"available_at":          assessment.AvailableAtTimestamp,
+					"consecutive_failures":  assessment.ConsecutiveFailures,
 				}).Returning("*"),
 		).Select(r.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))))
@@ -272,6 +275,9 @@ func (r *workspaceAssessments) UpdateWorkspaceAssessment(ctx context.Context, as
 						"requires_notification": assessment.RequiresNotification,
 						"completed_at":          assessment.CompletedAtTimestamp,
 						"started_at":            assessment.StartedAtTimestamp,
+						"error_message":         assessment.ErrorMessage,
+						"available_at":          assessment.AvailableAtTimestamp,
+						"consecutive_failures":  assessment.ConsecutiveFailures,
 					},
 				).Where(goqu.Ex{"id": assessment.Metadata.ID, "version": assessment.Metadata.Version}).Returning("*"),
 		).Select(r.getSelectFields()...).
@@ -382,6 +388,9 @@ func scanWorkspaceAssessment(row scanner) (*models.WorkspaceAssessment, error) {
 		&wa.HasDrift,
 		&wa.RequiresNotification,
 		&wa.RunID,
+		&wa.ErrorMessage,
+		&wa.AvailableAtTimestamp,
+		&wa.ConsecutiveFailures,
 		&workspacePath,
 	}
 

@@ -59,6 +59,11 @@ func (r *WorkspaceAssessmentResolver) HasDrift() bool {
 	return r.assessment.HasDrift
 }
 
+// ErrorMessage resolver
+func (r *WorkspaceAssessmentResolver) ErrorMessage() *string {
+	return r.assessment.ErrorMessage
+}
+
 /* WorkspaceAssessment loader */
 
 const assessmentLoaderKey = "assessment"

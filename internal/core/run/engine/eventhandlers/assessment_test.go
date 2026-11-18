@@ -3,6 +3,7 @@ package eventhandlers
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,7 @@ import (
 const (
 	assessTestRunID       = "run-1"
 	assessTestWorkspaceID = "ws-1"
+	assessTestMinInterval = time.Hour
 )
 
 func TestAssessmentRunHandler_HandleRunChanges_NoOpCases(t *testing.T) {
@@ -53,7 +55,7 @@ func TestAssessmentRunHandler_HandleRunChanges_NoOpCases(t *testing.T) {
 			logr, _ := logger.NewForTest()
 			// No db sub-clients should be touched for these no-op cases.
 			dbClient := &db.Client{WorkspaceAssessments: db.NewMockWorkspaceAssessments(t)}
-			handler := NewAssessmentRunHandler(logr, dbClient)
+			handler := NewAssessmentRunHandler(logr, dbClient, assessTestMinInterval)
 
 			require.NoError(t, handler.HandleRunChanges(context.Background(), []types.RunChange{{Run: test.run}}))
 		})
@@ -149,12 +151,17 @@ func TestAssessmentRunHandler_AssessmentRun_DriftUpdates(t *testing.T) {
 				if test.expectRunIDSet && (a.RunID == nil || *a.RunID != assessTestRunID) {
 					return false
 				}
-				// CompletedAtTimestamp is always stamped.
-				return a.CompletedAtTimestamp != nil
+				// CompletedAtTimestamp is always stamped, and AvailableAtTimestamp is stamped
+				// to the base interval for both outcomes here -- neither a successful nor a
+				// failed-during-planning run is backed off, since a run was created either way.
+				if a.CompletedAtTimestamp == nil || a.AvailableAtTimestamp == nil {
+					return false
+				}
+				return a.AvailableAtTimestamp.Sub(*a.CompletedAtTimestamp) == assessTestMinInterval
 			})).Return(assessment, nil)
 
 			dbClient := &db.Client{WorkspaceAssessments: mockAssess}
-			handler := NewAssessmentRunHandler(logr, dbClient)
+			handler := NewAssessmentRunHandler(logr, dbClient, assessTestMinInterval)
 
 			run := &models.Run{
 				Metadata:        models.ResourceMetadata{ID: assessTestRunID},
@@ -179,7 +186,7 @@ func TestAssessmentRunHandler_AssessmentRun_MissingAssessmentRecord(t *testing.T
 	// UpdateWorkspaceAssessment must not be called when the record is missing.
 
 	dbClient := &db.Client{WorkspaceAssessments: mockAssess}
-	handler := NewAssessmentRunHandler(logr, dbClient)
+	handler := NewAssessmentRunHandler(logr, dbClient, assessTestMinInterval)
 
 	run := &models.Run{
 		Metadata:        models.ResourceMetadata{ID: assessTestRunID},
@@ -275,7 +282,7 @@ func TestAssessmentRunHandler_RegularRun_InvalidateStaleAssessment(t *testing.T)
 				Workspaces:           mockWS,
 				StateVersions:        mockSV,
 			}
-			handler := NewAssessmentRunHandler(logr, dbClient)
+			handler := NewAssessmentRunHandler(logr, dbClient, assessTestMinInterval)
 
 			// Non-assessment, non-speculative, completed run.
 			run := &models.Run{

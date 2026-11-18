@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<0a522aae5a4ecf1d072d48e7f08fc95c>>
+ * @generated SignedSource<<3efad06cd1acd40b3bf0d6fa9b8cee50>>
  * @lightSyntaxTransform
  */
 
@@ -13,6 +13,7 @@ import { FragmentRefs } from "relay-runtime";
 export type WorkspaceDetailsDriftDetectionFragment_workspace$data = {
   readonly assessment: {
     readonly completedAt: any | null | undefined;
+    readonly errorMessage: string | null | undefined;
     readonly hasDrift: boolean;
     readonly run: {
       readonly id: string;
@@ -83,6 +84,13 @@ return {
         {
           "alias": null,
           "args": null,
+          "kind": "ScalarField",
+          "name": "errorMessage",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
           "concreteType": "Run",
           "kind": "LinkedField",
           "name": "run",
@@ -108,6 +116,6 @@ return {
 };
 })();
 
-(node as any).hash = "9814940926704f320abe44420c34c410";
+(node as any).hash = "be2c872f93a0fc02ec56ad18727d122b";
 
 export default node;
