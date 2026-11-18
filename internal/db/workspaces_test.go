@@ -413,7 +413,7 @@ func TestWorkspaces_GetWorkspaceByID(t *testing.T) {
 	}
 }
 
-func TestWorkspaces_GetWorkspacesMinDurationSinceLastAssessment(t *testing.T) {
+func TestWorkspaces_GetWorkspacesAssessmentDue(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -460,9 +460,32 @@ func TestWorkspaces_GetWorkspacesMinDurationSinceLastAssessment(t *testing.T) {
 		now.Add(-2*models.AssessmentStaleTimeout), staleAssessment.Metadata.ID)
 	require.NoError(t, err)
 
-	minDuration := time.Hour
+	// available_at in the future (backoff, or the normal interval not yet elapsed): should
+	// NOT be matched.
+	backedOffWorkspace := createWorkspace("ws-backed-off")
+	completedLongAgo := now.Add(-2 * time.Hour)
+	backoffFuture := now.Add(time.Hour)
+	_, err = testClient.client.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, &models.WorkspaceAssessment{
+		WorkspaceID:          backedOffWorkspace.Metadata.ID,
+		StartedAtTimestamp:   completedLongAgo,
+		CompletedAtTimestamp: &completedLongAgo,
+		AvailableAtTimestamp: &backoffFuture,
+	})
+	require.NoError(t, err)
+
+	// available_at in the past: should be matched.
+	backoffElapsedWorkspace := createWorkspace("ws-backoff-elapsed")
+	backoffPast := now.Add(-time.Minute)
+	_, err = testClient.client.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, &models.WorkspaceAssessment{
+		WorkspaceID:          backoffElapsedWorkspace.Metadata.ID,
+		StartedAtTimestamp:   completedLongAgo,
+		CompletedAtTimestamp: &completedLongAgo,
+		AvailableAtTimestamp: &backoffPast,
+	})
+	require.NoError(t, err)
+
 	result, err := testClient.client.Workspaces.GetWorkspaces(ctx, &GetWorkspacesInput{
-		Filter: &WorkspaceFilter{MinDurationSinceLastAssessment: &minDuration},
+		Filter: &WorkspaceFilter{AssessmentDue: ptr.Bool(true)},
 	})
 	require.NoError(t, err)
 
@@ -473,6 +496,8 @@ func TestWorkspaces_GetWorkspacesMinDurationSinceLastAssessment(t *testing.T) {
 	assert.True(t, matched["ws-no-assessment"], "workspace with no assessment should be eligible")
 	assert.True(t, matched["ws-stale-in-progress"], "workspace with a stale in-progress assessment should be eligible")
 	assert.False(t, matched["ws-fresh-in-progress"], "workspace with a fresh in-progress assessment should not be eligible")
+	assert.False(t, matched["ws-backed-off"], "workspace whose available_at is in the future should not be eligible")
+	assert.True(t, matched["ws-backoff-elapsed"], "workspace whose available_at has passed should be eligible")
 }
 
 func TestWorkspaces_GetWorkspaces(t *testing.T) {

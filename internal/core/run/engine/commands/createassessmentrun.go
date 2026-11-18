@@ -145,10 +145,14 @@ func (c *CreateAssessmentRun) upsertAssessment(ctx context.Context) error {
 				errors.WithErrorCode(errors.EConflict),
 			)
 		}
-		if _, err = c.dbClient.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, &models.WorkspaceAssessment{
+		newAssessment := &models.WorkspaceAssessment{
 			WorkspaceID:        workspaceID,
 			StartedAtTimestamp: time.Now().UTC(),
-		}); err != nil {
+		}
+		if err = newAssessment.Validate(); err != nil {
+			return errors.Wrap(err, "failed to validate workspace assessment for workspace %q", workspaceID)
+		}
+		if _, err = c.dbClient.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, newAssessment); err != nil {
 			return errors.Wrap(err, "failed to create assessment for workspace %q", workspaceID)
 		}
 		return nil
@@ -172,6 +176,18 @@ func (c *CreateAssessmentRun) upsertAssessment(ctx context.Context) error {
 
 	assessment.StartedAtTimestamp = time.Now().UTC()
 	assessment.CompletedAtTimestamp = nil
+	// Reaching Execute means Prepare resolved the module and source run, so any earlier
+	// failure reason is stale, and clearing it keeps the record truthful. ConsecutiveFailures
+	// resets too: creation succeeding ends the failure streak backoff tracked.
+	// AvailableAtTimestamp also resets, mattering operationally: left at its old, already-past
+	// value, it would make the candidate query reselect this workspace before the run just
+	// created finishes.
+	assessment.ErrorMessage = nil
+	assessment.AvailableAtTimestamp = nil
+	assessment.ConsecutiveFailures = 0
+	if err = assessment.Validate(); err != nil {
+		return errors.Wrap(err, "failed to validate workspace assessment with ID %q", assessment.Metadata.ID)
+	}
 	if _, err = c.dbClient.WorkspaceAssessments.UpdateWorkspaceAssessment(ctx, assessment); err != nil {
 		return errors.Wrap(err, "failed to update workspace assessment with ID %q", assessment.Metadata.ID)
 	}

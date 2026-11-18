@@ -29,11 +29,13 @@ const DriftDetectionButton = ({ onClick }: { onClick: () => void }) => (
 
 const StatusMessage = ({
     isInProgress,
+    lastAttemptFailed,
     timestamp,
     runId,
     workspacePath
 }: {
     isInProgress: boolean,
+    lastAttemptFailed: boolean,
     timestamp: string,
     runId?: string,
     workspacePath: string
@@ -42,13 +44,13 @@ const StatusMessage = ({
         <Typography color="textSecondary" sx={{
             mr: 1
         }}>
-            {isInProgress ? 'Drift detection started' : 'Drift last checked'}{' '}
+            {isInProgress ? 'Drift detection started' : lastAttemptFailed ? 'Drift detection last attempted' : 'Drift last checked'}{' '}
             <Timestamp
                 component="span"
                 timestamp={timestamp}
             />
         </Typography>
-        {!isInProgress && runId && (
+        {!isInProgress && runId && !lastAttemptFailed && (
             <Link
                 to={`/groups/${workspacePath}/-/runs/${runId}`}
                 color="textSecondary"
@@ -74,6 +76,7 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
                     hasDrift
                     startedAt
                     completedAt
+                    errorMessage
                     run {
                         id
                         status
@@ -149,11 +152,42 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
         return data.assessment?.run?.status === 'errored';
     }, [data.assessment]);
 
+    // The most recent attempt could not even create an assessment run: the module it was built
+    // from is gone, its registry credential expired, or a managed identity rule rejects a
+    // system-initiated run. The reason is surfaced alongside any earlier result rather than in
+    // place of it.
+    const assessmentBlockedReason = useMemo(() => {
+        return isAssessmentInProgress ? null : data.assessment?.errorMessage;
+    }, [data.assessment, isAssessmentInProgress]);
+
+    // A completed assessment links the run that produced its result, and an attempt that could not
+    // create a run leaves any earlier link in place. So a recorded failure with no linked run means
+    // no check has ever completed for this workspace, and the stored drift flag is just its default
+    // rather than a result. Showing "No drift detected" would claim a clean result nobody computed.
+    const assessmentHasNoResult = useMemo(() => {
+        return !!assessmentBlockedReason && !data.assessment?.run;
+    }, [assessmentBlockedReason, data.assessment]);
+
     return (
         <Box>
             {error && (
                 <Alert sx={{ mb: 2 }} severity={error.severity}>
                     {error.message}
+                </Alert>
+            )}
+
+            {assessmentBlockedReason && (
+                <Alert sx={{ mb: 2 }} severity="warning">
+                    <Typography variant="body2" gutterBottom>
+                        {assessmentHasNoResult
+                            ? 'Drift detection could not run for this workspace, so its drift status is unknown.'
+                            : assessmentRunFailed
+                                ? 'Drift detection could not run for this workspace, and the status below is from a drift detection run that itself failed.'
+                                : 'Drift detection could not run for this workspace, so any status below is from the last successful check.'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
+                        {assessmentBlockedReason}
+                    </Typography>
                 </Alert>
             )}
 
@@ -163,6 +197,7 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
                         <CompareArrowsIcon />
                         <StatusMessage
                             isInProgress={isAssessmentInProgress}
+                            lastAttemptFailed={!!assessmentBlockedReason}
                             timestamp={isAssessmentInProgress ? data.assessment.startedAt : data.assessment.completedAt}
                             runId={data.assessment.run?.id}
                             workspacePath={data.fullPath}
@@ -244,7 +279,7 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
                 </Suspense>
             )}
 
-            {data.assessment && !isAssessmentInProgress && !assessmentRunFailed && !data.assessment.hasDrift && (
+            {data.assessment && !isAssessmentInProgress && !assessmentRunFailed && !assessmentHasNoResult && !data.assessment.hasDrift && (
                 <Paper variant="outlined" sx={{ marginTop: 2, display: "flex", justifyContent: "center" }}>
                     <Box
                         sx={{

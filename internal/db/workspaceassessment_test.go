@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -605,4 +606,139 @@ func TestGetWorkspaceAssessmentsWithPaginationAndSorting(t *testing.T) {
 
 		return result.PageInfo, resources, nil
 	})
+}
+
+// TestWorkspaceAssessmentErrorMessageRoundTrip covers the error_message column through create,
+// read and update. The column is appended to workspaceAssessmentsFieldList and scanned
+// positionally, so a mismatch between the two silently mis-scans every read; asserting the
+// neighbouring fields survive intact is what catches that.
+func TestWorkspaceAssessmentErrorMessageRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.Nil(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.Nil(t, err)
+
+	startedAt := time.Now().UTC()
+
+	// Created without a message: the last attempt did not fail.
+	created, err := testClient.client.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, &models.WorkspaceAssessment{
+		WorkspaceID:        workspace.Metadata.ID,
+		StartedAtTimestamp: startedAt,
+	})
+	require.Nil(t, err)
+	require.NotNil(t, created)
+	assert.Nil(t, created.ErrorMessage, "a new assessment has no recorded failure")
+
+	// Record a failure, as the scheduler does when it cannot create the assessment run. The
+	// message is truncated by the model helper first, which is what the scheduler does.
+	completedAt := time.Now().UTC()
+	longMessage := models.TruncateAssessmentErrorMessage(
+		"token in environment variable TF_TOKEN_example_com is not authorized to access this module: " +
+			strings.Repeat("x", models.MaxAssessmentErrorMessageLength),
+	)
+
+	created.ErrorMessage = &longMessage
+	created.CompletedAtTimestamp = &completedAt
+	created.HasDrift = true
+
+	updated, err := testClient.client.WorkspaceAssessments.UpdateWorkspaceAssessment(ctx, created)
+	require.Nil(t, err)
+	require.NotNil(t, updated)
+	require.NotNil(t, updated.ErrorMessage)
+	assert.Equal(t, longMessage, *updated.ErrorMessage)
+	assert.LessOrEqual(t, len(*updated.ErrorMessage), models.MaxAssessmentErrorMessageLength)
+	// Neighbouring columns must survive, proving the positional scan stayed aligned.
+	assert.True(t, updated.HasDrift)
+	assert.Equal(t, workspace.Metadata.ID, updated.WorkspaceID)
+	assert.Equal(t, startedAt.Format(time.RFC3339), updated.StartedAtTimestamp.Format(time.RFC3339))
+	require.NotNil(t, updated.CompletedAtTimestamp)
+	assert.Equal(t, completedAt.Format(time.RFC3339), updated.CompletedAtTimestamp.Format(time.RFC3339))
+
+	// A separate read goes through getSelectFields/scanWorkspaceAssessment too.
+	fetched, err := testClient.client.WorkspaceAssessments.GetWorkspaceAssessmentByWorkspaceID(ctx, workspace.Metadata.ID)
+	require.Nil(t, err)
+	require.NotNil(t, fetched)
+	require.NotNil(t, fetched.ErrorMessage)
+	assert.Equal(t, longMessage, *fetched.ErrorMessage)
+	assert.True(t, fetched.HasDrift)
+
+	// Cleared when an assessment run is created again.
+	fetched.ErrorMessage = nil
+	cleared, err := testClient.client.WorkspaceAssessments.UpdateWorkspaceAssessment(ctx, fetched)
+	require.Nil(t, err)
+	require.NotNil(t, cleared)
+	assert.Nil(t, cleared.ErrorMessage, "clearing the message must write a NULL, not an empty string")
+	assert.True(t, cleared.HasDrift, "clearing the failure must not disturb the drift verdict")
+}
+
+// TestWorkspaceAssessmentBackoffRoundTrip covers the available_at and consecutive_failures
+// columns the scheduler uses to back off a workspace that keeps failing. Like error_message,
+// both are appended to workspaceAssessmentsFieldList and scanned positionally, so this also
+// guards against the scan silently drifting out of alignment.
+func TestWorkspaceAssessmentBackoffRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.Nil(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.Nil(t, err)
+
+	// Created without backoff state: the last attempt did not fail.
+	created, err := testClient.client.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, &models.WorkspaceAssessment{
+		WorkspaceID: workspace.Metadata.ID,
+	})
+	require.Nil(t, err)
+	require.NotNil(t, created)
+	assert.Nil(t, created.AvailableAtTimestamp)
+	assert.Equal(t, 0, created.ConsecutiveFailures)
+
+	// Record a failure, as the scheduler does: a future available_at suppresses eligibility,
+	// and the failure count drives how far out it was pushed.
+	availableAt := time.Now().UTC().Add(4 * time.Hour)
+	created.AvailableAtTimestamp = &availableAt
+	created.ConsecutiveFailures = 3
+
+	updated, err := testClient.client.WorkspaceAssessments.UpdateWorkspaceAssessment(ctx, created)
+	require.Nil(t, err)
+	require.NotNil(t, updated)
+	require.NotNil(t, updated.AvailableAtTimestamp)
+	assert.Equal(t, availableAt.Format(time.RFC3339), updated.AvailableAtTimestamp.Format(time.RFC3339))
+	assert.Equal(t, 3, updated.ConsecutiveFailures)
+
+	// A separate read goes through getSelectFields/scanWorkspaceAssessment too.
+	fetched, err := testClient.client.WorkspaceAssessments.GetWorkspaceAssessmentByWorkspaceID(ctx, workspace.Metadata.ID)
+	require.Nil(t, err)
+	require.NotNil(t, fetched)
+	require.NotNil(t, fetched.AvailableAtTimestamp)
+	assert.Equal(t, availableAt.Format(time.RFC3339), fetched.AvailableAtTimestamp.Format(time.RFC3339))
+	assert.Equal(t, 3, fetched.ConsecutiveFailures)
+
+	// Cleared when an assessment run is created again.
+	fetched.AvailableAtTimestamp = nil
+	fetched.ConsecutiveFailures = 0
+	cleared, err := testClient.client.WorkspaceAssessments.UpdateWorkspaceAssessment(ctx, fetched)
+	require.Nil(t, err)
+	require.NotNil(t, cleared)
+	assert.Nil(t, cleared.AvailableAtTimestamp, "clearing must write a NULL, not a zero timestamp")
+	assert.Equal(t, 0, cleared.ConsecutiveFailures)
 }

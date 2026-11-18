@@ -17,13 +17,17 @@ var workspaceDriftCount = metric.NewCounter("workspace_drift_count", "Total coun
 // run completes, and invalidates a stale assessment when a regular run updates the
 // workspace's state.
 type AssessmentRunHandler struct {
-	dbClient *db.Client
-	logger   logger.Logger
+	dbClient              *db.Client
+	logger                logger.Logger
+	assessmentMinInterval time.Duration
 }
 
-// NewAssessmentRunHandler creates a new AssessmentRunHandler.
-func NewAssessmentRunHandler(logger logger.Logger, dbClient *db.Client) *AssessmentRunHandler {
-	return &AssessmentRunHandler{dbClient: dbClient, logger: logger}
+// NewAssessmentRunHandler creates a new AssessmentRunHandler. assessmentMinInterval is the same
+// base interval the assessment scheduler uses; it's stamped onto AvailableAtTimestamp whenever
+// an assessment run completes, so the scheduler's candidate query can rely on that single
+// column rather than recomputing the interval against CompletedAtTimestamp at read time.
+func NewAssessmentRunHandler(logger logger.Logger, dbClient *db.Client, assessmentMinInterval time.Duration) *AssessmentRunHandler {
+	return &AssessmentRunHandler{dbClient: dbClient, logger: logger, assessmentMinInterval: assessmentMinInterval}
 }
 
 // HandleRunChanges implements RunChangeHandler.
@@ -71,6 +75,11 @@ func (h *AssessmentRunHandler) handleRun(ctx context.Context, run *models.Run) e
 	// Link the run that completed this assessment, regardless of outcome, so the
 	// recorded run reflects the latest attempt (and its status is visible).
 	assessment.RunID = &run.Metadata.ID
+	// Stamps the next-eligible time for both outcomes: success and a no-verdict run, at the
+	// normal interval, not backed off. Backoff is for an attempt that could not create a run
+	// (recordAssessmentFailure); not the case here.
+	availableAt := now.Add(h.assessmentMinInterval)
+	assessment.AvailableAtTimestamp = &availableAt
 
 	if run.Status == models.RunPlannedAndFinished {
 		hasDrift := run.Plan.Summary.ResourceDrift > 0

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<70eacec68aa0e588babe52deb432b0e1>>
+ * @generated SignedSource<<cec5dd661a81b752af9c54cfc0d7351e>>
  * @lightSyntaxTransform
  */
 
@@ -217,6 +217,13 @@ return {
                       {
                         "alias": null,
                         "args": null,
+                        "kind": "ScalarField",
+                        "name": "errorMessage",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
                         "concreteType": "Run",
                         "kind": "LinkedField",
                         "name": "run",
@@ -250,12 +257,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "816761db6407e83fee4aebe4b4d962ba",
+    "cacheID": "495f08645511d1a20d1378173bdee353",
     "id": null,
     "metadata": {},
     "name": "WorkspaceDetailsDriftDetectionMutation",
     "operationKind": "mutation",
-    "text": "mutation WorkspaceDetailsDriftDetectionMutation(\n  $input: AssessWorkspaceInput!\n) {\n  assessWorkspace(input: $input) {\n    run {\n      id\n      workspace {\n        fullPath\n        ...WorkspaceDetailsDriftDetectionFragment_workspace\n        id\n      }\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment WorkspaceDetailsDriftDetectionFragment_workspace on Workspace {\n  id\n  fullPath\n  assessment {\n    hasDrift\n    startedAt\n    completedAt\n    run {\n      id\n      status\n    }\n    id\n  }\n}\n"
+    "text": "mutation WorkspaceDetailsDriftDetectionMutation(\n  $input: AssessWorkspaceInput!\n) {\n  assessWorkspace(input: $input) {\n    run {\n      id\n      workspace {\n        fullPath\n        ...WorkspaceDetailsDriftDetectionFragment_workspace\n        id\n      }\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment WorkspaceDetailsDriftDetectionFragment_workspace on Workspace {\n  id\n  fullPath\n  assessment {\n    hasDrift\n    startedAt\n    completedAt\n    errorMessage\n    run {\n      id\n      status\n    }\n    id\n  }\n}\n"
   }
 };
 })();

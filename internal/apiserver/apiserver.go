@@ -264,6 +264,10 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	runAdmitter := admission.New(dbClient)
 	runCmdFactory := runcommands.NewFactory(logger, dbClient, runAdmitter, runVariablesBuilder, moduleResolver, cfg.TerraformCLIVersionConstraint, limits, artifactStore)
 
+	// Shared by the assessment run handler (stamps the next-eligible time on every completion)
+	// and the assessment scheduler (the base backoff interval, and its own candidate query).
+	assessmentMinInterval := time.Duration(cfg.WorkspaceAssessmentIntervalHours) * time.Hour
+
 	// Run command processor and handlers
 	runCmdProcessor := engine.NewCmdProcessor(
 		logger,
@@ -275,7 +279,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		},
 		[]runtypes.RunChangeHandler{
 			runeventhandlers.NewWorkspaceLockManager(logger, dbClient),
-			runeventhandlers.NewAssessmentRunHandler(logger, dbClient),
+			runeventhandlers.NewAssessmentRunHandler(logger, dbClient, assessmentMinInterval),
 			runeventhandlers.NewStalePlannedRunDiscarder(logger, dbClient),
 			runeventhandlers.NewRunGateManager(logger, dbClient),
 			runeventhandlers.NewPolicyCheckWorkItemEnqueuer(logger, dbClient),
@@ -407,7 +411,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		runCmdFactory,
 		inheritedSettingsResolver,
 		maintenanceMonitor,
-		time.Duration(cfg.WorkspaceAssessmentIntervalHours)*time.Hour,
+		assessmentMinInterval,
 		cfg.WorkspaceAssessmentRunLimit,
 	).Start(ctx)
 

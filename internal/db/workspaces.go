@@ -67,20 +67,23 @@ type WorkspaceFilter struct {
 	// RootNamespaceMemberships limits results to workspaces at or under one of the caller's
 	// root member namespace paths. A non-nil empty slice matches nothing (caller has no
 	// memberships); nil means no membership filter (e.g. admin).
-	RootNamespaceMemberships       []models.MembershipNamespace
-	Search                         *string
-	AssignedManagedIdentityID      *string
-	WorkspaceIDs                   []string
-	PathLessThan                   *string
-	MinDurationSinceLastAssessment *time.Duration
-	Locked                         *bool
-	Dirty                          *bool
-	HasStateVersion                *bool
-	WorkspacePath                  *string
-	NamespacePathPrefix            *string
-	LabelFilters                   []WorkspaceLabelFilter
-	FavoriteUserID                 *string
-	ExcludeFavoriteUserID          *string
+	RootNamespaceMemberships  []models.MembershipNamespace
+	Search                    *string
+	AssignedManagedIdentityID *string
+	WorkspaceIDs              []string
+	PathLessThan              *string
+	// AssessmentDue activates the assessment-scheduler eligibility check (see GetWorkspaces):
+	// whether a workspace is due is decided entirely by its own available_at column, so this is
+	// just an on/off switch for the caller, not a tunable value.
+	AssessmentDue         *bool
+	Locked                *bool
+	Dirty                 *bool
+	HasStateVersion       *bool
+	WorkspacePath         *string
+	NamespacePathPrefix   *string
+	LabelFilters          []WorkspaceLabelFilter
+	FavoriteUserID        *string
+	ExcludeFavoriteUserID *string
 }
 
 // WorkspaceLabelFilter represents a label filter for workspace queries
@@ -251,20 +254,27 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		ex = ex.Append(goqu.Ex{"workspace_managed_identity_relation.managed_identity_id": input.Filter.AssignedManagedIdentityID})
 	}
 
-	if input.Filter != nil && input.Filter.MinDurationSinceLastAssessment != nil {
+	if input.Filter != nil && input.Filter.AssessmentDue != nil && *input.Filter.AssessmentDue {
 		query = query.LeftJoin(goqu.T("workspace_assessments"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("workspace_assessments.workspace_id")}))
 
-		maxTime := time.Now().Add(-(*input.Filter.MinDurationSinceLastAssessment))
-		staleTime := time.Now().Add(-models.AssessmentStaleTimeout)
+		now := time.Now().UTC()
+		staleTime := now.Add(-models.AssessmentStaleTimeout)
 
+		// The assessment run handler and the scheduler's failure path both stamp available_at
+		// with the interval already applied, so eligibility here is just available_at <= now.
+		// A row that completed before this column existed was backfilled to "due now" by the
+		// migration that added it, so there is no separate branch for that case here.
 		ex = ex.Append(goqu.Or(
+			// Never assessed.
 			goqu.I("workspace_assessments.id").IsNull(),
-			goqu.I("workspace_assessments.completed_at").Lte(maxTime.UTC()),
-			// An in-progress assessment that hasn't been updated within the stale
-			// timeout was abandoned; treat the workspace as eligible to reassess.
+			// The normal case: available_at was stamped on the last completion (or on a
+			// recorded failure, with backoff already applied) and that time has passed.
+			goqu.I("workspace_assessments.available_at").Lte(now),
+			// An in-progress assessment that hasn't been updated within the stale timeout was
+			// abandoned; treat the workspace as eligible to reassess.
 			goqu.And(
 				goqu.I("workspace_assessments.completed_at").IsNull(),
-				goqu.I("workspace_assessments.updated_at").Lte(staleTime.UTC()),
+				goqu.I("workspace_assessments.updated_at").Lte(staleTime),
 			),
 		))
 	}
