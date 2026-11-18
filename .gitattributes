@@ -1,0 +1,7 @@
+# Generated code: changes are hidden from diffs, including GitLab merge request diffs.
+# This copy is for the open-source repo, which the oss/ subtree becomes, so its paths are relative to oss/.
+# Keep it in sync with the .gitattributes at the repository root.
+# Relay compiler output.
+*.graphql.ts -diff
+# protoc output.
+pkg/protos/gen/** -diff

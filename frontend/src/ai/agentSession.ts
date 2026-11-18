@@ -61,10 +61,10 @@ const AgentSessionEventsSubscription = graphql`
             ... on AgentSessionTextMessageStartEvent { type messageId role }
             ... on AgentSessionTextMessageContentEvent { type messageId delta }
             ... on AgentSessionTextMessageEndEvent { type messageId }
-            ... on AgentSessionToolCallStartEvent { type toolCallId toolCallName parentMessageId }
+            ... on AgentSessionToolCallStartEvent { type toolCallId toolCallName parentMessageId timestamp }
             ... on AgentSessionToolCallArgsEvent { type toolCallId delta }
             ... on AgentSessionToolCallEndEvent { type toolCallId }
-            ... on AgentSessionToolCallResultEvent { type messageId toolCallId content role }
+            ... on AgentSessionToolCallResultEvent { type messageId toolCallId content role timestamp }
             ... on AgentSessionReasoningStartEvent { type messageId }
             ... on AgentSessionReasoningMessageStartEvent { type messageId role }
             ... on AgentSessionReasoningMessageContentEvent { type messageId delta }

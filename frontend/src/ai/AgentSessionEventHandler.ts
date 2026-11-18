@@ -21,6 +21,10 @@ type ToolCallState = {
     parsedArgs: Record<string, any> | undefined;
     result: unknown;
     isError: boolean | undefined;
+    // Server timestamps in epoch ms. The start is when the model's tool call was saved and the end is when
+    // the tool's result was saved, so they hold the same values when a session's history is replayed.
+    startedAt: number | undefined;
+    completedAt: number | undefined;
 };
 
 type PartOrder =
@@ -310,6 +314,8 @@ export class AgentSessionEventHandler {
             parsedArgs: undefined,
             result: undefined,
             isError: undefined,
+            startedAt: event.timestamp ?? undefined,
+            completedAt: undefined,
         });
         this.syncAssistant();
     }
@@ -351,6 +357,8 @@ export class AgentSessionEventHandler {
                 parsedArgs: undefined,
                 result: undefined,
                 isError: undefined,
+                startedAt: undefined,
+                completedAt: undefined,
             };
             this.toolCalls.set(id, entry);
             if (!this.partOrder.some(p => p.kind === 'tool-call' && p.toolCallId === id)) {
@@ -359,6 +367,7 @@ export class AgentSessionEventHandler {
         }
 
         entry.result = tryParseJSON(event.content ?? '');
+        entry.completedAt = event.timestamp ?? undefined;
         this.completedToolCallIds.add(id);
         this.syncAssistant();
     }
@@ -473,6 +482,12 @@ export class AgentSessionEventHandler {
                 argsText: tc.argsText,
                 ...(tc.result !== undefined ? { result: tc.result } : {}),
                 ...(tc.isError !== undefined ? { isError: tc.isError } : {}),
+                ...(tc.startedAt !== undefined ? {
+                    timing: {
+                        startedAt: tc.startedAt,
+                        ...(tc.completedAt !== undefined ? { completedAt: tc.completedAt } : {}),
+                    },
+                } : {}),
             });
         }
 

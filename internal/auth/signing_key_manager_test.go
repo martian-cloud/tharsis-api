@@ -26,6 +26,13 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
+// expectedJWSKeyFilter is the filter every signing key query must use: only JWT signing keys, never keys of
+// another usage such as audit checkpoint keys.
+func expectedJWSKeyFilter(statuses ...models.AsymSigningKeyStatus) *db.AsymSigningKeyFilter {
+	usage := models.AsymSigningKeyUsage("jws")
+	return &db.AsymSigningKeyFilter{KeyUsage: &usage, Status: statuses}
+}
+
 func TestSigningKeyManager_GenerateToken(t *testing.T) {
 	now := time.Now()
 	expiration := now.Add(time.Hour)
@@ -54,9 +61,7 @@ func TestSigningKeyManager_GenerateToken(t *testing.T) {
 				}
 
 				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{
-					Filter: &db.AsymSigningKeyFilter{
-						Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusActive},
-					},
+					Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusActive),
 					PaginationOptions: &pagination.Options{
 						First: ptr.Int32(1),
 					},
@@ -163,7 +168,7 @@ func TestSigningKeyManager_VerifyToken(t *testing.T) {
 				// Use the shared public key for verification
 				keyBytes, _ := json.Marshal(publicKey1)
 
-				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{}).Return(&db.AsymSigningKeysResult{
+				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusActive, models.AsymSigningKeyStatusDecommissioning)}).Return(&db.AsymSigningKeysResult{
 					AsymSigningKeys: []models.AsymSigningKey{
 						{
 							Metadata:  models.ResourceMetadata{ID: "key-1"},
@@ -195,7 +200,7 @@ func TestSigningKeyManager_VerifyToken(t *testing.T) {
 			setupMocks: func(mockAsymSigningKeys *db.MockAsymSigningKeys) {
 				keyBytes, _ := json.Marshal(publicKey1)
 
-				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{}).Return(&db.AsymSigningKeysResult{
+				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusActive, models.AsymSigningKeyStatusDecommissioning)}).Return(&db.AsymSigningKeysResult{
 					AsymSigningKeys: []models.AsymSigningKey{
 						{
 							Metadata:  models.ResourceMetadata{ID: "key-1"},
@@ -260,7 +265,7 @@ func TestSigningKeyManager_GetKeys(t *testing.T) {
 				publicKey.Set(jwk.KeyIDKey, "test-key-id")
 				keyBytes, _ := json.Marshal(publicKey)
 
-				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{}).Return(&db.AsymSigningKeysResult{
+				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusActive, models.AsymSigningKeyStatusDecommissioning)}).Return(&db.AsymSigningKeysResult{
 					AsymSigningKeys: []models.AsymSigningKey{
 						{
 							Metadata:  models.ResourceMetadata{ID: "key-1"},
@@ -338,9 +343,7 @@ func TestNewSigningKeyManager(t *testing.T) {
 			setupMocks: func(mockAsymSigningKeys *db.MockAsymSigningKeys, _ *jwsplugin.MockProvider) {
 				// Mock cleanup of failed keys
 				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{
-					Filter: &db.AsymSigningKeyFilter{
-						Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusCreating},
-					},
+					Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusCreating),
 				}).Return(&db.AsymSigningKeysResult{
 					AsymSigningKeys: []models.AsymSigningKey{},
 				}, nil)
@@ -353,15 +356,13 @@ func TestNewSigningKeyManager(t *testing.T) {
 				}
 
 				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{
-					Filter: &db.AsymSigningKeyFilter{
-						Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusCreating, models.AsymSigningKeyStatusActive},
-					},
+					Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusCreating, models.AsymSigningKeyStatusActive),
 				}).Return(&db.AsymSigningKeysResult{
 					AsymSigningKeys: []models.AsymSigningKey{activeKey},
 				}, nil)
 
 				// Mock sync key set
-				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{}).Return(&db.AsymSigningKeysResult{
+				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusActive, models.AsymSigningKeyStatusDecommissioning)}).Return(&db.AsymSigningKeysResult{
 					AsymSigningKeys: []models.AsymSigningKey{activeKey},
 				}, nil)
 			},
@@ -442,7 +443,7 @@ func TestSigningKeyManager_syncKeySet(t *testing.T) {
 				publicKey.Set(jwk.KeyIDKey, "test-key-id")
 				keyBytes, _ := json.Marshal(publicKey)
 
-				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{}).Return(&db.AsymSigningKeysResult{
+				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusActive, models.AsymSigningKeyStatusDecommissioning)}).Return(&db.AsymSigningKeysResult{
 					AsymSigningKeys: []models.AsymSigningKey{
 						{
 							Metadata:  models.ResourceMetadata{ID: "key-1"},
@@ -499,9 +500,7 @@ func TestSigningKeyManager_getActiveKey(t *testing.T) {
 				}
 
 				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{
-					Filter: &db.AsymSigningKeyFilter{
-						Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusActive},
-					},
+					Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusActive),
 					PaginationOptions: &pagination.Options{
 						First: ptr.Int32(1),
 					},
@@ -576,9 +575,7 @@ func TestSigningKeyManager_cleanupFailedKeys(t *testing.T) {
 				}
 
 				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{
-					Filter: &db.AsymSigningKeyFilter{
-						Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusCreating},
-					},
+					Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusCreating),
 				}).Return(&db.AsymSigningKeysResult{
 					AsymSigningKeys: []models.AsymSigningKey{failedKey},
 				}, nil)
@@ -704,9 +701,7 @@ func TestSigningKeyManager_waitForActiveKey(t *testing.T) {
 				}
 
 				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{
-					Filter: &db.AsymSigningKeyFilter{
-						Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusActive},
-					},
+					Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusActive),
 					PaginationOptions: &pagination.Options{
 						First: ptr.Int32(1),
 					},
@@ -846,9 +841,7 @@ func TestSigningKeyManager_deleteDecommissionedKeys(t *testing.T) {
 				}
 
 				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{
-					Filter: &db.AsymSigningKeyFilter{
-						Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusDecommissioning},
-					},
+					Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusDecommissioning),
 				}).Return(&db.AsymSigningKeysResult{
 					AsymSigningKeys: []models.AsymSigningKey{decommissionedKey},
 				}, nil)
@@ -916,9 +909,7 @@ func TestSigningKeyManager_checkForExpiredKey(t *testing.T) {
 
 				// Mock getActiveKey
 				mockAsymSigningKeys.On("GetAsymSigningKeys", mock.Anything, &db.GetAsymSigningKeysInput{
-					Filter: &db.AsymSigningKeyFilter{
-						Status: []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusActive},
-					},
+					Filter: expectedJWSKeyFilter(models.AsymSigningKeyStatusActive),
 					PaginationOptions: &pagination.Options{
 						First: ptr.Int32(1),
 					},

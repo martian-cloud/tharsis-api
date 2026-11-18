@@ -314,6 +314,16 @@ func TestGetAsymSigningKeys(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// A key of another usage, as a later release adds for audit checkpoints. This version has no way to create
+	// one, so it is inserted directly.
+	_, err = testClient.client.getConnection(ctx).Exec(ctx,
+		`INSERT INTO asym_signing_keys (id, version, created_at, updated_at, public_key, plugin_data, plugin_type, pub_key_id, status, key_usage)
+		VALUES (gen_random_uuid(), 1, NOW(), NOW(), 'checkpoint-public-key', 'checkpoint-plugin-data', 'memory', 'checkpoint-key-id', 'active', 'audit_checkpoint')`)
+	require.NoError(t, err)
+
+	jwsUsage := models.AsymSigningKeyUsageJWS
+	checkpointUsage := models.AsymSigningKeyUsage("audit_checkpoint")
+
 	type testCase struct {
 		filter            *AsymSigningKeyFilter
 		name              string
@@ -324,7 +334,25 @@ func TestGetAsymSigningKeys(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:              "return all asymmetric signing keys",
+			expectResultCount: 3,
+		},
+		{
+			name:              "keys created without a usage are jws keys",
+			filter:            &AsymSigningKeyFilter{KeyUsage: &jwsUsage},
 			expectResultCount: 2,
+		},
+		{
+			name:              "filter by another usage",
+			filter:            &AsymSigningKeyFilter{KeyUsage: &checkpointUsage},
+			expectResultCount: 1,
+		},
+		{
+			name: "filter by usage and status",
+			filter: &AsymSigningKeyFilter{
+				KeyUsage: &jwsUsage,
+				Status:   []models.AsymSigningKeyStatus{models.AsymSigningKeyStatusActive},
+			},
+			expectResultCount: 0,
 		},
 	}
 

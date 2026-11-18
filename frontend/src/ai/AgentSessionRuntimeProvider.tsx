@@ -1,11 +1,13 @@
 import type { AppendMessage, ThreadMessageLike } from '@assistant-ui/react';
 import {
     AssistantRuntimeProvider,
+    AuiConfig,
+    MessageNotSentError,
     Suggestions,
-    useAui,
     useExternalStoreRuntime,
 } from '@assistant-ui/react';
 import { withKey } from '@assistant-ui/tap';
+import { useSnackbar } from 'notistack';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRelayEnvironment } from 'react-relay/hooks';
 import { cancelAgentRun, createAgentRun, createAgentSession } from './agentSession';
@@ -16,6 +18,7 @@ const convertMessage = (m: ThreadMessageLike) => m;
 
 export function AgentSessionRuntimeProvider({ children }: Readonly<{ children: ReactNode }>) {
     const environment = useRelayEnvironment();
+    const { enqueueSnackbar } = useSnackbar();
     const { agentSessionId, setAgentSessionId, state: copilotState } = useAgentCopilot();
     const [messages, setMessages] = useState<ThreadMessageLike[]>([]);
     const runIdRef = useRef<string | undefined>(undefined);
@@ -37,8 +40,15 @@ export function AgentSessionRuntimeProvider({ children }: Readonly<{ children: R
     const onNew = useCallback(async (message: AppendMessage) => {
         const text = message.content[0]?.type === 'text' ? message.content[0].text : '';
         if (!text) return;
-        startRun(text);
-    }, [startRun]);
+        try {
+            await startRun(text);
+        } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error);
+            enqueueSnackbar(`Failed to send message: ${reason}`, { variant: 'error' });
+            // The run was never created, so hand the text back to the composer instead of losing it.
+            throw new MessageNotSentError(reason);
+        }
+    }, [startRun, enqueueSnackbar]);
 
     const onCancel = useCallback(async () => {
         const runId = runIdRef.current;
@@ -73,12 +83,12 @@ export function AgentSessionRuntimeProvider({ children }: Readonly<{ children: R
     const allSuggestions = useMemo(() => [...(copilotState?.suggestions ?? []), ...defaultSuggestions].map(s => ({ ...s, label: '' })), [copilotState?.suggestions, defaultSuggestions]);
     const suggestionsKey = useMemo(() => allSuggestions.map(s => s.prompt).join('|'), [allSuggestions]);
 
-    const aui = useAui({
+    const config = AuiConfig({
         suggestions: withKey(suggestionsKey, Suggestions(allSuggestions)),
     });
 
     return (
-        <AssistantRuntimeProvider runtime={runtime} aui={aui}>
+        <AssistantRuntimeProvider runtime={runtime} config={config}>
             {children}
         </AssistantRuntimeProvider>
     );

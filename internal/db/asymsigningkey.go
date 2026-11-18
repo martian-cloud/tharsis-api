@@ -53,7 +53,9 @@ func (as AsymSigningKeySortableField) getSortDirection() pagination.SortDirectio
 
 // AsymSigningKeyFilter contains the supported fields for filtering AsymSigningKey resources
 type AsymSigningKeyFilter struct {
-	Status []models.AsymSigningKeyStatus
+	// KeyUsage limits the results to keys of one usage.
+	KeyUsage *models.AsymSigningKeyUsage
+	Status   []models.AsymSigningKeyStatus
 }
 
 // GetAsymSigningKeysInput is the input for listing asymmetric signing keys
@@ -111,6 +113,9 @@ func (a *asymSigningKeys) GetAsymSigningKeys(ctx context.Context, input *GetAsym
 	if input.Filter != nil {
 		if input.Filter.Status != nil && len(input.Filter.Status) > 0 {
 			ex = ex.Append(goqu.I("asym_signing_keys.status").In(input.Filter.Status))
+		}
+		if input.Filter.KeyUsage != nil {
+			ex = ex.Append(goqu.I("asym_signing_keys.key_usage").Eq(*input.Filter.KeyUsage))
 		}
 	}
 

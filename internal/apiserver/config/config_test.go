@@ -86,3 +86,40 @@ func TestConfigValidate_UserCredentialLogin(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigValidate_PrometheusServerPort(t *testing.T) {
+	valid := Config{
+		ServerPort:                 "8000",
+		GRPCServerPort:             "50051",
+		ObjectStorePluginType:      "aws_s3",
+		TharsisAPIURL:              "https://api.example.com",
+		TharsisUIURL:               "https://example.com",
+		JWSProviderPluginType:      "memory",
+		UserCredentialLoginEnabled: true,
+	}
+
+	tests := []struct {
+		name              string
+		port              string
+		expectErrorFields string
+	}{
+		{name: "default port", port: defaultPrometheusServerPort},
+		{name: "custom port", port: "21434"},
+		{name: "not a number", port: "metrics", expectErrorFields: "PrometheusServerPort"},
+		{name: "out of range", port: "70000", expectErrorFields: "PrometheusServerPort"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := valid
+			cfg.PrometheusServerPort = test.port
+
+			err := cfg.Validate()
+			if test.expectErrorFields != "" {
+				assert.ErrorContains(t, err, test.expectErrorFields)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}

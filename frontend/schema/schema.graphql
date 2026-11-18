@@ -235,7 +235,7 @@ type AgentSession implements Node {
 
 type AgentSessionCustomEvent {
   name: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
   value: String
 }
@@ -250,34 +250,34 @@ input AgentSessionEventSubscriptionInput {
 
 type AgentSessionReasoningEndEvent {
   messageId: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
 type AgentSessionReasoningMessageContentEvent {
   delta: String!
   messageId: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
 type AgentSessionReasoningMessageEndEvent {
   messageId: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
 type AgentSessionReasoningMessageStartEvent {
   messageId: String!
   role: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
 """Reasoning events"""
 type AgentSessionReasoningStartEvent {
   messageId: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
@@ -307,14 +307,14 @@ type AgentSessionRunErrorEvent {
   message: String!
   runId: String!
   threadId: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
 type AgentSessionRunFinishedEvent {
   runId: String!
   threadId: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
@@ -327,32 +327,32 @@ enum AgentSessionRunSort {
 type AgentSessionRunStartedEvent {
   runId: String!
   threadId: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
 type AgentSessionStepFinishedEvent {
   stepName: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
 type AgentSessionStepStartedEvent {
   stepName: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
 type AgentSessionTextMessageContentEvent {
   delta: String!
   messageId: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
 type AgentSessionTextMessageEndEvent {
   messageId: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
@@ -360,19 +360,19 @@ type AgentSessionTextMessageEndEvent {
 type AgentSessionTextMessageStartEvent {
   messageId: String!
   role: String!
-  timestamp: Int
+  timestamp: Int64
   type: String!
 }
 
 type AgentSessionToolCallArgsEvent {
   delta: String!
-  timestamp: Int
+  timestamp: Int64
   toolCallId: String!
   type: String!
 }
 
 type AgentSessionToolCallEndEvent {
-  timestamp: Int
+  timestamp: Int64
   toolCallId: String!
   type: String!
 }
@@ -381,7 +381,7 @@ type AgentSessionToolCallResultEvent {
   content: String!
   messageId: String!
   role: String!
-  timestamp: Int
+  timestamp: Int64
   toolCallId: String!
   type: String!
 }
@@ -389,7 +389,7 @@ type AgentSessionToolCallResultEvent {
 """Tool call events"""
 type AgentSessionToolCallStartEvent {
   parentMessageId: String
-  timestamp: Int
+  timestamp: Int64
   toolCallId: String!
   toolCallName: String!
   type: String!
