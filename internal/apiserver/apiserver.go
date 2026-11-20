@@ -335,7 +335,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		policySetService           = policy.NewService(logger, dbClient, limits)
 		cleanupPolicyService       = cleanuppolicy.NewService(logger, dbClient)
 		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits)
-		scimService                = scim.NewService(logger, dbClient, signingKeyManager, cfg.OauthProviders)
+		scimService                = scim.NewService(logger, dbClient, cfg.OauthProviders, cfg.SCIMTokenMaxExpirationDays)
 		federatedRegistryService   = federatedregistry.NewService(logger, dbClient, limits, signingKeyManager)
 		providerRegistryClient     = provider.NewRegistryClient(httpClient)
 		runService                 = run.NewService(logger, dbClient, runCmdProcessor, runCmdFactory, artifactStore, eventManager, runVariablesBuilder)
@@ -358,7 +358,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		logger,
 		dbClient,
 		limits,
-		signingKeyManager,
 		httpClient,
 		runService,
 		workspaceService,

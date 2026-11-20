@@ -25,6 +25,12 @@ type Config {
   asymmetricSigningKeyDecommissionPeriodDays: Int!
   disableSensitiveVariableFeature: Boolean!
   serviceAccountClientSecretMaxExpirationDays: Int!
+  """
+  Maximum number of days a SCIM token may be valid for, or 0 for no maximum. The
+  maximum only applies when an expiration is set: a token created without an
+  expiration never expires, whatever this value is.
+  """
+  scimTokenMaxExpirationDays: Int!
   emailFooter: String
   emailEphemeralRetentionDays: Int!
   objectStorePluginType: String!

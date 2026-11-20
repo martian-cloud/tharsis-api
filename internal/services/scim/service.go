@@ -7,10 +7,11 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/google/uuid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/apikey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -93,16 +94,22 @@ type DeleteSCIMResourceInput struct {
 	ID string // Metadata ID.
 }
 
-// CreateSCIMTokenOutput contains the generated secret and its persisted model.
+// CreateSCIMTokenInput is the input for creating a SCIM token.
+type CreateSCIMTokenInput struct {
+	ExpiresAt    *time.Time // Nil means the token never expires.
+	IDPIssuerURL string
+}
+
+// CreateSCIMTokenOutput contains the generated token and its persisted model.
 type CreateSCIMTokenOutput struct {
-	PlaintextToken []byte
+	PlaintextToken string
 	SCIMToken      *models.SCIMToken
 }
 
 // Service encapsulates the logic for interacting with the SCIM service.
 type Service interface {
 	GetSCIMToken(ctx context.Context) (*models.SCIMToken, error)
-	CreateSCIMToken(ctx context.Context, idpIssuerURL string) (*CreateSCIMTokenOutput, error)
+	CreateSCIMToken(ctx context.Context, input *CreateSCIMTokenInput) (*CreateSCIMTokenOutput, error)
 	GetSCIMUsers(ctx context.Context, input *GetSCIMUsersInput) ([]models.User, error)
 	CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput) (*models.User, error)
 	UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput) (*models.User, error)
@@ -116,22 +123,22 @@ type Service interface {
 type service struct {
 	logger            logger.Logger
 	dbClient          *db.Client
-	signingKeyManager auth.SigningKeyManager
 	oauthProviders    []config.IdpConfig
+	maxExpirationDays int
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	signingKeyManager auth.SigningKeyManager,
 	oauthProviders []config.IdpConfig,
+	maxExpirationDays int,
 ) Service {
 	return &service{
-		logger,
-		dbClient,
-		signingKeyManager,
-		oauthProviders,
+		logger:            logger,
+		dbClient:          dbClient,
+		oauthProviders:    oauthProviders,
+		maxExpirationDays: maxExpirationDays,
 	}
 }
 
@@ -167,9 +174,9 @@ func (s *service) GetSCIMToken(ctx context.Context) (*models.SCIMToken, error) {
 	return &tokens[0], nil
 }
 
-func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) (*CreateSCIMTokenOutput, error) {
+func (s *service) CreateSCIMToken(ctx context.Context, input *CreateSCIMTokenInput) (*CreateSCIMTokenOutput, error) {
 	ctx, span := tracer.Start(ctx, "svc.CreateSCIMToken")
-	span.SetAttributes(attribute.String("idpIssuerURL", idpIssuerURL))
+	span.SetAttributes(attribute.String("idpIssuerURL", input.IDPIssuerURL))
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -192,20 +199,41 @@ func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) (*Cr
 			errors.WithErrorCode(errors.EForbidden))
 	}
 
-	if _, err := url.Parse(idpIssuerURL); err != nil {
+	if _, err = url.Parse(input.IDPIssuerURL); err != nil {
 		return nil, errors.Wrap(err, "failed to parse idpIssuerURL", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Validate that the idpIssuerURL matches a configured identity provider
 	validIssuer := false
 	for _, idp := range s.oauthProviders {
-		if idp.IssuerURL == idpIssuerURL {
+		if idp.IssuerURL == input.IDPIssuerURL {
 			validIssuer = true
 			break
 		}
 	}
+
 	if !validIssuer {
 		return nil, errors.New("identity provider issuer url does not match any configured identity provider", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	key, hash, err := apikey.Generate(apikey.TypeSCIM)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SCIM token", errors.WithSpan(span))
+	}
+
+	toCreate := &models.SCIMToken{
+		TokenHash:    hash,
+		IDPIssuerURL: input.IDPIssuerURL,
+		ExpiresAt:    input.ExpiresAt,
+		CreatedBy:    caller.GetActor(),
+	}
+
+	if err = toCreate.Validate(); err != nil {
+		return nil, errors.Wrap(err, "failed to validate SCIM token model", errors.WithSpan(span))
+	}
+
+	if input.ExpiresAt != nil && s.maxExpirationDays > 0 && input.ExpiresAt.UTC().After(time.Now().UTC().Add(time.Duration(s.maxExpirationDays)*24*time.Hour)) {
+		return nil, errors.New("scim token expiration cannot be more than %d days from now", s.maxExpirationDays, errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Transaction is used to avoid invalidating previous token if new one fails creation.
@@ -237,27 +265,7 @@ func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) (*Cr
 		}
 	}
 
-	// Generate a token with a UUID claim.
-	jwtID := uuid.New().String()
-	scimToken, err := s.signingKeyManager.GenerateToken(txContext, &auth.TokenInput{
-		Subject:  "scim",
-		Audience: "tharsis",
-		JwtID:    jwtID,
-		Claims: map[string]string{
-			"type":                     auth.SCIMTokenType,
-			auth.IDPIssuerURLClaimName: idpIssuerURL,
-		},
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate token", errors.WithSpan(span))
-	}
-
-	input := &models.SCIMToken{
-		Nonce:     jwtID,
-		CreatedBy: caller.GetActor(),
-	}
-
-	createdToken, err := s.dbClient.SCIMTokens.CreateToken(txContext, input)
+	createdToken, err := s.dbClient.SCIMTokens.CreateToken(txContext, toCreate)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create token", errors.WithSpan(span))
 	}
@@ -265,9 +273,13 @@ func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) (*Cr
 		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
-	s.logger.WithContextFields(ctx).Infow("Created a new SCIM token.")
+	s.logger.WithContextFields(ctx).Infow("Created a new SCIM token.",
+		"tokenID", createdToken.Metadata.ID,
+		"idpIssuerURL", createdToken.IDPIssuerURL,
+		"expiresAt", createdToken.ExpiresAt,
+	)
 
-	return &CreateSCIMTokenOutput{PlaintextToken: scimToken, SCIMToken: createdToken}, nil
+	return &CreateSCIMTokenOutput{PlaintextToken: key, SCIMToken: createdToken}, nil
 }
 
 func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMUsersInput) ([]models.User, error) {

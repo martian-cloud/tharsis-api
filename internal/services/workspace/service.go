@@ -143,6 +143,8 @@ type GetWorkspacesInput struct {
 	GroupID *string
 	// AssignedManagedIdentityID filters the workspaces by the specified managed identity
 	AssignedManagedIdentityID *string
+	// LinkedVCSProviderID filters the workspaces by the VCS provider they're linked to
+	LinkedVCSProviderID *string
 	// Search is used to search for a workspace by name or namespace path
 	Search *string
 	// WorkspacePath is used to search for a workspace by its full path
@@ -429,6 +431,7 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 		Filter: &db.WorkspaceFilter{
 			Search:                    input.Search,
 			AssignedManagedIdentityID: input.AssignedManagedIdentityID,
+			LinkedVCSProviderID:       input.LinkedVCSProviderID,
 			WorkspacePath:             input.WorkspacePath,
 			LabelFilters:              input.LabelFilters,
 		},

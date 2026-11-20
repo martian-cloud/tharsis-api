@@ -11,6 +11,7 @@ import { MutationError } from '../common/error';
 import NamespaceBreadcrumbs from '../namespace/NamespaceBreadcrumbs';
 import WorkspaceDetailsStatusPanel from './WorkspaceDetailsStatusPanel';
 import WorkspaceDetailsEmpty from './WorkspaceDetailsEmpty';
+import WorkspaceVCSWebhookAlert from './WorkspaceVCSWebhookAlert';
 import { WorkspaceDetailsIndexFragment_workspace$key } from './__generated__/WorkspaceDetailsIndexFragment_workspace.graphql';
 import { WorkspaceDetailsIndex_DestroyWorkspaceMutation } from './__generated__/WorkspaceDetailsIndex_DestroyWorkspaceMutation.graphql';
 import { WorkspaceDetailsIndex_ReconcileWorkspaceMutation } from './__generated__/WorkspaceDetailsIndex_ReconcileWorkspaceMutation.graphql';
@@ -67,6 +68,7 @@ function WorkspaceDetailsIndex(props: Props) {
         assessment {
             hasDrift
         }
+        ...WorkspaceVCSWebhookAlertFragment_workspace
         ...WorkspaceDetailsEmptyFragment_workspace
         ...WorkspaceDetailsStatusPanelFragment_workspace
         ...WorkspaceNotificationPreferenceFragment_workspace
@@ -305,6 +307,8 @@ function WorkspaceDetailsIndex(props: Props) {
                     </Box>
                 </Alert>
             }
+
+            <WorkspaceVCSWebhookAlert fragmentRef={data} />
 
             {data.assessment?.hasDrift &&
                 <Alert

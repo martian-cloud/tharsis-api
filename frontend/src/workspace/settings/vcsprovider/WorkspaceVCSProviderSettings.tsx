@@ -1,101 +1,39 @@
-import { useState } from 'react';
-import { Alert, Box, Button, Dialog, DialogActions, DialogTitle, DialogContent, IconButton, Typography } from '@mui/material'
-import CopyIcon from '@mui/icons-material/ContentCopy';
-import { useFragment } from 'react-relay';
+import { Box, Button, Paper, Stack, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
+import { useState } from 'react';
+import { useFragment } from 'react-relay';
 import { Link as RouterLink } from 'react-router-dom';
 import SettingsSection from '../../../common/SettingsSection';
+import ChangeVCSProviderDialog, { ChangeVCSProviderLink } from './ChangeVCSProviderDialog';
 import EditVCSProviderLink from './EditVCSProviderLink';
+import ManualWebhookDialog, { ManualWebhookDetails } from './ManualWebhookDialog';
 import NewVCSProviderLink from './NewVCSProviderLink';
+import VCSProviderLinkDangerZone from './VCSProviderLinkDangerZone';
+import VCSProviderLinkWebhook from './VCSProviderLinkWebhook';
 import { WorkspaceVCSProviderSettingsFragment_workspace$key } from './__generated__/WorkspaceVCSProviderSettingsFragment_workspace.graphql';
-
-export interface WebhooksData {
-    url: string
-    token: string | null | undefined
-    type: string | undefined
-}
 
 interface Props {
     fragmentRef: WorkspaceVCSProviderSettingsFragment_workspace$key
 }
 
-interface WebhooksDialogProps {
-    open: boolean
-    onClose: (confirm?: boolean) => void
-    webhooksData: WebhooksData | null
-}
-
-function WebhooksDialog(props: WebhooksDialogProps){
-    const { open, onClose, webhooksData } = props
-
-    if (webhooksData) {
-        return (
-            <Dialog
-                open={open}
-                keepMounted
-                maxWidth="sm"
-            >
-                <DialogTitle>Manually Configure Webhooks</DialogTitle>
-                <DialogContent dividers>
-                    <Box sx={{ mb: 3 }}>
-                        <Typography variant="subtitle1">Copy this URL {webhooksData.type === 'gitlab' ? 'and token' : null} to manually configure webhooks in your VCS provider</Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                        <Box
-                            sx={{
-                                display: "flex",
-                                flexDirection: "row"
-                            }}>
-                            <Typography variant="subtitle1">Webhook URL</Typography>
-                            <IconButton sx={{ padding: '4px' }} onClick={() => navigator.clipboard.writeText(webhooksData.url)}>
-                                <CopyIcon sx={{ width: 16, height: 16 }} />
-                            </IconButton>
-                        </Box>
-                        <Typography noWrap>{webhooksData?.url}</Typography>
-                    </Box>
-                    {webhooksData.type === 'gitlab' ? <Box sx={{ mb: 3 }}>
-                        <Box
-                            sx={{
-                                display: "flex",
-                                flexDirection: "row"
-                            }}>
-                            <Typography variant="subtitle1">Webhook token</Typography>
-                            <IconButton sx={{ padding: '4px' }} onClick={() => navigator.clipboard.writeText(webhooksData.token || '')}>
-                                <CopyIcon sx={{ width: 16, height: 16 }} />
-                            </IconButton>
-                        </Box>
-                        <Typography noWrap>{webhooksData.token}</Typography>
-                    </Box> : null}
-                    <Alert sx={{ marginBottom: 2 }} severity="warning">
-                        Closing this dialog will cause the URL {webhooksData?.type === 'gitlab' ? 'and token' : null} to be lost. If you intend to manually configure your webhooks, ensure you have copied this information.
-                    </Alert>
-                </DialogContent>
-                <DialogActions>
-                    <Button size='small' variant='outlined' color="inherit" onClick={() => onClose()}>
-                        Close
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        );
-    } else {
-        return null
-    }
-}
-
 function WorkspaceVCSProviderSettings({ fragmentRef }: Props) {
-    const [webhookObj, setWebhookObj] = useState<WebhooksData | null>(null);
-    const [openDialog, setOpenDialog] = useState<boolean>(false);
+    const [linking, setLinking] = useState(false);
+    const [webhookDetails, setWebhookDetails] = useState<ManualWebhookDetails | null>(null);
+    const [changeProviderLink, setChangeProviderLink] = useState<ChangeVCSProviderLink | null>(null);
 
     const data = useFragment<WorkspaceVCSProviderSettingsFragment_workspace$key>(
         graphql`
         fragment WorkspaceVCSProviderSettingsFragment_workspace on Workspace
         {
-            workspaceVcsProviderLink {
-                id
-            }
             fullPath
             groupPath
-            vcsProviders(first: 10, includeInherited: true) {
+            workspaceVcsProviderLink {
+                id
+                ...EditVCSProviderLinkFragment_link
+                ...VCSProviderLinkWebhookFragment_link
+                ...VCSProviderLinkDangerZoneFragment_link
+            }
+            vcsProviders(first: 1, includeInherited: true) {
                 edges {
                     node {
                         ... on VCSProvider {
@@ -104,57 +42,64 @@ function WorkspaceVCSProviderSettings({ fragmentRef }: Props) {
                     }
                 }
             }
-            ...EditVCSProviderLinkFragment_workspace
-            ...NewVCSProviderLinkFragment_workspace
         }
     `, fragmentRef
-    )
+    );
 
-    const handleWebhookDialog = (confirm: boolean, data: WebhooksData) => {
-        setWebhookObj(data)
-        setOpenDialog(confirm)
-    }
-
-    const edges = data?.vcsProviders?.edges ?? [];
+    const link = data.workspaceVcsProviderLink;
+    const hasProviders = (data.vcsProviders?.edges?.length ?? 0) > 0;
 
     return (
         <Box>
             <SettingsSection section="vcs-provider" title="VCS Provider Link Settings">
-                <Box>
-                    {data.workspaceVcsProviderLink && <EditVCSProviderLink fragmentRef={data} handleWebhookDialog={(confirm: boolean, data: WebhooksData) => handleWebhookDialog(confirm, data)} />}
-                    {!data.workspaceVcsProviderLink && edges.length > 0 && <NewVCSProviderLink fragmentRef={data}
-                        handleWebhookDialog={(confirm: boolean, data: WebhooksData) => handleWebhookDialog(confirm, data)} />}
-                    {!data.workspaceVcsProviderLink && edges.length === 0 && <Box>
-                        <Box sx={{ marginTop: 2, display: "flex", marginBottom: 2 }}>
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: "column"
-                                }}>
-                                <Typography variant="subtitle1" gutterBottom>
-                                    This workspace is not linked to a VCS Provider and there are no inherited VCS Providers. Get started by creating a VCS Provider in this group.
-                                </Typography>
-                                <Box sx={{
-                                    marginTop: 2
-                                }}>
-                                    <Button sx={{ minWidth: 200 }}
-                                        component={RouterLink}
-                                        variant="outlined"
-                                        to={`../${data.groupPath}/-/vcs_providers/new`}
-                                    >
-                                        New VCS Provider
-                                    </Button>
-                                </Box>
-                            </Box>
-                        </Box>
-                    </Box>}
-                </Box>
+                {link && (
+                    <Stack spacing={3} sx={{ mt: 2 }}>
+                        <EditVCSProviderLink key={link.id} fragmentRef={link} onChangeProvider={setChangeProviderLink} />
+                        <VCSProviderLinkWebhook fragmentRef={link} onShowWebhookDetails={setWebhookDetails} />
+                        <VCSProviderLinkDangerZone fragmentRef={link} />
+                    </Stack>
+                )}
+                {!link && linking && (
+                    <NewVCSProviderLink
+                        workspacePath={data.fullPath}
+                        onLinked={() => setLinking(false)}
+                        onCancel={() => setLinking(false)}
+                        onShowWebhookDetails={setWebhookDetails}
+                    />
+                )}
+                {!link && !linking && (
+                    <Paper sx={{ p: 4, mt: 2, textAlign: 'center' }}>
+                        <Typography variant="h6" gutterBottom>No repository linked</Typography>
+                        {hasProviders ? <>
+                            <Typography color="textSecondary" sx={{ mb: 3 }}>
+                                Link a GitHub or GitLab repository to start runs from pushes, tags and merge requests.
+                            </Typography>
+                            <Button variant="contained" color="secondary" onClick={() => setLinking(true)}>Link a repository</Button>
+                        </> : <>
+                            <Typography color="textSecondary" sx={{ mb: 3 }}>
+                                There are no VCS providers in this group or its parent groups. Create one to link a repository.
+                            </Typography>
+                            <Button
+                                variant="outlined"
+                                color="secondary"
+                                component={RouterLink}
+                                to={`../${data.groupPath}/-/vcs_providers/new`}
+                            >
+                                New VCS provider
+                            </Button>
+                        </>}
+                    </Paper>
+                )}
             </SettingsSection>
-            <WebhooksDialog
-                webhooksData={webhookObj}
-                open={openDialog}
-                onClose={() => setOpenDialog(false)}
-            />
+            {changeProviderLink && (
+                <ChangeVCSProviderDialog
+                    link={changeProviderLink}
+                    workspacePath={data.fullPath}
+                    onClose={() => setChangeProviderLink(null)}
+                    onShowWebhookDetails={setWebhookDetails}
+                />
+            )}
+            {webhookDetails && <ManualWebhookDialog details={webhookDetails} onClose={() => setWebhookDetails(null)} />}
         </Box>
     );
 }

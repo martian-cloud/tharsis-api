@@ -228,6 +228,18 @@ func TestBuildRepositoryURL(t *testing.T) {
 	}
 }
 
+func TestBuildCommitURL(t *testing.T) {
+	provider, err := New(context.TODO(), nil, nil, "")
+	assert.Nil(t, err)
+
+	actualURL, err := provider.BuildCommitURL(&types.BuildCommitURLInput{
+		RepositoryURL: "https://github.com/owner/repository",
+		CommitID:      "64b317c5bcfc637cca80b25f38501571f2a02b21",
+	})
+	assert.Nil(t, err)
+	assert.Equal(t, "https://github.com/owner/repository/commit/64b317c5bcfc637cca80b25f38501571f2a02b21", actualURL)
+}
+
 func TestTestConnection(t *testing.T) {
 	ctx := context.Background()
 
@@ -1165,4 +1177,123 @@ func TestRefsAreNotEscaped(t *testing.T) {
 	})
 	assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
 	assert.Empty(t, requested)
+}
+
+func TestUpdateWebhook(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		expectedError     error
+		expectedErrorCode errors.CodeType
+		input             *types.UpdateWebhookInput
+		name              string
+	}{
+		{
+			name: "positive: input is valid; expect no errors",
+			input: &types.UpdateWebhookInput{
+				ProviderURL:    defaultURL,
+				AccessToken:    "an-access-token",
+				RepositoryPath: "owner/repository",
+				WebhookID:      "50",
+				WebhookToken:   []byte("webhook-auth-token"),
+			},
+		},
+		{
+			name: "positive: input is valid with custom provider instance; expect no errors",
+			input: &types.UpdateWebhookInput{
+				ProviderURL:    customProviderURL,
+				AccessToken:    "an-access-token",
+				RepositoryPath: "owner/repository",
+				WebhookID:      "50",
+				WebhookToken:   []byte("webhook-auth-token"),
+			},
+		},
+		{
+			name: "negative: webhook does not exist; expect not found",
+			input: &types.UpdateWebhookInput{
+				ProviderURL:    defaultURL,
+				AccessToken:    "an-access-token",
+				RepositoryPath: "owner/repository",
+				WebhookID:      "404",
+				WebhookToken:   []byte("webhook-auth-token"),
+			},
+			expectedErrorCode: errors.ENotFound,
+		},
+		{
+			name: "negative: input is invalid; expect error",
+			input: &types.UpdateWebhookInput{
+				ProviderURL:    defaultURL,
+				AccessToken:    "some-token",
+				RepositoryPath: "owner/repo",
+				WebhookID:      "50",
+				WebhookToken:   []byte("webhook-auth-token"),
+			},
+			expectedError: fmt.Errorf("failed to update webhook. Response status: %s", "401"),
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			client := newTestClient(func(r *http.Request) *http.Response {
+				expectedPath := path.Join(
+					test.input.ProviderURL.Path,
+					"/repos",
+					test.input.RepositoryPath,
+					"hooks",
+					test.input.WebhookID,
+				)
+
+				assert.Equal(t, http.MethodPatch, r.Method)
+				assert.Equal(t, test.input.ProviderURL.Scheme, r.URL.Scheme)
+				assert.Equal(t, test.input.ProviderURL.Host, r.URL.Host)
+				assert.Equal(t, expectedPath, r.URL.Path)
+
+				var body updateWebhookBody
+				assert.Nil(t, json.NewDecoder(r.Body).Decode(&body))
+				assert.Equal(t, map[string]interface{}{
+					"url":          "https://tharsis.domain/v1/vcs/events?token=webhook-auth-token",
+					"content_type": "json",
+					"insecure_ssl": float64(0), // Marshalling will convert to float64.
+				}, body.Config)
+
+				if test.input.WebhookID == "404" {
+					return &http.Response{
+						StatusCode: http.StatusNotFound,
+						Body:       nil,
+						Status:     "404",
+						Header:     make(http.Header),
+					}
+				}
+
+				if r.Header.Get(authorizationHeader) != sampleValidToken {
+					return &http.Response{
+						StatusCode: http.StatusUnauthorized,
+						Body:       nil,
+						Status:     "401",
+						Header:     make(http.Header),
+					}
+				}
+
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString("{}")),
+					Status:     "200",
+					Header:     make(http.Header),
+				}
+			})
+
+			logger, _ := logger.NewForTest()
+			provider, err := New(ctx, logger, client, "https://tharsis.domain")
+			assert.Nil(t, err)
+
+			err = provider.UpdateWebhook(ctx, test.input)
+			if test.expectedErrorCode != "" {
+				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
+			} else if test.expectedError != nil {
+				assert.Equal(t, test.expectedError, err)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }

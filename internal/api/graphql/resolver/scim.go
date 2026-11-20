@@ -5,10 +5,11 @@ import (
 
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/scim"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
-// SCIMTokenResolver resolves a SCIM token without exposing its nonce.
+// SCIMTokenResolver resolves a SCIM token without exposing its hash.
 type SCIMTokenResolver struct {
 	token *models.SCIMToken
 }
@@ -34,9 +35,19 @@ func (r *SCIMTokenResolver) CreatedByActor() *ActorResolver {
 	return newActorResolver(r.token.CreatedBy)
 }
 
+// ExpiresAt resolver
+func (r *SCIMTokenResolver) ExpiresAt() *graphql.Time {
+	if r.token.ExpiresAt == nil {
+		return nil
+	}
+
+	return &graphql.Time{Time: *r.token.ExpiresAt}
+}
+
 // CreateSCIMTokenInput contains the input for creating a SCIM token
 type CreateSCIMTokenInput struct {
 	ClientMutationID *string
+	ExpiresAt        *graphql.Time
 	IdpIssuerURL     string
 }
 
@@ -49,7 +60,7 @@ type CreateSCIMTokenPayload struct {
 
 // CreateSCIMTokenPayloadResolver resolves a CreateSCIMTokenPayload.
 type CreateSCIMTokenPayloadResolver struct {
-	plaintextToken []byte
+	plaintextToken *string
 	CreateSCIMTokenPayload
 }
 
@@ -64,12 +75,7 @@ func (r *CreateSCIMTokenPayloadResolver) SCIMToken() *SCIMTokenResolver {
 
 // TokenText field resolver
 func (r *CreateSCIMTokenPayloadResolver) TokenText() *string {
-	if r.plaintextToken == nil {
-		return nil
-	}
-
-	tokenText := string(r.plaintextToken)
-	return &tokenText
+	return r.plaintextToken
 }
 
 func scimTokenQuery(ctx context.Context) (*SCIMTokenResolver, error) {
@@ -96,7 +102,12 @@ func handleSCIMMutationProblem(e error, clientMutationID *string) (*CreateSCIMTo
 }
 
 func createSCIMTokenMutation(ctx context.Context, input *CreateSCIMTokenInput) (*CreateSCIMTokenPayloadResolver, error) {
-	output, err := getServiceCatalog(ctx).SCIMService.CreateSCIMToken(ctx, input.IdpIssuerURL)
+	createInput := &scim.CreateSCIMTokenInput{IDPIssuerURL: input.IdpIssuerURL}
+	if input.ExpiresAt != nil {
+		createInput.ExpiresAt = &input.ExpiresAt.Time
+	}
+
+	output, err := getServiceCatalog(ctx).SCIMService.CreateSCIMToken(ctx, createInput)
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +120,6 @@ func createSCIMTokenMutation(ctx context.Context, input *CreateSCIMTokenInput) (
 
 	return &CreateSCIMTokenPayloadResolver{
 		CreateSCIMTokenPayload: payload,
-		plaintextToken:         output.PlaintextToken,
+		plaintextToken:         &output.PlaintextToken,
 	}, nil
 }

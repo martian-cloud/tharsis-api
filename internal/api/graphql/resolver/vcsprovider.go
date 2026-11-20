@@ -7,10 +7,13 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // VCSProviderConnectionQueryArgs are used to query a vcsProvider connection
@@ -182,6 +185,25 @@ func (r *VCSProviderResolver) Type() string {
 // AutoCreateWebhooks resolver
 func (r *VCSProviderResolver) AutoCreateWebhooks() bool {
 	return r.vcsProvider.AutoCreateWebhooks
+}
+
+// Workspaces resolver
+func (r *VCSProviderResolver) Workspaces(ctx context.Context, args *WorkspaceConnectionQueryArgs) (*WorkspaceConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := workspace.GetWorkspacesInput{
+		PaginationOptions:   &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		LinkedVCSProviderID: &r.vcsProvider.Metadata.ID,
+	}
+
+	if args.Sort != nil {
+		sort := db.WorkspaceSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewWorkspaceConnectionResolver(ctx, &input)
 }
 
 /* VCSProvider Mutation Resolvers */

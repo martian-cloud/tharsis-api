@@ -22,6 +22,7 @@ type WorkspaceVCSProviderLinks interface {
 	GetLinkByID(ctx context.Context, id string) (*models.WorkspaceVCSProviderLink, error)
 	GetLinkByTRN(ctx context.Context, trnValue string) (*models.WorkspaceVCSProviderLink, error)
 	GetLinkByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceVCSProviderLink, error)
+	GetLinkByTokenHash(ctx context.Context, tokenHash string) (*models.WorkspaceVCSProviderLink, error)
 	CreateLink(ctx context.Context, link *models.WorkspaceVCSProviderLink) (*models.WorkspaceVCSProviderLink, error)
 	UpdateLink(ctx context.Context, link *models.WorkspaceVCSProviderLink) (*models.WorkspaceVCSProviderLink, error)
 	DeleteLink(ctx context.Context, provider *models.WorkspaceVCSProviderLink) error
@@ -36,6 +37,7 @@ var workspaceVCSProviderLinksFieldList = append(
 	"workspace_id",
 	"provider_id",
 	"token_nonce",
+	"token_hash",
 	"repository_path",
 	"auto_speculative_plan",
 	"webhook_id",
@@ -125,6 +127,13 @@ func (wpl *workspaceVCSProviderLinks) GetLinkByWorkspaceID(ctx context.Context, 
 	return wpl.getLink(ctx, goqu.Ex{"workspace_vcs_provider_links.workspace_id": workspaceID})
 }
 
+func (wpl *workspaceVCSProviderLinks) GetLinkByTokenHash(ctx context.Context, tokenHash string) (*models.WorkspaceVCSProviderLink, error) {
+	ctx, span := tracer.Start(ctx, "db.GetLinkByTokenHash")
+	defer span.End()
+
+	return wpl.getLink(ctx, goqu.Ex{"workspace_vcs_provider_links.token_hash": tokenHash})
+}
+
 func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *models.WorkspaceVCSProviderLink) (*models.WorkspaceVCSProviderLink, error) {
 	ctx, span := tracer.Start(ctx, "db.CreateLink")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -158,6 +167,7 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 					"workspace_id":          link.WorkspaceID,
 					"provider_id":           link.ProviderID,
 					"token_nonce":           link.TokenNonce,
+					"token_hash":            link.TokenHash,
 					"repository_path":       link.RepositoryPath,
 					"auto_speculative_plan": link.AutoSpeculativePlan,
 					"webhook_id":            nullableString(link.WebhookID),
@@ -215,6 +225,8 @@ func (wpl *workspaceVCSProviderLinks) UpdateLink(ctx context.Context, link *mode
 					goqu.Record{
 						"version":               goqu.L("? + ?", goqu.C("version"), 1),
 						"updated_at":            timestamp,
+						"token_nonce":           link.TokenNonce,
+						"token_hash":            link.TokenHash,
 						"auto_speculative_plan": link.AutoSpeculativePlan,
 						"module_directory":      link.ModuleDirectory,
 						"webhook_id":            nullableString(link.WebhookID),
@@ -337,6 +349,7 @@ func scanLink(row scanner) (*models.WorkspaceVCSProviderLink, error) {
 		&wpl.WorkspaceID,
 		&wpl.ProviderID,
 		&wpl.TokenNonce,
+		&wpl.TokenHash,
 		&wpl.RepositoryPath,
 		&wpl.AutoSpeculativePlan,
 		&webhookID,

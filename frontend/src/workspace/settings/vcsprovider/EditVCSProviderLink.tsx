@@ -1,149 +1,55 @@
-import { Box, Button, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, Link, Paper, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useFragment, useMutation } from 'react-relay';
+import { Link as RouterLink } from 'react-router-dom';
 import { MutationError } from '../../../common/error';
-import { NewMutation } from './NewVCSProviderLink';
-import VCSProviderLinkForm, { VCSFormData } from './VCSProviderLinkForm';
-import { StyledCode } from '../../../common/StyledCode';
-import { WebhooksData } from './WorkspaceVCSProviderSettings';
-import { NewVCSProviderLinkMutation } from './__generated__/NewVCSProviderLinkMutation.graphql';
-import { EditVCSProviderLinkDeleteMutation } from './__generated__/EditVCSProviderLinkDeleteMutation.graphql';
-import { EditVCSProviderLinkFragment_workspace$key } from './__generated__/EditVCSProviderLinkFragment_workspace.graphql';
+import VCSProviderTypeChip from '../../../groups/vcsprovider/VCSProviderTypeChip';
+import { ChangeVCSProviderLink } from './ChangeVCSProviderDialog';
+import VCSProviderLinkForm, { isFormDataEqual, mapLinkToFormData, VCSFormData } from './VCSProviderLinkForm';
+import { EditVCSProviderLinkFragment_link$key } from './__generated__/EditVCSProviderLinkFragment_link.graphql';
 import { EditVCSProviderLinkMutation } from './__generated__/EditVCSProviderLinkMutation.graphql';
 
 interface Props {
-    fragmentRef: EditVCSProviderLinkFragment_workspace$key
-    handleWebhookDialog: (confirm: boolean, data: WebhooksData) => void
+    fragmentRef: EditVCSProviderLinkFragment_link$key
+    onChangeProvider: (link: ChangeVCSProviderLink) => void
 }
 
-function EditVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
+function EditVCSProviderLink({ fragmentRef, onChangeProvider }: Props) {
     const { enqueueSnackbar } = useSnackbar();
 
-    const data = useFragment<EditVCSProviderLinkFragment_workspace$key>(
+    const data = useFragment<EditVCSProviderLinkFragment_link$key>(
         graphql`
-        fragment EditVCSProviderLinkFragment_workspace on Workspace
+        fragment EditVCSProviderLinkFragment_link on WorkspaceVCSProviderLink
         {
-            fullPath
-            workspaceVcsProviderLink {
+            id
+            repositoryPath
+            branch
+            moduleDirectory
+            tagRegex
+            globPatterns
+            autoSpeculativePlan
+            webhookDisabled
+            vcsProvider {
                 id
-                metadata {
-                    createdAt
-                }
-                createdBy
-                createdByActor {
-                    ...ActorDisplayFragment_actor
-                }
-                repositoryPath
-                autoSpeculativePlan
-                webhookDisabled
-                moduleDirectory
-                branch
-                tagRegex
-                globPatterns
-                vcsProvider {
-                    id
-                    name
-                    description
-                    type
-                    autoCreateWebhooks
-                }
+                name
+                groupPath
+                type
+                autoCreateWebhooks
             }
-            ...VCSProviderLinkFormFragment_workspace
         }
         `, fragmentRef
-    )
+    );
 
-    const [updateCommit, updateIsInFlight] = useMutation<EditVCSProviderLinkMutation>(
+    const [commit, isInFlight] = useMutation<EditVCSProviderLinkMutation>(
         graphql`
         mutation EditVCSProviderLinkMutation($input: UpdateWorkspaceVCSProviderLinkInput!) {
-            updateWorkspaceVCSProviderLink(input: $input){
-                vcsProviderLink{
-                    id
-                    repositoryPath
-                    moduleDirectory
-                    branch
-                    tagRegex
-                    globPatterns
-                    autoSpeculativePlan
-                    webhookDisabled
-                }
-                problems {
-                    message
-                    field
-                    type
-                }
-            }
-        }
-    `)
-    const [error, setError] = useState<MutationError>()
-    const [formData, setFormData] = useState<VCSFormData>({
-        id: data.workspaceVcsProviderLink?.vcsProvider.id || '',
-        repositoryPath: data.workspaceVcsProviderLink?.repositoryPath || '',
-        moduleDirectory: data.workspaceVcsProviderLink?.moduleDirectory || '',
-        branch: data.workspaceVcsProviderLink?.branch || '',
-        tagRegex: data.workspaceVcsProviderLink?.tagRegex || '',
-        globPatterns: data.workspaceVcsProviderLink?.globPatterns || [''],
-        autoSpeculativePlan: data.workspaceVcsProviderLink?.autoSpeculativePlan || false,
-        webhookDisabled: data.workspaceVcsProviderLink?.webhookDisabled || false,
-        label: data.workspaceVcsProviderLink?.vcsProvider.name || '',
-        description: data.workspaceVcsProviderLink?.vcsProvider.description || '',
-        type: data.workspaceVcsProviderLink?.vcsProvider.type || ''
-    })
-
-    const onUpdate = () => {
-        if (data.workspaceVcsProviderLink) {
-            updateCommit({
-                variables: {
-                    input: {
-                        id: data.workspaceVcsProviderLink.id,
-                        moduleDirectory: formData.moduleDirectory,
-                        branch: formData.branch,
-                        tagRegex: formData.tagRegex,
-                        globPatterns: formData.globPatterns,
-                        autoSpeculativePlan: formData.autoSpeculativePlan,
-                        webhookDisabled: formData.webhookDisabled
-                    }
-                },
-                onCompleted: data => {
-                    if (data.updateWorkspaceVCSProviderLink.problems.length) {
-                        setError({
-                            severity: 'warning',
-                            message: data.updateWorkspaceVCSProviderLink.problems.map((problem: any) => problem.message).join('; ')
-                        });
-                    } else if (!data.updateWorkspaceVCSProviderLink.vcsProviderLink) {
-                        setError({
-                            severity: 'error',
-                            message: "Unexpected error occurred"
-                        });
-                    } else {
-                        enqueueSnackbar('VCS Provider Settings updated', { variant: 'success' });
-                    }
-                },
-                onError: error => {
-                    setError({
-                        severity: 'error',
-                        message: `Unexpected error occurred: ${error.message}`
-                    });
-                }
-            });
-        }
-    };
-
-    const [newCommit] = useMutation<NewVCSProviderLinkMutation>(NewMutation)
-
-    const [deleteCommit, deleteIsInFlight] = useMutation<EditVCSProviderLinkDeleteMutation>(
-        graphql`
-        mutation EditVCSProviderLinkDeleteMutation($input: DeleteWorkspaceVCSProviderLinkInput!) {
-            deleteWorkspaceVCSProviderLink(input: $input) {
+            updateWorkspaceVCSProviderLink(input: $input) {
                 vcsProviderLink {
-                    workspace {
-                        id
-                        workspaceVcsProviderLink {
-                            id
-                        }
-                    }
+                    id
+                    ...EditVCSProviderLinkFragment_link
+                    ...VCSProviderLinkWebhookFragment_link
                 }
                 problems {
                     message
@@ -154,112 +60,97 @@ function EditVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
         }
     `);
 
-    const onDeleteAndCreate = () => {
+    const savedFormData = useMemo(() => mapLinkToFormData(data), [data]);
+    const [formData, setFormData] = useState<VCSFormData>(savedFormData);
+    const [error, setError] = useState<MutationError>();
 
-        const workspaceVcsProvider = data.workspaceVcsProviderLink as any
+    const dirty = !isFormDataEqual(formData, savedFormData);
 
-        deleteCommit({
+    const onSave = () => {
+        commit({
             variables: {
                 input: {
-                    id: workspaceVcsProvider.id
-                },
+                    id: data.id,
+                    branch: formData.branch,
+                    moduleDirectory: formData.moduleDirectory,
+                    tagRegex: formData.tagRegex,
+                    globPatterns: formData.globPatterns,
+                    autoSpeculativePlan: formData.autoSpeculativePlan,
+                    webhookDisabled: formData.webhookDisabled
+                }
             },
-            onCompleted: dataDelete => {
-                if (dataDelete.deleteWorkspaceVCSProviderLink.problems.length) {
-                    enqueueSnackbar(dataDelete.deleteWorkspaceVCSProviderLink.problems.map((problem: any) => problem.message).join('; '), { variant: 'warning' });
+            onCompleted: response => {
+                const payload = response.updateWorkspaceVCSProviderLink;
+                if (payload.problems.length) {
+                    setError({ severity: 'warning', message: payload.problems.map(problem => problem.message).join('; ') });
+                } else if (!payload.vcsProviderLink) {
+                    setError({ severity: 'error', message: 'Unexpected error occurred' });
                 } else {
-                    if (formData.id !== '') {
-                        newCommit({
-                            variables: {
-                                input: {
-                                    repositoryPath: formData.repositoryPath,
-                                    workspacePath: workspaceVcsProvider.workspace.fullPath,
-                                    moduleDirectory: formData.moduleDirectory,
-                                    providerId: formData.id || '',
-                                    branch: formData.branch,
-                                    tagRegex: formData.tagRegex,
-                                    globPatterns: formData.globPatterns,
-                                    autoSpeculativePlan: formData.autoSpeculativePlan,
-                                    webhookDisabled: formData.webhookDisabled
-                                },
-                            },
-                            onCompleted: data => {
-                                if (data.createWorkspaceVCSProviderLink.problems.length) {
-                                    setError({
-                                        severity: 'warning',
-                                        message: data.createWorkspaceVCSProviderLink.problems.map((problem: any) => problem.message).join('; ')
-                                    });
-                                } else if (!data.createWorkspaceVCSProviderLink.vcsProviderLink) {
-                                    setError({
-                                        severity: 'error',
-                                        message: "Unexpected error occurred"
-                                    });
-                                } else {
-                                    enqueueSnackbar(`Workspace VCS Provider Link created`, { variant: 'success' })
-                                    if (!data.createWorkspaceVCSProviderLink.vcsProviderLink.vcsProvider.autoCreateWebhooks && data.createWorkspaceVCSProviderLink.webhookUrl) {
-                                        handleWebhookDialog(true, { ...data, url: data.createWorkspaceVCSProviderLink.webhookUrl, token: data.createWorkspaceVCSProviderLink.webhookToken, type: data.createWorkspaceVCSProviderLink.vcsProviderLink.vcsProvider.type })
-                                    }
-                                }
-                            },
-                            onError: error => {
-                                setError({
-                                    severity: 'error',
-                                    message: `Unexpected error occurred: ${error.message}`
-                                });
-                            }
-                        });
-                    } else {
-                        enqueueSnackbar(`Workspace VCS Provider Link deleted`, { variant: 'success' })
-                    }
+                    setError(undefined);
+                    enqueueSnackbar('Link settings saved.', { variant: 'success' });
                 }
             },
             onError: error => {
-                enqueueSnackbar(`Unexpected error occurred: ${error.message}`, { variant: 'error' });
-            },
+                setError({ severity: 'error', message: `Unexpected error occurred: ${error.message}` });
+            }
         });
-    }
+    };
 
-    const handleChanges = () => {
-        if (data.workspaceVcsProviderLink?.vcsProvider.id === formData.id) {
-            onUpdate()
-        }
-        else {
-            onDeleteAndCreate()
-        }
-    }
+    const onDiscard = () => {
+        setFormData(savedFormData);
+        setError(undefined);
+    };
 
     return (
-        <Box>
-            <Box>
-                <Typography variant="subtitle1" gutterBottom>To link to different provider, select a provider from the drop-down menu, fill out the form, and click <StyledCode>Save Changes</StyledCode>.
-                </Typography>
-                <Typography variant="subtitle1" gutterBottom>To <strong>delete this link</strong>, empty the drop-down menu, and then click <StyledCode>Save Changes</StyledCode>.
-                </Typography>
-            </Box>
-            <VCSProviderLinkForm
-                viewMode
-                error={error}
-                data={formData}
-                onChange={(data: VCSFormData) => setFormData(data)}
-                fragmentRef={data}
-            />
-            <Box
-                sx={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    mt: 2
-                }}>
+        <Paper sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                    <VCSProviderTypeChip type={data.vcsProvider.type} />
+                    <Box sx={{ minWidth: 0 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="h6">Link settings</Typography>
+                            {dirty && <Chip size="small" variant="outlined" color="warning" label="Unsaved changes" />}
+                        </Box>
+                        <Typography variant="body2" color="textSecondary" noWrap>
+                            Provider: <Link
+                                component={RouterLink}
+                                to={`/groups/${data.vcsProvider.groupPath}/-/vcs_providers/${data.vcsProvider.id}`}
+                                underline="hover"
+                            >
+                                {data.vcsProvider.name}
+                            </Link>
+                        </Typography>
+                    </Box>
+                </Box>
                 <Button
                     size="small"
-                    loading={updateIsInFlight || deleteIsInFlight}
                     variant="outlined"
-                    color="primary"
-                    onClick={handleChanges}
+                    color="secondary"
+                    sx={{ flexShrink: 0 }}
+                    // The replacement link copies the saved settings, so unsaved edits must be saved or discarded first.
+                    disabled={dirty}
+                    onClick={() => onChangeProvider({
+                        id: data.id,
+                        providerId: data.vcsProvider.id,
+                        providerName: data.vcsProvider.name,
+                        providerAutoCreateWebhooks: data.vcsProvider.autoCreateWebhooks,
+                        ...savedFormData
+                    })}
                 >
-                    Save changes
+                    Change provider
                 </Button>
             </Box>
-        </Box>
+            {error && (
+                <Alert severity={error.severity} sx={{ mb: 3 }}>
+                    {error.message}
+                </Alert>
+            )}
+            <VCSProviderLinkForm data={formData} onChange={setFormData} repositoryPathReadOnly />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
+                {dirty && <Button size="small" color="inherit" disabled={isInFlight} onClick={onDiscard}>Discard changes</Button>}
+                <Button size="small" variant="outlined" color="primary" disabled={!dirty} loading={isInFlight} onClick={onSave}>Save changes</Button>
+            </Box>
+        </Paper>
     );
 }
 

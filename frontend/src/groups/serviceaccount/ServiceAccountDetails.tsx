@@ -16,7 +16,7 @@ import CopyButton from '../../common/CopyButton';
 import { ResponsiveRow, ResponsiveTable } from '../../common/ResponsiveTable';
 import Timestamp from '../../common/Timestamp';
 import cfg from '../../common/config';
-import ExpirationDateTimePicker, { isExpirationInvalid } from './ExpirationDateTimePicker';
+import ExpirationDateTimePicker, { isExpirationInvalid } from '../../common/ExpirationDateTimePicker';
 import TRNButton from '../../common/TRNButton';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import ClientCredentialsDialog from './ClientCredentialsDialog';

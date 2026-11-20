@@ -4,12 +4,17 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import InfiniteScroll from 'react-infinite-scroll-component';
 import { useFragment } from 'react-relay/hooks';
 import { ResponsiveTable } from '../../common/ResponsiveTable';
 import SearchInput from '../../common/SearchInput';
+import ListSkeleton from '../../skeletons/ListSkeleton';
 import StateVersionResourceListItem from './StateVersionResourceListItem';
 import { StateVersionResourcesFragment_resources$key } from './__generated__/StateVersionResourcesFragment_resources.graphql';
+
+// A state can hold thousands of resources, so rows are rendered in pages as the user scrolls.
+const PAGE_SIZE = 100;
 
 interface Props {
     fragmentRef: StateVersionResourcesFragment_resources$key
@@ -28,6 +33,8 @@ function StateVersionResources(props: Props) {
         fragment StateVersionResourcesFragment_resources on StateVersionInventory
         {
             resources {
+                mode
+                module
                 name
                 provider
                 type
@@ -37,12 +44,19 @@ function StateVersionResources(props: Props) {
       `, fragmentRef)
 
     const [search, setSearch] = useState('');
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
     const onSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSearch(event.target.value.toLowerCase());
+        setVisibleCount(PAGE_SIZE);
     };
 
-    const filteredOutputs = search ? data.resources.filter(searchFilter(search)) : data.resources;
+    const filteredOutputs = useMemo(
+        () => search ? data.resources.filter(searchFilter(search)) : data.resources,
+        [data.resources, search]
+    );
+
+    const visibleResources = useMemo(() => filteredOutputs.slice(0, visibleCount), [filteredOutputs, visibleCount]);
 
     return (
         <Box>
@@ -76,20 +90,27 @@ function StateVersionResources(props: Props) {
                 This workspace does not have any resources
             </NoResults>}
             {filteredOutputs.length > 0 && <Box sx={{ mt: 2 }}>
-                <ResponsiveTable
-                    ariaLabel="resources"
-                    columns={[
-                        { label: 'Name' },
-                        { label: 'Type' },
-                        { label: 'Provider' },
-                        { label: 'Module' },
-                    ]}
+                <InfiniteScroll
+                    dataLength={visibleResources.length}
+                    next={() => setVisibleCount(count => count + PAGE_SIZE)}
+                    hasMore={visibleResources.length < filteredOutputs.length}
+                    loader={<ListSkeleton rowCount={3} />}
                 >
-                    {filteredOutputs.map((r) => <StateVersionResourceListItem
-                        key={`${r.provider}::${r.type}::${r.name}`}
-                        fragmentRef={r}
-                    />)}
-                </ResponsiveTable>
+                    <ResponsiveTable
+                        ariaLabel="resources"
+                        columns={[
+                            { label: 'Name' },
+                            { label: 'Type' },
+                            { label: 'Provider' },
+                            { label: 'Module' },
+                        ]}
+                    >
+                        {visibleResources.map((r) => <StateVersionResourceListItem
+                            key={`${r.module}::${r.mode}::${r.provider}::${r.type}::${r.name}`}
+                            fragmentRef={r}
+                        />)}
+                    </ResponsiveTable>
+                </InfiniteScroll>
             </Box>}
         </Box>
     );

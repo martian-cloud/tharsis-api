@@ -2,6 +2,7 @@ package vcs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +23,7 @@ import (
 	"github.com/hashicorp/go-slug"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/apikey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/core/activity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
@@ -68,6 +71,14 @@ var (
 		"refs/tags/",
 
 		// More can be added here as needed for other providers.
+	}
+
+	// runAnnotationEventNames names each VCS event type in the vcs-event run annotation.
+	runAnnotationEventNames = map[models.VCSEventType]string{
+		models.BranchEventType:       "push",
+		models.TagEventType:          "tag",
+		models.MergeRequestEventType: "merge-request",
+		models.ManualEventType:       "manual",
 	}
 
 	// commitIDRegex matches a full SHA-1 (40) or SHA-256 (64) git commit hash.
@@ -149,6 +160,18 @@ type CreateWorkspaceVCSProviderLinkResponse struct {
 	WebhookToken []byte
 }
 
+// ResetWorkspaceVCSProviderLinkWebhookTokenInput is the input for resetting the webhook token of a workspace VCS provider link.
+type ResetWorkspaceVCSProviderLinkWebhookTokenInput struct {
+	LinkID string
+}
+
+// ResetWorkspaceVCSProviderLinkWebhookTokenResponse is the response for resetting the webhook token of a workspace VCS provider link.
+type ResetWorkspaceVCSProviderLinkWebhookTokenResponse struct {
+	WebhookURL   *string
+	Link         *models.WorkspaceVCSProviderLink
+	WebhookToken []byte
+}
+
 // CreateVCSRunInput is the input for creating a run via VCS.
 type CreateVCSRunInput struct {
 	Workspace     *models.Workspace
@@ -175,15 +198,18 @@ type CreateVCSProviderResponse struct {
 
 // ProcessWebhookEventInput is the input for processing a webhook event.
 type ProcessWebhookEventInput struct {
-	EventHeader      string
-	Action           string // Type of action for a MR / PR.
-	SourceRepository string // Repository from which the MR originated.
-	SourceBranch     string // Source branch from which the MR originated.
-	TargetBranch     string // Branch this MR is for.
-	HeadCommitID     string // Head commit for an MR.
-	Before           string // Commit SHA before the change (can be empty).
-	After            string // Commit SHA after the change  (can be empty).
-	Ref              string // Ref name starting with refs/heads or similar.
+	EventHeader        string
+	Action             string // Type of action for a MR / PR.
+	SourceRepository   string // Repository from which the MR originated.
+	SourceBranch       string // Source branch from which the MR originated.
+	TargetBranch       string // Branch this MR is for.
+	HeadCommitID       string // Head commit for an MR.
+	MergeRequestURL    string // Web URL of an MR.
+	Sender             string // Username of who triggered the event (can be empty).
+	Before             string // Commit SHA before the change (can be empty).
+	After              string // Commit SHA after the change  (can be empty).
+	Ref                string // Ref name starting with refs/heads or similar.
+	MergeRequestNumber int    // MergeRequestNumber is the number of an MR, zero for other events.
 }
 
 // ProcessOAuthInput is the input for processing OAuth callback.
@@ -249,6 +275,7 @@ type Service interface {
 	CreateWorkspaceVCSProviderLink(ctx context.Context, input *CreateWorkspaceVCSProviderLinkInput) (*CreateWorkspaceVCSProviderLinkResponse, error)
 	UpdateWorkspaceVCSProviderLink(ctx context.Context, input *UpdateWorkspaceVCSProviderLinkInput) (*models.WorkspaceVCSProviderLink, error)
 	DeleteWorkspaceVCSProviderLink(ctx context.Context, input *DeleteWorkspaceVCSProviderLinkInput) error
+	ResetWorkspaceVCSProviderLinkWebhookToken(ctx context.Context, input *ResetWorkspaceVCSProviderLinkWebhookTokenInput) (*ResetWorkspaceVCSProviderLinkWebhookTokenResponse, error)
 	GetVCSEventByID(ctx context.Context, id string) (*models.VCSEvent, error)
 	GetVCSEventByTRN(ctx context.Context, trn string) (*models.VCSEvent, error)
 	GetVCSEvents(ctx context.Context, input *GetVCSEventsInput) (*db.VCSEventsResult, error)
@@ -263,7 +290,6 @@ type service struct {
 	logger              logger.Logger
 	dbClient            *db.Client
 	limitChecker        limits.LimitChecker
-	signingKeyManager   auth.SigningKeyManager
 	vcsProviderMap      map[models.VCSProviderType]Provider
 	runService          run.Service
 	workspaceService    workspace.Service
@@ -279,7 +305,6 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	signingKeyManager auth.SigningKeyManager,
 	httpClient *http.Client,
 	runService run.Service,
 	workspaceService workspace.Service,
@@ -296,7 +321,6 @@ func NewService(
 		logger,
 		dbClient,
 		limitChecker,
-		signingKeyManager,
 		vcsProviderMap,
 		runService,
 		workspaceService,
@@ -311,7 +335,6 @@ func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	signingKeyManager auth.SigningKeyManager,
 	vcsProviderMap map[models.VCSProviderType]Provider,
 	runService run.Service,
 	workspaceService workspace.Service,
@@ -324,7 +347,6 @@ func newService(
 		logger,
 		dbClient,
 		limitChecker,
-		signingKeyManager,
 		vcsProviderMap,
 		runService,
 		workspaceService,
@@ -871,7 +893,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -931,24 +953,16 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 		branch = *input.Branch
 	}
 
-	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	token, tokenHash, err := apikey.Generate(apikey.TypeVCS)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to generate webhook token", errors.WithSpan(span))
 	}
-
-	defer func() {
-		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateWorkspaceVCSProviderLink: %v", txErr)
-		}
-	}()
-
-	jwtID := uuid.New().String()
 
 	toCreate := &models.WorkspaceVCSProviderLink{
 		CreatedBy:           caller.GetActor(),
 		WorkspaceID:         input.Workspace.Metadata.ID,
 		ProviderID:          input.ProviderID,
-		TokenNonce:          jwtID,
+		TokenHash:           &tokenHash,
 		Branch:              branch,
 		RepositoryPath:      input.RepositoryPath,
 		TagRegex:            input.TagRegex,
@@ -968,26 +982,23 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 		return nil, errors.Wrap(err, "failed to validate workspace VCS provider link model", errors.WithSpan(span))
 	}
 
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateWorkspaceVCSProviderLink: %v", txErr)
+		}
+	}()
+
 	createdLink, err := s.dbClient.WorkspaceVCSProviderLinks.CreateLink(txContext, toCreate)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create link", errors.WithSpan(span))
 	}
 
 	response := &CreateWorkspaceVCSProviderLinkResponse{}
-
-	// Create the token and configure webhook if using them.
-	// Generate a token with a UUID claim.
-	token, gErr := s.signingKeyManager.GenerateToken(ctx, &auth.TokenInput{
-		Subject: vp.GetResourcePath(),
-		JwtID:   createdLink.TokenNonce,
-		Claims: map[string]string{
-			"type":    auth.VCSWorkspaceLinkTokenType,
-			"link_id": createdLink.GetGlobalID(),
-		},
-	})
-	if gErr != nil {
-		return nil, errors.Wrap(gErr, "failed to generate token with a UUID claim", errors.WithSpan(span))
-	}
 
 	// If provider was set to automatically create webhook, create it.
 	if vp.AutoCreateWebhooks {
@@ -996,7 +1007,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 			ProviderURL:    vp.URL,
 			AccessToken:    accessToken,
 			RepositoryPath: createdLink.RepositoryPath,
-			WebhookToken:   token,
+			WebhookToken:   []byte(token),
 		})
 		if cErr != nil {
 			return nil, errors.Wrap(cErr, "failed to create webhook", errors.WithSpan(span))
@@ -1010,23 +1021,13 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 			return nil, errors.Wrap(err, "failed to update link", errors.WithSpan(span))
 		}
 	} else {
-		// Get the webhook URL based on the provider type. GitLab supports
-		// passing in a token whereas GitHub does not. It must be added
-		// as a query parameter for the latter.
-		var webhookToken []byte
-		switch vp.Type {
-		case models.GitLabProviderType:
-			response.WebhookToken = token // Only set token field for GitLab.
-		case models.GitHubProviderType:
-			webhookToken = token // For GitHub. include token as a query param.
-		}
-
-		webhookURL, wErr := getTharsisWebhookURL(s.tharsisURL, webhookToken)
+		webhookURL, webhookToken, wErr := s.getManualWebhookDetails(vp.Type, token)
 		if wErr != nil {
 			return nil, errors.Wrap(wErr, "failed to get webhook URL", errors.WithSpan(span))
 		}
 
 		response.WebhookURL = &webhookURL
+		response.WebhookToken = webhookToken
 	}
 
 	// Set the created link.
@@ -1055,7 +1056,7 @@ func (s *service) UpdateWorkspaceVCSProviderLink(ctx context.Context, input *Upd
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Link.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(input.Link.WorkspaceID))
 	if err != nil {
 		return nil, err
 	}
@@ -1136,6 +1137,114 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 	)
 
 	return s.dbClient.WorkspaceVCSProviderLinks.DeleteLink(ctx, input.Link)
+}
+
+func (s *service) ResetWorkspaceVCSProviderLinkWebhookToken(ctx context.Context, input *ResetWorkspaceVCSProviderLinkWebhookTokenInput) (*ResetWorkspaceVCSProviderLinkWebhookTokenResponse, error) {
+	ctx, span := tracer.Start(ctx, "svc.ResetWorkspaceVCSProviderLinkWebhookToken")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	link, err := s.dbClient.WorkspaceVCSProviderLinks.GetLinkByID(ctx, input.LinkID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get link by ID", errors.WithSpan(span))
+	}
+
+	if link == nil {
+		return nil, errors.New("workspace vcs provider link with ID %s not found", input.LinkID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(link.WorkspaceID))
+	if err != nil {
+		return nil, err
+	}
+
+	vp, err := s.dbClient.VCSProviders.GetProviderByID(ctx, link.ProviderID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get provider by ID", errors.WithSpan(span))
+	}
+
+	if vp == nil {
+		return nil, errors.New("vcs provider with id %s not found", link.ProviderID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	token, tokenHash, err := apikey.Generate(apikey.TypeVCS)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate webhook token", errors.WithSpan(span))
+	}
+
+	link.TokenHash = &tokenHash
+	link.TokenNonce = nil
+
+	if err = link.Validate(); err != nil {
+		return nil, errors.Wrap(err, "failed to validate workspace VCS provider link model", errors.WithSpan(span))
+	}
+
+	var provider Provider
+	var accessToken string
+	if vp.AutoCreateWebhooks {
+		if provider, err = s.getVCSProvider(vp.Type); err != nil {
+			return nil, errors.Wrap(err, "failed to get VCS provider", errors.WithSpan(span))
+		}
+
+		if accessToken, err = s.refreshOAuthToken(ctx, provider, vp, false); err != nil {
+			return nil, errors.Wrap(err, "failed to refresh access token", errors.WithSpan(span))
+		}
+	}
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer ResetWorkspaceVCSProviderLinkWebhookToken: %v", txErr)
+		}
+	}()
+
+	updatedLink, err := s.dbClient.WorkspaceVCSProviderLinks.UpdateLink(txContext, link)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update link", errors.WithSpan(span))
+	}
+
+	response := &ResetWorkspaceVCSProviderLinkWebhookTokenResponse{Link: updatedLink}
+
+	if vp.AutoCreateWebhooks {
+		// The webhook is updated in place right before the commit so a failure here rolls back with nothing left to clean up, a commit failure after this leaves the webhook on the new token until the reset is retried.
+		if err = provider.UpdateWebhook(ctx, &types.UpdateWebhookInput{
+			ProviderURL:    vp.URL,
+			AccessToken:    accessToken,
+			RepositoryPath: link.RepositoryPath,
+			WebhookID:      link.WebhookID,
+			WebhookToken:   []byte(token),
+		}); err != nil {
+			return nil, errors.Wrap(err, "failed to update webhook", errors.WithSpan(span))
+		}
+	} else {
+		webhookURL, webhookToken, wErr := s.getManualWebhookDetails(vp.Type, token)
+		if wErr != nil {
+			return nil, errors.Wrap(wErr, "failed to get webhook URL", errors.WithSpan(span))
+		}
+
+		response.WebhookURL = &webhookURL
+		response.WebhookToken = webhookToken
+	}
+
+	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Reset the webhook token for a workspace vcs provider link.",
+		"workspaceID", updatedLink.WorkspaceID,
+		"linkID", updatedLink.Metadata.ID,
+	)
+
+	return response, nil
 }
 
 func (s *service) GetVCSEventByID(ctx context.Context, id string) (*models.VCSEvent, error) {
@@ -1808,6 +1917,25 @@ func (s *service) getVCSProvider(providerType models.VCSProviderType) (Provider,
 	return provider, nil
 }
 
+// getManualWebhookDetails returns what a user needs to configure a webhook by hand. GitLab takes the token
+// as a separate secret whereas GitHub does not, so for GitHub it is added to the URL as a query parameter.
+func (s *service) getManualWebhookDetails(providerType models.VCSProviderType, token string) (string, []byte, error) {
+	var urlToken, webhookToken []byte
+	switch providerType {
+	case models.GitLabProviderType:
+		webhookToken = []byte(token)
+	case models.GitHubProviderType:
+		urlToken = []byte(token)
+	}
+
+	webhookURL, err := getTharsisWebhookURL(s.tharsisURL, urlToken)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return webhookURL, webhookToken, nil
+}
+
 func (s *service) handleVCSRun(ctx context.Context, input *handleVCSRunInput) error {
 	// Download the repository archive and get the path to the local repo.
 	parentDirectory, repoDirectory, err := downloadRepositoryArchive(ctx, &downloadRepositoryArchiveInput{
@@ -1863,6 +1991,7 @@ func (s *service) handleVCSRun(ctx context.Context, input *handleVCSRunInput) er
 		ConfigurationVersionID: &configurationVersionID,
 		WorkspaceID:            input.link.WorkspaceID,
 		IsDestroy:              input.isDestroy,
+		Annotations:            buildRunAnnotations(input.provider, input.link, input.vcsEvent, nil),
 	}); err != nil {
 		return fmt.Errorf(
 			"failed to create a run for repository %s for workspace %s and workspace vcs provider link ID %s: %v",
@@ -1965,6 +2094,7 @@ func (s *service) handleEvent(ctx context.Context, input *handleEventInput) erro
 	if _, err = s.runService.CreateRun(ctx, &run.CreateRunInput{
 		ConfigurationVersionID: &configurationVersionID,
 		WorkspaceID:            input.link.WorkspaceID,
+		Annotations:            buildRunAnnotations(input.provider, input.link, input.vcsEvent, input.processInput),
 	}); err != nil {
 		return fmt.Errorf(
 			"failed to create a run for repository %s for workspace %s and workspace vcs provider link ID %s: %v",
@@ -2382,4 +2512,66 @@ func getTharsisWebhookURL(tharsisURL string, token []byte) (string, error) {
 	}
 
 	return endpoint.String(), nil
+}
+
+// buildRunAnnotations describes where a VCS run came from; webhookInput is nil for manual runs. An
+// annotation that doesn't fit within the size limit is skipped, so a long ref never blocks the run.
+func buildRunAnnotations(
+	provider Provider,
+	link *models.WorkspaceVCSProviderLink,
+	vcsEvent *models.VCSEvent,
+	webhookInput *ProcessWebhookEventInput,
+) []*models.RunAnnotation {
+	annotations := []*models.RunAnnotation{}
+
+	add := func(key, value string, annotationLink *string) {
+		if key == "" || value == "" {
+			return
+		}
+
+		candidate := append(annotations, &models.RunAnnotation{Key: key, Value: value, Link: annotationLink})
+		if marshalled, err := json.Marshal(candidate); err == nil && len(marshalled) <= models.MaxRunAnnotationsSize {
+			annotations = candidate
+		}
+	}
+
+	add("vcs-event", runAnnotationEventNames[vcsEvent.Type], nil)
+	add("repository", link.RepositoryPath, webLink(vcsEvent.RepositoryURL))
+
+	if vcsEvent.SourceReferenceName != nil {
+		add("ref", trimRefPrefix(*vcsEvent.SourceReferenceName), nil)
+	}
+
+	if vcsEvent.CommitID != nil {
+		var commitLink *string
+		if commitURL, err := provider.BuildCommitURL(&types.BuildCommitURLInput{
+			RepositoryURL: vcsEvent.RepositoryURL,
+			CommitID:      *vcsEvent.CommitID,
+		}); err == nil {
+			commitLink = &commitURL
+		}
+
+		add("commit", *vcsEvent.CommitID, commitLink)
+	}
+
+	if webhookInput == nil {
+		return annotations
+	}
+
+	if webhookInput.MergeRequestNumber > 0 {
+		add("merge-request", strconv.Itoa(webhookInput.MergeRequestNumber), webLink(webhookInput.MergeRequestURL))
+		add("target-branch", webhookInput.TargetBranch, nil)
+	}
+
+	return annotations
+}
+
+// webLink returns rawURL only when it is an absolute http(s) URL; MR URLs come from the webhook payload.
+func webLink(rawURL string) *string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
+		return nil
+	}
+
+	return &rawURL
 }

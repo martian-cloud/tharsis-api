@@ -16,11 +16,13 @@ import {
     Typography,
 } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
+import { Moment } from 'moment';
 import { useState } from 'react';
 import { useLazyLoadQuery, useMutation } from 'react-relay/hooks';
 import ActorDisplay from '../../common/ActorDisplay';
 import CopyButton from '../../common/CopyButton';
 import { MutationError } from '../../common/error';
+import ExpirationDateTimePicker, { isExpirationInvalid } from '../../common/ExpirationDateTimePicker';
 import NoResults from '../../common/NoResults';
 import Timestamp from '../../common/Timestamp';
 import { AdminAreaSCIMTokenSettingsMutation } from './__generated__/AdminAreaSCIMTokenSettingsMutation.graphql';
@@ -32,11 +34,13 @@ const query = graphql`
             createdByActor {
                 ...ActorDisplayFragment_actor
             }
+            expiresAt
             metadata {
                 createdAt
             }
         }
         config {
+            scimTokenMaxExpirationDays
             oauthProviders {
                 issuerUrl
             }
@@ -47,6 +51,7 @@ const query = graphql`
 function AdminAreaSCIMTokenSettings() {
     const data = useLazyLoadQuery<AdminAreaSCIMTokenSettingsQuery>(query, {}, { fetchPolicy: 'network-only' });
     const [selectedIssuerUrl, setSelectedIssuerUrl] = useState('');
+    const [expiresAt, setExpiresAt] = useState<Moment | null>(null);
     const [confirmationOpen, setConfirmationOpen] = useState(false);
     const [scimToken, setSCIMToken] = useState(data.scimToken);
     const [tokenText, setTokenText] = useState<string | null>(null);
@@ -60,6 +65,7 @@ function AdminAreaSCIMTokenSettings() {
                     createdByActor {
                         ...ActorDisplayFragment_actor
                     }
+                    expiresAt
                     metadata {
                         createdAt
                     }
@@ -76,6 +82,7 @@ function AdminAreaSCIMTokenSettings() {
     const closeConfirmationDialog = () => {
         setConfirmationOpen(false);
         setSelectedIssuerUrl('');
+        setExpiresAt(null);
     };
 
     const createToken = () => {
@@ -85,6 +92,7 @@ function AdminAreaSCIMTokenSettings() {
             variables: {
                 input: {
                     idpIssuerURL: selectedIssuerUrl,
+                    expiresAt: expiresAt?.toISOString(),
                 },
             },
             onCompleted: response => {
@@ -125,9 +133,10 @@ function AdminAreaSCIMTokenSettings() {
         setConfirmationOpen(false);
         setTokenText(null);
         setSelectedIssuerUrl('');
+        setExpiresAt(null);
     };
 
-    const oauthProviders = data.config.oauthProviders;
+    const { oauthProviders, scimTokenMaxExpirationDays } = data.config;
 
     return (
         <Box>
@@ -150,6 +159,9 @@ function AdminAreaSCIMTokenSettings() {
                     <Typography variant="body2">
                         Created at: <Timestamp timestamp={scimToken.metadata.createdAt} format="absolute" />
                     </Typography>
+                    <Typography variant="body2">
+                        Expires at: {scimToken.expiresAt ? <Timestamp timestamp={scimToken.expiresAt} format="absolute" /> : 'Never'}
+                    </Typography>
                 </Paper>
             ) : (
                 <NoResults sx={{ mb: 2 }}>
@@ -169,7 +181,7 @@ function AdminAreaSCIMTokenSettings() {
             {confirmationOpen && (
                 <Dialog
                     open
-                    maxWidth={tokenText ? 'md' : 'sm'}
+                    maxWidth="sm"
                     fullWidth
                     keepMounted={false}
                     onClose={() => {
@@ -187,8 +199,7 @@ function AdminAreaSCIMTokenSettings() {
                                 </Alert>
                                 <TextField
                                     fullWidth
-                                    multiline
-                                    minRows={4}
+                                    size="small"
                                     label="SCIM Token"
                                     value={tokenText}
                                     slotProps={{
@@ -234,6 +245,16 @@ function AdminAreaSCIMTokenSettings() {
                                                 ))}
                                             </Select>
                                         </FormControl>
+                                        <Box sx={{ mt: 2 }}>
+                                            <ExpirationDateTimePicker
+                                                label="Token Expiration (Optional)"
+                                                value={expiresAt}
+                                                onChange={setExpiresAt}
+                                                maxExpirationDays={scimTokenMaxExpirationDays}
+                                                width="100%"
+                                                emptyCaption={`The token never expires if left empty. Min: 1 day${scimTokenMaxExpirationDays ? `, max: ${scimTokenMaxExpirationDays} days` : ''}`}
+                                            />
+                                        </Box>
                                     </>
                                 )}
                             </>
@@ -249,7 +270,7 @@ function AdminAreaSCIMTokenSettings() {
                                 </Button>
                                 <Button
                                     color="primary"
-                                    disabled={!selectedIssuerUrl || isInFlight}
+                                    disabled={!selectedIssuerUrl || isInFlight || isExpirationInvalid(expiresAt, scimTokenMaxExpirationDays)}
                                     loading={isInFlight}
                                     onClick={createToken}
                                 >

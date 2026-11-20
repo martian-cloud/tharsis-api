@@ -73,7 +73,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 				test.mockSetup(mockTokenAuth)
 			}
 
-			authenticator := newAuthenticator([]tokenAuthenticator{mockTokenAuth})
+			authenticator := newAuthenticator(nil, []tokenAuthenticator{mockTokenAuth})
 
 			caller, err := authenticator.Authenticate(context.Background(), test.tokenString, true)
 
@@ -393,70 +393,6 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 			expectCaller: jobTokenCaller(activeJob(models.JobCanceling)),
 		},
 		{
-			name:        "scim token type with valid token",
-			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
-				token := jwt.New()
-				err := token.Set(jwt.JwtIDKey, "test-jti")
-				require.NoError(t, err)
-
-				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
-					Token: token,
-					PrivateClaims: map[string]string{
-						"type":                SCIMTokenType,
-						IDPIssuerURLClaimName: "https://idp.example.com",
-					},
-				}, nil)
-
-				mockSCIMTokens := db.NewMockSCIMTokens(t)
-				mockSCIMTokens.On("GetTokenByNonce", mock.Anything, "test-jti").Return(&models.SCIMToken{}, nil)
-				mockDBClient.SCIMTokens = mockSCIMTokens
-			},
-			expectCaller: &SCIMCaller{},
-		},
-		{
-			name:        "scim token type without an idp issuer url",
-			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
-				token := jwt.New()
-				err := token.Set(jwt.JwtIDKey, "test-jti")
-				require.NoError(t, err)
-
-				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
-					Token: token,
-					PrivateClaims: map[string]string{
-						"type": SCIMTokenType,
-					},
-				}, nil)
-
-				mockSCIMTokens := db.NewMockSCIMTokens(t)
-				mockSCIMTokens.On("GetTokenByNonce", mock.Anything, "test-jti").Return(&models.SCIMToken{}, nil)
-				mockDBClient.SCIMTokens = mockSCIMTokens
-			},
-			expectErrorMessage: "scim token is missing the idp_issuer_url claim",
-		},
-		{
-			name:        "scim token type with invalid token",
-			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
-				token := jwt.New()
-				err := token.Set(jwt.JwtIDKey, "test-jti")
-				require.NoError(t, err)
-
-				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
-					Token: token,
-					PrivateClaims: map[string]string{
-						"type": SCIMTokenType,
-					},
-				}, nil)
-
-				mockSCIMTokens := db.NewMockSCIMTokens(t)
-				mockSCIMTokens.On("GetTokenByNonce", mock.Anything, "test-jti").Return(nil, nil)
-				mockDBClient.SCIMTokens = mockSCIMTokens
-			},
-			expectErrorMessage: "scim token has an invalid jti claim",
-		},
-		{
 			name:        "vcs token type missing link_id claim",
 			tokenString: "test-token",
 			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
@@ -489,7 +425,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 				mockLinks := db.NewMockWorkspaceVCSProviderLinks(t)
 				mockLinks.On("GetLinkByID", mock.Anything, linkID).Return(&models.WorkspaceVCSProviderLink{
 					ProviderID: "test-provider-id",
-					TokenNonce: "test-jti",
+					TokenNonce: new("test-jti"),
 					Metadata:   models.ResourceMetadata{ID: linkID},
 				}, nil)
 				mockDBClient.WorkspaceVCSProviderLinks = mockLinks
@@ -519,7 +455,33 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 				mockLinks := db.NewMockWorkspaceVCSProviderLinks(t)
 				mockLinks.On("GetLinkByID", mock.Anything, linkID).Return(&models.WorkspaceVCSProviderLink{
 					ProviderID: "test-provider-id",
-					TokenNonce: "different-jti",
+					TokenNonce: new("different-jti"),
+					Metadata:   models.ResourceMetadata{ID: linkID},
+				}, nil)
+				mockDBClient.WorkspaceVCSProviderLinks = mockLinks
+			},
+			expectErrorMessage: "vcs token has an invalid jti claim",
+		},
+		{
+			name:        "vcs token type for a link that was reset to an API key",
+			tokenString: "test-token",
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
+				token := jwt.New()
+				err := token.Set(jwt.JwtIDKey, "test-jti")
+				require.NoError(t, err)
+
+				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
+					Token: token,
+					PrivateClaims: map[string]string{
+						"type":    VCSWorkspaceLinkTokenType,
+						"link_id": gid.ToGlobalID(types.WorkspaceVCSProviderLinkModelType, linkID),
+					},
+				}, nil)
+
+				mockLinks := db.NewMockWorkspaceVCSProviderLinks(t)
+				mockLinks.On("GetLinkByID", mock.Anything, linkID).Return(&models.WorkspaceVCSProviderLink{
+					ProviderID: "test-provider-id",
+					TokenHash:  new("some-hash"),
 					Metadata:   models.ResourceMetadata{ID: linkID},
 				}, nil)
 				mockDBClient.WorkspaceVCSProviderLinks = mockLinks
@@ -545,7 +507,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 				mockLinks := db.NewMockWorkspaceVCSProviderLinks(t)
 				mockLinks.On("GetLinkByID", mock.Anything, linkID).Return(&models.WorkspaceVCSProviderLink{
 					ProviderID: "test-provider-id",
-					TokenNonce: "test-jti",
+					TokenNonce: new("test-jti"),
 					Metadata:   models.ResourceMetadata{ID: linkID},
 				}, nil)
 				mockDBClient.WorkspaceVCSProviderLinks = mockLinks

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ff6e7c633520c38c909f25645fb45ade>>
+ * @generated SignedSource<<383aef3e6346081bb8d71a5b43fe51ed>>
  * @lightSyntaxTransform
  */
 
@@ -21,8 +21,8 @@ export type WorkspaceVCSProviderSettingsFragment_workspace$data = {
   };
   readonly workspaceVcsProviderLink: {
     readonly id: string;
+    readonly " $fragmentSpreads": FragmentRefs<"EditVCSProviderLinkFragment_link" | "VCSProviderLinkDangerZoneFragment_link" | "VCSProviderLinkWebhookFragment_link">;
   } | null | undefined;
-  readonly " $fragmentSpreads": FragmentRefs<"EditVCSProviderLinkFragment_workspace" | "NewVCSProviderLinkFragment_workspace">;
   readonly " $fragmentType": "WorkspaceVCSProviderSettingsFragment_workspace";
 };
 export type WorkspaceVCSProviderSettingsFragment_workspace$key = {
@@ -31,31 +31,19 @@ export type WorkspaceVCSProviderSettingsFragment_workspace$key = {
 };
 
 const node: ReaderFragment = (function(){
-var v0 = [
-  {
-    "alias": null,
-    "args": null,
-    "kind": "ScalarField",
-    "name": "id",
-    "storageKey": null
-  }
-];
+var v0 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "id",
+  "storageKey": null
+};
 return {
   "argumentDefinitions": [],
   "kind": "Fragment",
   "metadata": null,
   "name": "WorkspaceVCSProviderSettingsFragment_workspace",
   "selections": [
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "WorkspaceVCSProviderLink",
-      "kind": "LinkedField",
-      "name": "workspaceVcsProviderLink",
-      "plural": false,
-      "selections": (v0/*:: as any*/),
-      "storageKey": null
-    },
     {
       "alias": null,
       "args": null,
@@ -72,11 +60,38 @@ return {
     },
     {
       "alias": null,
+      "args": null,
+      "concreteType": "WorkspaceVCSProviderLink",
+      "kind": "LinkedField",
+      "name": "workspaceVcsProviderLink",
+      "plural": false,
+      "selections": [
+        (v0/*:: as any*/),
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "EditVCSProviderLinkFragment_link"
+        },
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "VCSProviderLinkWebhookFragment_link"
+        },
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "VCSProviderLinkDangerZoneFragment_link"
+        }
+      ],
+      "storageKey": null
+    },
+    {
+      "alias": null,
       "args": [
         {
           "kind": "Literal",
           "name": "first",
-          "value": 10
+          "value": 1
         },
         {
           "kind": "Literal",
@@ -104,24 +119,16 @@ return {
               "kind": "LinkedField",
               "name": "node",
               "plural": false,
-              "selections": (v0/*:: as any*/),
+              "selections": [
+                (v0/*:: as any*/)
+              ],
               "storageKey": null
             }
           ],
           "storageKey": null
         }
       ],
-      "storageKey": "vcsProviders(first:10,includeInherited:true)"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "EditVCSProviderLinkFragment_workspace"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
-      "name": "NewVCSProviderLinkFragment_workspace"
+      "storageKey": "vcsProviders(first:1,includeInherited:true)"
     }
   ],
   "type": "Workspace",
@@ -129,6 +136,6 @@ return {
 };
 })();
 
-(node as any).hash = "322e818c25d81dc630957f0613e820dd";
+(node as any).hash = "811f0d274bcf3aa569eee4510a54b419";
 
 export default node;

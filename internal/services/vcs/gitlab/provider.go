@@ -13,6 +13,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -163,6 +164,11 @@ func (p *Provider) BuildRepositoryURL(input *types.BuildRepositoryURLInput) (str
 	}
 
 	return url.JoinPath(input.ProviderURL.String(), repositoryPath)
+}
+
+// BuildCommitURL returns the web URL of a commit in the repository.
+func (p *Provider) BuildCommitURL(input *types.BuildCommitURLInput) (string, error) {
+	return url.JoinPath(input.RepositoryURL, "-", "commit", input.CommitID)
 }
 
 // TestConnection simply queries for the user metadata that's
@@ -521,22 +527,10 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 		return nil, err
 	}
 
-	// Build Tharsis webhook endpoint.
-	parsedURL, err := url.Parse(p.tharsisURL)
+	form, err := p.webhookForm(input.WebhookToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse Tharsis URL: %v", err)
+		return nil, err
 	}
-	parsedURL.Path = types.V1WebhookEndpoint
-
-	// Add the webhook event types to body form.
-	form := url.Values{}
-	for _, event := range eventTypes {
-		form.Add(event, "true")
-	}
-
-	// Add the Tharsis URL and token.
-	form.Add("url", parsedURL.String())
-	form.Add("token", string(input.WebhookToken))
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -571,6 +565,63 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 	return &types.WebhookPayload{
 		WebhookID: strconv.Itoa(webhookResponse.ID),
 	}, nil
+}
+
+// UpdateWebhook replaces the token on the existing webhook so the webhook ID stays the same, GitLab requires the URL on update.
+func (p *Provider) UpdateWebhook(ctx context.Context, input *types.UpdateWebhookInput) error {
+	repositoryPath, err := models.NormalizeRepositoryPath(input.RepositoryPath)
+	if err != nil {
+		return err
+	}
+
+	// Build the request URL.
+	rawPath := strings.Join([]string{
+		apiV4Endpoint,
+		"projects",
+		url.PathEscape(repositoryPath),
+		"hooks",
+		input.WebhookID,
+	}, "/")
+
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), rawPath)
+	if err != nil {
+		return err
+	}
+
+	form, err := p.webhookForm(input.WebhookToken)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return fmt.Errorf("failed to prepare HTTP request: %v", err)
+	}
+
+	// Add request headers.
+	request.Header.Add("Accept", types.JSONContentType)
+	request.Header.Add("Content-Type", types.FormContentType)
+	request.Header.Add("Authorization", types.BearerAuthPrefix+input.AccessToken)
+
+	resp, err := p.client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cErr := resp.Body.Close(); cErr != nil {
+			p.logger.WithContextFields(ctx).Errorf("failed to close response body in UpdateWebhook: %v", cErr)
+		}
+	}()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return errors.New("webhook %s was not found in the repository, it may have been deleted from the VCS provider", input.WebhookID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to update webhook. Response status: %s", resp.Status)
+	}
+
+	return nil
 }
 
 // DeleteWebhook deletes a webhook at the specified provider.
@@ -614,6 +665,25 @@ func (p *Provider) DeleteWebhook(ctx context.Context, input *types.DeleteWebhook
 	}
 
 	return nil
+}
+
+// webhookForm returns the form body for creating or updating a webhook, GitLab requires the URL on update.
+func (p *Provider) webhookForm(token []byte) (url.Values, error) {
+	parsedURL, err := url.Parse(p.tharsisURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Tharsis URL: %v", err)
+	}
+	parsedURL.Path = types.V1WebhookEndpoint
+
+	form := url.Values{}
+	for _, event := range eventTypes {
+		form.Add(event, "true")
+	}
+
+	form.Add("url", parsedURL.String())
+	form.Add("token", string(token))
+
+	return form, nil
 }
 
 // createChangesMap creates a unique map of files that have been altered.

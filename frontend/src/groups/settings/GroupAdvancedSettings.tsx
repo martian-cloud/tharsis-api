@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { Alert, AlertTitle, Box, Button, TextField, Typography } from '@mui/material';
+import { Alert, AlertTitle, Box, Button, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useFragment, useMutation } from 'react-relay';
 import { useSnackbar } from 'notistack';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +17,6 @@ interface Props {
 function GroupAdvancedSettings({ fragmentRef }: Props) {
     const [showDeleteConfirmationDialog, setShowDeleteConfirmationDialog] = useState<boolean>(false);
     const [showMigrateGroupDialog, setShowMigrateGroupDialog] = useState<boolean>(false);
-    const [confirmInput, setConfirmInput] = useState('');
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
 
@@ -64,20 +61,17 @@ function GroupAdvancedSettings({ fragmentRef }: Props) {
                 },
                 onCompleted: deleteData => {
                     setShowDeleteConfirmationDialog(false);
-                    setConfirmInput('');
                     if (deleteData.deleteGroup.problems.length) {
                         enqueueSnackbar(deleteData.deleteGroup.problems.map(problem => problem.message).join('; '), { variant: 'warning' });
                     } else navigate(`../${data.fullPath.slice(0, -data.name.length - 1)}`);
                 },
                 onError: error => {
                     setShowDeleteConfirmationDialog(false);
-                    setConfirmInput('');
                     enqueueSnackbar(`An unexpected error occurred: ${error.message}`, { variant: 'error' });
                 }
             });
         } else {
             setShowDeleteConfirmationDialog(false);
-            setConfirmInput('');
         }
     };
 
@@ -111,7 +105,7 @@ function GroupAdvancedSettings({ fragmentRef }: Props) {
                         title="Delete Group"
                         maxWidth="sm"
                         confirmLabel="Delete"
-                        confirmDisabled={data.fullPath !== confirmInput}
+                        typedConfirmation={{ label: 'Enter the following to confirm deletion:', value: data.fullPath }}
                         confirmInProgress={commitDeleteInFlight}
                         onConfirm={() => onDeleteConfirmationDialogClosed(true)}
                         onClose={() => onDeleteConfirmationDialogClosed()}
@@ -120,16 +114,6 @@ function GroupAdvancedSettings({ fragmentRef }: Props) {
                             <AlertTitle>Warning</AlertTitle>
                             Deleting a group is an <strong><ins>irreversible</ins></strong> operation. All nested groups and/or workspaces with their associated deployment states will be deleted and <strong><ins>cannot be recovered</ins></strong>.
                         </Alert>
-                        <Typography variant="subtitle2">Enter the following to confirm deletion:</Typography>
-                        <SyntaxHighlighter style={prismTheme} customStyle={{ fontSize: 14, marginBottom: 14 }}>{data.fullPath}</SyntaxHighlighter>
-                        <TextField
-                            autoComplete="off"
-                            fullWidth
-                            size="small"
-                            placeholder={data.fullPath}
-                            value={confirmInput}
-                            onChange={(e) => setConfirmInput(e.target.value)}
-                        />
                     </ConfirmationDialog>
                 )}
             </SettingsSection>

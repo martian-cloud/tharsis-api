@@ -1,5 +1,7 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
-import React from "react";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from "@mui/material";
+import React, { useState } from "react";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface Props {
     title: string;
@@ -19,9 +21,20 @@ interface Props {
     onConfirm: () => void;
     onClose: () => void;
     maxWidth?: 'xs' | 'sm' | 'md';
+    // When set, confirm stays disabled until the user types value exactly.
+    typedConfirmation?: { label: string; value: string };
 }
 
-function ConfirmationDialog({ title, children, confirmLabel, cancelLabel, confirmDisabled, confirmColor = 'error', confirmInProgress, confirmHref, onClose, onConfirm, maxWidth = 'xs', ...other }: Props) {
+function ConfirmationDialog({ title, children, confirmLabel, cancelLabel, confirmDisabled, confirmColor = 'error', confirmInProgress, confirmHref, onClose, onConfirm, maxWidth = 'xs', typedConfirmation, ...other }: Props) {
+    const [typed, setTyped] = useState('');
+    const [typedFor, setTypedFor] = useState(typedConfirmation?.value);
+
+    // Clear the input whenever the required value changes or the requirement is toggled off and back on.
+    if (typedFor !== typedConfirmation?.value) {
+        setTypedFor(typedConfirmation?.value);
+        setTyped('');
+    }
+
     return (
         <Dialog
             maxWidth={maxWidth}
@@ -33,6 +46,19 @@ function ConfirmationDialog({ title, children, confirmLabel, cancelLabel, confir
             <DialogTitle>{title}</DialogTitle>
             <DialogContent dividers>
                 {children}
+                {typedConfirmation && <>
+                    <Typography variant="subtitle2">{typedConfirmation.label}</Typography>
+                    <SyntaxHighlighter style={prismTheme} customStyle={{ fontSize: 14, marginBottom: 14 }}>{typedConfirmation.value}</SyntaxHighlighter>
+                    <TextField
+                        autoComplete="off"
+                        fullWidth
+                        size="small"
+                        placeholder={typedConfirmation.value}
+                        value={typed}
+                        onChange={event => setTyped(event.target.value)}
+                        slotProps={{ htmlInput: { 'aria-label': typedConfirmation.label } }}
+                    />
+                </>}
             </DialogContent>
             <DialogActions>
                 <Button color="inherit" onClick={onClose}>
@@ -41,7 +67,7 @@ function ConfirmationDialog({ title, children, confirmLabel, cancelLabel, confir
                 <Button
                     color={confirmColor}
                     loading={confirmInProgress}
-                    disabled={confirmDisabled}
+                    disabled={confirmDisabled || (!!typedConfirmation && typed !== typedConfirmation.value)}
                     {...(confirmHref && { href: confirmHref, target: '_blank', rel: 'noopener noreferrer' })}
                     onClick={onConfirm}
                 >

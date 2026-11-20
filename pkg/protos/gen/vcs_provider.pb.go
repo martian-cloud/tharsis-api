@@ -851,6 +851,51 @@ func (x *DeleteWorkspaceVCSProviderLinkRequest) GetVersion() int64 {
 	return 0
 }
 
+// ResetWorkspaceVCSProviderLinkWebhookTokenRequest is the input for resetting the webhook token of a WorkspaceVCSProviderLink.
+type ResetWorkspaceVCSProviderLinkWebhookTokenRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResetWorkspaceVCSProviderLinkWebhookTokenRequest) Reset() {
+	*x = ResetWorkspaceVCSProviderLinkWebhookTokenRequest{}
+	mi := &file_vcs_provider_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetWorkspaceVCSProviderLinkWebhookTokenRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetWorkspaceVCSProviderLinkWebhookTokenRequest) ProtoMessage() {}
+
+func (x *ResetWorkspaceVCSProviderLinkWebhookTokenRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vcs_provider_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetWorkspaceVCSProviderLinkWebhookTokenRequest.ProtoReflect.Descriptor instead.
+func (*ResetWorkspaceVCSProviderLinkWebhookTokenRequest) Descriptor() ([]byte, []int) {
+	return file_vcs_provider_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ResetWorkspaceVCSProviderLinkWebhookTokenRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 // CreateVCSRunRequest is the input for creating a VCS run.
 type CreateVCSRunRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -863,7 +908,7 @@ type CreateVCSRunRequest struct {
 
 func (x *CreateVCSRunRequest) Reset() {
 	*x = CreateVCSRunRequest{}
-	mi := &file_vcs_provider_proto_msgTypes[10]
+	mi := &file_vcs_provider_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -875,7 +920,7 @@ func (x *CreateVCSRunRequest) String() string {
 func (*CreateVCSRunRequest) ProtoMessage() {}
 
 func (x *CreateVCSRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vcs_provider_proto_msgTypes[10]
+	mi := &file_vcs_provider_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -888,7 +933,7 @@ func (x *CreateVCSRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateVCSRunRequest.ProtoReflect.Descriptor instead.
 func (*CreateVCSRunRequest) Descriptor() ([]byte, []int) {
-	return file_vcs_provider_proto_rawDescGZIP(), []int{10}
+	return file_vcs_provider_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CreateVCSRunRequest) GetWorkspaceId() string {
@@ -936,7 +981,7 @@ type VCSProvider struct {
 
 func (x *VCSProvider) Reset() {
 	*x = VCSProvider{}
-	mi := &file_vcs_provider_proto_msgTypes[11]
+	mi := &file_vcs_provider_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -948,7 +993,7 @@ func (x *VCSProvider) String() string {
 func (*VCSProvider) ProtoMessage() {}
 
 func (x *VCSProvider) ProtoReflect() protoreflect.Message {
-	mi := &file_vcs_provider_proto_msgTypes[11]
+	mi := &file_vcs_provider_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -961,7 +1006,7 @@ func (x *VCSProvider) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VCSProvider.ProtoReflect.Descriptor instead.
 func (*VCSProvider) Descriptor() ([]byte, []int) {
-	return file_vcs_provider_proto_rawDescGZIP(), []int{11}
+	return file_vcs_provider_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *VCSProvider) GetMetadata() *ResourceMetadata {
@@ -1050,13 +1095,16 @@ type WorkspaceVCSProviderLink struct {
 	// created_by_actor is the structured identity of the creator. Absent for
 	// resources created before actors were introduced.
 	CreatedByActor *Actor `protobuf:"bytes,13,opt,name=created_by_actor,json=createdByActor,proto3" json:"created_by_actor,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// uses_legacy_webhook_token is true when the webhook authenticates with a deprecated token
+	// that stops working when signing keys rotate.
+	UsesLegacyWebhookToken bool `protobuf:"varint,14,opt,name=uses_legacy_webhook_token,json=usesLegacyWebhookToken,proto3" json:"uses_legacy_webhook_token,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *WorkspaceVCSProviderLink) Reset() {
 	*x = WorkspaceVCSProviderLink{}
-	mi := &file_vcs_provider_proto_msgTypes[12]
+	mi := &file_vcs_provider_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1068,7 +1116,7 @@ func (x *WorkspaceVCSProviderLink) String() string {
 func (*WorkspaceVCSProviderLink) ProtoMessage() {}
 
 func (x *WorkspaceVCSProviderLink) ProtoReflect() protoreflect.Message {
-	mi := &file_vcs_provider_proto_msgTypes[12]
+	mi := &file_vcs_provider_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1081,7 +1129,7 @@ func (x *WorkspaceVCSProviderLink) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkspaceVCSProviderLink.ProtoReflect.Descriptor instead.
 func (*WorkspaceVCSProviderLink) Descriptor() ([]byte, []int) {
-	return file_vcs_provider_proto_rawDescGZIP(), []int{12}
+	return file_vcs_provider_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *WorkspaceVCSProviderLink) GetMetadata() *ResourceMetadata {
@@ -1176,6 +1224,13 @@ func (x *WorkspaceVCSProviderLink) GetCreatedByActor() *Actor {
 	return nil
 }
 
+func (x *WorkspaceVCSProviderLink) GetUsesLegacyWebhookToken() bool {
+	if x != nil {
+		return x.UsesLegacyWebhookToken
+	}
+	return false
+}
+
 // GetVCSProvidersResponse is the paginated list of VCS Providers.
 type GetVCSProvidersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1187,7 +1242,7 @@ type GetVCSProvidersResponse struct {
 
 func (x *GetVCSProvidersResponse) Reset() {
 	*x = GetVCSProvidersResponse{}
-	mi := &file_vcs_provider_proto_msgTypes[13]
+	mi := &file_vcs_provider_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1199,7 +1254,7 @@ func (x *GetVCSProvidersResponse) String() string {
 func (*GetVCSProvidersResponse) ProtoMessage() {}
 
 func (x *GetVCSProvidersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vcs_provider_proto_msgTypes[13]
+	mi := &file_vcs_provider_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1212,7 +1267,7 @@ func (x *GetVCSProvidersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVCSProvidersResponse.ProtoReflect.Descriptor instead.
 func (*GetVCSProvidersResponse) Descriptor() ([]byte, []int) {
-	return file_vcs_provider_proto_rawDescGZIP(), []int{13}
+	return file_vcs_provider_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetVCSProvidersResponse) GetVcsProviders() []*VCSProvider {
@@ -1240,7 +1295,7 @@ type CreateVCSProviderResponse struct {
 
 func (x *CreateVCSProviderResponse) Reset() {
 	*x = CreateVCSProviderResponse{}
-	mi := &file_vcs_provider_proto_msgTypes[14]
+	mi := &file_vcs_provider_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1252,7 +1307,7 @@ func (x *CreateVCSProviderResponse) String() string {
 func (*CreateVCSProviderResponse) ProtoMessage() {}
 
 func (x *CreateVCSProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vcs_provider_proto_msgTypes[14]
+	mi := &file_vcs_provider_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1265,7 +1320,7 @@ func (x *CreateVCSProviderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateVCSProviderResponse.ProtoReflect.Descriptor instead.
 func (*CreateVCSProviderResponse) Descriptor() ([]byte, []int) {
-	return file_vcs_provider_proto_rawDescGZIP(), []int{14}
+	return file_vcs_provider_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CreateVCSProviderResponse) GetVcsProvider() *VCSProvider {
@@ -1293,7 +1348,7 @@ type ResetVCSProviderOAuthTokenResponse struct {
 
 func (x *ResetVCSProviderOAuthTokenResponse) Reset() {
 	*x = ResetVCSProviderOAuthTokenResponse{}
-	mi := &file_vcs_provider_proto_msgTypes[15]
+	mi := &file_vcs_provider_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1305,7 +1360,7 @@ func (x *ResetVCSProviderOAuthTokenResponse) String() string {
 func (*ResetVCSProviderOAuthTokenResponse) ProtoMessage() {}
 
 func (x *ResetVCSProviderOAuthTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vcs_provider_proto_msgTypes[15]
+	mi := &file_vcs_provider_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1318,7 +1373,7 @@ func (x *ResetVCSProviderOAuthTokenResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ResetVCSProviderOAuthTokenResponse.ProtoReflect.Descriptor instead.
 func (*ResetVCSProviderOAuthTokenResponse) Descriptor() ([]byte, []int) {
-	return file_vcs_provider_proto_rawDescGZIP(), []int{15}
+	return file_vcs_provider_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ResetVCSProviderOAuthTokenResponse) GetVcsProvider() *VCSProvider {
@@ -1347,7 +1402,7 @@ type CreateWorkspaceVCSProviderLinkResponse struct {
 
 func (x *CreateWorkspaceVCSProviderLinkResponse) Reset() {
 	*x = CreateWorkspaceVCSProviderLinkResponse{}
-	mi := &file_vcs_provider_proto_msgTypes[16]
+	mi := &file_vcs_provider_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1359,7 +1414,7 @@ func (x *CreateWorkspaceVCSProviderLinkResponse) String() string {
 func (*CreateWorkspaceVCSProviderLinkResponse) ProtoMessage() {}
 
 func (x *CreateWorkspaceVCSProviderLinkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vcs_provider_proto_msgTypes[16]
+	mi := &file_vcs_provider_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1372,7 +1427,7 @@ func (x *CreateWorkspaceVCSProviderLinkResponse) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use CreateWorkspaceVCSProviderLinkResponse.ProtoReflect.Descriptor instead.
 func (*CreateWorkspaceVCSProviderLinkResponse) Descriptor() ([]byte, []int) {
-	return file_vcs_provider_proto_rawDescGZIP(), []int{16}
+	return file_vcs_provider_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CreateWorkspaceVCSProviderLinkResponse) GetVcsProviderLink() *WorkspaceVCSProviderLink {
@@ -1390,6 +1445,67 @@ func (x *CreateWorkspaceVCSProviderLinkResponse) GetWebhookToken() string {
 }
 
 func (x *CreateWorkspaceVCSProviderLinkResponse) GetWebhookUrl() string {
+	if x != nil && x.WebhookUrl != nil {
+		return *x.WebhookUrl
+	}
+	return ""
+}
+
+// ResetWorkspaceVCSProviderLinkWebhookTokenResponse is the response for resetting the webhook token of a WorkspaceVCSProviderLink.
+type ResetWorkspaceVCSProviderLinkWebhookTokenResponse struct {
+	state           protoimpl.MessageState    `protogen:"open.v1"`
+	VcsProviderLink *WorkspaceVCSProviderLink `protobuf:"bytes,1,opt,name=vcs_provider_link,json=vcsProviderLink,proto3" json:"vcs_provider_link,omitempty"`
+	WebhookToken    string                    `protobuf:"bytes,2,opt,name=webhook_token,json=webhookToken,proto3" json:"webhook_token,omitempty"`
+	WebhookUrl      *string                   `protobuf:"bytes,3,opt,name=webhook_url,json=webhookUrl,proto3,oneof" json:"webhook_url,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ResetWorkspaceVCSProviderLinkWebhookTokenResponse) Reset() {
+	*x = ResetWorkspaceVCSProviderLinkWebhookTokenResponse{}
+	mi := &file_vcs_provider_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetWorkspaceVCSProviderLinkWebhookTokenResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetWorkspaceVCSProviderLinkWebhookTokenResponse) ProtoMessage() {}
+
+func (x *ResetWorkspaceVCSProviderLinkWebhookTokenResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vcs_provider_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetWorkspaceVCSProviderLinkWebhookTokenResponse.ProtoReflect.Descriptor instead.
+func (*ResetWorkspaceVCSProviderLinkWebhookTokenResponse) Descriptor() ([]byte, []int) {
+	return file_vcs_provider_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ResetWorkspaceVCSProviderLinkWebhookTokenResponse) GetVcsProviderLink() *WorkspaceVCSProviderLink {
+	if x != nil {
+		return x.VcsProviderLink
+	}
+	return nil
+}
+
+func (x *ResetWorkspaceVCSProviderLinkWebhookTokenResponse) GetWebhookToken() string {
+	if x != nil {
+		return x.WebhookToken
+	}
+	return ""
+}
+
+func (x *ResetWorkspaceVCSProviderLinkWebhookTokenResponse) GetWebhookUrl() string {
 	if x != nil && x.WebhookUrl != nil {
 		return *x.WebhookUrl
 	}
@@ -1483,7 +1599,9 @@ const file_vcs_provider_proto_rawDesc = "" +
 	"\aversion\x18\x03 \x01(\x03H\x01R\aversion\x88\x01\x01B\b\n" +
 	"\x06_forceB\n" +
 	"\n" +
-	"\b_version\"\x96\x01\n" +
+	"\b_version\"B\n" +
+	"0ResetWorkspaceVCSProviderLinkWebhookTokenRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x96\x01\n" +
 	"\x13CreateVCSRunRequest\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12*\n" +
 	"\x0ereference_name\x18\x02 \x01(\tH\x00R\rreferenceName\x88\x01\x01\x12\x1d\n" +
@@ -1500,7 +1618,7 @@ const file_vcs_provider_proto_rawDesc = "" +
 	"\n" +
 	"created_by\x18\a \x01(\tB\x02\x18\x01R\tcreatedBy\x120\n" +
 	"\x14auto_create_webhooks\x18\b \x01(\bR\x12autoCreateWebhooks\x12O\n" +
-	"\x10created_by_actor\x18\t \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\"\x83\x05\n" +
+	"\x10created_by_actor\x18\t \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\"\xbe\x05\n" +
 	"\x18WorkspaceVCSProviderLink\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12!\n" +
 	"\n" +
@@ -1517,7 +1635,8 @@ const file_vcs_provider_proto_rawDesc = "" +
 	" \x03(\tR\fglobPatterns\x122\n" +
 	"\x15auto_speculative_plan\x18\v \x01(\bR\x13autoSpeculativePlan\x12)\n" +
 	"\x10webhook_disabled\x18\f \x01(\bR\x0fwebhookDisabled\x12O\n" +
-	"\x10created_by_actor\x18\r \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActorB\x13\n" +
+	"\x10created_by_actor\x18\r \x01(\v2%.martiancloud.tharsis.api.actor.ActorR\x0ecreatedByActor\x129\n" +
+	"\x19uses_legacy_webhook_token\x18\x0e \x01(\bR\x16usesLegacyWebhookTokenB\x13\n" +
 	"\x11_module_directoryB\f\n" +
 	"\n" +
 	"_tag_regex\"\xbe\x01\n" +
@@ -1535,6 +1654,12 @@ const file_vcs_provider_proto_rawDesc = "" +
 	"\rwebhook_token\x18\x02 \x01(\tR\fwebhookToken\x12$\n" +
 	"\vwebhook_url\x18\x03 \x01(\tH\x00R\n" +
 	"webhookUrl\x88\x01\x01B\x0e\n" +
+	"\f_webhook_url\"\xfb\x01\n" +
+	"1ResetWorkspaceVCSProviderLinkWebhookTokenResponse\x12k\n" +
+	"\x11vcs_provider_link\x18\x01 \x01(\v2?.martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLinkR\x0fvcsProviderLink\x12#\n" +
+	"\rwebhook_token\x18\x02 \x01(\tR\fwebhookToken\x12$\n" +
+	"\vwebhook_url\x18\x03 \x01(\tH\x00R\n" +
+	"webhookUrl\x88\x01\x01B\x0e\n" +
 	"\f_webhook_url*)\n" +
 	"\x0fVCSProviderType\x12\n" +
 	"\n" +
@@ -1547,7 +1672,7 @@ const file_vcs_provider_proto_rawDesc = "" +
 	"\x0eUPDATED_AT_ASC\x10\x02\x12\x13\n" +
 	"\x0fUPDATED_AT_DESC\x10\x03\x12\x13\n" +
 	"\x0fGROUP_LEVEL_ASC\x10\x04\x12\x14\n" +
-	"\x10GROUP_LEVEL_DESC\x10\x052\x87\r\n" +
+	"\x10GROUP_LEVEL_DESC\x10\x052\xe8\x0e\n" +
 	"\fVCSProviders\x12\x8a\x01\n" +
 	"\x12GetVCSProviderByID\x12@.martiancloud.tharsis.api.vcs_provider.GetVCSProviderByIDRequest\x1a2.martiancloud.tharsis.api.vcs_provider.VCSProvider\x12\x90\x01\n" +
 	"\x0fGetVCSProviders\x12=.martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest\x1a>.martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse\x12\x96\x01\n" +
@@ -1558,7 +1683,8 @@ const file_vcs_provider_proto_rawDesc = "" +
 	"\x1fGetWorkspaceVCSProviderLinkByID\x12M.martiancloud.tharsis.api.vcs_provider.GetWorkspaceVCSProviderLinkByIDRequest\x1a?.martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink\x12\xbd\x01\n" +
 	"\x1eCreateWorkspaceVCSProviderLink\x12L.martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkRequest\x1aM.martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse\x12\xaf\x01\n" +
 	"\x1eUpdateWorkspaceVCSProviderLink\x12L.martiancloud.tharsis.api.vcs_provider.UpdateWorkspaceVCSProviderLinkRequest\x1a?.martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink\x12\x86\x01\n" +
-	"\x1eDeleteWorkspaceVCSProviderLink\x12L.martiancloud.tharsis.api.vcs_provider.DeleteWorkspaceVCSProviderLinkRequest\x1a\x16.google.protobuf.Empty\x12b\n" +
+	"\x1eDeleteWorkspaceVCSProviderLink\x12L.martiancloud.tharsis.api.vcs_provider.DeleteWorkspaceVCSProviderLinkRequest\x1a\x16.google.protobuf.Empty\x12\xde\x01\n" +
+	")ResetWorkspaceVCSProviderLinkWebhookToken\x12W.martiancloud.tharsis.api.vcs_provider.ResetWorkspaceVCSProviderLinkWebhookTokenRequest\x1aX.martiancloud.tharsis.api.vcs_provider.ResetWorkspaceVCSProviderLinkWebhookTokenResponse\x12b\n" +
 	"\fCreateVCSRun\x12:.martiancloud.tharsis.api.vcs_provider.CreateVCSRunRequest\x1a\x16.google.protobuf.EmptyBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var (
@@ -1574,73 +1700,78 @@ func file_vcs_provider_proto_rawDescGZIP() []byte {
 }
 
 var file_vcs_provider_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_vcs_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_vcs_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_vcs_provider_proto_goTypes = []any{
-	(VCSProviderType)(0),                           // 0: martiancloud.tharsis.api.vcs_provider.VCSProviderType
-	(VCSProviderSortableField)(0),                  // 1: martiancloud.tharsis.api.vcs_provider.VCSProviderSortableField
-	(*GetVCSProviderByIDRequest)(nil),              // 2: martiancloud.tharsis.api.vcs_provider.GetVCSProviderByIDRequest
-	(*GetVCSProvidersRequest)(nil),                 // 3: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest
-	(*CreateVCSProviderRequest)(nil),               // 4: martiancloud.tharsis.api.vcs_provider.CreateVCSProviderRequest
-	(*UpdateVCSProviderRequest)(nil),               // 5: martiancloud.tharsis.api.vcs_provider.UpdateVCSProviderRequest
-	(*DeleteVCSProviderRequest)(nil),               // 6: martiancloud.tharsis.api.vcs_provider.DeleteVCSProviderRequest
-	(*ResetVCSProviderOAuthTokenRequest)(nil),      // 7: martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenRequest
-	(*GetWorkspaceVCSProviderLinkByIDRequest)(nil), // 8: martiancloud.tharsis.api.vcs_provider.GetWorkspaceVCSProviderLinkByIDRequest
-	(*CreateWorkspaceVCSProviderLinkRequest)(nil),  // 9: martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkRequest
-	(*UpdateWorkspaceVCSProviderLinkRequest)(nil),  // 10: martiancloud.tharsis.api.vcs_provider.UpdateWorkspaceVCSProviderLinkRequest
-	(*DeleteWorkspaceVCSProviderLinkRequest)(nil),  // 11: martiancloud.tharsis.api.vcs_provider.DeleteWorkspaceVCSProviderLinkRequest
-	(*CreateVCSRunRequest)(nil),                    // 12: martiancloud.tharsis.api.vcs_provider.CreateVCSRunRequest
-	(*VCSProvider)(nil),                            // 13: martiancloud.tharsis.api.vcs_provider.VCSProvider
-	(*WorkspaceVCSProviderLink)(nil),               // 14: martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
-	(*GetVCSProvidersResponse)(nil),                // 15: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse
-	(*CreateVCSProviderResponse)(nil),              // 16: martiancloud.tharsis.api.vcs_provider.CreateVCSProviderResponse
-	(*ResetVCSProviderOAuthTokenResponse)(nil),     // 17: martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenResponse
-	(*CreateWorkspaceVCSProviderLinkResponse)(nil), // 18: martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse
-	(*PaginationOptions)(nil),                      // 19: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),                       // 20: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*Actor)(nil),                                  // 21: martiancloud.tharsis.api.actor.Actor
-	(*PageInfo)(nil),                               // 22: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),                          // 23: google.protobuf.Empty
+	(VCSProviderType)(0),                                      // 0: martiancloud.tharsis.api.vcs_provider.VCSProviderType
+	(VCSProviderSortableField)(0),                             // 1: martiancloud.tharsis.api.vcs_provider.VCSProviderSortableField
+	(*GetVCSProviderByIDRequest)(nil),                         // 2: martiancloud.tharsis.api.vcs_provider.GetVCSProviderByIDRequest
+	(*GetVCSProvidersRequest)(nil),                            // 3: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest
+	(*CreateVCSProviderRequest)(nil),                          // 4: martiancloud.tharsis.api.vcs_provider.CreateVCSProviderRequest
+	(*UpdateVCSProviderRequest)(nil),                          // 5: martiancloud.tharsis.api.vcs_provider.UpdateVCSProviderRequest
+	(*DeleteVCSProviderRequest)(nil),                          // 6: martiancloud.tharsis.api.vcs_provider.DeleteVCSProviderRequest
+	(*ResetVCSProviderOAuthTokenRequest)(nil),                 // 7: martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenRequest
+	(*GetWorkspaceVCSProviderLinkByIDRequest)(nil),            // 8: martiancloud.tharsis.api.vcs_provider.GetWorkspaceVCSProviderLinkByIDRequest
+	(*CreateWorkspaceVCSProviderLinkRequest)(nil),             // 9: martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkRequest
+	(*UpdateWorkspaceVCSProviderLinkRequest)(nil),             // 10: martiancloud.tharsis.api.vcs_provider.UpdateWorkspaceVCSProviderLinkRequest
+	(*DeleteWorkspaceVCSProviderLinkRequest)(nil),             // 11: martiancloud.tharsis.api.vcs_provider.DeleteWorkspaceVCSProviderLinkRequest
+	(*ResetWorkspaceVCSProviderLinkWebhookTokenRequest)(nil),  // 12: martiancloud.tharsis.api.vcs_provider.ResetWorkspaceVCSProviderLinkWebhookTokenRequest
+	(*CreateVCSRunRequest)(nil),                               // 13: martiancloud.tharsis.api.vcs_provider.CreateVCSRunRequest
+	(*VCSProvider)(nil),                                       // 14: martiancloud.tharsis.api.vcs_provider.VCSProvider
+	(*WorkspaceVCSProviderLink)(nil),                          // 15: martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
+	(*GetVCSProvidersResponse)(nil),                           // 16: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse
+	(*CreateVCSProviderResponse)(nil),                         // 17: martiancloud.tharsis.api.vcs_provider.CreateVCSProviderResponse
+	(*ResetVCSProviderOAuthTokenResponse)(nil),                // 18: martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenResponse
+	(*CreateWorkspaceVCSProviderLinkResponse)(nil),            // 19: martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse
+	(*ResetWorkspaceVCSProviderLinkWebhookTokenResponse)(nil), // 20: martiancloud.tharsis.api.vcs_provider.ResetWorkspaceVCSProviderLinkWebhookTokenResponse
+	(*PaginationOptions)(nil),                                 // 21: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),                                  // 22: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*Actor)(nil),                                             // 23: martiancloud.tharsis.api.actor.Actor
+	(*PageInfo)(nil),                                          // 24: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),                                     // 25: google.protobuf.Empty
 }
 var file_vcs_provider_proto_depIdxs = []int32{
-	19, // 0: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	21, // 0: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	1,  // 1: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest.sort:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProviderSortableField
 	0,  // 2: martiancloud.tharsis.api.vcs_provider.CreateVCSProviderRequest.type:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProviderType
-	20, // 3: martiancloud.tharsis.api.vcs_provider.VCSProvider.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	21, // 4: martiancloud.tharsis.api.vcs_provider.VCSProvider.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
-	20, // 5: martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	21, // 6: martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
-	13, // 7: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse.vcs_providers:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
-	22, // 8: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	13, // 9: martiancloud.tharsis.api.vcs_provider.CreateVCSProviderResponse.vcs_provider:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
-	13, // 10: martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenResponse.vcs_provider:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
-	14, // 11: martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse.vcs_provider_link:type_name -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
-	2,  // 12: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviderByID:input_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProviderByIDRequest
-	3,  // 13: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviders:input_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest
-	4,  // 14: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSProviderRequest
-	5,  // 15: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.UpdateVCSProviderRequest
-	6,  // 16: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.DeleteVCSProviderRequest
-	7,  // 17: martiancloud.tharsis.api.vcs_provider.VCSProviders.ResetVCSProviderOAuthToken:input_type -> martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenRequest
-	8,  // 18: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetWorkspaceVCSProviderLinkByID:input_type -> martiancloud.tharsis.api.vcs_provider.GetWorkspaceVCSProviderLinkByIDRequest
-	9,  // 19: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkRequest
-	10, // 20: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.UpdateWorkspaceVCSProviderLinkRequest
-	11, // 21: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.DeleteWorkspaceVCSProviderLinkRequest
-	12, // 22: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSRun:input_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSRunRequest
-	13, // 23: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviderByID:output_type -> martiancloud.tharsis.api.vcs_provider.VCSProvider
-	15, // 24: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviders:output_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse
-	16, // 25: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSProvider:output_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSProviderResponse
-	13, // 26: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateVCSProvider:output_type -> martiancloud.tharsis.api.vcs_provider.VCSProvider
-	23, // 27: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteVCSProvider:output_type -> google.protobuf.Empty
-	17, // 28: martiancloud.tharsis.api.vcs_provider.VCSProviders.ResetVCSProviderOAuthToken:output_type -> martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenResponse
-	14, // 29: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetWorkspaceVCSProviderLinkByID:output_type -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
-	18, // 30: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateWorkspaceVCSProviderLink:output_type -> martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse
-	14, // 31: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateWorkspaceVCSProviderLink:output_type -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
-	23, // 32: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteWorkspaceVCSProviderLink:output_type -> google.protobuf.Empty
-	23, // 33: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSRun:output_type -> google.protobuf.Empty
-	23, // [23:34] is the sub-list for method output_type
-	12, // [12:23] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	22, // 3: martiancloud.tharsis.api.vcs_provider.VCSProvider.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	23, // 4: martiancloud.tharsis.api.vcs_provider.VCSProvider.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	22, // 5: martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	23, // 6: martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink.created_by_actor:type_name -> martiancloud.tharsis.api.actor.Actor
+	14, // 7: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse.vcs_providers:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
+	24, // 8: martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	14, // 9: martiancloud.tharsis.api.vcs_provider.CreateVCSProviderResponse.vcs_provider:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
+	14, // 10: martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenResponse.vcs_provider:type_name -> martiancloud.tharsis.api.vcs_provider.VCSProvider
+	15, // 11: martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse.vcs_provider_link:type_name -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
+	15, // 12: martiancloud.tharsis.api.vcs_provider.ResetWorkspaceVCSProviderLinkWebhookTokenResponse.vcs_provider_link:type_name -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
+	2,  // 13: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviderByID:input_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProviderByIDRequest
+	3,  // 14: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviders:input_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProvidersRequest
+	4,  // 15: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSProviderRequest
+	5,  // 16: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.UpdateVCSProviderRequest
+	6,  // 17: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteVCSProvider:input_type -> martiancloud.tharsis.api.vcs_provider.DeleteVCSProviderRequest
+	7,  // 18: martiancloud.tharsis.api.vcs_provider.VCSProviders.ResetVCSProviderOAuthToken:input_type -> martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenRequest
+	8,  // 19: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetWorkspaceVCSProviderLinkByID:input_type -> martiancloud.tharsis.api.vcs_provider.GetWorkspaceVCSProviderLinkByIDRequest
+	9,  // 20: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkRequest
+	10, // 21: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.UpdateWorkspaceVCSProviderLinkRequest
+	11, // 22: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteWorkspaceVCSProviderLink:input_type -> martiancloud.tharsis.api.vcs_provider.DeleteWorkspaceVCSProviderLinkRequest
+	12, // 23: martiancloud.tharsis.api.vcs_provider.VCSProviders.ResetWorkspaceVCSProviderLinkWebhookToken:input_type -> martiancloud.tharsis.api.vcs_provider.ResetWorkspaceVCSProviderLinkWebhookTokenRequest
+	13, // 24: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSRun:input_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSRunRequest
+	14, // 25: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviderByID:output_type -> martiancloud.tharsis.api.vcs_provider.VCSProvider
+	16, // 26: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetVCSProviders:output_type -> martiancloud.tharsis.api.vcs_provider.GetVCSProvidersResponse
+	17, // 27: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSProvider:output_type -> martiancloud.tharsis.api.vcs_provider.CreateVCSProviderResponse
+	14, // 28: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateVCSProvider:output_type -> martiancloud.tharsis.api.vcs_provider.VCSProvider
+	25, // 29: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteVCSProvider:output_type -> google.protobuf.Empty
+	18, // 30: martiancloud.tharsis.api.vcs_provider.VCSProviders.ResetVCSProviderOAuthToken:output_type -> martiancloud.tharsis.api.vcs_provider.ResetVCSProviderOAuthTokenResponse
+	15, // 31: martiancloud.tharsis.api.vcs_provider.VCSProviders.GetWorkspaceVCSProviderLinkByID:output_type -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
+	19, // 32: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateWorkspaceVCSProviderLink:output_type -> martiancloud.tharsis.api.vcs_provider.CreateWorkspaceVCSProviderLinkResponse
+	15, // 33: martiancloud.tharsis.api.vcs_provider.VCSProviders.UpdateWorkspaceVCSProviderLink:output_type -> martiancloud.tharsis.api.vcs_provider.WorkspaceVCSProviderLink
+	25, // 34: martiancloud.tharsis.api.vcs_provider.VCSProviders.DeleteWorkspaceVCSProviderLink:output_type -> google.protobuf.Empty
+	20, // 35: martiancloud.tharsis.api.vcs_provider.VCSProviders.ResetWorkspaceVCSProviderLinkWebhookToken:output_type -> martiancloud.tharsis.api.vcs_provider.ResetWorkspaceVCSProviderLinkWebhookTokenResponse
+	25, // 36: martiancloud.tharsis.api.vcs_provider.VCSProviders.CreateVCSRun:output_type -> google.protobuf.Empty
+	25, // [25:37] is the sub-list for method output_type
+	13, // [13:25] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_vcs_provider_proto_init() }
@@ -1658,16 +1789,17 @@ func file_vcs_provider_proto_init() {
 	file_vcs_provider_proto_msgTypes[7].OneofWrappers = []any{}
 	file_vcs_provider_proto_msgTypes[8].OneofWrappers = []any{}
 	file_vcs_provider_proto_msgTypes[9].OneofWrappers = []any{}
-	file_vcs_provider_proto_msgTypes[10].OneofWrappers = []any{}
-	file_vcs_provider_proto_msgTypes[12].OneofWrappers = []any{}
-	file_vcs_provider_proto_msgTypes[16].OneofWrappers = []any{}
+	file_vcs_provider_proto_msgTypes[11].OneofWrappers = []any{}
+	file_vcs_provider_proto_msgTypes[13].OneofWrappers = []any{}
+	file_vcs_provider_proto_msgTypes[17].OneofWrappers = []any{}
+	file_vcs_provider_proto_msgTypes[18].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_vcs_provider_proto_rawDesc), len(file_vcs_provider_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   17,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -19,6 +19,7 @@ import { GetConnections } from './runs/WorkspaceRunList';
 import Runs from './runs/Runs';
 import JobDetails from './runs/jobs/JobDetails';
 import StateVersions from './state/StateVersions';
+import VCSEvents from './vcsevents/VCSEvents';
 import WorkspaceDetailsDrawer from './WorkspaceDetailsDrawer';
 import WorkspaceDetailsIndex from './WorkspaceDetailsIndex';
 import WorkspaceRoleBinding from './WorkspaceRoleBinding';
@@ -66,12 +67,16 @@ function WorkspaceDetails(props: Props) {
       name
       description
       fullPath
+      workspaceVcsProviderLink {
+        id
+      }
       ...WorkspaceDetailsIndexFragment_workspace
       ...AssignedPolicyListFragment_workspace
       ...AssignedManagedIdentityListFragment_workspace
       ...RunsFragment_runs
       ...ConfigurationVersionDetailsFragment_workspace
       ...StateVersionsFragment_stateVersions
+      ...VCSEventsFragment_vcsEvents
       ...VariablesFragment_variables
       ...NamespaceMembershipsFragment_memberships
       ...WorkspaceSettingsFragment_workspace
@@ -144,7 +149,7 @@ function WorkspaceDetails(props: Props) {
     <Box sx={{
       display: "flex"
     }}>
-      <WorkspaceDetailsDrawer workspaceName={data.name} workspacePath={workspacePath} route={route} />
+      <WorkspaceDetailsDrawer workspaceName={data.name} workspacePath={workspacePath} route={route} hasVCSProvider={!!data.workspaceVcsProviderLink} />
       <Box
         component="main"
         sx={{
@@ -168,6 +173,7 @@ function WorkspaceDetails(props: Props) {
               <Route path={`${workspacePath}/-/activity/*`} element={<NamespaceActivity fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/jobs/:jobId`} element={<JobDetails />} />
               <Route path={`${workspacePath}/-/runs/*`} element={<Runs fragmentRef={data} />} />
+              <Route path={`${workspacePath}/-/vcs_events/*`} element={<VCSEvents fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/configuration_versions/:id/*`} element={<ConfigurationVersionDetails fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/state_versions/*`} element={<StateVersions fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/managed_identities/*`} element={<AssignedManagedIdentityList fragmentRef={data} />} />

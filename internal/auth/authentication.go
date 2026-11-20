@@ -6,9 +6,10 @@ package auth
 
 import (
 	"context"
-	"fmt"
+
 	"github.com/aws/smithy-go/ptr"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/apikey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
@@ -31,14 +32,8 @@ const (
 	ServiceAccountTokenType    string = "service_account"
 	UserSessionAccessTokenType string = "user_session_access"
 	UserSessionCSRFTokenType   string = "user_session_csrf"
-	SCIMTokenType              string = "scim"
 	VCSWorkspaceLinkTokenType  string = "vcs_workspace_link"
 	FederatedRegistryTokenType string = "federated_registry"
-)
-
-// SCIM token claim names.
-const (
-	IDPIssuerURLClaimName = "idp_issuer_url"
 )
 
 // Authenticator is used to authenticate JWT tokens
@@ -54,6 +49,7 @@ type tokenAuthenticator interface {
 
 // Authenticator is used to authenticate JWT tokens
 type authenticator struct {
+	apiKeyAuthenticator *apiKeyAuthenticator
 	tokenAuthenticators []tokenAuthenticator
 }
 
@@ -68,6 +64,7 @@ func NewAuthenticator(
 	issuerURL string,
 ) Authenticator {
 	return newAuthenticator(
+		&apiKeyAuthenticator{dbClient: dbClient, maintenanceMonitor: maintenanceMonitor},
 		[]tokenAuthenticator{
 			&tharsisIDPTokenAuthenticator{
 				issuerURL:                issuerURL,
@@ -83,9 +80,11 @@ func NewAuthenticator(
 }
 
 func newAuthenticator(
+	apiKeyAuthenticator *apiKeyAuthenticator,
 	tokenAuthenticators []tokenAuthenticator,
 ) *authenticator {
 	return &authenticator{
+		apiKeyAuthenticator: apiKeyAuthenticator,
 		tokenAuthenticators: tokenAuthenticators,
 	}
 }
@@ -94,6 +93,10 @@ func newAuthenticator(
 func (a *authenticator) Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error) {
 	if tokenString == "" {
 		return nil, errors.New("authentication token is missing", errors.WithErrorCode(errors.EUnauthorized))
+	}
+
+	if apikey.IsAPIKey(tokenString) {
+		return a.apiKeyAuthenticator.Authenticate(ctx, tokenString)
 	}
 
 	tokenBytes := []byte(tokenString)
@@ -209,16 +212,6 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 			t.inheritedSettingResolver,
 			useCache,
 		), nil
-	case SCIMTokenType:
-		if sErr := t.verifySCIMTokenClaim(ctx, output.Token); sErr != nil {
-			return nil, sErr
-		}
-		// The issuer scopes everything a SCIM caller can manage, so a token without one is never accepted.
-		idpIssuerURL := output.PrivateClaims[IDPIssuerURLClaimName]
-		if idpIssuerURL == "" {
-			return nil, errors.New("scim token is missing the %s claim", IDPIssuerURLClaimName, errors.WithErrorCode(errors.EUnauthorized))
-		}
-		return NewSCIMCaller(t.maintenanceMonitor, idpIssuerURL), nil
 	case VCSWorkspaceLinkTokenType:
 		vcsCaller, sErr := t.verifyVCSToken(ctx, output)
 		if sErr != nil {
@@ -230,22 +223,7 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 	}
 }
 
-// verifySCIMToken verifies the JwtID field is known.
-func (t *tharsisIDPTokenAuthenticator) verifySCIMTokenClaim(ctx context.Context, token jwt.Token) error {
-	// Get the token claim to verify it is known.
-	tokenClaim, err := t.dbClient.SCIMTokens.GetTokenByNonce(ctx, token.JwtID())
-	if err != nil {
-		return err
-	}
-
-	if tokenClaim == nil {
-		return errors.New("scim token has an invalid jti claim", errors.WithErrorCode(errors.EUnauthorized))
-	}
-
-	return nil
-}
-
-// verifyVCSToken verifies a VCS token is known.
+// verifyVCSToken verifies a legacy JWT VCS token, which is deprecated in favor of API keys.
 func (t *tharsisIDPTokenAuthenticator) verifyVCSToken(ctx context.Context, output *VerifyTokenOutput) (*VCSWorkspaceLinkCaller, error) {
 	linkID, ok := output.PrivateClaims["link_id"]
 	if !ok {
@@ -261,7 +239,8 @@ func (t *tharsisIDPTokenAuthenticator) verifyVCSToken(ctx context.Context, outpu
 		return nil, errors.New("vcs token has invalid vcs provider link id", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	if link.TokenNonce != output.Token.JwtID() {
+	// A link without a nonce has been reset to an API key, so its old JWT must no longer work.
+	if link.TokenNonce == nil || *link.TokenNonce != output.Token.JwtID() {
 		return nil, errors.New("vcs token has an invalid jti claim", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
@@ -271,7 +250,7 @@ func (t *tharsisIDPTokenAuthenticator) verifyVCSToken(ctx context.Context, outpu
 	}
 
 	if provider == nil {
-		return nil, fmt.Errorf("failed to get vcs provider associated with link %s", link.Metadata.ID)
+		return nil, errors.New("failed to get vcs provider associated with link %s", link.Metadata.ID)
 	}
 
 	return NewVCSWorkspaceLinkCaller(

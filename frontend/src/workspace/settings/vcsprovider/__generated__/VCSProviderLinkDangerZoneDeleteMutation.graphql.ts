@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<28b80bcf8e8cbf190827c739ed020227>>
+ * @generated SignedSource<<4a62c3ac61e23fa876ae6f78782a9d66>>
  * @lightSyntaxTransform
  */
 
@@ -18,10 +18,10 @@ export type DeleteWorkspaceVCSProviderLinkInput = {
 export type ResourceMetadataInput = {
   version: string;
 };
-export type EditVCSProviderLinkDeleteMutation$variables = {
+export type VCSProviderLinkDangerZoneDeleteMutation$variables = {
   input: DeleteWorkspaceVCSProviderLinkInput;
 };
-export type EditVCSProviderLinkDeleteMutation$data = {
+export type VCSProviderLinkDangerZoneDeleteMutation$data = {
   readonly deleteWorkspaceVCSProviderLink: {
     readonly problems: ReadonlyArray<{
       readonly field: ReadonlyArray<string> | null | undefined;
@@ -38,9 +38,9 @@ export type EditVCSProviderLinkDeleteMutation$data = {
     } | null | undefined;
   };
 };
-export type EditVCSProviderLinkDeleteMutation = {
-  response: EditVCSProviderLinkDeleteMutation$data;
-  variables: EditVCSProviderLinkDeleteMutation$variables;
+export type VCSProviderLinkDangerZoneDeleteMutation = {
+  response: VCSProviderLinkDangerZoneDeleteMutation$data;
+  variables: VCSProviderLinkDangerZoneDeleteMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -126,7 +126,7 @@ return {
     "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "EditVCSProviderLinkDeleteMutation",
+    "name": "VCSProviderLinkDangerZoneDeleteMutation",
     "selections": [
       {
         "alias": null,
@@ -160,7 +160,7 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*:: as any*/),
     "kind": "Operation",
-    "name": "EditVCSProviderLinkDeleteMutation",
+    "name": "VCSProviderLinkDangerZoneDeleteMutation",
     "selections": [
       {
         "alias": null,
@@ -190,16 +190,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "7f2973922117b976ee4edc99111cbf77",
+    "cacheID": "44921bf312c622d4263c1e70fbb53048",
     "id": null,
     "metadata": {},
-    "name": "EditVCSProviderLinkDeleteMutation",
+    "name": "VCSProviderLinkDangerZoneDeleteMutation",
     "operationKind": "mutation",
-    "text": "mutation EditVCSProviderLinkDeleteMutation(\n  $input: DeleteWorkspaceVCSProviderLinkInput!\n) {\n  deleteWorkspaceVCSProviderLink(input: $input) {\n    vcsProviderLink {\n      workspace {\n        id\n        workspaceVcsProviderLink {\n          id\n        }\n      }\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
+    "text": "mutation VCSProviderLinkDangerZoneDeleteMutation(\n  $input: DeleteWorkspaceVCSProviderLinkInput!\n) {\n  deleteWorkspaceVCSProviderLink(input: $input) {\n    vcsProviderLink {\n      workspace {\n        id\n        workspaceVcsProviderLink {\n          id\n        }\n      }\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "96e2730b2b426c49a8bca9dd053f7cd6";
+(node as any).hash = "89591479fb176b49489a29d2ecf6b870";
 
 export default node;

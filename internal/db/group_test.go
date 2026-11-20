@@ -1027,7 +1027,7 @@ func TestGroups_MigrateGroup(t *testing.T) {
 		link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
 			WorkspaceID:    workspaces[test.resourcePath].Metadata.ID,
 			ProviderID:     provider.Metadata.ID,
-			TokenNonce:     uuid.New().String(),
+			TokenNonce:     new(uuid.New().String()),
 			RepositoryPath: "test-org/test-repo",
 			Branch:         "main",
 			CreatedBy:      models.Actor{Subject: "db-integration-tests"},

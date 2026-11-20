@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ecfa342fc197c911b84e7e5ff1e6c3bc>>
+ * @generated SignedSource<<0d7216f64e3f07e02546790ada0b44a0>>
  * @lightSyntaxTransform
  */
 
@@ -15,20 +15,22 @@ export type VCSProviderDetailsQuery$variables = {
 };
 export type VCSProviderDetailsQuery$data = {
   readonly node: {
-    readonly autoCreateWebhooks?: boolean;
-    readonly createdByActor?: {
-      readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+    readonly vcsProvider: {
+      readonly autoCreateWebhooks: boolean;
+      readonly createdByActor: {
+        readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
+      } | null | undefined;
+      readonly description: string;
+      readonly id: string;
+      readonly metadata: {
+        readonly createdAt: any;
+        readonly trn: string;
+      };
+      readonly name: string;
+      readonly resourcePath: string;
+      readonly type: VCSProviderType;
+      readonly url: string;
     } | null | undefined;
-    readonly description?: string;
-    readonly id?: string;
-    readonly metadata?: {
-      readonly createdAt: any;
-      readonly trn: string;
-    };
-    readonly name?: string;
-    readonly resourcePath?: string;
-    readonly type?: VCSProviderType;
-    readonly url?: string;
   } | null | undefined;
 };
 export type VCSProviderDetailsQuery = {
@@ -157,35 +159,39 @@ return {
         "plural": false,
         "selections": [
           {
-            "kind": "InlineFragment",
-            "selections": [
-              (v2/*:: as any*/),
-              (v3/*:: as any*/),
-              {
-                "alias": null,
-                "args": null,
-                "concreteType": null,
-                "kind": "LinkedField",
-                "name": "createdByActor",
-                "plural": false,
-                "selections": [
-                  {
-                    "args": null,
-                    "kind": "FragmentSpread",
-                    "name": "ActorDisplayFragment_actor"
-                  }
-                ],
-                "storageKey": null
-              },
-              (v4/*:: as any*/),
-              (v5/*:: as any*/),
-              (v6/*:: as any*/),
-              (v7/*:: as any*/),
-              (v8/*:: as any*/),
-              (v9/*:: as any*/)
-            ],
-            "type": "VCSProvider",
-            "abstractKey": null
+            "fragment": {
+              "kind": "InlineFragment",
+              "selections": [
+                (v2/*:: as any*/),
+                (v3/*:: as any*/),
+                {
+                  "alias": null,
+                  "args": null,
+                  "concreteType": null,
+                  "kind": "LinkedField",
+                  "name": "createdByActor",
+                  "plural": false,
+                  "selections": [
+                    {
+                      "args": null,
+                      "kind": "FragmentSpread",
+                      "name": "ActorDisplayFragment_actor"
+                    }
+                  ],
+                  "storageKey": null
+                },
+                (v4/*:: as any*/),
+                (v5/*:: as any*/),
+                (v6/*:: as any*/),
+                (v7/*:: as any*/),
+                (v8/*:: as any*/),
+                (v9/*:: as any*/)
+              ],
+              "type": "VCSProvider",
+              "abstractKey": null
+            },
+            "kind": "AliasedInlineFragmentSpread",
+            "name": "vcsProvider"
           }
         ],
         "storageKey": null
@@ -308,6 +314,6 @@ return {
 };
 })();
 
-(node as any).hash = "0bd12c19bb6b5dc550ef9ebbcf3cccb7";
+(node as any).hash = "9c87069a2b96c940e879081c4f0b5b88";
 
 export default node;

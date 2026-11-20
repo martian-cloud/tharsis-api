@@ -553,7 +553,6 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
 	})
 	require.NoError(t, err)
-	_ = wsInGroupB
 
 	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
 		Username: "test-user-workspaces",
@@ -566,6 +565,36 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 		WorkspaceID: &createdWorkspaces[0].Metadata.ID,
 	})
 	require.NoError(t, err)
+
+	vcsProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:      "test-provider-workspaces-list",
+		GroupID:   group.Metadata.ID,
+		Type:      models.GitLabProviderType,
+		URL:       url.URL{Scheme: "https", Host: "gitlab.example.com"},
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
+	})
+	require.NoError(t, err)
+
+	unusedVCSProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:      "test-provider-workspaces-list-unused",
+		GroupID:   group.Metadata.ID,
+		Type:      models.GitLabProviderType,
+		URL:       url.URL{Scheme: "https", Host: "gitlab.example.com"},
+		CreatedBy: models.Actor{Subject: "db-integration-tests"},
+	})
+	require.NoError(t, err)
+
+	for _, workspaceID := range []string{createdWorkspaces[0].Metadata.ID, wsInGroupB.Metadata.ID} {
+		_, err = testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+			WorkspaceID:    workspaceID,
+			ProviderID:     vcsProvider.Metadata.ID,
+			TokenNonce:     new(uuid.New().String()),
+			RepositoryPath: "test-org/test-repo",
+			Branch:         "main",
+			CreatedBy:      models.Actor{Subject: "db-integration-tests"},
+		})
+		require.NoError(t, err)
+	}
 
 	type testCase struct {
 		name            string
@@ -684,6 +713,34 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 			input: &GetWorkspacesInput{
 				Filter: &WorkspaceFilter{
 					NamespacePathPrefix: ptr.String("nonexistent-prefix"),
+				},
+			},
+			expectCount: 0,
+		},
+		{
+			name: "filter by linked VCS provider — workspaces across groups",
+			input: &GetWorkspacesInput{
+				Filter: &WorkspaceFilter{
+					LinkedVCSProviderID: &vcsProvider.Metadata.ID,
+				},
+			},
+			expectCount: 2,
+		},
+		{
+			name: "filter by linked VCS provider and root namespace membership",
+			input: &GetWorkspacesInput{
+				Filter: &WorkspaceFilter{
+					LinkedVCSProviderID:      &vcsProvider.Metadata.ID,
+					RootNamespaceMemberships: []models.MembershipNamespace{{Path: group.FullPath}},
+				},
+			},
+			expectCount: 1,
+		},
+		{
+			name: "filter by linked VCS provider — provider without links",
+			input: &GetWorkspacesInput{
+				Filter: &WorkspaceFilter{
+					LinkedVCSProviderID: &unusedVCSProvider.Metadata.ID,
 				},
 			},
 			expectCount: 0,
@@ -1258,7 +1315,7 @@ func TestWorkspaces_MigrateWorkspace(t *testing.T) {
 		link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
 			WorkspaceID:    workspaces[test.workspacePath].Metadata.ID,
 			ProviderID:     provider.Metadata.ID,
-			TokenNonce:     uuid.New().String(),
+			TokenNonce:     new(uuid.New().String()),
 			RepositoryPath: "test-org/test-repo",
 			Branch:         "main",
 			CreatedBy:      models.Actor{Subject: "db-integration-tests"},

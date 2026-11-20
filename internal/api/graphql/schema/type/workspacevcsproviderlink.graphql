@@ -12,6 +12,14 @@ type UpdateWorkspaceVCSProviderLinkPayload {
   problems: [Problem!]!
 }
 
+type ResetWorkspaceVCSProviderLinkWebhookTokenPayload {
+  clientMutationId: String
+  vcsProviderLink: WorkspaceVCSProviderLink
+  webhookToken: String
+  webhookUrl: String
+  problems: [Problem!]!
+}
+
 type DeleteWorkspaceVCSProviderLinkPayload {
   clientMutationId: String
   vcsProviderLink: WorkspaceVCSProviderLink
@@ -38,6 +46,7 @@ type WorkspaceVCSProviderLink implements Node {
   globPatterns: [String!]!
   autoSpeculativePlan: Boolean!
   webhookDisabled: Boolean!
+  usesLegacyWebhookToken: Boolean!
 }
 
 input CreateWorkspaceVCSProviderLinkInput {
@@ -74,6 +83,11 @@ input DeleteWorkspaceVCSProviderLinkInput {
   id: ID!
   force: Boolean
   metadata: ResourceMetadataInput
+}
+
+input ResetWorkspaceVCSProviderLinkWebhookTokenInput {
+  clientMutationId: String
+  id: ID!
 }
 
 input CreateVCSRunInput {

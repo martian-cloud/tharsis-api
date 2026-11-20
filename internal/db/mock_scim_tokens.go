@@ -62,21 +62,21 @@ func (_m *MockSCIMTokens) DeleteToken(ctx context.Context, token *models.SCIMTok
 	return r0
 }
 
-// GetTokenByNonce provides a mock function with given fields: ctx, nonce
-func (_m *MockSCIMTokens) GetTokenByNonce(ctx context.Context, nonce string) (*models.SCIMToken, error) {
-	ret := _m.Called(ctx, nonce)
+// GetTokenByHash provides a mock function with given fields: ctx, tokenHash
+func (_m *MockSCIMTokens) GetTokenByHash(ctx context.Context, tokenHash string) (*models.SCIMToken, error) {
+	ret := _m.Called(ctx, tokenHash)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetTokenByNonce")
+		panic("no return value specified for GetTokenByHash")
 	}
 
 	var r0 *models.SCIMToken
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.SCIMToken, error)); ok {
-		return rf(ctx, nonce)
+		return rf(ctx, tokenHash)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.SCIMToken); ok {
-		r0 = rf(ctx, nonce)
+		r0 = rf(ctx, tokenHash)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.SCIMToken)
@@ -84,7 +84,7 @@ func (_m *MockSCIMTokens) GetTokenByNonce(ctx context.Context, nonce string) (*m
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, nonce)
+		r1 = rf(ctx, tokenHash)
 	} else {
 		r1 = ret.Error(1)
 	}

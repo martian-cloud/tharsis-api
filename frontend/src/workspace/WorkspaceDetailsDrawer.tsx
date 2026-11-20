@@ -5,7 +5,7 @@ import ActivityIcon from '@mui/icons-material/TimelineOutlined';
 import VariablesIcon from '@mui/icons-material/WindowOutlined';
 import { Box, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { AccountLockOutline as ManagedIdentityIcon, ContentDuplicate as ProviderMirrorIcon, DeleteClockOutline as CleanupPolicyIcon, RocketLaunchOutline as RunIcon, ShieldAccountOutline as RoleBindingIcon, ShieldLockOutline as PolicyIcon } from 'mdi-material-ui';
+import { AccountLockOutline as ManagedIdentityIcon, ContentDuplicate as ProviderMirrorIcon, DeleteClockOutline as CleanupPolicyIcon, RocketLaunchOutline as RunIcon, SourceBranch as VCSEventsIcon, ShieldAccountOutline as RoleBindingIcon, ShieldLockOutline as PolicyIcon } from 'mdi-material-ui';
 import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
 import NamespaceAvatar from '../common/NamespaceAvatar';
@@ -14,6 +14,7 @@ interface Props {
     workspacePath: string
     workspaceName: string
     route: string
+    hasVCSProvider: boolean
 }
 
 const DRAWER_WIDTH = 224;
@@ -23,6 +24,7 @@ const NAV_SECTIONS = [
         items: [
             { route: 'activity', label: 'Activity', icon: <ActivityIcon /> },
             { route: 'runs', label: 'Runs', icon: <RunIcon /> },
+            { route: 'vcs_events', label: 'VCS Events', icon: <VCSEventsIcon /> },
             { route: 'variables', label: 'Variables', icon: <VariablesIcon /> },
             { route: 'state_versions', label: 'State Versions', icon: <StateIcon /> },
         ],
@@ -47,7 +49,7 @@ const NAV_SECTIONS = [
 ];
 
 function WorkspaceDetailsDrawer(props: Props) {
-    const { route, workspaceName, workspacePath } = props;
+    const { route, workspaceName, workspacePath, hasVCSProvider } = props;
     const theme = useTheme();
     const fullSize = useMediaQuery(theme.breakpoints.up('md'));
 
@@ -165,7 +167,7 @@ function WorkspaceDetailsDrawer(props: Props) {
                                 {section.label}
                             </ListSubheader>
                         )}
-                        {section.items.map(item => (
+                        {section.items.filter(item => item.route !== 'vcs_events' || hasVCSProvider).map(item => (
                             <ListItemButton
                                 key={item.route}
                                 selected={route === item.route}

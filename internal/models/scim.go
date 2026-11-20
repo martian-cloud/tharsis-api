@@ -1,17 +1,25 @@
 package models
 
 import (
+	"time"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+// minSCIMTokenExpiration is the minimum time a SCIM token with an expiration must remain valid.
+const minSCIMTokenExpiration = 24 * time.Hour
 
 var _ Model = (*SCIMToken)(nil)
 
 // SCIMToken represents a SCIM token.
 type SCIMToken struct {
-	Nonce     string
-	CreatedBy Actor
-	Metadata  ResourceMetadata
+	ExpiresAt    *time.Time // Nil means the token never expires.
+	TokenHash    string
+	IDPIssuerURL string
+	CreatedBy    Actor
+	Metadata     ResourceMetadata
 }
 
 // GetID returns the Metadata ID.
@@ -36,5 +44,17 @@ func (s *SCIMToken) ResolveMetadata(key string) (*string, error) {
 
 // Validate returns an error if the model is not valid
 func (s *SCIMToken) Validate() error {
+	if s.TokenHash == "" {
+		return errors.New("scim token hash is required", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	if s.IDPIssuerURL == "" {
+		return errors.New("scim token idp issuer url is required", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	if s.ExpiresAt != nil && s.ExpiresAt.Before(time.Now().UTC().Add(minSCIMTokenExpiration)) {
+		return errors.New("scim token expiration must be at least 1 day from now", errors.WithErrorCode(errors.EInvalid))
+	}
+
 	return nil
 }

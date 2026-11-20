@@ -1,11 +1,9 @@
 import React, { useState } from 'react'
 import { LoadingButton } from '@mui/lab';
-import { Alert, AlertTitle, Stack, TextField, Typography } from '@mui/material'
+import { Alert, AlertTitle, Stack } from '@mui/material'
 import { useFragment, useMutation } from 'react-relay/hooks'
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import { ForceCancelRunButtonFragment_run$key } from './__generated__/ForceCancelRunButtonFragment_run.graphql'
 import { ForceCancelRunButtonCancelRunMutation } from './__generated__/ForceCancelRunButtonCancelRunMutation.graphql'
@@ -16,7 +14,6 @@ interface Props {
 
 function ForceCancelRunButton(props: Props) {
     const [openDialog, setOpenDialog] = useState(false)
-    const [confirmInput, setConfirmInput] = useState('')
     const { enqueueSnackbar } = useSnackbar();
 
     const data = useFragment<ForceCancelRunButtonFragment_run$key>(
@@ -52,20 +49,17 @@ function ForceCancelRunButton(props: Props) {
                 },
                 onCompleted: data => {
                     setOpenDialog(false)
-                    setConfirmInput('')
                     if (data.cancelRun.problems.length) {
                         enqueueSnackbar(data.cancelRun.problems.map(problem => problem.message).join('; '), { variant: 'warning' });
                     }
                 },
                 onError: error => {
                     setOpenDialog(false)
-                    setConfirmInput('')
                     enqueueSnackbar(`An unexpected error occurred: ${error.message}`, { variant: 'error' });
                 }
             })
         } else {
             setOpenDialog(false)
-            setConfirmInput('')
         }
     }
 
@@ -85,7 +79,7 @@ function ForceCancelRunButton(props: Props) {
                     title="Force Cancel Run"
                     maxWidth="sm"
                     confirmLabel="Force Cancel"
-                    confirmDisabled={data.workspace.fullPath !== confirmInput}
+                    typedConfirmation={{ label: 'Enter the following to confirm force cancelling this run:', value: data.workspace.fullPath }}
                     confirmInProgress={commitForceCancelRunInFlight}
                     onConfirm={() => forceCancelRun(true)}
                     onClose={() => forceCancelRun()}
@@ -94,16 +88,6 @@ function ForceCancelRunButton(props: Props) {
                         <AlertTitle>Warning</AlertTitle>
                         Force cancelling this run may result in a stale workspace state.
                     </Alert>
-                    <Typography variant="subtitle2">Enter the following to confirm force cancelling this run:</Typography>
-                    <SyntaxHighlighter style={prismTheme} customStyle={{ fontSize: 14, marginBottom: 14 }}>{data.workspace.fullPath}</SyntaxHighlighter>
-                    <TextField
-                        autoComplete="off"
-                        fullWidth
-                        size="small"
-                        placeholder={data.workspace.fullPath}
-                        value={confirmInput}
-                        onChange={(e) => setConfirmInput(e.target.value)}
-                    />
                 </ConfirmationDialog>
             )}
         </Stack>

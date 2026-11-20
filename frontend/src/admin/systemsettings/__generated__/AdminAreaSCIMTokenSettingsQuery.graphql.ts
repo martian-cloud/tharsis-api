@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<03ce73e5d554d00d1a96a0988118c32f>>
+ * @generated SignedSource<<fe9eba3e7877aebfaefd428b24ac1539>>
  * @lightSyntaxTransform
  */
 
@@ -15,11 +15,13 @@ export type AdminAreaSCIMTokenSettingsQuery$data = {
     readonly oauthProviders: ReadonlyArray<{
       readonly issuerUrl: string;
     }>;
+    readonly scimTokenMaxExpirationDays: number;
   };
   readonly scimToken: {
     readonly createdByActor: {
       readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
     } | null | undefined;
+    readonly expiresAt: any | null | undefined;
     readonly metadata: {
       readonly createdAt: any;
     };
@@ -32,6 +34,13 @@ export type AdminAreaSCIMTokenSettingsQuery = {
 
 const node: ConcreteRequest = (function(){
 var v0 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "expiresAt",
+  "storageKey": null
+},
+v1 = {
   "alias": null,
   "args": null,
   "concreteType": "ResourceMetadata",
@@ -49,7 +58,7 @@ var v0 = {
   ],
   "storageKey": null
 },
-v1 = {
+v2 = {
   "alias": null,
   "args": null,
   "concreteType": "Config",
@@ -57,6 +66,13 @@ v1 = {
   "name": "config",
   "plural": false,
   "selections": [
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "scimTokenMaxExpirationDays",
+      "storageKey": null
+    },
     {
       "alias": null,
       "args": null,
@@ -78,14 +94,14 @@ v1 = {
   ],
   "storageKey": null
 },
-v2 = {
+v3 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "id",
   "storageKey": null
 },
-v3 = [
+v4 = [
   {
     "alias": null,
     "args": null,
@@ -125,11 +141,12 @@ return {
             ],
             "storageKey": null
           },
-          (v0/*:: as any*/)
+          (v0/*:: as any*/),
+          (v1/*:: as any*/)
         ],
         "storageKey": null
       },
-      (v1/*:: as any*/)
+      (v2/*:: as any*/)
     ],
     "type": "Query",
     "abstractKey": null
@@ -199,7 +216,7 @@ return {
                         "name": "email",
                         "storageKey": null
                       },
-                      (v2/*:: as any*/)
+                      (v3/*:: as any*/)
                     ],
                     "storageKey": null
                   }
@@ -209,19 +226,19 @@ return {
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v3/*:: as any*/),
+                "selections": (v4/*:: as any*/),
                 "type": "ServiceAccountActor",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v3/*:: as any*/),
+                "selections": (v4/*:: as any*/),
                 "type": "VCSProviderActor",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v3/*:: as any*/),
+                "selections": (v4/*:: as any*/),
                 "type": "JobActor",
                 "abstractKey": null
               }
@@ -229,24 +246,25 @@ return {
             "storageKey": null
           },
           (v0/*:: as any*/),
-          (v2/*:: as any*/)
+          (v1/*:: as any*/),
+          (v3/*:: as any*/)
         ],
         "storageKey": null
       },
-      (v1/*:: as any*/)
+      (v2/*:: as any*/)
     ]
   },
   "params": {
-    "cacheID": "c4cb8d091aee1256414f0f64de57c314",
+    "cacheID": "676e286008f54096a5e692966fa3dfd6",
     "id": null,
     "metadata": {},
     "name": "AdminAreaSCIMTokenSettingsQuery",
     "operationKind": "query",
-    "text": "query AdminAreaSCIMTokenSettingsQuery {\n  scimToken {\n    createdByActor {\n      __typename\n      ...ActorDisplayFragment_actor\n    }\n    metadata {\n      createdAt\n    }\n    id\n  }\n  config {\n    oauthProviders {\n      issuerUrl\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n"
+    "text": "query AdminAreaSCIMTokenSettingsQuery {\n  scimToken {\n    createdByActor {\n      __typename\n      ...ActorDisplayFragment_actor\n    }\n    expiresAt\n    metadata {\n      createdAt\n    }\n    id\n  }\n  config {\n    scimTokenMaxExpirationDays\n    oauthProviders {\n      issuerUrl\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "c9e9b6b7fb020b448a626322b4222dfa";
+(node as any).hash = "3965545deab5e566f6c33614a4ca9ff3";
 
 export default node;

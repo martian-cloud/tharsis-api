@@ -58,6 +58,10 @@ type gitLabWebhookRequest struct {
 		SourceBranch string `json:"source_branch"`
 		// Allows filtering merge requests based on action.
 		Action string `json:"action"`
+		// Web URL of the merge request.
+		URL string `json:"url"`
+		// Project-scoped merge request number.
+		IID int `json:"iid"`
 
 		// Used only for merge requests.
 		LastCommit struct {
@@ -66,9 +70,15 @@ type gitLabWebhookRequest struct {
 		} `json:"last_commit"`
 	} `json:"object_attributes"`
 
-	Before string `json:"before"` // Commit SHA before push event.
-	After  string `json:"after"`  // Commit SHA after push event.
-	Ref    string `json:"ref"`    // Tag or branch name.
+	// Used only for merge requests.
+	User struct {
+		Username string `json:"username"`
+	} `json:"user"`
+
+	UserUsername string `json:"user_username"` // User who pushed, for push and tag events.
+	Before       string `json:"before"`        // Commit SHA before push event.
+	After        string `json:"after"`         // Commit SHA after push event.
+	Ref          string `json:"ref"`           // Tag or branch name.
 }
 
 // gitHubWebhookRequest represents a GitHub webhook request.
@@ -89,7 +99,15 @@ type gitHubWebhookRequest struct {
 		Base struct {
 			TargetBranch string `json:"ref"`
 		} `json:"base"`
+
+		HTMLURL string `json:"html_url"`
+		Number  int    `json:"number"`
 	} `json:"pull_request"`
+
+	// User who triggered the event.
+	Sender struct {
+		Login string `json:"login"`
+	} `json:"sender"`
 
 	Before string `json:"before"` // Commit SHA before push event.
 	After  string `json:"after"`  // Commit SHA after push event.
@@ -203,16 +221,24 @@ func (c *vcsController) gitLabHandler(r *http.Request) error {
 		return err
 	}
 
+	sender := req.UserUsername
+	if sender == "" {
+		sender = req.User.Username
+	}
+
 	return c.vcsService.ProcessWebhookEvent(r.Context(), &vcs.ProcessWebhookEventInput{
-		Action:           req.ObjectAttributes.Action,
-		HeadCommitID:     req.ObjectAttributes.LastCommit.ID,
-		EventHeader:      r.Header.Get(gitLabEventHeader),
-		SourceRepository: req.ObjectAttributes.Source.PathWithNamespace,
-		SourceBranch:     req.ObjectAttributes.SourceBranch,
-		TargetBranch:     req.ObjectAttributes.TargetBranch,
-		Before:           req.Before,
-		After:            req.After,
-		Ref:              req.Ref,
+		Action:             req.ObjectAttributes.Action,
+		HeadCommitID:       req.ObjectAttributes.LastCommit.ID,
+		EventHeader:        r.Header.Get(gitLabEventHeader),
+		SourceRepository:   req.ObjectAttributes.Source.PathWithNamespace,
+		SourceBranch:       req.ObjectAttributes.SourceBranch,
+		TargetBranch:       req.ObjectAttributes.TargetBranch,
+		MergeRequestURL:    req.ObjectAttributes.URL,
+		MergeRequestNumber: req.ObjectAttributes.IID,
+		Sender:             sender,
+		Before:             req.Before,
+		After:              req.After,
+		Ref:                req.Ref,
 	})
 }
 
@@ -223,15 +249,18 @@ func (c *vcsController) gitHubHandler(r *http.Request) error {
 	}
 
 	return c.vcsService.ProcessWebhookEvent(r.Context(), &vcs.ProcessWebhookEventInput{
-		Action:           req.Action,
-		HeadCommitID:     req.PullRequest.Head.CommitSHA,
-		EventHeader:      r.Header.Get(gitHubEventHeader),
-		SourceRepository: req.PullRequest.Head.Repo.SourceRepository,
-		SourceBranch:     req.PullRequest.Head.SourceBranch,
-		TargetBranch:     req.PullRequest.Base.TargetBranch,
-		Before:           req.Before,
-		After:            req.After,
-		Ref:              req.Ref,
+		Action:             req.Action,
+		HeadCommitID:       req.PullRequest.Head.CommitSHA,
+		EventHeader:        r.Header.Get(gitHubEventHeader),
+		SourceRepository:   req.PullRequest.Head.Repo.SourceRepository,
+		SourceBranch:       req.PullRequest.Head.SourceBranch,
+		TargetBranch:       req.PullRequest.Base.TargetBranch,
+		MergeRequestURL:    req.PullRequest.HTMLURL,
+		MergeRequestNumber: req.PullRequest.Number,
+		Sender:             req.Sender.Login,
+		Before:             req.Before,
+		After:              req.After,
+		Ref:                req.Ref,
 	})
 }
 
