@@ -620,7 +620,6 @@ api_security:
     KUBERNETES_SERVICE_CPU_LIMIT: "500m"
     KUBERNETES_SERVICE_MEMORY_REQUEST: "500Mi"
     KUBERNETES_SERVICE_MEMORY_LIMIT: "1Gi"
-    JAVA_OPTS_APPEND: "-Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
   needs:
     - build_aio_container_image
   before_script:
@@ -677,7 +676,6 @@ apifuzzer_fuzz:
     KUBERNETES_SERVICE_CPU_LIMIT: "500m"
     KUBERNETES_SERVICE_MEMORY_REQUEST: "500Mi"
     KUBERNETES_SERVICE_MEMORY_LIMIT: "1Gi"
-    JAVA_OPTS_APPEND: "-Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
   needs:
     - build_aio_container_image
   before_script:
@@ -710,7 +708,6 @@ dast:
     KUBERNETES_SERVICE_CPU_LIMIT: "500m"
     KUBERNETES_SERVICE_MEMORY_REQUEST: "500Mi"
     KUBERNETES_SERVICE_MEMORY_LIMIT: "1Gi"
-    JAVA_OPTS_APPEND: "-Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
   before_script:
     - |
       timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || false
