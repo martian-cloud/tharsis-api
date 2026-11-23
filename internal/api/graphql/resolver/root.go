@@ -1414,6 +1414,20 @@ func (r RootResolver) DeleteWorkspaceVCSProviderLink(ctx context.Context,
 	return response, nil
 }
 
+// ResetWorkspaceVCSProviderLinkWebhookToken resets the webhook token of a vcs provider link
+func (r RootResolver) ResetWorkspaceVCSProviderLinkWebhookToken(ctx context.Context,
+	args *struct {
+		Input ResetWorkspaceVCSProviderLinkWebhookTokenInput
+	},
+) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
+	response, err := resetWorkspaceVCSProviderLinkWebhookTokenMutation(ctx, &args.Input)
+	if err != nil {
+		return handleWorkspaceVCSProviderLinkMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 // CreateVCSRun creates a vcs run
 func (r RootResolver) CreateVCSRun(ctx context.Context,
 	args *struct {

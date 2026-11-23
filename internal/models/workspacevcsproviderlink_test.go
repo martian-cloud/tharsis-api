@@ -25,7 +25,7 @@ func TestWorkspaceVCSProviderLink_ValidateModuleDirectory(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.moduleDirectory, func(t *testing.T) {
-			link := &WorkspaceVCSProviderLink{RepositoryPath: "owner/repo", ModuleDirectory: ptr.String(test.moduleDirectory)}
+			link := &WorkspaceVCSProviderLink{TokenHash: new("hash"), RepositoryPath: "owner/repo", ModuleDirectory: ptr.String(test.moduleDirectory)}
 			err := link.Validate()
 			if test.valid {
 				assert.NoError(t, err)
@@ -65,7 +65,7 @@ func TestWorkspaceVCSProviderLink_ValidateRepositoryPath(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.repositoryPath, func(t *testing.T) {
-			link := &WorkspaceVCSProviderLink{RepositoryPath: test.repositoryPath}
+			link := &WorkspaceVCSProviderLink{TokenHash: new("hash"), RepositoryPath: test.repositoryPath}
 			err := link.Validate()
 			if test.valid {
 				assert.NoError(t, err)
@@ -94,7 +94,7 @@ func TestWorkspaceVCSProviderLink_ValidateGlobPatterns(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.pattern, func(t *testing.T) {
-			link := &WorkspaceVCSProviderLink{RepositoryPath: "owner/repo", GlobPatterns: []string{test.pattern}}
+			link := &WorkspaceVCSProviderLink{TokenHash: new("hash"), RepositoryPath: "owner/repo", GlobPatterns: []string{test.pattern}}
 			err := link.Validate()
 			if test.valid {
 				assert.NoError(t, err)
@@ -130,6 +130,73 @@ func TestNormalizeRepositoryPath(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
+
+func TestWorkspaceVCSProviderLink_ValidateToken(t *testing.T) {
+	tests := []struct {
+		name  string
+		nonce *string
+		hash  *string
+		valid bool
+	}{
+		{
+			name:  "nonce only",
+			nonce: new("nonce"),
+			valid: true,
+		},
+		{
+			name:  "hash only",
+			hash:  new("hash"),
+			valid: true,
+		},
+		{
+			name: "neither",
+		},
+		{
+			name:  "both",
+			nonce: new("nonce"),
+			hash:  new("hash"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			link := &WorkspaceVCSProviderLink{TokenNonce: test.nonce, TokenHash: test.hash, RepositoryPath: "owner/repo"}
+			err := link.Validate()
+			if test.valid {
+				assert.NoError(t, err)
+				return
+			}
+
+			assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
+		})
+	}
+}
+
+func TestWorkspaceVCSProviderLink_UsesLegacyWebhookToken(t *testing.T) {
+	tests := []struct {
+		name   string
+		nonce  *string
+		hash   *string
+		expect bool
+	}{
+		{
+			name:   "nonce only",
+			nonce:  new("nonce"),
+			expect: true,
+		},
+		{
+			name: "hash only",
+			hash: new("hash"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			link := &WorkspaceVCSProviderLink{TokenNonce: test.nonce, TokenHash: test.hash}
+			assert.Equal(t, test.expect, link.UsesLegacyWebhookToken())
 		})
 	}
 }

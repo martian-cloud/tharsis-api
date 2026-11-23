@@ -17,7 +17,7 @@ import (
 
 // SCIMTokens encapsulates the logic to access SCIM tokens from the database
 type SCIMTokens interface {
-	GetTokenByNonce(ctx context.Context, nonce string) (*models.SCIMToken, error)
+	GetTokenByHash(ctx context.Context, tokenHash string) (*models.SCIMToken, error)
 	GetTokens(ctx context.Context) ([]models.SCIMToken, error)
 	CreateToken(ctx context.Context, token *models.SCIMToken) (*models.SCIMToken, error)
 	DeleteToken(ctx context.Context, token *models.SCIMToken) error
@@ -27,19 +27,19 @@ type scimTokens struct {
 	dbClient *Client
 }
 
-var scimTokensFieldList = append(metadataAndCreatedByFieldList, "nonce")
+var scimTokensFieldList = append(metadataAndCreatedByFieldList, "token_hash", "idp_issuer_url", "expires_at")
 
 // NewSCIMTokens returns an instance of the SCIMTokens interface.
 func NewSCIMTokens(dbClient *Client) SCIMTokens {
 	return &scimTokens{dbClient: dbClient}
 }
 
-func (s *scimTokens) GetTokenByNonce(ctx context.Context, nonce string) (*models.SCIMToken, error) {
-	ctx, span := tracer.Start(ctx, "db.GetTokenByNonce")
+func (s *scimTokens) GetTokenByHash(ctx context.Context, tokenHash string) (*models.SCIMToken, error) {
+	ctx, span := tracer.Start(ctx, "db.GetTokenByHash")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	return s.getToken(ctx, goqu.Ex{"scim_tokens.nonce": nonce})
+	return s.getToken(ctx, goqu.Ex{"scim_tokens.token_hash": tokenHash})
 }
 
 func (s *scimTokens) GetTokens(ctx context.Context) ([]models.SCIMToken, error) {
@@ -97,7 +97,9 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 			"created_by_actor_type": createdByActorType,
 			"created_by_actor_id":   createdByActorID,
 			"created_by_actor_trn":  createdByActorTRN,
-			"nonce":                 token.Nonce,
+			"token_hash":            token.TokenHash,
+			"idp_issuer_url":        token.IDPIssuerURL,
+			"expires_at":            token.ExpiresAt,
 		}).
 		Returning(scimTokensFieldList...))
 	if err != nil {
@@ -192,7 +194,9 @@ func scanSCIMToken(row scanner) (*models.SCIMToken, error) {
 		&createdByActorType,
 		&createdByActorID,
 		&createdByActorTRN,
-		&token.Nonce,
+		&token.TokenHash,
+		&token.IDPIssuerURL,
+		&token.ExpiresAt,
 	}
 
 	err := row.Scan(fields...)

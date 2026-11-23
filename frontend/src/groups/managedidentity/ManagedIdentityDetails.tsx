@@ -16,6 +16,7 @@ import { useAgentCopilot } from '../../ai/AgentCopilotProvider';
 import { parseBase64Json } from '../../common/base64';
 import config from '../../common/config';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
+import { ManagedIdentityIcon } from '../../common/Icons';
 import TRNButton from '../../common/TRNButton';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import { ManagedIdentityDetailsDeleteAliasMutation } from './__generated__/ManagedIdentityDetailsDeleteAliasMutation.graphql';
@@ -291,19 +292,16 @@ function ManagedIdentityDetails(props: Props) {
                     ]}
                 />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, marginBottom: 2 }}>
-                    <Box sx={{ minWidth: 0 }}>
-                        <Box
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                flexWrap: "wrap"
-                            }}>
-                            <Typography variant="h5" sx={{ marginRight: 1, wordBreak: 'break-word' }}>{data.managedIdentity.name}</Typography>
-                            <ManagedIdentityTypeChip mr={1} type={data.managedIdentity.type} />
-                            {data.managedIdentity.isAlias && <Chip label="alias" color="secondary" size="small" />}
-
+                    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                        <ManagedIdentityIcon sx={{ flexShrink: 0 }} />
+                        <Box sx={{ marginLeft: 1, minWidth: 0 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <Typography variant="h5" sx={{ marginRight: 1, wordBreak: 'break-word' }}>{data.managedIdentity.name}</Typography>
+                                <ManagedIdentityTypeChip mr={1} type={data.managedIdentity.type} />
+                                {data.managedIdentity.isAlias && <Chip label="alias" color="secondary" size="small" />}
+                            </Box>
+                            <Typography color="textSecondary">{data.managedIdentity.description}</Typography>
                         </Box>
-                        <Typography color="textSecondary">{data.managedIdentity.description}</Typography>
                     </Box>
                     {!data.managedIdentity.isAlias && <Box sx={{ flexShrink: 0 }}>
                         <Stack direction="row" spacing={1}>

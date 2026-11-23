@@ -200,6 +200,11 @@ func (r *ConfigResolver) DisableSensitiveVariableFeature() bool {
 	return r.cfg.DisableSensitiveVariableFeature
 }
 
+// SCIMTokenMaxExpirationDays resolver
+func (r *ConfigResolver) SCIMTokenMaxExpirationDays() int32 {
+	return int32(r.cfg.SCIMTokenMaxExpirationDays)
+}
+
 // ServiceAccountClientSecretMaxExpirationDays resolver
 func (r *ConfigResolver) ServiceAccountClientSecretMaxExpirationDays() int32 {
 	return int32(r.cfg.ServiceAccountClientSecretMaxExpirationDays)

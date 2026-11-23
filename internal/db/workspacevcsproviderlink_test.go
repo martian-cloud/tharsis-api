@@ -87,7 +87,7 @@ func TestWorkspaceVCSProviderLinks_CreateLink(t *testing.T) {
 			link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
 				WorkspaceID:         test.workspaceID,
 				ProviderID:          test.providerID,
-				TokenNonce:          uuid.New().String(),
+				TokenNonce:          new(uuid.New().String()),
 				RepositoryPath:      test.repositoryPath,
 				Branch:              test.branch,
 				CreatedBy:           models.Actor{Subject: "db-integration-tests"},
@@ -145,7 +145,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByID(t *testing.T) {
 	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
 		WorkspaceID:    workspace.Metadata.ID,
 		ProviderID:     vcsProvider.Metadata.ID,
-		TokenNonce:     uuid.New().String(),
+		TokenNonce:     new(uuid.New().String()),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
 		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
@@ -230,7 +230,7 @@ func TestWorkspaceVCSProviderLinks_GetLinksByProviderID(t *testing.T) {
 	_, err = testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
 		WorkspaceID:    workspace.Metadata.ID,
 		ProviderID:     vcsProvider.Metadata.ID,
-		TokenNonce:     uuid.New().String(),
+		TokenNonce:     new(uuid.New().String()),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
 		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
@@ -301,7 +301,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByTRN(t *testing.T) {
 	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
 		WorkspaceID:    workspace.Metadata.ID,
 		ProviderID:     vcsProvider.Metadata.ID,
-		TokenNonce:     uuid.New().String(),
+		TokenNonce:     new(uuid.New().String()),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
 		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
@@ -360,7 +360,7 @@ func TestWorkspaceVCSProviderLinks_GetLinkByWorkspaceID(t *testing.T) {
 	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
 		WorkspaceID:    workspace.Metadata.ID,
 		ProviderID:     vcsProvider.Metadata.ID,
-		TokenNonce:     uuid.New().String(),
+		TokenNonce:     new(uuid.New().String()),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
 		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
@@ -441,7 +441,7 @@ func TestWorkspaceVCSProviderLinks_UpdateLink(t *testing.T) {
 	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
 		WorkspaceID:    workspace.Metadata.ID,
 		ProviderID:     vcsProvider.Metadata.ID,
-		TokenNonce:     uuid.New().String(),
+		TokenNonce:     new(uuid.New().String()),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
 		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
@@ -476,7 +476,9 @@ func TestWorkspaceVCSProviderLinks_UpdateLink(t *testing.T) {
 					ID:      link.Metadata.ID,
 					Version: test.version,
 				},
-				Branch: test.branch,
+				TokenNonce: link.TokenNonce,
+				TokenHash:  link.TokenHash,
+				Branch:     test.branch,
 			})
 
 			if test.expectErrorCode != "" {
@@ -526,7 +528,7 @@ func TestWorkspaceVCSProviderLinks_DeleteLink(t *testing.T) {
 	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
 		WorkspaceID:    workspace.Metadata.ID,
 		ProviderID:     vcsProvider.Metadata.ID,
-		TokenNonce:     uuid.New().String(),
+		TokenNonce:     new(uuid.New().String()),
 		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
 		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
@@ -571,4 +573,67 @@ func TestWorkspaceVCSProviderLinks_DeleteLink(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestWorkspaceVCSProviderLinks_GetLinkByTokenHash(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-link-token-hash",
+		Description: "test group for link token hash",
+		FullPath:    "test-group-link-token-hash",
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-link-token-hash",
+		Description:    "test workspace for link token hash",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	vcsProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:        "test-vcs-provider-link-token-hash",
+		Description: "test vcs provider for link token hash",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   models.Actor{Subject: "db-integration-tests"},
+		Type:        models.GitLabProviderType,
+		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
+	})
+	require.NoError(t, err)
+
+	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+		WorkspaceID:    workspace.Metadata.ID,
+		ProviderID:     vcsProvider.Metadata.ID,
+		TokenHash:      new("test-token-hash"),
+		RepositoryPath: "test-org/test-repo",
+		Branch:         "main",
+		CreatedBy:      models.Actor{Subject: "db-integration-tests"},
+	})
+	require.NoError(t, err)
+	assert.Nil(t, link.TokenNonce)
+
+	found, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByTokenHash(ctx, "test-token-hash")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, link.Metadata.ID, found.Metadata.ID)
+
+	// Resetting to a new hash replaces the old one.
+	found.TokenHash = new("new-token-hash")
+	updated, err := testClient.client.WorkspaceVCSProviderLinks.UpdateLink(ctx, found)
+	require.NoError(t, err)
+	assert.Equal(t, "new-token-hash", *updated.TokenHash)
+
+	old, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByTokenHash(ctx, "test-token-hash")
+	require.NoError(t, err)
+	assert.Nil(t, old)
+
+	missing, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByTokenHash(ctx, "missing")
+	require.NoError(t, err)
+	assert.Nil(t, missing)
 }

@@ -4,14 +4,11 @@ import {
     AlertTitle,
     Box,
     Button,
-    TextField,
     Typography
 } from '@mui/material'
 import { useFragment, useMutation } from 'react-relay';
 import { useSnackbar } from 'notistack';
 import { useNavigate } from 'react-router-dom';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import graphql from 'babel-plugin-relay/macro';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import SettingsSection from '../../common/SettingsSection';
@@ -26,7 +23,6 @@ interface Props {
 function WorkspaceAdvancedSettings({ fragmentRef }: Props) {
     const [showDeleteConfirmationDialog, setShowDeleteConfirmationDialog] = useState<boolean>(false);
     const [showMigrateWorkspaceDialog, setShowMigrateWorkspaceDialog] = useState<boolean>(false);
-    const [confirmInput, setConfirmInput] = useState('');
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
 
@@ -72,20 +68,17 @@ function WorkspaceAdvancedSettings({ fragmentRef }: Props) {
                 },
                 onCompleted: deleteData => {
                     setShowDeleteConfirmationDialog(false);
-                    setConfirmInput('');
                     if (deleteData.deleteWorkspace.problems.length) {
                         enqueueSnackbar(deleteData.deleteWorkspace.problems.map(problem => problem.message).join('; '), { variant: 'warning' });
                     } else navigate(`../${data.fullPath.slice(0, -data.name.length - 1)}`);
                 },
                 onError: error => {
                     setShowDeleteConfirmationDialog(false);
-                    setConfirmInput('');
                     enqueueSnackbar(`An unexpected error occurred: ${error.message}`, { variant: 'error' });
                 }
             });
         } else {
             setShowDeleteConfirmationDialog(false);
-            setConfirmInput('');
         }
     };
 
@@ -118,7 +111,7 @@ function WorkspaceAdvancedSettings({ fragmentRef }: Props) {
                     title="Delete Workspace"
                     maxWidth="sm"
                     confirmLabel="Delete"
-                    confirmDisabled={data.fullPath !== confirmInput}
+                    typedConfirmation={{ label: 'Enter the following to confirm deletion:', value: data.fullPath }}
                     confirmInProgress={commitDeleteInFlight}
                     onConfirm={() => onDeleteConfirmationDialogClosed(true)}
                     onClose={() => onDeleteConfirmationDialogClosed()}
@@ -127,16 +120,6 @@ function WorkspaceAdvancedSettings({ fragmentRef }: Props) {
                         <AlertTitle>Warning</AlertTitle>
                         Deleting a workspace is an <strong><ins>irreversible</ins></strong> operation. All state files, resources, and data associated with this workspace will be deleted and <strong><ins>cannot be recovered</ins></strong>.
                     </Alert>
-                    <Typography variant="subtitle2">Enter the following to confirm deletion:</Typography>
-                    <SyntaxHighlighter style={prismTheme} customStyle={{ fontSize: 14, marginBottom: 14 }}>{data.fullPath}</SyntaxHighlighter>
-                    <TextField
-                        autoComplete="off"
-                        fullWidth
-                        size="small"
-                        placeholder={data.fullPath}
-                        value={confirmInput}
-                        onChange={(e) => setConfirmInput(e.target.value)}
-                    />
                 </ConfirmationDialog>
             )}
         </Box>

@@ -444,7 +444,7 @@ func TestRun_Validate_Annotations(t *testing.T) {
 	// A value that would have breached the old 256-byte per-field cap but is fine within the total
 	// budget, and one large enough to breach the budget on its own.
 	valueOverOldPerFieldCap := strings.Repeat("a", 300)
-	valueOverTotalBudget := strings.Repeat("a", maxRunAnnotationsSize+1)
+	valueOverTotalBudget := strings.Repeat("a", MaxRunAnnotationsSize+1)
 
 	longLink := "https://example.com/" + strings.Repeat("a", 256)
 

@@ -3,29 +3,32 @@ import { AdapterMoment } from '@mui/x-date-pickers/AdapterMoment';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import moment, { Moment } from 'moment';
-import Timestamp from '../../common/Timestamp';
+import Timestamp from './Timestamp';
 
 const MIN_EXPIRATION_DAYS = 1;
 
 interface Props {
     value: Moment | null;
     onChange: (value: Moment | null) => void;
-    maxExpirationDays: number;
+    // Undefined or 0 means there is no maximum.
+    maxExpirationDays?: number;
     disabled?: boolean;
     label?: string;
     width?: number | string;
+    // Replaces the caption shown while no expiration is selected.
+    emptyCaption?: string;
 }
 
-export function isExpirationInvalid(value: Moment | null | undefined, maxExpirationDays: number): boolean {
+export function isExpirationInvalid(value: Moment | null | undefined, maxExpirationDays?: number): boolean {
     if (!value?.isValid()) return false; // null is valid (uses default)
     // Use 'hours' rather than 'days' so the bounds are a fixed elapsed duration, not local
     // wall-clock arithmetic that can drift by an hour across a DST transition.
     const min = moment().add(MIN_EXPIRATION_DAYS * 24, 'hours');
-    const max = moment().add(maxExpirationDays * 24, 'hours');
-    return value.isBefore(min) || value.isAfter(max);
+    if (value.isBefore(min)) return true;
+    return !!maxExpirationDays && value.isAfter(moment().add(maxExpirationDays * 24, 'hours'));
 }
 
-function ExpirationDateTimePicker({ value, onChange, maxExpirationDays, disabled, label = 'Secret Expiration', width = 300 }: Props) {
+function ExpirationDateTimePicker({ value, onChange, maxExpirationDays, disabled, label = 'Secret Expiration', width = 300, emptyCaption }: Props) {
     return (
         <Box>
             <LocalizationProvider dateAdapter={AdapterMoment}>
@@ -37,23 +40,17 @@ function ExpirationDateTimePicker({ value, onChange, maxExpirationDays, disabled
                         actionBar: { actions: ['clear', 'accept'] },
                     }}
                     minDateTime={moment().add(MIN_EXPIRATION_DAYS * 24, 'hours')}
-                    maxDateTime={moment().add(maxExpirationDays * 24, 'hours')}
+                    maxDateTime={maxExpirationDays ? moment().add(maxExpirationDays * 24, 'hours') : undefined}
                     value={value}
                     onChange={onChange}
                     disabled={disabled}
                     closeOnSelect={false}
                 />
             </LocalizationProvider>
-            <Typography
-                variant="caption"
-                color="textSecondary"
-                sx={{
-                    display: "block",
-                    mt: 0.5
-                }}>
+            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
                 {value?.isValid()
                     ? <>Secret will expire <Timestamp timestamp={value.toISOString()} /></>
-                    : `Min: ${MIN_EXPIRATION_DAYS} day, max and default: ${maxExpirationDays} days`}
+                    : emptyCaption ?? `Min: ${MIN_EXPIRATION_DAYS} day, max and default: ${maxExpirationDays} days`}
             </Typography>
         </Box>
     );

@@ -694,13 +694,13 @@ func (n *RunTaskStage) ShallowCompare(other RunNode) bool {
 // differs — Phobos caps each field individually, whereas a run's annotations share one budget.
 const (
 	maxRunAnnotations = 10
-	// maxRunAnnotationsSize bounds the annotations as they are actually stored: the marshalled JSON
+	// MaxRunAnnotationsSize bounds the annotations as they are actually stored: the marshalled JSON
 	// written to the run's JSONB column. A single total is enforced rather than per-field caps so
 	// callers can spend the allowance as they need — a few long values, or many short ones.
 	//
 	// 1024 bytes keeps the whole run row comfortably under 2KB, which avoids Postgres moving
 	// oversized values out to a TOAST table and costing an extra lookup on every read.
-	maxRunAnnotationsSize = 1024
+	MaxRunAnnotationsSize = 1024
 )
 
 // RunAnnotation is an immutable key/value pair (with an optional link) attached to a run at creation
@@ -781,7 +781,7 @@ func (r *Run) Validate() error {
 
 // validateAnnotations enforces the run annotation rules: at most maxRunAnnotations entries; each key
 // and value non-empty; each key a valid name; and the annotations as a whole no larger than
-// maxRunAnnotationsSize once marshalled. Duplicate keys are allowed. The optional link's content is
+// MaxRunAnnotationsSize once marshalled. Duplicate keys are allowed. The optional link's content is
 // not validated by design, matching Phobos — link safety is enforced at render time by the client
 // (the UI only makes http(s) links clickable), so any non-UI consumer must treat the link as
 // untrusted — but it counts towards the size budget.
@@ -810,9 +810,9 @@ func (r *Run) validateAnnotations() error {
 		if err != nil {
 			return errors.Wrap(err, "failed to measure annotations", errors.WithErrorCode(errors.EInvalid))
 		}
-		if len(marshalled) > maxRunAnnotationsSize {
+		if len(marshalled) > MaxRunAnnotationsSize {
 			return errors.New("annotations cannot be larger than %d bytes in total, got %d",
-				maxRunAnnotationsSize, len(marshalled), errors.WithErrorCode(errors.EInvalid))
+				MaxRunAnnotationsSize, len(marshalled), errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 

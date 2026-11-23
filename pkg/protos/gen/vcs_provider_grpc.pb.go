@@ -20,17 +20,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	VCSProviders_GetVCSProviderByID_FullMethodName              = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/GetVCSProviderByID"
-	VCSProviders_GetVCSProviders_FullMethodName                 = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/GetVCSProviders"
-	VCSProviders_CreateVCSProvider_FullMethodName               = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/CreateVCSProvider"
-	VCSProviders_UpdateVCSProvider_FullMethodName               = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/UpdateVCSProvider"
-	VCSProviders_DeleteVCSProvider_FullMethodName               = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/DeleteVCSProvider"
-	VCSProviders_ResetVCSProviderOAuthToken_FullMethodName      = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/ResetVCSProviderOAuthToken"
-	VCSProviders_GetWorkspaceVCSProviderLinkByID_FullMethodName = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/GetWorkspaceVCSProviderLinkByID"
-	VCSProviders_CreateWorkspaceVCSProviderLink_FullMethodName  = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/CreateWorkspaceVCSProviderLink"
-	VCSProviders_UpdateWorkspaceVCSProviderLink_FullMethodName  = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/UpdateWorkspaceVCSProviderLink"
-	VCSProviders_DeleteWorkspaceVCSProviderLink_FullMethodName  = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/DeleteWorkspaceVCSProviderLink"
-	VCSProviders_CreateVCSRun_FullMethodName                    = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/CreateVCSRun"
+	VCSProviders_GetVCSProviderByID_FullMethodName                        = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/GetVCSProviderByID"
+	VCSProviders_GetVCSProviders_FullMethodName                           = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/GetVCSProviders"
+	VCSProviders_CreateVCSProvider_FullMethodName                         = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/CreateVCSProvider"
+	VCSProviders_UpdateVCSProvider_FullMethodName                         = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/UpdateVCSProvider"
+	VCSProviders_DeleteVCSProvider_FullMethodName                         = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/DeleteVCSProvider"
+	VCSProviders_ResetVCSProviderOAuthToken_FullMethodName                = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/ResetVCSProviderOAuthToken"
+	VCSProviders_GetWorkspaceVCSProviderLinkByID_FullMethodName           = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/GetWorkspaceVCSProviderLinkByID"
+	VCSProviders_CreateWorkspaceVCSProviderLink_FullMethodName            = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/CreateWorkspaceVCSProviderLink"
+	VCSProviders_UpdateWorkspaceVCSProviderLink_FullMethodName            = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/UpdateWorkspaceVCSProviderLink"
+	VCSProviders_DeleteWorkspaceVCSProviderLink_FullMethodName            = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/DeleteWorkspaceVCSProviderLink"
+	VCSProviders_ResetWorkspaceVCSProviderLinkWebhookToken_FullMethodName = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/ResetWorkspaceVCSProviderLinkWebhookToken"
+	VCSProviders_CreateVCSRun_FullMethodName                              = "/martiancloud.tharsis.api.vcs_provider.VCSProviders/CreateVCSRun"
 )
 
 // VCSProvidersClient is the client API for VCSProviders service.
@@ -59,6 +60,8 @@ type VCSProvidersClient interface {
 	UpdateWorkspaceVCSProviderLink(ctx context.Context, in *UpdateWorkspaceVCSProviderLinkRequest, opts ...grpc.CallOption) (*WorkspaceVCSProviderLink, error)
 	// DeleteWorkspaceVCSProviderLink deletes a WorkspaceVCSProviderLink.
 	DeleteWorkspaceVCSProviderLink(ctx context.Context, in *DeleteWorkspaceVCSProviderLinkRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ResetWorkspaceVCSProviderLinkWebhookToken issues a new webhook token for a WorkspaceVCSProviderLink.
+	ResetWorkspaceVCSProviderLinkWebhookToken(ctx context.Context, in *ResetWorkspaceVCSProviderLinkWebhookTokenRequest, opts ...grpc.CallOption) (*ResetWorkspaceVCSProviderLinkWebhookTokenResponse, error)
 	// CreateVCSRun creates a run from a VCS event.
 	CreateVCSRun(ctx context.Context, in *CreateVCSRunRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
@@ -171,6 +174,16 @@ func (c *vCSProvidersClient) DeleteWorkspaceVCSProviderLink(ctx context.Context,
 	return out, nil
 }
 
+func (c *vCSProvidersClient) ResetWorkspaceVCSProviderLinkWebhookToken(ctx context.Context, in *ResetWorkspaceVCSProviderLinkWebhookTokenRequest, opts ...grpc.CallOption) (*ResetWorkspaceVCSProviderLinkWebhookTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResetWorkspaceVCSProviderLinkWebhookTokenResponse)
+	err := c.cc.Invoke(ctx, VCSProviders_ResetWorkspaceVCSProviderLinkWebhookToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vCSProvidersClient) CreateVCSRun(ctx context.Context, in *CreateVCSRunRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -207,6 +220,8 @@ type VCSProvidersServer interface {
 	UpdateWorkspaceVCSProviderLink(context.Context, *UpdateWorkspaceVCSProviderLinkRequest) (*WorkspaceVCSProviderLink, error)
 	// DeleteWorkspaceVCSProviderLink deletes a WorkspaceVCSProviderLink.
 	DeleteWorkspaceVCSProviderLink(context.Context, *DeleteWorkspaceVCSProviderLinkRequest) (*emptypb.Empty, error)
+	// ResetWorkspaceVCSProviderLinkWebhookToken issues a new webhook token for a WorkspaceVCSProviderLink.
+	ResetWorkspaceVCSProviderLinkWebhookToken(context.Context, *ResetWorkspaceVCSProviderLinkWebhookTokenRequest) (*ResetWorkspaceVCSProviderLinkWebhookTokenResponse, error)
 	// CreateVCSRun creates a run from a VCS event.
 	CreateVCSRun(context.Context, *CreateVCSRunRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedVCSProvidersServer()
@@ -248,6 +263,9 @@ func (UnimplementedVCSProvidersServer) UpdateWorkspaceVCSProviderLink(context.Co
 }
 func (UnimplementedVCSProvidersServer) DeleteWorkspaceVCSProviderLink(context.Context, *DeleteWorkspaceVCSProviderLinkRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteWorkspaceVCSProviderLink not implemented")
+}
+func (UnimplementedVCSProvidersServer) ResetWorkspaceVCSProviderLinkWebhookToken(context.Context, *ResetWorkspaceVCSProviderLinkWebhookTokenRequest) (*ResetWorkspaceVCSProviderLinkWebhookTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResetWorkspaceVCSProviderLinkWebhookToken not implemented")
 }
 func (UnimplementedVCSProvidersServer) CreateVCSRun(context.Context, *CreateVCSRunRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateVCSRun not implemented")
@@ -453,6 +471,24 @@ func _VCSProviders_DeleteWorkspaceVCSProviderLink_Handler(srv interface{}, ctx c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VCSProviders_ResetWorkspaceVCSProviderLinkWebhookToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResetWorkspaceVCSProviderLinkWebhookTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VCSProvidersServer).ResetWorkspaceVCSProviderLinkWebhookToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VCSProviders_ResetWorkspaceVCSProviderLinkWebhookToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VCSProvidersServer).ResetWorkspaceVCSProviderLinkWebhookToken(ctx, req.(*ResetWorkspaceVCSProviderLinkWebhookTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VCSProviders_CreateVCSRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateVCSRunRequest)
 	if err := dec(in); err != nil {
@@ -517,6 +553,10 @@ var VCSProviders_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteWorkspaceVCSProviderLink",
 			Handler:    _VCSProviders_DeleteWorkspaceVCSProviderLink_Handler,
+		},
+		{
+			MethodName: "ResetWorkspaceVCSProviderLinkWebhookToken",
+			Handler:    _VCSProviders_ResetWorkspaceVCSProviderLinkWebhookToken_Handler,
 		},
 		{
 			MethodName: "CreateVCSRun",

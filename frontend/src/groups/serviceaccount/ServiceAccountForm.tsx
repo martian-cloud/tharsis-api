@@ -4,7 +4,7 @@ import { nanoid } from 'nanoid';
 import { useContext, useRef } from 'react';
 import { ApiConfigContext } from '../../ApiConfigContext';
 import { MutationError } from '../../common/error';
-import ExpirationDateTimePicker from './ExpirationDateTimePicker';
+import ExpirationDateTimePicker from '../../common/ExpirationDateTimePicker';
 import ServiceAccountFormTrustPolicy from './ServiceAccountFormTrustPolicy';
 
 export const CLIENT_CREDENTIALS_DESCRIPTION = 'Allows authentication using a client ID and secret via the client credentials grant.';

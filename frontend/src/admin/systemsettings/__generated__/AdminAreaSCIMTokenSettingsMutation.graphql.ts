@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6e02ade0621901f68f7d2bbf276132bf>>
+ * @generated SignedSource<<d3310f636408ec7c36f49abf8e6eb8ce>>
  * @lightSyntaxTransform
  */
 
@@ -12,6 +12,7 @@ import { FragmentRefs } from "relay-runtime";
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type CreateSCIMTokenInput = {
   clientMutationId?: string | null | undefined;
+  expiresAt?: any | null | undefined;
   idpIssuerURL: string;
 };
 export type AdminAreaSCIMTokenSettingsMutation$variables = {
@@ -28,6 +29,7 @@ export type AdminAreaSCIMTokenSettingsMutation$data = {
       readonly createdByActor: {
         readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
       } | null | undefined;
+      readonly expiresAt: any | null | undefined;
       readonly metadata: {
         readonly createdAt: any;
       };
@@ -65,6 +67,13 @@ v2 = {
 v3 = {
   "alias": null,
   "args": null,
+  "kind": "ScalarField",
+  "name": "expiresAt",
+  "storageKey": null
+},
+v4 = {
+  "alias": null,
+  "args": null,
   "concreteType": "ResourceMetadata",
   "kind": "LinkedField",
   "name": "metadata",
@@ -80,14 +89,14 @@ v3 = {
   ],
   "storageKey": null
 },
-v4 = {
+v5 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "type",
   "storageKey": null
 },
-v5 = {
+v6 = {
   "alias": null,
   "args": null,
   "concreteType": "Problem",
@@ -109,18 +118,18 @@ v5 = {
       "name": "field",
       "storageKey": null
     },
-    (v4/*:: as any*/)
+    (v5/*:: as any*/)
   ],
   "storageKey": null
 },
-v6 = {
+v7 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "id",
   "storageKey": null
 },
-v7 = [
+v8 = [
   {
     "alias": null,
     "args": null,
@@ -169,11 +178,12 @@ return {
                 ],
                 "storageKey": null
               },
-              (v3/*:: as any*/)
+              (v3/*:: as any*/),
+              (v4/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v5/*:: as any*/)
+          (v6/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -223,7 +233,7 @@ return {
                     "kind": "TypeDiscriminator",
                     "abstractKey": "__isActor"
                   },
-                  (v4/*:: as any*/),
+                  (v5/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -249,7 +259,7 @@ return {
                             "name": "email",
                             "storageKey": null
                           },
-                          (v6/*:: as any*/)
+                          (v7/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -259,19 +269,19 @@ return {
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v7/*:: as any*/),
+                    "selections": (v8/*:: as any*/),
                     "type": "ServiceAccountActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v7/*:: as any*/),
+                    "selections": (v8/*:: as any*/),
                     "type": "VCSProviderActor",
                     "abstractKey": null
                   },
                   {
                     "kind": "InlineFragment",
-                    "selections": (v7/*:: as any*/),
+                    "selections": (v8/*:: as any*/),
                     "type": "JobActor",
                     "abstractKey": null
                   }
@@ -279,27 +289,28 @@ return {
                 "storageKey": null
               },
               (v3/*:: as any*/),
-              (v6/*:: as any*/)
+              (v4/*:: as any*/),
+              (v7/*:: as any*/)
             ],
             "storageKey": null
           },
-          (v5/*:: as any*/)
+          (v6/*:: as any*/)
         ],
         "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "d34dabb9e08cc81483ea045561321838",
+    "cacheID": "3be6a01f825ecb899cb60e04b8c9c8aa",
     "id": null,
     "metadata": {},
     "name": "AdminAreaSCIMTokenSettingsMutation",
     "operationKind": "mutation",
-    "text": "mutation AdminAreaSCIMTokenSettingsMutation(\n  $input: CreateSCIMTokenInput!\n) {\n  createSCIMToken(input: $input) {\n    tokenText\n    scimToken {\n      createdByActor {\n        __typename\n        ...ActorDisplayFragment_actor\n      }\n      metadata {\n        createdAt\n      }\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n"
+    "text": "mutation AdminAreaSCIMTokenSettingsMutation(\n  $input: CreateSCIMTokenInput!\n) {\n  createSCIMToken(input: $input) {\n    tokenText\n    scimToken {\n      createdByActor {\n        __typename\n        ...ActorDisplayFragment_actor\n      }\n      expiresAt\n      metadata {\n        createdAt\n      }\n      id\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "530ab7aa30293c8757bd48a9643b385a";
+(node as any).hash = "85eb8cb118384d27e6c3baa9be70a574";
 
 export default node;

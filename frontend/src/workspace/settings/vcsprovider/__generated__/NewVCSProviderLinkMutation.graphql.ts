@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c04508d30bc8202ba8e09961662aa147>>
+ * @generated SignedSource<<68dfe51388d6a74de17f899743962ec0>>
  * @lightSyntaxTransform
  */
 
@@ -35,6 +35,8 @@ export type NewVCSProviderLinkMutation$data = {
       readonly type: ProblemType;
     }>;
     readonly vcsProviderLink: {
+      readonly id: string;
+      readonly repositoryPath: string;
       readonly vcsProvider: {
         readonly autoCreateWebhooks: boolean;
         readonly type: VCSProviderType;
@@ -42,21 +44,8 @@ export type NewVCSProviderLinkMutation$data = {
       readonly workspace: {
         readonly id: string;
         readonly workspaceVcsProviderLink: {
-          readonly autoSpeculativePlan: boolean;
-          readonly branch: string;
-          readonly createdBy: string;
-          readonly createdByActor: {
-            readonly " $fragmentSpreads": FragmentRefs<"ActorDisplayFragment_actor">;
-          } | null | undefined;
-          readonly globPatterns: ReadonlyArray<string>;
           readonly id: string;
-          readonly metadata: {
-            readonly createdAt: any;
-          };
-          readonly moduleDirectory: string | null | undefined;
-          readonly repositoryPath: string;
-          readonly tagRegex: string | null | undefined;
-          readonly webhookDisabled: boolean;
+          readonly " $fragmentSpreads": FragmentRefs<"EditVCSProviderLinkFragment_link" | "VCSProviderLinkDangerZoneFragment_link" | "VCSProviderLinkWebhookFragment_link">;
         } | null | undefined;
       };
     } | null | undefined;
@@ -94,106 +83,39 @@ v2 = {
 v3 = {
   "alias": null,
   "args": null,
-  "concreteType": "ResourceMetadata",
-  "kind": "LinkedField",
-  "name": "metadata",
-  "plural": false,
-  "selections": [
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "createdAt",
-      "storageKey": null
-    }
-  ],
+  "kind": "ScalarField",
+  "name": "repositoryPath",
   "storageKey": null
 },
 v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "createdBy",
+  "name": "type",
   "storageKey": null
 },
 v5 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "repositoryPath",
+  "name": "autoCreateWebhooks",
   "storageKey": null
 },
 v6 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "branch",
+  "name": "webhookToken",
   "storageKey": null
 },
 v7 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "moduleDirectory",
-  "storageKey": null
-},
-v8 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "tagRegex",
-  "storageKey": null
-},
-v9 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "globPatterns",
-  "storageKey": null
-},
-v10 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "autoSpeculativePlan",
-  "storageKey": null
-},
-v11 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "webhookDisabled",
-  "storageKey": null
-},
-v12 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "type",
-  "storageKey": null
-},
-v13 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "autoCreateWebhooks",
-  "storageKey": null
-},
-v14 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "webhookToken",
-  "storageKey": null
-},
-v15 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
   "name": "webhookUrl",
   "storageKey": null
 },
-v16 = {
+v8 = {
   "alias": null,
   "args": null,
   "concreteType": "Problem",
@@ -215,19 +137,10 @@ v16 = {
       "name": "field",
       "storageKey": null
     },
-    (v12/*:: as any*/)
+    (v4/*:: as any*/)
   ],
   "storageKey": null
-},
-v17 = [
-  {
-    "alias": null,
-    "args": null,
-    "kind": "ScalarField",
-    "name": "trnSnapshot",
-    "storageKey": null
-  }
-];
+};
 return {
   "fragment": {
     "argumentDefinitions": (v0/*:: as any*/),
@@ -251,6 +164,21 @@ return {
             "name": "vcsProviderLink",
             "plural": false,
             "selections": [
+              (v2/*:: as any*/),
+              (v3/*:: as any*/),
+              {
+                "alias": null,
+                "args": null,
+                "concreteType": "VCSProvider",
+                "kind": "LinkedField",
+                "name": "vcsProvider",
+                "plural": false,
+                "selections": [
+                  (v4/*:: as any*/),
+                  (v5/*:: as any*/)
+                ],
+                "storageKey": null
+              },
               {
                 "alias": null,
                 "args": null,
@@ -269,56 +197,33 @@ return {
                     "plural": false,
                     "selections": [
                       (v2/*:: as any*/),
-                      (v3/*:: as any*/),
-                      (v4/*:: as any*/),
                       {
-                        "alias": null,
                         "args": null,
-                        "concreteType": null,
-                        "kind": "LinkedField",
-                        "name": "createdByActor",
-                        "plural": false,
-                        "selections": [
-                          {
-                            "args": null,
-                            "kind": "FragmentSpread",
-                            "name": "ActorDisplayFragment_actor"
-                          }
-                        ],
-                        "storageKey": null
+                        "kind": "FragmentSpread",
+                        "name": "EditVCSProviderLinkFragment_link"
                       },
-                      (v5/*:: as any*/),
-                      (v6/*:: as any*/),
-                      (v7/*:: as any*/),
-                      (v8/*:: as any*/),
-                      (v9/*:: as any*/),
-                      (v10/*:: as any*/),
-                      (v11/*:: as any*/)
+                      {
+                        "args": null,
+                        "kind": "FragmentSpread",
+                        "name": "VCSProviderLinkWebhookFragment_link"
+                      },
+                      {
+                        "args": null,
+                        "kind": "FragmentSpread",
+                        "name": "VCSProviderLinkDangerZoneFragment_link"
+                      }
                     ],
                     "storageKey": null
                   }
-                ],
-                "storageKey": null
-              },
-              {
-                "alias": null,
-                "args": null,
-                "concreteType": "VCSProvider",
-                "kind": "LinkedField",
-                "name": "vcsProvider",
-                "plural": false,
-                "selections": [
-                  (v12/*:: as any*/),
-                  (v13/*:: as any*/)
                 ],
                 "storageKey": null
               }
             ],
             "storageKey": null
           },
-          (v14/*:: as any*/),
-          (v15/*:: as any*/),
-          (v16/*:: as any*/)
+          (v6/*:: as any*/),
+          (v7/*:: as any*/),
+          (v8/*:: as any*/)
         ],
         "storageKey": null
       }
@@ -348,6 +253,22 @@ return {
             "name": "vcsProviderLink",
             "plural": false,
             "selections": [
+              (v2/*:: as any*/),
+              (v3/*:: as any*/),
+              {
+                "alias": null,
+                "args": null,
+                "concreteType": "VCSProvider",
+                "kind": "LinkedField",
+                "name": "vcsProvider",
+                "plural": false,
+                "selections": [
+                  (v4/*:: as any*/),
+                  (v5/*:: as any*/),
+                  (v2/*:: as any*/)
+                ],
+                "storageKey": null
+              },
               {
                 "alias": null,
                 "args": null,
@@ -367,131 +288,111 @@ return {
                     "selections": [
                       (v2/*:: as any*/),
                       (v3/*:: as any*/),
-                      (v4/*:: as any*/),
                       {
                         "alias": null,
                         "args": null,
-                        "concreteType": null,
+                        "kind": "ScalarField",
+                        "name": "branch",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "moduleDirectory",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "tagRegex",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "globPatterns",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "autoSpeculativePlan",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "webhookDisabled",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "VCSProvider",
                         "kind": "LinkedField",
-                        "name": "createdByActor",
+                        "name": "vcsProvider",
                         "plural": false,
                         "selections": [
+                          (v2/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
                             "kind": "ScalarField",
-                            "name": "__typename",
+                            "name": "name",
                             "storageKey": null
                           },
-                          {
-                            "kind": "TypeDiscriminator",
-                            "abstractKey": "__isActor"
-                          },
-                          (v12/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
                             "kind": "ScalarField",
-                            "name": "principalId",
+                            "name": "groupPath",
                             "storageKey": null
                           },
-                          {
-                            "kind": "InlineFragment",
-                            "selections": [
-                              {
-                                "alias": null,
-                                "args": null,
-                                "concreteType": "User",
-                                "kind": "LinkedField",
-                                "name": "user",
-                                "plural": false,
-                                "selections": [
-                                  {
-                                    "alias": null,
-                                    "args": null,
-                                    "kind": "ScalarField",
-                                    "name": "email",
-                                    "storageKey": null
-                                  },
-                                  (v2/*:: as any*/)
-                                ],
-                                "storageKey": null
-                              }
-                            ],
-                            "type": "UserActor",
-                            "abstractKey": null
-                          },
-                          {
-                            "kind": "InlineFragment",
-                            "selections": (v17/*:: as any*/),
-                            "type": "ServiceAccountActor",
-                            "abstractKey": null
-                          },
-                          {
-                            "kind": "InlineFragment",
-                            "selections": (v17/*:: as any*/),
-                            "type": "VCSProviderActor",
-                            "abstractKey": null
-                          },
-                          {
-                            "kind": "InlineFragment",
-                            "selections": (v17/*:: as any*/),
-                            "type": "JobActor",
-                            "abstractKey": null
-                          }
+                          (v4/*:: as any*/),
+                          (v5/*:: as any*/)
                         ],
                         "storageKey": null
                       },
-                      (v5/*:: as any*/),
-                      (v6/*:: as any*/),
-                      (v7/*:: as any*/),
-                      (v8/*:: as any*/),
-                      (v9/*:: as any*/),
-                      (v10/*:: as any*/),
-                      (v11/*:: as any*/)
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "usesLegacyWebhookToken",
+                        "storageKey": null
+                      }
                     ],
                     "storageKey": null
                   }
                 ],
                 "storageKey": null
-              },
-              {
-                "alias": null,
-                "args": null,
-                "concreteType": "VCSProvider",
-                "kind": "LinkedField",
-                "name": "vcsProvider",
-                "plural": false,
-                "selections": [
-                  (v12/*:: as any*/),
-                  (v13/*:: as any*/),
-                  (v2/*:: as any*/)
-                ],
-                "storageKey": null
-              },
-              (v2/*:: as any*/)
+              }
             ],
             "storageKey": null
           },
-          (v14/*:: as any*/),
-          (v15/*:: as any*/),
-          (v16/*:: as any*/)
+          (v6/*:: as any*/),
+          (v7/*:: as any*/),
+          (v8/*:: as any*/)
         ],
         "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "b6208bdefd11abf2616ca6f85c1b332d",
+    "cacheID": "67d9ad681b53565ae8e0e1def3750986",
     "id": null,
     "metadata": {},
     "name": "NewVCSProviderLinkMutation",
     "operationKind": "mutation",
-    "text": "mutation NewVCSProviderLinkMutation(\n  $input: CreateWorkspaceVCSProviderLinkInput!\n) {\n  createWorkspaceVCSProviderLink(input: $input) {\n    vcsProviderLink {\n      workspace {\n        id\n        workspaceVcsProviderLink {\n          id\n          metadata {\n            createdAt\n          }\n          createdBy\n          createdByActor {\n            __typename\n            ...ActorDisplayFragment_actor\n          }\n          repositoryPath\n          branch\n          moduleDirectory\n          tagRegex\n          globPatterns\n          autoSpeculativePlan\n          webhookDisabled\n        }\n      }\n      vcsProvider {\n        type\n        autoCreateWebhooks\n        id\n      }\n      id\n    }\n    webhookToken\n    webhookUrl\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n"
+    "text": "mutation NewVCSProviderLinkMutation(\n  $input: CreateWorkspaceVCSProviderLinkInput!\n) {\n  createWorkspaceVCSProviderLink(input: $input) {\n    vcsProviderLink {\n      id\n      repositoryPath\n      vcsProvider {\n        type\n        autoCreateWebhooks\n        id\n      }\n      workspace {\n        id\n        workspaceVcsProviderLink {\n          id\n          ...EditVCSProviderLinkFragment_link\n          ...VCSProviderLinkWebhookFragment_link\n          ...VCSProviderLinkDangerZoneFragment_link\n        }\n      }\n    }\n    webhookToken\n    webhookUrl\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n\nfragment EditVCSProviderLinkFragment_link on WorkspaceVCSProviderLink {\n  id\n  repositoryPath\n  branch\n  moduleDirectory\n  tagRegex\n  globPatterns\n  autoSpeculativePlan\n  webhookDisabled\n  vcsProvider {\n    id\n    name\n    groupPath\n    type\n    autoCreateWebhooks\n  }\n}\n\nfragment VCSProviderLinkDangerZoneFragment_link on WorkspaceVCSProviderLink {\n  id\n  repositoryPath\n  vcsProvider {\n    autoCreateWebhooks\n    id\n  }\n}\n\nfragment VCSProviderLinkWebhookFragment_link on WorkspaceVCSProviderLink {\n  id\n  repositoryPath\n  webhookDisabled\n  usesLegacyWebhookToken\n  vcsProvider {\n    type\n    autoCreateWebhooks\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "cd1cc9e174e183c66f3b66f5234fa7eb";
+(node as any).hash = "b1241fa1e6736e38a5ce1bb23df1dd63";
 
 export default node;

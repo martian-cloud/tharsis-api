@@ -77,7 +77,8 @@ type WorkspaceVCSProviderLink struct {
 	CreatedBy           Actor
 	WorkspaceID         string
 	ProviderID          string
-	TokenNonce          string
+	TokenNonce          *string // Legacy JWT ID, nil once the link uses an API key.
+	TokenHash           *string // Hash of the API key, nil for legacy links.
 	RepositoryPath      string
 	WebhookID           string   // Webhook ID if Tharsis configured it.
 	ModuleDirectory     *string  // Path to Terraform module, otherwise repo root.
@@ -109,8 +110,17 @@ func (wpl *WorkspaceVCSProviderLink) ResolveMetadata(key string) (*string, error
 	return wpl.Metadata.resolveFieldValue(key)
 }
 
+// UsesLegacyWebhookToken returns true if the link still authenticates webhooks with a deprecated JWT token.
+func (wpl *WorkspaceVCSProviderLink) UsesLegacyWebhookToken() bool {
+	return wpl.TokenNonce != nil && wpl.TokenHash == nil
+}
+
 // Validate verifies a VCS Provider link struct.
 func (wpl *WorkspaceVCSProviderLink) Validate() error {
+	if (wpl.TokenNonce == nil) == (wpl.TokenHash == nil) {
+		return errors.New("exactly one of token nonce or token hash must be set", errors.WithErrorCode(errors.EInvalid))
+	}
+
 	if err := ValidateRepositoryPath(wpl.RepositoryPath); err != nil {
 		return err
 	}

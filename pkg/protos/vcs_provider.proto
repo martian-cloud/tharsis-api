@@ -31,6 +31,8 @@ service VCSProviders {
   rpc UpdateWorkspaceVCSProviderLink(UpdateWorkspaceVCSProviderLinkRequest) returns (WorkspaceVCSProviderLink);
   // DeleteWorkspaceVCSProviderLink deletes a WorkspaceVCSProviderLink.
   rpc DeleteWorkspaceVCSProviderLink(DeleteWorkspaceVCSProviderLinkRequest) returns (google.protobuf.Empty);
+  // ResetWorkspaceVCSProviderLinkWebhookToken issues a new webhook token for a WorkspaceVCSProviderLink.
+  rpc ResetWorkspaceVCSProviderLinkWebhookToken(ResetWorkspaceVCSProviderLinkWebhookTokenRequest) returns (ResetWorkspaceVCSProviderLinkWebhookTokenResponse);
   // CreateVCSRun creates a run from a VCS event.
   rpc CreateVCSRun(CreateVCSRunRequest) returns (google.protobuf.Empty);
 }
@@ -136,6 +138,11 @@ message DeleteWorkspaceVCSProviderLinkRequest {
   optional int64 version = 3;
 }
 
+// ResetWorkspaceVCSProviderLinkWebhookTokenRequest is the input for resetting the webhook token of a WorkspaceVCSProviderLink.
+message ResetWorkspaceVCSProviderLinkWebhookTokenRequest {
+  string id = 1;
+}
+
 // CreateVCSRunRequest is the input for creating a VCS run.
 message CreateVCSRunRequest {
   string          workspace_id   = 1;
@@ -179,6 +186,9 @@ message WorkspaceVCSProviderLink {
   // created_by_actor is the structured identity of the creator. Absent for
   // resources created before actors were introduced.
   actor.Actor created_by_actor = 13;
+  // uses_legacy_webhook_token is true when the webhook authenticates with a deprecated token
+  // that stops working when signing keys rotate.
+  bool uses_legacy_webhook_token = 14;
 }
 
 // GetVCSProvidersResponse is the paginated list of VCS Providers.
@@ -201,6 +211,13 @@ message ResetVCSProviderOAuthTokenResponse {
 
 // CreateWorkspaceVCSProviderLinkResponse is the response for creating a WorkspaceVCSProviderLink.
 message CreateWorkspaceVCSProviderLinkResponse {
+  WorkspaceVCSProviderLink vcs_provider_link = 1;
+  string                   webhook_token     = 2;
+  optional string          webhook_url       = 3;
+}
+
+// ResetWorkspaceVCSProviderLinkWebhookTokenResponse is the response for resetting the webhook token of a WorkspaceVCSProviderLink.
+message ResetWorkspaceVCSProviderLinkWebhookTokenResponse {
   WorkspaceVCSProviderLink vcs_provider_link = 1;
   string                   webhook_token     = 2;
   optional string          webhook_url       = 3;

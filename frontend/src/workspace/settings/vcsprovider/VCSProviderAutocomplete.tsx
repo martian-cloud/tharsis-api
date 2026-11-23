@@ -14,16 +14,22 @@ export interface VCSProviderOption {
     readonly label: string
     readonly description: string
     readonly type: string
+    readonly autoCreateWebhooks: boolean
 }
 
 interface Props {
     path: string
-    value: any
-    onSelected: (value: any) => void
+    value: VCSProviderOption | null
+    onSelected: (value: VCSProviderOption | null) => void
+    label?: string
+    helperText?: string
+    error?: boolean
+    // excludeId hides a provider from the options, e.g. the one a link already uses.
+    excludeId?: string
 }
 
 function VCSProviderAutocomplete(props: Props) {
-    const { path, value, onSelected } = props
+    const { path, value, onSelected, label = 'VCS provider', helperText, error, excludeId } = props
 
     const [options, setOptions] = useState<ReadonlyArray<VCSProviderOption> | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -61,16 +67,20 @@ function VCSProviderAutocomplete(props: Props) {
                         `,
                         { path: path, search: request.input },
                         { fetchPolicy: 'network-only' }
-                    ).toPromise().then(async (response: any) => {
-                        const options = response?.workspace?.vcsProviders?.edges?.map((edge: { node: any }) => {
-                            return { id: edge.node.id, label: edge.node.name, description: edge.node.description, type: edge.node.type }
-                        })
+                    ).toPromise().then(response => {
+                        const options: VCSProviderOption[] = [];
+                        response?.workspace?.vcsProviders?.edges?.forEach(edge => {
+                            const node = edge?.node;
+                            if (node && node.id !== excludeId) {
+                                options.push({ id: node.id, label: node.name, description: node.description, type: node.type, autoCreateWebhooks: node.autoCreateWebhooks });
+                            }
+                        });
                         callback(options);
                     });
                 },
                 300,
             ),
-        [environment, path],
+        [environment, path, excludeId],
     );
 
     useEffect(() => {
@@ -92,10 +102,9 @@ function VCSProviderAutocomplete(props: Props) {
 
     return (
         <Autocomplete
-            sx={{ mb: 1 }}
             size="small"
             value={value}
-            onChange={(event: React.SyntheticEvent, value: any) => onSelected(value)}
+            onChange={(event: React.SyntheticEvent, value: VCSProviderOption | null) => onSelected(value)}
             inputValue={inputValue}
             isOptionEqualToValue={(option: VCSProviderOption, value: VCSProviderOption) => option.id === value.id}
             onInputChange={(event: React.SyntheticEvent<Element, Event>, newValue: string) => newValue ? setInputValue(newValue) : setInputValue('')}
@@ -104,8 +113,9 @@ function VCSProviderAutocomplete(props: Props) {
             renderInput={(params) =>
                 <TextField
                     {...params}
-                    placeholder="VCS Provider"
-                    label="VCS Provider"
+                    label={label}
+                    helperText={helperText}
+                    error={error}
                     slotProps={{
                         ...params.slotProps,
 

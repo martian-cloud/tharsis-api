@@ -1447,6 +1447,18 @@ func TestGetWorkspaces(t *testing.T) {
 			expectErrorCode:  errors.EInvalid,
 		},
 		{
+			name: "positive: filter workspaces by linked VCS provider",
+			input: &GetWorkspacesInput{
+				LinkedVCSProviderID: ptr.String("vcs-provider-1"),
+			},
+			adminMode:         false,
+			expectMemberships: []models.MembershipNamespace{},
+			rootNamespaces:    []models.MembershipNamespace{},
+			expectResult: []models.Workspace{
+				sampleWorkspace,
+			},
+		},
+		{
 			name: "positive: user caller with exclude favorites filter",
 			input: &GetWorkspacesInput{
 				ExcludeFavorites: ptr.Bool(true),
@@ -1492,6 +1504,7 @@ func TestGetWorkspaces(t *testing.T) {
 				Filter: &db.WorkspaceFilter{
 					Search:                    test.input.Search,
 					AssignedManagedIdentityID: test.input.AssignedManagedIdentityID,
+					LinkedVCSProviderID:       test.input.LinkedVCSProviderID,
 					LabelFilters:              test.input.LabelFilters,
 				},
 			}

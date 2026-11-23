@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c6782c0430fe9fa63314740ec4b033ea>>
+ * @generated SignedSource<<4dc99e8b67417cdcb483dac0afebf7fc>>
  * @lightSyntaxTransform
  */
 
@@ -41,7 +41,7 @@ export type WorkspaceDetailsIndexFragment_workspace$data = {
   };
   readonly name: string;
   readonly preventDestroyPlan: boolean;
-  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceDetailsDriftDetectionFragment_workspace" | "WorkspaceDetailsEmptyFragment_workspace" | "WorkspaceDetailsStatusPanelFragment_workspace" | "WorkspaceNotificationPreferenceFragment_workspace">;
+  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceDetailsDriftDetectionFragment_workspace" | "WorkspaceDetailsEmptyFragment_workspace" | "WorkspaceDetailsStatusPanelFragment_workspace" | "WorkspaceNotificationPreferenceFragment_workspace" | "WorkspaceVCSWebhookAlertFragment_workspace">;
   readonly " $fragmentType": "WorkspaceDetailsIndexFragment_workspace";
 };
 export type WorkspaceDetailsIndexFragment_workspace$key = {
@@ -170,6 +170,11 @@ return {
     {
       "args": null,
       "kind": "FragmentSpread",
+      "name": "WorkspaceVCSWebhookAlertFragment_workspace"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
       "name": "WorkspaceDetailsEmptyFragment_workspace"
     },
     {
@@ -270,6 +275,6 @@ return {
 };
 })();
 
-(node as any).hash = "5e9d634cdbbb73081aa413fbdb06a4d6";
+(node as any).hash = "b0e48ba4bd37aca8ac5a2cd9a7bf414a";
 
 export default node;

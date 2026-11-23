@@ -193,6 +193,9 @@ type Mutation {
   deleteWorkspaceVCSProviderLink(
     input: DeleteWorkspaceVCSProviderLinkInput!
   ): DeleteWorkspaceVCSProviderLinkPayload!
+  resetWorkspaceVCSProviderLinkWebhookToken(
+    input: ResetWorkspaceVCSProviderLinkWebhookTokenInput!
+  ): ResetWorkspaceVCSProviderLinkWebhookTokenPayload!
   createVCSRun(input: CreateVCSRunInput!): CreateVCSRunPayload!
   resetVCSProviderOAuthToken(
     input: ResetVCSProviderOAuthTokenInput!

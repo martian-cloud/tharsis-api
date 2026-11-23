@@ -259,6 +259,10 @@ type Config struct {
 	// ServiceAccountClientSecretMaxExpirationDays is the maximum number of days a service account client secret can be valid
 	ServiceAccountClientSecretMaxExpirationDays int `yaml:"service_account_client_secret_max_expiration_days" env:"SERVICE_ACCOUNT_CLIENT_SECRET_MAX_EXPIRATION_DAYS"`
 
+	// SCIMTokenMaxExpirationDays is the maximum number of days a SCIM token can be valid, 0 means no maximum.
+	// It only applies when an expiration is set; a token created without one never expires.
+	SCIMTokenMaxExpirationDays int `yaml:"scim_token_max_expiration_days" env:"SCIM_TOKEN_MAX_EXPIRATION_DAYS"`
+
 	// AdminLogTailStorePluginType selects the admin log tail store backend. Defaults to "noop".
 	AdminLogTailStorePluginType string            `yaml:"admin_log_tail_store_plugin_type" env:"ADMIN_LOG_TAIL_STORE_PLUGIN_TYPE"`
 	AdminLogTailStorePluginData map[string]string `yaml:"admin_log_tail_store_plugin_data" sensitive:"true"`

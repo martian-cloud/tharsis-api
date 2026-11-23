@@ -362,6 +362,25 @@ func (s *VCSProviderServer) DeleteWorkspaceVCSProviderLink(ctx context.Context, 
 	return &emptypb.Empty{}, nil
 }
 
+// ResetWorkspaceVCSProviderLinkWebhookToken issues a new webhook token for a WorkspaceVCSProviderLink.
+func (s *VCSProviderServer) ResetWorkspaceVCSProviderLinkWebhookToken(ctx context.Context, req *pb.ResetWorkspaceVCSProviderLinkWebhookTokenRequest) (*pb.ResetWorkspaceVCSProviderLinkWebhookTokenResponse, error) {
+	linkID, err := s.serviceCatalog.FetchModelID(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.serviceCatalog.VCSService.ResetWorkspaceVCSProviderLinkWebhookToken(ctx, &vcs.ResetWorkspaceVCSProviderLinkWebhookTokenInput{LinkID: linkID})
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.ResetWorkspaceVCSProviderLinkWebhookTokenResponse{
+		VcsProviderLink: toPBWorkspaceVCSProviderLink(result.Link),
+		WebhookToken:    string(result.WebhookToken),
+		WebhookUrl:      result.WebhookURL,
+	}, nil
+}
+
 // CreateVCSRun creates a run from a VCS event.
 func (s *VCSProviderServer) CreateVCSRun(ctx context.Context, req *pb.CreateVCSRunRequest) (*emptypb.Empty, error) {
 	model, err := s.serviceCatalog.FetchModel(ctx, req.WorkspaceId)
@@ -405,18 +424,19 @@ func toPBVCSProvider(v *models.VCSProvider) *pb.VCSProvider {
 // toPBWorkspaceVCSProviderLink converts from WorkspaceVCSProviderLink model to ProtoBuf model.
 func toPBWorkspaceVCSProviderLink(w *models.WorkspaceVCSProviderLink) *pb.WorkspaceVCSProviderLink {
 	return &pb.WorkspaceVCSProviderLink{
-		Metadata:            toPBMetadata(&w.Metadata, types.WorkspaceVCSProviderLinkModelType),
-		CreatedBy:           w.CreatedBy.Subject,
-		CreatedByActor:      toPBActor(w.CreatedBy),
-		WorkspaceId:         gid.ToGlobalID(types.WorkspaceModelType, w.WorkspaceID),
-		VcsProviderId:       gid.ToGlobalID(types.VCSProviderModelType, w.ProviderID),
-		RepositoryPath:      w.RepositoryPath,
-		WebhookId:           w.WebhookID,
-		ModuleDirectory:     w.ModuleDirectory,
-		Branch:              w.Branch,
-		TagRegex:            w.TagRegex,
-		GlobPatterns:        w.GlobPatterns,
-		AutoSpeculativePlan: w.AutoSpeculativePlan,
-		WebhookDisabled:     w.WebhookDisabled,
+		Metadata:               toPBMetadata(&w.Metadata, types.WorkspaceVCSProviderLinkModelType),
+		CreatedBy:              w.CreatedBy.Subject,
+		CreatedByActor:         toPBActor(w.CreatedBy),
+		WorkspaceId:            gid.ToGlobalID(types.WorkspaceModelType, w.WorkspaceID),
+		VcsProviderId:          gid.ToGlobalID(types.VCSProviderModelType, w.ProviderID),
+		RepositoryPath:         w.RepositoryPath,
+		WebhookId:              w.WebhookID,
+		ModuleDirectory:        w.ModuleDirectory,
+		Branch:                 w.Branch,
+		TagRegex:               w.TagRegex,
+		GlobPatterns:           w.GlobPatterns,
+		AutoSpeculativePlan:    w.AutoSpeculativePlan,
+		WebhookDisabled:        w.WebhookDisabled,
+		UsesLegacyWebhookToken: w.UsesLegacyWebhookToken(),
 	}
 }

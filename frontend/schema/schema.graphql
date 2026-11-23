@@ -630,6 +630,7 @@ type Config {
   otelTraceType: String
   rateLimitStorePluginData: [KeyValueEntry!]!
   rateLimitStorePluginType: String!
+  scimTokenMaxExpirationDays: Int!
   secretManagerPluginData: [KeyValueEntry!]!
   secretManagerPluginType: String!
   sensitiveFields: [String!]!
@@ -962,6 +963,7 @@ type CreateRunnerSessionPayload {
 
 input CreateSCIMTokenInput {
   clientMutationId: String
+  expiresAt: Time
   idpIssuerURL: String!
 }
 
@@ -2287,6 +2289,7 @@ type Mutation {
   removeUserFromTeam(input: RemoveUserFromTeamInput): RemoveUserFromTeamPayload!
   resetServiceAccountClientCredentials(input: ResetServiceAccountClientCredentialsInput!): ResetServiceAccountClientCredentialsPayload!
   resetVCSProviderOAuthToken(input: ResetVCSProviderOAuthTokenInput!): ResetVCSProviderOAuthTokenPayload!
+  resetWorkspaceVCSProviderLinkWebhookToken(input: ResetWorkspaceVCSProviderLinkWebhookTokenInput!): ResetWorkspaceVCSProviderLinkWebhookTokenPayload!
   retryRunNode(input: RetryRunNodeInput!): RunMutationPayload!
   revokeUserSession(input: RevokeUserSessionInput!): RevokeUserSessionPayload!
   runnerSessionHeartbeat(input: RunnerSessionHeartbeatInput!): RunnerSessionHeartbeatPayload!
@@ -3034,6 +3037,19 @@ type ResetVCSProviderOAuthTokenPayload {
   vcsProvider: VCSProvider
 }
 
+input ResetWorkspaceVCSProviderLinkWebhookTokenInput {
+  clientMutationId: String
+  id: ID!
+}
+
+type ResetWorkspaceVCSProviderLinkWebhookTokenPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  vcsProviderLink: WorkspaceVCSProviderLink
+  webhookToken: String
+  webhookUrl: String
+}
+
 type ResourceLimit {
   id: ID!
   metadata: ResourceMetadata!
@@ -3486,6 +3502,7 @@ type SCIMActor implements Actor {
 type SCIMToken implements Node {
   createdBy: String! @deprecated(reason: "Use createdByActor instead.")
   createdByActor: Actor
+  expiresAt: Time
   id: ID!
   metadata: ResourceMetadata!
 }
@@ -4670,6 +4687,7 @@ type VCSProvider implements Node {
   resourcePath: String!
   type: VCSProviderType!
   url: String!
+  workspaces(after: String, before: String, first: Int, last: Int, sort: WorkspaceSort): WorkspaceConnection!
 }
 
 type VCSProviderActor implements Actor {
@@ -4843,6 +4861,7 @@ type WorkspaceVCSProviderLink implements Node {
   moduleDirectory: String
   repositoryPath: String!
   tagRegex: String
+  usesLegacyWebhookToken: Boolean!
   vcsProvider: VCSProvider!
   webhookDisabled: Boolean!
   webhookId: String

@@ -108,7 +108,7 @@ func TestGetVCSProviderByID(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, "", 0)
 
 			provider, err := service.GetVCSProviderByID(ctx, test.inputID)
 			if test.expectedErrorCode != "" {
@@ -271,7 +271,7 @@ func TestGetVCSProviders(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, "", 0)
 
 			result, err := service.GetVCSProviders(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -347,7 +347,7 @@ func TestGetVCSProvidersByIDs_FiltersInaccessible(t *testing.T) {
 				Return(&db.VCSProvidersResult{VCSProviders: []models.VCSProvider{visible, hidden}}, nil)
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, &db.Client{VCSProviders: mockVCSProviders}, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(logger, &db.Client{VCSProviders: mockVCSProviders}, nil, nil, nil, nil, nil, nil, "", 0)
 
 			providers, err := service.GetVCSProvidersByIDs(auth.WithCaller(context.Background(), mockCaller),
 				[]string{visible.Metadata.ID, hidden.Metadata.ID})
@@ -422,7 +422,7 @@ func TestGetVCSProvidersByIDs(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, "", 0)
 
 			providerList, err := service.GetVCSProvidersByIDs(ctx, test.inputIDList)
 			if test.expectedErrorCode != "" {
@@ -845,7 +845,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				return sampleOAuthState, nil
 			}
 
-			service := newService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, providerMap, nil, nil, nil, stateGeneratorFunc, "", 0)
+			service := newService(logger, dbClient, limits.NewLimitChecker(dbClient), providerMap, nil, nil, nil, stateGeneratorFunc, "", 0)
 
 			response, err := service.CreateVCSProvider(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -919,7 +919,7 @@ func TestUpdateVCSProvider(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 
-			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, "", 0)
 
 			provider, err := service.UpdateVCSProvider(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1091,7 +1091,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
+			service := newService(logger, dbClient, nil, providerMap, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
 
 			err := service.DeleteVCSProvider(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1151,7 +1151,7 @@ func TestGetVCSProviderLinkByWorkspaceID(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, "", 0)
 
 			link, err := service.GetWorkspaceVCSProviderLinkByWorkspaceID(ctx, test.workspaceID)
 			if test.expectedErrorCode != "" {
@@ -1213,7 +1213,7 @@ func TestGetWorkspaceVCSProviderLinkByID(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, "", 0)
 
 			link, err := service.GetWorkspaceVCSProviderLinkByID(ctx, test.inputID)
 			if test.expectedErrorCode != "" {
@@ -1354,7 +1354,6 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				ProviderURL:    sampleProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
-				WebhookToken:   []byte("signed-token"),
 			},
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
@@ -1378,7 +1377,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				RepositoryPath:  "owner/repository",
 				Branch:          "main",
 				CreatedBy:       models.Actor{Subject: "some@some-email"},
-				TokenNonce:      "some-token-nonce",
+				TokenHash:       new("some-token-hash"),
 				ModuleDirectory: ptr.String("hidden/../path"), // Should be cleaned.
 				GlobPatterns:    []string{"/**/directory/*"},
 				// Other fields should remain unchanged.
@@ -1393,7 +1392,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				Branch:          "main",
 				CreatedBy:       models.Actor{Subject: "some@some-email"},
 				WebhookID:       "webhook-id", // Only present if Tharsis configures Git provider.
-				TokenNonce:      "some-token-nonce",
+				TokenHash:       new("some-token-hash"),
 				ModuleDirectory: ptr.String("path"), // Should be cleaned.
 				GlobPatterns:    []string{"/**/directory/*"},
 				WebhookDisabled: true,
@@ -1410,7 +1409,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 					Branch:          "main",
 					CreatedBy:       models.Actor{Subject: "some@some-email"},
 					WebhookID:       "webhook-id", // Only present if Tharsis configures Git provider.
-					TokenNonce:      "some-token-nonce",
+					TokenHash:       new("some-token-hash"),
 					ModuleDirectory: ptr.String("path"), // Should be cleaned.
 					GlobPatterns:    []string{"/**/directory/*"},
 					WebhookDisabled: true,
@@ -1456,7 +1455,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				RepositoryPath: "owner/repository",
 				Branch:         "main", // Default branch.
 				CreatedBy:      models.Actor{Subject: "some@some-email"},
-				TokenNonce:     "some-token-nonce",
+				TokenHash:      new("some-token-hash"),
 				TagRegex:       &sampleTagRegex,
 				// Other fields should remain unchanged.
 			},
@@ -1470,7 +1469,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 					RepositoryPath: "owner/repository",
 					Branch:         "main",
 					CreatedBy:      models.Actor{Subject: "some@some-email"},
-					TokenNonce:     "some-token-nonce",
+					TokenHash:      new("some-token-hash"),
 					TagRegex:       &sampleTagRegex,
 				},
 				WebhookURL: ptr.String("https://tharsis.domain/v1/vcs/events?token=signed-token"),
@@ -1567,10 +1566,8 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			mockTransactions.Test(t)
 			mockVCSProviders.Test(t)
 			mockWorkspaceVCSProviderLinks.Test(t)
-			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
-
 			mockCaller.On("GetActor").Return(mockCallerActor().WithSubject("testsubject"))
-			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
 			ctx := auth.WithCaller(context.Background(), &mockCaller)
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
@@ -1588,13 +1585,19 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 
 			mockProviders.On("CreateAccessToken", mock.Anything, createAccessTokenInput).Return(createAccessTokenPayload, nil)
 			mockProviders.On("GetProject", mock.Anything, test.getProjectInput).Return(sampleProjectPayload, nil)
-			mockProviders.On("CreateWebhook", mock.Anything, test.createWebhookInput).Return(sampleWebhookPayload, nil)
+			mockProviders.On("CreateWebhook", mock.Anything, mock.MatchedBy(func(input *types.CreateWebhookInput) bool {
+				got := *input
+				validToken := strings.HasPrefix(string(got.WebhookToken), "tsv_")
+				got.WebhookToken = nil
+
+				return validToken && assert.ObjectsAreEqual(*test.createWebhookInput, got)
+			})).Return(sampleWebhookPayload, nil)
 
 			mockVCSProviders.On("GetProviderByID", mock.Anything, "provider-id").Return(test.existingProvider, nil)
 
-			mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil).Maybe()
-
-			mockWorkspaceVCSProviderLinks.On("CreateLink", mock.Anything, mock.Anything).Return(test.createdLink, nil)
+			mockWorkspaceVCSProviderLinks.On("CreateLink", mock.Anything, mock.MatchedBy(func(link *models.WorkspaceVCSProviderLink) bool {
+				return link.TokenNonce == nil && link.TokenHash != nil
+			})).Return(test.createdLink, nil)
 			mockWorkspaceVCSProviderLinks.On("UpdateLink", mock.Anything, test.createdLink).Return(test.updatedLink, nil)
 
 			dbClient := &db.Client{
@@ -1614,7 +1617,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, mockSigningKeyManager, providerMap, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
+			service := newService(logger, dbClient, nil, providerMap, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
 
 			response, err := service.CreateWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1622,6 +1625,21 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			} else if err != nil {
 				t.Fatal(err)
 			} else {
+				// The webhook token is random, so check its format and swap in a fixed value for the comparison.
+				if response.WebhookURL != nil {
+					webhookURL, pErr := url.Parse(*response.WebhookURL)
+					require.NoError(t, pErr)
+
+					token := webhookURL.Query().Get("token")
+					require.True(t, strings.HasPrefix(token, "tsv_"))
+					response.WebhookURL = ptr.String(strings.Replace(*response.WebhookURL, token, "signed-token", 1))
+				}
+
+				if response.WebhookToken != nil {
+					require.True(t, strings.HasPrefix(string(response.WebhookToken), "tsv_"))
+					response.WebhookToken = []byte("signed-token")
+				}
+
 				assert.Equal(t, test.expectedResponse, response)
 			}
 		})
@@ -1646,6 +1664,7 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: resourceUUID,
 					},
+					TokenHash:       new("hash"),
 					RepositoryPath:  "owner/repository",
 					Branch:          "main",
 					ModuleDirectory: ptr.String("./modules/../modules/network/"),
@@ -1662,6 +1681,7 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: resourceUUID,
 					},
+					TokenHash:      new("hash"),
 					RepositoryPath: "owner/repository",
 					Branch:         "main",
 				},
@@ -1670,6 +1690,7 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: resourceUUID,
 				},
+				TokenHash:      new("hash"),
 				RepositoryPath: "owner/repository",
 				Branch:         "feature/branch",
 			},
@@ -1677,6 +1698,7 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: resourceUUID,
 				},
+				TokenHash:      new("hash"),
 				RepositoryPath: "owner/repository",
 				Branch:         "main",
 			},
@@ -1689,6 +1711,7 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: resourceUUID,
 					},
+					TokenHash:      new("hash"),
 					RepositoryPath: "owner/repository",
 					GlobPatterns:   []string{"[invalid"},
 				},
@@ -1717,7 +1740,7 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, "", 0)
 
 			link, err := service.UpdateWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1847,7 +1870,7 @@ func TestDeleteWorkspaceVCSProviderLink(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, oAuthStateGenerator, "", 0)
+			service := newService(logger, dbClient, nil, providerMap, nil, nil, nil, oAuthStateGenerator, "", 0)
 
 			err := service.DeleteWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -2016,7 +2039,7 @@ func TestCreateVCSRun(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, &mockManager, oAuthStateGenerator, "", 5000)
+			service := newService(logger, dbClient, nil, providerMap, nil, nil, &mockManager, oAuthStateGenerator, "", 5000)
 
 			err := service.CreateVCSRun(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -2351,7 +2374,7 @@ func TestProcessWebhookEvent(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, nil, &mockWorkspaceService, &mockManager, oAuthStateGenerator, "", 5000)
+			service := newService(logger, dbClient, nil, providerMap, nil, &mockWorkspaceService, &mockManager, oAuthStateGenerator, "", 5000)
 
 			err := service.ProcessWebhookEvent(auth.WithCaller(context.Background(), caller), test.input)
 			if test.expectedErrorCode != "" {
@@ -2440,7 +2463,7 @@ func TestResetVCSProviderOAuthToken(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, oAuthStateGenerator, "", 5000)
+			service := newService(logger, dbClient, nil, providerMap, nil, nil, nil, oAuthStateGenerator, "", 5000)
 
 			response, err := service.ResetVCSProviderOAuthToken(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -2644,7 +2667,7 @@ func TestProcessOAuth(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, nil, tharsisURL, 5000)
+			service := newService(logger, dbClient, nil, providerMap, nil, nil, nil, nil, tharsisURL, 5000)
 
 			err := service.ProcessOAuth(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -2946,6 +2969,10 @@ func Test_handleEvent(t *testing.T) {
 			runInput := &run.CreateRunInput{
 				ConfigurationVersionID: &createdCV.Metadata.ID,
 				WorkspaceID:            test.input.link.WorkspaceID,
+				Annotations: []*models.RunAnnotation{
+					{Key: "vcs-event", Value: runAnnotationEventNames[test.input.vcsEvent.Type]},
+					{Key: "repository", Value: test.input.link.RepositoryPath},
+				},
 			}
 
 			cvInput := &workspace.CreateConfigurationVersionInput{
@@ -3009,7 +3036,6 @@ func Test_handleEvent(t *testing.T) {
 			s := service{
 				logger:              logger,
 				dbClient:            nil,
-				signingKeyManager:   nil,
 				vcsProviderMap:      nil,
 				runService:          &mockRunService,
 				workspaceService:    &mockWorkspaceService,
@@ -3332,4 +3358,439 @@ func FuzzValidateWebhookEventInput(f *testing.F) {
 			assert.Equal(t, errors.EInvalid, errors.ErrorCode(err))
 		}
 	})
+}
+
+func TestResetWorkspaceVCSProviderLinkWebhookToken(t *testing.T) {
+	errWebhook := errors.New("webhook failure")
+
+	newLink := func() *models.WorkspaceVCSProviderLink {
+		return &models.WorkspaceVCSProviderLink{
+			Metadata:       models.ResourceMetadata{ID: resourceUUID},
+			WorkspaceID:    "workspace-id",
+			ProviderID:     "provider-id",
+			RepositoryPath: "owner/repository",
+			Branch:         "main",
+			TokenNonce:     new("legacy-nonce"),
+			WebhookID:      "old-webhook-id",
+		}
+	}
+
+	newProvider := func(providerType models.VCSProviderType, autoCreateWebhooks bool) *models.VCSProvider {
+		return &models.VCSProvider{
+			Metadata:           models.ResourceMetadata{ID: "provider-id"},
+			URL:                sampleProviderURL,
+			Type:               providerType,
+			OAuthAccessToken:   &sampleOAuthAccessToken,
+			AutoCreateWebhooks: autoCreateWebhooks,
+		}
+	}
+
+	isTokenLink := func(link *models.WorkspaceVCSProviderLink, webhookID string) bool {
+		return link.TokenNonce == nil && link.TokenHash != nil && link.WebhookID == webhookID
+	}
+
+	type mocks struct {
+		caller       *auth.MockCaller
+		providers    *db.MockVCSProviders
+		links        *db.MockWorkspaceVCSProviderLinks
+		transactions *db.MockTransactions
+		provider     *MockProvider
+	}
+
+	linkFound := func(m *mocks) {
+		m.links.On("GetLinkByID", mock.Anything, resourceUUID).Return(newLink(), nil)
+	}
+
+	allowed := func(m *mocks) {
+		linkFound(m)
+		m.caller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(nil)
+	}
+
+	updateWebhookMatcher := mock.MatchedBy(func(input *types.UpdateWebhookInput) bool {
+		return strings.HasPrefix(string(input.WebhookToken), "tsv_") &&
+			input.RepositoryPath == "owner/repository" &&
+			input.WebhookID == "old-webhook-id" &&
+			input.AccessToken == sampleOAuthAccessToken
+	})
+
+	testCases := []struct {
+		name                   string
+		withCaller             bool
+		setup                  func(*mocks)
+		expectErrorCode        errors.CodeType
+		expectWebhookURL       string
+		expectGitLabToken      bool
+		expectNoWebhookDetails bool
+	}{
+		{
+			name:            "unauthenticated caller",
+			expectErrorCode: errors.EUnauthorized,
+			setup:           func(*mocks) {},
+		},
+		{
+			name:       "link lookup fails",
+			withCaller: true,
+			setup: func(m *mocks) {
+				m.links.On("GetLinkByID", mock.Anything, resourceUUID).Return(nil, errors.New("db error"))
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:       "link not found",
+			withCaller: true,
+			setup: func(m *mocks) {
+				m.links.On("GetLinkByID", mock.Anything, resourceUUID).Return(nil, nil)
+			},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:       "permission denied",
+			withCaller: true,
+			setup: func(m *mocks) {
+				linkFound(m)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(errors.New("denied", errors.WithErrorCode(errors.EForbidden)))
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:       "provider lookup fails",
+			withCaller: true,
+			setup: func(m *mocks) {
+				allowed(m)
+				m.providers.On("GetProviderByID", mock.Anything, "provider-id").Return(nil, errors.New("db error"))
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:       "provider not found",
+			withCaller: true,
+			setup: func(m *mocks) {
+				allowed(m)
+				m.providers.On("GetProviderByID", mock.Anything, "provider-id").Return(nil, nil)
+			},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:       "auto create provider updates the existing webhook in place",
+			withCaller: true,
+			setup: func(m *mocks) {
+				allowed(m)
+				m.providers.On("GetProviderByID", mock.Anything, "provider-id").Return(newProvider(models.GitHubProviderType, true), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(nil)
+				m.links.On("UpdateLink", mock.Anything, mock.MatchedBy(func(link *models.WorkspaceVCSProviderLink) bool {
+					return isTokenLink(link, "old-webhook-id")
+				})).Return(&models.WorkspaceVCSProviderLink{Metadata: models.ResourceMetadata{ID: resourceUUID}}, nil)
+				m.provider.On("UpdateWebhook", mock.Anything, updateWebhookMatcher).Return(nil)
+			},
+			expectNoWebhookDetails: true,
+		},
+		{
+			name:       "webhook update failure rolls back without committing",
+			withCaller: true,
+			setup: func(m *mocks) {
+				allowed(m)
+				m.providers.On("GetProviderByID", mock.Anything, "provider-id").Return(newProvider(models.GitHubProviderType, true), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.links.On("UpdateLink", mock.Anything, mock.Anything).Return(&models.WorkspaceVCSProviderLink{Metadata: models.ResourceMetadata{ID: resourceUUID}}, nil)
+				m.provider.On("UpdateWebhook", mock.Anything, updateWebhookMatcher).Return(errWebhook)
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:       "webhook deleted at the provider returns not found and rolls back",
+			withCaller: true,
+			setup: func(m *mocks) {
+				allowed(m)
+				m.providers.On("GetProviderByID", mock.Anything, "provider-id").Return(newProvider(models.GitHubProviderType, true), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.links.On("UpdateLink", mock.Anything, mock.Anything).Return(&models.WorkspaceVCSProviderLink{Metadata: models.ResourceMetadata{ID: resourceUUID}}, nil)
+				m.provider.On("UpdateWebhook", mock.Anything, updateWebhookMatcher).Return(errors.New("gone", errors.WithErrorCode(errors.ENotFound)))
+			},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:       "link update failure does not touch the webhook",
+			withCaller: true,
+			setup: func(m *mocks) {
+				allowed(m)
+				m.providers.On("GetProviderByID", mock.Anything, "provider-id").Return(newProvider(models.GitHubProviderType, true), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.links.On("UpdateLink", mock.Anything, mock.Anything).Return(nil, errors.New("db error"))
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:       "commit failure after the webhook update returns an error",
+			withCaller: true,
+			setup: func(m *mocks) {
+				allowed(m)
+				m.providers.On("GetProviderByID", mock.Anything, "provider-id").Return(newProvider(models.GitHubProviderType, true), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(errors.New("commit failed"))
+				m.links.On("UpdateLink", mock.Anything, mock.Anything).Return(&models.WorkspaceVCSProviderLink{Metadata: models.ResourceMetadata{ID: resourceUUID}}, nil)
+				m.provider.On("UpdateWebhook", mock.Anything, updateWebhookMatcher).Return(nil)
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name:       "manual webhook for GitHub returns a url containing the token",
+			withCaller: true,
+			setup: func(m *mocks) {
+				allowed(m)
+				m.providers.On("GetProviderByID", mock.Anything, "provider-id").Return(newProvider(models.GitHubProviderType, false), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(nil)
+				m.links.On("UpdateLink", mock.Anything, mock.MatchedBy(func(link *models.WorkspaceVCSProviderLink) bool {
+					return isTokenLink(link, "old-webhook-id")
+				})).Return(&models.WorkspaceVCSProviderLink{Metadata: models.ResourceMetadata{ID: resourceUUID}}, nil)
+			},
+			expectWebhookURL: "token=tsv_",
+		},
+		{
+			name:       "manual webhook for GitLab returns the token separately",
+			withCaller: true,
+			setup: func(m *mocks) {
+				allowed(m)
+				m.providers.On("GetProviderByID", mock.Anything, "provider-id").Return(newProvider(models.GitLabProviderType, false), nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(nil)
+				m.links.On("UpdateLink", mock.Anything, mock.Anything).Return(&models.WorkspaceVCSProviderLink{Metadata: models.ResourceMetadata{ID: resourceUUID}}, nil)
+			},
+			expectGitLabToken: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			m := &mocks{
+				caller:       auth.NewMockCaller(t),
+				providers:    db.NewMockVCSProviders(t),
+				links:        db.NewMockWorkspaceVCSProviderLinks(t),
+				transactions: db.NewMockTransactions(t),
+				provider:     NewMockProvider(t),
+			}
+			test.setup(m)
+
+			testLogger, _ := logger.NewForTest()
+			service := newService(
+				testLogger,
+				&db.Client{VCSProviders: m.providers, WorkspaceVCSProviderLinks: m.links, Transactions: m.transactions},
+				nil,
+				map[models.VCSProviderType]Provider{models.GitHubProviderType: m.provider, models.GitLabProviderType: m.provider},
+				nil, nil, nil, nil, "https://tharsis.domain", 0,
+			)
+
+			ctx := t.Context()
+			if test.withCaller {
+				ctx = auth.WithCaller(ctx, m.caller)
+			}
+
+			response, err := service.ResetWorkspaceVCSProviderLinkWebhookToken(ctx, &ResetWorkspaceVCSProviderLinkWebhookTokenInput{LinkID: resourceUUID})
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, response.Link)
+
+			if test.expectNoWebhookDetails {
+				assert.Nil(t, response.WebhookURL)
+				assert.Nil(t, response.WebhookToken)
+			}
+
+			if test.expectWebhookURL != "" {
+				require.NotNil(t, response.WebhookURL)
+				assert.Contains(t, *response.WebhookURL, test.expectWebhookURL)
+				assert.Nil(t, response.WebhookToken)
+			}
+
+			if test.expectGitLabToken {
+				require.NotNil(t, response.WebhookURL)
+				assert.NotContains(t, *response.WebhookURL, "token=")
+				assert.True(t, strings.HasPrefix(string(response.WebhookToken), "tsv_"))
+			}
+		})
+	}
+}
+
+func TestBuildRunAnnotations(t *testing.T) {
+	repositoryURL := "https://github.com/owner/repository"
+	commitURL := repositoryURL + "/commit/" + sampleAfterCommit
+	mergeRequestURL := repositoryURL + "/pull/12"
+	branchRef := "refs/heads/feature/branch"
+	tagRef := "refs/tags/v0.1"
+	manualRef := "main"
+	commitID := sampleAfterCommit
+	longRef := strings.Repeat("a", 760)
+
+	link := &models.WorkspaceVCSProviderLink{RepositoryPath: "owner/repository"}
+
+	type testCase struct {
+		name                string
+		vcsEvent            *models.VCSEvent
+		webhookInput        *ProcessWebhookEventInput
+		commitURLErr        error
+		expectBuildCommit   bool
+		expectedAnnotations []*models.RunAnnotation
+	}
+
+	testCases := []testCase{
+		{
+			name: "branch push",
+			vcsEvent: &models.VCSEvent{
+				Type:                models.BranchEventType,
+				SourceReferenceName: &branchRef,
+				CommitID:            &commitID,
+				RepositoryURL:       repositoryURL,
+			},
+			webhookInput: &ProcessWebhookEventInput{
+				Sender: "jane",
+			},
+			expectBuildCommit: true,
+			expectedAnnotations: []*models.RunAnnotation{
+				{Key: "vcs-event", Value: "push"},
+				{Key: "repository", Value: "owner/repository", Link: &repositoryURL},
+				{Key: "ref", Value: "feature/branch"},
+				{Key: "commit", Value: commitID, Link: &commitURL},
+			},
+		},
+		{
+			name: "tag push without a sender",
+			vcsEvent: &models.VCSEvent{
+				Type:                models.TagEventType,
+				SourceReferenceName: &tagRef,
+				CommitID:            &commitID,
+				RepositoryURL:       repositoryURL,
+			},
+			webhookInput:      &ProcessWebhookEventInput{},
+			expectBuildCommit: true,
+			expectedAnnotations: []*models.RunAnnotation{
+				{Key: "vcs-event", Value: "tag"},
+				{Key: "repository", Value: "owner/repository", Link: &repositoryURL},
+				{Key: "ref", Value: "v0.1"},
+				{Key: "commit", Value: commitID, Link: &commitURL},
+			},
+		},
+		{
+			name: "merge request",
+			vcsEvent: &models.VCSEvent{
+				Type:                models.MergeRequestEventType,
+				SourceReferenceName: new("feature/branch"),
+				CommitID:            &commitID,
+				RepositoryURL:       repositoryURL,
+			},
+			webhookInput: &ProcessWebhookEventInput{
+				MergeRequestNumber: 12,
+				MergeRequestURL:    mergeRequestURL,
+				TargetBranch:       "main",
+				Sender:             "jane",
+			},
+			expectBuildCommit: true,
+			expectedAnnotations: []*models.RunAnnotation{
+				{Key: "vcs-event", Value: "merge-request"},
+				{Key: "repository", Value: "owner/repository", Link: &repositoryURL},
+				{Key: "ref", Value: "feature/branch"},
+				{Key: "commit", Value: commitID, Link: &commitURL},
+				{Key: "merge-request", Value: "12", Link: &mergeRequestURL},
+				{Key: "target-branch", Value: "main"},
+			},
+		},
+		{
+			name: "merge request with a non-web URL drops the link",
+			vcsEvent: &models.VCSEvent{
+				Type:          models.MergeRequestEventType,
+				RepositoryURL: repositoryURL,
+			},
+			webhookInput: &ProcessWebhookEventInput{
+				MergeRequestNumber: 12,
+				MergeRequestURL:    "javascript:alert(1)",
+				TargetBranch:       "main",
+			},
+			expectedAnnotations: []*models.RunAnnotation{
+				{Key: "vcs-event", Value: "merge-request"},
+				{Key: "repository", Value: "owner/repository", Link: &repositoryURL},
+				{Key: "merge-request", Value: "12"},
+				{Key: "target-branch", Value: "main"},
+			},
+		},
+		{
+			name: "manual run of a ref",
+			vcsEvent: &models.VCSEvent{
+				Type:                models.ManualEventType,
+				SourceReferenceName: &manualRef,
+				RepositoryURL:       repositoryURL,
+			},
+			expectedAnnotations: []*models.RunAnnotation{
+				{Key: "vcs-event", Value: "manual"},
+				{Key: "repository", Value: "owner/repository", Link: &repositoryURL},
+				{Key: "ref", Value: "main"},
+			},
+		},
+		{
+			name: "manual run of a commit whose URL can't be built",
+			vcsEvent: &models.VCSEvent{
+				Type:          models.ManualEventType,
+				CommitID:      &commitID,
+				RepositoryURL: repositoryURL,
+			},
+			commitURLErr:      errors.New("bad url"),
+			expectBuildCommit: true,
+			expectedAnnotations: []*models.RunAnnotation{
+				{Key: "vcs-event", Value: "manual"},
+				{Key: "repository", Value: "owner/repository", Link: &repositoryURL},
+				{Key: "commit", Value: commitID},
+			},
+		},
+		{
+			name: "annotations that don't fit within the size limit are skipped",
+			vcsEvent: &models.VCSEvent{
+				Type:          models.MergeRequestEventType,
+				CommitID:      &commitID,
+				RepositoryURL: repositoryURL,
+			},
+			webhookInput: &ProcessWebhookEventInput{
+				MergeRequestNumber: 12,
+				TargetBranch:       longRef,
+			},
+			expectBuildCommit: true,
+			expectedAnnotations: []*models.RunAnnotation{
+				{Key: "vcs-event", Value: "merge-request"},
+				{Key: "repository", Value: "owner/repository", Link: &repositoryURL},
+				{Key: "commit", Value: commitID, Link: &commitURL},
+				{Key: "merge-request", Value: "12"},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockProvider := NewMockProvider(t)
+
+			if test.expectBuildCommit {
+				builtURL := commitURL
+				if test.commitURLErr != nil {
+					builtURL = ""
+				}
+
+				mockProvider.On("BuildCommitURL", &types.BuildCommitURLInput{
+					RepositoryURL: repositoryURL,
+					CommitID:      commitID,
+				}).Return(builtURL, test.commitURLErr)
+			}
+
+			annotations := buildRunAnnotations(mockProvider, link, test.vcsEvent, test.webhookInput)
+
+			assert.Equal(t, test.expectedAnnotations, annotations)
+			assert.Nil(t, (&models.Run{Annotations: annotations}).Validate())
+		})
+	}
 }

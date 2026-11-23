@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<02af7cfc76dce26803da7680e232845c>>
+ * @generated SignedSource<<e79e2bd2f98f6acd10dca386d8c18020>>
  * @lightSyntaxTransform
  */
 
@@ -353,6 +353,32 @@ return {
               {
                 "alias": null,
                 "args": null,
+                "concreteType": "WorkspaceVCSProviderLink",
+                "kind": "LinkedField",
+                "name": "workspaceVcsProviderLink",
+                "plural": false,
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "usesLegacyWebhookToken",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "webhookDisabled",
+                    "storageKey": null
+                  },
+                  (v2/*:: as any*/)
+                ],
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
                 "concreteType": "Run",
                 "kind": "LinkedField",
                 "name": "currentApplyRun",
@@ -417,15 +443,6 @@ return {
                             "name": "__typename",
                             "storageKey": null
                           },
-                          (v3/*:: as any*/),
-                          {
-                            "alias": null,
-                            "args": null,
-                            "kind": "ScalarField",
-                            "name": "provider",
-                            "storageKey": null
-                          },
-                          (v14/*:: as any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -439,7 +456,16 @@ return {
                             "kind": "ScalarField",
                             "name": "module",
                             "storageKey": null
-                          }
+                          },
+                          (v3/*:: as any*/),
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "provider",
+                            "storageKey": null
+                          },
+                          (v14/*:: as any*/)
                         ],
                         "storageKey": null
                       },
@@ -724,12 +750,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "24376b15646deee67a43a74504264e12",
+    "cacheID": "f573dc48c262a9dced0c306f23f2ac9e",
     "id": null,
     "metadata": {},
     "name": "WorkspaceDetailsWorkspaceEventSubscription",
     "operationKind": "subscription",
-    "text": "subscription WorkspaceDetailsWorkspaceEventSubscription(\n  $input: WorkspaceSubscriptionInput!\n) {\n  workspaceEvents(input: $input) {\n    workspace {\n      id\n      ...WorkspaceDetailsIndexFragment_workspace\n    }\n  }\n}\n\nfragment ModuleSourceLinkFragment_run on Run {\n  moduleSource\n  moduleVersion\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment StateVersionCheckResultRowFragment_checkResult on TerraformCheckResult {\n  name\n  status\n  objects {\n    address\n    status\n    failureMessages\n  }\n}\n\nfragment StateVersionCheckResultsFragment_checkResults on StateVersionInventory {\n  checkResults {\n    name\n    status\n    ...StateVersionCheckResultRowFragment_checkResult\n  }\n}\n\nfragment StateVersionDependenciesFragment_dependencies on StateVersionInventory {\n  dependencies {\n    workspacePath\n    ...StateVersionDependencyListItemFragment_dependency\n  }\n}\n\nfragment StateVersionDependencyListItemFragment_dependency on StateVersionDependency {\n  workspacePath\n  stateVersion {\n    id\n    metadata {\n      updatedAt\n    }\n  }\n  workspace {\n    id\n    currentStateVersion {\n      id\n    }\n  }\n}\n\nfragment StateVersionFileFragment_stateVersion on StateVersion {\n  id\n}\n\nfragment StateVersionInputVariableListItemFragment_variable on RunVariable {\n  key\n  value\n  category\n  namespacePath\n  sensitive\n  versionId\n  includedInTfConfig\n}\n\nfragment StateVersionInputVariablesFragment_variables on Run {\n  variables {\n    key\n    category\n    namespacePath\n    includedInTfConfig\n    ...StateVersionInputVariableListItemFragment_variable\n  }\n}\n\nfragment StateVersionOutputListItemFragment_output on StateVersionOutput {\n  name\n  value\n  type\n  sensitive\n}\n\nfragment StateVersionOutputsFragment_outputs on StateVersion {\n  outputs {\n    name\n    ...StateVersionOutputListItemFragment_output\n    id\n  }\n}\n\nfragment StateVersionResourceListItemFragment_resource on StateVersionResource {\n  name\n  type\n  provider\n  mode\n  module\n}\n\nfragment StateVersionResourcesFragment_resources on StateVersionInventory {\n  resources {\n    name\n    provider\n    type\n    ...StateVersionResourceListItemFragment_resource\n  }\n}\n\nfragment WorkspaceDetailsDriftDetectionFragment_workspace on Workspace {\n  id\n  fullPath\n  assessment {\n    hasDrift\n    startedAt\n    completedAt\n    errorMessage\n    run {\n      id\n      status\n    }\n    id\n  }\n}\n\nfragment WorkspaceDetailsEmptyFragment_workspace on Workspace {\n  id\n  fullPath\n}\n\nfragment WorkspaceDetailsIndexFragment_workspace on Workspace {\n  id\n  name\n  description\n  fullPath\n  locked\n  destroyed\n  preventDestroyPlan\n  labels {\n    key\n    value\n  }\n  metadata {\n    trn\n  }\n  assessment {\n    hasDrift\n    id\n  }\n  ...WorkspaceDetailsEmptyFragment_workspace\n  ...WorkspaceDetailsStatusPanelFragment_workspace\n  ...WorkspaceNotificationPreferenceFragment_workspace\n  currentApplyRun {\n    id\n  }\n  currentStateVersion {\n    id\n    ...StateVersionOutputsFragment_outputs\n    inventory {\n      ...StateVersionResourcesFragment_resources\n      ...StateVersionDependenciesFragment_dependencies\n      ...StateVersionCheckResultsFragment_checkResults\n    }\n    ...StateVersionFileFragment_stateVersion\n    run {\n      id\n      ...StateVersionInputVariablesFragment_variables\n    }\n  }\n  ...WorkspaceDetailsDriftDetectionFragment_workspace\n}\n\nfragment WorkspaceDetailsStatusPanelFragment_workspace on Workspace {\n  fullPath\n  currentApplyRun {\n    ...RunStageIconsFragment_run\n    id\n    isDestroy\n  }\n  currentStateVersion {\n    id\n    metadata {\n      createdAt\n    }\n    inventory {\n      resources {\n        __typename\n      }\n    }\n    run {\n      ...ModuleSourceLinkFragment_run\n      ...RunStageIconsFragment_run\n      id\n      status\n      apply {\n        status\n        id\n      }\n      plan {\n        summary {\n          resourceAdditions\n          resourceChanges\n          resourceDestructions\n        }\n        id\n      }\n      moduleSource\n      moduleVersion\n      configurationVersion {\n        id\n        metadata {\n          createdAt\n        }\n        vcsEvent {\n          id\n        }\n      }\n    }\n  }\n}\n\nfragment WorkspaceNotificationPreferenceFragment_workspace on Workspace {\n  fullPath\n}\n"
+    "text": "subscription WorkspaceDetailsWorkspaceEventSubscription(\n  $input: WorkspaceSubscriptionInput!\n) {\n  workspaceEvents(input: $input) {\n    workspace {\n      id\n      ...WorkspaceDetailsIndexFragment_workspace\n    }\n  }\n}\n\nfragment ModuleSourceLinkFragment_run on Run {\n  moduleSource\n  moduleVersion\n}\n\nfragment RunStageIconsFragment_run on Run {\n  id\n  status\n  hasAdvisoryFailures\n  plan {\n    status\n    id\n  }\n  taskStages {\n    stageName\n    status\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n\nfragment StateVersionCheckResultRowFragment_checkResult on TerraformCheckResult {\n  name\n  status\n  objects {\n    address\n    status\n    failureMessages\n  }\n}\n\nfragment StateVersionCheckResultsFragment_checkResults on StateVersionInventory {\n  checkResults {\n    name\n    status\n    ...StateVersionCheckResultRowFragment_checkResult\n  }\n}\n\nfragment StateVersionDependenciesFragment_dependencies on StateVersionInventory {\n  dependencies {\n    workspacePath\n    ...StateVersionDependencyListItemFragment_dependency\n  }\n}\n\nfragment StateVersionDependencyListItemFragment_dependency on StateVersionDependency {\n  workspacePath\n  stateVersion {\n    id\n    metadata {\n      updatedAt\n    }\n  }\n  workspace {\n    id\n    currentStateVersion {\n      id\n    }\n  }\n}\n\nfragment StateVersionFileFragment_stateVersion on StateVersion {\n  id\n}\n\nfragment StateVersionInputVariableListItemFragment_variable on RunVariable {\n  key\n  value\n  category\n  namespacePath\n  sensitive\n  versionId\n  includedInTfConfig\n}\n\nfragment StateVersionInputVariablesFragment_variables on Run {\n  variables {\n    key\n    category\n    namespacePath\n    includedInTfConfig\n    ...StateVersionInputVariableListItemFragment_variable\n  }\n}\n\nfragment StateVersionOutputListItemFragment_output on StateVersionOutput {\n  name\n  value\n  type\n  sensitive\n}\n\nfragment StateVersionOutputsFragment_outputs on StateVersion {\n  outputs {\n    name\n    ...StateVersionOutputListItemFragment_output\n    id\n  }\n}\n\nfragment StateVersionResourceListItemFragment_resource on StateVersionResource {\n  name\n  type\n  provider\n  mode\n  module\n}\n\nfragment StateVersionResourcesFragment_resources on StateVersionInventory {\n  resources {\n    mode\n    module\n    name\n    provider\n    type\n    ...StateVersionResourceListItemFragment_resource\n  }\n}\n\nfragment WorkspaceDetailsDriftDetectionFragment_workspace on Workspace {\n  id\n  fullPath\n  assessment {\n    hasDrift\n    startedAt\n    completedAt\n    errorMessage\n    run {\n      id\n      status\n    }\n    id\n  }\n}\n\nfragment WorkspaceDetailsEmptyFragment_workspace on Workspace {\n  id\n  fullPath\n}\n\nfragment WorkspaceDetailsIndexFragment_workspace on Workspace {\n  id\n  name\n  description\n  fullPath\n  locked\n  destroyed\n  preventDestroyPlan\n  labels {\n    key\n    value\n  }\n  metadata {\n    trn\n  }\n  assessment {\n    hasDrift\n    id\n  }\n  ...WorkspaceVCSWebhookAlertFragment_workspace\n  ...WorkspaceDetailsEmptyFragment_workspace\n  ...WorkspaceDetailsStatusPanelFragment_workspace\n  ...WorkspaceNotificationPreferenceFragment_workspace\n  currentApplyRun {\n    id\n  }\n  currentStateVersion {\n    id\n    ...StateVersionOutputsFragment_outputs\n    inventory {\n      ...StateVersionResourcesFragment_resources\n      ...StateVersionDependenciesFragment_dependencies\n      ...StateVersionCheckResultsFragment_checkResults\n    }\n    ...StateVersionFileFragment_stateVersion\n    run {\n      id\n      ...StateVersionInputVariablesFragment_variables\n    }\n  }\n  ...WorkspaceDetailsDriftDetectionFragment_workspace\n}\n\nfragment WorkspaceDetailsStatusPanelFragment_workspace on Workspace {\n  fullPath\n  currentApplyRun {\n    ...RunStageIconsFragment_run\n    id\n    isDestroy\n  }\n  currentStateVersion {\n    id\n    metadata {\n      createdAt\n    }\n    inventory {\n      resources {\n        __typename\n      }\n    }\n    run {\n      ...ModuleSourceLinkFragment_run\n      ...RunStageIconsFragment_run\n      id\n      status\n      apply {\n        status\n        id\n      }\n      plan {\n        summary {\n          resourceAdditions\n          resourceChanges\n          resourceDestructions\n        }\n        id\n      }\n      moduleSource\n      moduleVersion\n      configurationVersion {\n        id\n        metadata {\n          createdAt\n        }\n        vcsEvent {\n          id\n        }\n      }\n    }\n  }\n}\n\nfragment WorkspaceNotificationPreferenceFragment_workspace on Workspace {\n  fullPath\n}\n\nfragment WorkspaceVCSWebhookAlertFragment_workspace on Workspace {\n  fullPath\n  workspaceVcsProviderLink {\n    usesLegacyWebhookToken\n    webhookDisabled\n    id\n  }\n}\n"
   }
 };
 })();

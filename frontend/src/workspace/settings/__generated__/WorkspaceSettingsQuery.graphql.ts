@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<852d879a7eb3a619f9639296bcb149bf>>
+ * @generated SignedSource<<cec46a5757494f22d889d8c560eb401b>>
  * @lightSyntaxTransform
  */
 
@@ -43,72 +43,49 @@ v2 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "__typename",
+  "name": "id",
   "storageKey": null
 },
 v3 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "id",
+  "name": "name",
   "storageKey": null
 },
 v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "name",
+  "name": "inherited",
   "storageKey": null
 },
 v5 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "description",
+  "name": "namespacePath",
   "storageKey": null
 },
 v6 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "inherited",
+  "name": "value",
   "storageKey": null
 },
-v7 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "namespacePath",
-  "storageKey": null
-},
+v7 = [
+  (v4/*:: as any*/),
+  (v6/*:: as any*/),
+  (v5/*:: as any*/)
+],
 v8 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "value",
+  "name": "groupPath",
   "storageKey": null
-},
-v9 = [
-  (v6/*:: as any*/),
-  (v8/*:: as any*/),
-  (v7/*:: as any*/)
-],
-v10 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "type",
-  "storageKey": null
-},
-v11 = [
-  {
-    "alias": null,
-    "args": null,
-    "kind": "ScalarField",
-    "name": "trnSnapshot",
-    "storageKey": null
-  }
-];
+};
 return {
   "fragment": {
     "argumentDefinitions": (v0/*:: as any*/),
@@ -161,13 +138,25 @@ return {
         "name": "node",
         "plural": false,
         "selections": [
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "__typename",
+            "storageKey": null
+          },
           (v2/*:: as any*/),
-          (v3/*:: as any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v4/*:: as any*/),
-              (v5/*:: as any*/),
+              (v3/*:: as any*/),
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "description",
+                "storageKey": null
+              },
               {
                 "alias": null,
                 "args": null,
@@ -183,9 +172,9 @@ return {
                 "name": "runnerTags",
                 "plural": false,
                 "selections": [
-                  (v6/*:: as any*/),
-                  (v7/*:: as any*/),
-                  (v8/*:: as any*/)
+                  (v4/*:: as any*/),
+                  (v5/*:: as any*/),
+                  (v6/*:: as any*/)
                 ],
                 "storageKey": null
               },
@@ -217,7 +206,7 @@ return {
                 "kind": "LinkedField",
                 "name": "driftDetectionEnabled",
                 "plural": false,
-                "selections": (v9/*:: as any*/),
+                "selections": (v7/*:: as any*/),
                 "storageKey": null
               },
               {
@@ -227,7 +216,7 @@ return {
                 "kind": "LinkedField",
                 "name": "providerMirrorEnabled",
                 "plural": false,
-                "selections": (v9/*:: as any*/),
+                "selections": (v7/*:: as any*/),
                 "storageKey": null
               },
               {
@@ -237,16 +226,10 @@ return {
                 "kind": "LinkedField",
                 "name": "outputVisibility",
                 "plural": false,
-                "selections": (v9/*:: as any*/),
+                "selections": (v7/*:: as any*/),
                 "storageKey": null
               },
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "groupPath",
-                "storageKey": null
-              },
+              (v8/*:: as any*/),
               {
                 "alias": null,
                 "args": null,
@@ -255,100 +238,7 @@ return {
                 "name": "workspaceVcsProviderLink",
                 "plural": false,
                 "selections": [
-                  (v3/*:: as any*/),
-                  {
-                    "alias": null,
-                    "args": null,
-                    "concreteType": "ResourceMetadata",
-                    "kind": "LinkedField",
-                    "name": "metadata",
-                    "plural": false,
-                    "selections": [
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "createdAt",
-                        "storageKey": null
-                      }
-                    ],
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "createdBy",
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "concreteType": null,
-                    "kind": "LinkedField",
-                    "name": "createdByActor",
-                    "plural": false,
-                    "selections": [
-                      (v2/*:: as any*/),
-                      {
-                        "kind": "TypeDiscriminator",
-                        "abstractKey": "__isActor"
-                      },
-                      (v10/*:: as any*/),
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "principalId",
-                        "storageKey": null
-                      },
-                      {
-                        "kind": "InlineFragment",
-                        "selections": [
-                          {
-                            "alias": null,
-                            "args": null,
-                            "concreteType": "User",
-                            "kind": "LinkedField",
-                            "name": "user",
-                            "plural": false,
-                            "selections": [
-                              {
-                                "alias": null,
-                                "args": null,
-                                "kind": "ScalarField",
-                                "name": "email",
-                                "storageKey": null
-                              },
-                              (v3/*:: as any*/)
-                            ],
-                            "storageKey": null
-                          }
-                        ],
-                        "type": "UserActor",
-                        "abstractKey": null
-                      },
-                      {
-                        "kind": "InlineFragment",
-                        "selections": (v11/*:: as any*/),
-                        "type": "ServiceAccountActor",
-                        "abstractKey": null
-                      },
-                      {
-                        "kind": "InlineFragment",
-                        "selections": (v11/*:: as any*/),
-                        "type": "VCSProviderActor",
-                        "abstractKey": null
-                      },
-                      {
-                        "kind": "InlineFragment",
-                        "selections": (v11/*:: as any*/),
-                        "type": "JobActor",
-                        "abstractKey": null
-                      }
-                    ],
-                    "storageKey": null
-                  },
+                  (v2/*:: as any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -360,14 +250,7 @@ return {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
-                    "name": "autoSpeculativePlan",
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "webhookDisabled",
+                    "name": "branch",
                     "storageKey": null
                   },
                   {
@@ -375,13 +258,6 @@ return {
                     "args": null,
                     "kind": "ScalarField",
                     "name": "moduleDirectory",
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "branch",
                     "storageKey": null
                   },
                   {
@@ -401,15 +277,35 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "kind": "ScalarField",
+                    "name": "autoSpeculativePlan",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "webhookDisabled",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "concreteType": "VCSProvider",
                     "kind": "LinkedField",
                     "name": "vcsProvider",
                     "plural": false,
                     "selections": [
+                      (v2/*:: as any*/),
                       (v3/*:: as any*/),
-                      (v4/*:: as any*/),
-                      (v5/*:: as any*/),
-                      (v10/*:: as any*/),
+                      (v8/*:: as any*/),
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "type",
+                        "storageKey": null
+                      },
                       {
                         "alias": null,
                         "args": null,
@@ -418,6 +314,13 @@ return {
                         "storageKey": null
                       }
                     ],
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "usesLegacyWebhookToken",
                     "storageKey": null
                   }
                 ],
@@ -429,7 +332,7 @@ return {
                   {
                     "kind": "Literal",
                     "name": "first",
-                    "value": 10
+                    "value": 1
                   },
                   {
                     "kind": "Literal",
@@ -458,7 +361,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v3/*:: as any*/)
+                          (v2/*:: as any*/)
                         ],
                         "storageKey": null
                       }
@@ -466,7 +369,7 @@ return {
                     "storageKey": null
                   }
                 ],
-                "storageKey": "vcsProviders(first:10,includeInherited:true)"
+                "storageKey": "vcsProviders(first:1,includeInherited:true)"
               },
               {
                 "alias": null,
@@ -490,7 +393,7 @@ return {
                     "name": "key",
                     "storageKey": null
                   },
-                  (v8/*:: as any*/)
+                  (v6/*:: as any*/)
                 ],
                 "storageKey": null
               }
@@ -504,12 +407,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "064ced8d6d02e0bb6409d63d74590659",
+    "cacheID": "c3c350b3b7e762e11ca55ed992c4e72c",
     "id": null,
     "metadata": {},
     "name": "WorkspaceSettingsQuery",
     "operationKind": "query",
-    "text": "query WorkspaceSettingsQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Workspace {\n      ...WorkspaceSettingsContentFragment_workspace\n    }\n    id\n  }\n}\n\nfragment ActorDisplayFragment_actor on Actor {\n  __isActor: __typename\n  type\n  principalId\n  ... on UserActor {\n    user {\n      email\n      id\n    }\n  }\n  ... on ServiceAccountActor {\n    trnSnapshot\n  }\n  ... on VCSProviderActor {\n    trnSnapshot\n  }\n  ... on JobActor {\n    trnSnapshot\n  }\n}\n\nfragment DriftDetectionSettingsFormFragment_driftDetectionEnabled on NamespaceDriftDetectionEnabled {\n  inherited\n  namespacePath\n  value\n}\n\nfragment EditVCSProviderLinkFragment_workspace on Workspace {\n  fullPath\n  workspaceVcsProviderLink {\n    id\n    metadata {\n      createdAt\n    }\n    createdBy\n    createdByActor {\n      __typename\n      ...ActorDisplayFragment_actor\n    }\n    repositoryPath\n    autoSpeculativePlan\n    webhookDisabled\n    moduleDirectory\n    branch\n    tagRegex\n    globPatterns\n    vcsProvider {\n      id\n      name\n      description\n      type\n      autoCreateWebhooks\n    }\n  }\n  ...VCSProviderLinkFormFragment_workspace\n}\n\nfragment MaxJobDurationSettingFragment_workspace on Workspace {\n  maxJobDuration\n}\n\nfragment MigrateWorkspaceDialogFragment_workspace on Workspace {\n  name\n  fullPath\n  groupPath\n}\n\nfragment NewVCSProviderLinkFragment_workspace on Workspace {\n  fullPath\n  ...VCSProviderLinkFormFragment_workspace\n}\n\nfragment OutputVisibilitySettingsFormFragment_outputVisibility on NamespaceOutputVisibility {\n  inherited\n  namespacePath\n  value\n}\n\nfragment ProviderMirrorSettingsFormFragment_providerMirrorEnabled on NamespaceProviderMirrorEnabled {\n  inherited\n  namespacePath\n  value\n}\n\nfragment RunnerSettingsForm_runnerTags on NamespaceRunnerTags {\n  inherited\n  namespacePath\n  value\n}\n\nfragment VCSProviderLinkFormFragment_workspace on Workspace {\n  fullPath\n  workspaceVcsProviderLink {\n    id\n    repositoryPath\n    branch\n    moduleDirectory\n    tagRegex\n    globPatterns\n    autoSpeculativePlan\n    webhookDisabled\n    vcsProvider {\n      id\n      name\n      description\n      type\n      autoCreateWebhooks\n    }\n  }\n}\n\nfragment WorkspaceAdvancedSettingsFragment_workspace on Workspace {\n  name\n  fullPath\n  ...MigrateWorkspaceDialogFragment_workspace\n}\n\nfragment WorkspaceDriftDetectionSettingsFragment_workspace on Workspace {\n  fullPath\n  driftDetectionEnabled {\n    inherited\n    value\n    ...DriftDetectionSettingsFormFragment_driftDetectionEnabled\n  }\n}\n\nfragment WorkspaceGeneralSettingsFragment_workspace on Workspace {\n  name\n  description\n  fullPath\n}\n\nfragment WorkspaceLabelSettingsFragment_workspace on Workspace {\n  id\n  fullPath\n  description\n  labels {\n    key\n    value\n  }\n}\n\nfragment WorkspaceOutputVisibilitySettingsFragment_workspace on Workspace {\n  fullPath\n  outputVisibility {\n    inherited\n    value\n    ...OutputVisibilitySettingsFormFragment_outputVisibility\n  }\n}\n\nfragment WorkspaceProviderMirrorSettingsFragment_workspace on Workspace {\n  fullPath\n  providerMirrorEnabled {\n    inherited\n    value\n    ...ProviderMirrorSettingsFormFragment_providerMirrorEnabled\n  }\n}\n\nfragment WorkspaceRunSettingsFragment_workspace on Workspace {\n  name\n  description\n  fullPath\n  maxJobDuration\n  terraformVersion\n  preventDestroyPlan\n  ...MaxJobDurationSettingFragment_workspace\n}\n\nfragment WorkspaceRunnerSettingsFragment_workspace on Workspace {\n  fullPath\n  runnerTags {\n    inherited\n    namespacePath\n    value\n    ...RunnerSettingsForm_runnerTags\n  }\n}\n\nfragment WorkspaceSettingsContentFragment_workspace on Workspace {\n  name\n  description\n  fullPath\n  ...WorkspaceGeneralSettingsFragment_workspace\n  ...WorkspaceRunnerSettingsFragment_workspace\n  ...WorkspaceRunSettingsFragment_workspace\n  ...WorkspaceDriftDetectionSettingsFragment_workspace\n  ...WorkspaceProviderMirrorSettingsFragment_workspace\n  ...WorkspaceOutputVisibilitySettingsFragment_workspace\n  ...WorkspaceAdvancedSettingsFragment_workspace\n  ...WorkspaceVCSProviderSettingsFragment_workspace\n  ...WorkspaceStateSettingsFragment_workspace\n  ...WorkspaceLabelSettingsFragment_workspace\n}\n\nfragment WorkspaceStateSettingsFragment_workspace on Workspace {\n  fullPath\n  locked\n}\n\nfragment WorkspaceVCSProviderSettingsFragment_workspace on Workspace {\n  workspaceVcsProviderLink {\n    id\n  }\n  fullPath\n  groupPath\n  vcsProviders(first: 10, includeInherited: true) {\n    edges {\n      node {\n        id\n      }\n    }\n  }\n  ...EditVCSProviderLinkFragment_workspace\n  ...NewVCSProviderLinkFragment_workspace\n}\n"
+    "text": "query WorkspaceSettingsQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on Workspace {\n      ...WorkspaceSettingsContentFragment_workspace\n    }\n    id\n  }\n}\n\nfragment DriftDetectionSettingsFormFragment_driftDetectionEnabled on NamespaceDriftDetectionEnabled {\n  inherited\n  namespacePath\n  value\n}\n\nfragment EditVCSProviderLinkFragment_link on WorkspaceVCSProviderLink {\n  id\n  repositoryPath\n  branch\n  moduleDirectory\n  tagRegex\n  globPatterns\n  autoSpeculativePlan\n  webhookDisabled\n  vcsProvider {\n    id\n    name\n    groupPath\n    type\n    autoCreateWebhooks\n  }\n}\n\nfragment MaxJobDurationSettingFragment_workspace on Workspace {\n  maxJobDuration\n}\n\nfragment MigrateWorkspaceDialogFragment_workspace on Workspace {\n  name\n  fullPath\n  groupPath\n}\n\nfragment OutputVisibilitySettingsFormFragment_outputVisibility on NamespaceOutputVisibility {\n  inherited\n  namespacePath\n  value\n}\n\nfragment ProviderMirrorSettingsFormFragment_providerMirrorEnabled on NamespaceProviderMirrorEnabled {\n  inherited\n  namespacePath\n  value\n}\n\nfragment RunnerSettingsForm_runnerTags on NamespaceRunnerTags {\n  inherited\n  namespacePath\n  value\n}\n\nfragment VCSProviderLinkDangerZoneFragment_link on WorkspaceVCSProviderLink {\n  id\n  repositoryPath\n  vcsProvider {\n    autoCreateWebhooks\n    id\n  }\n}\n\nfragment VCSProviderLinkWebhookFragment_link on WorkspaceVCSProviderLink {\n  id\n  repositoryPath\n  webhookDisabled\n  usesLegacyWebhookToken\n  vcsProvider {\n    type\n    autoCreateWebhooks\n    id\n  }\n}\n\nfragment WorkspaceAdvancedSettingsFragment_workspace on Workspace {\n  name\n  fullPath\n  ...MigrateWorkspaceDialogFragment_workspace\n}\n\nfragment WorkspaceDriftDetectionSettingsFragment_workspace on Workspace {\n  fullPath\n  driftDetectionEnabled {\n    inherited\n    value\n    ...DriftDetectionSettingsFormFragment_driftDetectionEnabled\n  }\n}\n\nfragment WorkspaceGeneralSettingsFragment_workspace on Workspace {\n  name\n  description\n  fullPath\n}\n\nfragment WorkspaceLabelSettingsFragment_workspace on Workspace {\n  id\n  fullPath\n  description\n  labels {\n    key\n    value\n  }\n}\n\nfragment WorkspaceOutputVisibilitySettingsFragment_workspace on Workspace {\n  fullPath\n  outputVisibility {\n    inherited\n    value\n    ...OutputVisibilitySettingsFormFragment_outputVisibility\n  }\n}\n\nfragment WorkspaceProviderMirrorSettingsFragment_workspace on Workspace {\n  fullPath\n  providerMirrorEnabled {\n    inherited\n    value\n    ...ProviderMirrorSettingsFormFragment_providerMirrorEnabled\n  }\n}\n\nfragment WorkspaceRunSettingsFragment_workspace on Workspace {\n  name\n  description\n  fullPath\n  maxJobDuration\n  terraformVersion\n  preventDestroyPlan\n  ...MaxJobDurationSettingFragment_workspace\n}\n\nfragment WorkspaceRunnerSettingsFragment_workspace on Workspace {\n  fullPath\n  runnerTags {\n    inherited\n    namespacePath\n    value\n    ...RunnerSettingsForm_runnerTags\n  }\n}\n\nfragment WorkspaceSettingsContentFragment_workspace on Workspace {\n  name\n  description\n  fullPath\n  ...WorkspaceGeneralSettingsFragment_workspace\n  ...WorkspaceRunnerSettingsFragment_workspace\n  ...WorkspaceRunSettingsFragment_workspace\n  ...WorkspaceDriftDetectionSettingsFragment_workspace\n  ...WorkspaceProviderMirrorSettingsFragment_workspace\n  ...WorkspaceOutputVisibilitySettingsFragment_workspace\n  ...WorkspaceAdvancedSettingsFragment_workspace\n  ...WorkspaceVCSProviderSettingsFragment_workspace\n  ...WorkspaceStateSettingsFragment_workspace\n  ...WorkspaceLabelSettingsFragment_workspace\n}\n\nfragment WorkspaceStateSettingsFragment_workspace on Workspace {\n  fullPath\n  locked\n}\n\nfragment WorkspaceVCSProviderSettingsFragment_workspace on Workspace {\n  fullPath\n  groupPath\n  workspaceVcsProviderLink {\n    id\n    ...EditVCSProviderLinkFragment_link\n    ...VCSProviderLinkWebhookFragment_link\n    ...VCSProviderLinkDangerZoneFragment_link\n  }\n  vcsProviders(first: 1, includeInherited: true) {\n    edges {\n      node {\n        id\n      }\n    }\n  }\n}\n"
   }
 };
 })();

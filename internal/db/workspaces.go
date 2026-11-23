@@ -70,6 +70,7 @@ type WorkspaceFilter struct {
 	RootNamespaceMemberships  []models.MembershipNamespace
 	Search                    *string
 	AssignedManagedIdentityID *string
+	LinkedVCSProviderID       *string
 	WorkspaceIDs              []string
 	PathLessThan              *string
 	// AssessmentDue activates the assessment-scheduler eligibility check (see GetWorkspaces):
@@ -252,6 +253,13 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		query = query.InnerJoin(goqu.T("workspace_managed_identity_relation"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("workspace_managed_identity_relation.workspace_id")}))
 
 		ex = ex.Append(goqu.Ex{"workspace_managed_identity_relation.managed_identity_id": input.Filter.AssignedManagedIdentityID})
+	}
+
+	// A workspace has at most one VCS provider link, so this join can't produce duplicates.
+	if input.Filter != nil && input.Filter.LinkedVCSProviderID != nil {
+		query = query.InnerJoin(goqu.T("workspace_vcs_provider_links"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("workspace_vcs_provider_links.workspace_id")}))
+
+		ex = ex.Append(goqu.Ex{"workspace_vcs_provider_links.provider_id": input.Filter.LinkedVCSProviderID})
 	}
 
 	if input.Filter != nil && input.Filter.AssessmentDue != nil && *input.Filter.AssessmentDue {

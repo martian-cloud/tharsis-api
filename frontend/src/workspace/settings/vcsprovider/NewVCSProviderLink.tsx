@@ -1,18 +1,20 @@
-import { useState } from 'react';
-import { Box, Button, Typography } from '@mui/material'
-import VCSProviderLinkForm from './VCSProviderLinkForm';
+import { Alert, Box, Button, Paper, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import { VCSFormData } from './VCSProviderLinkForm';
-import { MutationError } from '../../../common/error';
 import { useSnackbar } from 'notistack';
-import { WebhooksData } from './WorkspaceVCSProviderSettings';
-import { GraphQLTaggedNode, useFragment, useMutation } from 'react-relay';
+import { useState } from 'react';
+import { GraphQLTaggedNode, useMutation } from 'react-relay';
+import { MutationError } from '../../../common/error';
+import { ManualWebhookDetails } from './ManualWebhookDialog';
+import VCSProviderAutocomplete, { VCSProviderOption } from './VCSProviderAutocomplete';
+import VCSProviderLinkForm, { EMPTY_VCS_FORM_DATA, VCSFormData } from './VCSProviderLinkForm';
+import { providerHelperText } from './utils';
 import { NewVCSProviderLinkMutation } from './__generated__/NewVCSProviderLinkMutation.graphql';
-import { NewVCSProviderLinkFragment_workspace$key } from './__generated__/NewVCSProviderLinkFragment_workspace.graphql';
 
 interface Props {
-    fragmentRef: NewVCSProviderLinkFragment_workspace$key
-    handleWebhookDialog: (confirm: boolean, data: WebhooksData) => void
+    workspacePath: string
+    onLinked: () => void
+    onCancel: () => void
+    onShowWebhookDetails: (details: ManualWebhookDetails) => void
 }
 
 export const NewMutation: GraphQLTaggedNode =
@@ -20,29 +22,20 @@ export const NewMutation: GraphQLTaggedNode =
     mutation NewVCSProviderLinkMutation($input: CreateWorkspaceVCSProviderLinkInput!) {
         createWorkspaceVCSProviderLink(input: $input) {
             vcsProviderLink {
-                workspace{
-                    id
-                    workspaceVcsProviderLink {
-                        id
-                        metadata {
-                            createdAt
-                        }
-                        createdBy
-                        createdByActor {
-                            ...ActorDisplayFragment_actor
-                        }
-                        repositoryPath
-                        branch
-                        moduleDirectory
-                        tagRegex
-                        globPatterns
-                        autoSpeculativePlan
-                        webhookDisabled
-                    }
-                }
+                id
+                repositoryPath
                 vcsProvider {
                     type
                     autoCreateWebhooks
+                }
+                workspace {
+                    id
+                    workspaceVcsProviderLink {
+                        id
+                        ...EditVCSProviderLinkFragment_link
+                        ...VCSProviderLinkWebhookFragment_link
+                        ...VCSProviderLinkDangerZoneFragment_link
+                    }
                 }
             }
             webhookToken
@@ -55,46 +48,33 @@ export const NewMutation: GraphQLTaggedNode =
         }
     }`
 
-
-function NewVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
+function NewVCSProviderLink({ workspacePath, onLinked, onCancel, onShowWebhookDetails }: Props) {
     const { enqueueSnackbar } = useSnackbar();
 
-    const [error, setError] = useState<MutationError>()
-    const [formData, setFormData] = useState<VCSFormData>({
-        id: '',
-        repositoryPath: '',
-        moduleDirectory: '',
-        branch: '',
-        tagRegex: '',
-        globPatterns: [],
-        autoSpeculativePlan: false,
-        webhookDisabled: false,
-        label: '',
-        description: '',
-        type: undefined
-    })
+    const [provider, setProvider] = useState<VCSProviderOption | null>(null);
+    const [formData, setFormData] = useState<VCSFormData>(EMPTY_VCS_FORM_DATA);
+    const [submitted, setSubmitted] = useState(false);
+    const [error, setError] = useState<MutationError>();
 
-    const workspace = useFragment<NewVCSProviderLinkFragment_workspace$key>(
-        graphql`
-        fragment NewVCSProviderLinkFragment_workspace on Workspace
-        {
-            fullPath
-            ...VCSProviderLinkFormFragment_workspace
+    const [commit, isInFlight] = useMutation<NewVCSProviderLinkMutation>(NewMutation);
+
+    const providerMissing = submitted && !provider;
+    const repositoryPathMissing = submitted && formData.repositoryPath.trim() === '';
+
+    const onLink = () => {
+        setSubmitted(true);
+        if (!provider || formData.repositoryPath.trim() === '') {
+            return;
         }
-        `, fragmentRef
-    )
 
-    const [newCommit, newIsInFlight] = useMutation<NewVCSProviderLinkMutation>(NewMutation)
-
-    const onSave = () => {
-        newCommit({
+        commit({
             variables: {
                 input: {
-                    repositoryPath: formData.repositoryPath,
-                    workspacePath: workspace.fullPath,
-                    moduleDirectory: formData.moduleDirectory,
-                    providerId: formData.id,
+                    workspacePath,
+                    providerId: provider.id,
+                    repositoryPath: formData.repositoryPath.trim(),
                     branch: formData.branch,
+                    moduleDirectory: formData.moduleDirectory,
                     tagRegex: formData.tagRegex,
                     globPatterns: formData.globPatterns,
                     autoSpeculativePlan: formData.autoSpeculativePlan,
@@ -102,54 +82,68 @@ function NewVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
                 },
             },
             onCompleted: data => {
-                if (data.createWorkspaceVCSProviderLink.problems.length) {
-                    setError({
-                        severity: 'warning',
-                        message: data.createWorkspaceVCSProviderLink.problems.map((problem: any) => problem.message).join('; ')
-                    });
-                } else if (!data.createWorkspaceVCSProviderLink.vcsProviderLink) {
-                    setError({
-                        severity: 'error',
-                        message: "Unexpected error occurred"
+                const payload = data.createWorkspaceVCSProviderLink;
+                if (payload.problems.length) {
+                    setError({ severity: 'warning', message: payload.problems.map(problem => problem.message).join('; ') });
+                    return;
+                }
+
+                const link = payload.vcsProviderLink;
+                if (!link) {
+                    setError({ severity: 'error', message: 'Unexpected error occurred' });
+                    return;
+                }
+
+                // A webhook URL is only returned when the webhook has to be added by hand.
+                if (payload.webhookUrl) {
+                    enqueueSnackbar(`Repository linked. Add the webhook to ${link.repositoryPath} to start runs.`, { variant: 'success' });
+                    onShowWebhookDetails({
+                        context: 'new',
+                        url: payload.webhookUrl,
+                        token: payload.webhookToken,
+                        providerType: link.vcsProvider.type,
+                        repositoryPath: link.repositoryPath
                     });
                 } else {
-                    enqueueSnackbar(`Workspace VCS Provider Link created`, { variant: 'success' })
-                    if (!data.createWorkspaceVCSProviderLink.vcsProviderLink.vcsProvider.autoCreateWebhooks && data.createWorkspaceVCSProviderLink.webhookUrl) {
-                        handleWebhookDialog(true, { ...data, url: data.createWorkspaceVCSProviderLink.webhookUrl, token: data.createWorkspaceVCSProviderLink.webhookToken, type: data.createWorkspaceVCSProviderLink.vcsProviderLink.vcsProvider.type })
-                    }
+                    enqueueSnackbar(`Repository linked. Tharsis created the webhook in ${link.repositoryPath}.`, { variant: 'success' });
                 }
+
+                onLinked();
             },
             onError: error => {
-                setError({
-                    severity: 'error',
-                    message: `Unexpected error occurred: ${error.message}`
-                });
+                setError({ severity: 'error', message: `Unexpected error occurred: ${error.message}` });
             }
         });
     };
 
     return (
-        <Box>
-            <Typography variant="subtitle1" gutterBottom>To link this workspace to a VCS provider, get started by selecting a provider below.</Typography>
-            <VCSProviderLinkForm
-                error={error}
-                data={formData}
-                fragmentRef={workspace}
-                onChange={(data: VCSFormData) => setFormData(data)}
-            />
-            <Box sx={{ mt: 2 }}>
-                <Button
-                    sx={{ mr: 2 }}
-                    size="small"
-                    disabled={!formData.id || formData.repositoryPath === ''}
-                    loading={newIsInFlight}
-                    variant="outlined"
-                    color="primary"
-                    onClick={onSave}>Save changes
-                </Button>
+        <Paper sx={{ p: 3, mt: 2 }}>
+            <Typography variant="h6" sx={{ mb: 3 }}>Link a repository</Typography>
+            {error && (
+                <Alert severity={error.severity} sx={{ mb: 3 }}>
+                    {error.message}
+                </Alert>
+            )}
+            <Box sx={{ mb: 2 }}>
+                <VCSProviderAutocomplete
+                    path={workspacePath}
+                    value={provider}
+                    onSelected={setProvider}
+                    error={providerMissing}
+                    helperText={providerMissing ? 'Choose a provider.' : providerHelperText(provider, 'Pick the GitHub or GitLab connection that can read this repository.')}
+                />
             </Box>
-        </Box>
-    )
+            <VCSProviderLinkForm
+                data={formData}
+                onChange={setFormData}
+                repositoryPathError={repositoryPathMissing}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
+                <Button size="small" color="inherit" onClick={onCancel} disabled={isInFlight}>Cancel</Button>
+                <Button size="small" variant="outlined" color="primary" loading={isInFlight} onClick={onLink}>Link repository</Button>
+            </Box>
+        </Paper>
+    );
 }
 
 export default NewVCSProviderLink

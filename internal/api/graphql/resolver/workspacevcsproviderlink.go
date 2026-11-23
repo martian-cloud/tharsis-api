@@ -104,6 +104,11 @@ func (r *WorkspaceVCSProviderLinkResolver) WebhookDisabled() bool {
 	return r.workspaceVCSProviderLink.WebhookDisabled
 }
 
+// UsesLegacyWebhookToken resolver
+func (r *WorkspaceVCSProviderLinkResolver) UsesLegacyWebhookToken() bool {
+	return r.workspaceVCSProviderLink.UsesLegacyWebhookToken()
+}
+
 /* WorkspaceVCSProviderLink Mutation Resolvers */
 
 // WorkspaceVCSProviderLinkMutationPayload is the response payload for a workspace vcs provider mutation
@@ -177,6 +182,12 @@ type DeleteWorkspaceVCSProviderLinkInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
 	Force            *bool
+	ID               string
+}
+
+// ResetWorkspaceVCSProviderLinkWebhookTokenInput is the input for resetting the webhook token of a workspace VCS provider link.
+type ResetWorkspaceVCSProviderLinkWebhookTokenInput struct {
+	ClientMutationID *string
 	ID               string
 }
 
@@ -332,6 +343,32 @@ func deleteWorkspaceVCSProviderLinkMutation(ctx context.Context, input *DeleteWo
 
 	payload := WorkspaceVCSProviderLinkMutationPayload{ClientMutationID: input.ClientMutationID, VCSProviderLink: link, Problems: []Problem{}}
 	return &WorkspaceVCSProviderLinkMutationPayloadResolver{WorkspaceVCSProviderLinkMutationPayload: payload}, nil
+}
+
+func resetWorkspaceVCSProviderLinkWebhookTokenMutation(ctx context.Context, input *ResetWorkspaceVCSProviderLinkWebhookTokenInput) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	linkID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := serviceCatalog.VCSService.ResetWorkspaceVCSProviderLinkWebhookToken(ctx, &vcs.ResetWorkspaceVCSProviderLinkWebhookTokenInput{LinkID: linkID})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := WorkspaceVCSProviderLinkMutationPayload{
+		ClientMutationID: input.ClientMutationID,
+		VCSProviderLink:  response.Link,
+		Problems:         []Problem{},
+	}
+
+	return &WorkspaceVCSProviderLinkMutationPayloadResolver{
+		WorkspaceVCSProviderLinkMutationPayload: payload,
+		webhookToken:                            response.WebhookToken,
+		webhookURL:                              response.WebhookURL,
+	}, nil
 }
 
 /* CreateVCSRun Mutation Resolvers */

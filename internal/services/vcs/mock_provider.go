@@ -20,6 +20,34 @@ type MockProvider struct {
 	mock.Mock
 }
 
+// BuildCommitURL provides a mock function with given fields: input
+func (_m *MockProvider) BuildCommitURL(input *types.BuildCommitURLInput) (string, error) {
+	ret := _m.Called(input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildCommitURL")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*types.BuildCommitURLInput) (string, error)); ok {
+		return rf(input)
+	}
+	if rf, ok := ret.Get(0).(func(*types.BuildCommitURLInput) string); ok {
+		r0 = rf(input)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(*types.BuildCommitURLInput) error); ok {
+		r1 = rf(input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // BuildOAuthAuthorizationURL provides a mock function with given fields: input
 func (_m *MockProvider) BuildOAuthAuthorizationURL(input *types.BuildOAuthAuthorizationURLInput) (string, error) {
 	ret := _m.Called(input)
@@ -341,6 +369,24 @@ func (_m *MockProvider) ToVCSEventType(input *types.ToVCSEventTypeInput) models.
 		r0 = rf(input)
 	} else {
 		r0 = ret.Get(0).(models.VCSEventType)
+	}
+
+	return r0
+}
+
+// UpdateWebhook provides a mock function with given fields: ctx, input
+func (_m *MockProvider) UpdateWebhook(ctx context.Context, input *types.UpdateWebhookInput) error {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateWebhook")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UpdateWebhookInput) error); ok {
+		r0 = rf(ctx, input)
+	} else {
+		r0 = ret.Error(0)
 	}
 
 	return r0

@@ -23,6 +23,7 @@ type Provider interface {
 	ToVCSEventType(input *types.ToVCSEventTypeInput) models.VCSEventType
 	BuildOAuthAuthorizationURL(input *types.BuildOAuthAuthorizationURLInput) (string, error)
 	BuildRepositoryURL(input *types.BuildRepositoryURLInput) (string, error)
+	BuildCommitURL(input *types.BuildCommitURLInput) (string, error)
 	TestConnection(ctx context.Context, input *types.TestConnectionInput) error
 	GetProject(ctx context.Context, input *types.GetProjectInput) (*types.GetProjectPayload, error)
 	GetDiff(ctx context.Context, input *types.GetDiffInput) (*types.GetDiffsPayload, error)
@@ -30,6 +31,7 @@ type Provider interface {
 	GetArchive(ctx context.Context, input *types.GetArchiveInput) (*http.Response, error)
 	CreateAccessToken(ctx context.Context, input *types.CreateAccessTokenInput) (*types.AccessTokenPayload, error)
 	CreateWebhook(ctx context.Context, input *types.CreateWebhookInput) (*types.WebhookPayload, error)
+	UpdateWebhook(ctx context.Context, input *types.UpdateWebhookInput) error
 	DeleteWebhook(ctx context.Context, input *types.DeleteWebhookInput) error
 }
 

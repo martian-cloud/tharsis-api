@@ -2,24 +2,24 @@ import { useState } from 'react';
 import { ArrowDropUp } from '@mui/icons-material';
 import { default as ArrowDropDown, default as ArrowDropDownIcon } from '@mui/icons-material/ArrowDropDown';
 import { LoadingButton } from '@mui/lab';
-import { Avatar, Alert, Box, Button, ButtonGroup, Collapse, Dialog, DialogActions, DialogTitle, DialogContent, Divider, Menu, MenuItem, Link, Paper, Stack, styled, Typography } from '@mui/material'
+import { Alert, Box, Button, ButtonGroup, Collapse, Dialog, DialogActions, DialogTitle, DialogContent, Menu, MenuItem, Link, Stack, styled, Tab, Tabs, Typography } from '@mui/material'
 import ActorDisplay from '../../common/ActorDisplay';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
+import { VCSProviderIcon } from '../../common/Icons';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
 import { MutationError } from '../../common/error';
 import { useFragment, useLazyLoadQuery, useMutation } from 'react-relay'
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import { GetConnections } from './VCSProviderList';
+import VCSProviderWorkspaceList from './VCSProviderWorkspaceList';
 import { VCSProviderDetailsFragment_group$key } from './__generated__/VCSProviderDetailsFragment_group.graphql'
 import { VCSProviderDetailsQuery } from './__generated__/VCSProviderDetailsQuery.graphql'
 import { VCSProviderDetailsDeleteMutation } from './__generated__/VCSProviderDetailsDeleteMutation.graphql';
 import { VCSProviderDetailsResetOAuthMutation } from './__generated__/VCSProviderDetailsResetOAuthMutation.graphql';
-
-const CARD_PADDING = 3;
 
 interface Props {
     fragmentRef: VCSProviderDetailsFragment_group$key
@@ -81,6 +81,7 @@ function ResetOAuthDialog(props: DialogProps) {
 
 function VCSProviderDetails(props: Props) {
     const { id } = useParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
     const [menuAnchorEl, setMenuAnchorEl] = useState<Element | null>(null);
@@ -90,6 +91,7 @@ function VCSProviderDetails(props: Props) {
     const [error, setError] = useState<MutationError>()
 
     const vcsProviderId = id as string;
+    const tab = searchParams.get('tab') || 'details';
 
     const group = useFragment<VCSProviderDetailsFragment_group$key>(
         graphql`
@@ -103,7 +105,7 @@ function VCSProviderDetails(props: Props) {
     const data = useLazyLoadQuery<VCSProviderDetailsQuery>(graphql`
         query VCSProviderDetailsQuery($id: String!) {
             node(id: $id) {
-                ... on VCSProvider {
+                ... on VCSProvider @alias(as: "vcsProvider") {
                     id
                     name
                     createdByActor {
@@ -217,6 +219,11 @@ function VCSProviderDetails(props: Props) {
         }
     };
 
+    const onTabChange = (event: React.SyntheticEvent, newValue: string) => {
+        searchParams.set('tab', newValue);
+        setSearchParams(searchParams, { replace: true });
+    };
+
     const onOpenMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
         setMenuAnchorEl(event.currentTarget);
     };
@@ -230,10 +237,9 @@ function VCSProviderDetails(props: Props) {
         actionCallback();
     };
 
-    if (data.node && id) {
+    const vcsProvider = data.node?.vcsProvider;
 
-        const vcsProvider = data.node as any;
-
+    if (vcsProvider && id) {
         return (
             <Box>
                 <NamespaceBreadcrumbs
@@ -243,88 +249,72 @@ function VCSProviderDetails(props: Props) {
                         { title: vcsProvider.name, path: id }
                     ]}
                 />
-                <Paper variant="outlined" sx={{ marginTop: 3, padding: CARD_PADDING }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-                        <Box
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                minWidth: 0
-                            }}>
-                            <Avatar variant="rounded" sx={{ width: 32, height: 32, marginRight: 1, bgcolor: 'avatar.default' }}>
-                                {vcsProvider.name[0].toUpperCase()}
-                            </Avatar>
-                            <Box
-                                sx={{
-                                    marginLeft: 1,
-                                    minWidth: 0
-                                }}>
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        alignItems: "center"
-                                    }}>
-                                    <Typography variant="h5" sx={{ marginRight: 1 }}>{vcsProvider.name}</Typography>
-                                </Box>
-                                <Typography color="textSecondary">{vcsProvider.description}</Typography>
-                            </Box>
-                        </Box>
-                        <Box sx={{ flexShrink: 0 }}>
-                            <Stack direction="row" spacing={1} >
-                                <TRNButton trn={vcsProvider.metadata.trn} />
-                                <ButtonGroup variant="outlined" color="primary">
-                                    <Button onClick={() => navigate('edit')}>Edit</Button>
-                                    <Button
-                                        color="primary"
-                                        size="small"
-                                        aria-label="more options menu"
-                                        aria-haspopup="menu"
-                                        onClick={onOpenMenu}
-                                    >
-                                        <ArrowDropDownIcon fontSize="small" />
-                                    </Button>
-                                </ButtonGroup>
-                                <Menu
-                                    id="vcs-provider-more-options-menu"
-                                    anchorEl={menuAnchorEl}
-                                    open={Boolean(menuAnchorEl)}
-                                    onClose={onMenuClose}
-                                    anchorOrigin={{
-                                        vertical: 'bottom',
-                                        horizontal: 'right',
-                                    }}
-                                    transformOrigin={{
-                                        vertical: 'top',
-                                        horizontal: 'right',
-                                    }}
-                                >
-                                    <MenuItem onClick={() => navigate('edit_oauth_credentials')}>
-                                        Edit OAuth Credentials
-                                    </MenuItem>
-                                    <MenuItem onClick={() => onMenuAction(() =>
-                                        setShowResetOAuthDialog(true))}>
-                                        Reset OAuth Token
-                                    </MenuItem>
-                                    <MenuItem onClick={() => onMenuAction(() => setShowDeleteConfirmationDialog(true))}>
-                                        Delete VCS Provider
-                                    </MenuItem>
-                                </Menu>
-                            </Stack>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, marginBottom: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                        <VCSProviderIcon sx={{ flexShrink: 0 }} />
+                        <Box sx={{ marginLeft: 1, minWidth: 0 }}>
+                            <Typography variant="h5" sx={{ wordBreak: 'break-word' }}>{vcsProvider.name}</Typography>
+                            <Typography color="textSecondary">{vcsProvider.description}</Typography>
                         </Box>
                     </Box>
-                    <Divider sx={{ opacity: 0.6, marginTop: 2, marginBottom: 2, marginLeft: -CARD_PADDING, marginRight: -CARD_PADDING }} />
-                    <Box>
-                        <Box>
-                            <FieldLabel>Type</FieldLabel>
-                            <FieldValue>{vcsProvider.type === 'github' ? 'GitHub' : 'GitLab'}</FieldValue>
-                            <FieldLabel>URL</FieldLabel>
-                            <FieldValue>{vcsProvider.url}</FieldValue>
-                            <FieldLabel>Automatically create webhooks?</FieldLabel>
-                            <FieldValue>{vcsProvider.autoCreateWebhooks ? 'Yes' : 'No'}</FieldValue>
-                        </Box>
-                        <Box sx={{
-                            marginTop: 4
-                        }}>
+                    <Box sx={{ flexShrink: 0 }}>
+                        <Stack direction="row" spacing={1} >
+                            <TRNButton trn={vcsProvider.metadata.trn} />
+                            <ButtonGroup variant="outlined" color="primary">
+                                <Button onClick={() => navigate('edit')}>Edit</Button>
+                                <Button
+                                    color="primary"
+                                    size="small"
+                                    aria-label="more options menu"
+                                    aria-haspopup="menu"
+                                    onClick={onOpenMenu}
+                                >
+                                    <ArrowDropDownIcon fontSize="small" />
+                                </Button>
+                            </ButtonGroup>
+                            <Menu
+                                id="vcs-provider-more-options-menu"
+                                anchorEl={menuAnchorEl}
+                                open={Boolean(menuAnchorEl)}
+                                onClose={onMenuClose}
+                                anchorOrigin={{
+                                    vertical: 'bottom',
+                                    horizontal: 'right',
+                                }}
+                                transformOrigin={{
+                                    vertical: 'top',
+                                    horizontal: 'right',
+                                }}
+                            >
+                                <MenuItem onClick={() => navigate('edit_oauth_credentials')}>
+                                    Edit OAuth Credentials
+                                </MenuItem>
+                                <MenuItem onClick={() => onMenuAction(() =>
+                                    setShowResetOAuthDialog(true))}>
+                                    Reset OAuth Token
+                                </MenuItem>
+                                <MenuItem onClick={() => onMenuAction(() => setShowDeleteConfirmationDialog(true))}>
+                                    Delete VCS Provider
+                                </MenuItem>
+                            </Menu>
+                        </Stack>
+                    </Box>
+                </Box>
+                <Box sx={{ border: 1, borderTopLeftRadius: 4, borderTopRightRadius: 4, borderColor: 'divider', maxWidth: '100%' }}>
+                    <Tabs value={tab} onChange={onTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
+                        <Tab label="Details" value="details" />
+                        <Tab label="Workspaces" value="workspaces" />
+                    </Tabs>
+                </Box>
+                <Box sx={{ border: 1, borderTop: 0, borderBottomLeftRadius: 4, borderBottomRightRadius: 4, borderColor: 'divider', padding: 2 }}>
+                    {tab === 'details' && <Box>
+                        <FieldLabel>Type</FieldLabel>
+                        <FieldValue>{vcsProvider.type === 'github' ? 'GitHub' : 'GitLab'}</FieldValue>
+                        <FieldLabel>URL</FieldLabel>
+                        <FieldValue>{vcsProvider.url}</FieldValue>
+                        <FieldLabel>Automatically create webhooks?</FieldLabel>
+                        <FieldValue>{vcsProvider.autoCreateWebhooks ? 'Yes' : 'No'}</FieldValue>
+                        <Box sx={{ marginTop: 4 }}>
                             <Link
                                 sx={{ display: 'flex', alignItems: 'center' }}
                                 component="button" variant="body1"
@@ -339,13 +329,14 @@ function VCSProviderDetails(props: Props) {
                                     marginTop: 2
                                 }}>
                                     <Typography variant="body2">
-                                        Created <Timestamp timestamp={vcsProvider.metadata.createdAt as string} /> by <ActorDisplay fragmentRef={vcsProvider.createdByActor} variant="text" />
+                                        Created <Timestamp timestamp={vcsProvider.metadata.createdAt} /> by <ActorDisplay fragmentRef={vcsProvider.createdByActor} variant="text" />
                                     </Typography>
                                 </Box>
                             </Collapse>
                         </Box>
-                    </Box>
-                </Paper >
+                    </Box>}
+                    {tab === 'workspaces' && <VCSProviderWorkspaceList vcsProviderId={vcsProvider.id} />}
+                </Box>
                 {showDeleteConfirmationDialog && (
                     <ConfirmationDialog
                         title="Delete VCS Provider"

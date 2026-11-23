@@ -3,6 +3,10 @@ type SCIMToken implements Node {
   metadata: ResourceMetadata!
   createdBy: String! @deprecated(reason: "Use createdByActor instead.")
   createdByActor: Actor @complexity(value: 0)
+  """
+  The time the token expires, null if it never expires.
+  """
+  expiresAt: Time
 }
 
 type CreateSCIMTokenPayload {
@@ -15,4 +19,5 @@ type CreateSCIMTokenPayload {
 input CreateSCIMTokenInput {
   clientMutationId: String
   idpIssuerURL: String!
+  expiresAt: Time
 }

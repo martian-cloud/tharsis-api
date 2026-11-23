@@ -3,6 +3,7 @@ package scim
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/apikey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
@@ -72,7 +74,7 @@ func TestGetSCIMToken(t *testing.T) {
 			dbClient := &db.Client{SCIMTokens: mockSCIMTokens, Users: mockUsers}
 			caller := auth.NewUserCaller(user, nil, dbClient, nil, nil)
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, auth.NewMockSigningKeyManager(t), nil)
+			service := NewService(logger, dbClient, nil, 0)
 
 			actual, err := service.GetSCIMToken(auth.WithCaller(context.Background(), caller))
 			if test.expectErrorCode != "" {
@@ -88,19 +90,21 @@ func TestGetSCIMToken(t *testing.T) {
 
 func TestCreateSCIMToken(t *testing.T) {
 	existingToken := models.SCIMToken{
-		Nonce: "dc05adc5-4535-4251-9cc3-c01d77cbc9e9",
+		TokenHash: "existing-hash",
 		Metadata: models.ResourceMetadata{
 			ID: resourceUUID,
 		},
 	}
 
 	testCases := []struct {
-		caller          *auth.UserCaller
-		inputToken      *models.SCIMToken
-		name            string
-		expectErrorCode errors.CodeType
-		existingTokens  []models.SCIMToken
-		idpIssuerURL    string
+		caller            *auth.UserCaller
+		inputToken        *models.SCIMToken
+		name              string
+		expectErrorCode   errors.CodeType
+		existingTokens    []models.SCIMToken
+		expiresAt         *time.Time
+		idpIssuerURL      string
+		maxExpirationDays int
 	}{
 		{
 			name: "positive: caller is admin; expect signed token.",
@@ -148,6 +152,91 @@ func TestCreateSCIMToken(t *testing.T) {
 			expectErrorCode: errors.EInvalid,
 			idpIssuerURL:    "https://invalid-idp.com",
 		},
+		{
+			name: "positive: expiry within the maximum",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{
+						ID: "user-1",
+					},
+					Email:               "user-1@example.com",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				},
+			},
+			existingTokens:    []models.SCIMToken{},
+			idpIssuerURL:      "https://example.com/scim",
+			expiresAt:         func() *time.Time { t := time.Now().Add(48 * time.Hour); return &t }(),
+			maxExpirationDays: 30,
+		},
+		{
+			name: "positive: no expiry is allowed even when a maximum is configured",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{
+						ID: "user-1",
+					},
+					Email:               "user-1@example.com",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				},
+			},
+			existingTokens:    []models.SCIMToken{},
+			idpIssuerURL:      "https://example.com/scim",
+			maxExpirationDays: 30,
+		},
+		{
+			name: "negative: expiry in the past",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{
+						ID: "user-1",
+					},
+					Email:               "user-1@example.com",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				},
+			},
+			existingTokens:  []models.SCIMToken{},
+			idpIssuerURL:    "https://example.com/scim",
+			expiresAt:       func() *time.Time { t := time.Now().Add(-time.Hour); return &t }(),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "negative: expiry under 1 day",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{
+						ID: "user-1",
+					},
+					Email:               "user-1@example.com",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				},
+			},
+			existingTokens:  []models.SCIMToken{},
+			idpIssuerURL:    "https://example.com/scim",
+			expiresAt:       func() *time.Time { t := time.Now().Add(12 * time.Hour); return &t }(),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "negative: expiry past the maximum",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{
+						ID: "user-1",
+					},
+					Email:               "user-1@example.com",
+					Admin:               true,
+					AdminModeExpiration: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+				},
+			},
+			existingTokens:    []models.SCIMToken{},
+			idpIssuerURL:      "https://example.com/scim",
+			expiresAt:         func() *time.Time { t := time.Now().Add(31 * 24 * time.Hour); return &t }(),
+			maxExpirationDays: 30,
+			expectErrorCode:   errors.EInvalid,
+		},
 	}
 
 	for _, test := range testCases {
@@ -183,16 +272,12 @@ func TestCreateSCIMToken(t *testing.T) {
 
 			caller := auth.NewUserCaller(test.caller.User, nil, dbClient, nil, nil)
 
-			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
-
-			mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil).Maybe()
-
 			logger, _ := logger.NewForTest()
 
 			cfg := &config.Config{OauthProviders: []config.IdpConfig{{IssuerURL: "https://example.com/scim"}}}
-			service := NewService(logger, dbClient, mockSigningKeyManager, cfg.OauthProviders)
+			service := NewService(logger, dbClient, cfg.OauthProviders, test.maxExpirationDays)
 
-			output, err := service.CreateSCIMToken(auth.WithCaller(ctx, caller), test.idpIssuerURL)
+			output, err := service.CreateSCIMToken(auth.WithCaller(ctx, caller), &CreateSCIMTokenInput{IDPIssuerURL: test.idpIssuerURL, ExpiresAt: test.expiresAt})
 			if test.expectErrorCode != "" {
 				// Negative case.
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -200,7 +285,10 @@ func TestCreateSCIMToken(t *testing.T) {
 				t.Fatal(err)
 			} else {
 				// Positive case.
-				assert.Equal(t, []byte("signed-token"), output.PlaintextToken)
+				require.True(t, strings.HasPrefix(output.PlaintextToken, "tsc_"))
+				assert.Equal(t, apikey.GetHash(output.PlaintextToken), output.SCIMToken.TokenHash)
+				assert.Equal(t, test.idpIssuerURL, output.SCIMToken.IDPIssuerURL)
+				assert.Equal(t, test.expiresAt, output.SCIMToken.ExpiresAt)
 				assert.Equal(t, models.NewUserActor(test.caller.User.Metadata.ID).WithSubject(test.caller.User.Email), output.SCIMToken.CreatedBy)
 			}
 		})
@@ -338,7 +426,7 @@ func TestGetSCIMUsers(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
+			service := NewService(logger, dbClient, []config.IdpConfig{}, 0)
 
 			users, err := service.GetSCIMUsers(ctx, test.input)
 			if test.expectedError != "" {
@@ -509,7 +597,7 @@ func TestCreateSCIMUser(t *testing.T) {
 			scimCaller := auth.NewSCIMCaller(mockMaintenanceMonitor, issuer)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
+			service := NewService(logger, dbClient, []config.IdpConfig{}, 0)
 
 			user, err := service.CreateSCIMUser(auth.WithCaller(ctx, scimCaller), test.input)
 
@@ -744,7 +832,7 @@ func TestUpdateSCIMUser(t *testing.T) {
 			scimCaller := auth.NewSCIMCaller(mockMaintenanceMonitor, issuer)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
+			service := NewService(logger, dbClient, []config.IdpConfig{}, 0)
 
 			user, err := service.UpdateSCIMUser(auth.WithCaller(ctx, scimCaller), test.input)
 
@@ -817,7 +905,7 @@ func TestDeleteSCIMUser(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &db.Client{Users: mockUsers}, nil, []config.IdpConfig{})
+			service := NewService(logger, &db.Client{Users: mockUsers}, []config.IdpConfig{}, 0)
 
 			err := service.DeleteSCIMUser(ctx, &DeleteSCIMResourceInput{ID: resourceUUID})
 			if test.expectedErrorCode != "" {
@@ -902,7 +990,7 @@ func TestGetSCIMGroups(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
+			service := NewService(logger, dbClient, []config.IdpConfig{}, 0)
 
 			groups, err := service.GetSCIMGroups(ctx, test.input)
 			if test.expectedError != "" {
@@ -1020,7 +1108,7 @@ func TestCreateSCIMGroup(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
+			service := NewService(logger, dbClient, []config.IdpConfig{}, 0)
 
 			group, err := service.CreateSCIMGroup(auth.WithCaller(ctx, scimCaller), test.input)
 			if test.expectedErrorCode != "" {
@@ -1344,7 +1432,7 @@ func TestUpdateSCIMGroup(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, []config.IdpConfig{})
+			service := NewService(logger, dbClient, []config.IdpConfig{}, 0)
 
 			input := &UpdateResourceInput{
 				ID:         test.inputID,
@@ -1417,7 +1505,7 @@ func TestDeleteSCIMGroup(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &db.Client{Teams: mockTeams}, nil, []config.IdpConfig{})
+			service := NewService(logger, &db.Client{Teams: mockTeams}, []config.IdpConfig{}, 0)
 
 			err := service.DeleteSCIMGroup(ctx, &DeleteSCIMResourceInput{ID: resourceUUID})
 			if test.expectedErrorCode != "" {

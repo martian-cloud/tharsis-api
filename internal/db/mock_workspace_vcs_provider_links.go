@@ -122,6 +122,36 @@ func (_m *MockWorkspaceVCSProviderLinks) GetLinkByTRN(ctx context.Context, trnVa
 	return r0, r1
 }
 
+// GetLinkByTokenHash provides a mock function with given fields: ctx, tokenHash
+func (_m *MockWorkspaceVCSProviderLinks) GetLinkByTokenHash(ctx context.Context, tokenHash string) (*models.WorkspaceVCSProviderLink, error) {
+	ret := _m.Called(ctx, tokenHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLinkByTokenHash")
+	}
+
+	var r0 *models.WorkspaceVCSProviderLink
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.WorkspaceVCSProviderLink, error)); ok {
+		return rf(ctx, tokenHash)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.WorkspaceVCSProviderLink); ok {
+		r0 = rf(ctx, tokenHash)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.WorkspaceVCSProviderLink)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, tokenHash)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetLinkByWorkspaceID provides a mock function with given fields: ctx, workspaceID
 func (_m *MockWorkspaceVCSProviderLinks) GetLinkByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceVCSProviderLink, error) {
 	ret := _m.Called(ctx, workspaceID)

@@ -66,6 +66,11 @@ type createWebhookBody struct {
 	Active bool                   `json:"active"`
 }
 
+// updateWebhookBody is the request body for updating a webhook.
+type updateWebhookBody struct {
+	Config map[string]interface{} `json:"config"`
+}
+
 // getProjectResponse is the response struct for retrieving a project.
 type getProjectResponse struct {
 	DefaultBranch string `json:"default_branch"`
@@ -164,6 +169,11 @@ func (p *Provider) BuildRepositoryURL(input *types.BuildRepositoryURLInput) (str
 
 	input.ProviderURL.Host = p.stripAPIPrefix(input.ProviderURL.Host)
 	return url.JoinPath(input.ProviderURL.String(), input.RepositoryPath)
+}
+
+// BuildCommitURL returns the web URL of a commit in the repository.
+func (p *Provider) BuildCommitURL(input *types.BuildCommitURLInput) (string, error) {
+	return url.JoinPath(input.RepositoryURL, "commit", input.CommitID)
 }
 
 // TestConnection simply queries for the user metadata that's
@@ -495,29 +505,17 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 		return nil, err
 	}
 
-	// Build Tharsis webhook endpoint.
-	parsedURL, err := url.Parse(p.tharsisURL)
+	config, err := p.webhookConfig(input.WebhookToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse Tharsis URL: %v", err)
+		return nil, err
 	}
-	parsedURL.Path = types.V1WebhookEndpoint
-
-	// Add the token as a query param.
-	queries := parsedURL.Query()
-	queries.Set("token", string(input.WebhookToken))
-	parsedURL.RawQuery = queries.Encode()
 
 	// Create the request body.
 	body := createWebhookBody{
 		Name:   "web", // Only possible value.
 		Active: true,
 		Events: eventTypes,
-		Config: map[string]interface{}{
-			// GitHub doesn't seem to support passing in token via 'token' field.
-			"url":          parsedURL.String(),
-			"content_type": "json",
-			"insecure_ssl": 0, // Don't allow webhook to connect with insecure SSL.
-		},
+		Config: config,
 	}
 
 	marshalledBody, err := json.Marshal(body)
@@ -558,6 +556,68 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 	return &types.WebhookPayload{
 		WebhookID: strconv.Itoa(webhookResponse.ID),
 	}, nil
+}
+
+// UpdateWebhook rewrites the webhook config in place so the webhook ID stays the same, GitHub carries the token in the URL.
+func (p *Provider) UpdateWebhook(ctx context.Context, input *types.UpdateWebhookInput) error {
+	if _, err := models.NormalizeRepositoryPath(input.RepositoryPath); err != nil {
+		return err
+	}
+
+	// Build the request URL.
+	path := strings.Join([]string{
+		"repos",
+		input.RepositoryPath,
+		"hooks",
+		input.WebhookID,
+	}, "/")
+
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), path)
+	if err != nil {
+		return err
+	}
+
+	config, err := p.webhookConfig(input.WebhookToken)
+	if err != nil {
+		return err
+	}
+
+	body := updateWebhookBody{Config: config}
+
+	marshalledBody, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request body: %v", err)
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint, bytes.NewBuffer(marshalledBody))
+	if err != nil {
+		return fmt.Errorf("failed to prepare HTTP request: %v", err)
+	}
+
+	// Add the headers.
+	request.Header.Add("Accept", jsonContentType)
+	request.Header.Add("Content-Type", jsonContentType)
+	request.Header.Add("Authorization", types.BearerAuthPrefix+input.AccessToken)
+
+	resp, err := p.client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cErr := resp.Body.Close(); cErr != nil {
+			p.logger.WithContextFields(ctx).Errorf("failed to close response body in UpdateWebhook: %v", cErr)
+		}
+	}()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return errors.New("webhook %s was not found in the repository, it may have been deleted from the VCS provider", input.WebhookID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to update webhook. Response status: %s", resp.Status)
+	}
+
+	return nil
 }
 
 // DeleteWebhook deletes a webhook at the specified provider.
@@ -622,6 +682,25 @@ func (p *Provider) createChangesMap(diffResp *getDiffsResponse) map[string]struc
 	}
 
 	return changesMap
+}
+
+// webhookConfig returns the webhook config pointing at Tharsis with the token as a query param, GitHub doesn't support passing in a token via a field.
+func (p *Provider) webhookConfig(token []byte) (map[string]interface{}, error) {
+	parsedURL, err := url.Parse(p.tharsisURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Tharsis URL: %v", err)
+	}
+	parsedURL.Path = types.V1WebhookEndpoint
+
+	queries := parsedURL.Query()
+	queries.Set("token", string(token))
+	parsedURL.RawQuery = queries.Encode()
+
+	return map[string]interface{}{
+		"url":          parsedURL.String(),
+		"content_type": "json",
+		"insecure_ssl": 0, // Don't allow webhook to connect with insecure SSL.
+	}, nil
 }
 
 // validateRef verifies a ref (branch, tag or commit) before it's joined into an API URL. Slashes are

@@ -38,6 +38,12 @@ type BuildRepositoryURLInput struct {
 	RepositoryPath string
 }
 
+// BuildCommitURLInput is the input for building a commit URL.
+type BuildCommitURLInput struct {
+	RepositoryURL string
+	CommitID      string
+}
+
 // TestConnectionInput is the input for testing a connection with a provider.
 type TestConnectionInput struct {
 	ProviderURL url.URL
@@ -91,6 +97,15 @@ type CreateWebhookInput struct {
 	ProviderURL    url.URL
 	AccessToken    string
 	RepositoryPath string
+	WebhookToken   []byte
+}
+
+// UpdateWebhookInput is the input for updating the token of an existing webhook.
+type UpdateWebhookInput struct {
+	ProviderURL    url.URL
+	AccessToken    string
+	RepositoryPath string
+	WebhookID      string
 	WebhookToken   []byte
 }
 

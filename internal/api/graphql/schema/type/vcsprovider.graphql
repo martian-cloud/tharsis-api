@@ -62,6 +62,13 @@ type VCSProvider implements Node {
   resourcePath: String!
   type: VCSProviderType!
   autoCreateWebhooks: Boolean!
+  workspaces(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: WorkspaceSort
+  ): WorkspaceConnection!
 }
 
 input CreateVCSProviderInput {
